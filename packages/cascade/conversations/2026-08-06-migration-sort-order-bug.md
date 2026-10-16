@@ -28,7 +28,7 @@ Checked against **source**, not the built `esm/` the report was written from:
    pending migrations immediately before execution. So it isn't "two comparators disagree" — the
    wrong one wins by running second and discarding the right one's work.
 2. **A second failure mode with mixed timestamp formats.** An ISO `createdAt` parses fine while a
-   generator stamp floors to `0`, so *every* generator-stamped migration sorted ahead of *every*
+   generator stamp floors to `0`, so _every_ generator-stamped migration sorted ahead of _every_
    ISO-stamped one regardless of actual date. The report only covered the all-generator case.
 
 Also confirmed the framework generates the format it couldn't parse:

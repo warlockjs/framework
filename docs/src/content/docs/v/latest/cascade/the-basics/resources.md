@@ -7,7 +7,7 @@ sidebar:
 
 Every Cascade model has a `toJSON()` method, and `JSON.stringify(user)` calls it. By default that returns the model's raw `data` object — every column, including the ones you didn't mean to expose. For HTTP responses that's usually wrong.
 
-This guide covers the ways Cascade lets you shape what flows *out*: the `static toJsonColumns` allow-list, the `static resource` class, and `static hidden` — a guaranteed exclusion that wins over both. All three are Cascade-native — no framework helpers required.
+This guide covers the ways Cascade lets you shape what flows _out_: the `static toJsonColumns` allow-list, the `static resource` class, and `static hidden` — a guaranteed exclusion that wins over both. All three are Cascade-native — no framework helpers required.
 
 ## `toJSON()` is the entry point
 
@@ -25,7 +25,7 @@ await cache.set(`user:${user.id}`, shaped);
 
 // Arrays — map over them
 const users = await User.query().get();
-return users.map(u => u.toJSON());
+return users.map((u) => u.toJSON());
 ```
 
 Both routes go through the same `toJsonColumns` / `resource` pipeline described below. Cascade doesn't distinguish between `JSON.stringify` calling `toJSON()` and you calling it yourself.
@@ -109,7 +109,7 @@ class UserResource {
       displayName: this.data.name,
       initials: this.data.name
         .split(" ")
-        .map(w => w[0])
+        .map((w) => w[0])
         .join("")
         .slice(0, 2)
         .toUpperCase(),
@@ -177,7 +177,7 @@ export class User extends Model<UserSchema> {
 
 What it does: Cascade calls `model.only(resourceColumns)` first, then merges loaded relations onto that, then hands it to the resource.
 
-When to reach for it: you want defence-in-depth so that a freshly-added sensitive column doesn't accidentally leak into `toJSON()` even if the developer forgets to update the resource. The resource is the *shape*; `resourceColumns` is the *gate*.
+When to reach for it: you want defence-in-depth so that a freshly-added sensitive column doesn't accidentally leak into `toJSON()` even if the developer forgets to update the resource. The resource is the _shape_; `resourceColumns` is the _gate_.
 
 **Distinction from `toJsonColumns`:**
 
@@ -214,15 +214,15 @@ public static resource = UserResource;                     // resource's `this.d
 
 ## Choosing between the patterns
 
-| Situation                                | Reach for                                  |
-| ---------------------------------------- | ------------------------------------------ |
-| Strict subset of columns, no renames     | `toJsonColumns`                            |
-| Rename a field                           | `resource`                                 |
-| Compute / format a field                 | `resource`                                 |
-| Conditionally include a field            | `resource`                                 |
-| Include loaded relations in output       | `resource` (automatic composition)         |
-| Different shape for different consumers  | Multiple resources, explicit constructor   |
-| A field must NEVER serialize, whichever of the above is set | `hidden` |
+| Situation                                                   | Reach for                                |
+| ----------------------------------------------------------- | ---------------------------------------- |
+| Strict subset of columns, no renames                        | `toJsonColumns`                          |
+| Rename a field                                              | `resource`                               |
+| Compute / format a field                                    | `resource`                               |
+| Conditionally include a field                               | `resource`                               |
+| Include loaded relations in output                          | `resource` (automatic composition)       |
+| Different shape for different consumers                     | Multiple resources, explicit constructor |
+| A field must NEVER serialize, whichever of the above is set | `hidden`                                 |
 
 ## Multiple shapes — admin view, list view, etc.
 

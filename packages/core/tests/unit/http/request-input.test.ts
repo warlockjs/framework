@@ -148,7 +148,17 @@ describe("Request — only()/except()/pluck()", () => {
   });
 
   it("except() drops the requested keys", () => {
-    const result = request.except(["id", "zero", "flagTrue", "flagFalse", "price", "count", "notNumeric", "nested", "email"]);
+    const result = request.except([
+      "id",
+      "zero",
+      "flagTrue",
+      "flagFalse",
+      "price",
+      "count",
+      "notNumeric",
+      "nested",
+      "email",
+    ]);
 
     expect(result).toEqual({ name: "Sam" });
   });

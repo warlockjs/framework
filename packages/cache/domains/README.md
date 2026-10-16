@@ -6,12 +6,12 @@ Planning, design, and reference content for the `@warlock.js/cache` package — 
 
 ## What's where
 
-| Folder | Purpose |
-| --- | --- |
-| [`backlog.md`](./backlog.md) | Roadmap, known issues, v2.1 follow-ups |
-| [`design/`](./design/) | Internal design: architecture, decisions, v2 API spec |
-| [`plans/`](./plans/) | Implementation plans (active + archive) |
-| [`discussions/`](./discussions/) | Handoffs, session notes |
+| Folder                           | Purpose                                               |
+| -------------------------------- | ----------------------------------------------------- |
+| [`backlog.md`](./backlog.md)     | Roadmap, known issues, v2.1 follow-ups                |
+| [`design/`](./design/)           | Internal design: architecture, decisions, v2 API spec |
+| [`plans/`](./plans/)             | Implementation plans (active + archive)               |
+| [`discussions/`](./discussions/) | Handoffs, session notes                               |
 
 ## Key documents
 

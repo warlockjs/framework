@@ -20,7 +20,7 @@ The watch list is intentionally narrow. Files under `node_modules/`, `dist/`, an
 
 ## The HMR loop
 
-When a file changes, the dev server doesn't restart. It figures out the dependency graph (who imports what), invalidates the changed file *and* every file that transitively imports it, then re-imports the affected chain. Routes get re-registered, listeners get re-attached, your controllers reload — all without bouncing the database connection or the HTTP server.
+When a file changes, the dev server doesn't restart. It figures out the dependency graph (who imports what), invalidates the changed file _and_ every file that transitively imports it, then re-imports the affected chain. Routes get re-registered, listeners get re-attached, your controllers reload — all without bouncing the database connection or the HTTP server.
 
 The mechanism is a per-import `?v=N` query string that Node treats as a cache key. Bump the version, Node treats the URL as a new module, the file gets re-loaded with the latest contents. No userland module cache to manage, no native-ESM cycle weirdness.
 
@@ -30,7 +30,7 @@ What it means for you: save a file, the change appears within a hundred millisec
 
 TypeScript transpilation is fast — fast enough that you don't notice it on one file. Across a 500-file project on a fresh boot, those milliseconds add up. The transpile cache stores the JS output of every successfully-transpiled file, keyed by a hash of the source content plus a transform-options fingerprint (esbuild version, a cache-format epoch, and your `tsconfig` `compilerOptions`).
 
-The cache is persisted to disk under `.warlock/transpile/`, content-hash addressed — entries are sharded by the first two hex chars of the key, and the on-disk filename is opaque (the source identity lives only inside the source map). Because it survives between processes, files that haven't changed hit the cache and skip transpilation on the *next* boot, not just within the current session. Change a file's content and you get a different key, so a fresh transpile — there's no stale-output risk.
+The cache is persisted to disk under `.warlock/transpile/`, content-hash addressed — entries are sharded by the first two hex chars of the key, and the on-disk filename is opaque (the source identity lives only inside the source map). Because it survives between processes, files that haven't changed hit the cache and skip transpilation on the _next_ boot, not just within the current session. Change a file's content and you get a different key, so a fresh transpile — there's no stale-output risk.
 
 ## The ESM loader hook
 
@@ -58,7 +58,7 @@ What it means for you: boot times stay fast even as your project grows. The cach
 
 ## Type generation
 
-The `.warlock/typings/` folder holds generated `.d.ts` files that augment Warlock's public types based on *your* project. The `ConfigRegistry` augmentation makes `config.get("database")` autocomplete with your actual config keys. The route augmentations type your URL patterns. The storage augmentation types your driver names.
+The `.warlock/typings/` folder holds generated `.d.ts` files that augment Warlock's public types based on _your_ project. The `ConfigRegistry` augmentation makes `config.get("database")` autocomplete with your actual config keys. The route augmentations type your URL patterns. The storage augmentation types your driver names.
 
 The generator runs in the background as part of `warlock dev` (and can be re-run on demand with `warlock generate.typings`). The TypeScript Compiler API parses your config files, extracts the exported keys, and writes a module augmentation. Your IDE picks it up automatically.
 
@@ -84,4 +84,4 @@ If you need to extend any of this — write a custom loader, plug into the bundl
 
 ## A note on stability
 
-The dev server, the manifest, the loader hook, the production builder — these are internals. The team treats their *behavior* as stable but their *interfaces* as not. Reaching into core's internal modules (the dev server, manifest, loader, production builder) from a user project will work today and break in two months. If you find yourself wanting to do that, file an issue first — there's usually a public-API path we can extend instead.
+The dev server, the manifest, the loader hook, the production builder — these are internals. The team treats their _behavior_ as stable but their _interfaces_ as not. Reaching into core's internal modules (the dev server, manifest, loader, production builder) from a user project will work today and break in two months. If you find yourself wanting to do that, file an issue first — there's usually a public-API path we can extend instead.

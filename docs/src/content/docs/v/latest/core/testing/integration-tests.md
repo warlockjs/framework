@@ -324,7 +324,6 @@ Either works. The first is easier to find when you're fixing a specific endpoint
 - For the full HTTP helper reference, see `test-http/SKILL.md`.
 - For mail tests (assert "the welcome email got sent"), see the [Mail guide → Test mailbox](../digging-deeper/mail.md).
 
-
 ## Signed-in HTTP requests
 
 `actingAs(user)` from `@warlock.js/core/tests` issues a real persisted access token

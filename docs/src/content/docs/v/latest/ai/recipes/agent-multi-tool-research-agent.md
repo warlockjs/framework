@@ -6,7 +6,7 @@ sidebar:
   label: "Multi-tool research agent"
 ---
 
-A user asks your product analytics assistant: *"How many days of runway do we have if our balance is the number I gave finance last quarter, and we're burning the rate shown on our latest investor update?"* Answering it takes three different tools — a database lookup for the recorded balance, a web search for the public investor-update figure, and a calculator to divide one by the other. The interesting part isn't any single tool; it's watching the agent decide which to call, in what order, and surfacing that decision stream to the UI as it happens.
+A user asks your product analytics assistant: _"How many days of runway do we have if our balance is the number I gave finance last quarter, and we're burning the rate shown on our latest investor update?"_ Answering it takes three different tools — a database lookup for the recorded balance, a web search for the public investor-update figure, and a calculator to divide one by the other. The interesting part isn't any single tool; it's watching the agent decide which to call, in what order, and surfacing that decision stream to the UI as it happens.
 
 This recipe builds that agent and wires up the `agent.tool.*` event stream so you can render "Searching the web…", "Looking up the ledger…", "Calculating…" in real time.
 
@@ -38,7 +38,8 @@ const webSearchTool = ai.tool({
 
 const dbLookupTool = ai.tool({
   name: "db_lookup",
-  description: "Look up a recorded financial metric for a given quarter. Metrics: balance, burn_rate.",
+  description:
+    "Look up a recorded financial metric for a given quarter. Metrics: balance, burn_rate.",
   action: ({ metric, quarter }) => `Looking up ${metric} for ${quarter}`,
   input: v.object({
     metric: v.enum(["balance", "burn_rate"]),
@@ -74,9 +75,12 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const researchAgent = ai.agent({
   name: "research-assistant",
   model: openai.model({ name: "gpt-4o" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a precise financial research assistant.")
-    .instruction("Use db_lookup for any figure we recorded internally, and web_search for any public figure.")
+    .instruction(
+      "Use db_lookup for any figure we recorded internally, and web_search for any public figure.",
+    )
     .instruction("Never do arithmetic in your head — always call calculator for the final number.")
     .instruction("State which source each number came from."),
   tools: [webSearchTool, dbLookupTool, calculatorTool],
@@ -145,8 +149,8 @@ const toolCalls = report.children.filter((c): c is ToolCall => c.type === "tool"
 for (const call of toolCalls) {
   console.log(
     `${call.name} (trip ${call.tripIndex}) ` +
-    `input=${JSON.stringify(call.input)} → ${JSON.stringify(call.output)} ` +
-    `[${call.status}, ${call.duration}ms]`,
+      `input=${JSON.stringify(call.input)} → ${JSON.stringify(call.output)} ` +
+      `[${call.status}, ${call.duration}ms]`,
   );
 }
 ```

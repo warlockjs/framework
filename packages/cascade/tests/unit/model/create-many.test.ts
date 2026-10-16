@@ -137,10 +137,9 @@ describe("Model.createMany", () => {
     });
 
     it("merges driver-returned values back onto the returned models", async () => {
-      const [alice, bob] = await BulkUser.createMany(
-        [{ name: "Alice" }, { name: "Bob" }],
-        { bulk: true },
-      );
+      const [alice, bob] = await BulkUser.createMany([{ name: "Alice" }, { name: "Bob" }], {
+        bulk: true,
+      });
 
       expect(alice.get("_id")).toBe("mongo_0");
       expect(bob.get("_id")).toBe("mongo_1");
@@ -182,10 +181,9 @@ describe("Model.createMany", () => {
         },
       );
 
-      const [alice, bob] = await BulkUser.createMany(
-        [{ name: "Alice" }, { name: "Bob" }],
-        { bulk: true },
-      );
+      const [alice, bob] = await BulkUser.createMany([{ name: "Alice" }, { name: "Bob" }], {
+        bulk: true,
+      });
 
       expect(alice.get("id")).toBe(100);
       expect(bob.get("id")).toBe(101);

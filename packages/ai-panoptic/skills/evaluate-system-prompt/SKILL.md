@@ -31,10 +31,10 @@ Absent `evaluate` ⇒ the drawer never renders the button and a `POST` to its ro
 
 ### `EvaluateConfig`
 
-| Field | Required | Notes |
-|---|---|---|
-| `model` | yes | A `ModelContract`, or a `() => ModelContract \| Promise<ModelContract>` factory — mirrors `panoptic.cache`'s literal-or-factory ergonomics. Resolved fresh on every evaluate click (a deliberate, infrequent, human-triggered action — not the collector's hot path — so no memoization, unlike the cache store's driver). |
-| `instructions` | no | Default grading rubric/criteria, verbatim — the same shape `ai.prompts().validate({ criteria })` accepts. Seeds the dashboard's editable textarea (baked into the served page at boot, so the operator sees and can extend the actual default, not a blank box); the built-in prompt-quality rubric is used when neither this nor a per-run override is supplied. |
+| Field          | Required | Notes                                                                                                                                                                                                                                                                                                                                                             |
+| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`        | yes      | A `ModelContract`, or a `() => ModelContract \| Promise<ModelContract>` factory — mirrors `panoptic.cache`'s literal-or-factory ergonomics. Resolved fresh on every evaluate click (a deliberate, infrequent, human-triggered action — not the collector's hot path — so no memoization, unlike the cache store's driver).                                        |
+| `instructions` | no       | Default grading rubric/criteria, verbatim — the same shape `ai.prompts().validate({ criteria })` accepts. Seeds the dashboard's editable textarea (baked into the served page at boot, so the operator sees and can extend the actual default, not a blank box); the built-in prompt-quality rubric is used when neither this nor a per-run override is supplied. |
 
 ## The UI
 
@@ -45,10 +45,14 @@ Click it to open an inline panel: a textarea pre-filled with the configured `ins
 ## The building blocks (for embedding elsewhere)
 
 ```ts
-import { evaluateSystemPrompt, extractLastSystemPrompt, findSpanById } from "@warlock.js/ai-panoptic";
+import {
+  evaluateSystemPrompt,
+  extractLastSystemPrompt,
+  findSpanById,
+} from "@warlock.js/ai-panoptic";
 
-const span = findSpanById(trace.root, spanId);          // walk the span tree
-const prompt = extractLastSystemPrompt(span);            // undefined if none captured
+const span = findSpanById(trace.root, spanId); // walk the span tree
+const prompt = extractLastSystemPrompt(span); // undefined if none captured
 if (prompt) {
   const verdict = await evaluateSystemPrompt(prompt, evaluateConfig, "Per-run override, optional");
   // verdict: { score?: number; issues: string[] }
@@ -63,15 +67,15 @@ if (prompt) {
 
 `POST {basePath}api/traces/:traceId/spans/:spanId/evaluate`, body `{ instructions?: string }` (all optional — an empty body is valid). Gated by the same `authToken` / `allowedHosts` checks as every other route (S4) — off-loopback still requires a token, exactly like the rest of the dashboard. Body reads are capped at 64 KB (`413` past that) so a hostile/oversized payload can't hold the connection open.
 
-| Status | Meaning |
-|---|---|
-| `200` | `EvaluateVerdict` — `{ score?: number; issues: string[] }` |
-| `404` | trace or span not found |
-| `422` | the span carried no captured system prompt to grade |
-| `413` | request body over 64 KB |
-| `400` | request body isn't valid JSON |
-| `502` | `config.model` (a factory) threw resolving the judge model |
-| `405` | POST hit this path but `evaluate` isn't configured |
+| Status | Meaning                                                    |
+| ------ | ---------------------------------------------------------- |
+| `200`  | `EvaluateVerdict` — `{ score?: number; issues: string[] }` |
+| `404`  | trace or span not found                                    |
+| `422`  | the span carried no captured system prompt to grade        |
+| `413`  | request body over 64 KB                                    |
+| `400`  | request body isn't valid JSON                              |
+| `502`  | `config.model` (a factory) threw resolving the judge model |
+| `405`  | POST hit this path but `evaluate` isn't configured         |
 
 ```sh
 curl -X POST 'http://127.0.0.1:4319/api/traces/tr_1/spans/sp_1/evaluate' \

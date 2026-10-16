@@ -57,12 +57,12 @@ The extension is always `json`, regardless of the `extension` option. Each file 
 
 ## Differences from FileLog
 
-| Aspect | FileLog | JSONFileLog |
-| --- | --- | --- |
-| Output format | Plain-text lines | JSON object with `messages` array |
-| Error stack | Raw multi-line string after `[trace]` | Split on newlines, stored as `string[]` in `stack` |
-| Message field | Pre-formatted log line | `content` field holds the original string |
-| File extension | Configurable (default `"log"`) | Always `"json"` |
+| Aspect         | FileLog                               | JSONFileLog                                        |
+| -------------- | ------------------------------------- | -------------------------------------------------- |
+| Output format  | Plain-text lines                      | JSON object with `messages` array                  |
+| Error stack    | Raw multi-line string after `[trace]` | Split on newlines, stored as `string[]` in `stack` |
+| Message field  | Pre-formatted log line                | `content` field holds the original string          |
+| File extension | Configurable (default `"log"`)        | Always `"json"`                                    |
 
 :::tip[Error stacks as arrays]
 Storing the stack as `string[]` rather than a raw string makes it trivial to query in aggregators like Elasticsearch, Loki, or Datadog — no string-splitting at query time.
@@ -74,13 +74,13 @@ It inherits every `FileLog` option and supports the same chunking, rotation, and
 
 `JSONFileLog` writes through `safe-stable-stringify` (the same library Pino and Winston use), so the `context` payload can carry shapes that would otherwise throw in `JSON.stringify`:
 
-| Shape | Serialized as |
-| --- | --- |
-| Circular reference | handled (no throw) |
-| `BigInt` | stringified value |
-| Function / `symbol` | dropped (standard JSON behavior) |
-| `Error` (top-level or nested in `context`) | `{ name, message, stack, ...enumerableProps }` |
-| Class instance | enumerable own properties — same as default JSON |
+| Shape                                      | Serialized as                                    |
+| ------------------------------------------ | ------------------------------------------------ |
+| Circular reference                         | handled (no throw)                               |
+| `BigInt`                                   | stringified value                                |
+| Function / `symbol`                        | dropped (standard JSON behavior)                 |
+| `Error` (top-level or nested in `context`) | `{ name, message, stack, ...enumerableProps }`   |
+| Class instance                             | enumerable own properties — same as default JSON |
 
 The channel does **not** tag class instances with their class name. If you need a specific shape, pre-shape the value before passing it to `context`:
 

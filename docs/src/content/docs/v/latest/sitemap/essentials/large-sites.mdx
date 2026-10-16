@@ -28,7 +28,11 @@ index
   .addSource("products", async function* () {
     // streamProducts(): your own AsyncIterable over the products table
     for await (const product of streamProducts()) {
-      yield { route: "/products/:slug", path: `/products/${product.slug}`, lastmod: product.updatedAt };
+      yield {
+        route: "/products/:slug",
+        path: `/products/${product.slug}`,
+        lastmod: product.updatedAt,
+      };
     }
   });
 
@@ -45,15 +49,15 @@ site is small enough for [`Sitemap`](/v/latest/sitemap/essentials/standalone/).
 
 ## Options
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `baseUrl` | — | **Required.** Validated the same way `Sitemap` validates it (`InvalidBaseUrlError`). |
-| `filePrefix` | `"sitemap"` | The shard name prefix: `sitemap-0001.xml`. |
-| `indexFileName` | `"sitemap_index.xml"` | The name of the master index file. |
-| `gzip` | `false` | Writes shards as `.xml.gz` and points the index at them. |
-| `maxUrlsPerFile` | `50_000` | The URL limit per shard. A value above the protocol limit throws `RangeError`; it is never silently lowered. |
-| `maxBytesPerFile` | `50 * 1024 * 1024` | The uncompressed byte limit per shard, with the same protocol limit. |
-| `changefreq` / `priority` / `lastmod` | — | Defaults for every entry, as with `Sitemap`. |
+| Option                                | Default               | Meaning                                                                                                      |
+| ------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `baseUrl`                             | —                     | **Required.** Validated the same way `Sitemap` validates it (`InvalidBaseUrlError`).                         |
+| `filePrefix`                          | `"sitemap"`           | The shard name prefix: `sitemap-0001.xml`.                                                                   |
+| `indexFileName`                       | `"sitemap_index.xml"` | The name of the master index file.                                                                           |
+| `gzip`                                | `false`               | Writes shards as `.xml.gz` and points the index at them.                                                     |
+| `maxUrlsPerFile`                      | `50_000`              | The URL limit per shard. A value above the protocol limit throws `RangeError`; it is never silently lowered. |
+| `maxBytesPerFile`                     | `50 * 1024 * 1024`    | The uncompressed byte limit per shard, with the same protocol limit.                                         |
+| `changefreq` / `priority` / `lastmod` | —                     | Defaults for every entry, as with `Sitemap`.                                                                 |
 
 `shardPathPrefix` changes the public URL directory written into the master
 index without changing where `saveTo()` writes shards. Use it when a proxy or
@@ -106,6 +110,7 @@ Every publish writes a `.sitemap-set.json` marker into `outDir`. A later call
 replaces a directory only if it doesn't exist, is empty, or has that marker.
 A non-empty directory without the marker throws `UnownedOutputDirectoryError`
 before anything is written, and the directory is not changed.
+
 </Aside>
 
 `Sitemap.publishTo(outDir)` follows the same rule. That lets a site start with

@@ -11,12 +11,12 @@ This page covers three strategies, ranked by how often you'll reach for each.
 
 `MockCacheDriver` is a full driver implementation backed by an in-memory `Map`, plus four helpers that no production driver exposes:
 
-| Helper | What it does |
-|---|---|
-| `wasCalled(operation, key?)` | Did this op run? Optional key matched post-`parseKey`. |
-| `getStored(key)` | Raw stored value, bypassing TTL handling and clone protection. |
-| `reset()` | Wipe storage, tag index, and call log in one call. |
-| `callLog: CacheCall[]` | Ordered record of every op — `{ operation, key, args, timestamp }`. |
+| Helper                       | What it does                                                        |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `wasCalled(operation, key?)` | Did this op run? Optional key matched post-`parseKey`.              |
+| `getStored(key)`             | Raw stored value, bypassing TTL handling and clone protection.      |
+| `reset()`                    | Wipe storage, tag index, and call log in one call.                  |
+| `callLog: CacheCall[]`       | Ordered record of every op — `{ operation, key, args, timestamp }`. |
 
 Setup mirrors any other driver:
 
@@ -67,8 +67,8 @@ describe("UserService", () => {
 ```ts
 await cache.set({ id: 1 }, user);
 
-driver.wasCalled("set", { id: 1 });   // true
-driver.wasCalled("set", "id.1");      // also true
+driver.wasCalled("set", { id: 1 }); // true
+driver.wasCalled("set", "id.1"); // also true
 ```
 
 ### Inspect the raw store
@@ -98,7 +98,7 @@ cache.setCacheConfigurations({
 });
 ```
 
-Pick this when the test is about *outcome* ("the user got the cached profile") rather than *interaction* ("the cache was hit twice").
+Pick this when the test is about _outcome_ ("the user got the cached profile") rather than _interaction_ ("the cache was hit twice").
 
 ## `NullCacheDriver` — cache disabled
 
@@ -139,7 +139,7 @@ The in-package vitest config runs `silent: true`, but if your test suite is outs
 ```ts
 cache.setCacheConfigurations({
   default: "mock",
-  logging: false,             // here
+  logging: false, // here
   drivers: { mock: MockCacheDriver },
   options: { mock: {} },
 });
@@ -149,13 +149,13 @@ Or per-driver: `driver.setLoggingState(false)`.
 
 ## Choosing between mock, memory, and null
 
-| Test goal | Use |
-|---|---|
-| "Did my service call `set` / `remove` with the right args?" | `MockCacheDriver` |
-| "Does my service produce the right output when caching works?" | `MemoryCacheDriver` |
-| "Does my code still work with cache turned off?" | `NullCacheDriver` |
-| "Does my similarity-based recommender return the right hits?" | `MemoryCacheDriver` |
-| "Did my code attach the right tags?" | `MockCacheDriver` (inspect `callLog`) |
+| Test goal                                                      | Use                                   |
+| -------------------------------------------------------------- | ------------------------------------- |
+| "Did my service call `set` / `remove` with the right args?"    | `MockCacheDriver`                     |
+| "Does my service produce the right output when caching works?" | `MemoryCacheDriver`                   |
+| "Does my code still work with cache turned off?"               | `NullCacheDriver`                     |
+| "Does my similarity-based recommender return the right hits?"  | `MemoryCacheDriver`                   |
+| "Did my code attach the right tags?"                           | `MockCacheDriver` (inspect `callLog`) |
 
 Default to `MockCacheDriver`. Reach for the others when the test is about real behavior, not about how your code talks to the cache.
 
@@ -164,7 +164,6 @@ Default to `MockCacheDriver`. Reach for the others when the test is about real b
 - [Memory Cache Driver](/v/latest/cache/memory/) — runtime semantics for the in-memory backend.
 - [Null Cache Driver](/v/latest/cache/null/) — no-op driver reference.
 - [Event System](/v/latest/cache/events/) — full event payload reference.
-
 
 ## Framework Redis integration checks
 

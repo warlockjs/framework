@@ -17,9 +17,9 @@ herald()
   .subscribe(async (message, ctx) => {
     try {
       await sendWelcomeEmail(message.payload.email);
-      await ctx.ack();          // success — message removed from queue
+      await ctx.ack(); // success — message removed from queue
     } catch (error) {
-      await ctx.nack(true);     // failure — requeue for redelivery
+      await ctx.nack(true); // failure — requeue for redelivery
     }
   });
 ```
@@ -30,7 +30,7 @@ herald()
 - Handler **throws** → herald **auto-nacks** (requeue, or DLQ/reject once retries are exhausted — see below).
 - Handler calls `ctx.ack()` / `ctx.nack()` / `ctx.reject()` / `ctx.retry()` → herald respects that and does nothing further.
 
-So the `try/catch` above is optional — letting the error throw produces the same auto-nack. Call `ctx` methods explicitly only when you want a *non-default* outcome (reject without requeue, route to DLQ, delayed retry). The one mode that loses messages is `autoAck: true`, where the broker acks on delivery before your handler runs.
+So the `try/catch` above is optional — letting the error throw produces the same auto-nack. Call `ctx` methods explicitly only when you want a _non-default_ outcome (reject without requeue, route to DLQ, delayed retry). The one mode that loses messages is `autoAck: true`, where the broker acks on delivery before your handler runs.
 
 ## Message context — flow control
 
@@ -44,23 +44,23 @@ ctx.reply(payload);     // for request-response pattern (see request-and-respond
 
 Pick by intent:
 
-| Intent | Use |
-| --- | --- |
-| Processed cleanly | `ctx.ack()` |
-| Transient failure, try again | `ctx.nack(true)` or `ctx.retry(5000)` |
-| Permanent failure, send to DLQ | `ctx.nack(false)` or `ctx.reject()` |
-| Validation failure (bad message) | `ctx.reject()` — don't requeue |
+| Intent                           | Use                                   |
+| -------------------------------- | ------------------------------------- |
+| Processed cleanly                | `ctx.ack()`                           |
+| Transient failure, try again     | `ctx.nack(true)` or `ctx.retry(5000)` |
+| Permanent failure, send to DLQ   | `ctx.nack(false)` or `ctx.reject()`   |
+| Validation failure (bad message) | `ctx.reject()` — don't requeue        |
 
 ## Subscribe options
 
 ```ts
 await channel.subscribe(handler, {
-  group: "email-workers",      // consumer group / tag — multiple consumers share work
-  prefetch: 10,                 // concurrency — how many in-flight messages this consumer holds
-  autoAck: false,               // default; keep it false in production
-  exclusive: false,             // single consumer only on this channel?
+  group: "email-workers", // consumer group / tag — multiple consumers share work
+  prefetch: 10, // concurrency — how many in-flight messages this consumer holds
+  autoAck: false, // default; keep it false in production
+  exclusive: false, // single consumer only on this channel?
   retry: {
-    maxRetries: 3,              // redelivery ceiling on handler throw (delay not auto-applied — see below)
+    maxRetries: 3, // redelivery ceiling on handler throw (delay not auto-applied — see below)
     delay: 1000,
   },
   deadLetter: {
@@ -101,10 +101,12 @@ The DLQ always forwards the full original payload plus the message metadata, so 
 Messages that exhausted retries land in `user.created.failed`. Subscribe to it separately for alerting / manual inspection:
 
 ```ts
-herald().channel("user.created.failed").subscribe(async (message, ctx) => {
-  await alerts.notify(`Failed: ${JSON.stringify(message.payload)}`);
-  await ctx.ack();
-});
+herald()
+  .channel("user.created.failed")
+  .subscribe(async (message, ctx) => {
+    await alerts.notify(`Failed: ${JSON.stringify(message.payload)}`);
+    await ctx.ack();
+  });
 ```
 
 ## Decorator-style consumers — `@Consumable` + `EventConsumer`
@@ -115,7 +117,7 @@ For class-based consumers that pair with the `EventMessage` (the `publish-messag
 import { Consumable, EventConsumer } from "@warlock.js/herald";
 import type { ConsumedEventMessage } from "@warlock.js/herald";
 
-@Consumable()  // or @Consumable({ broker: "analytics" }) to target a non-default broker
+@Consumable() // or @Consumable({ broker: "analytics" }) to target a non-default broker
 export class UserCreatedConsumer extends EventConsumer<{ id: number; email: string }> {
   public static eventName = "user.created";
 
@@ -167,7 +169,7 @@ export class UserCreatedConsumer extends EventConsumer {
 import { defineConsumer } from "@warlock.js/herald";
 
 export const userCreatedConsumer = defineConsumer<{ id: number; email: string }>("user.created", {
-  schema: userCreatedSchema,                 // optional seal validation
+  schema: userCreatedSchema, // optional seal validation
   handle: async (payload, event) => {
     await sendWelcomeEmail(payload.email);
   },
@@ -183,11 +185,11 @@ export const userCreatedConsumer = defineConsumer<{ id: number; email: string }>
 ```ts
 const subscription = await channel.subscribe(handler);
 
-subscription.id;            // the consumer id (string)
-subscription.isActive();    // boolean
+subscription.id; // the consumer id (string)
+subscription.isActive(); // boolean
 
-await subscription.unsubscribe();   // cancel the consumer on the broker
-await subscription.pause();          // also cancels the consumer (RabbitMQ has no native pause)
+await subscription.unsubscribe(); // cancel the consumer on the broker
+await subscription.pause(); // also cancels the consumer (RabbitMQ has no native pause)
 ```
 
 On the RabbitMQ driver, `pause()` and `unsubscribe()` both cancel the consumer; `resume()` is **not supported and throws** — create a fresh subscription to start consuming again. You can also cancel by id from the channel: `await channel.unsubscribeById(consumerId)`, or drop every consumer on the channel with `await channel.stopConsuming()`.
@@ -198,10 +200,10 @@ The channel exposes queue-management helpers beyond pub/sub:
 
 ```ts
 const { messageCount, consumerCount } = await channel.stats(); // queue depth + live consumers
-const purged = await channel.purge();    // drop all pending messages, returns the count
-const ok = await channel.exists();        // does the queue exist on the broker?
-await channel.assert();                   // create the queue with its options (idempotent)
-await channel.delete();                   // remove the queue entirely
+const purged = await channel.purge(); // drop all pending messages, returns the count
+const ok = await channel.exists(); // does the queue exist on the broker?
+await channel.assert(); // create the queue with its options (idempotent)
+await channel.delete(); // remove the queue entirely
 ```
 
 `assert()` runs lazily on the first `publish` / `subscribe`, so you rarely call it directly — reach for it only to pre-create a queue before any traffic.

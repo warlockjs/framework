@@ -1495,6 +1495,6 @@ function escapeHtml(value: string): string {
 function encodeForInlineScript(value: string): string {
   return value
     .split("`")
-    .map(part => JSON.stringify(part))
+    .map((part) => JSON.stringify(part))
     .join(" + BT + ");
 }

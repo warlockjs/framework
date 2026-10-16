@@ -75,9 +75,30 @@ describe("toRouteRow", () => {
 
 describe("filterRouteRows", () => {
   const rows: RouteRow[] = [
-    { method: "GET", path: "/users", name: "users.list", action: "index", middleware: 1, source: "a" },
-    { method: "POST", path: "/users", name: "users.create", action: "store", middleware: 2, source: "a" },
-    { method: "GET", path: "/posts", name: "posts.list", action: "index", middleware: 0, source: "b" },
+    {
+      method: "GET",
+      path: "/users",
+      name: "users.list",
+      action: "index",
+      middleware: 1,
+      source: "a",
+    },
+    {
+      method: "POST",
+      path: "/users",
+      name: "users.create",
+      action: "store",
+      middleware: 2,
+      source: "a",
+    },
+    {
+      method: "GET",
+      path: "/posts",
+      name: "posts.list",
+      action: "index",
+      middleware: 0,
+      source: "b",
+    },
   ];
 
   it("matches everything when no filter is given", () => {

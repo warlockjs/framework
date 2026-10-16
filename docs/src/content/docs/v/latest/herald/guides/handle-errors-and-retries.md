@@ -12,13 +12,13 @@ Failure handling in herald is layered. There's "this one message failed" (handle
 
 Before reaching for retries or DLQs, decide what kind of failure you're handling:
 
-| Failure | Example | Right move |
-| --- | --- | --- |
-| **Transient — same attempt, immediate retry** | Network blip during DB write | `ctx.nack(true)` — requeue, broker redelivers |
-| **Transient — with backoff** | Rate-limited by an upstream API | `ctx.retry(2000)` — wait then retry |
-| **Permanent — bad input** | Email field malformed | `ctx.reject()` — DLQ, don't requeue |
-| **Permanent — code bug** | TypeError in handler | Throw — let `retry` + `deadLetter` handle it |
-| **Poison message — keeps failing forever** | Edge case the handler doesn't cover | DLQ after `maxRetries`, alert on DLQ depth |
+| Failure                                       | Example                             | Right move                                    |
+| --------------------------------------------- | ----------------------------------- | --------------------------------------------- |
+| **Transient — same attempt, immediate retry** | Network blip during DB write        | `ctx.nack(true)` — requeue, broker redelivers |
+| **Transient — with backoff**                  | Rate-limited by an upstream API     | `ctx.retry(2000)` — wait then retry           |
+| **Permanent — bad input**                     | Email field malformed               | `ctx.reject()` — DLQ, don't requeue           |
+| **Permanent — code bug**                      | TypeError in handler                | Throw — let `retry` + `deadLetter` handle it  |
+| **Poison message — keeps failing forever**    | Edge case the handler doesn't cover | DLQ after `maxRetries`, alert on DLQ depth    |
 
 The mistake is treating every failure as a retry. A bad payload that violates a schema isn't a retry — it'll fail forever and clog the queue. Reject it.
 
@@ -35,9 +35,9 @@ await channel.subscribe(async (message, ctx) => {
     await ctx.ack();
   } catch (error) {
     if (isTransient(error)) {
-      await ctx.nack(true);   // back on the queue, broker redelivers
+      await ctx.nack(true); // back on the queue, broker redelivers
     } else {
-      throw error;            // let smart-nack handle it
+      throw error; // let smart-nack handle it
     }
   }
 });
@@ -46,23 +46,26 @@ await channel.subscribe(async (message, ctx) => {
 ### Transient with backoff
 
 ```ts
-await channel.subscribe(async (message, ctx) => {
-  try {
-    await callRateLimitedAPI(message.payload);
-    await ctx.ack();
-  } catch (error) {
-    if (error.status === 429) {
-      const retryAfter = Number(error.headers["retry-after"]) * 1000;
-      await ctx.retry(retryAfter);
-      return;
-    }
+await channel.subscribe(
+  async (message, ctx) => {
+    try {
+      await callRateLimitedAPI(message.payload);
+      await ctx.ack();
+    } catch (error) {
+      if (error.status === 429) {
+        const retryAfter = Number(error.headers["retry-after"]) * 1000;
+        await ctx.retry(retryAfter);
+        return;
+      }
 
-    throw error;
-  }
-}, {
-  retry: { maxRetries: 5, delay: 1000 },
-  deadLetter: { channel: "api.failed" },
-});
+      throw error;
+    }
+  },
+  {
+    retry: { maxRetries: 5, delay: 1000 },
+    deadLetter: { channel: "api.failed" },
+  },
+);
 ```
 
 `ctx.retry(delayMs)` republishes the message with `x-retry-count` (and `x-delay` if the broker has the delayed-message plugin) and acks the original. After `maxRetries`, it goes to the configured DLQ — or is dropped if no DLQ is set.
@@ -70,17 +73,20 @@ await channel.subscribe(async (message, ctx) => {
 ### Permanent failure — bad payload
 
 ```ts
-await channel.subscribe(async (message, ctx) => {
-  if (!isValidShape(message.payload)) {
-    await ctx.reject();     // straight to DLQ — don't requeue
-    return;
-  }
+await channel.subscribe(
+  async (message, ctx) => {
+    if (!isValidShape(message.payload)) {
+      await ctx.reject(); // straight to DLQ — don't requeue
+      return;
+    }
 
-  await process(message.payload);
-  await ctx.ack();
-}, {
-  deadLetter: { channel: "user.created.failed" },
-});
+    await process(message.payload);
+    await ctx.ack();
+  },
+  {
+    deadLetter: { channel: "user.created.failed" },
+  },
+);
 ```
 
 For schema-shaped validation, push it into `ChannelOptions.schema` instead — the consumer-side validation runs automatically before your handler. Invalid messages get nacked-without-requeue (which sends them to DLQ if configured).
@@ -125,18 +131,21 @@ The one place a wait happens is the explicit `ctx.retry(delayMs)` call — it re
 So for real backoff, drive it from the handler and pass the figure yourself:
 
 ```ts
-await channel.subscribe(async (message, ctx) => {
-  try {
-    await doWork(message.payload);
-    await ctx.ack();
-  } catch (error) {
-    const attempt = (message.metadata.retryCount ?? 0) + 1;
-    await ctx.retry(Math.min(2 ** attempt * 100, 30_000));   // capped exponential
-  }
-}, {
-  retry: { maxRetries: 5, delay: 0 },   // delay here is inert; maxRetries is the ceiling that matters
-  deadLetter: { channel: "user.created.failed" },
-});
+await channel.subscribe(
+  async (message, ctx) => {
+    try {
+      await doWork(message.payload);
+      await ctx.ack();
+    } catch (error) {
+      const attempt = (message.metadata.retryCount ?? 0) + 1;
+      await ctx.retry(Math.min(2 ** attempt * 100, 30_000)); // capped exponential
+    }
+  },
+  {
+    retry: { maxRetries: 5, delay: 0 }, // delay here is inert; maxRetries is the ceiling that matters
+    deadLetter: { channel: "user.created.failed" },
+  },
+);
 ```
 
 ## Dead-letter queues
@@ -170,7 +179,7 @@ await channel.subscribe(async (message, ctx) => {
   const wasProcessed = await db.processedMessages.exists(message.metadata.messageId);
 
   if (wasProcessed) {
-    await ctx.ack();   // dedup — skip, but ack so broker stops redelivering
+    await ctx.ack(); // dedup — skip, but ack so broker stops redelivering
     return;
   }
 
@@ -211,7 +220,7 @@ brokerRegistry.on("disconnected", (broker) => {
   alerts.warning(`Broker ${broker.name} disconnected`);
 });
 
-const broker = await connectToBroker({ /* ... */ });
+const broker = await connectToBroker({/* ... */});
 
 broker.driver.on("reconnecting", (attempt) => {
   console.log(`Reconnect #${attempt}`);
@@ -238,9 +247,7 @@ Wire it into your `/health` endpoint:
 
 ```ts
 app.get("/health", async (req, res) => {
-  const checks = await Promise.all(
-    brokerRegistry.getAll().map((broker) => broker.healthCheck()),
-  );
+  const checks = await Promise.all(brokerRegistry.getAll().map((broker) => broker.healthCheck()));
 
   const allHealthy = checks.every((check) => check.healthy);
   res.status(allHealthy ? 200 : 503).json({ checks });

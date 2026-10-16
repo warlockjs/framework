@@ -31,7 +31,11 @@ describe("PostgresQueryParser", () => {
     });
 
     it("aliases the table with AS when an alias is supplied", () => {
-      const result = new PostgresQueryParser({ table: "users", alias: "u", operations: [] }).parse();
+      const result = new PostgresQueryParser({
+        table: "users",
+        alias: "u",
+        operations: [],
+      }).parse();
 
       expect(result.query).toBe(`SELECT * FROM "users" AS "u"`);
     });
@@ -39,7 +43,9 @@ describe("PostgresQueryParser", () => {
 
   describe("where()", () => {
     it("builds an equality clause with a $1 placeholder and qualified column", () => {
-      const result = parse([{ type: "where", data: { field: "name", operator: "=", value: "Alice" } }]);
+      const result = parse([
+        { type: "where", data: { field: "name", operator: "=", value: "Alice" } },
+      ]);
 
       expect(result.query).toBe(`SELECT * FROM "users" WHERE "users"."name" = $1`);
       expect(result.bindings).toEqual(["Alice"]);
@@ -53,20 +59,26 @@ describe("PostgresQueryParser", () => {
     });
 
     it("emits IS NULL (no binding) when the value is null", () => {
-      const result = parse([{ type: "where", data: { field: "deletedAt", operator: "=", value: null } }]);
+      const result = parse([
+        { type: "where", data: { field: "deletedAt", operator: "=", value: null } },
+      ]);
 
       expect(result.query).toBe(`SELECT * FROM "users" WHERE "users"."deletedAt" IS NULL`);
       expect(result.bindings).toEqual([]);
     });
 
     it("emits IS NOT NULL when the operator is != and the value is null", () => {
-      const result = parse([{ type: "where", data: { field: "deletedAt", operator: "!=", value: null } }]);
+      const result = parse([
+        { type: "where", data: { field: "deletedAt", operator: "!=", value: null } },
+      ]);
 
       expect(result.query).toBe(`SELECT * FROM "users" WHERE "users"."deletedAt" IS NOT NULL`);
     });
 
     it("treats a dotted field with no known table prefix as a JSONB path", () => {
-      const result = parse([{ type: "where", data: { field: "meta.city", operator: "=", value: "NYC" } }]);
+      const result = parse([
+        { type: "where", data: { field: "meta.city", operator: "=", value: "NYC" } },
+      ]);
 
       expect(result.query).toBe(`SELECT * FROM "users" WHERE "users"."meta"->>'city' = $1`);
       expect(result.bindings).toEqual(["NYC"]);
@@ -177,7 +189,9 @@ describe("PostgresQueryParser", () => {
         { type: "where", data: { field: "b", operator: ">", value: 2 } },
       ]);
 
-      expect(result.query).toBe(`SELECT * FROM "users" WHERE "users"."a" = $1 AND "users"."b" > $2`);
+      expect(result.query).toBe(
+        `SELECT * FROM "users" WHERE "users"."a" = $1 AND "users"."b" > $2`,
+      );
       expect(result.bindings).toEqual([1, 2]);
     });
 

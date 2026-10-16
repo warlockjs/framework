@@ -51,22 +51,22 @@ XaiModelConfig {
 
 Capabilities are inferred from the Grok model **name** (via `inferVisionCapability` / `inferReasoningCapability`, matched as a prefix so dated / `-latest` / `-fast` / `-beta` variants are covered) and injected as explicit flags before delegating — an explicit value always wins.
 
-| Model           | `vision` | `reasoning`             |
-| --------------- | -------- | ----------------------- |
-| `grok-4`        | true     | true (reasoning-first)  |
-| `grok-3`        | false    | false                   |
+| Model           | `vision` | `reasoning`                |
+| --------------- | -------- | -------------------------- |
+| `grok-4`        | true     | true (reasoning-first)     |
+| `grok-3`        | false    | false                      |
 | `grok-3-mini`   | false    | true (the "think" variant) |
-| `grok-2-vision` | true     | false                   |
-| `grok-2`        | false    | false                   |
+| `grok-2-vision` | true     | false                      |
+| `grok-2`        | false    | false                      |
 
 - `structuredOutput` / `promptCaching` and the image / PDF / audio wire mapping all come from the wrapped OpenAI adapter unchanged.
 - `XAI_CHAT_MODELS`, `XAI_VISION_MODEL_PREFIXES`, and `XAI_REASONING_MODEL_PREFIXES` are exported for menus, validation, and docs.
 
 ```ts
-xai.model({ name: "grok-4" });                  // vision + reasoning auto-true
-xai.model({ name: "grok-3-mini" });             // reasoning auto-true, vision false
-xai.model({ name: "grok-2-vision" });           // vision auto-true
-xai.model({ name: "grok-3", vision: true });    // explicit capability override
+xai.model({ name: "grok-4" }); // vision + reasoning auto-true
+xai.model({ name: "grok-3-mini" }); // reasoning auto-true, vision false
+xai.model({ name: "grok-2-vision" }); // vision auto-true
+xai.model({ name: "grok-3", vision: true }); // explicit capability override
 ```
 
 > Model availability changes over time — pass any current Grok id through `.model({ name })`; the prefix inference covers dated / `-latest` variants. Don't assume a model exists; check xAI's docs.
@@ -74,8 +74,8 @@ xai.model({ name: "grok-3", vision: true });    // explicit capability override
 ## Reasoning effort
 
 ```ts
-const model = xai.model({ name: "grok-4" });                        // reasoning auto-true
-await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+const model = xai.model({ name: "grok-4" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 `reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim to the OpenAI-compatible `reasoning_effort` param and is dropped for a non-reasoning model (e.g. `grok-3`).

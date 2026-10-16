@@ -31,9 +31,7 @@ describe("FileHealthResult", () => {
   it("flips to defective and counts warnings", () => {
     const result = new FileHealthResult();
 
-    result.addWarnings([
-      { message: "careful", type: "warning", lineNumber: 1, columnNumber: 1 },
-    ]);
+    result.addWarnings([{ message: "careful", type: "warning", lineNumber: 1, columnNumber: 1 }]);
 
     const stats = result.getStats();
 

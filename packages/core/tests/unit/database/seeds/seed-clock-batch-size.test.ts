@@ -94,9 +94,7 @@ describe("SeedersManager — injectable clock (now)", () => {
     const user = memory.rowsOf("users").find((row) => row.name === "Root");
 
     expect(user?.created_at).toBe(fixed);
-    expect((user!.created_at as Date).toISOString()).toBe(
-      "2019-07-04T12:00:00.000Z",
-    );
+    expect((user!.created_at as Date).toISOString()).toBe("2019-07-04T12:00:00.000Z");
   });
 
   it("stamps tracked ref runAt from the injected clock", async () => {

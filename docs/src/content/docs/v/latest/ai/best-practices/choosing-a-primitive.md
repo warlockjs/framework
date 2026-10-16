@@ -15,22 +15,22 @@ Climbing is deliberately cheap. Every primitive resolves to the same `ExecuteRes
 
 Read it top-down and stop at the first row that's true. The row you stop on is the rung to build on.
 
-| Your task is… | Rung | Why this and not the one below |
-| --- | --- | --- |
-| **A single task** — one prompt, maybe some tools, one answer. | `ai.agent` | Nothing to coordinate. A workflow around one agent is ceremony. |
-| **A fixed, known sequence of steps** you can name in advance. | `ai.workflow` | The order is *yours*, not the model's. Don't pay an LLM to decide what you already know. |
-| **Dynamic dispatch across multiple agents, resolved in one call.** | `ai.supervisor` | The *next* specialist depends on what the last one found — a fixed workflow can't branch on model output, an agent can't hand off. |
-| **A multi-turn session** that must persist state, history, and memory across calls. | `ai.orchestrator` | A supervisor is amnesiac between `execute()` calls. Sessions need durable checkpoints and a `sessionId`. |
-| **Open-ended** — you can't name the steps because they depend on the goal, and the model must *plan*. | `ai.planner` | When even *you* don't know the step list up front, hand the model your capabilities and let it generate the plan. |
+| Your task is…                                                                                         | Rung              | Why this and not the one below                                                                                                     |
+| ----------------------------------------------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **A single task** — one prompt, maybe some tools, one answer.                                         | `ai.agent`        | Nothing to coordinate. A workflow around one agent is ceremony.                                                                    |
+| **A fixed, known sequence of steps** you can name in advance.                                         | `ai.workflow`     | The order is _yours_, not the model's. Don't pay an LLM to decide what you already know.                                           |
+| **Dynamic dispatch across multiple agents, resolved in one call.**                                    | `ai.supervisor`   | The _next_ specialist depends on what the last one found — a fixed workflow can't branch on model output, an agent can't hand off. |
+| **A multi-turn session** that must persist state, history, and memory across calls.                   | `ai.orchestrator` | A supervisor is amnesiac between `execute()` calls. Sessions need durable checkpoints and a `sessionId`.                           |
+| **Open-ended** — you can't name the steps because they depend on the goal, and the model must _plan_. | `ai.planner`      | When even _you_ don't know the step list up front, hand the model your capabilities and let it generate the plan.                  |
 
-The four core rungs are a strict ladder; `ai.planner` is the escape hatch for the one case the ladder can't express — *"I don't know the steps."*
+The four core rungs are a strict ladder; `ai.planner` is the escape hatch for the one case the ladder can't express — _"I don't know the steps."_
 
 Two side primitives sit next to the ladder rather than on it. Reach for them by shape, not by climbing:
 
-| Your task is… | Primitive | Why this and not a rung |
-| --- | --- | --- |
-| **A named roster collaborating under a manager** — a builder, a reviewer, a fixer — with a "loop until approved/passed" quality gate. | `ai.team` | A supervisor expresses this, but you'd hand-wire the review-then-fix `evaluate` every time. `team` names the roles and ships the gate. |
-| **Grounding an agent in your documents** — retrieve relevant passages and cite them. | `ai.rag` | Retrieval isn't an orchestration rung; it's a tool an agent calls. `rag` is chunk → embed → store → retrieve → rerank → cite, exposed via `.asTool()`. |
+| Your task is…                                                                                                                         | Primitive | Why this and not a rung                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A named roster collaborating under a manager** — a builder, a reviewer, a fixer — with a "loop until approved/passed" quality gate. | `ai.team` | A supervisor expresses this, but you'd hand-wire the review-then-fix `evaluate` every time. `team` names the roles and ships the gate.                 |
+| **Grounding an agent in your documents** — retrieve relevant passages and cite them.                                                  | `ai.rag`  | Retrieval isn't an orchestration rung; it's a tool an agent calls. `rag` is chunk → embed → store → retrieve → rerank → cite, exposed via `.asTool()`. |
 
 ## Rung 1 — `ai.agent` for a single task
 
@@ -54,25 +54,24 @@ const supportAgent = ai.agent({
   name: "order-support",
   model: openai.model({ name: "gpt-4o-mini" }),
   tools: [lookupOrder],
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You answer order-status questions.")
     .instruction("Look up the order before answering. Be concise."),
 });
 
-const { data, error, usage } = await supportAgent.execute(
-  "Where is order #4471?",
-);
+const { data, error, usage } = await supportAgent.execute("Where is order #4471?");
 ```
 
 **Avoid this — wrapping one agent in a workflow "to be structured."** A workflow whose only step dispatches one agent adds a snapshot store, a step contract, and a signature to maintain — and buys nothing the agent didn't already give you. The agent already returns `{ data, error, usage, report }`; the report already tells you which tools it called.
 
-**The upgrade trigger:** you find yourself coordinating *several* agents, or you need steps to run in a guaranteed order with retries and resumability. The moment a single trip loop can't express the work — that's the climb.
+**The upgrade trigger:** you find yourself coordinating _several_ agents, or you need steps to run in a guaranteed order with retries and resumability. The moment a single trip loop can't express the work — that's the climb.
 
 ## Rung 2 — `ai.workflow` for a fixed, known sequence
 
 You run the same pipeline every time: fetch the source, draft, then fact-check. The steps never change — only the data does. That's a workflow: you own the order, each step is a named unit, and the engine gives you retries, cancellation, and resume-from-snapshot for free.
 
-**Do this — use a workflow when *you* know the steps and the order.** A `run` step is plain code that writes into `ctx.state`; an agent step takes an `input(ctx)` that builds the prompt from prior state and an `output.extract` that pulls the text out. The order is declared, not inferred by a model.
+**Do this — use a workflow when _you_ know the steps and the order.** A `run` step is plain code that writes into `ctx.state`; an agent step takes an `input(ctx)` that builds the prompt from prior state and an `output.extract` that pulls the text out. The order is declared, not inferred by a model.
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -111,11 +110,11 @@ const { data, error, usage, report } = await articlePipeline.execute({ slug: "q3
 
 **Avoid this — using a workflow when the next step depends on the model's output.** The instant "if the draft is about pricing, run the finance reviewer; otherwise run the legal reviewer" becomes a real requirement, a static `steps: []` array can't express it. You'd be reaching for a `nextStep` callback that re-implements routing by hand — at which point you want the rung above, which does exactly that, well.
 
-**The upgrade trigger:** the path through the steps stops being fixed. When *which agent runs next* is a decision the model (or post-step state) has to make, you've outgrown the fixed sequence. Climb to a supervisor.
+**The upgrade trigger:** the path through the steps stops being fixed. When _which agent runs next_ is a decision the model (or post-step state) has to make, you've outgrown the fixed sequence. Climb to a supervisor.
 
 ## Rung 3 — `ai.supervisor` for dynamic multi-agent dispatch
 
-A support message arrives — *"I was charged twice and now the dashboard won't load."* That needs a billing specialist *and* a tech specialist *and* a resolver, in an order nobody can fix in advance: it depends on what each specialist finds. The supervisor picks the next intent each iteration (deterministically via `route`, or LLM-driven via `router`), merges each specialist's slice into shared state, and an `evaluate` verdict decides when the run is done — all inside **one** `execute()` call.
+A support message arrives — _"I was charged twice and now the dashboard won't load."_ That needs a billing specialist _and_ a tech specialist _and_ a resolver, in an order nobody can fix in advance: it depends on what each specialist finds. The supervisor picks the next intent each iteration (deterministically via `route`, or LLM-driven via `router`), merges each specialist's slice into shared state, and an `evaluate` verdict decides when the run is done — all inside **one** `execute()` call.
 
 **Do this — use a supervisor when dispatch is dynamic but the conversation is single-shot.** The router re-decides each turn; `evaluate` is your real stop condition.
 
@@ -147,7 +146,7 @@ const supportTriage = ai.supervisor<{ reply: string }>({
 const { data, error, usage, report } = await supportTriage.execute(message);
 ```
 
-**Avoid this — a supervisor when the routing is actually fixed.** If the route is knowable from the input alone (a form field, an enum, a keyword rule), you're paying a routing LLM trip per iteration for a decision a `switch` could make. Use a deterministic `route` callback, or drop back to a workflow. The supervisor earns its routing cost only when *one input genuinely needs several specialists in an order you can't predict.*
+**Avoid this — a supervisor when the routing is actually fixed.** If the route is knowable from the input alone (a form field, an enum, a keyword rule), you're paying a routing LLM trip per iteration for a decision a `switch` could make. Use a deterministic `route` callback, or drop back to a workflow. The supervisor earns its routing cost only when _one input genuinely needs several specialists in an order you can't predict._
 
 **The upgrade trigger:** the conversation has more than one turn, and turn N needs to remember turn N−1. A supervisor is amnesiac — each `execute()` starts cold, with no session, no persisted history, no carried-over state. The moment you're hand-threading `history` and reconstructing state on every call, you've outgrown it. Climb to an orchestrator.
 
@@ -155,7 +154,7 @@ const { data, error, usage, report } = await supportTriage.execute(message);
 
 A customer is mid-refund. They said "the Pro plan" three messages ago and "actually make it annual" just now. The bot has to carry that across turns, survive a process restart, and not re-ask what it already knows. That's an orchestrator: a session manager wrapped around a supervisor, keyed by a `sessionId`, with durable checkpoints, history windowing, automatic compaction, and per-turn memory.
 
-**Do this — use an orchestrator when the unit of work is a *session*, not a *call*.** Each `execute()` is one turn; `sessionId` and the prior `history` are required arguments, because the orchestrator is explicit that *you* own the message store and it owns the durable session state.
+**Do this — use an orchestrator when the unit of work is a _session_, not a _call_.** Each `execute()` is one turn; `sessionId` and the prior `history` are required arguments, because the orchestrator is explicit that _you_ own the message store and it owns the durable session state.
 
 ```ts
 import { ai, END } from "@warlock.js/ai";
@@ -177,13 +176,13 @@ const result = await supportBot.execute(userMessage, {
 
 **Avoid this — an orchestrator for a one-shot request.** If there's no second turn, the `sessionId`, checkpoint store, and history plumbing are pure overhead — every one of them exists to serve continuity you don't have. A stateless triage that answers and forgets is a supervisor (or a single agent), not an orchestrator. Don't pay for durability a one-shot will never read back.
 
-**The upgrade trigger (sideways, not up):** none — the orchestrator is the capstone of the linear ladder. The only thing left is the case the ladder can't express at all: *you can't name the steps.* That's not higher on this ladder; it's `ai.planner`.
+**The upgrade trigger (sideways, not up):** none — the orchestrator is the capstone of the linear ladder. The only thing left is the case the ladder can't express at all: _you can't name the steps._ That's not higher on this ladder; it's `ai.planner`.
 
 ## The side rung — `ai.planner` for the open-ended case
 
-The four core rungs all assume *someone* knows the shape of the work — you (workflow), or a router choosing from a fixed intent set (supervisor/orchestrator). `ai.planner` is for when nobody does up front. You hand it a goal and a toolbox of `capabilities` (each an agent, tool, or workflow — anything executable), and it asks an LLM to *generate* an ordered plan over those capabilities, then runs it step by step.
+The four core rungs all assume _someone_ knows the shape of the work — you (workflow), or a router choosing from a fixed intent set (supervisor/orchestrator). `ai.planner` is for when nobody does up front. You hand it a goal and a toolbox of `capabilities` (each an agent, tool, or workflow — anything executable), and it asks an LLM to _generate_ an ordered plan over those capabilities, then runs it step by step.
 
-**Do this — reach for a planner when the step list is a function of the goal, not a constant.** A request like *"draft a launch announcement and make sure the numbers are right"* always has the same *capabilities* (fetch, verify, write) but never a fixed step order you'd want to hard-code.
+**Do this — reach for a planner when the step list is a function of the goal, not a constant.** A request like _"draft a launch announcement and make sure the numbers are right"_ always has the same _capabilities_ (fetch, verify, write) but never a fixed step order you'd want to hard-code.
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -192,7 +191,11 @@ const taskRunner = ai.planner({
   name: "launch-task-runner",
   model: openai.model({ name: "gpt-4o" }),
   capabilities: [
-    { name: "fetch_pricing", description: "Fetch current pricing tiers.", executable: fetchPricingTool },
+    {
+      name: "fetch_pricing",
+      description: "Fetch current pricing tiers.",
+      executable: fetchPricingTool,
+    },
     { name: "verify_figures", description: "Cross-check the numbers.", executable: verifierAgent },
     { name: "write_announcement", description: "Draft the launch copy.", executable: writerAgent },
   ],
@@ -204,11 +207,11 @@ const { data, error, usage, report } = await taskRunner.execute(
 );
 ```
 
-**Avoid this — a planner when you already know the steps.** If the order is fixed, a planner spends an LLM trip *generating* a plan you could have written by hand as a `workflow` — and you inherit the risk that the generated plan is wrong. Plan generation is a cost and a failure mode; only pay it when the alternative is hard-coding a step list you genuinely cannot predict. Known steps → `ai.workflow`. Known intent set, model picks among them → `ai.supervisor`. Only when even the *set* of steps is open-ended does the planner earn its keep. Bound it hard with `maxSteps`.
+**Avoid this — a planner when you already know the steps.** If the order is fixed, a planner spends an LLM trip _generating_ a plan you could have written by hand as a `workflow` — and you inherit the risk that the generated plan is wrong. Plan generation is a cost and a failure mode; only pay it when the alternative is hard-coding a step list you genuinely cannot predict. Known steps → `ai.workflow`. Known intent set, model picks among them → `ai.supervisor`. Only when even the _set_ of steps is open-ended does the planner earn its keep. Bound it hard with `maxSteps`.
 
 ## The team rung — `ai.team` for a managed roster with a quality gate
 
-You keep building the same supervisor shape: a manager that dispatches to a small roster — a builder, a reviewer, a fixer — and an `evaluate` that loops "until the reviewer approves" or "until the tests pass," re-dispatching the fixer with the reviewer's notes in between. `ai.team` is that shape named. It is **thin, transparent sugar over `ai.supervisor`** — the manager becomes `route`/`router`, the `members` become `intents`, and the `gate` becomes `evaluate`. It returns the *unchanged* `SupervisorContract`, so `.asTool()`, `.resume()`, snapshots, and `ctx.intents.<member>` all stay intact.
+You keep building the same supervisor shape: a manager that dispatches to a small roster — a builder, a reviewer, a fixer — and an `evaluate` that loops "until the reviewer approves" or "until the tests pass," re-dispatching the fixer with the reviewer's notes in between. `ai.team` is that shape named. It is **thin, transparent sugar over `ai.supervisor`** — the manager becomes `route`/`router`, the `members` become `intents`, and the `gate` becomes `evaluate`. It returns the _unchanged_ `SupervisorContract`, so `.asTool()`, `.resume()`, snapshots, and `ctx.intents.<member>` all stay intact.
 
 **Do this — reach for a team when the work is a named roster collaborating under a manager, gated on quality.** A `gate: "quality"` string desugars to a review-then-fix loop (reads `state.approved`, `reassignTo` the `fixer` with feedback on rejection); `gate: "verify"` is the test-then-fix variant (reads `state.passed`). A function `gate` forwards straight through as `evaluate` — the full escape hatch.
 
@@ -229,11 +232,11 @@ const codeTeam = ai.team({
 const { data, error, usage, report } = await codeTeam.execute("Build a debounce<T> utility.");
 ```
 
-**Avoid this — hand-wiring the same review-then-fix `evaluate` on a raw supervisor.** If you find yourself writing "read the reviewer verdict, `reassignTo` the fixer with `state.notes`, terminate on approval" by hand, you're re-implementing the gate `team` already ships and tests. Drop to a bare `ai.supervisor` only when the roster *isn't* a manager-plus-members-plus-gate shape — when the routing logic genuinely doesn't fit the team mold. When your `members` keys differ from the canonical `reviewer` / `fixer` / `tester`, map them with `roles` rather than abandoning the sugar; the missing-role check throws at construction, not at `maxIterations`.
+**Avoid this — hand-wiring the same review-then-fix `evaluate` on a raw supervisor.** If you find yourself writing "read the reviewer verdict, `reassignTo` the fixer with `state.notes`, terminate on approval" by hand, you're re-implementing the gate `team` already ships and tests. Drop to a bare `ai.supervisor` only when the roster _isn't_ a manager-plus-members-plus-gate shape — when the routing logic genuinely doesn't fit the team mold. When your `members` keys differ from the canonical `reviewer` / `fixer` / `tester`, map them with `roles` rather than abandoning the sugar; the missing-role check throws at construction, not at `maxIterations`.
 
 ## The retrieval primitive — `ai.rag` for grounding an agent in documents
 
-Your agent needs to answer from *your* corpus — a policy handbook, a product catalog, last quarter's tickets — not just its training data. That's retrieval, and it isn't a rung on the orchestration ladder: it's a *tool* an agent calls. `ai.rag` is the pipeline behind that tool — chunk → embed → vector store → retrieve → rerank → cite — built on the existing `ai.embedder` and a `@warlock.js/cache` `CacheDriver` as the vector store, with zero new dependencies.
+Your agent needs to answer from _your_ corpus — a policy handbook, a product catalog, last quarter's tickets — not just its training data. That's retrieval, and it isn't a rung on the orchestration ladder: it's a _tool_ an agent calls. `ai.rag` is the pipeline behind that tool — chunk → embed → vector store → retrieve → rerank → cite — built on the existing `ai.embedder` and a `@warlock.js/cache` `CacheDriver` as the vector store, with zero new dependencies.
 
 **Do this — use `ai.rag` to index a corpus once, then expose retrieval to an agent with `.asTool()`.** `index(docs)` chunks, embeds, and stores; `retrieve(query)` embeds the query, fetches candidates, reranks, slices `topK`, and attaches citations. `asTool()` drops the whole thing into an agent's `tools: []` as a `{ query }` → `RetrieveResult` tool.
 
@@ -256,7 +259,7 @@ const supportAgent = ai.agent({
 });
 ```
 
-**Avoid this — building a workflow or supervisor to "do retrieval as a step."** Retrieval isn't an orchestration shape; the agent's own trip loop decides *when* it needs context and calls the tool. Wrapping `rag` in a fixed step forces a retrieval on every run even when the model didn't need one, and discards the model's judgment about *what* to look up. Index with `ai.rag`, hand the agent `rag.asTool()`, and let the trip loop do the rest.
+**Avoid this — building a workflow or supervisor to "do retrieval as a step."** Retrieval isn't an orchestration shape; the agent's own trip loop decides _when_ it needs context and calls the tool. Wrapping `rag` in a fixed step forces a retrieval on every run even when the model didn't need one, and discards the model's judgment about _what_ to look up. Index with `ai.rag`, hand the agent `rag.asTool()`, and let the trip loop do the rest.
 
 ## Climbing is cheap — the same envelope, the same tool surface
 
@@ -276,7 +279,7 @@ if (error) {
 console.log(`spent ${usage.total} tokens across ${report.children.length} children`);
 ```
 
-**Do this — compose a lower rung into a higher one instead of rewriting it.** The agent you shipped at rung 1 becomes a specialist `intent` in a rung-3 supervisor unchanged; the supervisor you built becomes a tool inside an outer agent via `.asTool({ inputSchema })`. Climbing *wraps* what you have — it doesn't replace it.
+**Do this — compose a lower rung into a higher one instead of rewriting it.** The agent you shipped at rung 1 becomes a specialist `intent` in a rung-3 supervisor unchanged; the supervisor you built becomes a tool inside an outer agent via `.asTool({ inputSchema })`. Climbing _wraps_ what you have — it doesn't replace it.
 
 ```ts
 import { v } from "@warlock.js/seal";
@@ -294,7 +297,7 @@ const frontDesk = ai.agent({
 });
 ```
 
-**Avoid this — pre-building the top rung "so you won't have to migrate later."** You pay the orchestrator's session plumbing or the planner's plan-generation trip on day one for a flexibility a single agent would have covered for months. Because the envelope and the tool surface are uniform, the migration you're fearing is a small, mechanical wrap when it finally comes — far cheaper than carrying the heavier rung's complexity through every iteration until then. Build the rung the task needs *today*; the ladder guarantees the climb stays cheap.
+**Avoid this — pre-building the top rung "so you won't have to migrate later."** You pay the orchestrator's session plumbing or the planner's plan-generation trip on day one for a flexibility a single agent would have covered for months. Because the envelope and the tool surface are uniform, the migration you're fearing is a small, mechanical wrap when it finally comes — far cheaper than carrying the heavier rung's complexity through every iteration until then. Build the rung the task needs _today_; the ladder guarantees the climb stays cheap.
 
 ## See also
 

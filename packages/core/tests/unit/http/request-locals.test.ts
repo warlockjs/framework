@@ -54,7 +54,7 @@ describe("Request — locals isolation across concurrent request contexts", () =
         // Yield so the two contexts genuinely interleave before reading back —
         // if `locals` were shared (module-level, not per-instance) this is
         // where the second write would clobber the first.
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         return useRequest().locals.owner;
       });

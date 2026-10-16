@@ -50,10 +50,12 @@ describe("AuthTokenFamily", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValue(family);
 
-    await expect(AuthTokenFamily.ensure({ id: 1, userType: "user" } as never, "family"))
-      .resolves.toBe(family);
-    await expect(AuthTokenFamily.ensure({ id: 1, userType: "user" } as never, "family"))
-      .resolves.toBe(family);
+    await expect(
+      AuthTokenFamily.ensure({ id: 1, userType: "user" } as never, "family"),
+    ).resolves.toBe(family);
+    await expect(
+      AuthTokenFamily.ensure({ id: 1, userType: "user" } as never, "family"),
+    ).resolves.toBe(family);
 
     expect(atomic).toHaveBeenCalledTimes(1);
   });

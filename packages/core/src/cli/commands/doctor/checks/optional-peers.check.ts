@@ -50,12 +50,7 @@ function text(value: unknown): string | undefined {
 function databasePeer(): RequiredPeer | undefined {
   const driver = text(config.get("database.driver"));
 
-  const packageName =
-    driver === "mongodb"
-      ? "mongodb"
-      : driver === "postgres"
-        ? "pg"
-        : undefined;
+  const packageName = driver === "mongodb" ? "mongodb" : driver === "postgres" ? "pg" : undefined;
 
   return packageName
     ? { package: packageName, because: `database.driver = "${driver}"` }

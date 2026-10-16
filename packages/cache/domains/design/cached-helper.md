@@ -11,16 +11,12 @@
 Turn any async function into a memoized version with a declared caching strategy.
 
 ```ts
-const getUser = cached(
-  (id: number) => db.users.find(id),
-  "user",
-  "1h",
-);
+const getUser = cached((id: number) => db.users.find(id), "user", "1h");
 
-await getUser(42);     // cache miss → runs, caches, returns
-await getUser(42);     // cache hit → no DB call
-await getUser.invalidate(42);   // drops the user.42 entry
-await getUser(42);     // miss again
+await getUser(42); // cache miss → runs, caches, returns
+await getUser(42); // cache hit → no DB call
+await getUser.invalidate(42); // drops the user.42 entry
+await getUser(42); // miss again
 ```
 
 Uses `remember()` under the hood — inherits the same stampede protection. Not a renamed alias; a higher-order wrapper.
@@ -70,20 +66,20 @@ type CachedOptions<Args extends unknown[]> = {
 ```
 
 **Deliberately excluded from options** (not a fit for the memoization pattern):
+
 - `onConflict` — a cached wrapper's purpose is "get or compute," not conditional writes.
 - `expiresAt` — the wrapper caches at each call site; absolute deadlines don't compose with "cache for TTL from first miss."
 
 ### `CachedFn<Args, R>`
 
 ```ts
-type CachedFn<Args extends unknown[], R> =
-  ((...args: Args) => Promise<R>) & {
-    /**
-     * Remove the cache entry for a specific argument combination.
-     * Uses the same key function the wrapper uses internally.
-     */
-    invalidate(...args: Args): Promise<void>;
-  };
+type CachedFn<Args extends unknown[], R> = ((...args: Args) => Promise<R>) & {
+  /**
+   * Remove the cache entry for a specific argument combination.
+   * Uses the same key function the wrapper uses internally.
+   */
+  invalidate(...args: Args): Promise<void>;
+};
 ```
 
 `.refresh()` and `.peek()` are **deferred** (per prior decision) — added only when there's real demand.
@@ -92,14 +88,14 @@ type CachedFn<Args extends unknown[], R> =
 
 When the caller uses `cached(fn, prefix)` or `cached(fn, prefix, ttl)`, we derive the key from `prefix` + the wrapped function's arguments. Rules:
 
-| Args shape | Rule | Example |
-|------------|------|---------|
-| No args | Just the prefix | `getFeatured()` → `"featured"` |
-| All primitives (string / number / boolean) | Prefix + args joined with `.` | `getUser(42)` → `"user.42"` |
-| Includes `null` / `undefined` | Serialize as literal `"null"` / `"undefined"` | `getBy("john", null)` → `"user.john.null"` |
-| Includes `bigint` | Convert via `.toString()` | `getById(1n)` → `"user.1"` |
-| Includes any other type | `JSON.stringify(args)` appended to prefix | `searchBy({ q: "a" })` → `"search.[{\"q\":\"a\"}]"` |
-| Serialization throws (circular / `BigInt` inside a nested object / `Map` / `Set`) | Throw `CacheConfigurationError` at the call site | — |
+| Args shape                                                                        | Rule                                             | Example                                             |
+| --------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------- |
+| No args                                                                           | Just the prefix                                  | `getFeatured()` → `"featured"`                      |
+| All primitives (string / number / boolean)                                        | Prefix + args joined with `.`                    | `getUser(42)` → `"user.42"`                         |
+| Includes `null` / `undefined`                                                     | Serialize as literal `"null"` / `"undefined"`    | `getBy("john", null)` → `"user.john.null"`          |
+| Includes `bigint`                                                                 | Convert via `.toString()`                        | `getById(1n)` → `"user.1"`                          |
+| Includes any other type                                                           | `JSON.stringify(args)` appended to prefix        | `searchBy({ q: "a" })` → `"search.[{\"q\":\"a\"}]"` |
+| Serialization throws (circular / `BigInt` inside a nested object / `Map` / `Set`) | Throw `CacheConfigurationError` at the call site | —                                                   |
 
 ### Caveats (documented, not bugs)
 
@@ -115,14 +111,15 @@ When the caller uses `cached(fn, prefix)` or `cached(fn, prefix, ttl)`, we deriv
 ### `remember` — extended to accept options
 
 The current signature:
+
 ```ts
-cache.remember(key, ttl, callback)
+cache.remember(key, ttl, callback);
 ```
 
 To support `tags` / `driver` cleanly in `cached`, we extend `remember` to accept an options object in the TTL position:
 
 ```ts
-cache.remember(key, ttlOrOptions, callback)
+cache.remember(key, ttlOrOptions, callback);
 
 // Where ttlOrOptions is:
 //   - CacheTtl (number or duration string) — current behavior
@@ -132,6 +129,7 @@ cache.remember(key, ttlOrOptions, callback)
 Backwards compatible — every existing `remember(k, 3600, fn)` call keeps working.
 
 `cached` implementation:
+
 ```ts
 function cached(fn, prefixOrOptions, maybeTtl) {
   const { keyFn, ttl, tags, driver } = normalizeArgs(prefixOrOptions, maybeTtl);
@@ -189,10 +187,14 @@ The `Args` and `R` type parameters are inferred from `fn` at the call site. The 
 Inherited directly from `remember`. Concurrent calls to the same wrapper with the same args share one in-flight promise (within a single process). No new code path.
 
 ```ts
-const getUser = cached(async (id: number) => {
-  console.log(`fetching user ${id}`);
-  return db.users.find(id);
-}, "user", "1h");
+const getUser = cached(
+  async (id: number) => {
+    console.log(`fetching user ${id}`);
+    return db.users.find(id);
+  },
+  "user",
+  "1h",
+);
 
 // 100 concurrent calls for the same id — "fetching user 42" logs ONCE
 await Promise.all(Array.from({ length: 100 }, () => getUser(42)));
@@ -228,6 +230,7 @@ Target: 15-20 tests, all in `cached/cached.spec.ts`.
 ## Docs
 
 Single page: `domains/cache/docs/cached.mdx` at sidebar_position around 10 (with the v2-features group). Includes:
+
 - Opening example (the getUser pattern).
 - The three shapes.
 - Auto-key rules + footguns + escape hatch.

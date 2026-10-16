@@ -109,7 +109,9 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
     const cacheKey = buildIdempotencyCacheKey(request, idempotencyKey);
     const bodyHash = hashBody(request.body);
 
-    const respondToExisting = (existing: CachedResponse | InFlightReservation | undefined | null) => {
+    const respondToExisting = (
+      existing: CachedResponse | InFlightReservation | undefined | null,
+    ) => {
       if (!existing || (existing as InFlightReservation).state === "in-flight") {
         response.header("Retry-After", "1");
 

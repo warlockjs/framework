@@ -69,9 +69,9 @@ describe("PostgresDriver transaction-local settings", () => {
   it("rejects an invalid setting name before acquiring a client", async () => {
     const driver = new PostgresDriver({ database: "test" });
 
-    await expect(driver.beginTransaction({ settings: { "app.tenant-id": "acme" } })).rejects.toThrow(
-      'Invalid PostgreSQL transaction setting name: "app.tenant-id"',
-    );
+    await expect(
+      driver.beginTransaction({ settings: { "app.tenant-id": "acme" } }),
+    ).rejects.toThrow('Invalid PostgreSQL transaction setting name: "app.tenant-id"');
 
     expect(connect).not.toHaveBeenCalled();
   });
@@ -87,9 +87,9 @@ describe("PostgresDriver transaction-local settings", () => {
     );
     connect.mockResolvedValue(client);
 
-    await expect(
-      driver.beginTransaction({ settings: { "app.tenant_id": "acme" } }),
-    ).rejects.toBe(settingError);
+    await expect(driver.beginTransaction({ settings: { "app.tenant_id": "acme" } })).rejects.toBe(
+      settingError,
+    );
 
     expect(client.query.mock.calls).toEqual([
       ["BEGIN"],

@@ -84,7 +84,7 @@ required reviewer, by owner choice: a green gate authorises the publish.
    `package.json` version and every literal `@warlock.js/*` pin, date each
    `CHANGELOG.md` heading, run the llms projections (see "Docs are part of the
    release"). `main` clean and pushed; check `git ls-remote origin
-refs/heads/main` against local `HEAD`. If any dependency changed, the root
+   refs/heads/main` against local `HEAD`. If any dependency changed, the root
    `pnpm-lock.yaml` must be committed with it (CI installs `--frozen-lockfile`).
 2. **Test run**: dispatch `release.yml` with `publish` off. It must be green
    through the blog step. Fix, push, repeat.
@@ -434,7 +434,7 @@ a manual `npm publish`.**
    `zero-edit-generator-matrix` skill.
 
    **Since 5.6 the runner enforces the first half of this.** `--matrix none |
-subset | full` is required on a gate run and has no default; `subset` and
+   subset | full` is required on a gate run and has no default; `subset` and
    `full` additionally require `--authorised-by`, `--authorisation-date` and
    `--authorisation "<their words>"`. The scope, the rows and the quoted
    authorisation ride in the handoff, so the publish step can read them back
@@ -460,7 +460,7 @@ node --import tsx scripts/release-family.ts confirm  --version 5.9.0
 - **Publish auth (since builder `8304b52`):** the publish env falls back to the
   token in the user's global `~/.npmrc` when `NPM_TOKEN` is not set — so an
   interactive release needs neither a per-release env var nor a manual `npm
-publish`. `NPM_TOKEN` still wins when present (CI).
+  publish`. `NPM_TOKEN` still wins when present (CI).
 - **`confirm` after publish:** a 404 can be propagation lag; never republish.
   Registry views and install/import/scaffold checks share one thirty-minute
   deadline with three-to-sixty-second exponential backoff. Already-live
@@ -728,7 +728,7 @@ no task ids, no internal process, no tooling detail.
 
 - **One member failed to publish while the rest succeeded.** pkgist 1.6.3 does
   accept a family member by name: `pkgist build <family-member> --bump
-<exact-version> --no-publish --no-git`. That is useful when intentionally
+  <exact-version> --no-publish --no-git`. That is useful when intentionally
   producing a new candidate, but it is **not** the first recovery move: it
   rebuilds the package, changes the bytes, and therefore requires a new local
   gate and publish handoff. Re-running `build:family` is worse — it rebuilds

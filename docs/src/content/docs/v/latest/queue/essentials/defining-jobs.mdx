@@ -39,15 +39,15 @@ Warlock app, anything under `src/app` loaded at boot, since
 
 The handler's second argument:
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | `string` | The job id |
-| `name` | `string` | The name given to `defineJob` |
-| `queue` | `string` | The queue this job runs on |
-| `attempt` | `number` | Current attempt, starting at `1` |
-| `maxAttempts` | `number` | Total attempts allowed |
+| Field             | Type            | Notes                                       |
+| ----------------- | --------------- | ------------------------------------------- |
+| `id`              | `string`        | The job id                                  |
+| `name`            | `string`        | The name given to `defineJob`               |
+| `queue`           | `string`        | The queue this job runs on                  |
+| `attempt`         | `number`        | Current attempt, starting at `1`            |
+| `maxAttempts`     | `number`        | Total attempts allowed                      |
 | `progress(value)` | `Promise<void>` | Record progress — a number or a JSON object |
-| `log(line)` | `Promise<void>` | Append a line to the job's log |
+| `log(line)`       | `Promise<void>` | Append a line to the job's log              |
 
 ## Carry request context into jobs
 
@@ -73,13 +73,16 @@ setQueueContext(
 ```ts
 const { id } = await sendInvoice.dispatch({ invoiceId: "42" });
 
-await sendInvoice.dispatch({ invoiceId: "43" }, {
-  delay: "10m", // a number of ms, or "500ms" | "30s" | "10m" | "2h" | "1d"
-  priority: 1, // 1 runs first; larger numbers later; omitted runs ahead of any prioritized job
-  jobId: "invoice:43", // dispatching again with a still-live id is a no-op — idempotent dispatch
-  attempts: 3, // overrides defineJob's attempts for this call only
-  backoff: { type: "fixed", delay: 500 },
-});
+await sendInvoice.dispatch(
+  { invoiceId: "43" },
+  {
+    delay: "10m", // a number of ms, or "500ms" | "30s" | "10m" | "2h" | "1d"
+    priority: 1, // 1 runs first; larger numbers later; omitted runs ahead of any prioritized job
+    jobId: "invoice:43", // dispatching again with a still-live id is a no-op — idempotent dispatch
+    attempts: 3, // overrides defineJob's attempts for this call only
+    backoff: { type: "fixed", delay: 500 },
+  },
+);
 ```
 
 Option precedence for `attempts` / `backoff`: dispatch options >

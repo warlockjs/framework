@@ -15,13 +15,7 @@ import { safeJsonStringify } from "../utils/safe-json-stringify";
 /**
  * Sentry severity levels — the `@sentry/node` `SeverityLevel` union.
  */
-type SentrySeverityLevel =
-  | "fatal"
-  | "error"
-  | "warning"
-  | "log"
-  | "info"
-  | "debug";
+type SentrySeverityLevel = "fatal" | "error" | "warning" | "log" | "info" | "debug";
 
 /**
  * The Sentry `Scope` surface used while building a single event.

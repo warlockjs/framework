@@ -51,17 +51,17 @@ Two type parameters on the generic: `T` (the model) and `F` (the filter shape). 
 
 Every property below is optional except `source`.
 
-| Property              | Type                          | What it does                                                            |
-| --------------------- | ----------------------------- | ----------------------------------------------------------------------- |
-| `source`              | model class                   | Used by the default adapter resolver. The framework reads it to know what model to query. |
-| `filterBy`            | `FilterRules`                 | Maps filter keys to query operations. The heart of the repository.       |
-| `defaultOptions`      | `Partial<RepositoryOptions>`  | Applied to every list/all query unless the caller overrides.            |
-| `simpleSelectColumns` | `string[]`                    | Column subset returned when callers pass `simpleSelect: true`.          |
-| `isActiveColumn`      | `string` (default `"isActive"`) | The column the `*Active` variants filter on.                            |
-| `isActiveValue`       | `any` (default `true`)        | The value `isActiveColumn` must match for `*Active` queries.            |
-| `name`                | `string`                      | Used as a prefix in cache keys. Auto-resolved from the model's table.   |
-| `isCacheable`         | `boolean` (default `true`)    | Master switch for caching on this repository.                           |
-| `cacheDriver`         | `CacheDriver`                 | Per-repository cache driver. Falls back to the app's default.           |
+| Property              | Type                            | What it does                                                                              |
+| --------------------- | ------------------------------- | ----------------------------------------------------------------------------------------- |
+| `source`              | model class                     | Used by the default adapter resolver. The framework reads it to know what model to query. |
+| `filterBy`            | `FilterRules`                   | Maps filter keys to query operations. The heart of the repository.                        |
+| `defaultOptions`      | `Partial<RepositoryOptions>`    | Applied to every list/all query unless the caller overrides.                              |
+| `simpleSelectColumns` | `string[]`                      | Column subset returned when callers pass `simpleSelect: true`.                            |
+| `isActiveColumn`      | `string` (default `"isActive"`) | The column the `*Active` variants filter on.                                              |
+| `isActiveValue`       | `any` (default `true`)          | The value `isActiveColumn` must match for `*Active` queries.                              |
+| `name`                | `string`                        | Used as a prefix in cache keys. Auto-resolved from the model's table.                     |
+| `isCacheable`         | `boolean` (default `true`)      | Master switch for caching on this repository.                                             |
+| `cacheDriver`         | `CacheDriver`                   | Per-repository cache driver. Falls back to the app's default.                             |
 
 The exported instance is the singleton — every service in the module imports the same instance.
 
@@ -71,72 +71,72 @@ These are inherited from `RepositoryManager`. The page in essentials shows the s
 
 ### Read — by id
 
-| Method                  | Returns               | Notes                                                |
-| ----------------------- | --------------------- | ---------------------------------------------------- |
-| `find(id)`              | `T \| null`           | By primary key.                                      |
-| `findBy(column, value)` | `T \| null`           | By any column.                                       |
-| `findActive(id)`        | `T \| null`           | By id, filtered by `isActiveColumn`.                 |
-| `findByActive(col, v)`  | `T \| null`           | By column, filtered by `isActiveColumn`.             |
-| `idExists(id)`          | `boolean`             | Exists-by-id shortcut.                               |
-| `idExistsActive(id)`    | `boolean`             | Same, active only.                                   |
+| Method                  | Returns     | Notes                                    |
+| ----------------------- | ----------- | ---------------------------------------- |
+| `find(id)`              | `T \| null` | By primary key.                          |
+| `findBy(column, value)` | `T \| null` | By any column.                           |
+| `findActive(id)`        | `T \| null` | By id, filtered by `isActiveColumn`.     |
+| `findByActive(col, v)`  | `T \| null` | By column, filtered by `isActiveColumn`. |
+| `idExists(id)`          | `boolean`   | Exists-by-id shortcut.                   |
+| `idExistsActive(id)`    | `boolean`   | Same, active only.                       |
 
 ### Read — first / last by filter
 
-| Method                       | Returns              | Notes                                                            |
-| ---------------------------- | -------------------- | ---------------------------------------------------------------- |
-| `first(options?)`            | `T \| null`          | First match for the filter.                                      |
-| `firstActive(options?)`      | `T \| null`          | First match, active only.                                        |
-| `last(options?)`             | `T \| null`          | Last match (orderBy `id desc` by default).                       |
-| `lastActive(options?)`       | `T \| null`          | Same, active only.                                               |
-| `firstId(options?)`          | `string \| number`   | `first()` then `.id`.                                            |
-| `firstUuid(options?)`        | `string`             | `first()` then `.uuid`.                                          |
-| `firstActiveId(options?)`    | `string \| number`   | First active, just the id.                                       |
-| `firstActiveUuid(options?)`  | `string`             | First active, just the uuid.                                     |
-| `exists(filter?)`            | `boolean`            | Existence check by filter.                                       |
-| `existsActive(filter?)`      | `boolean`            | Same, active only.                                               |
+| Method                      | Returns            | Notes                                      |
+| --------------------------- | ------------------ | ------------------------------------------ |
+| `first(options?)`           | `T \| null`        | First match for the filter.                |
+| `firstActive(options?)`     | `T \| null`        | First match, active only.                  |
+| `last(options?)`            | `T \| null`        | Last match (orderBy `id desc` by default). |
+| `lastActive(options?)`      | `T \| null`        | Same, active only.                         |
+| `firstId(options?)`         | `string \| number` | `first()` then `.id`.                      |
+| `firstUuid(options?)`       | `string`           | `first()` then `.uuid`.                    |
+| `firstActiveId(options?)`   | `string \| number` | First active, just the id.                 |
+| `firstActiveUuid(options?)` | `string`           | First active, just the uuid.               |
+| `exists(filter?)`           | `boolean`          | Existence check by filter.                 |
+| `existsActive(filter?)`     | `boolean`          | Same, active only.                         |
 
 ### Read — listing
 
 The headline pair plus their variants:
 
-| Method                       | Returns                                            | Notes                                  |
-| ---------------------------- | -------------------------------------------------- | -------------------------------------- |
-| `list(options?)`             | `{ data, pagination }` (pages or cursor)           | The default list.                      |
-| `listActive(options?)`       | same                                               | List, active only.                     |
-| `all(options?)`              | `T[]`                                              | Non-paginated. Be careful on big sets. |
-| `allActive(options?)`        | `T[]`                                              | Same, active only.                     |
-| `latest(options?)`           | `{ data, pagination }`                             | `orderBy: ["id", "desc"]`.             |
-| `latestActive(options?)`     | same                                               | Latest, active only.                   |
-| `oldest(options?)`           | same                                               | `orderBy: ["id", "asc"]`.              |
-| `oldestActive(options?)`     | same                                               | Oldest, active only.                   |
+| Method                   | Returns                                  | Notes                                  |
+| ------------------------ | ---------------------------------------- | -------------------------------------- |
+| `list(options?)`         | `{ data, pagination }` (pages or cursor) | The default list.                      |
+| `listActive(options?)`   | same                                     | List, active only.                     |
+| `all(options?)`          | `T[]`                                    | Non-paginated. Be careful on big sets. |
+| `allActive(options?)`    | `T[]`                                    | Same, active only.                     |
+| `latest(options?)`       | `{ data, pagination }`                   | `orderBy: ["id", "desc"]`.             |
+| `latestActive(options?)` | same                                     | Latest, active only.                   |
+| `oldest(options?)`       | same                                     | `orderBy: ["id", "asc"]`.              |
+| `oldestActive(options?)` | same                                     | Oldest, active only.                   |
 
 ### Read — counts
 
-| Method                       | Returns                                            | Notes                                  |
-| ---------------------------- | -------------------------------------------------- | -------------------------------------- |
-| `count(options?)`            | `number`                                           | Count by filter.                       |
-| `countActive(options?)`      | `number`                                           | Count, active only.                    |
-| `countCached(options?)`      | `number`                                           | Cached count.                          |
-| `countActiveCached(options?)` | `number`                                          | Cached count, active only.             |
+| Method                        | Returns  | Notes                      |
+| ----------------------------- | -------- | -------------------------- |
+| `count(options?)`             | `number` | Count by filter.           |
+| `countActive(options?)`       | `number` | Count, active only.        |
+| `countCached(options?)`       | `number` | Cached count.              |
+| `countActiveCached(options?)` | `number` | Cached count, active only. |
 
 ### Write
 
-| Method                            | Returns | Notes                                                              |
-| --------------------------------- | ------- | ------------------------------------------------------------------ |
-| `create(data)`                    | `T`     | Insert. Fires the model's `creating` / `created` events.           |
-| `update(id, data)`                | `T`     | Update by id. Fires `updating` / `updated`. Accepts model or id.   |
-| `delete(id)`                      | `void`  | Delete by id. Fires `deleting` / `deleted`.                        |
-| `updateMany(filter, data)`        | `number` | Bulk update. Returns affected count.                              |
-| `deleteMany(filter)`              | `number` | Bulk delete. Returns deleted count.                               |
-| `findOrCreate(where, data)`       | `T`     | Find or insert if missing.                                         |
-| `updateOrCreate(where, data)`     | `T`     | True upsert.                                                       |
+| Method                        | Returns  | Notes                                                            |
+| ----------------------------- | -------- | ---------------------------------------------------------------- |
+| `create(data)`                | `T`      | Insert. Fires the model's `creating` / `created` events.         |
+| `update(id, data)`            | `T`      | Update by id. Fires `updating` / `updated`. Accepts model or id. |
+| `delete(id)`                  | `void`   | Delete by id. Fires `deleting` / `deleted`.                      |
+| `updateMany(filter, data)`    | `number` | Bulk update. Returns affected count.                             |
+| `deleteMany(filter)`          | `number` | Bulk delete. Returns deleted count.                              |
+| `findOrCreate(where, data)`   | `T`      | Find or insert if missing.                                       |
+| `updateOrCreate(where, data)` | `T`      | True upsert.                                                     |
 
 ### Bulk read
 
-| Method                                  | Returns | Notes                                                          |
-| --------------------------------------- | ------- | -------------------------------------------------------------- |
-| `chunk(size, callback, options?)`       | `void`  | Process in chunks. Return `false` from the callback to stop.   |
-| `chunkActive(size, callback, options?)` | `void`  | Same, active only.                                             |
+| Method                                  | Returns | Notes                                                        |
+| --------------------------------------- | ------- | ------------------------------------------------------------ |
+| `chunk(size, callback, options?)`       | `void`  | Process in chunks. Return `false` from the callback to stop. |
+| `chunkActive(size, callback, options?)` | `void`  | Same, active only.                                           |
 
 A real chunk pattern — for reindexing or batch jobs:
 
@@ -154,22 +154,22 @@ await productsRepository.chunk(500, async (products, chunkIndex) => {
 
 Every cached variant. The plain `list/find/all/first/last` versions have a `*Cached` sibling — pick the cached one for read-heavy endpoints with stable filters.
 
-| Method                              | Returns                  | Notes                                          |
-| ----------------------------------- | ------------------------ | ---------------------------------------------- |
-| `findCached(id)` / `getCached(id)`  | `T \| null` (cached)     | The two names are aliases.                     |
-| `getCachedBy(column, value)`        | `T \| null` (cached)     | Cached version of `findBy`.                    |
-| `getActiveCached(id)`               | `T \| undefined`         | Cached, also checks the active column.         |
-| `firstCached(options?)`             | `T \| null` (cached)     | Cached `first()`.                              |
-| `firstActiveCached(options?)`       | same                     | First active, cached.                          |
-| `lastCached(options?)`              | `T \| null` (cached)     | Cached `last()`.                               |
-| `lastActiveCached(options?)`        | same                     | Last active, cached.                           |
-| `listCached(options?)`              | `{ data, pagination }`   | Cached page list (page-mode only).             |
-| `listActiveCached(options?)`        | same                     | Cached list, active only.                      |
-| `allCached(options?)`               | `T[]` (cached)           | Cached non-paginated list.                     |
-| `allActiveCached(options?)`         | `T[]` (cached)           | Same, active only.                             |
-| `countCached(options?)`             | `number` (cached)        | Cached count.                                  |
-| `firstCachedId / firstCachedUuid`   | id-or-uuid               | Cached id/uuid helpers.                        |
-| `firstActiveCachedId / Uuid`        | id-or-uuid               | Same, active.                                  |
+| Method                             | Returns                | Notes                                  |
+| ---------------------------------- | ---------------------- | -------------------------------------- |
+| `findCached(id)` / `getCached(id)` | `T \| null` (cached)   | The two names are aliases.             |
+| `getCachedBy(column, value)`       | `T \| null` (cached)   | Cached version of `findBy`.            |
+| `getActiveCached(id)`              | `T \| undefined`       | Cached, also checks the active column. |
+| `firstCached(options?)`            | `T \| null` (cached)   | Cached `first()`.                      |
+| `firstActiveCached(options?)`      | same                   | First active, cached.                  |
+| `lastCached(options?)`             | `T \| null` (cached)   | Cached `last()`.                       |
+| `lastActiveCached(options?)`       | same                   | Last active, cached.                   |
+| `listCached(options?)`             | `{ data, pagination }` | Cached page list (page-mode only).     |
+| `listActiveCached(options?)`       | same                   | Cached list, active only.              |
+| `allCached(options?)`              | `T[]` (cached)         | Cached non-paginated list.             |
+| `allActiveCached(options?)`        | `T[]` (cached)         | Same, active only.                     |
+| `countCached(options?)`            | `number` (cached)      | Cached count.                          |
+| `firstCachedId / firstCachedUuid`  | id-or-uuid             | Cached id/uuid helpers.                |
+| `firstActiveCachedId / Uuid`       | id-or-uuid             | Same, active.                          |
 
 Cache invalidation is automatic — see the [caching section](#caching) below.
 
@@ -197,16 +197,16 @@ type RepositoryOptions = {
 
 The interesting ones:
 
-| Field            | Purpose                                                                        |
-| ---------------- | ------------------------------------------------------------------------------ |
-| `page`           | 1-indexed page number (default `1`).                                           |
-| `limit`          | Items per page. Defaults via `defaultLimit` or `15`.                           |
-| `defaultLimit`   | Fallback when `limit` isn't set. Per-repository default.                       |
-| `select`         | Explicit column allow-list.                                                    |
-| `simpleSelect`   | When `true`, use `simpleSelectColumns` from the repository.                    |
-| `deselect`       | Explicit deny-list of columns.                                                 |
-| `orderBy`        | The only ordering field that's honored. Three forms — see below.              |
-| `perform`        | Escape hatch — custom query callback. Covered in [Custom queries](#custom-queries-beyond-filterby). |
+| Field          | Purpose                                                                                             |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| `page`         | 1-indexed page number (default `1`).                                                                |
+| `limit`        | Items per page. Defaults via `defaultLimit` or `15`.                                                |
+| `defaultLimit` | Fallback when `limit` isn't set. Per-repository default.                                            |
+| `select`       | Explicit column allow-list.                                                                         |
+| `simpleSelect` | When `true`, use `simpleSelectColumns` from the repository.                                         |
+| `deselect`     | Explicit deny-list of columns.                                                                      |
+| `orderBy`      | The only ordering field that's honored. Three forms — see below.                                    |
+| `perform`      | Escape hatch — custom query callback. Covered in [Custom queries](#custom-queries-beyond-filterby). |
 
 > **`sortBy` / `sortDirection` are not honored.** The `RepositoryOptions` type still carries them, but `applyOptionsToQuery` only reads `orderBy` — passing `sortBy`/`sortDirection` does nothing. Use `orderBy` for all ordering. Likewise, there is no working `purgeCache` option: invalidation is driven by model events (see [Caching](#caching)), so a `purgeCache` flag on the options object is inert.
 
@@ -315,11 +315,11 @@ The cached `listCached(...)` is **page-mode only**. Cursor pagination skips the 
 
 ```ts
 type FilterRule =
-  | FilterOperator                       // "="   →  WHERE key = value
-  | FilterFunction                       // (value, query, ctx) => void
-  | [FilterOperator]                     // ["="]  →  same as "="
-  | [FilterOperator, string]             // ["in", "id"]  →  rename
-  | [FilterOperator, string[]];          // ["like", ["name", "description"]]  →  OR across columns
+  | FilterOperator // "="   →  WHERE key = value
+  | FilterFunction // (value, query, ctx) => void
+  | [FilterOperator] // ["="]  →  same as "="
+  | [FilterOperator, string] // ["in", "id"]  →  rename
+  | [FilterOperator, string[]]; // ["like", ["name", "description"]]  →  OR across columns
 ```
 
 ### The four shapes
@@ -348,67 +348,67 @@ Every operator the Cascade adapter supports. Anything else falls through to `Whe
 
 #### SQL where operators
 
-| Operator       | What it does                            | Filter input                              |
-| -------------- | --------------------------------------- | ----------------------------------------- |
-| `"="`          | `WHERE col = value`                     | scalar                                    |
-| `"!="` / `"<>"`| `WHERE col != value`                    | scalar                                    |
-| `">"` / `">="` | `WHERE col > value` / `>=`              | scalar                                    |
-| `"<"` / `"<="` | `WHERE col < value` / `<=`              | scalar                                    |
-| `"like"`       | `WHERE col LIKE value`                  | string with `%` or plain (framework adds) |
-| `"not like"`   | `WHERE col NOT LIKE value`              | string                                    |
-| `"in"`         | `WHERE col IN (...)`                    | array (single-value auto-wraps)           |
-| `"not in"`     | `WHERE col NOT IN (...)`                | array                                     |
-| `"between"`    | `WHERE col BETWEEN a AND b`             | `[a, b]`                                  |
-| `"not between"`| `WHERE col NOT BETWEEN a AND b`         | `[a, b]`                                  |
+| Operator        | What it does                    | Filter input                              |
+| --------------- | ------------------------------- | ----------------------------------------- |
+| `"="`           | `WHERE col = value`             | scalar                                    |
+| `"!="` / `"<>"` | `WHERE col != value`            | scalar                                    |
+| `">"` / `">="`  | `WHERE col > value` / `>=`      | scalar                                    |
+| `"<"` / `"<="`  | `WHERE col < value` / `<=`      | scalar                                    |
+| `"like"`        | `WHERE col LIKE value`          | string with `%` or plain (framework adds) |
+| `"not like"`    | `WHERE col NOT LIKE value`      | string                                    |
+| `"in"`          | `WHERE col IN (...)`            | array (single-value auto-wraps)           |
+| `"not in"`      | `WHERE col NOT IN (...)`        | array                                     |
+| `"between"`     | `WHERE col BETWEEN a AND b`     | `[a, b]`                                  |
+| `"not between"` | `WHERE col NOT BETWEEN a AND b` | `[a, b]`                                  |
 
 #### Type-coercing operators
 
 These coerce the incoming filter value before applying the comparison — useful when the query string came from an HTTP request and everything is a string by default.
 
-| Operator     | Behaviour                                                          |
-| ------------ | ------------------------------------------------------------------ |
-| `"bool"` / `"boolean"` | Coerce value via truthy rules, then `WHERE col = value`. |
-| `"int"` / `"integer"`  | `parseInt(value)`, then `WHERE col = value`.            |
-| `"!int"`     | `parseInt(value)`, then `WHERE col != value`.                      |
-| `"int>"` / `"int>="` / `"int<"` / `"int<="` | `parseInt`, then `WHERE col <op> value`. |
-| `"inInt"`    | `parseInt` on each item, then `WHERE col IN (...)`.                |
-| `"number"`   | `Number(value)`, then `WHERE col = value`.                         |
-| `"inNumber"` | `Number` on each item, then `WHERE col IN (...)`.                  |
-| `"float"` / `"double"` | `parseFloat(value)`, then `WHERE col = value`.           |
-| `"inFloat"`  | `parseFloat` per item, then `WHERE col IN (...)`.                  |
+| Operator                                    | Behaviour                                                |
+| ------------------------------------------- | -------------------------------------------------------- |
+| `"bool"` / `"boolean"`                      | Coerce value via truthy rules, then `WHERE col = value`. |
+| `"int"` / `"integer"`                       | `parseInt(value)`, then `WHERE col = value`.             |
+| `"!int"`                                    | `parseInt(value)`, then `WHERE col != value`.            |
+| `"int>"` / `"int>="` / `"int<"` / `"int<="` | `parseInt`, then `WHERE col <op> value`.                 |
+| `"inInt"`                                   | `parseInt` on each item, then `WHERE col IN (...)`.      |
+| `"number"`                                  | `Number(value)`, then `WHERE col = value`.               |
+| `"inNumber"`                                | `Number` on each item, then `WHERE col IN (...)`.        |
+| `"float"` / `"double"`                      | `parseFloat(value)`, then `WHERE col = value`.           |
+| `"inFloat"`                                 | `parseFloat` per item, then `WHERE col IN (...)`.        |
 
 #### Null operators
 
-| Operator           | Behaviour                              |
-| ------------------ | -------------------------------------- |
-| `"null"`           | `WHERE col IS NULL`.                   |
-| `"notNull"` / `"!null"` | `WHERE col IS NOT NULL`.          |
+| Operator                | Behaviour                |
+| ----------------------- | ------------------------ |
+| `"null"`                | `WHERE col IS NULL`.     |
+| `"notNull"` / `"!null"` | `WHERE col IS NOT NULL`. |
 
 #### Date / datetime operators
 
 These respect `dateFormat: "DD-MM-YYYY"` and `dateTimeFormat: "DD-MM-YYYY HH:mm:ss"` (the framework defaults).
 
-| Operator                                | Behaviour                                                       |
-| --------------------------------------- | --------------------------------------------------------------- |
-| `"date"`                                | Parse value as date, then `WHERE col = date`.                   |
-| `"date>"` / `"date>="` / `"date<"` / `"date<="` | Parse + comparison.                                  |
-| `"dateBetween"`                         | Value is `[from, to]`. `WHERE col BETWEEN`.                     |
-| `"inDate"`                              | Array of dates. `WHERE col IN (...)`.                           |
-| `"dateTime"`                            | Same shape as `"date"` but uses `dateTimeFormat`.               |
-| `"dateTime>"` / `>=` / `<` / `<=`       | DateTime comparisons.                                            |
-| `"dateTimeBetween"`                     | DateTime between.                                                |
-| `"inDateTime"`                          | DateTime IN.                                                     |
+| Operator                                        | Behaviour                                         |
+| ----------------------------------------------- | ------------------------------------------------- |
+| `"date"`                                        | Parse value as date, then `WHERE col = date`.     |
+| `"date>"` / `"date>="` / `"date<"` / `"date<="` | Parse + comparison.                               |
+| `"dateBetween"`                                 | Value is `[from, to]`. `WHERE col BETWEEN`.       |
+| `"inDate"`                                      | Array of dates. `WHERE col IN (...)`.             |
+| `"dateTime"`                                    | Same shape as `"date"` but uses `dateTimeFormat`. |
+| `"dateTime>"` / `>=` / `<` / `<=`               | DateTime comparisons.                             |
+| `"dateTimeBetween"`                             | DateTime between.                                 |
+| `"inDateTime"`                                  | DateTime IN.                                      |
 
 #### Relation operators
 
 These reach into Cascade's relation system from the filter layer.
 
-| Operator         | Behaviour                                                                  |
-| ---------------- | -------------------------------------------------------------------------- |
-| `"with"`         | Eager-load the named relation when the filter value is truthy.             |
-| `"joinWith"`     | Eager-load via SQL JOIN (forces an INNER JOIN — implicitly filters).       |
-| `"scope"`        | Apply a model scope (e.g. `Model.scope("published")`) when value is truthy. |
-| `"similarTo"`    | Vector similarity search — `column similarTo embeddingArray`.              |
+| Operator      | Behaviour                                                                   |
+| ------------- | --------------------------------------------------------------------------- |
+| `"with"`      | Eager-load the named relation when the filter value is truthy.              |
+| `"joinWith"`  | Eager-load via SQL JOIN (forces an INNER JOIN — implicitly filters).        |
+| `"scope"`     | Apply a model scope (e.g. `Model.scope("published")`) when value is truthy. |
+| `"similarTo"` | Vector similarity search — `column similarTo embeddingArray`.               |
 
 A real example from the reference codebase — joining contacts onto chat queries:
 
@@ -645,8 +645,8 @@ Writes on this repository **or any other code path that fires the model events**
 For finer control, you can invalidate manually:
 
 ```ts
-await productsRepository.clearCache();          // wipe the whole namespace
-await productsRepository.clearModelCache(prod);  // wipe a single id
+await productsRepository.clearCache(); // wipe the whole namespace
+await productsRepository.clearModelCache(prod); // wipe a single id
 ```
 
 ### Per-repository driver

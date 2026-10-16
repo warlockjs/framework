@@ -22,7 +22,12 @@ describe.skipIf(!redisAvailable)("queueConnector().boot() with the dashboard ena
     resetQueueConfig();
 
     vi.doMock("@warlock.js/core", () => ({
-      config: { get: () => ({ ...testQueueConfig(), dashboard: { enabled: true, middleware: [() => undefined] } }) },
+      config: {
+        get: () => ({
+          ...testQueueConfig(),
+          dashboard: { enabled: true, middleware: [() => undefined] },
+        }),
+      },
       getHttpServer: () => server,
     }));
   });

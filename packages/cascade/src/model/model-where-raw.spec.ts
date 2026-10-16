@@ -14,8 +14,15 @@ describe("Model.whereRaw", () => {
   beforeEach(() => {
     dataSourceRegistry.clear();
 
-    const driver = { dialect: new PostgresDialect(), on: () => undefined } as Record<string, unknown>;
-    const dataSource = new DataSource({ name: "where-raw", driver: driver as never, isDefault: true });
+    const driver = { dialect: new PostgresDialect(), on: () => undefined } as Record<
+      string,
+      unknown
+    >;
+    const dataSource = new DataSource({
+      name: "where-raw",
+      driver: driver as never,
+      isDefault: true,
+    });
     driver.queryBuilder = (table: string) => new PostgresQueryBuilder(table, dataSource);
     dataSourceRegistry.register(dataSource);
   });

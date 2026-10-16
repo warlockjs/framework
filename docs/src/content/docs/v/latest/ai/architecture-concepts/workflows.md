@@ -18,7 +18,7 @@ This page is the mental model. For the API surface see [Run workflow](/v/latest/
 - **Branch on intermediate results** — `nextStep` reads completed step outputs.
 - **Run children in parallel** when they're independent.
 
-Reach for a supervisor when the *shape* changes per call. Reach for an [orchestrator](/v/latest/ai/architecture-concepts/orchestrators/) when the *session* matters across runs.
+Reach for a supervisor when the _shape_ changes per call. Reach for an [orchestrator](/v/latest/ai/architecture-concepts/orchestrators/) when the _session_ matters across runs.
 
 ## The step lifecycle
 
@@ -28,18 +28,18 @@ Every step runs through the same phases:
 skip? → before? → (run | agent | parallel) → output.extract (+ schema) → after? → nextStep?
 ```
 
-| Phase | What it owns |
-| --- | --- |
-| `skip` | Return `true` to skip the step entirely. Output becomes `undefined`. |
-| `before` | Pre-work — fetch resources, set state, validate. |
-| `run` | The core non-agent work — pure code. |
-| `agent` | An agent to dispatch. `input(ctx)` builds the prompt from current state. |
-| `parallel` | A list of child steps that fan out and settle together. |
-| `output.extract` | Pull the step's output value out of `ctx`. Schema-validated if `schema` is supplied. |
-| `after` | Post-work — save, notify, emit metrics. |
-| `nextStep` | Step-level routing on success. Return `{ goto: "stepName" }`, `{ end: true }`, or void to fall through. |
-| `onFailure` | Step-level recovery after retries exhaust. |
-| `onCancel` | Cleanup if the signal aborts in flight. |
+| Phase            | What it owns                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `skip`           | Return `true` to skip the step entirely. Output becomes `undefined`.                                    |
+| `before`         | Pre-work — fetch resources, set state, validate.                                                        |
+| `run`            | The core non-agent work — pure code.                                                                    |
+| `agent`          | An agent to dispatch. `input(ctx)` builds the prompt from current state.                                |
+| `parallel`       | A list of child steps that fan out and settle together.                                                 |
+| `output.extract` | Pull the step's output value out of `ctx`. Schema-validated if `schema` is supplied.                    |
+| `after`          | Post-work — save, notify, emit metrics.                                                                 |
+| `nextStep`       | Step-level routing on success. Return `{ goto: "stepName" }`, `{ end: true }`, or void to fall through. |
+| `onFailure`      | Step-level recovery after retries exhaust.                                                              |
+| `onCancel`       | Cleanup if the signal aborts in flight.                                                                 |
 
 Errors in `before` / `run` / `agent` / `after` / `output` are retryable per the step's `retry` config. Errors in `nextStep` / `onFailure` terminate the workflow immediately — those are programmer errors, not transient failures.
 
@@ -47,11 +47,11 @@ Errors in `before` / `run` / `agent` / `after` / `output` are retryable per the 
 
 ```ts
 type WorkflowContext<TInput, TState, TContext> = {
-  readonly input: TInput;                         // frozen — the durable cause
-  readonly context: TContext;                     // frozen — per-execution, never persisted
-  readonly steps: Record<string, StepSnapshot>;   // frozen snapshots of completed steps
-  state: TState;                                  // mutable — current shared state
-  readonly agentResult?: AgentResult<unknown>;    // set when current step has an agent
+  readonly input: TInput; // frozen — the durable cause
+  readonly context: TContext; // frozen — per-execution, never persisted
+  readonly steps: Record<string, StepSnapshot>; // frozen snapshots of completed steps
+  state: TState; // mutable — current shared state
+  readonly agentResult?: AgentResult<unknown>; // set when current step has an agent
   readonly runId: string;
   readonly signal?: AbortSignal;
   readonly startedAt: Date;
@@ -60,9 +60,9 @@ type WorkflowContext<TInput, TState, TContext> = {
 
 The three buckets answer three different questions:
 
-- **`input`** — *what* are we processing? Frozen. Replayed verbatim on resume.
-- **`context`** — *who* is running it? Tenancy, user, locale, traceId. Frozen. **Never persisted** — callers pass fresh on every `execute()` and `resume()`.
-- **`state`** — *what's in flight right now?* Mutable. Cloned on each retry attempt.
+- **`input`** — _what_ are we processing? Frozen. Replayed verbatim on resume.
+- **`context`** — _who_ is running it? Tenancy, user, locale, traceId. Frozen. **Never persisted** — callers pass fresh on every `execute()` and `resume()`.
+- **`state`** — _what's in flight right now?_ Mutable. Cloned on each retry attempt.
 
 The split matters because of resume: when you re-run a workflow with `resume(runId)`, the framework rehydrates `input` from the snapshot but needs `context` fresh from the caller (DB connections, request IDs, current user). Mixing them would persist things you don't want persisted.
 
@@ -129,9 +129,9 @@ Drift is the framework refusing to silently corrupt your data. You then choose: 
 ```ts
 type WorkflowResult<TOutput> = {
   type: "workflow";
-  data?: TOutput;            // from workflow.output.extract
-  report: WorkflowReport;    // runId, signature, status, timings, per-step snapshots
-  usage: Usage;              // aggregated across all agent calls
+  data?: TOutput; // from workflow.output.extract
+  report: WorkflowReport; // runId, signature, status, timings, per-step snapshots
+  usage: Usage; // aggregated across all agent calls
   error?: AIError;
 };
 ```

@@ -21,9 +21,7 @@ function partsOf(content: Message["content"]): MappedContentPart[] {
 
 describe("toOpenAIMessages — multimodal parts", () => {
   it("maps an inlined image to an image_url data URL", () => {
-    const parts = partsOf([
-      { type: "image", source: { base64: "QUJD", mediaType: "image/png" } },
-    ]);
+    const parts = partsOf([{ type: "image", source: { base64: "QUJD", mediaType: "image/png" } }]);
     expect(parts[0]).toEqual({
       type: "image_url",
       image_url: { url: "data:image/png;base64,QUJD" },
@@ -55,14 +53,14 @@ describe("toOpenAIMessages — multimodal parts", () => {
   });
 
   it("throws for a remote-URL PDF (no remote file source on chat completions)", () => {
-    expect(() =>
-      partsOf([{ type: "pdf", source: { url: "https://x/doc.pdf" } }]),
-    ).toThrow(InvalidRequestError);
+    expect(() => partsOf([{ type: "pdf", source: { url: "https://x/doc.pdf" } }])).toThrow(
+      InvalidRequestError,
+    );
   });
 
   it("throws for remote-URL audio", () => {
-    expect(() =>
-      partsOf([{ type: "audio", source: { url: "https://x/clip.mp3" } }]),
-    ).toThrow(InvalidRequestError);
+    expect(() => partsOf([{ type: "audio", source: { url: "https://x/clip.mp3" } }])).toThrow(
+      InvalidRequestError,
+    );
   });
 });

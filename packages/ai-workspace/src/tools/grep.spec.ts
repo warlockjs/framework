@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMockBackend } from "../backends/mock";
 import { WorkspacePolicyError } from "../errors";
-import type {
-  GrepResult,
-  WorkspaceBackend,
-  WorkspaceOps,
-} from "../contracts";
+import type { GrepResult, WorkspaceBackend, WorkspaceOps } from "../contracts";
 import { makeGrepTool } from "./grep";
 
 /** Absolute jail root the seeded tree lives under. */
@@ -80,10 +76,7 @@ async function walk(backend: WorkspaceBackend, dir: string): Promise<string[]> {
  * accidental call is loud. `escape` forces every op to reject with a
  * {@link WorkspacePolicyError} for the jail-violation surface test.
  */
-function seededOps(
-  files: Record<string, string>,
-  opts: { escape?: boolean } = {},
-): WorkspaceOps {
+function seededOps(files: Record<string, string>, opts: { escape?: boolean } = {}): WorkspaceOps {
   const backend = createMockBackend(
     Object.fromEntries(
       Object.entries(files).map(([path, content]) => [`${ROOT}/${path}`, content]),

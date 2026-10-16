@@ -57,11 +57,7 @@ By default, `update()` preserves whatever TTL is on the existing entry. Pass an 
 await cache.update("user.1", (user) => ({ ...user, name: "Jane" }));
 
 // Reset TTL on update
-await cache.update(
-  "user.1",
-  (user) => ({ ...user, name: "Jane" }),
-  { ttl: "1h" },
-);
+await cache.update("user.1", (user) => ({ ...user, name: "Jane" }), { ttl: "1h" });
 ```
 
 ## merge(key, partial, options?)
@@ -71,11 +67,7 @@ Shallow-merge sugar for the common "update one field" shape:
 ```ts
 await cache.merge<User>("user.1", { name: "Jane" });
 
-await cache.merge<User>(
-  "user.1",
-  { lastSeenAt: Date.now() },
-  { ttl: "1h" },
-);
+await cache.merge<User>("user.1", { lastSeenAt: Date.now() }, { ttl: "1h" });
 ```
 
 ### Rules
@@ -89,7 +81,7 @@ await cache.merge<User>(
 Deep merge is deliberately not built in — it invites edge cases around arrays, nullish values, and nested undefined. If you need deep-merge semantics, compose it explicitly inside `update()` using whatever deep-merge utility your project already uses:
 
 ```ts
-import { merge as deepMerge } from "lodash";   // or "lodash-es" / "deepmerge" / etc.
+import { merge as deepMerge } from "lodash"; // or "lodash-es" / "deepmerge" / etc.
 
 await cache.update<User>("user.1", (current) => deepMerge({}, current, patch));
 ```
@@ -108,7 +100,7 @@ await Promise.all(
   ),
 );
 
-await cache.get("counter");   // 10 — no lost updates
+await cache.get("counter"); // 10 — no lost updates
 ```
 
 The lock lives on the driver, not globally. Concurrent updates against **different keys** still run in parallel.
@@ -125,7 +117,7 @@ const lock = await cache.set(`lock.user.${id}`, process.pid, {
   onConflict: "create",
   ttl: "10s",
 });
-if (!lock.wasSet) return;     // another node is already updating
+if (!lock.wasSet) return; // another node is already updating
 
 try {
   await cache.update(`user.${id}`, (current) => ({ ...current, ...patch }));
@@ -133,35 +125,37 @@ try {
   await cache.remove(`lock.user.${id}`);
 }
 ```
+
 :::
 
 ## Driver support
 
-| Driver | `update()` | `merge()` |
-|--------|:-:|:-:|
-| `memory` | ✓ | ✓ |
-| `memoryExtended` | ✓ | ✓ |
-| `lru` | ✓ | ✓ |
-| `redis` | ✓ (in-process only today) | ✓ (in-process only today) |
-| `file` | ✗ throws `CacheUnsupportedError` | ✗ throws `CacheUnsupportedError` |
-| `null` | ✓ (no-op) | ✓ (no-op) |
+| Driver           |            `update()`            |            `merge()`             |
+| ---------------- | :------------------------------: | :------------------------------: |
+| `memory`         |                ✓                 |                ✓                 |
+| `memoryExtended` |                ✓                 |                ✓                 |
+| `lru`            |                ✓                 |                ✓                 |
+| `redis`          |    ✓ (in-process only today)     |    ✓ (in-process only today)     |
+| `file`           | ✗ throws `CacheUnsupportedError` | ✗ throws `CacheUnsupportedError` |
+| `null`           |            ✓ (no-op)             |            ✓ (no-op)             |
 
 The file driver is deliberately unsupported — it has no file-lock primitive today, so concurrent updates would clobber each other silently. Throwing is safer than lying. See [Errors](/v/latest/cache/errors/) for the `CacheUnsupportedError` pattern.
 
 ## When to reach for what
 
-| Task | Use |
-|------|-----|
-| "Add 1 to this counter" | [`increment()`](/v/latest/cache/atomic-operations/#increment-and-decrement) — Redis-native `INCRBY` |
-| "Change one field on a cached object" | `merge()` |
-| "Read-decide-maybe-write, possibly remove" | `update()` |
-| "Only set if missing" | [`set(k, v, { onConflict: "create" })`](/v/latest/cache/set-options/#conditional-writes--onconflict) |
-| "Only set if already exists" | [`set(k, v, { onConflict: "update" })`](/v/latest/cache/set-options/#conditional-writes--onconflict) |
-| "Read-then-delete atomically" | [`pull()`](/v/latest/cache/cache-manager/) |
+| Task                                       | Use                                                                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| "Add 1 to this counter"                    | [`increment()`](/v/latest/cache/atomic-operations/#increment-and-decrement) — Redis-native `INCRBY`  |
+| "Change one field on a cached object"      | `merge()`                                                                                            |
+| "Read-decide-maybe-write, possibly remove" | `update()`                                                                                           |
+| "Only set if missing"                      | [`set(k, v, { onConflict: "create" })`](/v/latest/cache/set-options/#conditional-writes--onconflict) |
+| "Only set if already exists"               | [`set(k, v, { onConflict: "update" })`](/v/latest/cache/set-options/#conditional-writes--onconflict) |
+| "Read-then-delete atomically"              | [`pull()`](/v/latest/cache/cache-manager/)                                                           |
 
 ## Real-world examples
 
 All examples below assume:
+
 ```ts
 import { cache } from "@warlock.js/cache";
 
@@ -180,12 +174,9 @@ async function updateUserTheme(userId: number, theme: "light" | "dark") {
 
 ```ts
 async function recordActivity(userId: number, activity: Activity) {
-  return cache.update<{ activities: Activity[] }>(
-    `user.${userId}.activities`,
-    (current) => ({
-      activities: [...(current?.activities ?? []), activity].slice(-100),
-    }),
-  );
+  return cache.update<{ activities: Activity[] }>(`user.${userId}.activities`, (current) => ({
+    activities: [...(current?.activities ?? []), activity].slice(-100),
+  }));
 }
 ```
 

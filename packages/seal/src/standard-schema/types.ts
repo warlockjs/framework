@@ -90,8 +90,10 @@ export interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
 }
 
 export declare namespace StandardJSONSchemaV1 {
-  export interface Props<Input = unknown, Output = Input>
-    extends Omit<StandardSchemaV1.Props<Input, Output>, never> {
+  export interface Props<Input = unknown, Output = Input> extends Omit<
+    StandardSchemaV1.Props<Input, Output>,
+    never
+  > {
     readonly jsonSchema: Converter;
   }
 

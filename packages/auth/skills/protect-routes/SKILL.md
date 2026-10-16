@@ -64,21 +64,21 @@ The user is loaded via `Model.find(decodedToken.id)` against the `config.auth.us
 
 A token passes three separate checks, in order — a token can fail any one of them while satisfying the other two:
 
-1. **The JWT verifies** — signature, algorithm, `tokenType`, and (since 4.12.0) the presence of an `exp` claim that has not passed. A token with *no* `exp` is rejected: there is no deadline to check, so it would otherwise verify indefinitely.
+1. **The JWT verifies** — signature, algorithm, `tokenType`, and (since 4.12.0) the presence of an `exp` claim that has not passed. A token with _no_ `exp` is rejected: there is no deadline to check, so it would otherwise verify indefinitely.
 2. **The access-token row still exists** — deleting it (logout) invalidates the token immediately, before its JWT expiry.
 3. **The row's own `expires_at` has not passed** (since 4.12.0). The database is the authority on the session: a row whose expiry has elapsed is rejected and deleted, even if the JWT itself is still within its lifetime. A row with a missing or unparseable `expires_at` is treated as expired, not as never-expiring.
 
 Missing or invalid credentials return 401; an authenticated disallowed user type returns 403:
 
-| Error code | When |
-| --- | --- |
-| `MissingAccessToken` | No credential at the configured source |
+| Error code           | When                                                                                                                          |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `MissingAccessToken` | No credential at the configured source                                                                                        |
 | `InvalidAccessToken` | Token doesn't verify (signature, missing/passed `exp`, wrong token type), has no DB row, or the row's `expires_at` has passed |
-| `Unauthorized` | Token valid but user-type isn't in the allowed list (403) |
+| `Unauthorized`       | Token valid but user-type isn't in the allowed list (403)                                                                     |
 
 ## Page routes: redirect to login instead of the JSON 401
 
-By default every auth failure — API or page — returns the JSON `401` above. That's right for an API client, but a logged-out human who *navigates* to a guarded page route gets a raw JSON error blob instead of a login screen.
+By default every auth failure — API or page — returns the JSON `401` above. That's right for an API client, but a logged-out human who _navigates_ to a guarded page route gets a raw JSON error blob instead of a login screen.
 
 Opt into a redirect with `auth.pageAuth` (5.8+). Set `loginPath` and a guarded **page** route (`route.isPage`) that a logged-out browser hits redirects to `loginPath?returnUrl=<original path>` instead of returning the JSON 401:
 
@@ -88,7 +88,7 @@ import { User } from "app/users/models/user/user.model";
 export default {
   userType: { user: User },
   pageAuth: {
-    loginPath: "/login",        // set this to turn the redirect on
+    loginPath: "/login", // set this to turn the redirect on
     returnUrlParam: "returnUrl", // optional, this is the default
   },
 };
@@ -120,7 +120,7 @@ declare module "@warlock.js/auth" {
 import { type RequestHandler } from "@warlock.js/core";
 
 export const accountController: RequestHandler = async ({ request, response }) => {
-  const user = request.locals.user!;          // typed via the RequestUser augmentation above
+  const user = request.locals.user!; // typed via the RequestUser augmentation above
   return response.success({
     id: user.id,
     email: user.get("email"),
@@ -146,7 +146,7 @@ Every route inside the group is gated — the group's `middleware` array applies
 Use `optional: true` in the object form when a public route should receive a verified user when one is present. Missing or invalid credentials continue anonymously; a hard gate remains the default.
 
 ```ts
-middleware: [authMiddleware({ source: "header", optional: true })]
+middleware: [authMiddleware({ source: "header", optional: true })];
 ```
 
 ## Automatic cookie renewal
@@ -158,6 +158,7 @@ through `authService.setAuthCookie`; it never replays a handler. `overlapMs` is
 clamped to 0â€“10,000 ms (default 5,000). Only the exact immediate successor is
 tolerated during that window. The legacy `refreshTokens` API stays strict; a
 later old-token presentation revokes its family.
+
 ## Custom error responses
 
 The middleware uses the framework's `response.unauthorized({...})` shape. To override the response globally, hook the framework's error transformer to remap `AuthErrorCodes.*` codes.
@@ -182,8 +183,9 @@ import { User } from "app/users/models/user/user.model";
 
 const articlesController: RequestHandler = async ({ request, response }) => {
   // Who-may-act-on-whom: an ABAC policy on top of the RBAC grant
-  definePolicy("users.create", (actor, target, ctx) =>
-    ctx.hasRole("superAdmin") || (target as User).userType === "teacher",
+  definePolicy(
+    "users.create",
+    (actor, target, ctx) => ctx.hasRole("superAdmin") || (target as User).userType === "teacher",
   );
 
   if (await can(request.locals.user!, "users.create", { resource: request.body })) {
@@ -194,10 +196,12 @@ const articlesController: RequestHandler = async ({ request, response }) => {
 };
 
 // Permission-based route gate, in place of a user-type gate
-router.post("/articles", articlesController, { middleware: [authMiddleware([]), gate("articles.create")] });
+router.post("/articles", articlesController, {
+  middleware: [authMiddleware([]), gate("articles.create")],
+});
 ```
 
-Use `authMiddleware` to establish *who the caller is*, and `access` to decide *what they may do*. They compose — `access` reads the user `authMiddleware` put on the request.
+Use `authMiddleware` to establish _who the caller is_, and `access` to decide _what they may do_. They compose — `access` reads the user `authMiddleware` put on the request.
 
 ## Cookie credentials
 
@@ -213,7 +217,7 @@ A route is header-only or cookie-only, never both — `tokenFrom` accepts exactl
 
 ### Writing and clearing the cookie: `authService.setAuthCookie` / `clearAuthCookie`
 
-Reading a cookie is opt-in per route (above); *writing* one is a separate, explicit step your login/logout controller calls — `authService.login`/`logout` never set cookies implicitly, so upgrading never starts emitting `Set-Cookie` for an existing bearer-only app.
+Reading a cookie is opt-in per route (above); _writing_ one is a separate, explicit step your login/logout controller calls — `authService.login`/`logout` never set cookies implicitly, so upgrading never starts emitting `Set-Cookie` for an existing bearer-only app.
 
 ```ts
 import { type RequestHandler } from "@warlock.js/core";

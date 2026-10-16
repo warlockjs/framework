@@ -45,7 +45,8 @@ const classifyAgent = ai.agent({
     reasoning: v.string().optional(),
     confidence: v.number().optional(),
   }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You triage inbound support messages.")
     .instruction("Pick the single best intent: `billing`, `tech`, or `smalltalk`.")
     .instruction("Set `confidence` between 0 and 1 for how sure you are."),
@@ -62,7 +63,8 @@ const billingAgent = ai.agent({
   description: "Answers charges, refunds, invoices, and plan questions.",
   model,
   output: v.object({ reply: v.string() }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a billing specialist.")
     .instruction("Answer the customer's billing question directly in one short paragraph."),
 });
@@ -72,7 +74,8 @@ const techAgent = ai.agent({
   description: "Answers bugs, errors, outages, and login failures.",
   model,
   output: v.object({ reply: v.string() }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a technical support engineer.")
     .instruction("Give the most likely fix or next diagnostic step."),
 });
@@ -82,7 +85,8 @@ const smalltalkAgent = ai.agent({
   description: "Handles greetings, thanks, and non-support chit-chat.",
   model,
   output: v.object({ reply: v.string() }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a friendly support concierge.")
     .instruction("Reply warmly and briefly. Invite a real question if there isn't one."),
 });
@@ -180,8 +184,8 @@ Now the only LLM call in the whole run is the one specialist that actually answe
 
 ## Production notes
 
-- **Fast-path vs. loop is a config switch, not a rewrite.** The same `intents` map works with `classifier` alone (single pass), with `router`/`route` alone (multi-turn loop), or with both — when you configure a classifier *and* a router, the classifier drives iteration 0 and the router picks up from iteration 1+. Start with the classifier; add a router later only if you find messages that genuinely need more than one specialist. See the [support-triage recipe](/v/latest/ai/recipes/supervisor-support-triage/) for the full-loop version.
-- **Don't gate control flow on raw `confidence`.** LLM-reported confidence is poorly calibrated — a model that says `0.95` is wrong about as often as one that says `0.85`. Use it as a *soft* signal inside `refine` (combined with a deterministic check or a fallback intent), never as the sole branch condition.
-- **`refine` can also halt.** Returning the bare `END` sentinel from `refine` terminates the run before any intent dispatches — useful for a policy gate ("if the message is abusive, stop here"). Returning `{ intent: END, ...slice }` halts *after* merging a slice into state, so a rejection reason can surface on `data`.
+- **Fast-path vs. loop is a config switch, not a rewrite.** The same `intents` map works with `classifier` alone (single pass), with `router`/`route` alone (multi-turn loop), or with both — when you configure a classifier _and_ a router, the classifier drives iteration 0 and the router picks up from iteration 1+. Start with the classifier; add a router later only if you find messages that genuinely need more than one specialist. See the [support-triage recipe](/v/latest/ai/recipes/supervisor-support-triage/) for the full-loop version.
+- **Don't gate control flow on raw `confidence`.** LLM-reported confidence is poorly calibrated — a model that says `0.95` is wrong about as often as one that says `0.85`. Use it as a _soft_ signal inside `refine` (combined with a deterministic check or a fallback intent), never as the sole branch condition.
+- **`refine` can also halt.** Returning the bare `END` sentinel from `refine` terminates the run before any intent dispatches — useful for a policy gate ("if the message is abusive, stop here"). Returning `{ intent: END, ...slice }` halts _after_ merging a slice into state, so a rejection reason can surface on `data`.
 - **`intent` must be a real key.** The classifier's (or `refine`'s) `intent` must match a key in `intents`, or the supervisor throws `SUPERVISOR_INVALID_ROUTE` at runtime. The `v.enum` over the intent keys catches this at the schema boundary before it ever reaches dispatch.
 - **Forensics live on `report.classifier`.** `intent`, `reasoning`, `confidence`, the `refined`/`halted` flags, and the original pre-refine `raw` output are all captured there — log them to spot drift between what the classifier picked and what actually resolved the ticket.

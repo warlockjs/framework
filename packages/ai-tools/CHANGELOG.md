@@ -81,6 +81,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed
@@ -144,7 +145,7 @@ changelogs.
 
 ### Security
 
-- **`fetch_url` and `http_request` now deny private-network targets by default and route through `@warlock.js/ai`'s hardened `guardedFetch` instead of a local host check.** Previously `allowHosts` was the *only* SSRF guardrail and it was opt-in — a bare `ai.tools.fetchUrl()` / `ai.tools.http()` would fetch any `http(s)` URL the model supplied, including `http://169.254.169.254/latest/meta-data/...`, `localhost`, and RFC1918 addresses, and neither tool re-validated redirect targets, so even a configured allowlist could be 302'd into an internal endpoint. Both tools now issue every request through the core outbound policy, which by default refuses private / loopback / link-local / CGNAT / cloud-metadata addresses — resolving hostnames through DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it, with a hop cap and cross-origin credential-header stripping. Blocks surface as the existing typed errors (`WebToolError` `type: "denied-host"`, `HttpPolicyError` `type: "host-not-allowed"`), so agents still read them as `{ error }` data
+- **`fetch_url` and `http_request` now deny private-network targets by default and route through `@warlock.js/ai`'s hardened `guardedFetch` instead of a local host check.** Previously `allowHosts` was the _only_ SSRF guardrail and it was opt-in — a bare `ai.tools.fetchUrl()` / `ai.tools.http()` would fetch any `http(s)` URL the model supplied, including `http://169.254.169.254/latest/meta-data/...`, `localhost`, and RFC1918 addresses, and neither tool re-validated redirect targets, so even a configured allowlist could be 302'd into an internal endpoint. Both tools now issue every request through the core outbound policy, which by default refuses private / loopback / link-local / CGNAT / cloud-metadata addresses — resolving hostnames through DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it, with a hop cap and cross-origin credential-header stripping. Blocks surface as the existing typed errors (`WebToolError` `type: "denied-host"`, `HttpPolicyError` `type: "host-not-allowed"`), so agents still read them as `{ error }` data
 - **New `allowPrivateNetwork` option (default `false`) on both tools** for the deliberate case of a tool that must call an internal service (e.g. a local dev server); `allowHosts` still works and now also constrains redirect targets
 
 ## 4.12.0

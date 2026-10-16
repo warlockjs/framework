@@ -54,8 +54,9 @@ export async function queueDashboard(
 ): Promise<void> {
   const basePath = options.basePath ?? "/admin/queues";
   const { createBullBoard, BullMQAdapter, FastifyAdapter } = await loadBullBoard();
-  const queueNames =
-    options.queues ?? [...new Set([defaultQueueName(), ...registeredJobs().map((job) => queueOf(job))])];
+  const queueNames = options.queues ?? [
+    ...new Set([defaultQueueName(), ...registeredJobs().map((job) => queueOf(job))]),
+  ];
 
   const serverAdapter = new FastifyAdapter();
   serverAdapter.setBasePath(basePath);
@@ -65,7 +66,10 @@ export async function queueDashboard(
     serverAdapter,
   });
 
-  const guardedPlugin = buildDashboardGuardPlugin(options.middleware ?? [], serverAdapter.registerPlugin());
+  const guardedPlugin = buildDashboardGuardPlugin(
+    options.middleware ?? [],
+    serverAdapter.registerPlugin(),
+  );
 
   await server.register(guardedPlugin as never, { prefix: basePath });
 }
@@ -75,7 +79,8 @@ export async function queueDashboard(
  * dependency path; `importer` defaults to a real dynamic import.
  */
 export async function loadBullBoard(
-  importer: (specifier: string) => Promise<Record<string, unknown>> = (specifier) => import(specifier),
+  importer: (specifier: string) => Promise<Record<string, unknown>> = (specifier) =>
+    import(specifier),
 ): Promise<BullBoardModules> {
   const api = await importOptional(importer, "@bull-board/api");
   const adapter = await importOptional(importer, "@bull-board/api/bullMQAdapter");

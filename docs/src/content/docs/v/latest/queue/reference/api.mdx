@@ -65,53 +65,53 @@ missing `handle`, or a non-integer `attempts < 1`. See
 
 `JobDefinition<TPayload, TResult>` extends `JobOptions` with:
 
-| Field | Type | Notes |
-|---|---|---|
-| `name` | `string` | Unique job name |
-| `queue?` | `string` | Default: `queue.defaultQueue` (`"default"`) |
-| `handle` | `(payload: TPayload, context: JobContext) => Promise<TResult> \| TResult` | Throw to fail the attempt |
+| Field    | Type                                                                      | Notes                                       |
+| -------- | ------------------------------------------------------------------------- | ------------------------------------------- |
+| `name`   | `string`                                                                  | Unique job name                             |
+| `queue?` | `string`                                                                  | Default: `queue.defaultQueue` (`"default"`) |
+| `handle` | `(payload: TPayload, context: JobContext) => Promise<TResult> \| TResult` | Throw to fail the attempt                   |
 
 `JobOptions` (also the shape of `queue.defaultJobOptions`):
 
-| Field | Type | Notes |
-|---|---|---|
-| `attempts?` | `number` | Total attempts including the first. Default `1` |
-| `backoff?` | `JobBackoff` | `number` (fixed ms) or `{ type: "fixed" \| "exponential", delay }` |
+| Field               | Type           | Notes                                                                     |
+| ------------------- | -------------- | ------------------------------------------------------------------------- |
+| `attempts?`         | `number`       | Total attempts including the first. Default `1`                           |
+| `backoff?`          | `JobBackoff`   | `number` (fixed ms) or `{ type: "fixed" \| "exponential", delay }`        |
 | `removeOnComplete?` | `JobRetention` | `boolean \| number` — `true` removes at once, a number keeps the newest N |
-| `removeOnFail?` | `JobRetention` | Same shape, for failed jobs |
+| `removeOnFail?`     | `JobRetention` | Same shape, for failed jobs                                               |
 
 ### `QueueJob<TPayload, TResult>`
 
-| Member | Type | Notes |
-|---|---|---|
-| `name` | `string` | readonly |
-| `queue` | `string` | readonly, resolved queue name |
-| `dispatch(payload, options?)` | `Promise<DispatchedJob>` | `{ id, name, queue }` |
-| `find(id)` | `Promise<JobSnapshot<TPayload, TResult> \| undefined>` | `undefined` if the job no longer exists, or belongs to a different name |
+| Member                        | Type                                                   | Notes                                                                   |
+| ----------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `name`                        | `string`                                               | readonly                                                                |
+| `queue`                       | `string`                                               | readonly, resolved queue name                                           |
+| `dispatch(payload, options?)` | `Promise<DispatchedJob>`                               | `{ id, name, queue }`                                                   |
+| `find(id)`                    | `Promise<JobSnapshot<TPayload, TResult> \| undefined>` | `undefined` if the job no longer exists, or belongs to a different name |
 
 ### `DispatchOptions`
 
-| Field | Type | Notes |
-|---|---|---|
-| `delay?` | `Duration` | `number` (ms) or `` `${number}${"ms"\|"s"\|"m"\|"h"\|"d"}` `` |
-| `priority?` | `number` | `1` is highest; omitted runs ahead of any prioritized job |
-| `jobId?` | `string` | Dispatching again with a still-live id is a no-op — idempotent |
-| `attempts?` | `number` | Overrides `defineJob` for this dispatch |
-| `backoff?` | `JobBackoff` | Overrides `defineJob` for this dispatch |
+| Field       | Type         | Notes                                                          |
+| ----------- | ------------ | -------------------------------------------------------------- |
+| `delay?`    | `Duration`   | `number` (ms) or `` `${number}${"ms"\|"s"\|"m"\|"h"\|"d"}` ``  |
+| `priority?` | `number`     | `1` is highest; omitted runs ahead of any prioritized job      |
+| `jobId?`    | `string`     | Dispatching again with a still-live id is a no-op — idempotent |
+| `attempts?` | `number`     | Overrides `defineJob` for this dispatch                        |
+| `backoff?`  | `JobBackoff` | Overrides `defineJob` for this dispatch                        |
 
 Precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
 
 ### `JobContext`
 
-| Field | Type |
-|---|---|
-| `id` | `string` |
-| `name` | `string` |
-| `queue` | `string` |
-| `attempt` | `number` (1-based) |
-| `maxAttempts` | `number` |
-| `progress(value: JobProgress)` | `Promise<void>` |
-| `log(line: string)` | `Promise<void>` |
+| Field                          | Type               |
+| ------------------------------ | ------------------ |
+| `id`                           | `string`           |
+| `name`                         | `string`           |
+| `queue`                        | `string`           |
+| `attempt`                      | `number` (1-based) |
+| `maxAttempts`                  | `number`           |
+| `progress(value: JobProgress)` | `Promise<void>`    |
+| `log(line: string)`            | `Promise<void>`    |
 
 ### `JobSnapshot<TPayload, TResult>`
 
@@ -121,7 +121,7 @@ type JobSnapshot<TPayload = unknown, TResult = unknown> = {
   name: string;
   queue: string;
   state: JobState; // "waiting" | "delayed" | "prioritized" | "active"
-                    // | "completed" | "failed" | "waiting-children" | "unknown"
+  // | "completed" | "failed" | "waiting-children" | "unknown"
   payload: TPayload;
   progress: JobProgress;
   attemptsMade: number;
@@ -252,10 +252,10 @@ and `@warlock.js/notifications`'s own API reference.
 
 ## Errors
 
-| Error | Thrown when |
-|---|---|
-| `QueueNotConfiguredError` | The queue is used before `setQueueConfig()` (or the connector) supplied a `QueueConfig` |
-| `InvalidDurationError` | A malformed `Duration` string, e.g. `"10 minutes"` |
-| `InvalidJobDefinitionError` | `defineJob` called with an empty name, no `handle`, or a bad `attempts` |
-| `FailedJobNotFoundError` | `retryFailedJob(id)` finds no FAILED job with that id |
-| `QueueDashboardDependencyError` | `queueDashboard()` called without `@bull-board/api` / `@bull-board/fastify` installed |
+| Error                           | Thrown when                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `QueueNotConfiguredError`       | The queue is used before `setQueueConfig()` (or the connector) supplied a `QueueConfig` |
+| `InvalidDurationError`          | A malformed `Duration` string, e.g. `"10 minutes"`                                      |
+| `InvalidJobDefinitionError`     | `defineJob` called with an empty name, no `handle`, or a bad `attempts`                 |
+| `FailedJobNotFoundError`        | `retryFailedJob(id)` finds no FAILED job with that id                                   |
+| `QueueDashboardDependencyError` | `queueDashboard()` called without `@bull-board/api` / `@bull-board/fastify` installed   |

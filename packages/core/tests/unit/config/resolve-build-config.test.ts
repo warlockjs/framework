@@ -9,9 +9,8 @@ vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
   warlockConfigManager: { get: (key: string) => getConfig(key) },
 }));
 
-const { resolveBuildConfig, ForbiddenBuildOptionError } = await import(
-  "../../../src/production/resolve-build-config"
-);
+const { resolveBuildConfig, ForbiddenBuildOptionError } =
+  await import("../../../src/production/resolve-build-config");
 
 /**
  * Compile-time half of the tsconfig guard. The `@ts-expect-error` directives
@@ -88,7 +87,7 @@ describe("resolveBuildConfig", () => {
   // The type guard above is erased at runtime, so an `as any` config — or a
   // plain JS warlock.config.js — can still carry the key through. Rejected,
   // never stripped: silently dropping it would hide a real intent mismatch.
-  it.each(["tsconfig", "tsconfigRaw"] as const)("rejects an esbuild %s", key => {
+  it.each(["tsconfig", "tsconfigRaw"] as const)("rejects an esbuild %s", (key) => {
     getConfig.mockReturnValue({ [key]: "./tsconfig.json" });
 
     expect(() => resolveBuildConfig()).toThrow(ForbiddenBuildOptionError);

@@ -21,8 +21,8 @@ const support = ai
 const agent = ai.agent({ model, systemPrompt: support });
 
 // Explicit: compile now — admin routes, previews, boot warmup, CI.
-const text = await support.refine();          // the compiled template STRING
-const prompt = await support.refinePrompt();  // a composable SystemPromptContract
+const text = await support.refine(); // the compiled template STRING
+const prompt = await support.refinePrompt(); // a composable SystemPromptContract
 ```
 
 ## The four trust rules
@@ -35,7 +35,7 @@ const prompt = await support.refinePrompt();  // a composable SystemPromptContra
 ## `refine(options?)` — the explicit string surface
 
 ```ts
-const text = await support.refine();                 // store-first; pins on first compile
+const text = await support.refine(); // store-first; pins on first compile
 const another = await support.refine({ fresh: true }); // skip the pin, new take, re-pins
 ```
 
@@ -46,23 +46,23 @@ Expose it via a route for an admin **preview / approve** flow — the admin sees
 ```ts
 const compiled = await support.refinePrompt();
 
-compiled.blocks;                 // one instruction block = the refined template
-compiled.meta()?.refinedFrom;    // "support@1" (or "anonymous")
-compiled.meta()?.refinerModel;   // "anthropic:claude-sonnet-4-5"
-compiled.meta()?.required;       // carried from the source — contract preserved
+compiled.blocks; // one instruction block = the refined template
+compiled.meta()?.refinedFrom; // "support@1" (or "anonymous")
+compiled.meta()?.refinerModel; // "anthropic:claude-sonnet-4-5"
+compiled.meta()?.required; // carried from the source — contract preserved
 ```
 
 It never auto-registers (no `name` — registry versions stay human-intentional). Register it deliberately to unlock the review flow:
 
 ```ts
-compiled.meta({ name: "support" });          // registers as support@<next>
-ai.prompts.diff("support", "1", "2");        // original vs refined, block by block
+compiled.meta({ name: "support" }); // registers as support@<next>
+ai.prompts.diff("support", "1", "2"); // original vs refined, block by block
 ```
 
 ## Options
 
 - **`model`** (required) — the refiner `ModelContract`. The call runs as a one-shot `"prompt-refiner"` agent, so usage/cost surface through the standard report/observer machinery.
-- **`criteria`** — a string or list of rules the rewrite MUST satisfy, on top of the built-in recipe. Same word and shape as `validate({ criteria })`: *validate grades against criteria; refined rewrites against them*. Folded into the pin key — new rules compile fresh.
+- **`criteria`** — a string or list of rules the rewrite MUST satisfy, on top of the built-in recipe. Same word and shape as `validate({ criteria })`: _validate grades against criteria; refined rewrites against them_. Folded into the pin key — new rules compile fresh.
 - **`store`** — structural `{ get, set }` (`RefinedPromptStoreLike`; any `@warlock.js/cache` `CacheDriver` satisfies it — the cache package stays an optional peer). Share a redis/pg-backed driver so ONE process pays each compilation and the fleet reads the pin. Omitted ⇒ the pin lives on the wrapper instance for the process lifetime. A pinned value that fails the parity check (corrupt / tampered store) is treated as a miss and recompiled.
 
 ## What compiles where — the lazy boundary

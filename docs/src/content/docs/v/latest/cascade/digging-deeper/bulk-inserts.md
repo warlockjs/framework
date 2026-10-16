@@ -95,12 +95,12 @@ Like SQL `SERIAL`, the counter advance is a standalone, immediately-durable writ
 
 ## Choosing a strategy
 
-| Need                                              | Use                          |
-| ------------------------------------------------- | ---------------------------- |
-| Per-row hooks / events / sync                     | default (`createMany(rows)`) |
-| Casts, timestamps, defaults, generated ids        | either — both apply them     |
-| Maximum throughput, no per-row lifecycle          | `{ bulk: true }`             |
-| Cap concurrency / statement size                  | `{ batchSize: n }` on either |
+| Need                                       | Use                          |
+| ------------------------------------------ | ---------------------------- |
+| Per-row hooks / events / sync              | default (`createMany(rows)`) |
+| Casts, timestamps, defaults, generated ids | either — both apply them     |
+| Maximum throughput, no per-row lifecycle   | `{ bulk: true }`             |
+| Cap concurrency / statement size           | `{ batchSize: n }` on either |
 
 ## Use from a seeder
 
@@ -125,7 +125,7 @@ See the [Seeding guide](/v/latest/core/digging-deeper/seeding/) in the Core docs
 ## Gotchas
 
 - **`bulk: true` skips hooks and events.** If your model slugs in `onCreating` or indexes in `onCreated`, those won't run on the bulk path. Either use the default path or run the side effects in one pass after the insert.
-- **The bulk path still validates and casts.** Don't reach for it to skip validation — it runs the same writer prep per row; only the lifecycle *events/hooks/sync* are skipped.
+- **The bulk path still validates and casts.** Don't reach for it to skip validation — it runs the same writer prep per row; only the lifecycle _events/hooks/sync_ are skipped.
 - **Mind the bind-parameter ceiling.** On Postgres, `batchSize × columns` must stay under 65535. The 500 default is safe for typical tables; lower it for very wide rows.
 - **An empty array is a no-op.** `createMany([])` returns `[]` without touching the driver.
 

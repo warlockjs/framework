@@ -33,9 +33,7 @@ type ChangelogHeading = {
  * Returns `undefined` when no version heading is present.
  */
 function parseTopHeading(changelog: string): ChangelogHeading | undefined {
-  const match = changelog.match(
-    /^##\s+(\d+)\.(\d+)\.(\d+)(?:\s*[-–]\s*(\d{4}-\d{2}-\d{2}))?\s*$/m,
-  );
+  const match = changelog.match(/^##\s+(\d+)\.(\d+)\.(\d+)(?:\s*[-–]\s*(\d{4}-\d{2}-\d{2}))?\s*$/m);
 
   if (!match) {
     return undefined;
@@ -79,10 +77,8 @@ function isExactlyOneAhead(
     return false;
   }
 
-  const oneMinorAhead =
-    heading.minor === pkg.minor + 1 && heading.patch === 0;
-  const onePatchAhead =
-    heading.minor === pkg.minor && heading.patch === pkg.patch + 1;
+  const oneMinorAhead = heading.minor === pkg.minor + 1 && heading.patch === 0;
+  const onePatchAhead = heading.minor === pkg.minor && heading.patch === pkg.patch + 1;
 
   return oneMinorAhead || onePatchAhead;
 }
@@ -129,9 +125,7 @@ describe("release hygiene: version ↔ changelog invariant", () => {
     const isAhead =
       top.major > pkg.major ||
       (top.major === pkg.major && top.minor > pkg.minor) ||
-      (top.major === pkg.major &&
-        top.minor === pkg.minor &&
-        top.patch > pkg.patch);
+      (top.major === pkg.major && top.minor === pkg.minor && top.patch > pkg.patch);
 
     // A future (ahead-of-published) version stamped with a concrete date is the
     // exact F9 footgun: it claims to have shipped on a date while package.json

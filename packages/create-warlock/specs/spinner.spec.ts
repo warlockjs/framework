@@ -40,9 +40,7 @@ describe("spinner — non-TTY output", () => {
     vi.useFakeTimers();
     setStdoutTTY(undefined);
 
-    const write = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     const s = spinner();
     s.start("Summoning dependencies...");
@@ -56,7 +54,7 @@ describe("spinner — non-TTY output", () => {
     // One start line + one stop line. No per-frame writes in between.
     expect(write).toHaveBeenCalledTimes(2);
 
-    const output = write.mock.calls.map(call => String(call[0])).join("");
+    const output = write.mock.calls.map((call) => String(call[0])).join("");
     const lines = output.split("\n").filter(Boolean);
 
     expect(lines).toHaveLength(2);
@@ -66,9 +64,7 @@ describe("spinner — non-TTY output", () => {
     vi.useFakeTimers();
     setStdoutTTY(undefined);
 
-    const write = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     const s = spinner();
     s.start("Weaving in your features...");
@@ -86,14 +82,12 @@ describe("spinner — non-TTY output", () => {
   it("marks a failed stop with a distinct symbol from a successful one", () => {
     setStdoutTTY(undefined);
 
-    const write = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     spinner().stop("Dependencies could not be installed", 1);
     spinner().stop("Dependencies materialized!", 0);
 
-    const [failure, success] = write.mock.calls.map(call => String(call[0]));
+    const [failure, success] = write.mock.calls.map((call) => String(call[0]));
 
     expect(failure).not.toEqual(success);
     expect(failure).toContain("could not be installed");
@@ -106,9 +100,7 @@ describe("spinner — TTY output", () => {
     vi.useFakeTimers();
     setStdoutTTY(true);
 
-    const write = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     const s = spinner();
     s.start("Summoning dependencies...");

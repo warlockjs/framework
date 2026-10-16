@@ -14,7 +14,7 @@ sidebar:
 interface EmbedderContract {
   readonly name: string;
   readonly provider: string;
-  readonly dimensions: number;        // 0 until first call when no override given
+  readonly dimensions: number; // 0 until first call when no override given
 
   embed(input: string): Promise<EmbeddingResult>;
   embedMany(inputs: string[]): Promise<EmbeddingBatchResult>;

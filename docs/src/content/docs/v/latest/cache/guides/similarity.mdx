@@ -3,7 +3,7 @@ title: "Similarity Retrieval"
 slug: v/latest/cache/similarity
 ---
 
-Most cache operations look up entries by exact key match. **Similarity retrieval** looks them up by *meaning* — give the cache a query vector, get back the stored entries whose vectors are closest to it. Same `set` / `get` model you already know, just a different lookup function.
+Most cache operations look up entries by exact key match. **Similarity retrieval** looks them up by _meaning_ — give the cache a query vector, get back the stored entries whose vectors are closest to it. Same `set` / `get` model you already know, just a different lookup function.
 
 ```ts
 // Embed once on the way in...
@@ -53,11 +53,15 @@ import { cache } from "@warlock.js/cache";
 const text = "Refunds are issued within 14 days of purchase.";
 const vector = await embedder.embed(text);
 
-await cache.set("policy.refunds", { text }, {
-  vector,
-  tags: ["policies"],
-  ttl: "30d",
-});
+await cache.set(
+  "policy.refunds",
+  { text },
+  {
+    vector,
+    tags: ["policies"],
+    ttl: "30d",
+  },
+);
 ```
 
 The `vector` lives alongside the entry. Read it back with plain `get`:
@@ -86,7 +90,7 @@ Tag filters narrow the candidate pool **before** ranking — handy for multi-ten
 ```ts
 const hits = await cache.similar(queryVec, {
   topK: 5,
-  tags: ["docs"],          // only entries tagged with "docs" are scored
+  tags: ["docs"], // only entries tagged with "docs" are scored
 });
 ```
 
@@ -118,16 +122,16 @@ const hits = await cache.similar(queryVec, { topK: 10 });
 
 Not every driver indexes vectors. The capability is opt-in per driver:
 
-| Driver | Status | Notes |
-|---|---|---|
-| `memory` | ✅ Brute force | Dev / small datasets only — O(N) per query |
-| `lru-memory` | ✅ Brute force | Same — eviction also drops vectors |
-| `memory-extended` | ✅ Brute force | Inherits `memory` semantics |
-| `pg` *(with `vector` config)* | ✅ pgvector | Production option — HNSW or IVFFlat index, native cosine `<=>` |
-| `pg` *(without `vector` config)* | ❌ Throws `CacheUnsupportedError` | Run KV-only |
-| `redis` | ❌ Throws `CacheUnsupportedError` | RediSearch support is on the backlog |
-| `file` | ❌ Throws `CacheUnsupportedError` | No similarity index |
-| `null` | n/a — `similar()` returns `[]` | Black-hole semantics preserved |
+| Driver                           | Status                            | Notes                                                          |
+| -------------------------------- | --------------------------------- | -------------------------------------------------------------- |
+| `memory`                         | ✅ Brute force                    | Dev / small datasets only — O(N) per query                     |
+| `lru-memory`                     | ✅ Brute force                    | Same — eviction also drops vectors                             |
+| `memory-extended`                | ✅ Brute force                    | Inherits `memory` semantics                                    |
+| `pg` _(with `vector` config)_    | ✅ pgvector                       | Production option — HNSW or IVFFlat index, native cosine `<=>` |
+| `pg` _(without `vector` config)_ | ❌ Throws `CacheUnsupportedError` | Run KV-only                                                    |
+| `redis`                          | ❌ Throws `CacheUnsupportedError` | RediSearch support is on the backlog                           |
+| `file`                           | ❌ Throws `CacheUnsupportedError` | No similarity index                                            |
+| `null`                           | n/a — `similar()` returns `[]`    | Black-hole semantics preserved                                 |
 
 For dev, start with `memory`. For production, switch to [`pg`](/v/latest/cache/pg/) with the `vector` config block — same code, real index.
 

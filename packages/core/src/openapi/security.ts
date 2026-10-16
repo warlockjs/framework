@@ -1,4 +1,9 @@
-import type { AuthDescriptor, OpenApiSecurityRequirement, OpenApiSecurityScheme, WarningSink } from "./types";
+import type {
+  AuthDescriptor,
+  OpenApiSecurityRequirement,
+  OpenApiSecurityScheme,
+  WarningSink,
+} from "./types";
 
 /**
  * The marker `authMiddleware()` attaches to the middleware it returns.
@@ -34,7 +39,10 @@ export function parseAuthDescriptor(value: unknown): AuthDescriptor | undefined 
     return undefined;
   }
 
-  if (userTypes !== undefined && !(Array.isArray(userTypes) && userTypes.every((type) => typeof type === "string"))) {
+  if (
+    userTypes !== undefined &&
+    !(Array.isArray(userTypes) && userTypes.every((type) => typeof type === "string"))
+  ) {
     return undefined;
   }
 
@@ -73,7 +81,9 @@ export function readRouteAuth(middleware: unknown, warn: WarningSink): AuthDescr
     const descriptor = parseAuthDescriptor(raw);
 
     if (!descriptor) {
-      warn("a middleware carries a malformed warlock.auth descriptor; the route is documented without security.");
+      warn(
+        "a middleware carries a malformed warlock.auth descriptor; the route is documented without security.",
+      );
 
       continue;
     }
@@ -134,7 +144,9 @@ export class SecuritySchemes {
 
     // The first cookie keeps the conventional name; a second, different cookie gets its own.
     const name =
-      this.cookieSchemeNames.size === 0 ? "cookieAuth" : `cookieAuth_${cookie.replace(/[^A-Za-z0-9._-]/g, "")}`;
+      this.cookieSchemeNames.size === 0
+        ? "cookieAuth"
+        : `cookieAuth_${cookie.replace(/[^A-Za-z0-9._-]/g, "")}`;
 
     this.cookieSchemeNames.set(cookie, name);
     this.schemes[name] = { type: "apiKey", in: "cookie", name: cookie };

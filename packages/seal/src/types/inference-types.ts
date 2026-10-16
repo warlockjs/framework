@@ -108,7 +108,9 @@ export type IsOutputOptionalKey<V> = V extends { isOptional: true }
  * (it'll be filled, defaulted, or rescued).
  */
 export type IsInputOptionalKey<V> = V extends
-  { isOptional: true } | { hasDefault: true } | { hasCatch: true }
+  | { isOptional: true }
+  | { hasDefault: true }
+  | { hasCatch: true }
   ? true
   : false;
 

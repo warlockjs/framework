@@ -38,7 +38,7 @@ function buildImportJob() {
     steps: [
       ai.step({
         name: "fetch",
-        run: async ctx => {
+        run: async (ctx) => {
           const raw = await catalogApi.download(ctx.input.feedUrl);
           ctx.state.rawCount = raw.length;
           ctx.state.raw = raw;
@@ -47,7 +47,7 @@ function buildImportJob() {
 
       ai.step({
         name: "normalize",
-        run: ctx => {
+        run: (ctx) => {
           const raw = ctx.state.raw as unknown[];
           ctx.state.products = raw.map(normalizeRow);
           // Drop the bulky raw payload from state once we no longer need it —
@@ -58,7 +58,7 @@ function buildImportJob() {
 
       ai.step({
         name: "enrich",
-        run: async ctx => {
+        run: async (ctx) => {
           const products = ctx.state.products as Product[];
           const enriched: Product[] = [];
 
@@ -82,7 +82,7 @@ function buildImportJob() {
 
       ai.step({
         name: "upsert",
-        run: async ctx => {
+        run: async (ctx) => {
           const products = ctx.state.products as Product[];
           await productsRepo.bulkUpsert(ctx.input.vendorId, products);
           ctx.state.imported = products.length;
@@ -103,10 +103,7 @@ const runId = `import-${vendorId}-${dateKey}`;
 // ---- First invocation (this process crashes mid-enrich) ----
 async function firstAttempt() {
   const job = buildImportJob();
-  const { error, report } = await job.execute(
-    { vendorId, feedUrl },
-    { runId },
-  );
+  const { error, report } = await job.execute({ vendorId, feedUrl }, { runId });
 
   // If the process is killed before this returns, the last snapshot on
   // `snapshotStore` already holds completed steps (`fetch`, `normalize`)
@@ -166,7 +163,7 @@ try {
 ## Production notes
 
 - **`ai.snapshot.memory()` does NOT survive a process restart** — it is a process-local `Map`. It exists for dev, tests, and single-process apps. For a real "resume after a crash" guarantee, use `ai.snapshot.pg()` or `ai.snapshot.redis()`, which persist outside the process. The workflow code does not change — only the store factory does.
-- **Keep step bodies idempotent.** A step that crashes *after* its side effect but *before* the snapshot commits will re-run on resume. The `enrich` loop above guards with `if (product.description)`; the `upsert` uses `bulkUpsert` (an upsert, not an insert) so re-running it is harmless.
+- **Keep step bodies idempotent.** A step that crashes _after_ its side effect but _before_ the snapshot commits will re-run on resume. The `enrich` loop above guards with `if (product.description)`; the `upsert` uses `bulkUpsert` (an upsert, not an insert) so re-running it is harmless.
 - **Prune bulky intermediates from `ctx.state`.** Everything in `state` is serialized into every subsequent snapshot. The `normalize` step clears `ctx.state.raw` once it's consumed so the large feed payload isn't re-persisted on each later step.
 - **`ctx.context` is NOT persisted** — request-scoped values (tenant, traceId, the current user) must be supplied fresh on `resume({ context })`. Only `input` and `state` round-trip. Put durable cause in `input`, request scope in `context`.
 - **Bump `version` when you intentionally change the shape** so drift detection is meaningful: a stored snapshot from `version: "1"` will trip `WorkflowDriftError` against `version: "2"`, forcing an explicit decision instead of a silent mis-resume.

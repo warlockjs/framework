@@ -12,7 +12,7 @@ Tags let you invalidate by a label rather than by enumerating every key. Use the
 ```ts
 // Inline — terser when you know the tags up front
 await cache.set("user:1:profile", profile, { tags: ["users", "tenant-42"] });
-await cache.set("user:1:prefs",   prefs,   { tags: ["users", "tenant-42"] });
+await cache.set("user:1:prefs", prefs, { tags: ["users", "tenant-42"] });
 
 // Fluent — useful when you already have a tagged handle
 const users = cache.tags(["users"]);
@@ -34,11 +34,11 @@ Multi-tag is **union** semantics: an entry is invalidated if it carries **at lea
 
 ## When to reach for tags vs namespaces
 
-| Use case | Reach for |
-| --- | --- |
-| The keys share a known prefix | `cache.removeNamespace("prefix")` (the `use-cache-namespace` topic) |
-| The keys are spread across prefixes, tied by entity | Tags |
-| Both apply | Tags — more flexible; cheap on most drivers |
+| Use case                                            | Reach for                                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| The keys share a known prefix                       | `cache.removeNamespace("prefix")` (the `use-cache-namespace` topic) |
+| The keys are spread across prefixes, tied by entity | Tags                                                                |
+| Both apply                                          | Tags — more flexible; cheap on most drivers                         |
 
 Namespaces are cheaper (no reverse index). Tags are more powerful (any key can carry any tag).
 
@@ -48,13 +48,13 @@ Subsequent `set("user:1", ...)` with **no** `tags` leaves previous associations 
 
 ## Driver behavior
 
-| Driver | Tag invalidation |
-| --- | :-: |
-| `null` | noop |
+| Driver                              |                       Tag invalidation                       |
+| ----------------------------------- | :----------------------------------------------------------: |
+| `null`                              |                             noop                             |
 | `memory` / `memoryExtended` / `lru` | ✓ (separate index store; eviction and expiry never touch it) |
-| `file` | ✓ (serialized index) |
-| `redis` | ✓ (native SET inside the prefix) |
-| `pg` | ✓ (JSON-array merge on the index row) |
+| `file`                              |                     ✓ (serialized index)                     |
+| `redis`                             |               ✓ (native SET inside the prefix)               |
+| `pg`                                |            ✓ (JSON-array merge on the index row)             |
 
 The index uses driver primitives (`tagAdd` / `tagMembers` / `tagRemove`), so concurrent tagged writes never drop members. It stores un-prefixed keys, `invalidate()` deletes exactly the members it read, writes prune up to 20 dead members, and `remove()` / `pull()` detach the key. Tags are global across scopes. Across servers, use `redis` or `pg` so every server shares one index.
 
@@ -76,7 +76,7 @@ Tags re-apply on every successful refresh — see the `use-swr` topic.
 const getUser = cached(fn, { key: (id) => `user.${id}`, ttl: "1h", tags: ["users"] });
 const getPosts = cached(fn, { key: (u) => `posts.by.${u}`, ttl: "30m", tags: ["users", "posts"] });
 
-await cache.tags(["users"]).invalidate();   // drops both wrappers' caches
+await cache.tags(["users"]).invalidate(); // drops both wrappers' caches
 ```
 
 See the `use-cached-hof` topic.

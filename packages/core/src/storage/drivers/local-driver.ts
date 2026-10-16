@@ -133,7 +133,6 @@ export class LocalDriver implements StorageDriverContract {
 
     await writeFile(absolutePath, new Uint8Array(fileBuffer));
 
-
     const stats = await stat(absolutePath);
     const mimeType = options?.mimeType || this.guessMimeType(location);
 
@@ -191,7 +190,6 @@ export class LocalDriver implements StorageDriverContract {
       await unlink(tempPath).catch(() => undefined);
     }
 
-
     const stats = await stat(absolutePath);
     const mimeType = options?.mimeType || this.guessMimeType(location);
 
@@ -228,7 +226,6 @@ export class LocalDriver implements StorageDriverContract {
 
     const writeStream = createWriteStream(absolutePath);
     await pipeline(stream, hashTransform, writeStream);
-
 
     const hash = hasher.digest("hex");
     const stats = await stat(absolutePath);
@@ -543,7 +540,6 @@ export class LocalDriver implements StorageDriverContract {
 
     await ensureDirectoryAsync(dirname(toPath));
     await copyFile(fromPath, toPath);
-
 
     const hash = await this.hashFile(toPath);
     const stats = await stat(toPath);

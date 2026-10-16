@@ -46,8 +46,8 @@ ActiveRecord's `has_many :through` lets the pivot be a real model. Cascade lacks
 ```ts
 const post = await Post.query().with("tags").first();
 const tag = post.tags[0];
-tag.name;         // "javascript"
-tag.pivot.role;   // "primary" — pivot column
+tag.name; // "javascript"
+tag.pivot.role; // "primary" — pivot column
 tag.pivot.createdAt; // Date — pivot accessor
 ```
 
@@ -65,12 +65,12 @@ Mirrors Laravel's `->withPivot('column1', 'column2')`. Without it, only join key
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | `relatedInstance.pivot` or `_pivot` as accessor name? | **`pivot`.** Matches Laravel; clean DX. Document collision risk if a model field is also named `pivot`. |
-| 2 | Auto-generate pivot Model from table string? | **No.** Explicit-only. Avoids surprise schema. |
-| 3 | Default `withPivot` columns when pivot is a Model? | **All columns.** When pivot is a string, only join keys (current behaviour). |
-| 4 | Pivot Model's events fire on attach/detach? | **Yes.** That's the whole point of promoting it. |
+| #   | Question                                              | Recommendation                                                                                          |
+| --- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 1   | `relatedInstance.pivot` or `_pivot` as accessor name? | **`pivot`.** Matches Laravel; clean DX. Document collision risk if a model field is also named `pivot`. |
+| 2   | Auto-generate pivot Model from table string?          | **No.** Explicit-only. Avoids surprise schema.                                                          |
+| 3   | Default `withPivot` columns when pivot is a Model?    | **All columns.** When pivot is a string, only join keys (current behaviour).                            |
+| 4   | Pivot Model's events fire on attach/detach?           | **Yes.** That's the whole point of promoting it.                                                        |
 
 ## Verification
 

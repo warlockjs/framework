@@ -11,7 +11,7 @@ Common shapes — the "general patterns" file. Specialized shapes live in their 
 
 ```ts
 const user = await cache.remember(`user:${id}`, "1h", async () => {
-  return db.users.find(id);   // runs only on cache miss
+  return db.users.find(id); // runs only on cache miss
 });
 ```
 
@@ -81,8 +81,9 @@ await cache.set("user:1", user, "1h");
 ```
 
 Clear a tenant out:
+
 ```ts
-await cache.removeNamespace("");   // when globalPrefix is set, flush scopes to it
+await cache.removeNamespace(""); // when globalPrefix is set, flush scopes to it
 // or
 await cache.tags([`tenant-${tenantId}`]).invalidate();
 ```

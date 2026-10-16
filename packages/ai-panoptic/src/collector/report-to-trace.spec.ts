@@ -39,7 +39,9 @@ describe("reportToTrace", () => {
   it("embeds the projected root span and its subtree", () => {
     const trace = reportToTrace(
       rootReport({
-        children: [rootReport({ runId: "tool-1", parentRunId: "run-1", type: "tool", name: "search" })],
+        children: [
+          rootReport({ runId: "tool-1", parentRunId: "run-1", type: "tool", name: "search" }),
+        ],
       }),
     );
 
@@ -49,7 +51,9 @@ describe("reportToTrace", () => {
   });
 
   it("omits sessionId and schema version when absent", () => {
-    const trace = reportToTrace(rootReport({ sessionId: undefined, reportSchemaVersion: undefined }));
+    const trace = reportToTrace(
+      rootReport({ sessionId: undefined, reportSchemaVersion: undefined }),
+    );
 
     expect(trace.sessionId).toBeUndefined();
     expect(trace.reportSchemaVersion).toBeUndefined();

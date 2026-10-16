@@ -24,7 +24,7 @@ await cache.update<UserState>("user:1:state", (current) => ({
 // Conditional update — return null to remove
 await cache.update<Session>("session:abc", (current) => {
   if (!current || current.expired) {
-    return null;          // removes the key
+    return null; // removes the key
   }
   return { ...current, extendedAt: Date.now() };
 });
@@ -67,18 +67,18 @@ await Promise.all(
   ),
 );
 
-await cache.get("counter");   // 10 — not a lost-update
+await cache.get("counter"); // 10 — not a lost-update
 ```
 
 The per-key lock map lives on the driver instance and is cleared after each chain link finishes. No leak.
 
 ## When to reach for what
 
-| Task | Use |
-| --- | --- |
-| "Add 1 to this counter" | `increment()` (Redis-atomic via `INCRBY`; in-process elsewhere) |
-| "Change one field on a cached object" | `merge()` |
-| "Read-decide-maybe-write, possibly remove" | `update()` |
-| "Only set if missing" | `set(k, v, { onConflict: "create" })` |
-| "Only set if already exists" | `set(k, v, { onConflict: "update" })` |
-| "Read-then-delete atomically" | `pull()` |
+| Task                                       | Use                                                             |
+| ------------------------------------------ | --------------------------------------------------------------- |
+| "Add 1 to this counter"                    | `increment()` (Redis-atomic via `INCRBY`; in-process elsewhere) |
+| "Change one field on a cached object"      | `merge()`                                                       |
+| "Read-decide-maybe-write, possibly remove" | `update()`                                                      |
+| "Only set if missing"                      | `set(k, v, { onConflict: "create" })`                           |
+| "Only set if already exists"               | `set(k, v, { onConflict: "update" })`                           |
+| "Read-then-delete atomically"              | `pull()`                                                        |

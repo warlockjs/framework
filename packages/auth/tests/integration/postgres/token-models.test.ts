@@ -110,8 +110,14 @@ describe("Postgres integration — RefreshToken", () => {
 
   it("activeFor excludes expired and revoked tokens", async () => {
     await RefreshToken.issue(USER_A, "live", { familyId: "f1", expiresAt: future().toISOString() });
-    await RefreshToken.issue(USER_A, "expired", { familyId: "f2", expiresAt: past().toISOString() });
-    await RefreshToken.issue(USER_A, "revoked", { familyId: "f3", expiresAt: future().toISOString() });
+    await RefreshToken.issue(USER_A, "expired", {
+      familyId: "f2",
+      expiresAt: past().toISOString(),
+    });
+    await RefreshToken.issue(USER_A, "revoked", {
+      familyId: "f3",
+      expiresAt: future().toISOString(),
+    });
 
     const toRevoke = await RefreshToken.findByToken("revoked");
     await toRevoke!.revoke();
@@ -127,7 +133,10 @@ describe("Postgres integration — RefreshToken", () => {
   it("revokeAllFor revokes every active token AND returns the revoked rows (C1)", async () => {
     await RefreshToken.issue(USER_A, "r1", { familyId: "f1", expiresAt: future().toISOString() });
     await RefreshToken.issue(USER_A, "r2", { familyId: "f2", expiresAt: future().toISOString() });
-    await RefreshToken.issue(USER_B, "other", { familyId: "f3", expiresAt: future().toISOString() });
+    await RefreshToken.issue(USER_B, "other", {
+      familyId: "f3",
+      expiresAt: future().toISOString(),
+    });
 
     const revoked = await RefreshToken.revokeAllFor(USER_A);
 
@@ -143,9 +152,18 @@ describe("Postgres integration — RefreshToken", () => {
   });
 
   it("revokeFamily revokes only the named family AND returns those rows (C1)", async () => {
-    await RefreshToken.issue(USER_A, "f1-a", { familyId: "fam", expiresAt: future().toISOString() });
-    await RefreshToken.issue(USER_A, "f1-b", { familyId: "fam", expiresAt: future().toISOString() });
-    await RefreshToken.issue(USER_A, "f2", { familyId: "other", expiresAt: future().toISOString() });
+    await RefreshToken.issue(USER_A, "f1-a", {
+      familyId: "fam",
+      expiresAt: future().toISOString(),
+    });
+    await RefreshToken.issue(USER_A, "f1-b", {
+      familyId: "fam",
+      expiresAt: future().toISOString(),
+    });
+    await RefreshToken.issue(USER_A, "f2", {
+      familyId: "other",
+      expiresAt: future().toISOString(),
+    });
 
     const revoked = await RefreshToken.revokeFamily("fam");
 

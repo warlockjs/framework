@@ -30,11 +30,7 @@ import { emit } from "./notifications-event-bus";
  */
 export type Notify = {
   channel(name: string): {
-    send(
-      to: Notifiable | string,
-      payload: unknown,
-      options?: SendOptions,
-    ): Promise<void>;
+    send(to: Notifiable | string, payload: unknown, options?: SendOptions): Promise<void>;
   };
 } & {
   [C in ChannelName]: (
@@ -81,11 +77,9 @@ async function notifyImpl(
     const config = getNotificationConfig();
 
     if (config.preferences) {
-      const allowed = await config.preferences.resolveChannels(
-        notifiable,
-        notificationType,
-        [channelName as ChannelName],
-      );
+      const allowed = await config.preferences.resolveChannels(notifiable, notificationType, [
+        channelName as ChannelName,
+      ]);
 
       if (!allowed.includes(channelName as ChannelName)) {
         await emit("skipped", {

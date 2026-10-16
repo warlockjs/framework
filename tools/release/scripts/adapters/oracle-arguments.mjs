@@ -88,7 +88,7 @@ export function parseOracleArguments(argv) {
     throw new Error(`--features-json is not valid JSON: ${String(error)}`);
   }
 
-  if (!Array.isArray(features) || features.some(feature => typeof feature !== "string")) {
+  if (!Array.isArray(features) || features.some((feature) => typeof feature !== "string")) {
     throw new Error("--features-json must be a JSON array of strings");
   }
 

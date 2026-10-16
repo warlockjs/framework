@@ -224,7 +224,11 @@ describe("HTTP restful — only / except shaping", () => {
     });
 
     const list = await harness.inject({ method: "GET", url: "/read-only" });
-    const create = await harness.inject({ method: "POST", url: "/read-only", payload: { title: "X" } });
+    const create = await harness.inject({
+      method: "POST",
+      url: "/read-only",
+      payload: { title: "X" },
+    });
 
     expect(list.statusCode).toBe(200);
     // create was never registered → Fastify miss.
@@ -240,9 +244,7 @@ describe("HTTP restful — custom Restful subclass", () => {
       public cache = true;
 
       protected middleware = {
-        get: [
-          ({ response }: HttpContext) => response.forbidden({ error: "no peeking" }),
-        ],
+        get: [({ response }: HttpContext) => response.forbidden({ error: "no peeking" })],
       } as any;
     }
 

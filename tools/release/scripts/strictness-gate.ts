@@ -22,15 +22,32 @@ const __dirname = path.dirname(__filename);
 export const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const ALLOWANCES_PATH = path.join(__dirname, "strictness-allowances.jsonc");
 const STRICTNESS_CONTRACT_PATH = path.join(REPO_ROOT, "tsconfig.base.json");
-const TSC_PATH = path.join(REPO_ROOT, "node_modules", ".pnpm", "typescript@5.9.3", "node_modules", "typescript", "bin", "tsc");
-const STRICTNESS_OPTIONS = ["strict", "noUncheckedIndexedAccess", "forceConsistentCasingInFileNames"] as const;
+const TSC_PATH = path.join(
+  REPO_ROOT,
+  "node_modules",
+  ".pnpm",
+  "typescript@5.9.3",
+  "node_modules",
+  "typescript",
+  "bin",
+  "tsc",
+);
+const STRICTNESS_OPTIONS = [
+  "strict",
+  "noUncheckedIndexedAccess",
+  "forceConsistentCasingInFileNames",
+] as const;
 
 export type WorkspacePackage = { dir: string; path: string };
 export type OwnedDiagnostic = { file: string; line: number; code: number };
 export type Measurement = { diagnostics: Map<string, OwnedDiagnostic[]>; covered: Set<string> };
 
 function isDirectory(filePath: string): boolean {
-  try { return statSync(filePath).isDirectory(); } catch { return false; }
+  try {
+    return statSync(filePath).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -44,13 +61,19 @@ export function discoverPackages(repoRoot = REPO_ROOT): WorkspacePackage[] {
   const parents = isDirectory(packagesRoot) ? [packagesRoot, repoRoot] : [repoRoot];
   return parents
     .flatMap((parent) => readdirSync(parent).map((dir) => ({ dir, path: path.join(parent, dir) })))
-    .filter((pkg) => isDirectory(pkg.path) && existsSync(path.join(pkg.path, "src")) && existsSync(path.join(pkg.path, "tsconfig.json")))
+    .filter(
+      (pkg) =>
+        isDirectory(pkg.path) &&
+        existsSync(path.join(pkg.path, "src")) &&
+        existsSync(path.join(pkg.path, "tsconfig.json")),
+    )
     .sort((a, b) => a.dir.localeCompare(b.dir));
 }
 
 export function readAllowances(filePath = ALLOWANCES_PATH): Record<string, number> {
   const parsed = ts.parseConfigFileTextToJson(filePath, readFileSync(filePath, "utf8"));
-  if (parsed.error || !parsed.config || typeof parsed.config !== "object") throw new Error(`Cannot read strictness allowances at ${filePath}.`);
+  if (parsed.error || !parsed.config || typeof parsed.config !== "object")
+    throw new Error(`Cannot read strictness allowances at ${filePath}.`);
   return parsed.config as Record<string, number>;
 }
 
@@ -58,7 +81,8 @@ export function readAllowances(filePath = ALLOWANCES_PATH): Record<string, numbe
 export function sharedStrictnessArgs(filePath = STRICTNESS_CONTRACT_PATH): string[] {
   const parsed = ts.parseConfigFileTextToJson(filePath, readFileSync(filePath, "utf8"));
   const options = parsed.config?.compilerOptions;
-  if (parsed.error || !options || typeof options !== "object") throw new Error(`Cannot read strictness contract at ${filePath}.`);
+  if (parsed.error || !options || typeof options !== "object")
+    throw new Error(`Cannot read strictness contract at ${filePath}.`);
   return STRICTNESS_OPTIONS.flatMap((option) => {
     if (options[option] !== true) throw new Error(`Strictness contract must enable '${option}'.`);
     return [`--${option}`, "true"];
@@ -75,10 +99,13 @@ export function sharedStrictnessArgs(filePath = STRICTNESS_CONTRACT_PATH): strin
 export function buildForcedStrictnessArgs(): string[] {
   const seen = new Set<string>();
   const args: string[] = [];
-  const flagPairs = [...sharedStrictnessArgs().reduce<[string, string][]>((pairs, value, index, all) => {
-    if (index % 2 === 0) pairs.push([value, all[index + 1]]);
-    return pairs;
-  }, []), ...consumerStrictnessFlags().map((flag): [string, string] => [`--${flag}`, "true"])];
+  const flagPairs = [
+    ...sharedStrictnessArgs().reduce<[string, string][]>((pairs, value, index, all) => {
+      if (index % 2 === 0) pairs.push([value, all[index + 1]]);
+      return pairs;
+    }, []),
+    ...consumerStrictnessFlags().map((flag): [string, string] => [`--${flag}`, "true"]),
+  ];
   for (const [flag, value] of flagPairs) {
     if (seen.has(flag)) continue;
     seen.add(flag);
@@ -91,9 +118,17 @@ function normalizeFile(filePath: string, base = REPO_ROOT): string {
   return path.resolve(base, filePath.replace(/\\/g, "/")).replace(/\\/g, "/");
 }
 
-function ownerOf(filePath: string, packages: WorkspacePackage[], base?: string): WorkspacePackage | undefined {
+function ownerOf(
+  filePath: string,
+  packages: WorkspacePackage[],
+  base?: string,
+): WorkspacePackage | undefined {
   const normalized = normalizeFile(filePath, base);
-  return packages.find((pkg) => normalized === normalizeFile(pkg.path) || normalized.startsWith(`${normalizeFile(pkg.path)}/`));
+  return packages.find(
+    (pkg) =>
+      normalized === normalizeFile(pkg.path) ||
+      normalized.startsWith(`${normalizeFile(pkg.path)}/`),
+  );
 }
 
 function extractDiagnostic(line: string): { file: string; line: number; code: number } | undefined {
@@ -130,30 +165,73 @@ export function collectOwnedDiagnostics(packages: WorkspacePackage[]): Measureme
   const compiles = packages.map((pkg) => ({ path: pkg.path, coverage: pkg }));
   const strictnessArgs = buildForcedStrictnessArgs();
   for (const compile of compiles) {
-    const result = spawnSync(process.execPath, [TSC_PATH, "-p", "tsconfig.json", "--noEmit", "--pretty", "false", "--listFiles", ...strictnessArgs], { cwd: compile.path, encoding: "utf8" });
+    const result = spawnSync(
+      process.execPath,
+      [
+        TSC_PATH,
+        "-p",
+        "tsconfig.json",
+        "--noEmit",
+        "--pretty",
+        "false",
+        "--listFiles",
+        ...strictnessArgs,
+      ],
+      { cwd: compile.path, encoding: "utf8" },
+    );
     if (result.error) throw result.error;
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     for (const rawLine of output.split(/\r?\n/)) {
       const candidate = rawLine.trim();
-      if (compile.coverage && ownerOf(candidate, [compile.coverage], compile.path)) covered.add(compile.coverage.dir);
+      if (compile.coverage && ownerOf(candidate, [compile.coverage], compile.path))
+        covered.add(compile.coverage.dir);
       const parsed = extractDiagnostic(candidate);
       if (!parsed) continue;
-      const owner = PROGRAM_CONTAINMENT_CODES.has(parsed.code) ? compile.coverage : ownerOf(parsed.file, packages, compile.path);
+      const owner = PROGRAM_CONTAINMENT_CODES.has(parsed.code)
+        ? compile.coverage
+        : ownerOf(parsed.file, packages, compile.path);
       if (!owner) continue;
-      const diagnostic: OwnedDiagnostic = { file: path.relative(REPO_ROOT, normalizeFile(parsed.file, compile.path)).replace(/\\/g, "/"), line: parsed.line, code: parsed.code };
-      diagnostics.get(owner.dir)?.set(`${diagnostic.file}:${diagnostic.line}:${diagnostic.code}`, diagnostic);
+      const diagnostic: OwnedDiagnostic = {
+        file: path
+          .relative(REPO_ROOT, normalizeFile(parsed.file, compile.path))
+          .replace(/\\/g, "/"),
+        line: parsed.line,
+        code: parsed.code,
+      };
+      diagnostics
+        .get(owner.dir)
+        ?.set(`${diagnostic.file}:${diagnostic.line}:${diagnostic.code}`, diagnostic);
     }
   }
-  return { diagnostics: new Map([...diagnostics].map(([dir, entries]) => [dir, [...entries.values()].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.code - b.code)])), covered };
+  return {
+    diagnostics: new Map(
+      [...diagnostics].map(([dir, entries]) => [
+        dir,
+        [...entries.values()].sort(
+          (a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.code - b.code,
+        ),
+      ]),
+    ),
+    covered,
+  };
 }
 
-export function formatReport(packages: WorkspacePackage[], allowances: Record<string, number>, measurement: Measurement): { text: string; failed: boolean } {
+export function formatReport(
+  packages: WorkspacePackage[],
+  allowances: Record<string, number>,
+  measurement: Measurement,
+): { text: string; failed: boolean } {
   const lines = ["strictness-gate: owned diagnostics / allowance"];
   let failed = false;
   for (const pkg of packages) {
-    if (!measurement.covered.has(pkg.dir)) { lines.push(`  ${pkg.dir}: UNMEASURED`); failed = true; continue; }
+    if (!measurement.covered.has(pkg.dir)) {
+      lines.push(`  ${pkg.dir}: UNMEASURED`);
+      failed = true;
+      continue;
+    }
     const allowance = allowances[pkg.dir];
-    if (allowance === undefined) throw new Error(`No allowance recorded for measured package '${pkg.dir}'.`);
+    if (allowance === undefined)
+      throw new Error(`No allowance recorded for measured package '${pkg.dir}'.`);
     const count = measurement.diagnostics.get(pkg.dir)?.length ?? 0;
     const over = count - allowance;
     lines.push(`  ${pkg.dir}: ${count} / ${allowance}${over > 0 ? ` OVER by ${over}` : " OK"}`);
@@ -171,7 +249,8 @@ export function formatReport(packages: WorkspacePackage[], allowances: Record<st
 
 function selectedPackages(packages: WorkspacePackage[], args: string[]): WorkspacePackage[] {
   if (args.length === 0) return packages;
-  if (args.length !== 2 || args[0] !== "--package") throw new Error("Usage: strictness-gate.ts [--package <package>]");
+  if (args.length !== 2 || args[0] !== "--package")
+    throw new Error("Usage: strictness-gate.ts [--package <package>]");
   const pkg = packages.find(({ dir }) => dir === args[1]);
   if (!pkg) throw new Error(`'${args[1]}' is not a measured package.`);
   return [pkg];
@@ -205,7 +284,9 @@ export type StrictnessGateRunResult = {
  * fake substituted in tests -- rather than shelling back out to this file as
  * a subprocess.
  */
-export function runStrictnessGate(packages: WorkspacePackage[] = discoverPackages()): StrictnessGateRunResult {
+export function runStrictnessGate(
+  packages: WorkspacePackage[] = discoverPackages(),
+): StrictnessGateRunResult {
   const allowances = readAllowances();
   const measurement = collectOwnedDiagnostics(packages);
   const report = formatReport(packages, allowances, measurement);
@@ -227,4 +308,10 @@ async function main(): Promise<number> {
   return result.passed ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === __filename) main().then((code) => process.exit(code)).catch((error: unknown) => { console.error(error instanceof Error ? error.message : error); process.exit(1); });
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename)
+  main()
+    .then((code) => process.exit(code))
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exit(1);
+    });

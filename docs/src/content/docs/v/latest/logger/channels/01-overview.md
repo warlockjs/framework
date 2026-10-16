@@ -69,9 +69,11 @@ import { ConsoleLog, type LoggingData } from "@warlock.js/logger";
 // Drop GET /health noise from the console
 new ConsoleLog({
   filter: (data: LoggingData) =>
-    !(data.type === "info" &&
+    !(
+      data.type === "info" &&
       typeof data.message === "string" &&
-      data.message.includes("GET /health")),
+      data.message.includes("GET /health")
+    ),
 });
 
 // Suppress all debug output from a noisy third-party module
@@ -100,12 +102,12 @@ A channel can also carry a per-channel `redact` config that adds paths on top of
 
 ## Built-in channels
 
-| Channel | `name` | `terminal` | Output |
-| --- | --- | --- | --- |
-| [`ConsoleLog`](./02-console/) | `"console"` | `true` | Colorized, icon-prefixed terminal lines |
-| [`FileLog`](./03-file/) | `"file"` | `false` | Plain-text `.log` files with rotation + chunking |
-| [`JSONFileLog`](./04-json-file/) | `"fileJson"` | `false` | Structured `.json` files for aggregators |
-| [`SentryLog`](./06-sentry/) | `"sentry"` | `false` | Sentry events + breadcrumbs (needs the optional `@sentry/node` peer) |
+| Channel                          | `name`       | `terminal` | Output                                                               |
+| -------------------------------- | ------------ | ---------- | -------------------------------------------------------------------- |
+| [`ConsoleLog`](./02-console/)    | `"console"`  | `true`     | Colorized, icon-prefixed terminal lines                              |
+| [`FileLog`](./03-file/)          | `"file"`     | `false`    | Plain-text `.log` files with rotation + chunking                     |
+| [`JSONFileLog`](./04-json-file/) | `"fileJson"` | `false`    | Structured `.json` files for aggregators                             |
+| [`SentryLog`](./06-sentry/)      | `"sentry"`   | `false`    | Sentry events + breadcrumbs (needs the optional `@sentry/node` peer) |
 
 Need a different destination — Slack, a database, an HTTP endpoint? Write a [Custom Channel](./05-custom/).
 

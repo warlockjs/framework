@@ -3,28 +3,24 @@ title: "Stale-While-Revalidate"
 slug: v/latest/cache/swr
 ---
 
-`cache.swr(key, options, fn)` is the cache pattern you reach for when a slow upstream shouldn't make a fast endpoint slow. It returns the cached value immediately whenever it can, refreshes in the background when the value is *getting* old, and only blocks for a fresh fetch when the entry is fully expired.
+`cache.swr(key, options, fn)` is the cache pattern you reach for when a slow upstream shouldn't make a fast endpoint slow. It returns the cached value immediately whenever it can, refreshes in the background when the value is _getting_ old, and only blocks for a fresh fetch when the entry is fully expired.
 
 ## The problem it solves
 
 ```ts
 // remember(): every miss blocks every caller until the upstream responds
-const product = await cache.remember("product.42", "1h", () =>
-  db.products.find(42),
-);
+const product = await cache.remember("product.42", "1h", () => db.products.find(42));
 ```
 
 If the upstream takes 800ms, every cache-miss request takes 800ms. With SWR:
 
 ```ts
-const product = await cache.swr(
-  "product.42",
-  { freshTtl: "1m", staleTtl: "1h" },
-  () => db.products.find(42),
+const product = await cache.swr("product.42", { freshTtl: "1m", staleTtl: "1h" }, () =>
+  db.products.find(42),
 );
 ```
 
-The first call still blocks (you have to fetch *something*). After that, **every read for an hour returns instantly**. Within the first minute it's "fresh." Between 1 minute and 1 hour it's "stale" — you get the cached value while the cache refreshes in the background. Past an hour it falls back to a normal miss.
+The first call still blocks (you have to fetch _something_). After that, **every read for an hour returns instantly**. Within the first minute it's "fresh." Between 1 minute and 1 hour it's "stale" — you get the cached value while the cache refreshes in the background. Past an hour it falls back to a normal miss.
 
 ## Three windows, three behaviors
 
@@ -37,11 +33,11 @@ The first call still blocks (you have to fetch *something*). After that, **every
      │  no upstream call  │  bg refresh        │  like a miss
 ```
 
-| Window | What happens |
-|---|---|
-| `now < freshTtl` | Return cached value. No upstream call. |
+| Window                       | What happens                                                                                                |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `now < freshTtl`             | Return cached value. No upstream call.                                                                      |
 | `freshTtl <= now < staleTtl` | Return cached value immediately. Kick off `fn()` in the background; the next read sees the refreshed value. |
-| `now >= staleTtl` | Block on `fn()`. Same behavior as `remember()`. |
+| `now >= staleTtl`            | Block on `fn()`. Same behavior as `remember()`.                                                             |
 
 ## Concurrent callers share one refresh
 
@@ -61,13 +57,13 @@ This is a deliberate design choice: SWR optimizes for "the user always gets a re
 
 ## When to choose SWR over `remember()`
 
-| Scenario | Use |
-|---|---|
-| The upstream is fast and freshness matters | `remember()` |
-| The upstream is slow and slightly-stale data is acceptable | `swr()` |
-| You want zero p99 spikes on cache misses | `swr()` |
+| Scenario                                                                               | Use          |
+| -------------------------------------------------------------------------------------- | ------------ |
+| The upstream is fast and freshness matters                                             | `remember()` |
+| The upstream is slow and slightly-stale data is acceptable                             | `swr()`      |
+| You want zero p99 spikes on cache misses                                               | `swr()`      |
 | You're caching a function with a strict accuracy requirement (auth, balances, billing) | `remember()` |
-| You're caching read-heavy data that changes occasionally | `swr()` |
+| You're caching read-heavy data that changes occasionally                               | `swr()`      |
 
 The shape of your `freshTtl` / `staleTtl` encodes how much staleness your product can tolerate. Tight pair (`freshTtl: "1m", staleTtl: "5m"`) keeps things fresh; wide pair (`freshTtl: "10m", staleTtl: "24h"`) prioritizes availability.
 
@@ -93,10 +89,8 @@ Tags attach on the first miss-fetch and on every successful background refresh.
 ```ts
 const feed = cache.namespace(`feed.${userId}`, { tags: [`user.${userId}`] });
 
-await feed.swr(
-  "home",
-  { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
-  () => buildHomeFeed(userId),
+await feed.swr("home", { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] }, () =>
+  buildHomeFeed(userId),
 );
 // Stored at feed.<userId>.home, tagged [user.<userId>, computed]
 ```
@@ -108,24 +102,22 @@ Note: scope-level `ttl` defaults are NOT applied to SWR — `freshTtl` / `staleT
 Same pattern as `remember()` and `set()`:
 
 ```ts
-await cache.swr(
-  "expensive-report",
-  { freshTtl: "5m", staleTtl: "1h", driver: "redis" },
-  () => buildReport(),
+await cache.swr("expensive-report", { freshTtl: "5m", staleTtl: "1h", driver: "redis" }, () =>
+  buildReport(),
 );
 ```
 
 ## Driver support
 
-| Driver | Background refresh | Notes |
-|---|---|---|
-| memory, memoryExtended | ✅ Full | |
-| lru | ✅ Full | |
-| file | ✅ Full | |
-| redis | ✅ Full | Uses a sidecar key (`__swrmeta:<key>`) for freshness tracking — keeps existing entry shapes backwards-compatible. |
-| pg | ✅ Full | Persists freshness in a `stale_at TIMESTAMPTZ` column on the cache table. Run `driver.schema()` once via your migration tool to provision it. |
-| mock | ✅ Full | |
-| null | ❌ Always-fetch | Null driver caches nothing, so every SWR call blocks on `fn()`. |
+| Driver                 | Background refresh | Notes                                                                                                                                         |
+| ---------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| memory, memoryExtended | ✅ Full            |                                                                                                                                               |
+| lru                    | ✅ Full            |                                                                                                                                               |
+| file                   | ✅ Full            |                                                                                                                                               |
+| redis                  | ✅ Full            | Uses a sidecar key (`__swrmeta:<key>`) for freshness tracking — keeps existing entry shapes backwards-compatible.                             |
+| pg                     | ✅ Full            | Persists freshness in a `stale_at TIMESTAMPTZ` column on the cache table. Run `driver.schema()` once via your migration tool to provision it. |
+| mock                   | ✅ Full            |                                                                                                                                               |
+| null                   | ❌ Always-fetch    | Null driver caches nothing, so every SWR call blocks on `fn()`.                                                                               |
 
 ## Common patterns
 
@@ -133,10 +125,8 @@ await cache.swr(
 
 ```ts
 async function getProduct(id: string) {
-  return cache.swr(
-    `product.${id}`,
-    { freshTtl: "1m", staleTtl: "1h" },
-    () => db.products.findById(id),
+  return cache.swr(`product.${id}`, { freshTtl: "1m", staleTtl: "1h" }, () =>
+    db.products.findById(id),
   );
 }
 ```
@@ -147,10 +137,8 @@ Most product reads return instantly from cache. Stock prices and counts may be 1
 
 ```ts
 async function dashboardKPIs(tenantId: string) {
-  return cache.swr(
-    `dashboard.${tenantId}.kpis`,
-    { freshTtl: "5m", staleTtl: "1h" },
-    () => computeKPIs(tenantId),
+  return cache.swr(`dashboard.${tenantId}.kpis`, { freshTtl: "5m", staleTtl: "1h" }, () =>
+    computeKPIs(tenantId),
   );
 }
 ```
@@ -161,10 +149,8 @@ The aggregation runs at most once every 5 minutes per tenant, even if 1000 users
 
 ```ts
 async function getExchangeRates() {
-  return cache.swr(
-    "exchange.rates",
-    { freshTtl: "10m", staleTtl: "24h" },
-    () => fetchFromForexAPI(),
+  return cache.swr("exchange.rates", { freshTtl: "10m", staleTtl: "24h" }, () =>
+    fetchFromForexAPI(),
   );
 }
 ```

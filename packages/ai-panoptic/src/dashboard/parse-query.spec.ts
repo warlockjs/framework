@@ -40,7 +40,9 @@ describe("parseQuery", () => {
 
   it("maps startedAfter / startedBefore as ISO strings", () => {
     expect(
-      parseQuery(qs("startedAfter=2026-06-01T00:00:00.000Z&startedBefore=2026-06-30T00:00:00.000Z")),
+      parseQuery(
+        qs("startedAfter=2026-06-01T00:00:00.000Z&startedBefore=2026-06-30T00:00:00.000Z"),
+      ),
     ).toEqual({
       startedAfter: "2026-06-01T00:00:00.000Z",
       startedBefore: "2026-06-30T00:00:00.000Z",
@@ -52,7 +54,9 @@ describe("parseQuery", () => {
   });
 
   it("combines every dimension into one filter", () => {
-    expect(parseQuery(qs("sessionId=s1&status=failed&startedAfter=2026-06-01T00:00:00.000Z"))).toEqual({
+    expect(
+      parseQuery(qs("sessionId=s1&status=failed&startedAfter=2026-06-01T00:00:00.000Z")),
+    ).toEqual({
       sessionId: "s1",
       status: "failed",
       startedAfter: "2026-06-01T00:00:00.000Z",

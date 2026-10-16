@@ -44,7 +44,9 @@ describe("writeCurrentRouteTypes", () => {
     await writeCurrentRouteTypes({ appRoot, apis: [] });
 
     const output = fs.readFileSync(path.join(appRoot, ".warlock/typings/web-routes.d.ts"), "utf8");
-    expect(output).toContain('"account.show": { path: "/account"; params: {}; actions: "save"; guard: "user" };');
+    expect(output).toContain(
+      '"account.show": { path: "/account"; params: {}; actions: "save"; guard: "user" };',
+    );
     expect(output).toContain('"about": { path: "/about"; params: {} };');
   });
 });

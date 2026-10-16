@@ -19,9 +19,7 @@ export type StructuredOutputPlan =
  * preserve the prior assumption that OpenAI models support strict
  * structured output.
  */
-export function inferStructuredOutput(
-  responseFormat: OpenAIResponseFormat | undefined,
-): boolean {
+export function inferStructuredOutput(responseFormat: OpenAIResponseFormat | undefined): boolean {
   if (responseFormat === "json_object" || responseFormat === "text") {
     return false;
   }

@@ -30,9 +30,7 @@ export const literalRule: SchemaRule<{ values: readonly (string | number | boole
     }
 
     this.context.translationParams.values = this.context.options.values
-      .map(v =>
-        resolveTranslation({ key: String(v), rawValue: String(v), rule: this, context }),
-      )
+      .map((v) => resolveTranslation({ key: String(v), rawValue: String(v), rule: this, context }))
       .join(", ");
 
     return invalidRule(this, context);

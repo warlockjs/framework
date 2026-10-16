@@ -23,8 +23,7 @@ generic output declaration, for example:
 
 ```ts
 // Inside Seal's factory:
-string: () =>
-  new StringValidator() as StringValidator & StandardSchemaV1<string>;
+string: () => new StringValidator() as StringValidator & StandardSchemaV1<string>;
 ```
 
 Keep input and output distinct when writing consumer types. Defaults and catches
@@ -52,7 +51,7 @@ ai.tool({
   name: "create_user",
   description: "Create a new user",
   input: userSchema,
-  execute: async input => createUser(input),
+  execute: async (input) => createUser(input),
 });
 
 // ✅ supervisor output — no cast

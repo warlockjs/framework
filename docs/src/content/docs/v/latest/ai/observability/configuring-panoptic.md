@@ -36,19 +36,19 @@ The `panoptic` slot on `ai.config` accepts:
 
 ```ts
 type PanopticConfig = {
-  exporters?: ExporterContract[];        // sinks the collector feeds
-  cache?: CacheDriverInput;              // persist traces across restarts
+  exporters?: ExporterContract[]; // sinks the collector feeds
+  cache?: CacheDriverInput; // persist traces across restarts
   dashboard?: boolean | DashboardOptions; // serve the local dashboard
-  observeAll?: boolean;                  // observe every flow by default
+  observeAll?: boolean; // observe every flow by default
 };
 ```
 
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `exporters` | `[]` | The sinks the collector fans each trace out to — a store, `consoleExporter()`, `otelExporter()`, `langfuseExporter()`, … Exactly the array you'd pass to `panoptic({ exporters })`. |
-| `cache` | _unset_ | A `@warlock.js/cache` `CacheDriver` (or a `() => CacheDriver \| Promise<CacheDriver>` factory) that backs a [persistent trace store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts). When set — and no store-shaped exporter was supplied — the dashboard reads a cache-backed store that **survives a process restart** instead of a fresh in-memory one. |
-| `observeAll` | `false` | When `true`, every flow is observed unless it opts out. When `false`, only flows that set `observe: true` (or a flow-local observer) are collected. |
-| `dashboard` | _unset_ | `true` uses the [dashboard defaults](/v/latest/ai/observability/local-dashboard/); an object overrides them. See [the local dashboard](/v/latest/ai/observability/local-dashboard/) for the full option set. |
+| Field        | Default | Meaning                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `exporters`  | `[]`    | The sinks the collector fans each trace out to — a store, `consoleExporter()`, `otelExporter()`, `langfuseExporter()`, … Exactly the array you'd pass to `panoptic({ exporters })`.                                                                                                                                                                                                        |
+| `cache`      | _unset_ | A `@warlock.js/cache` `CacheDriver` (or a `() => CacheDriver \| Promise<CacheDriver>` factory) that backs a [persistent trace store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts). When set — and no store-shaped exporter was supplied — the dashboard reads a cache-backed store that **survives a process restart** instead of a fresh in-memory one. |
+| `observeAll` | `false` | When `true`, every flow is observed unless it opts out. When `false`, only flows that set `observe: true` (or a flow-local observer) are collected.                                                                                                                                                                                                                                        |
+| `dashboard`  | _unset_ | `true` uses the [dashboard defaults](/v/latest/ai/observability/local-dashboard/); an object overrides them. See [the local dashboard](/v/latest/ai/observability/local-dashboard/) for the full option set.                                                                                                                                                                               |
 
 ### Persisting traces across a restart
 
@@ -62,7 +62,7 @@ ai.config({
   panoptic: {
     observeAll: true,
     dashboard: { port: 4319, open: true },
-    cache: () => ai.config().cache!,   // any CacheDriver, or an async factory
+    cache: () => ai.config().cache!, // any CacheDriver, or an async factory
   },
 });
 ```
@@ -106,11 +106,11 @@ So calling `ai.config({ panoptic: { observeAll: false } })` later flips observe-
 type FlowObserveOption = boolean | Observer;
 ```
 
-| `observe` value | Effect |
-| --- | --- |
-| _omitted_ | Follow the global `observeAll` flag. |
-| `true` | Always route this flow's completed report to the registered observers — **even when `observeAll` is off**. |
-| `false` | Opt this flow out entirely — **even when `observeAll` is on**. |
+| `observe` value      | Effect                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| _omitted_            | Follow the global `observeAll` flag.                                                                                |
+| `true`               | Always route this flow's completed report to the registered observers — **even when `observeAll` is off**.          |
+| `false`              | Opt this flow out entirely — **even when `observeAll` is on**.                                                      |
 | an `Observer` object | A flow-local collector: only this flow's report is routed, and only to that observer (the global ones are skipped). |
 
 ### Pattern A — opt-in (observeAll off, default)
@@ -120,8 +120,8 @@ Leave `observeAll` unset and tag only the flows you care about. Everything else 
 ```ts
 ai.config({ panoptic: { exporters: [store] } }); // observeAll defaults to false
 
-const audited = ai.agent({ model, observe: true });    // collected
-const noisy = ai.agent({ model });                     // not collected
+const audited = ai.agent({ model, observe: true }); // collected
+const noisy = ai.agent({ model }); // not collected
 ```
 
 ### Pattern B — observe-all with surgical opt-outs
@@ -131,7 +131,7 @@ Flip `observeAll` on and silence the chatty flows.
 ```ts
 ai.config({ panoptic: { exporters: [store], observeAll: true } });
 
-const main = ai.agent({ model });                    // collected (observeAll)
+const main = ai.agent({ model }); // collected (observeAll)
 const healthCheck = ai.agent({ model, observe: false }); // explicitly excluded
 ```
 
@@ -157,9 +157,9 @@ Declarative config does not replace `panoptic()` — it sits on top of it. Every
 ```ts
 const observe = panoptic({ exporters: [consoleExporter()] });
 
-observe.attach(myAgent);                 // subscribe to one primitive's events
-observe.middleware();                    // feed via the middleware pipeline
-await observe.collect(result.report);    // feed a report directly (orchestrator turns)
+observe.attach(myAgent); // subscribe to one primitive's events
+observe.middleware(); // feed via the middleware pipeline
+await observe.collect(result.report); // feed a report directly (orchestrator turns)
 ```
 
 The two coexist. Use declarative config for the broad "observe my whole app" stroke, and the imperative `attach()` / `collect()` for the cases the global seam can't cover — most notably an **orchestrator turn**, whose completed event carries only session identity and no result-bearing report. That still needs an explicit `collect()`; see the orchestrator-turn section of [What Panoptic traces](/v/latest/ai/observability/what-panoptic-traces/).

@@ -56,12 +56,12 @@ export class User extends Model<UserSchema> {
 
 // Write
 const user = await User.create({ name: "Ada Lovelace", email: "ada@example.com" });
-user.id;                  // generated ID — direct property
-user.get("status");        // "active" — default fired
+user.id; // generated ID — direct property
+user.get("status"); // "active" — default fired
 
 // Read
 const found = await User.find(user.id);
-found?.get("email");       // "ada@example.com"
+found?.get("email"); // "ada@example.com"
 
 // Filter
 const active = await User.where("status", "active").get();
@@ -70,22 +70,22 @@ const page = await User.paginate({ page: 1, limit: 20 });
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Defining a model class — schema, decorators, `Model<TSchema>`, accessors | The `define-model` topic |
-| Querying — `.where`, `.find`, `.first`, `.all`, `.count`, `.exists`, ordering | The `query-data` topic |
-| Pagination — `.paginate`, `cursorPaginate`, `chunk` | The `paginate-results` topic |
-| Relations — `belongsTo` / `hasMany` / `belongsToMany`, eager loading | The `define-relations` topic |
-| Migrations — `migration` definition, `up`/`down`, CLI | The `write-migration` topic |
-| Transactions — `transaction(fn)`, rollback, isolation | The `manage-transactions` topic |
-| Dirty tracking — `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues` | The `track-changes` topic |
-| Lifecycle hooks — `saving`, `saved`, `deleting`, `deleted` | The `subscribe-to-model-events` topic |
-| Soft / hard / trash deletes + restore | The `configure-delete-strategy` topic |
-| Atomic ops — `Model.increase`, `decrease`, `atomic`, `Model.delete(filter)` | The `perform-atomic-ops` topic |
-| Aggregates — `.sum`, `.avg`, `.count`, `.groupBy`, `.having` | The `aggregate-data` topic |
-| Vector search — `similarTo`, pgvector / Atlas vector index | The `search-by-vector` topic |
-| Multiple databases — `connectToDatabase`, per-model `static dataSource` | The `manage-data-sources` topic |
-| CLI + Operations API — `cascade migrate`, `migrate:rollback`, programmatic | The `run-cascade-cli` topic |
+| If the task is about…                                                                    | Load                                  |
+| ---------------------------------------------------------------------------------------- | ------------------------------------- |
+| Defining a model class — schema, decorators, `Model<TSchema>`, accessors                 | The `define-model` topic              |
+| Querying — `.where`, `.find`, `.first`, `.all`, `.count`, `.exists`, ordering            | The `query-data` topic                |
+| Pagination — `.paginate`, `cursorPaginate`, `chunk`                                      | The `paginate-results` topic          |
+| Relations — `belongsTo` / `hasMany` / `belongsToMany`, eager loading                     | The `define-relations` topic          |
+| Migrations — `migration` definition, `up`/`down`, CLI                                    | The `write-migration` topic           |
+| Transactions — `transaction(fn)`, rollback, isolation                                    | The `manage-transactions` topic       |
+| Dirty tracking — `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues` | The `track-changes` topic             |
+| Lifecycle hooks — `saving`, `saved`, `deleting`, `deleted`                               | The `subscribe-to-model-events` topic |
+| Soft / hard / trash deletes + restore                                                    | The `configure-delete-strategy` topic |
+| Atomic ops — `Model.increase`, `decrease`, `atomic`, `Model.delete(filter)`              | The `perform-atomic-ops` topic        |
+| Aggregates — `.sum`, `.avg`, `.count`, `.groupBy`, `.having`                             | The `aggregate-data` topic            |
+| Vector search — `similarTo`, pgvector / Atlas vector index                               | The `search-by-vector` topic          |
+| Multiple databases — `connectToDatabase`, per-model `static dataSource`                  | The `manage-data-sources` topic       |
+| CLI + Operations API — `cascade migrate`, `migrate:rollback`, programmatic               | The `run-cascade-cli` topic           |
 
 ## Things NOT to do
 

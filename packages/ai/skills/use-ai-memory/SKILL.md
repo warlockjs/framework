@@ -8,9 +8,9 @@ description: 'Agent memory with ai.memory({...}) — a provider-neutral store wi
 A single provider-neutral store that holds and retrieves what an agent / orchestrator should remember across turns. Four tiers ship in 4.3.0:
 
 - **working** — in-run scratch threaded across turns of one session. Volatile, unscored, recalled in insertion order (recency). On by default, size-bounded (`working: { maxItems }`, default `1000` — see below).
-- **semantic** — durable *facts* stored as embeddings in a `@warlock.js/cache` driver, retrieved by cosine similarity via the driver's native `.similar()` — the same delegation the `semanticCache` middleware uses. Activates only when you pass `semantic` config.
-- **episodic** — durable *events*: a timestamped log retrieved by similarity **blended with recency** (recent episodes rank higher). Embedder-backed like semantic; tune with `recencyWeight` + `halfLifeMs`.
-- **procedural** — durable *how-tos*: learned procedures retrieved by similarity **blended with reinforcement** — re-remembering a procedure increments its use count so well-worn procedures rank higher. Tune with `reinforcementWeight`.
+- **semantic** — durable _facts_ stored as embeddings in a `@warlock.js/cache` driver, retrieved by cosine similarity via the driver's native `.similar()` — the same delegation the `semanticCache` middleware uses. Activates only when you pass `semantic` config.
+- **episodic** — durable _events_: a timestamped log retrieved by similarity **blended with recency** (recent episodes rank higher). Embedder-backed like semantic; tune with `recencyWeight` + `halfLifeMs`.
+- **procedural** — durable _how-tos_: learned procedures retrieved by similarity **blended with reinforcement** — re-remembering a procedure increments its use count so well-worn procedures rank higher. Tune with `reinforcementWeight`.
 
 > **Still deferred** — decay / forgetting (TTL falloff, eviction). The four tiers above are the full 4.3.0 surface; the `MemoryTier` union widened from `"working" | "semantic"` to add `"episodic" | "procedural"` (a non-breaking change).
 
@@ -29,12 +29,12 @@ store.setOptions({});
 const mem = ai.memory({
   semantic: {
     embedder: openai.embedder({ name: "text-embedding-3-small" }),
-    store,                                  // vector-capable CacheDriver
-    namespace: "ai.memory",                 // key prefix; default "ai.memory"
+    store, // vector-capable CacheDriver
+    namespace: "ai.memory", // key prefix; default "ai.memory"
   },
-  defaultTier: "semantic",                  // tier a remember() item lands in without its own `tier`
-  k: 5,                                     // default recall count
-  threshold: 0.7,                           // default semantic similarity floor [0,1]
+  defaultTier: "semantic", // tier a remember() item lands in without its own `tier`
+  k: 5, // default recall count
+  threshold: 0.7, // default semantic similarity floor [0,1]
 });
 
 await mem.remember({ text: "User prefers concise answers." });
@@ -50,18 +50,29 @@ const hits = await mem.recall("how should I respond?", { k: 3 });
 
 ## Episodic & procedural tiers
 
-Both are durable, embedder-backed tiers wired like `semantic` (`{ embedder, store? }`), but they re-rank by *time* and *use*:
+Both are durable, embedder-backed tiers wired like `semantic` (`{ embedder, store? }`), but they re-rank by _time_ and _use_:
 
 ```ts
 const mem = ai.memory({
-  episodic:   { embedder, store, recencyWeight: 0.3, halfLifeMs: 7 * 24 * 60 * 60 * 1000 },
+  episodic: { embedder, store, recencyWeight: 0.3, halfLifeMs: 7 * 24 * 60 * 60 * 1000 },
   procedural: { embedder, store, reinforcementWeight: 0.3 },
   defaultTier: "episodic",
 });
 
-await mem.remember({ text: "Refunded order 5821 after a cracked-item complaint.", tier: "episodic" });
-await mem.remember({ id: "esc", text: "Escalate refunds over $500 to a human.", tier: "procedural" });
-await mem.remember({ id: "esc", text: "Escalate refunds over $500 to a human.", tier: "procedural" }); // reinforce → uses 1→2
+await mem.remember({
+  text: "Refunded order 5821 after a cracked-item complaint.",
+  tier: "episodic",
+});
+await mem.remember({
+  id: "esc",
+  text: "Escalate refunds over $500 to a human.",
+  tier: "procedural",
+});
+await mem.remember({
+  id: "esc",
+  text: "Escalate refunds over $500 to a human.",
+  tier: "procedural",
+}); // reinforce → uses 1→2
 ```
 
 - **episodic** — stamps each entry with the remember time and decays its recency on an exponential half-life; at equal similarity a recent episode wins. `recencyWeight: 0` → pure similarity. The similarity `threshold` still gates relevance (recency never surfaces an irrelevant-but-recent episode). `now` is injectable for deterministic tests.
@@ -73,8 +84,12 @@ await mem.remember({ id: "esc", text: "Escalate refunds over $500 to a human.", 
 ### `remember(items)`
 
 ```ts
-await mem.remember({ text: "User is on the Enterprise plan.", tier: "semantic", metadata: { source: "crm" } });
-await mem.remember([{ text: "a" }, { text: "b", tier: "working" }]);   // batch
+await mem.remember({
+  text: "User is on the Enterprise plan.",
+  tier: "semantic",
+  metadata: { source: "crm" },
+});
+await mem.remember([{ text: "a" }, { text: "b", tier: "working" }]); // batch
 ```
 
 A `MemoryItem` is `{ text, tier?, id?, scope?, metadata? }`. `text` is the only required field — it's what gets embedded (semantic) and surfaced back on recall. `tier` defaults to the factory `defaultTier`. Semantic items are embedded + indexed; working items append to the in-run buffer. **Re-remembering an item whose id (explicit or text-derived) already exists overwrites in place rather than duplicating.** `metadata` is an opaque bag round-tripped verbatim onto the recalled memory. `scope` is the ISOLATION key — see below.
@@ -83,14 +98,18 @@ A `MemoryItem` is `{ text, tier?, id?, scope?, metadata? }`. `text` is the only 
 
 ```ts
 const hits = await mem.recall("which plan is the user on?", {
-  k: 5,              // cap result count (defaults to factory k)
-  threshold: 0.75,   // raise the semantic floor for this call
-  tier: "semantic",  // restrict to one tier; omit to query every enabled tier
+  k: 5, // cap result count (defaults to factory k)
+  threshold: 0.75, // raise the semantic floor for this call
+  tier: "semantic", // restrict to one tier; omit to query every enabled tier
   scope: "tenant-42", // isolation key — only memories remembered under this exact scope
 });
 
 for (const hit of hits) {
-  hit.id; hit.text; hit.tier; hit.score; hit.metadata;
+  hit.id;
+  hit.text;
+  hit.tier;
+  hit.score;
+  hit.metadata;
 }
 ```
 
@@ -105,9 +124,9 @@ One store instance is normally shared by many callers (built once at boot, passe
 ```ts
 await mem.remember({ text: "User A's account email is a@example.com", scope: "user-a" });
 
-await mem.recall("what is my email?", { scope: "user-b" });   // [] — never sees user A
-await mem.recall("what is my email?", { scope: "user-a" });   // user A's own memories
-await mem.recall("what is my email?");                        // only the UNSCOPED pool
+await mem.recall("what is my email?", { scope: "user-b" }); // [] — never sees user A
+await mem.recall("what is my email?", { scope: "user-a" }); // user A's own memories
+await mem.recall("what is my email?"); // only the UNSCOPED pool
 ```
 
 - The match is **exact equality**, enforced inside every tier (`working` / `semantic` / `episodic` / `procedural`) before hits are scored, merged, or sliced — not something the caller filters afterward.
@@ -120,7 +139,7 @@ await mem.recall("what is my email?");                        // only the UNSCOP
 
 ```ts
 const mem = ai.memory({
-  working: { maxItems: 2_000 },   // default 1000; bare `working: true` also works
+  working: { maxItems: 2_000 }, // default 1000; bare `working: true` also works
 });
 ```
 
@@ -133,8 +152,8 @@ The bound is **global**, not per-scope — a busy session can push another sessi
 ### `clear(tier?)`
 
 ```ts
-await mem.clear();            // every tier
-await mem.clear("working");   // just working — e.g. at session end, keeping durable recall
+await mem.clear(); // every tier
+await mem.clear("working"); // just working — e.g. at session end, keeping durable recall
 ```
 
 ## Wiring into an orchestrator
@@ -144,6 +163,7 @@ Pass the store as `ai.orchestrator({ memory })` to recall before each turn's dis
 ## Picking a vector driver
 
 The semantic tier delegates similarity entirely to the `CacheDriver`:
+
 - **Dev / tests** — `new MemoryCacheDriver()` (zero config, O(N) scan; fine up to a few thousand entries).
 - **Production** — a driver with a real ANN index: `pg` with pgvector, `redis` with RediSearch.
 

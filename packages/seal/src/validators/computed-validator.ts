@@ -77,19 +77,25 @@ export class ComputedValidator<TResult = any> extends BaseValidator {
           };
         }
 
-        return this.refineResult({
-          isValid: true,
-          errors: [],
-          data: validation.data,
-        }, context);
+        return this.refineResult(
+          {
+            isValid: true,
+            errors: [],
+            data: validation.data,
+          },
+          context,
+        );
       }
 
       // No validation - return computed result directly
-      return this.refineResult({
-        isValid: true,
-        errors: [],
-        data: result,
-      }, context);
+      return this.refineResult(
+        {
+          isValid: true,
+          errors: [],
+          data: result,
+        },
+        context,
+      );
     } catch (error) {
       // Handle callback execution errors
       return {
@@ -139,9 +145,9 @@ export class ComputedValidator<TResult = any> extends BaseValidator {
   public override toJsonSchema(_target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
     throw new Error(
       `[Seal] toJsonSchema() is not supported on ComputedValidator / ManagedValidator. ` +
-      `Computed fields are runtime-only and have no input JSON Schema representation. ` +
-      `ObjectValidator.toJsonSchema() automatically skips computed fields — ` +
-      `do not call toJsonSchema() on a computed validator directly.`,
+        `Computed fields are runtime-only and have no input JSON Schema representation. ` +
+        `ObjectValidator.toJsonSchema() automatically skips computed fields — ` +
+        `do not call toJsonSchema() on a computed validator directly.`,
     );
   }
 }

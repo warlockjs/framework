@@ -104,8 +104,7 @@ describe("Date period rules - string-field arms (parse a date string)", () => {
       when: v.date().betweenYears("from", "to"),
     });
     expect(
-      (await validate(years, { from: "2020-01-01", to: "2025-01-01", when: "2023-06-15" }))
-        .isValid,
+      (await validate(years, { from: "2020-01-01", to: "2025-01-01", when: "2023-06-15" })).isValid,
     ).toBe(true);
   });
 

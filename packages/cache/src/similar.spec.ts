@@ -100,9 +100,7 @@ describe("MemoryCacheDriver — similar()", () => {
 
   it("throws on dimension mismatch at query time", async () => {
     await driver.set("doc.a", 1, { vector: [1, 0, 0] });
-    await expect(
-      driver.similar([1, 0], { topK: 1 }),
-    ).rejects.toThrow(CacheConfigurationError);
+    await expect(driver.similar([1, 0], { topK: 1 })).rejects.toThrow(CacheConfigurationError);
   });
 
   it("drops vector index entry on remove", async () => {
@@ -241,15 +239,11 @@ describe("FileCacheDriver — similarity unsupported", () => {
   }, 30000);
 
   it("throws CacheUnsupportedError when set is called with a vector", async () => {
-    await expect(
-      driver.set("a", 1, { vector: [1, 0, 0] }),
-    ).rejects.toThrow(CacheUnsupportedError);
+    await expect(driver.set("a", 1, { vector: [1, 0, 0] })).rejects.toThrow(CacheUnsupportedError);
   });
 
   it("throws CacheUnsupportedError on similar()", async () => {
-    await expect(
-      driver.similar([1, 0, 0], { topK: 1 }),
-    ).rejects.toThrow(CacheUnsupportedError);
+    await expect(driver.similar([1, 0, 0], { topK: 1 })).rejects.toThrow(CacheUnsupportedError);
   });
 });
 

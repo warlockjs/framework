@@ -32,4 +32,3 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
 - `channel.send` throws → retried per `attempts` / `backoff`, then listed by `failedJobs()`.
 - Channel not configured in the worker → fails at once, no retries.
 - Deliveries run under the job name `warlock.notifications.deliver`.
-

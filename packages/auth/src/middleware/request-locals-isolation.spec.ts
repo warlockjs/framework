@@ -52,9 +52,8 @@ const accessTokenFindByToken = vi.fn();
 
 vi.mock("@warlock.js/core", async () => {
   const { Request } = await import("@warlock.js/core/src/http/request");
-  const { requestContext, useCurrentUser, useRequest } = await import(
-    "@warlock.js/core/src/http/context/request-context"
-  );
+  const { requestContext, useCurrentUser, useRequest } =
+    await import("@warlock.js/core/src/http/context/request-context");
 
   return {
     Request,
@@ -66,7 +65,7 @@ vi.mock("@warlock.js/core", async () => {
   };
 });
 
-vi.mock("@warlock.js/logger", async importOriginal => {
+vi.mock("@warlock.js/logger", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@warlock.js/logger")>();
 
   return {
@@ -75,7 +74,7 @@ vi.mock("@warlock.js/logger", async importOriginal => {
   };
 });
 
-vi.mock("../services/jwt", async importOriginal => {
+vi.mock("../services/jwt", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/jwt")>();
 
   return {
@@ -181,7 +180,7 @@ describe("request.locals.user cross-request isolation (5.12.0 move)", () => {
       async () => {
         await middleware(makeCtx({ request: requestA, response: responseA }));
 
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
 
         return {
           localsUser: requestA.locals.user,
@@ -194,7 +193,7 @@ describe("request.locals.user cross-request isolation (5.12.0 move)", () => {
     const runB = requestContext.run(
       { request: requestB as any, response: responseB as any },
       async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
 
         return {
           localsUser: requestB.locals.user,

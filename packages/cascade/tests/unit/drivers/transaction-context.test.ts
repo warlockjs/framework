@@ -3,7 +3,10 @@ import { PostgresDriver } from "../../../src/drivers/postgres/postgres-driver";
 
 const makeDriver = () => {
   const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }), release: vi.fn() };
-  const pool = { connect: vi.fn().mockResolvedValue(client), query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) };
+  const pool = {
+    connect: vi.fn().mockResolvedValue(client),
+    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+  };
   const driver = new PostgresDriver({ database: "x" } as never);
 
   (driver as unknown as { _pool: unknown })._pool = pool;

@@ -22,7 +22,9 @@ describe("ai.realtime", () => {
     session.sendAudio("QUJD", "audio/pcm");
     session.sendText("hello");
 
-    expect(transport.lastConnection?.sentAudio).toEqual([{ base64: "QUJD", mediaType: "audio/pcm" }]);
+    expect(transport.lastConnection?.sentAudio).toEqual([
+      { base64: "QUJD", mediaType: "audio/pcm" },
+    ]);
     expect(transport.lastConnection?.sentText).toEqual(["hello"]);
   });
 

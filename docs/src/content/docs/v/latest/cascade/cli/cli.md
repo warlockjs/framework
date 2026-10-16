@@ -79,7 +79,7 @@ npx cascade migrate -p "src/app/**/migrations/*.ts"
 npx cascade migrate --path "db/schema/*.migration.ts"
 ```
 
-> **Quote the glob.** On macOS / Linux, bash expands `**` and `*` *before* passing them to the binary, leaving Cascade with a single resolved filename instead of a glob. Always wrap the pattern in double quotes when it contains shell metacharacters.
+> **Quote the glob.** On macOS / Linux, bash expands `**` and `*` _before_ passing them to the binary, leaving Cascade with a single resolved filename instead of a glob. Always wrap the pattern in double quotes when it contains shell metacharacters.
 
 Each file must `export default` a migration class — the same shape you'd write for `warlock migrate`. Cascade infers the migration name from the filename (`02-04-2026_06-31-48-organization.migration.ts` → `02-04-2026_06-31-48-organization`) and uses the timestamp prefix for ordering when present.
 
@@ -123,7 +123,7 @@ npx cascade migrate:rollback --batches 3  # last three batches
 Rollbacks run **newest-first** — the exact inverse of the order the migrations were applied — so a `down()` never meets schema that a later migration's `down()` has already removed.
 
 :::caution[Upgrade to 4.9.2 if you roll back multi-migration batches]
-Before 4.9.2, rollback ran `down()` in *apply* order, so a batch containing more than one migration could drop a table before dropping the column added to it and fail with `relation "…" does not exist`. Batches holding a single migration were unaffected — one item has no order to get wrong.
+Before 4.9.2, rollback ran `down()` in _apply_ order, so a batch containing more than one migration could drop a table before dropping the column added to it and fail with `relation "…" does not exist`. Batches holding a single migration were unaffected — one item has no order to get wrong.
 :::
 
 `migrate:export-sql` writes phase-ordered `.up.sql` and `.down.sql` files to `<cwd>/database/sql/` — useful for code review, reproducing schema changes in another environment, or feeding into a DBA workflow:

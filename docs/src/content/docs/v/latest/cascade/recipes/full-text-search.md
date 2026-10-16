@@ -10,9 +10,7 @@ sidebar:
 ## What `whereFullText` does
 
 ```ts
-await Post.query()
-  .whereFullText(["title", "body"], "cascade orm")
-  .get();
+await Post.query().whereFullText(["title", "body"], "cascade orm").get();
 ```
 
 - **Postgres** — translates to a `to_tsquery(...)` match against the combined `to_tsvector(title || ' ' || body)`. Without a GIN index on that vector expression, it's a sequential scan.
@@ -83,7 +81,8 @@ The `scoreExpression` helper holds the driver-specific bit:
 function scoreExpression(query: string) {
   return {
     // Postgres
-    expression: "ts_rank(to_tsvector('english', title || ' ' || body), to_tsquery('english', ?)) AS score",
+    expression:
+      "ts_rank(to_tsvector('english', title || ' ' || body), to_tsquery('english', ?)) AS score",
     bindings: [query.split(/\s+/).join(" & ")],
 
     // MongoDB equivalent shape would be { score: { $meta: "textScore" } } via selectDriverProjection
@@ -100,9 +99,7 @@ For cross-driver code, branch the helper by driver type and emit the right shape
 Wrap the query in quotes to ask for an exact phrase rather than individual tokens:
 
 ```ts
-await Post.query()
-  .whereFullText(["title"], '"cascade orm"')
-  .get();
+await Post.query().whereFullText(["title"], '"cascade orm"').get();
 ```
 
 Both drivers honour the quoting convention.

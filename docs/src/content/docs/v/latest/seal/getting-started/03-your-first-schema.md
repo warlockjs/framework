@@ -57,7 +57,7 @@ const bad = await validate(signupSchema, {
   role: "stranger",
 });
 
-bad.isValid;   // false
+bad.isValid; // false
 bad.errors;
 // [
 //   { type: "email", error: "The email must be a valid email", input: "email" },
@@ -92,7 +92,7 @@ Three things to notice:
 - `role` is the literal union `"admin" | "user" | "guest"`, not the wider `string`. That's the payoff for using `v.literal(...)` instead of `v.string().oneOf([...])`.
 - The schema is the **single source of truth**. Adding a field to the schema adds it to the type — no parallel `type Signup = { ... }` to keep in sync.
 
-If you want the *post-validation* shape (after defaults fire, after `.catch()` rescues), use `Infer.Output<typeof schema>`. The [inferring types essential](../essentials/04-inferring-types.md) page covers the input/output split in detail.
+If you want the _post-validation_ shape (after defaults fire, after `.catch()` rescues), use `Infer.Output<typeof schema>`. The [inferring types essential](../essentials/04-inferring-types.md) page covers the input/output split in detail.
 
 ## Step 3 — Emit JSON Schema
 

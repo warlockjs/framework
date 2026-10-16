@@ -17,7 +17,7 @@ import { Notification } from "app/notifications/models/notification/notification
 
 const config: NotificationConfig = {
   channels: {
-    mail:     mailChannel({ from: "no-reply@store.com" }),
+    mail: mailChannel({ from: "no-reply@store.com" }),
     database: inApp.configure({ model: Notification }),
   },
 };
@@ -32,17 +32,17 @@ The `database` channel is returned by `inApp.configure({ model | repository })` 
 ```ts
 const config: NotificationConfig = {
   channels: {
-    mail:     mailChannel({ from }),
+    mail: mailChannel({ from }),
     database: inApp.configure({ model: Notification }),
 
     // custom channels
-    discord:  discordChannel(),            // defineChannel + declare module
+    discord: discordChannel(), // defineChannel + declare module
   },
 
   // optional gates — both app-owned; package ships no defaults
-  preferences: userPreferences,            // drops channels recipient muted
-  rateLimit,                               // drops channels over budget
-  queue: heraldQueue(),                    // backs `.queue()` (needs @warlock.js/herald)
+  preferences: userPreferences, // drops channels recipient muted
+  rateLimit, // drops channels over budget
+  queue: heraldQueue(), // backs `.queue()` (needs @warlock.js/herald)
 };
 
 export default config;
@@ -116,7 +116,7 @@ Dropped channels fire a `skipped` event with reason `"rate-limit"`. `force` does
 ```ts
 import { getNotificationConfig } from "@warlock.js/notifications";
 
-const cfg = getNotificationConfig();   // throws NotificationsNotConfiguredError if unset
+const cfg = getNotificationConfig(); // throws NotificationsNotConfiguredError if unset
 ```
 
 ## Tests

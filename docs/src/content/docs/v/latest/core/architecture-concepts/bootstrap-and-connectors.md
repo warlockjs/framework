@@ -6,7 +6,7 @@ sidebar:
   label: "Bootstrap and connectors"
 ---
 
-Every Warlock app starts the same way. A tiny prelude prepares the process, then a sequence of *connectors* spin up each subsystem in priority order, around the app code that depends on them. By the time the first request hits the router, the database is connected, the logger is flushing, the storage adapter is wired, and the HTTP server is listening.
+Every Warlock app starts the same way. A tiny prelude prepares the process, then a sequence of _connectors_ spin up each subsystem in priority order, around the app code that depends on them. By the time the first request hits the router, the database is connected, the logger is flushing, the storage adapter is wired, and the HTTP server is listening.
 
 This guide walks the boot sequence end-to-end, names every built-in connector and what it owns, and shows you how to plug in a custom one when "we have one more subsystem with a lifecycle" lands on your plate. For a flat catalog of all ten built-ins at a glance — and the rule that the config file (not registration) is what activates each subsystem — see [Connectors](./connectors.md).
 
@@ -53,11 +53,11 @@ export async function bootstrap() {
 
 Three things, no more:
 
-| Step                              | What it does                                                                          | Comes from           |
-| --------------------------------- | ------------------------------------------------------------------------------------- | -------------------- |
-| `await loadEnv()`                 | Reads `.env` (plus `.env.<environment>` and local overrides) into `process.env`       | `@mongez/dotenv`     |
-| `initializeDayjs()`               | Wires dayjs plugins: relative time, timezone, UTC, locale support                     | `@mongez/time-wizard`|
-| `captureAnyUnhandledRejection()`  | Routes any unhandled promise rejection into the framework logger instead of crashing  | `@warlock.js/logger` |
+| Step                             | What it does                                                                         | Comes from            |
+| -------------------------------- | ------------------------------------------------------------------------------------ | --------------------- |
+| `await loadEnv()`                | Reads `.env` (plus `.env.<environment>` and local overrides) into `process.env`      | `@mongez/dotenv`      |
+| `initializeDayjs()`              | Wires dayjs plugins: relative time, timezone, UTC, locale support                    | `@mongez/time-wizard` |
+| `captureAnyUnhandledRejection()` | Routes any unhandled promise rejection into the framework logger instead of crashing | `@warlock.js/logger`  |
 
 `loadEnv` is awaited because reading a file is async. The other two are synchronous.
 
@@ -73,16 +73,16 @@ Each connector implements three lifecycle hooks: `boot()`, `start()`, `shutdown(
 
 Connectors run in **priority order** (lower number first):
 
-| Priority | Connector       | Class               | Watches                          |
-| -------- | --------------- | ------------------- | -------------------------------- |
-| 0        | `logger`        | `LoggerConnector`   | `src/config/log.ts`              |
-| 1        | `mailer`        | `MailerConnector`   | `src/config/mail.ts`, `.env`     |
-| 2        | `database`      | `DatabaseConnector` | `src/config/database.ts`         |
-| 3        | `herald`        | `HeraldConnector`   | `src/config/herald.ts`           |
-| 4        | `cache`         | `CacheConnector`    | `src/config/cache.ts`            |
-| 6        | `storage`       | `StorageConnector`  | `src/config/storage.ts`          |
+| Priority | Connector       | Class                    | Watches                       |
+| -------- | --------------- | ------------------------ | ----------------------------- |
+| 0        | `logger`        | `LoggerConnector`        | `src/config/log.ts`           |
+| 1        | `mailer`        | `MailerConnector`        | `src/config/mail.ts`, `.env`  |
+| 2        | `database`      | `DatabaseConnector`      | `src/config/database.ts`      |
+| 3        | `herald`        | `HeraldConnector`        | `src/config/herald.ts`        |
+| 4        | `cache`         | `CacheConnector`         | `src/config/cache.ts`         |
+| 6        | `storage`       | `StorageConnector`       | `src/config/storage.ts`       |
 | 8        | `notifications` | `NotificationsConnector` | `src/config/notifications.ts` |
-| 9        | `access`        | `AccessConnector`   | `src/config/access.ts`           |
+| 9        | `access`        | `AccessConnector`        | `src/config/access.ts`        |
 
 (Priorities `5` and `7` — `http` and `socket` — are Late phase and live in the table further down.)
 
@@ -151,10 +151,10 @@ This is also where seed data, custom CLI commands, and module-specific event sub
 
 After app code is imported, the framework starts late-phase connectors:
 
-| Priority | Connector | Class            | Watches                 |
-| -------- | --------- | ---------------- | ----------------------- |
-| 5        | `http`    | `HttpConnector`  | `src/config/http.ts`    |
-| 7        | `socket`  | `SocketConnector`| `src/config/socket.ts`  |
+| Priority | Connector | Class             | Watches                |
+| -------- | --------- | ----------------- | ---------------------- |
+| 5        | `http`    | `HttpConnector`   | `src/config/http.ts`   |
+| 7        | `socket`  | `SocketConnector` | `src/config/socket.ts` |
 
 ### http (priority 5)
 
@@ -268,18 +268,18 @@ export class FeatureFlagsConnector extends BaseConnector {
 
 Four properties, two methods. That's the whole contract.
 
-| Property         | Type                       | Purpose                                                                  |
-| ---------------- | -------------------------- | ------------------------------------------------------------------------ |
-| `name`           | `ConnectorName`            | Unique identifier — used in logs and the registry                        |
-| `priority`       | `number`                   | Sort order in the boot sequence; lower runs first                        |
-| `lifecyclePhase` | `ConnectorLifecyclePhase`  | `Early` (before app code) or `Late` (after — only for HTTP/socket-like)  |
-| `watchedFiles`   | `string[]`                 | Relative paths whose changes trigger this connector's restart in dev     |
+| Property         | Type                      | Purpose                                                                 |
+| ---------------- | ------------------------- | ----------------------------------------------------------------------- |
+| `name`           | `ConnectorName`           | Unique identifier — used in logs and the registry                       |
+| `priority`       | `number`                  | Sort order in the boot sequence; lower runs first                       |
+| `lifecyclePhase` | `ConnectorLifecyclePhase` | `Early` (before app code) or `Late` (after — only for HTTP/socket-like) |
+| `watchedFiles`   | `string[]`                | Relative paths whose changes trigger this connector's restart in dev    |
 
-| Method       | Purpose                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------- |
-| `start()`    | Bring the subsystem up. Read config, open connections, set `this.active = true`.         |
-| `shutdown()` | Take the subsystem down. Close connections, release resources, set `this.active = false`.|
-| `boot()`     | Optional. Pre-start construction (rare; HTTP uses this to create Fastify before scan).   |
+| Method       | Purpose                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| `start()`    | Bring the subsystem up. Read config, open connections, set `this.active = true`.          |
+| `shutdown()` | Take the subsystem down. Close connections, release resources, set `this.active = false`. |
+| `boot()`     | Optional. Pre-start construction (rare; HTTP uses this to create Fastify before scan).    |
 
 The watched files matter only in development — when one of them changes, the dev server tells this connector to restart itself. Use it for the connector's own config file plus any other file whose change should refresh the connection (`.env` if you read env vars in `start()`).
 
@@ -388,7 +388,11 @@ A connector can also participate in `warlock build` by exporting an optional `bu
 - **`emit(context)`** — produce artifacts esbuild itself doesn't, such as a separate client bundle. Runs after esbuild and before `.warlock/production` is removed, so it can still read what `generate` wrote there.
 
 ```ts title="src/connectors/feature-flags.connector.ts"
-import type { ConnectorBuildContext, ConnectorBuildGenerateResult, ConnectorName } from "@warlock.js/core";
+import type {
+  ConnectorBuildContext,
+  ConnectorBuildGenerateResult,
+  ConnectorName,
+} from "@warlock.js/core";
 import { BaseConnector } from "@warlock.js/core";
 
 export class FeatureFlagsConnector extends BaseConnector {
@@ -406,7 +410,7 @@ export class FeatureFlagsConnector extends BaseConnector {
 }
 ```
 
-`context` (`ConnectorBuildContext`) hands over `productionDir`, `appRoot`, and the resolved build `options` — nothing that lets a heavy plugin instance or a compiled pipeline live on the contribution object itself; anything heavy is constructed *inside* a hook, after a dynamic import. The type is closed to exactly `generate` and `emit` — a connector declaring anything else on `build` fails the build, naming the connector and the offending key. `warlock build` never calls `boot()`/`start()`: only `build.generate`/`build.emit` run, reading the same `connectors` array declared in `warlock.config.ts`, statically. This is how `@warlock.js/web` gets its `pages` barrel imported into the generated entry, emits the page-route manifest `routes:diff` reads, and builds the hydration client — most app connectors never need it.
+`context` (`ConnectorBuildContext`) hands over `productionDir`, `appRoot`, and the resolved build `options` — nothing that lets a heavy plugin instance or a compiled pipeline live on the contribution object itself; anything heavy is constructed _inside_ a hook, after a dynamic import. The type is closed to exactly `generate` and `emit` — a connector declaring anything else on `build` fails the build, naming the connector and the offending key. `warlock build` never calls `boot()`/`start()`: only `build.generate`/`build.emit` run, reading the same `connectors` array declared in `warlock.config.ts`, statically. This is how `@warlock.js/web` gets its `pages` barrel imported into the generated entry, emits the page-route manifest `routes:diff` reads, and builds the hydration client — most app connectors never need it.
 
 ## Gotchas
 

@@ -21,7 +21,9 @@ const cover: ImageDescriptor = {
   formats: ["webp"],
 };
 
-export const config = { route: { path: "/blog/post", name: "blog.post" } } as const satisfies PageConfig;
+export const config = {
+  route: { path: "/blog/post", name: "blog.post" },
+} as const satisfies PageConfig;
 
 export default function PostPage() {
   return (
@@ -42,14 +44,14 @@ export default function PostPage() {
 
 ## Props
 
-| Prop | Type | Meaning |
-| --- | --- | --- |
-| `image` | `ImageDescriptor` | Required. The image and its renditions (below). |
-| `alt` | `string` | Required. Pass `""` for a decorative image. In development a call that omits it logs `<Image> is missing "alt" for "<src>"` to the console. |
-| `sizes` | `string` | The `sizes` attribute. Defaults to `"100vw"`; set it whenever the image is narrower than the viewport, or the browser picks an oversized file. |
-| `priority` | `boolean` | `true` sets `loading="eager"` and `fetchPriority="high"`. Default is lazy. Use on the page's single LCP image only. |
-| `loader` | `ImageLoader` | Turns a variant into a URL. Defaults to `warlockImageLoader`. |
-| any `<img>` attribute | | `className`, `style`, `onLoad`, `id`, `data-*`, ... are passed to the `<img>`. `src`, `srcSet`, `width`, `height`, `loading`, `fetchPriority` and `sizes` are not accepted as props; they come from the descriptor and the props above. |
+| Prop                  | Type              | Meaning                                                                                                                                                                                                                                 |
+| --------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `image`               | `ImageDescriptor` | Required. The image and its renditions (below).                                                                                                                                                                                         |
+| `alt`                 | `string`          | Required. Pass `""` for a decorative image. In development a call that omits it logs `<Image> is missing "alt" for "<src>"` to the console.                                                                                             |
+| `sizes`               | `string`          | The `sizes` attribute. Defaults to `"100vw"`; set it whenever the image is narrower than the viewport, or the browser picks an oversized file.                                                                                          |
+| `priority`            | `boolean`         | `true` sets `loading="eager"` and `fetchPriority="high"`. Default is lazy. Use on the page's single LCP image only.                                                                                                                     |
+| `loader`              | `ImageLoader`     | Turns a variant into a URL. Defaults to `warlockImageLoader`.                                                                                                                                                                           |
+| any `<img>` attribute |                   | `className`, `style`, `onLoad`, `id`, `data-*`, ... are passed to the `<img>`. `src`, `srcSet`, `width`, `height`, `loading`, `fetchPriority` and `sizes` are not accepted as props; they come from the descriptor and the props above. |
 
 ## The descriptor
 
@@ -223,7 +225,12 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
      return (
        <main>
          <h1>{data.title}</h1>
-         <Image image={data.cover} alt={data.title} sizes="(min-width: 768px) 50vw, 100vw" priority />
+         <Image
+           image={data.cover}
+           alt={data.title}
+           sizes="(min-width: 768px) 50vw, 100vw"
+           priority
+         />
        </main>
      );
    }

@@ -6,16 +6,19 @@ slug: v/latest/cache/redis
 [Redis](https://redis.io/) is a high-performance, in-memory data store. It is ideal for distributed, production-grade caching.
 
 ## When to Use
+
 - Production environments
 - Multi-server or distributed systems
 - Need for persistence, high availability, or large cache sizes
 
 ## Best For
+
 - Caching API/database responses
 - Session storage
 - Shared cache between multiple app instances
 
 ## Limitations
+
 - Requires Redis server setup
 - Redis Cluster is not supported
 - `flush()` without a `globalPrefix` runs `FLUSHDB` and clears the whole connected database; set a `globalPrefix` to flush only your keys
@@ -24,6 +27,7 @@ slug: v/latest/cache/redis
 - Slightly more operational overhead than memory/file
 
 ## Alternatives
+
 - [File Cache Driver](/v/latest/cache/file/): Simpler, persistent, but not distributed
 - [Memory Cache Driver](/v/latest/cache/memory/): Fastest, but not shared or persistent
 
@@ -85,16 +89,17 @@ Ensure Redis is installed and running on your machine or server.
 :::
 
 ## Options
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `host` | string | `"localhost"` | Redis server host |
-| `port` | number | `6379` | Redis server port |
-| `username` | string | `undefined` | Redis username for authentication |
-| `password` | string | `undefined` | Redis password for authentication |
-| `url` | string | `undefined` | Redis connection URL (overrides host/port) |
-| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
-| `ttl` | number \| string | `Infinity` | Default TTL — seconds or a duration string like `"1h"` |
-| `clientOptions` | object | `{}` | Additional Redis client options |
+
+| Option          | Type               | Default       | Description                                            |
+| --------------- | ------------------ | ------------- | ------------------------------------------------------ |
+| `host`          | string             | `"localhost"` | Redis server host                                      |
+| `port`          | number             | `6379`        | Redis server port                                      |
+| `username`      | string             | `undefined`   | Redis username for authentication                      |
+| `password`      | string             | `undefined`   | Redis password for authentication                      |
+| `url`           | string             | `undefined`   | Redis connection URL (overrides host/port)             |
+| `globalPrefix`  | string \| Function | `undefined`   | Global prefix for all cache keys                       |
+| `ttl`           | number \| string   | `Infinity`    | Default TTL — seconds or a duration string like `"1h"` |
+| `clientOptions` | object             | `{}`          | Additional Redis client options                        |
 
 ### Connection Options
 
@@ -155,6 +160,7 @@ Ensure Redis is installed and running on your machine or server.
 ## Example Usage
 
 ## Storing and Retrieving Data
+
 ```ts
 import { cache } from "@warlock.js/cache";
 
@@ -179,6 +185,7 @@ const remaining = await cache.decrement("api.quota", 10);
 ```
 
 **Under the hood:**
+
 - `increment()` uses Redis `INCRBY` command
 - `decrement()` uses Redis `DECRBY` command
 - Both are atomic at Redis level - guaranteed race-free
@@ -208,6 +215,7 @@ if (lock.wasSet) {
 ```
 
 **Use cases:**
+
 - Distributed locking across multiple servers
 - Idempotency keys (ensure an operation runs only once)
 - Leader election
@@ -221,7 +229,7 @@ In distributed systems, multiple servers might try to modify the same cache key 
 
 ```ts
 // ❌ WITHOUT ATOMIC OPERATIONS (Race condition)
-const views = await cache.get("page.views") || 0;
+const views = (await cache.get("page.views")) || 0;
 await cache.set("page.views", views + 1);
 // Two servers both read 100, both write 101 → Wrong!
 
@@ -244,7 +252,7 @@ const redisClient = cache.client;
 // Use native Redis commands if needed
 await redisClient.zAdd("leaderboard", {
   score: 100,
-  value: "player1"
+  value: "player1",
 });
 ```
 
@@ -253,6 +261,7 @@ await redisClient.zAdd("leaderboard", {
 `removeNamespace(ns)` walks matching keys with a non-blocking `SCAN` cursor (`scanIterator`) rather than the blocking `KEYS` command, so clearing a namespace on a large keyspace doesn't stall the single-threaded Redis event loop for other tenants. The namespace string is also glob-escaped (`*`, `?`, `[`, `\`) before it's used to build the match pattern, so untrusted input in the namespace can't widen the match beyond its own prefix.
 
 ## Troubleshooting
+
 - **Connection errors?** Check your Redis server is running and credentials are correct.
 - **Data not shared between servers?** Make sure all instances use the same Redis server.
 - **Race conditions?** Use atomic operations (`increment()`, `decrement()`, `set(k, v, { onConflict: "create" })`) instead of manual get/set for counters and locks.

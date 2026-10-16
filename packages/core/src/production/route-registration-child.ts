@@ -58,7 +58,9 @@ process.once("message", async (message: unknown) => {
       }
     }
 
-    await filesOrchestrator.moduleLoader.loadAll({ onBeforeLoad: (file) => sendProgress(file.relativePath) });
+    await filesOrchestrator.moduleLoader.loadAll({
+      onBeforeLoad: (file) => sendProgress(file.relativePath),
+    });
 
     if (request.openapi) {
       const { document, warnings } = await buildOpenApiForChild({

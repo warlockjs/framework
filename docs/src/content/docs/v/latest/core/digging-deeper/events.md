@@ -47,13 +47,13 @@ Four independent surfaces, four slightly different shapes. The sections below co
 
 ## Surfaces at a glance
 
-| Surface             | Import from              | Subscribe with                              | Returns                          |
-| ------------------- | ------------------------ | ------------------------------------------- | -------------------------------- |
-| Response (static)   | `@warlock.js/core`       | `Response.on(event, listener)`              | `EventSubscription` (`.unsubscribe()`) |
-| Per-request         | `@mongez/events`         | `events.subscribe("request.<event>", cb)`   | `EventSubscription` (`.unsubscribe()`) |
-| Use-case lifecycle  | `@warlock.js/core`       | `globalUseCasesEvents.on*(cb)`              | `{ unsubscribe() }`              |
-| Mail                | `@warlock.js/core`       | `mailEvents.on*(cb)`                         | `EventSubscription` (`.unsubscribe()`) |
-| Cascade model       | your model               | `Model.events().onCreated(cb)` (see below)  | subscription handle             |
+| Surface            | Import from        | Subscribe with                             | Returns                                |
+| ------------------ | ------------------ | ------------------------------------------ | -------------------------------------- |
+| Response (static)  | `@warlock.js/core` | `Response.on(event, listener)`             | `EventSubscription` (`.unsubscribe()`) |
+| Per-request        | `@mongez/events`   | `events.subscribe("request.<event>", cb)`  | `EventSubscription` (`.unsubscribe()`) |
+| Use-case lifecycle | `@warlock.js/core` | `globalUseCasesEvents.on*(cb)`             | `{ unsubscribe() }`                    |
+| Mail               | `@warlock.js/core` | `mailEvents.on*(cb)`                       | `EventSubscription` (`.unsubscribe()`) |
+| Cascade model      | your model         | `Model.events().onCreated(cb)` (see below) | subscription handle                    |
 
 ---
 
@@ -84,22 +84,22 @@ Under the hood, `Response.on(event, …)` subscribes to the `response.${event}` 
 
 The `ResponseEvent` type declares fifteen names, but not all of them are wired. This table reflects what `send()` (and the streaming paths) actually trigger:
 
-| Event                | Fires when                                                | Fired by               |
-| -------------------- | --------------------------------------------------------- | ---------------------- |
-| `sending`            | before the body is written, every response                | `send()`, `stream()`, `sse()` |
-| `sendingJson`        | `sending`, and the content-type is `application/json`     | `send()`               |
-| `sendingSuccessJson` | `sendingJson`, and the status is 2xx                      | `send()`               |
-| `sent`               | after the body is written, every response                 | `send()`, `stream().end()`, `sse().end()` |
-| `success`            | status is 2xx                                             | `send()`, `stream().end()`, `sse().end()` |
-| `successCreate`      | status is exactly 201                                    | `send()`, `stream().end()` |
-| `badRequest`         | status is exactly 400                                    | `send()`               |
-| `unauthorized`       | status is exactly 401                                    | `send()`               |
-| `forbidden`          | status is exactly 403                                    | `send()`               |
-| `notFound`           | status is exactly 404                                    | `send()`               |
-| `contentTooLarge`    | status is exactly 413                                    | `send()`               |
-| `throttled`          | status is exactly 429                                    | `send()`               |
-| `serverError`        | status is exactly 500                                    | `send()`               |
-| `error`              | status is 4xx or 5xx (any `>= 400`)                       | `send()`               |
+| Event                | Fires when                                            | Fired by                                  |
+| -------------------- | ----------------------------------------------------- | ----------------------------------------- |
+| `sending`            | before the body is written, every response            | `send()`, `stream()`, `sse()`             |
+| `sendingJson`        | `sending`, and the content-type is `application/json` | `send()`                                  |
+| `sendingSuccessJson` | `sendingJson`, and the status is 2xx                  | `send()`                                  |
+| `sent`               | after the body is written, every response             | `send()`, `stream().end()`, `sse().end()` |
+| `success`            | status is 2xx                                         | `send()`, `stream().end()`, `sse().end()` |
+| `successCreate`      | status is exactly 201                                 | `send()`, `stream().end()`                |
+| `badRequest`         | status is exactly 400                                 | `send()`                                  |
+| `unauthorized`       | status is exactly 401                                 | `send()`                                  |
+| `forbidden`          | status is exactly 403                                 | `send()`                                  |
+| `notFound`           | status is exactly 404                                 | `send()`                                  |
+| `contentTooLarge`    | status is exactly 413                                 | `send()`                                  |
+| `throttled`          | status is exactly 429                                 | `send()`                                  |
+| `serverError`        | status is exactly 500                                 | `send()`                                  |
+| `error`              | status is 4xx or 5xx (any `>= 400`)                   | `send()`                                  |
 
 > **`sendingBadRequestJson` is declared but never fired.** The name exists on the `ResponseEvent` type (and is therefore accepted by `Response.on`), but nothing in the framework triggers it. Subscribing to it is silently dead — use `badRequest` for the equivalent (it fires after the body is written, not before). This is a known gap.
 
@@ -120,12 +120,9 @@ import events from "@mongez/events";
 import type { Request } from "@warlock.js/core";
 
 // The triggering request is always the LAST argument.
-const sub = events.subscribe(
-  "request.executedAction",
-  (route, request: Request) => {
-    log.info("audit", "handled", `${request.method} ${request.path}`);
-  },
-);
+const sub = events.subscribe("request.executedAction", (route, request: Request) => {
+  log.info("audit", "handled", `${request.method} ${request.path}`);
+});
 
 sub.unsubscribe();
 ```
@@ -136,12 +133,12 @@ sub.unsubscribe();
 
 ### The four events
 
-| Event                 | Fires when                                                          | Extra args before `request` |
-| --------------------- | ------------------------------------------------------------------ | --------------------------- |
-| `executingMiddleware` | just before the route's middleware chain runs (only if there is at least one middleware) | `middlewares`, `route`      |
+| Event                 | Fires when                                                                                    | Extra args before `request`                             |
+| --------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `executingMiddleware` | just before the route's middleware chain runs (only if there is at least one middleware)      | `middlewares`, `route`                                  |
 | `executedMiddleware`  | after the middleware chain finishes — both when a middleware short-circuits and when all pass | `middlewares`, `route` (none on the short-circuit path) |
-| `executingAction`     | just before the route handler runs                                 | `route`                     |
-| `executedAction`      | just after the route handler returns successfully                  | `route`                     |
+| `executingAction`     | just before the route handler runs                                                            | `route`                                                 |
+| `executedAction`      | just after the route handler returns successfully                                             | `route`                                                 |
 
 All four are genuinely fired (`executingMiddleware` / `executedMiddleware` from the request's middleware runner, `executingAction` / `executedAction` from the request-context middleware that wraps the handler).
 
@@ -185,11 +182,11 @@ onFail.unsubscribe();
 
 ### When each fires
 
-| Hook          | Fires                                                                 | Callback arg                |
-| ------------- | -------------------------------------------------------------------- | --------------------------- |
-| `onExecuting` | at the start of execution, **before guards/validation run**          | `UseCaseOnExecutingContext` |
-| `onCompleted` | after the handler (and any retries) succeed                          | `UseCaseResult<Output>`     |
-| `onError`     | when a guard, validation, or the handler throws                     | `UseCaseErrorResult`        |
+| Hook          | Fires                                                       | Callback arg                |
+| ------------- | ----------------------------------------------------------- | --------------------------- |
+| `onExecuting` | at the start of execution, **before guards/validation run** | `UseCaseOnExecutingContext` |
+| `onCompleted` | after the handler (and any retries) succeed                 | `UseCaseResult<Output>`     |
+| `onError`     | when a guard, validation, or the handler throws             | `UseCaseErrorResult`        |
 
 Ordering: for each lifecycle point, observers fire in **invocation → use-case → global** order. Every observer is awaited sequentially and isolated in its own `try/catch`, so one slow or throwing observer can't stall or break the others — a throwing global observer will **not** fail an otherwise-successful use case (it's logged via `@warlock.js/logger`).
 
@@ -222,12 +219,12 @@ errSub.unsubscribe();
 
 ### Global listeners
 
-| Method                     | Fires                                              | Callback signature                        |
-| -------------------------- | -------------------------------------------------- | ----------------------------------------- |
-| `onBeforeSending(cb)`      | before each send; **return `false` to cancel** it  | `(mail) => void \| false \| Promise<…>`   |
-| `onSuccess(cb)`            | after a successful send                            | `(mail, result) => void`                  |
-| `onError(cb)`              | when a send throws                                 | `(mail, error) => void`                   |
-| `onSent(cb)`               | after every send attempt, success **or** failure   | `(mail, result, error) => void`           |
+| Method                | Fires                                             | Callback signature                      |
+| --------------------- | ------------------------------------------------- | --------------------------------------- |
+| `onBeforeSending(cb)` | before each send; **return `false` to cancel** it | `(mail) => void \| false \| Promise<…>` |
+| `onSuccess(cb)`       | after a successful send                           | `(mail, result) => void`                |
+| `onError(cb)`         | when a send throws                                | `(mail, error) => void`                 |
+| `onSent(cb)`          | after every send attempt, success **or** failure  | `(mail, result, error) => void`         |
 
 These fire across all three mail modes. In **test** mode and **development** mode the mail isn't actually transmitted (it's captured / logged), but `success` and `sent` still fire so your observers behave consistently; only **production** mode performs a real send and can fire `error`.
 

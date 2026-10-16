@@ -116,7 +116,8 @@ export function Form({
 }: FormProps): ReactElement {
   const ref = useRef<HTMLFormElement>(null);
   const actionData = useContext(DocumentContext)?.payload.actionData as
-    { errors?: Record<string, string> } | undefined;
+    | { errors?: Record<string, string> }
+    | undefined;
   const errors = actionData?.errors;
 
   // Wire aria on errored inputs after render; `<FieldError>` owns the message id.

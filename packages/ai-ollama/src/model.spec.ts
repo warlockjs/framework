@@ -354,7 +354,14 @@ describe("OllamaModel reasoning → think mapping", () => {
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "xhigh" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "max" } });
 
-    expect(calls.map((call) => call.think)).toEqual(["low", "low", "medium", "high", "high", "high"]);
+    expect(calls.map((call) => call.think)).toEqual([
+      "low",
+      "low",
+      "medium",
+      "high",
+      "high",
+      "high",
+    ]);
   });
 
   it("maps an effort-less reasoning hint to think: true", async () => {
@@ -499,7 +506,9 @@ describe("OllamaModel.stream()", () => {
 
   it("aborts the stream when an already-aborted signal is supplied", async () => {
     const { client, wasAborted } = makeFakeClient({
-      streamChunks: [{ message: { role: "assistant", content: "x" }, done: true, done_reason: "stop" }],
+      streamChunks: [
+        { message: { role: "assistant", content: "x" }, done: true, done_reason: "stop" },
+      ],
     });
     const model = new OllamaModel(client, { name: "llama3.1" });
     const controller = new AbortController();

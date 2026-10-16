@@ -78,12 +78,12 @@ If any step fails, the middleware returns `401` with an `errorCode` and a transl
 
 The `userType` argument is a string or string array. Common values:
 
-| Argument                            | Effect                                                                                                                                                                              |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Argument                            | Effect                                                                                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `authMiddleware()`                  | Optional auth — populates `request.locals.user` if a token is present, but doesn't `401` when missing. Useful for endpoints that change behavior based on whether the caller is logged in. |
-| `authMiddleware("user")`            | Requires a valid `user`-type token.                                                                                                                                                 |
-| `authMiddleware("admin")`           | Requires a valid `admin`-type token.                                                                                                                                                |
-| `authMiddleware(["user", "admin"])` | Either user type is accepted.                                                                                                                                                       |
+| `authMiddleware("user")`            | Requires a valid `user`-type token.                                                                                                                                                        |
+| `authMiddleware("admin")`           | Requires a valid `admin`-type token.                                                                                                                                                       |
+| `authMiddleware(["user", "admin"])` | Either user type is accepted.                                                                                                                                                              |
 
 User types live in your `auth` config (`src/config/auth.ts`) under `userType: { user: User, admin: Admin }`. The middleware does `config.key("auth.userType.<type>")` to find the model class.
 
@@ -131,7 +131,7 @@ Two helpers, two patterns:
 - **`publicRoutes`** — no middleware. Pure sugar for grouping public routes at the root.
 - **`guarded`** — `authMiddleware("user")`. The default for user-facing endpoints.
 
-Do **not** name a wrapper `guardedAdmin` (or similar) around an empty-array `authMiddleware([])` call — an empty allow-list accepts *any* authenticated user type, so a name plus an `/admin` prefix would promise an admin-only boundary the middleware never enforces. Restrict a group to a role by registering that user type and passing it explicitly, e.g. `authMiddleware(["admin"])`. You can extend with `guardedManager`, `guardedSupport`, etc. — same shape, different role and prefix, each backed by a real type check.
+Do **not** name a wrapper `guardedAdmin` (or similar) around an empty-array `authMiddleware([])` call — an empty allow-list accepts _any_ authenticated user type, so a name plus an `/admin` prefix would promise an admin-only boundary the middleware never enforces. Restrict a group to a role by registering that user type and passing it explicitly, e.g. `authMiddleware(["admin"])`. You can extend with `guardedManager`, `guardedSupport`, etc. — same shape, different role and prefix, each backed by a real type check.
 
 ## Step 4 — Use the helpers in `routes.ts`
 

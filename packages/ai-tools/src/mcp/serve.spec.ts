@@ -120,7 +120,9 @@ describe("serve() — tools/call", () => {
   it("serializes a no-argument tool's object result", async () => {
     const handler = createServeHandler([makePingTool()], { name: "s" });
 
-    const response = await handler.handle(request(1, "tools/call", { name: "ping", arguments: {} }));
+    const response = await handler.handle(
+      request(1, "tools/call", { name: "ping", arguments: {} }),
+    );
     const result = response.result as McpToolCallResult;
 
     expect(JSON.parse(result.content[0].text ?? "")).toEqual({ pong: true });

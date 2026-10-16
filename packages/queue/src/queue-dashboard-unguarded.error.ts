@@ -10,13 +10,13 @@ export class QueueDashboardUnguardedError extends Error {
       "queue.dashboard.enabled is true in production with no middleware. The dashboard can " +
         "retry and delete jobs, so it must be guarded before it is exposed.\n\n" +
         "Add a guard middleware:\n\n" +
-        "  import { middleware } from \"@warlock.js/core\";\n" +
-        "  import { authMiddleware } from \"@warlock.js/auth\";\n\n" +
+        '  import { middleware } from "@warlock.js/core";\n' +
+        '  import { authMiddleware } from "@warlock.js/auth";\n\n' +
         "  const queueConfig: QueueConfig = {\n" +
         "    // ...\n" +
         "    dashboard: {\n" +
         "      enabled: true,\n" +
-        "      middleware: [authMiddleware(\"admin\")],\n" +
+        '      middleware: [authMiddleware("admin")],\n' +
         "    },\n" +
         "  };\n",
     );

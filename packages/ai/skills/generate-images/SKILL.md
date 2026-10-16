@@ -13,15 +13,16 @@ This is image **output** (generation). For image/PDF/audio **input** to a chat a
 
 ```ts
 // 1. Build an image model from an adapter's image() factory.
-const model = openai.image({ name: "gpt-image-1" });   // ImageModelContract
+const model = openai.image({ name: "gpt-image-1" }); // ImageModelContract
 
 // 2. Run the verb — never throws; failures land on result.error.
 const { data, error, usage, report } = await ai.image({ model, prompt: "a red bicycle" });
 
 if (error) {
-  console.warn(error.code);          // typed AIError (auth / rate-limit / content-filter / …)
+  console.warn(error.code); // typed AIError (auth / rate-limit / content-filter / …)
 } else {
-  for (const img of data.images) {   // GeneratedImage[]
+  for (const img of data.images) {
+    // GeneratedImage[]
     if (img.type === "base64") save(Buffer.from(img.base64, "base64"), img.mediaType);
     else download(img.url);
   }
@@ -35,10 +36,10 @@ if (error) {
 ```ts
 type ImageResult = {
   type: "image";
-  data?: { images: GeneratedImage[] };  // undefined on failure
-  error?: AIError;                       // undefined on success — NEVER thrown
-  usage: Usage;                          // tokens (gpt-image) + cost when priced
-  report: ImageReport;                   // type:"image", model, imageCount, lineage
+  data?: { images: GeneratedImage[] }; // undefined on failure
+  error?: AIError; // undefined on success — NEVER thrown
+  usage: Usage; // tokens (gpt-image) + cost when priced
+  report: ImageReport; // type:"image", model, imageCount, lineage
 };
 
 type GeneratedImage =
@@ -52,14 +53,14 @@ type GeneratedImage =
 await ai.image({
   model,
   prompt: "an isometric office desk, soft studio lighting",
-  count: 2,            // n images
-  size: "1024x1024",   // OpenAI WxH (also resolves perImageBySize pricing)
-  quality: "high",     // OpenAI quality tier
+  count: 2, // n images
+  size: "1024x1024", // OpenAI WxH (also resolves perImageBySize pricing)
+  quality: "high", // OpenAI quality tier
   aspectRatio: "16:9", // Imagen ratio
   negativePrompt: "blurry, watermark", // Imagen
-  format: "png",       // output container hint
-  signal,              // AbortSignal
-  observe: collector,  // route the report to an Observer (panoptic), like agents
+  format: "png", // output container hint
+  signal, // AbortSignal
+  observe: collector, // route the report to an Observer (panoptic), like agents
   sessionId: "checkout-123",
   options: { background: "transparent" }, // provider-specific passthrough
 });
@@ -94,9 +95,16 @@ const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
 const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
 
 // Gemini image model — token-metered, via ai.models.generateContent:
-const gemini = google.image({ name: "gemini-3.1-flash-lite-image", pricing: { input: 0.3, output: 30 } });
+const gemini = google.image({
+  name: "gemini-3.1-flash-lite-image",
+  pricing: { input: 0.3, output: 30 },
+});
 
-const { data } = await ai.image({ model: imagen, prompt: "a watercolor lighthouse at dawn", aspectRatio: "3:4" });
+const { data } = await ai.image({
+  model: imagen,
+  prompt: "a watercolor lighthouse at dawn",
+  aspectRatio: "3:4",
+});
 ```
 
 The **id picks the transport**: a `gemini-` id goes to `generateContent` (token `usage` is passed through as Google reports it — price with `{ input, output }`), anything else to `generateImages` (Imagen — always zero usage, price with `{ perImage }`). Both surface images in the same `GeneratedImage` shape (base64 bytes, no hosted URL). When Google filters the request, `ai.image` surfaces a typed `ContentFilterError` on `result.error`; a Gemini response that answered with text instead of an image surfaces a `ProviderError` quoting that text.

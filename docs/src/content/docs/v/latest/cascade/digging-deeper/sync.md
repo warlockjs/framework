@@ -7,7 +7,7 @@ sidebar:
 
 When you denormalise data — embed the user's name into every comment, embed the category into every product — you trade query simplicity for write complexity. Update the source row and now the embedded copies are stale.
 
-Cascade's **sync system** automates the propagation: register *"when `Category` updates, refresh `Product.category` to match"*, and Cascade wires up the events for you. No manual `Product.where("category.id", id).update(...)` calls scattered through your update services.
+Cascade's **sync system** automates the propagation: register _"when `Category` updates, refresh `Product.category` to match"_, and Cascade wires up the events for you. No manual `Product.where("category.id", id).update(...)` calls scattered through your update services.
 
 This guide walks the API: when to reach for sync, how to declare it, and the depth/cycle/cleanup safety rails.
 
@@ -130,7 +130,7 @@ When `tag.save()` runs, Cascade updates every `Post` where some entry in `post.t
 
 ## Filtering — `.watchFields([...])`
 
-By default, every save on the source fires the sync. For hot writes (a user's `lastSeenAt` updated on every request), that's noisy. Limit syncing to when *specific* fields change:
+By default, every save on the source fires the sync. For hot writes (a user's `lastSeenAt` updated on every request), that's noisy. Limit syncing to when _specific_ fields change:
 
 ```ts
 User.sync(Comment, "author").watchFields(["name", "avatar"]);
@@ -140,7 +140,7 @@ If only `lastSeenAt` is dirty, the sync is skipped. If `name` or `avatar` is dir
 
 ## Deletion semantics — `.unsetOnDelete()` / `.removeOnDelete()`
 
-What happens to the embedded copy when the *source* row is deleted? Two strategies, both opt-in:
+What happens to the embedded copy when the _source_ row is deleted? Two strategies, both opt-in:
 
 ```ts
 // Clear the embedded field (set to null)
@@ -180,7 +180,7 @@ A few practical consequences:
 
 - **Sync runs after the source save commits.** It's not part of the source transaction.
 - **The bulk update doesn't fire target-model lifecycle events.** `Product`'s `onUpdating`/`onUpdated` don't run for sync-driven updates — they're driver-level bulk writes.
-- **Sync is non-atomic across collections.** A sync that updates `Product` and `Module` is two separate driver operations. If you need cross-collection atomicity, wrap the source save and the sync in a transaction — but note that the sync's bulk updates happen *after* the source save commits, so a transaction wrapping just the source save won't roll back the sync.
+- **Sync is non-atomic across collections.** A sync that updates `Product` and `Module` is two separate driver operations. If you need cross-collection atomicity, wrap the source save and the sync in a transaction — but note that the sync's bulk updates happen _after_ the source save commits, so a transaction wrapping just the source save won't roll back the sync.
 
 If you need synchronous atomicity, the pattern is "drive the multi-row update yourself inside a transaction" rather than relying on the sync system.
 
@@ -190,10 +190,7 @@ If you need synchronous atomicity, the pattern is "drive the multi-row update yo
 
 ```ts
 // Comment shows author's name + avatar inline
-User.sync(Comment, "author")
-  .embed("embedMinimal")
-  .watchFields(["name", "avatar"])
-  .unsetOnDelete();
+User.sync(Comment, "author").embed("embedMinimal").watchFields(["name", "avatar"]).unsetOnDelete();
 ```
 
 Only re-syncs when name/avatar changes. On user delete, clears the embedded author so deleted-user comments don't reference a phantom user.
@@ -230,15 +227,15 @@ if (import.meta.hot) {
 }
 ```
 
-The cleanup function removes the registered listeners. Without it, every HMR reload would *add* another set of subscribers on top of the existing ones, eventually firing the sync N times per save.
+The cleanup function removes the registered listeners. Without it, every HMR reload would _add_ another set of subscribers on top of the existing ones, eventually firing the sync N times per save.
 
-## When *not* to use sync
+## When _not_ to use sync
 
 Sync is for denormalised snapshots. Reach for `.with()` / `.joinWith()` (live relations) when:
 
 - **The embedded data is large** — embedding a User into every Comment with full profile is wasteful; loading the user once via `.with("author")` is cheaper than copying.
 - **Updates are frequent** — if `User.name` changes 100x/sec, syncing every Comment on every change is more expensive than joining at read time.
-- **Read traffic is low** — denormalisation is a *read* optimisation. If reads are rare, join at read time and skip the write amplification.
+- **Read traffic is low** — denormalisation is a _read_ optimisation. If reads are rare, join at read time and skip the write amplification.
 
 The rule of thumb: denormalise (and sync) when reads dwarf writes and embedded data is small. Otherwise, keep it normalised and load relations on demand.
 

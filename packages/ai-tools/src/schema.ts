@@ -77,9 +77,7 @@ export function optionalStringEnumField<T extends string>(
  * object whose every value is a string, and rejects arrays, non-objects,
  * and any record with a non-string value. Used for per-call `headers`.
  */
-export function optionalStringRecordField(): FieldValidator<
-  Record<string, string> | undefined
-> {
+export function optionalStringRecordField(): FieldValidator<Record<string, string> | undefined> {
   return (value, key) => {
     if (value === undefined) {
       return { value: undefined };
@@ -150,9 +148,7 @@ type ObjectShape<T> = {
  *   method: optionalStringEnumField(["GET", "POST"]),
  * });
  */
-export function objectSchema<T extends object>(
-  shape: ObjectShape<T>,
-): StandardSchemaV1<T> {
+export function objectSchema<T extends object>(shape: ObjectShape<T>): StandardSchemaV1<T> {
   return {
     "~standard": {
       version: 1,

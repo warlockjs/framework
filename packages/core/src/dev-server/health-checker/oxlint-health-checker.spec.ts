@@ -126,21 +126,40 @@ describe("Oxlint background file checks", () => {
 
   it("keeps stdout config errors alongside stderr warnings and preserves structured messages", async () => {
     const file = await write("changed.ts", "debugger;\n");
-    const contextual = new OxlintRunner({ execute: async () => ({ stdout: "Rule unknown-rule not found", stderr: "ExperimentalWarning: Type Stripping" }) });
+    const contextual = new OxlintRunner({
+      execute: async () => ({
+        stdout: "Rule unknown-rule not found",
+        stderr: "ExperimentalWarning: Type Stripping",
+      }),
+    });
     contextual.initialize(cwd);
-    await expect(contextual.checkFiles([file])).rejects.toThrow(/Type Stripping[\s\S]*unknown-rule not found/);
-    const structured = new OxlintRunner({ execute: async () => ({ stdout: JSON.stringify({ diagnostics: [{ message: "configuration problem", severity: "error" }] }), stderr: "warning noise" }) });
+    await expect(contextual.checkFiles([file])).rejects.toThrow(
+      /Type Stripping[\s\S]*unknown-rule not found/,
+    );
+    const structured = new OxlintRunner({
+      execute: async () => ({
+        stdout: JSON.stringify({
+          diagnostics: [{ message: "configuration problem", severity: "error" }],
+        }),
+        stderr: "warning noise",
+      }),
+    });
     structured.initialize(cwd);
     await expect(structured.checkFiles([file])).rejects.toThrow("Oxlint: configuration problem");
   });
 
   it("bounds command failure diagnostics without exposing full command arguments", () => {
-    const failure = Object.assign(new Error("Command failed: private-path".repeat(20000)), { code: "ETIMEDOUT", killed: true });
+    const failure = Object.assign(new Error("Command failed: private-path".repeat(20000)), {
+      code: "ETIMEDOUT",
+      killed: true,
+    });
     const message = oxlintCommandError(failure, "", "").message;
     expect(message).toContain("30s limit");
     expect(message).not.toContain("private-path");
     expect(message.length).toBeLessThan(200);
-    expect(oxlintCommandError({ code: 2 }, "config error", "warning").message).toContain("warning\nconfig error");
+    expect(oxlintCommandError({ code: 2 }, "config error", "warning").message).toContain(
+      "warning\nconfig error",
+    );
   });
 
   it("includes the real CLI's unknown-rule configuration error in the failure message", async () => {
@@ -193,25 +212,48 @@ describe("Oxlint background file checks", () => {
     const fake = path.join(cwd, "node_modules", "oxlint");
     await fs.rm(fake, { recursive: true, force: true });
     await fs.mkdir(fake, { recursive: true });
-    await fs.writeFile(path.join(fake, "package.json"), JSON.stringify({ name: "oxlint", bin: "cli.cjs" }));
+    await fs.writeFile(
+      path.join(fake, "package.json"),
+      JSON.stringify({ name: "oxlint", bin: "cli.cjs" }),
+    );
     const pidPath = path.join(cwd, "manager-child.pid");
-    await fs.writeFile(path.join(fake, "cli.cjs"), `require("node:fs").writeFileSync(${JSON.stringify(pidPath)}, String(process.pid)); setInterval(() => {}, 1000);`);
+    await fs.writeFile(
+      path.join(fake, "cli.cjs"),
+      `require("node:fs").writeFileSync(${JSON.stringify(pidPath)}, String(process.pid)); setInterval(() => {}, 1000);`,
+    );
     const file = await write("changed.ts", "debugger;\n");
     vi.spyOn(process, "cwd").mockReturnValue(cwd);
-    const manager = new FilesHealthcareManager(new Map([[file.path, { absolutePath: file.path, relativePath: file.relativePath, content: "debugger;" } as unknown as FileManager]]));
+    const manager = new FilesHealthcareManager(
+      new Map([
+        [
+          file.path,
+          {
+            absolutePath: file.path,
+            relativePath: file.relativePath,
+            content: "debugger;",
+          } as unknown as FileManager,
+        ],
+      ]),
+    );
     manager.setHealthCheckers([new OxlintHealthChecker()]);
     await manager.initialize();
     const checking = manager.validateAllFiles();
     let pid = 0;
     try {
-      await vi.waitFor(async () => expect(await fs.readFile(pidPath, "utf8")).toMatch(/^\d+$/), { timeout: 10000 });
+      await vi.waitFor(async () => expect(await fs.readFile(pidPath, "utf8")).toMatch(/^\d+$/), {
+        timeout: 10000,
+      });
       pid = Number(await fs.readFile(pidPath, "utf8"));
       await manager.shutdown();
       await checking;
       await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
     } finally {
       await manager.shutdown();
-      if (pid) { try { process.kill(pid); } catch {} }
+      if (pid) {
+        try {
+          process.kill(pid);
+        } catch {}
+      }
     }
   }, 15000);
 

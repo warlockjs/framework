@@ -8,10 +8,10 @@ sidebar:
 
 Warlock splits configuration into two layers. They have different shapes and different jobs, and once you've seen both you'll never confuse them again.
 
-| Layer                  | Where                  | What it controls                                                      | Loaded by            |
-| ---------------------- | ---------------------- | --------------------------------------------------------------------- | -------------------- |
-| **Project config**     | `warlock.config.ts`    | The server, the build, the dev server, the CLI, top-level migrations  | Once at boot         |
-| **Subsystem config**   | `src/config/*.ts`      | One file per subsystem: `http`, `mail`, `storage`, `cache`, `auth`, … | Once at boot, merged |
+| Layer                | Where               | What it controls                                                      | Loaded by            |
+| -------------------- | ------------------- | --------------------------------------------------------------------- | -------------------- |
+| **Project config**   | `warlock.config.ts` | The server, the build, the dev server, the CLI, top-level migrations  | Once at boot         |
+| **Subsystem config** | `src/config/*.ts`   | One file per subsystem: `http`, `mail`, `storage`, `cache`, `auth`, … | Once at boot, merged |
 
 Both pull values from `.env` via the `env()` helper. Both are typed. Both are read-only once boot finishes.
 
@@ -104,10 +104,10 @@ The default export's keys become reachable from anywhere via the `config` object
 import { config } from "@warlock.js/core";
 
 // config.get(namespace) — the whole subsystem config
-const httpConfig = config.get("http");      // → entire HttpConfigurations object
+const httpConfig = config.get("http"); // → entire HttpConfigurations object
 
 // config.key(path) — one value by dot-notation
-const port = config.key("http.port");        // → 3000
+const port = config.key("http.port"); // → 3000
 const fromAddress = config.key("mail.from");
 const dbDriver = config.key("database.driver"); // → "mongo" | "postgres"
 const corsOrigin = config.key("http.cors.origin"); // → deep paths work too
@@ -116,8 +116,8 @@ const corsOrigin = config.key("http.cors.origin"); // → deep paths work too
 `config.get(name)` autocompletes the subsystem name from the auto-generated `ConfigRegistry`. `config.key(path)` is the general-purpose dotted accessor. Both take an optional default as the second argument:
 
 ```ts
-config.key("http.port", 3000);     // → 3000 if http.port is unset
-config.key("http.missingThing");   // → null when the path resolves to nothing and no default is given
+config.key("http.port", 3000); // → 3000 if http.port is unset
+config.key("http.missingThing"); // → null when the path resolves to nothing and no default is given
 ```
 
 A key that resolves to nothing returns `null` (not `undefined`) when you don't pass a default — handy to know when you branch on the result. See **[Configuration (deep)](../architecture-concepts/configuration-deep.md)** for the full surface.
@@ -129,8 +129,8 @@ The bottom layer. Loaded by `@mongez/dotenv` at the very start of bootstrap. Bot
 ```ts
 import { env } from "@warlock.js/core";
 
-const port = env("HTTP_PORT", 3000);              // number with default
-const debug = env("DEBUG", false);                // boolean with default
+const port = env("HTTP_PORT", 3000); // number with default
+const debug = env("DEBUG", false); // boolean with default
 const baseUrl = env("BASE_URL", "http://localhost:3000");
 ```
 

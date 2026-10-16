@@ -216,11 +216,15 @@ describe("RabbitMQChannel — subscribe smart ack", () => {
 
     let retryCount = 0;
     for (let i = 0; i < 5; i++) {
-      await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": retryCount } }));
+      await amqp.deliver(
+        amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": retryCount } }),
+      );
 
       const republish = amqp.sent.pop();
       if (republish) {
-        retryCount = (republish.options.headers as Record<string, unknown>)["x-retry-count"] as number;
+        retryCount = (republish.options.headers as Record<string, unknown>)[
+          "x-retry-count"
+        ] as number;
       }
     }
 

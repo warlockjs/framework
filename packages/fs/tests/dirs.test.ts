@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import path from "node:path";
-import {
-  directoryExistsAsync,
-  ensureDirectory,
-  ensureDirectoryAsync,
-} from "../src/index.js";
+import { directoryExistsAsync, ensureDirectory, ensureDirectoryAsync } from "../src/index.js";
 import { withTempDir } from "./helpers.js";
 
 describe("dirs", () => {

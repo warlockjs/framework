@@ -33,7 +33,9 @@ A missing permission → `403` before your controller runs. Use `gateAny([...])`
 ```ts
 import { can, cannot, canAll, canAny } from "@warlock.js/access";
 
-if (await can(user, "orders.update")) { /* … */ }
+if (await can(user, "orders.update")) {
+  /* … */
+}
 
 await canAll(user, ["orders.update", "orders.viewCost"]); // needs BOTH
 await canAny(user, ["orders.update", "orders.updateStatus"]); // needs EITHER
@@ -69,7 +71,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 
 ## Gotchas
 
-- **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails *open*; the decision still fails closed).
+- **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails _open_; the decision still fails closed).
 - Stack `gate` **after** `authMiddleware` — it reads `request.locals.user`; without an authenticated user it `403`s.
 - The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).
 
@@ -169,6 +171,9 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 
 - The `implement-resolver` topic — write a resolver for your own storage.
 - The `manage-roles` topic — assign / revoke with the ejected table.
+
+```
+
 ```
 
 
@@ -190,9 +195,11 @@ Policies live **per module**, in `src/app/<module>/policies/`, and are loaded by
 ```ts title="src/app/orders/policies/index.ts"
 import { definePolicy } from "@warlock.js/access";
 
-definePolicy("orders.update", (user, order, ctx) =>
-  order.get("organization_id") === ctx.tenant &&
-  (order.get("customer_id") === user.id || ctx.hasRole("manager")),
+definePolicy(
+  "orders.update",
+  (user, order, ctx) =>
+    order.get("organization_id") === ctx.tenant &&
+    (order.get("customer_id") === user.id || ctx.hasRole("manager")),
 );
 ```
 
@@ -228,8 +235,9 @@ Policies **deny**, they don't grant — a policy can't let a user past a permiss
 ```ts
 await authorize(user, "orders.refund", { resource: order, amount: 5000 });
 
-definePolicy("orders.refund", (user, order, ctx) =>
-  ctx.hasRole("manager") || (ctx.amount as number) <= 1000,
+definePolicy(
+  "orders.refund",
+  (user, order, ctx) => ctx.hasRole("manager") || (ctx.amount as number) <= 1000,
 );
 ```
 
@@ -351,6 +359,9 @@ class DirectResolver implements AccessResolver {
 ## See also
 
 - The `configure-access` topic — the quickstart `DefaultAccessResolver`.
+
+```
+
 ```
 
 
@@ -378,7 +389,7 @@ await UserRole.assign(user, "viewer", "tenant-2"); // viewer in tenant-2 — sam
 await UserRole.revoke(user, "editor", "tenant-1"); // auto-flushes too
 ```
 
-The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to *global* roles only, never the union across tenants.
+The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to _global_ roles only, never the union across tenants.
 
 ### When you still need `access.flush`
 
@@ -426,6 +437,9 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 
 - The `configure-access` topic — choosing the resolver.
 - The `implement-resolver` topic — non-table role storage.
+
+```
+
 ```
 
 

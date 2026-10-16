@@ -14,11 +14,11 @@ Use URL helpers whenever you need to render a string that goes into a browser, a
 ```ts
 import { url, publicUrl, assetsUrl, uploadsUrl } from "@warlock.js/core";
 
-url();                       // → "http://localhost:3000"
-url("/health");              // → "http://localhost:3000/health"
+url(); // → "http://localhost:3000"
+url("/health"); // → "http://localhost:3000/health"
 
-publicUrl("favicon.ico");    // → "http://localhost:3000/public/favicon.ico"
-assetsUrl("logo.png");       // → "http://localhost:3000/public/assets/logo.png"
+publicUrl("favicon.ico"); // → "http://localhost:3000/public/favicon.ico"
+assetsUrl("logo.png"); // → "http://localhost:3000/public/assets/logo.png"
 uploadsUrl("avatars/42.png"); // → "http://localhost:3000/uploads/avatars/42.png"
 ```
 
@@ -54,13 +54,13 @@ setBaseUrl("https://cdn.example.com");
 
 ## Full inventory
 
-| Helper                | Resolves to                              | Use for                                     |
-| --------------------- | ---------------------------------------- | ------------------------------------------- |
-| `url(path?)`          | `<baseUrl>/<path>`                       | Arbitrary absolute URL on the same host.    |
-| `publicUrl(path?)`    | `<baseUrl>/public/<path>`                | Files served out of the `public/` folder.   |
-| `assetsUrl(path?)`    | `<baseUrl>/public/assets/<path>`         | Assets inside `public/assets/`.             |
-| `uploadsUrl(path?)`   | `<baseUrl>/uploads/<path>`               | User-uploaded files served over HTTP.       |
-| `setBaseUrl(url)`     | (sets the anchor for all of the above)   | Override at runtime — rarely needed.        |
+| Helper              | Resolves to                            | Use for                                   |
+| ------------------- | -------------------------------------- | ----------------------------------------- |
+| `url(path?)`        | `<baseUrl>/<path>`                     | Arbitrary absolute URL on the same host.  |
+| `publicUrl(path?)`  | `<baseUrl>/public/<path>`              | Files served out of the `public/` folder. |
+| `assetsUrl(path?)`  | `<baseUrl>/public/assets/<path>`       | Assets inside `public/assets/`.           |
+| `uploadsUrl(path?)` | `<baseUrl>/uploads/<path>`             | User-uploaded files served over HTTP.     |
+| `setBaseUrl(url)`   | (sets the anchor for all of the above) | Override at runtime — rarely needed.      |
 
 `assetsUrl` is just `publicUrl` with `assets/` prepended — they share the same `/public/` mount point.
 
@@ -70,12 +70,12 @@ setBaseUrl("https://cdn.example.com");
 
 The most common confusion. They look related but resolve completely differently:
 
-| Goal                                          | Helper            | Returns                                     |
-| --------------------------------------------- | ----------------- | ------------------------------------------- |
-| **Read** a file from the filesystem           | `uploadsPath(...)` | `<cwd>/storage/uploads/<path>` (filesystem) |
-| **Render** an `<img src>` for the same file   | `uploadsUrl(...)`  | `<baseUrl>/uploads/<path>` (HTTP URL)       |
-| **Write** to public folder                    | `publicPath(...)`  | `<cwd>/public/<path>` (filesystem)          |
-| **Embed** an asset URL in a response          | `publicUrl(...)`   | `<baseUrl>/public/<path>` (HTTP URL)        |
+| Goal                                        | Helper             | Returns                                     |
+| ------------------------------------------- | ------------------ | ------------------------------------------- |
+| **Read** a file from the filesystem         | `uploadsPath(...)` | `<cwd>/storage/uploads/<path>` (filesystem) |
+| **Render** an `<img src>` for the same file | `uploadsUrl(...)`  | `<baseUrl>/uploads/<path>` (HTTP URL)       |
+| **Write** to public folder                  | `publicPath(...)`  | `<cwd>/public/<path>` (filesystem)          |
+| **Embed** an asset URL in a response        | `publicUrl(...)`   | `<baseUrl>/public/<path>` (HTTP URL)        |
 
 Pick by the consumer:
 
@@ -144,7 +144,7 @@ await sendWebhook({
   url: vendor.callback_url,
   payload: {
     order_id: order.id,
-    receipt_url: url(`/orders/${order.id}/receipt`),  // → "https://api.example.com/orders/42/receipt"
+    receipt_url: url(`/orders/${order.id}/receipt`), // → "https://api.example.com/orders/42/receipt"
   },
 });
 ```

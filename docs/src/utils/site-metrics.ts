@@ -34,5 +34,5 @@ async function loadSiteMetrics(): Promise<SiteMetrics> {
 
 /** Build-time site metrics derived from committed canonical data and content. */
 export function getSiteMetrics(): Promise<SiteMetrics> {
-  return metricsPromise ??= loadSiteMetrics();
+  return (metricsPromise ??= loadSiteMetrics());
 }

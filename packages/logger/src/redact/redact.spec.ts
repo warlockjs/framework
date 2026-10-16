@@ -310,9 +310,7 @@ describe("default key denylist", () => {
 
       const result = applyRedact(data, undefined);
 
-      expect((result.context as any).req.headers.authorization).toBe(
-        "[REDACTED]",
-      );
+      expect((result.context as any).req.headers.authorization).toBe("[REDACTED]");
     });
 
     it("censors through arrays", () => {
@@ -522,9 +520,7 @@ describe("default key denylist", () => {
         },
       });
 
-      expect(seen).toEqual([
-        { value: "sk_live_1234", path: "context.user.apiKey" },
-      ]);
+      expect(seen).toEqual([{ value: "sk_live_1234", path: "context.user.apiKey" }]);
     });
 
     it("does not double-apply a function censor already applied by a path", () => {
@@ -585,26 +581,17 @@ describe("mergeRedact", () => {
   });
 
   it("concatenates paths from both sides", () => {
-    const merged = mergeRedact(
-      { paths: ["context.password"] },
-      { paths: ["context.email"] },
-    );
+    const merged = mergeRedact({ paths: ["context.password"] }, { paths: ["context.email"] });
     expect(merged?.paths).toEqual(["context.password", "context.email"]);
   });
 
   it("prefers the channel's censor over the base", () => {
-    const merged = mergeRedact(
-      { paths: ["a"], censor: "BASE" },
-      { paths: ["b"], censor: "CHAN" },
-    );
+    const merged = mergeRedact({ paths: ["a"], censor: "BASE" }, { paths: ["b"], censor: "CHAN" });
     expect(merged?.censor).toBe("CHAN");
   });
 
   it("falls back to base censor when channel omits one", () => {
-    const merged = mergeRedact(
-      { paths: ["a"], censor: "BASE" },
-      { paths: ["b"] },
-    );
+    const merged = mergeRedact({ paths: ["a"], censor: "BASE" }, { paths: ["b"] });
     expect(merged?.censor).toBe("BASE");
   });
 

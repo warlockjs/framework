@@ -142,9 +142,9 @@ describe("calculatorTool", () => {
     });
 
     it("never throws from invoke(), even on garbage", async () => {
-      await expect(
-        calculatorTool().invoke({ expression: "@#$%^&*" }),
-      ).resolves.toMatchObject({ error: expect.anything() });
+      await expect(calculatorTool().invoke({ expression: "@#$%^&*" })).resolves.toMatchObject({
+        error: expect.anything(),
+      });
     });
   });
 

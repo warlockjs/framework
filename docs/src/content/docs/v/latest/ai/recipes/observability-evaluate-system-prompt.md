@@ -6,7 +6,7 @@ sidebar:
   label: "Observability — evaluate a prompt"
 ---
 
-You're staring at a failed (or merely mediocre) run in the dashboard. The system prompt is right there in the drawer, captured verbatim — but is it actually *good*? Clear enough, scoped enough, missing a rule that would have prevented this exact failure? Rather than copy it into a separate playground, the dashboard can grade it in place: click "Evaluate system prompt," optionally tweak the grading instructions, and get a score back — no new tooling, no leaving the trace you're already looking at.
+You're staring at a failed (or merely mediocre) run in the dashboard. The system prompt is right there in the drawer, captured verbatim — but is it actually _good_? Clear enough, scoped enough, missing a rule that would have prevented this exact failure? Rather than copy it into a separate playground, the dashboard can grade it in place: click "Evaluate system prompt," optionally tweak the grading instructions, and get a score back — no new tooling, no leaving the trace you're already looking at.
 
 This is the dashboard's **one write-capable route** — everything else is `GET`-only by design (see [Wire Panoptic](/v/latest/ai/recipes/observability-wire-panoptic/)). It's off unless you configure it.
 

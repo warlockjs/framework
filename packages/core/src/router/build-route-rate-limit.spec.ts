@@ -3,7 +3,11 @@ import { buildRouteRateLimit } from "./build-route-rate-limit";
 
 describe("buildRouteRateLimit", () => {
   it("maps errorMessage to errorResponseBuilder", () => {
-    const result = buildRouteRateLimit({ max: 1, timeWindow: 1000, errorMessage: "Slow down" }) as any;
+    const result = buildRouteRateLimit({
+      max: 1,
+      timeWindow: 1000,
+      errorMessage: "Slow down",
+    }) as any;
 
     expect(result.errorMessage).toBeUndefined();
     expect(result.errorResponseBuilder().message).toBe("Slow down");

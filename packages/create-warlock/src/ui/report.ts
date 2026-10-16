@@ -44,9 +44,7 @@ function describeCommand(result: CommandResult): string[] {
   } else if (result.signal) {
     lines.push(`${colors.dim("killed:")}  ${colors.white(result.signal)}`);
   } else {
-    lines.push(
-      `${colors.dim("exited:")}  ${colors.white(`code ${result.code}`)}`,
-    );
+    lines.push(`${colors.dim("exited:")}  ${colors.white(`code ${result.code}`)}`);
   }
 
   const output = tail(result.stderr) || tail(result.stdout);
@@ -90,11 +88,7 @@ export function failFatally(problem: Problem): never {
 
   printProblem(problem);
 
-  console.log(
-    colors.dim(
-      "  The project directory was left in place so you can inspect it.",
-    ),
-  );
+  console.log(colors.dim("  The project directory was left in place so you can inspect it."));
   console.log();
 
   process.exit(1);
@@ -143,15 +137,11 @@ export function showPartialScreen(options: {
   missingFeatures: string[];
   packageManager: string;
 }): void {
-  const { projectName, database, features, missingFeatures, packageManager } =
-    options;
+  const { projectName, database, features, missingFeatures, packageManager } = options;
 
-  const devCommand =
-    packageManager === "npm" ? "npm run dev" : `${packageManager} dev`;
+  const devCommand = packageManager === "npm" ? "npm run dev" : `${packageManager} dev`;
 
-  console.log(
-    `  ${colors.bold(colors.yellow("⚠ PROJECT CREATED — BUT NOT AS REQUESTED"))}`,
-  );
+  console.log(`  ${colors.bold(colors.yellow("⚠ PROJECT CREATED — BUT NOT AS REQUESTED"))}`);
   console.log();
   console.log(`     ${colors.dim("Project:  ")}${colors.white(projectName)}`);
   console.log(`     ${colors.dim("Database: ")}${colors.white(database)}`);
@@ -160,9 +150,7 @@ export function showPartialScreen(options: {
   );
 
   if (missingFeatures.length > 0) {
-    console.log(
-      `     ${colors.dim("Missing:  ")}${colors.red(missingFeatures.join(", "))}`,
-    );
+    console.log(`     ${colors.dim("Missing:  ")}${colors.red(missingFeatures.join(", "))}`);
   }
 
   console.log();
@@ -171,9 +159,7 @@ export function showPartialScreen(options: {
   console.log(`     ${colors.cyan("cd")} ${projectName}`);
 
   if (missingFeatures.length > 0) {
-    console.log(
-      `     ${colors.cyan(`npx warlock add ${missingFeatures.join(" ")}`)}`,
-    );
+    console.log(`     ${colors.cyan(`npx warlock add ${missingFeatures.join(" ")}`)}`);
   }
 
   console.log(`     ${colors.cyan(devCommand)}`);
@@ -188,8 +174,7 @@ export function showPartialScreen(options: {
  */
 export function installFailureHints(result: CommandResult | undefined) {
   const output = `${result?.stdout ?? ""}${result?.stderr ?? ""}`;
-  const projectDirectory =
-    result?.cwd ?? "the already-created project directory";
+  const projectDirectory = result?.cwd ?? "the already-created project directory";
   const command = result?.command ?? "the install command";
   const npmArboristFailure =
     command.startsWith("npm ") &&
@@ -203,9 +188,7 @@ export function installFailureHints(result: CommandResult | undefined) {
     ];
   }
 
-  const logPath = output.match(
-    /A complete log of this run can be found in:\s*(\S+)/i,
-  )?.[1];
+  const logPath = output.match(/A complete log of this run can be found in:\s*(\S+)/i)?.[1];
   const hints = [
     `The project remains at ${projectDirectory}; \`${command}\` failed there.`,
     logPath
@@ -224,9 +207,7 @@ export function installFailureHints(result: CommandResult | undefined) {
   }
 
   if (/EACCES|EPERM/i.test(output)) {
-    hints.push(
-      "Permission denied — check the directory's ownership before retrying.",
-    );
+    hints.push("Permission denied — check the directory's ownership before retrying.");
   }
 
   return hints;

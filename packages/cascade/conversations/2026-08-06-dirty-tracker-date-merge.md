@@ -38,7 +38,7 @@ Every case starts from an already-populated column, because the first write into
 empty column always worked — that asymmetry is what made the bug look like a test
 artifact.
 
-⚠ My first draft had 3 failures caused by *my own wrong assumption*, not the bug:
+⚠ My first draft had 3 failures caused by _my own wrong assumption_, not the bug:
 `getDirtyColumnsWithValues()` returns a flattened `{ "a.b": { oldValue, newValue } }`
 diff, not merged data. Rewritten against the real API.
 

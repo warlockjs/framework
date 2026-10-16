@@ -36,7 +36,7 @@ function createExecutor() {
 describe("LayerExecutor deletion propagation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    shouldRestart.mockImplementation(files => files.includes(deletedPagePath));
+    shouldRestart.mockImplementation((files) => files.includes(deletedPagePath));
   });
 
   it("passes a delete-only page batch to connectors and restarts a matching connector", async () => {

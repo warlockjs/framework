@@ -47,7 +47,9 @@ import {
 const temporaryRoots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 async function makeAppRoot(): Promise<string> {
@@ -120,15 +122,21 @@ describe("discoverPages / route resolution", () => {
       path.join(appRoot, "src", "web", "index.page.tsx"),
       'export const route = { path: "/", name: "index" } as const;\nexport default function Home() { return null; }\n',
     );
-    await writeFile(path.join(appRoot, "src", "web", "error.page.tsx"), "export default function E() { return null; }\n");
-    await writeFile(path.join(appRoot, "src", "web", "404.page.tsx"), "export default function NF() { return null; }\n");
+    await writeFile(
+      path.join(appRoot, "src", "web", "error.page.tsx"),
+      "export default function E() { return null; }\n",
+    );
+    await writeFile(
+      path.join(appRoot, "src", "web", "404.page.tsx"),
+      "export default function NF() { return null; }\n",
+    );
     await writeFile(
       path.join(appRoot, "src", "web", "products", "[id].page.tsx"),
       "export default function P() { return null; }\n",
     );
 
     const pages = await discoverPages(appRoot);
-    const relatives = pages.map(page => page.relativeToWebRoot).sort();
+    const relatives = pages.map((page) => page.relativeToWebRoot).sort();
     assert.deepEqual(relatives, ["index.page.tsx", "products/[id].page.tsx"]);
   });
 
@@ -136,8 +144,14 @@ describe("discoverPages / route resolution", () => {
     const appRoot = await makeAppRoot();
     await mkdir(path.join(appRoot, "src", "web"), { recursive: true });
     const file = path.join(appRoot, "src", "web", "about.page.tsx");
-    await writeFile(file, 'export const route = { path: "/company/about", name: "about" } as const;\nexport default function A(){return null;}\n');
-    const routePath = await resolvePageRoutePath({ absolutePath: file, relativeToWebRoot: "about.page.tsx" });
+    await writeFile(
+      file,
+      'export const route = { path: "/company/about", name: "about" } as const;\nexport default function A(){return null;}\n',
+    );
+    const routePath = await resolvePageRoutePath({
+      absolutePath: file,
+      relativeToWebRoot: "about.page.tsx",
+    });
     assert.equal(routePath, "/company/about");
   });
 
@@ -145,8 +159,14 @@ describe("discoverPages / route resolution", () => {
     const appRoot = await makeAppRoot();
     await mkdir(path.join(appRoot, "src", "web"), { recursive: true });
     const file = path.join(appRoot, "src", "web", "contact.page.tsx");
-    await writeFile(file, 'export const route = "/contact";\nexport default function C(){return null;}\n');
-    const routePath = await resolvePageRoutePath({ absolutePath: file, relativeToWebRoot: "contact.page.tsx" });
+    await writeFile(
+      file,
+      'export const route = "/contact";\nexport default function C(){return null;}\n',
+    );
+    const routePath = await resolvePageRoutePath({
+      absolutePath: file,
+      relativeToWebRoot: "contact.page.tsx",
+    });
     assert.equal(routePath, "/contact");
   });
 
@@ -155,7 +175,10 @@ describe("discoverPages / route resolution", () => {
     await mkdir(path.join(appRoot, "src", "web", "products"), { recursive: true });
     const file = path.join(appRoot, "src", "web", "products", "[id].page.tsx");
     await writeFile(file, "export default function P() { return null; }\n");
-    const routePath = await resolvePageRoutePath({ absolutePath: file, relativeToWebRoot: "products/[id].page.tsx" });
+    const routePath = await resolvePageRoutePath({
+      absolutePath: file,
+      relativeToWebRoot: "products/[id].page.tsx",
+    });
     assert.equal(routePath, "/products/:id");
   });
 
@@ -176,18 +199,26 @@ describe("discoverPages / route resolution", () => {
   });
 
   it("returns undefined when nothing resolves to '/'", () => {
-    const home = findHomePage([{ absolutePath: "a", relativeToWebRoot: "products/index.page.tsx", routePath: "/products" }]);
+    const home = findHomePage([
+      { absolutePath: "a", relativeToWebRoot: "products/index.page.tsx", routePath: "/products" },
+    ]);
     assert.equal(home, undefined);
   });
 });
 
 describe("extractDeclaredRoutePath", () => {
   it("returns undefined for a page with no route export at all", () => {
-    assert.equal(extractDeclaredRoutePath("export default function Page() { return null; }\n"), undefined);
+    assert.equal(
+      extractDeclaredRoutePath("export default function Page() { return null; }\n"),
+      undefined,
+    );
   });
 
   it("returns undefined for an object route missing a literal path", () => {
-    assert.equal(extractDeclaredRoutePath("export const route = { name: \"x\" } as const;\n"), undefined);
+    assert.equal(
+      extractDeclaredRoutePath('export const route = { name: "x" } as const;\n'),
+      undefined,
+    );
   });
 });
 
@@ -198,10 +229,24 @@ describe("findIncrementMutationCandidate — real generated-app source", () => {
     // invented for this spec. Reading it here proves the adapter's mutation
     // selection works against real generated-app content, not a stand-in.
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const stubsFile = path.resolve(here, "..", "..", "..", "..", "packages", "core", "src", "generations", "stubs.ts");
+    const stubsFile = path.resolve(
+      here,
+      "..",
+      "..",
+      "..",
+      "..",
+      "packages",
+      "core",
+      "src",
+      "generations",
+      "stubs.ts",
+    );
     const stubsSource = await readFile(stubsFile, "utf8");
     const start = stubsSource.indexOf("export const webHomePageStub");
-    assert.ok(start >= 0, "webHomePageStub not found in core/src/generations/stubs.ts — has it moved?");
+    assert.ok(
+      start >= 0,
+      "webHomePageStub not found in core/src/generations/stubs.ts — has it moved?",
+    );
     const homePageSource = stubsSource.slice(start);
 
     const candidate = findIncrementMutationCandidate(homePageSource);
@@ -243,7 +288,12 @@ describe("findIncrementMutationCandidate — real generated-app source", () => {
   });
 
   it("returns undefined for a page with no useState at all", () => {
-    assert.equal(findIncrementMutationCandidate("export default function Page() { return <button>Click</button>; }"), undefined);
+    assert.equal(
+      findIncrementMutationCandidate(
+        "export default function Page() { return <button>Click</button>; }",
+      ),
+      undefined,
+    );
   });
 });
 
@@ -257,7 +307,10 @@ describe("extractCounterValue — reading the counter the way a user would", () 
   });
 
   it("extracts a multi-digit value after several increments", () => {
-    assert.equal(extractCounterValue("If this number goes up when you click, React is hydrated:12"), 12);
+    assert.equal(
+      extractCounterValue("If this number goes up when you click, React is hydrated:12"),
+      12,
+    );
   });
 
   it("throws COUNTER_VALUE_NOT_FOUND, naming the searched text, when no digits are present", () => {
@@ -309,10 +362,19 @@ describe("buildCertificate", () => {
     consoleErrors: [] as string[],
     pageErrors: [] as string[],
   };
-  const mutation = { relativePath: "src/web/index.page.tsx", find: "setCount(c => c + 1)", replacement: "setCount(c => c)" };
+  const mutation = {
+    relativePath: "src/web/index.page.tsx",
+    find: "setCount(c => c + 1)",
+    replacement: "setCount(c => c)",
+  };
 
   it("builds the exact schema the gate's parseBrowserCertificate requires", () => {
-    const certificate = buildCertificate({ appRoot: path.resolve("/apps/case-1"), development, production, mutation });
+    const certificate = buildCertificate({
+      appRoot: path.resolve("/apps/case-1"),
+      development,
+      production,
+      mutation,
+    });
     assert.equal(certificate.schemaVersion, 1);
     assert.equal(certificate.appRoot, path.resolve("/apps/case-1"));
     assert.deepEqual(certificate.development, development);
@@ -322,13 +384,22 @@ describe("buildCertificate", () => {
   });
 
   it("rejects a relative appRoot", () => {
-    assert.throws(() => buildCertificate({ appRoot: "apps/case-1", development, production, mutation }), /absolute appRoot/);
+    assert.throws(
+      () => buildCertificate({ appRoot: "apps/case-1", development, production, mutation }),
+      /absolute appRoot/,
+    );
   });
 
   it("rejects a development phase missing hmrStatePreserved", () => {
     const { hmrStatePreserved: _dropped, ...withoutHmr } = development;
     assert.throws(
-      () => buildCertificate({ appRoot: path.resolve("/apps/case-1"), development: withoutHmr, production, mutation }),
+      () =>
+        buildCertificate({
+          appRoot: path.resolve("/apps/case-1"),
+          development: withoutHmr,
+          production,
+          mutation,
+        }),
       /hmrStatePreserved/,
     );
   });
@@ -340,7 +411,10 @@ describe("buildCertificate", () => {
           appRoot: path.resolve("/apps/case-1"),
           development,
           production,
-          mutation: { ...mutation, relativePath: path.resolve("/apps/case-1/src/web/index.page.tsx") },
+          mutation: {
+            ...mutation,
+            relativePath: path.resolve("/apps/case-1/src/web/index.page.tsx"),
+          },
         }),
       /relative to the app root/,
     );
@@ -374,7 +448,11 @@ describe("phaseFullyPassed / decideOutcome", () => {
     consoleErrors: [] as string[],
     pageErrors: [] as string[],
   };
-  const mutation = { relativePath: "src/web/index.page.tsx", find: "setCount(c => c + 1)", replacement: "setCount(c => c)" };
+  const mutation = {
+    relativePath: "src/web/index.page.tsx",
+    find: "setCount(c => c + 1)",
+    replacement: "setCount(c => c)",
+  };
 
   it("phaseFullyPassed requires hmrStatePreserved only when asked for", () => {
     assert.equal(phaseFullyPassed(passingDevelopment, true), true);
@@ -389,14 +467,24 @@ describe("phaseFullyPassed / decideOutcome", () => {
   });
 
   it("normal mode: passes silently (exit 0) when both phases fully pass", () => {
-    const outcome = decideOutcome({ mutationControl: false, development: passingDevelopment, production: passingProduction, mutation });
+    const outcome = decideOutcome({
+      mutationControl: false,
+      development: passingDevelopment,
+      production: passingProduction,
+      mutation,
+    });
     assert.equal(outcome.ok, true);
     assert.equal(outcome.exitCode, 0);
   });
 
   it("normal mode: fails with a plain diagnostic (no marker) when a phase fails honestly", () => {
     const failingDevelopment = { ...passingDevelopment, clickPassed: false };
-    const outcome = decideOutcome({ mutationControl: false, development: failingDevelopment, production: passingProduction, mutation });
+    const outcome = decideOutcome({
+      mutationControl: false,
+      development: failingDevelopment,
+      production: passingProduction,
+      mutation,
+    });
     assert.equal(outcome.ok, false);
     assert.equal(outcome.exitCode, 1);
     assert.ok(!outcome.message.includes("ZERO_EDIT_BROWSER_ORACLE_ASSERTION_FAILED"));
@@ -404,7 +492,12 @@ describe("phaseFullyPassed / decideOutcome", () => {
 
   it("--mutation-control: exits non-zero WITH the required marker when the corruption is detected (the expected case)", () => {
     const corruptedDevelopment = { ...passingDevelopment, clickPassed: false };
-    const outcome = decideOutcome({ mutationControl: true, development: corruptedDevelopment, production: passingProduction, mutation });
+    const outcome = decideOutcome({
+      mutationControl: true,
+      development: corruptedDevelopment,
+      production: passingProduction,
+      mutation,
+    });
     assert.equal(outcome.ok, false);
     assert.equal(outcome.exitCode, 1);
     assert.ok(outcome.message.includes("ZERO_EDIT_BROWSER_ORACLE_ASSERTION_FAILED"));
@@ -415,7 +508,12 @@ describe("phaseFullyPassed / decideOutcome", () => {
     // The gate accepts the control only on `exitCode !== 0 && /MARKER/`
     // (`zero-edit-generator-gate.ts:299-302`). Emitting the marker here would
     // report a working red control while the oracle had in fact proved nothing.
-    const outcome = decideOutcome({ mutationControl: true, development: passingDevelopment, production: passingProduction, mutation });
+    const outcome = decideOutcome({
+      mutationControl: true,
+      development: passingDevelopment,
+      production: passingProduction,
+      mutation,
+    });
     assert.equal(outcome.ok, false);
     assert.equal(outcome.exitCode, 1);
     assert.ok(!outcome.message.includes("ZERO_EDIT_BROWSER_ORACLE_ASSERTION_FAILED"));
@@ -425,7 +523,12 @@ describe("phaseFullyPassed / decideOutcome", () => {
 
   it("--mutation-control: a production-only failure is still reported as detected", () => {
     const corruptedProduction = { ...passingProduction, linkSpaNavigationPassed: false };
-    const outcome = decideOutcome({ mutationControl: true, development: passingDevelopment, production: corruptedProduction, mutation });
+    const outcome = decideOutcome({
+      mutationControl: true,
+      development: passingDevelopment,
+      production: corruptedProduction,
+      mutation,
+    });
     assert.equal(outcome.ok, false);
     assert.ok(outcome.message.includes("ZERO_EDIT_BROWSER_ORACLE_ASSERTION_FAILED"));
     assert.ok(/correctly detected/.test(outcome.message));

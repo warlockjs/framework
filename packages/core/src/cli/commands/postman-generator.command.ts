@@ -18,7 +18,8 @@ export const postmanGeneratorCommand = command({
   options: [
     {
       text: "--out, -o",
-      description: "Output file, relative to the project root (default storage/postman/collection.json)",
+      description:
+        "Output file, relative to the project root (default storage/postman/collection.json)",
       type: "string",
     },
     {

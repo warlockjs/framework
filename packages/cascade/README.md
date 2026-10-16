@@ -8,7 +8,6 @@ Cascade is a unified ORM for MongoDB and PostgreSQL — one model-first API runs
 
 Some but not all of the features:
 
-
 - **Easy to use:** `Cascade` is very easy to use, it's just a wrapper around MongoDB driver.
 - **Supports multiple connections:** You can perform multiple connections to different MongoDB connections and use each one of them separately.
 - **Supports multiple databases:** `Cascade` supports multiple databases, you can connect to multiple databases at the same time.
@@ -26,7 +25,6 @@ Some but not all of the features:
 - **Data casting:** You can cast your data to a specific type or using custom casting.
 - **Embedded documents:** `Cascade` supports single and multiple embedded documents, you can embed documents inside other documents.
 - **Syncing Models**: Auto update documents when model's data is updated or deleted.
-
 
 ## Server-only
 
@@ -49,7 +47,6 @@ Using pnpm:
 ```bash
 pnpm add @warlock.js/cascade
 ```
-
 
 ## Peek inside cascade
 
@@ -96,7 +93,6 @@ Outputs something similar to:
 }
 ```
 
-
 ## Documentation
 
-To see the full documentation, please visit [Cascade Documentation](https://warlock.js.org/docs/cascade/getting-started/introduction) 
+To see the full documentation, please visit [Cascade Documentation](https://warlock.js.org/docs/cascade/getting-started/introduction)

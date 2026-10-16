@@ -236,9 +236,7 @@ describe.skipIf(!redisAvailable)("@warlock.js/queue against a real Redis", () =>
     const originalGetState = Job.prototype.getState;
     let getStateCalls = 0;
 
-    vi.spyOn(Job.prototype, "getState").mockImplementation(async function (
-      this: Job,
-    ) {
+    vi.spyOn(Job.prototype, "getState").mockImplementation(async function (this: Job) {
       getStateCalls++;
 
       if (getStateCalls === 1) {

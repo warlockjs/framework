@@ -21,11 +21,11 @@ defineNotification<Data>({
 
 Returns `{ send, queue, only }`:
 
-| Method | Signature | What it does |
-|---|---|---|
-| `.send` | `(to, data, options?)` | Render + dispatch synchronously. |
-| `.queue` | `(to, data, options?)` | Render + enqueue. Throws if no queue dispatcher is configured. |
-| `.only(...channels)` | returns `{send, queue, only}` | Restrict dispatch to a subset of channels. |
+| Method               | Signature                     | What it does                                                   |
+| -------------------- | ----------------------------- | -------------------------------------------------------------- |
+| `.send`              | `(to, data, options?)`        | Render + dispatch synchronously.                               |
+| `.queue`             | `(to, data, options?)`        | Render + enqueue. Throws if no queue dispatcher is configured. |
+| `.only(...channels)` | returns `{send, queue, only}` | Restrict dispatch to a subset of channels.                     |
 
 `to` accepts a `Notifiable` OR a `Notifiable[]`. Fan-out emits one render+dispatch per recipient with per-recipient + per-channel `Promise.allSettled` (one failure does not abort the others).
 
@@ -47,9 +47,7 @@ await welcome.send(user, { name: "Hasan" });
 export const orderShipped = defineNotification<{ order: Order }>({
   type: "order.shipped",
   via: (_data, to) =>
-    to.get("telegram_chat_id")
-      ? ["database", "telegram"]
-      : ["database", "mail"],
+    to.get("telegram_chat_id") ? ["database", "telegram"] : ["database", "mail"],
   database: ({ order }) => ({ title: `Order #${order.number} shipped` }),
   mail: ({ order }, to) => ({
     subject: `Order #${order.number} shipped`,
@@ -62,16 +60,15 @@ export const orderShipped = defineNotification<{ order: Order }>({
 ## The renderer's 3rd arg — `RenderContext`
 
 ```ts
-mail: ({ campaignId }, to, { locale = "en", meta }) => ({
+mail: (({ campaignId }, to, { locale = "en", meta }) => ({
   subject: subjectsByLocale[locale],
-  html:    htmlByLocale[locale],
+  html: htmlByLocale[locale],
 }),
-
-// usage:
-await marketing.queue(user, payload, {
-  locale: user.get("locale"),
-  meta:   { campaignId, source: "blast" },
-});
+  // usage:
+  await marketing.queue(user, payload, {
+    locale: user.get("locale"),
+    meta: { campaignId, source: "blast" },
+  }));
 ```
 
 `ctx` carries `locale` + `meta` from `SendOptions`. `meta` flows through to every observability event too.
@@ -82,7 +79,7 @@ The `database` renderer may OMIT `type` — the dispatcher injects `def.type` au
 
 ```ts
 defineNotification({
-  type: "order.shipped",   // ← single source of truth
+  type: "order.shipped", // ← single source of truth
   via: ["database"],
   database: () => ({ title: "Shipped" }), // type omitted; dispatcher injects "order.shipped"
 });
@@ -112,14 +109,14 @@ await orderShipped.queue(user, { order }, { delay: "10m" });
 
 ## SendOptions
 
-| Field | Effect |
-|---|---|
-| `delay` | Reserved — `"10m"` / `"3d"` / `600` (seconds). NOT honored yet: both `.send()` and the current `.queue()` worker dispatch immediately; delay-aware delivery is a follow-up. |
-| `locale` | Passed to renderers via `RenderContext.locale`. |
-| `meta` | Passed to renderers + included in every observability event. |
-| `idempotencyKey` | Injected into the database payload (dedupe via unique index). |
-| `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
-| `type` | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating. |
+| Field            | Effect                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `delay`          | Reserved — `"10m"` / `"3d"` / `600` (seconds). NOT honored yet: both `.send()` and the current `.queue()` worker dispatch immediately; delay-aware delivery is a follow-up. |
+| `locale`         | Passed to renderers via `RenderContext.locale`.                                                                                                                             |
+| `meta`           | Passed to renderers + included in every observability event.                                                                                                                |
+| `idempotencyKey` | Injected into the database payload (dedupe via unique index).                                                                                                               |
+| `force`          | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`.                                                                                                                 |
+| `type`           | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating.                                                                                                      |
 
 ## Failure isolation
 

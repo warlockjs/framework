@@ -7,10 +7,10 @@ description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() 
 
 `ai.orchestrator()` persists through **two distinct stores** with two distinct contracts. Confusing them is the #1 wiring mistake.
 
-| Store | Contract | Persists | Keyed by | Factories |
-|---|---|---|---|---|
-| **checkpoint** | `CheckpointStore` | cross-turn SESSION STATE (one append-only row per settled turn) | `(orchestrator_name, session_id, turn_index)` | `ai.checkpoint.{memory,pg,redis}()` |
-| **snapshot** | `SnapshotStore` | in-flight internal SUPERVISOR run state (for `iterate: true` mid-turn resume) | `runId` | `ai.snapshot.{memory,pg,redis}()` |
+| Store          | Contract          | Persists                                                                      | Keyed by                                      | Factories                           |
+| -------------- | ----------------- | ----------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------- |
+| **checkpoint** | `CheckpointStore` | cross-turn SESSION STATE (one append-only row per settled turn)               | `(orchestrator_name, session_id, turn_index)` | `ai.checkpoint.{memory,pg,redis}()` |
+| **snapshot**   | `SnapshotStore`   | in-flight internal SUPERVISOR run state (for `iterate: true` mid-turn resume) | `runId`                                       | `ai.snapshot.{memory,pg,redis}()`   |
 
 - A **checkpoint** is what lets `execute()` rehydrate a session across calls — state, `turn_index`, drift `signature`, `version`, `last_route`, compaction progress, lock metadata.
 - A **snapshot** is what lets a crashed mid-turn `iterate: true` turn resume — it round-trips the existing `SupervisorSnapshot` envelope (the same shape the supervisor's own `snapshotStore` uses).
@@ -28,7 +28,7 @@ const orch = ai.orchestrator({
   route,
   iterate: true,
   checkpointStore: ai.checkpoint.pg({ client: pgPool }),
-  snapshotStore: ai.snapshot.pg({ client: pgPool }),  // a single pg.Pool backs both
+  snapshotStore: ai.snapshot.pg({ client: pgPool }), // a single pg.Pool backs both
 });
 ```
 
@@ -45,11 +45,11 @@ Resolution: explicit `checkpointStore` / `snapshotStore` on the config wins, els
 
 ## The three drivers
 
-| Driver | Client | Durable | Cross-process | Fits |
-|---|---|---|---|---|
-| `memory()` | none | ❌ | ❌ | dev / tests / single-process; no resume across restarts |
-| `pg({ client, table?, ttl? })` | dev-supplied `pg.Pool`/`Client` | ✅ | ✅ | production with Postgres |
-| `redis({ client, prefix?, ttl? })` | dev-supplied `redis` client | ✅ | ✅ | production with Redis |
+| Driver                             | Client                          | Durable | Cross-process | Fits                                                    |
+| ---------------------------------- | ------------------------------- | ------- | ------------- | ------------------------------------------------------- |
+| `memory()`                         | none                            | ❌      | ❌            | dev / tests / single-process; no resume across restarts |
+| `pg({ client, table?, ttl? })`     | dev-supplied `pg.Pool`/`Client` | ✅      | ✅            | production with Postgres                                |
+| `redis({ client, prefix?, ttl? })` | dev-supplied `redis` client     | ✅      | ✅            | production with Redis                                   |
 
 `@warlock.js/ai` takes **NO peer dependency** on `pg` or `redis` — you install the client, build it, and pass it in via `{ client }` (anything matching `PgClientLike` / `RedisClientLike`). The store never opens or closes the connection. A single `pg.Pool` can back the cache, the checkpoint store, and the snapshot store at once.
 
@@ -73,7 +73,7 @@ The framework never creates or alters tables. Each pg store exposes `schema()` r
 
 ```ts
 const store = ai.checkpoint.pg({ client: pool });
-await pool.query(store.schema());   // once, via your migration tooling
+await pool.query(store.schema()); // once, via your migration tooling
 ```
 
 The memory and redis drivers return an empty `schema()` string (no backing table), so callers can treat `schema()` uniformly.
@@ -82,17 +82,17 @@ The memory and redis drivers return an empty `schema()` string (no backing table
 
 ```ts
 type CheckpointRecord = {
-  orchestrator_name: string;          // PK segment 1
-  session_id: string;                 // PK segment 2
-  turn_index: number;                 // PK segment 3 — highest is live
-  state: unknown;                     // post-merge session accumulator (TState)
+  orchestrator_name: string; // PK segment 1
+  session_id: string; // PK segment 2
+  turn_index: number; // PK segment 3 — highest is live
+  state: unknown; // post-merge session accumulator (TState)
   last_route: string | string[] | null;
-  signature: string;                  // drift fingerprint at write time
-  version: string | null;             // config.version tag — metadata only
-  summarized_through: number | null;  // exclusive turn index compaction reached
-  lock_acquired_at: string | null;    // compaction lock metadata
+  signature: string; // drift fingerprint at write time
+  version: string | null; // config.version tag — metadata only
+  summarized_through: number | null; // exclusive turn index compaction reached
+  lock_acquired_at: string | null; // compaction lock metadata
   lock_expires_at: string | null;
-  saved_at: string;                   // ISO write timestamp
+  saved_at: string; // ISO write timestamp
 };
 ```
 
@@ -110,9 +110,9 @@ Both stores: `load(...)`, `save(...)`, `delete(...)`, optional `list(...)`, `sch
 On startup, resume any session whose last turn was interrupted mid-flight:
 
 ```ts
-const sessions = await checkpointStore.list?.(orch.name) ?? [];
+const sessions = (await checkpointStore.list?.(orch.name)) ?? [];
 for (const sessionId of sessions) {
-  await orch.resume(sessionId);   // null when nothing in flight — harmless
+  await orch.resume(sessionId); // null when nothing in flight — harmless
 }
 ```
 

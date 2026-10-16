@@ -9,9 +9,8 @@ vi.mock("@mongez/dotenv", () => ({
   loadEnv: loadEnvMock,
 }));
 
-const { loadEnvironmentFiles, resetLoadedEnvironment } = await import(
-  "../../../src/utils/load-environment"
-);
+const { loadEnvironmentFiles, resetLoadedEnvironment } =
+  await import("../../../src/utils/load-environment");
 
 describe("loadEnvironmentFiles", () => {
   let directory: string;

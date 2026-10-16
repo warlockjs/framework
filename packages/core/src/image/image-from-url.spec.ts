@@ -36,9 +36,7 @@ describe("Image.fromUrl (SSRF guard)", () => {
   it("enforces the body size cap (declared content-length)", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        okResponse("x", { "content-length": String(60 * 1024 * 1024) }),
-      ),
+      vi.fn(async () => okResponse("x", { "content-length": String(60 * 1024 * 1024) })),
     );
 
     await expect(Image.fromUrl("http://93.184.216.34/big.png")).rejects.toThrow(/too large/);
@@ -53,7 +51,10 @@ describe("Image.fromUrl (SSRF guard)", () => {
         controller.enqueue(chunk);
       },
     });
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(stream, { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(stream, { status: 200 })),
+    );
 
     await expect(Image.fromUrl("http://93.184.216.34/big.png")).rejects.toThrow(/exceeded/);
   });

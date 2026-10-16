@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Repository formatting uses one pinned Oxfmt configuration and a blocking CI check; generated outputs, locks and archives keep their own projection checks. Scaffolder source tests share the root formatter while generated-app templates retain their toolchain gates.
+
 - Release CI and local gate quality commands require real Redis integration specs; configured-port reporting tests mock availability checks and no longer need fixed ports free.
 
 - Shared Oxlint correctness checks now block CI errors while style warnings remain advisory. Removed dead bindings, preserved deliberate collection snapshots and documented precise exceptions for aggregation fields, test probes, control-character rejection and model method bindings.

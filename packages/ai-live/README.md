@@ -15,6 +15,7 @@ import "@warlock.js/ai-live"; // side-effect: lights up ai.realtime + ai.video
 ## What it gives you
 
 ### `ai.realtime(options)` — duplex realtime voice sessions
+
 A **stateful, bidirectional voice session** (OpenAI Realtime-class): stream
 microphone audio in, stream synthesized audio + transcripts + tool-calls out,
 with barge-in. Unlike every other `ai.*` verb (one-shot request → result), this
@@ -25,7 +26,7 @@ endpoint), push audio, and consume an async event stream until you `close()` it
 
 ```ts
 const session = await ai.realtime({
-  transport: openAiRealtime({ apiKey }),   // provider transport (own adapter)
+  transport: openAiRealtime({ apiKey }), // provider transport (own adapter)
   model: "gpt-realtime",
   voice: "alloy",
   instructions: "You are a friendly phone receptionist.",
@@ -40,6 +41,7 @@ const report = await session.close();
 ```
 
 ### `ai.video(params)` — text-to-video generation
+
 Prompt → video (Sora / Veo / Kling-class). Generation is **async** (submit →
 poll), but the adapter hides the polling, so the verb returns the same uniform
 never-throws `{ data, error, usage, report }` envelope as `ai.image`, with
@@ -60,8 +62,8 @@ if (!error) download(data.video); // { type: "url" | "base64", ... }
 - **Heavy / optional deps.** Realtime needs a WebSocket transport (`ws` is an
   optional peer); video pulls long-poll + large-payload handling. Most apps
   using text/image/speech shouldn't carry that weight.
-- **Different shape.** `ai.realtime` is a *session*, not a request; `ai.video`
-  is a *long job*. Isolating them keeps the core verbs simple and synchronous.
+- **Different shape.** `ai.realtime` is a _session_, not a request; `ai.video`
+  is a _long job_. Isolating them keeps the core verbs simple and synchronous.
 - **Same contracts.** Both still produce a `BaseReport` (`type: "realtime"` /
   `"video"`) and route through the shared `observe` seam, so panoptic and the
   cost tree pick them up for free.

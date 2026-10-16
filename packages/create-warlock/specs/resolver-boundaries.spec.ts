@@ -28,9 +28,12 @@ afterEach(() => {
 describe("resolver publication boundaries", () => {
   it("allows tsconfig paths and Vite/Vitest aliases inside the package", () => {
     const root = fixture({
-      "tsconfig.json": JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "app/*": ["src/*"] } } }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { baseUrl: ".", paths: { "app/*": ["src/*"] } },
+      }),
       "vite.config.ts": 'export default { resolve: { alias: { app: "./src" } } };',
-      "vitest.config.ts": 'export default { resolve: { alias: [{ find: "app", replacement: "./src" }] } };',
+      "vitest.config.ts":
+        'export default { resolve: { alias: [{ find: "app", replacement: "./src" }] } };',
       "src/index.ts": "export {};",
     });
 
@@ -39,7 +42,9 @@ describe("resolver publication boundaries", () => {
 
   it("rejects a tsconfig path that escapes the independently published package", () => {
     const root = fixture({
-      "tsconfig.json": JSON.stringify({ compilerOptions: { paths: { "shared/*": ["../sibling/*"] } } }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { paths: { "shared/*": ["../sibling/*"] } },
+      }),
     });
 
     expect(findResolverBoundaryViolations(root)).toMatchObject([{ kind: "tsconfig paths" }]);
@@ -48,7 +53,8 @@ describe("resolver publication boundaries", () => {
   it("rejects Vite and Vitest aliases that escape the independently published package", () => {
     const root = fixture({
       "vite.config.ts": 'export default { resolve: { alias: { sibling: "../sibling" } } };',
-      "vitest.config.ts": 'export default { resolve: { alias: [{ find: "sibling", replacement: "../sibling" }] } };',
+      "vitest.config.ts":
+        'export default { resolve: { alias: [{ find: "sibling", replacement: "../sibling" }] } };',
     });
 
     const violations = findResolverBoundaryViolations(root);
@@ -56,8 +62,14 @@ describe("resolver publication boundaries", () => {
     expect(violations).toHaveLength(2);
     expect(violations).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ configFile: path.join(root, "vite.config.ts"), kind: "Vite/Vitest alias" }),
-        expect.objectContaining({ configFile: path.join(root, "vitest.config.ts"), kind: "Vite/Vitest alias" }),
+        expect.objectContaining({
+          configFile: path.join(root, "vite.config.ts"),
+          kind: "Vite/Vitest alias",
+        }),
+        expect.objectContaining({
+          configFile: path.join(root, "vitest.config.ts"),
+          kind: "Vite/Vitest alias",
+        }),
       ]),
     );
   });

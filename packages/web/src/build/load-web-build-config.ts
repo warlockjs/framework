@@ -90,7 +90,10 @@ export async function loadWebBuildConfig(appRoot: string): Promise<WebBuildConfi
   });
 
   const bundleDirectory = path.join(appRoot, ".warlock");
-  const bundleFile = path.join(bundleDirectory, `web-build-config.${process.pid}.${Date.now()}.mjs`);
+  const bundleFile = path.join(
+    bundleDirectory,
+    `web-build-config.${process.pid}.${Date.now()}.mjs`,
+  );
 
   await mkdir(bundleDirectory, { recursive: true });
   await writeFile(bundleFile, result.outputFiles[0]!.text, "utf8");

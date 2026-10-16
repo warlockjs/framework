@@ -16,8 +16,7 @@ const configStore: Record<string, unknown> = {};
 
 vi.mock("@mongez/config", () => ({
   default: {
-    get: (key: string, fallback?: unknown) =>
-      key in configStore ? configStore[key] : fallback,
+    get: (key: string, fallback?: unknown) => (key in configStore ? configStore[key] : fallback),
   },
 }));
 
@@ -69,11 +68,7 @@ function makeRequest(seed: {
   };
 }
 
-function makeResponse(seed: {
-  statusCode?: number;
-  contentType?: unknown;
-  parsedBody?: unknown;
-}) {
+function makeResponse(seed: { statusCode?: number; contentType?: unknown; parsedBody?: unknown }) {
   const sentCallbacks: SentCallback[] = [];
 
   const response = {
@@ -109,9 +104,8 @@ describe("idempotencyMiddleware", () => {
     cacheStore.set.mockReset();
     logError.mockReset();
     cacheStore.set.mockResolvedValue(undefined);
-    ({ idempotencyMiddleware } = await import(
-      "../../../src/http/middleware/idempotency.middleware"
-    ));
+    ({ idempotencyMiddleware } =
+      await import("../../../src/http/middleware/idempotency.middleware"));
   });
 
   afterEach(() => {

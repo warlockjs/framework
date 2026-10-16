@@ -45,13 +45,21 @@ function formFields(schema: OpenApiSchema, components: SchemaComponents): Postma
       return [];
     }
 
-    const description = typeof property.description === "string" ? { description: property.description } : {};
+    const description =
+      typeof property.description === "string" ? { description: property.description } : {};
 
     if (isFileSchema(property, components)) {
       return [{ key, type: "file", src: [], ...description }];
     }
 
-    return [{ key, value: stringifyValue(exampleFromSchema(property, components)), type: "text", ...description }];
+    return [
+      {
+        key,
+        value: stringifyValue(exampleFromSchema(property, components)),
+        type: "text",
+        ...description,
+      },
+    ];
   });
 }
 

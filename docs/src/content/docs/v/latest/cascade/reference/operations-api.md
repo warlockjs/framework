@@ -7,11 +7,12 @@ sidebar:
 
 This page documents every function in Cascade's Operations API — the public seam that both warlock-core's CLI and Cascade's standalone `cascade` binary call into. Each function is a thin, named entry over the underlying `migrationRunner` singleton or `dataSourceRegistry` lookup, picked to expose stable verbs that survive runner-internal refactors.
 
-For the *why* and when to use this vs the raw runner, see the [CLI guide](../cli/cli.md).
+For the _why_ and when to use this vs the raw runner, see the [CLI guide](../cli/cli.md).
 
 :::info — How method blocks are organised
 
 Each function shows:
+
 - **Signature** — the TypeScript signature
 - **What it does** — one paragraph
 - **Returns** — the resolved value shape
@@ -54,9 +55,9 @@ rollbackMigrations(options?: {
 **Returns.** `MigrationResult[]` with `direction: "down"`.
 
 ```ts
-await rollbackMigrations();                  // last batch
-await rollbackMigrations({ batches: 3 });    // last three batches
-await rollbackMigrations({ all: true });     // everything
+await rollbackMigrations(); // last batch
+await rollbackMigrations({ batches: 3 }); // last three batches
+await rollbackMigrations({ all: true }); // everything
 ```
 
 ### `freshMigrate()`

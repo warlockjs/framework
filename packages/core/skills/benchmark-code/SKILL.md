@@ -15,15 +15,15 @@ import { measure } from "@warlock.js/core";
 const result = await measure("db.findUser", () => db.users.findOne({ id }));
 
 if (result.success) {
-  console.log(result.value);          // T
-  console.log(result.latency);        // ms
-  console.log(result.state);          // "excellent" | "good" | "poor"
+  console.log(result.value); // T
+  console.log(result.latency); // ms
+  console.log(result.state); // "excellent" | "good" | "poor"
 } else {
   console.error(result.error);
 }
 ```
 
-`measure()` always *returns* — it never re-throws. The return type is `BenchmarkSuccessResult<T> | BenchmarkErrorResult`, discriminated by `result.success`. The one exception: `shouldBenchmarkError` returning false re-throws (see below).
+`measure()` always _returns_ — it never re-throws. The return type is `BenchmarkSuccessResult<T> | BenchmarkErrorResult`, discriminated by `result.success`. The one exception: `shouldBenchmarkError` returning false re-throws (see below).
 
 ## `BenchmarkResult` — what you get back
 
@@ -89,7 +89,7 @@ await measure("http.outbound", () => fetch(url), {
 
 ## Selective error capture — `shouldBenchmarkError`
 
-Business errors (4xx, validation) are not infrastructure problems and shouldn't pollute your latency stats. Return `false` to *re-throw* the error without producing a benchmark result:
+Business errors (4xx, validation) are not infrastructure problems and shouldn't pollute your latency stats. Return `false` to _re-throw_ the error without producing a benchmark result:
 
 ```ts
 await measure("create-user", () => createUser(input), {
@@ -120,17 +120,16 @@ For high-volume operations where you want p50/p95/p99 rather than per-call hooks
 import { BenchmarkProfiler, ConsoleChannel, measure } from "@warlock.js/core";
 
 const profiler = new BenchmarkProfiler({
-  maxSamples: 1000,                  // ring buffer per operation name
-  channels: [new ConsoleChannel()],  // where stats go on flush()
-  flushEvery: 60_000,                // auto-flush every minute
+  maxSamples: 1000, // ring buffer per operation name
+  channels: [new ConsoleChannel()], // where stats go on flush()
+  flushEvery: 60_000, // auto-flush every minute
 });
 
 for (let i = 0; i < 5; i++) {
-  await measure(
-    "db.findUser",
-    () => db.users.findOne({ id: i }),
-    { profiler, latencyRange: { excellent: 50, poor: 300 } },
-  );
+  await measure("db.findUser", () => db.users.findOne({ id: i }), {
+    profiler,
+    latencyRange: { excellent: 50, poor: 300 },
+  });
 }
 
 const stats = profiler.stats("db.findUser");
@@ -166,7 +165,7 @@ import { BenchmarkSnapshots, measure } from "@warlock.js/core";
 
 const snapshots = new BenchmarkSnapshots({
   maxSnapshots: 100,
-  capture: "error",        // "error" (default, safe) | "value" | "all"
+  capture: "error", // "error" (default, safe) | "value" | "all"
 });
 
 await measure("payment.charge", () => stripe.charge(payload), { snapshotContainer: snapshots });
@@ -180,11 +179,7 @@ const failed = snapshots.getSnapshots("payment.charge");
 ## Globals via `src/config/benchmark.ts`
 
 ```ts title="src/config/benchmark.ts"
-import {
-  BenchmarkProfiler,
-  ConsoleChannel,
-  type BenchmarkConfigurations,
-} from "@warlock.js/core";
+import { BenchmarkProfiler, ConsoleChannel, type BenchmarkConfigurations } from "@warlock.js/core";
 
 const benchmarkConfig: BenchmarkConfigurations = {
   enabled: true,
@@ -235,18 +230,16 @@ const result = await measure(
 import { measure } from "@warlock.js/core";
 import { retry } from "@mongez/reinforcements";
 
-await measure("publish-event", () =>
-  retry(() => bus.publish(event), { attempts: 4, delay: 200 }),
-);
+await measure("publish-event", () => retry(() => bus.publish(event), { attempts: 4, delay: 200 }));
 ```
 
-The `latency` is the *total* time including retries — useful for the SLO you actually care about. (`retry` moved to `@mongez/reinforcements`; `count` is now `attempts` — total tries.)
+The `latency` is the _total_ time including retries — useful for the SLO you actually care about. (`retry` moved to `@mongez/reinforcements`; `count` is now `attempts` — total tries.)
 
 ## Gotchas
 
 - **Name collisions aggregate.** Two calls to `measure("foo", …)` share one profiler bucket. Make `name` specific (`db.findUser`, not `db.query`) so percentiles mean something.
 - **`measure()` doesn't propagate AbortSignal.** If `fn` is cancellable, plumb that through yourself — the wrapper only times.
-- **Don't `measure()` synchronous trivia.** A `Math.round` call isn't worth a microsecond of overhead. Reserve for things that *can* be slow.
+- **Don't `measure()` synchronous trivia.** A `Math.round` call isn't worth a microsecond of overhead. Reserve for things that _can_ be slow.
 - **Snapshots with `"value"` retain references.** If `value` holds a request stream or a large buffer, you've kept it in memory until eviction.
 - **`shouldBenchmarkError` re-throws.** Make sure the caller is ready for that, or set it conservatively (`true` by default).
 

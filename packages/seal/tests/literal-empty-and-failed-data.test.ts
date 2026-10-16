@@ -27,7 +27,7 @@ describe("v.literal with an empty-string literal", () => {
   it("does not report a present empty value as missing", async () => {
     const result = await v.validate(v.object({ alt: v.literal("") }), { alt: "" });
 
-    expect(result.errors.map(e => e.type)).not.toContain("required");
+    expect(result.errors.map((e) => e.type)).not.toContain("required");
   });
 
   it("still rejects a non-empty value", async () => {
@@ -36,7 +36,7 @@ describe("v.literal with an empty-string literal", () => {
     expect(result.isValid).toBe(false);
   });
 
-  it("still rejects a missing key — `\"\"` is a value, not an absence", async () => {
+  it('still rejects a missing key — `""` is a value, not an absence', async () => {
     const result = await v.validate(v.object({ alt: v.literal("") }), {});
 
     expect(result.isValid).toBe(false);

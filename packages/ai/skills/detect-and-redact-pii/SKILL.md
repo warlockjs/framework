@@ -20,13 +20,13 @@ const policy = ai.guardrail({
 
 Scans for these `PiiCategory` values; `detect` narrows the set (default: all). Each pattern is **linear** (anchored, no nested quantifiers) — safe against catastrophic backtracking.
 
-| Category | Matches |
-|---|---|
-| `ssn` | US Social Security numbers |
-| `email` | email addresses |
-| `phone` | phone numbers |
-| `credit-card` | credit-card numbers |
-| `ipv4` | IPv4 addresses |
+| Category      | Matches                    |
+| ------------- | -------------------------- |
+| `ssn`         | US Social Security numbers |
+| `email`       | email addresses            |
+| `phone`       | phone numbers              |
+| `credit-card` | credit-card numbers        |
+| `ipv4`        | IPv4 addresses             |
 
 ```ts
 ai.guardrail.pii({ detect: ["ssn", "credit-card"] }); // scan only these two
@@ -70,7 +70,7 @@ So: **redact on output, block on input/tool.**
 ```ts
 const policy = ai.guardrail({
   output: [ai.guardrail.pii({ onMatch: "redact", mask: "[REDACTED:{label}]" })], // scrub the answer
-  tool: [ai.guardrail.pii({ onMatch: "block" })],                                // refuse to leak into tools
+  tool: [ai.guardrail.pii({ onMatch: "block" })], // refuse to leak into tools
   toolNames: ["send_email"],
 });
 ```
@@ -81,9 +81,7 @@ For model-graded content (violence, self-harm, hate) beyond regex, the optional 
 
 ```ts
 const policy = ai.guardrail({
-  output: [
-    ai.guardrail.moderation({ blockOn: ["violence", "self-harm"] }),
-  ],
+  output: [ai.guardrail.moderation({ blockOn: ["violence", "self-harm"] })],
 });
 ```
 

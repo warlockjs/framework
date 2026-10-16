@@ -10,18 +10,11 @@ Two independent execution-control concerns on a single `Job`. They compose clean
 ## `.retry(maxRetries, delay?, backoffMultiplier?)`
 
 ```ts
-job("send-report", sendReport)
-  .daily()
-  .at("08:00")
-  .retry(3);                  // 3 retries, 1000ms apart (default delay)
+job("send-report", sendReport).daily().at("08:00").retry(3); // 3 retries, 1000ms apart (default delay)
 
-job("sync", syncInventory)
-  .everyHour()
-  .retry(5, 2000);             // 5 retries, 2000ms each
+job("sync", syncInventory).everyHour().retry(5, 2000); // 5 retries, 2000ms each
 
-job("queue", processQueue)
-  .everyMinutes(10)
-  .retry(5, 1000, 2);          // exponential: 1s → 2s → 4s → 8s → 16s
+job("queue", processQueue).everyMinutes(10).retry(5, 1000, 2); // exponential: 1s → 2s → 4s → 8s → 16s
 ```
 
 **Signature:** `retry(maxRetries: number, delay = 1000, backoffMultiplier?: number): this`
@@ -46,6 +39,7 @@ scheduler.on("job:error", (name, error) => {
 ```
 
 `JobResult.retries`:
+
 - On **success**: the number of failed attempts before the eventual success (0 if first attempt succeeded).
 - On **failure**: equals the configured `maxRetries` (all of them were used).
 
@@ -68,7 +62,7 @@ To **stop** firing after N consecutive failures, do it in user code:
 
 ```ts
 let consecutiveFailures = 0;
-scheduler.on("job:error", name => {
+scheduler.on("job:error", (name) => {
   if (name !== "flaky") return;
   consecutiveFailures++;
   if (consecutiveFailures >= 5) {
@@ -76,7 +70,7 @@ scheduler.on("job:error", name => {
     alert.critical("flaky disabled after 5 failures");
   }
 });
-scheduler.on("job:complete", name => {
+scheduler.on("job:complete", (name) => {
   if (name === "flaky") consecutiveFailures = 0;
 });
 ```
@@ -86,9 +80,7 @@ scheduler.on("job:complete", name => {
 Tells the scheduler to skip a tick if the job is already running.
 
 ```ts
-job("queue", processQueue)
-  .everyMinutes(5)
-  .preventOverlap();
+job("queue", processQueue).everyMinutes(5).preventOverlap();
 ```
 
 **Important nuance.** The scheduler awaits each tick's jobs before scheduling the next tick — so **concurrent same-job runs from the scheduler's own loop are structurally impossible**, regardless of `preventOverlap()`. Where it actually matters: jobs whose callbacks ALSO get invoked outside the scheduler.
@@ -99,7 +91,7 @@ Real-world shapes that benefit:
 // 1) Boot-time recovery sweep before normal scheduling.
 const queueJob = job("queue", processQueueOnce).everyMinutes(5).preventOverlap();
 scheduler.addJob(queueJob);
-queueJob.run().catch(err => log.error({ err }, "boot sweep failed"));
+queueJob.run().catch((err) => log.error({ err }, "boot sweep failed"));
 scheduler.start();
 
 // 2) Admin-triggered manual re-run from a dashboard endpoint.
@@ -113,6 +105,7 @@ app.post("/admin/jobs/:name/run", async (req, res) => {
 ```
 
 If a tick lands while one of these external runs is mid-flight:
+
 - Scheduler emits `job:skip` with reason `"Job is already running"`
 - The tick proceeds without re-entering the job
 
@@ -123,10 +116,7 @@ For a single-process app where the callback is only ever invoked via the schedul
 They compose cleanly. Retry happens WITHIN one fire — if all retries fail, the tick ends and `nextRun` advances. `preventOverlap` matters only between fires.
 
 ```ts
-job("long-flaky", processQueue)
-  .everyMinutes(5)
-  .preventOverlap()
-  .retry(3, 1000, 2);   // up to 1 + 2 + 4 = 7 s of retry delay per fire
+job("long-flaky", processQueue).everyMinutes(5).preventOverlap().retry(3, 1000, 2); // up to 1 + 2 + 4 = 7 s of retry delay per fire
 ```
 
 If retries push the total work past the next interval, `preventOverlap()` ensures the next scheduled tick skips instead of stacking.

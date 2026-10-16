@@ -46,25 +46,35 @@ Every column starts with a helper imported from `@warlock.js/cascade`. Each retu
 ```ts
 import { string, char, text, mediumText, longText } from "@warlock.js/cascade";
 
-string(50)   // VARCHAR(50), default length 255
-char(3)      // fixed-length CHAR(3)
-text()       // unlimited TEXT
-mediumText() // MEDIUMTEXT
-longText()   // LONGTEXT
+string(50); // VARCHAR(50), default length 255
+char(3); // fixed-length CHAR(3)
+text(); // unlimited TEXT
+mediumText(); // MEDIUMTEXT
+longText(); // LONGTEXT
 ```
 
 **Numbers**
 
 ```ts
-import { integer, int, bigInteger, bigInt, smallInteger, tinyInteger, float, double, decimal } from "@warlock.js/cascade";
+import {
+  integer,
+  int,
+  bigInteger,
+  bigInt,
+  smallInteger,
+  tinyInteger,
+  float,
+  double,
+  decimal,
+} from "@warlock.js/cascade";
 
-integer()       // INTEGER (alias: int)
-bigInteger()    // BIGINT (alias: bigInt)
-smallInteger()  // SMALLINT (alias: smallInt)
-tinyInteger()   // TINYINT (alias: tinyInt)
-float()         // FLOAT
-double()        // DOUBLE
-decimal(10, 2)  // DECIMAL(10,2) — precision, scale (default 8, 2)
+integer(); // INTEGER (alias: int)
+bigInteger(); // BIGINT (alias: bigInt)
+smallInteger(); // SMALLINT (alias: smallInt)
+tinyInteger(); // TINYINT (alias: tinyInt)
+float(); // FLOAT
+double(); // DOUBLE
+decimal(10, 2); // DECIMAL(10,2) — precision, scale (default 8, 2)
 ```
 
 **Booleans, dates, times**
@@ -72,12 +82,12 @@ decimal(10, 2)  // DECIMAL(10,2) — precision, scale (default 8, 2)
 ```ts
 import { bool, boolCol, date, dateTime, timestamp, time, year } from "@warlock.js/cascade";
 
-boolCol()    // BOOLEAN (alias: bool — named to avoid the JS `boolean` clash)
-date()       // DATE
-dateTime()   // DATETIME
-timestamp()  // TIMESTAMP
-time()       // TIME
-year()       // YEAR
+boolCol(); // BOOLEAN (alias: bool — named to avoid the JS `boolean` clash)
+date(); // DATE
+dateTime(); // DATETIME
+timestamp(); // TIMESTAMP
+time(); // TIME
+year(); // YEAR
 ```
 
 **JSON, binary, identifiers**
@@ -85,23 +95,31 @@ year()       // YEAR
 ```ts
 import { json, objectCol, binary, blobCol, uuid, ulid } from "@warlock.js/cascade";
 
-json()      // JSON / JSONB (alias: objectCol)
-binary()    // BINARY / BLOB (alias: blobCol)
-uuid()      // UUID
-ulid()      // ULID
+json(); // JSON / JSONB (alias: objectCol)
+binary(); // BINARY / BLOB (alias: blobCol)
+uuid(); // UUID
+ulid(); // ULID
 ```
 
 **Network, spatial, AI**
 
 ```ts
-import { ipAddress, macAddress, point, polygon, lineString, geometry, vector } from "@warlock.js/cascade";
+import {
+  ipAddress,
+  macAddress,
+  point,
+  polygon,
+  lineString,
+  geometry,
+  vector,
+} from "@warlock.js/cascade";
 
-ipAddress()    // IP address column
-macAddress()   // MAC address column
-point()        // geo point
-polygon()      // polygon
-geometry()     // generic geometry
-vector(1536)   // fixed-dimension vector for AI embeddings
+ipAddress(); // IP address column
+macAddress(); // MAC address column
+point(); // geo point
+polygon(); // polygon
+geometry(); // generic geometry
+vector(1536); // fixed-dimension vector for AI embeddings
 ```
 
 **Enums, sets, Postgres arrays**
@@ -109,12 +127,12 @@ vector(1536)   // fixed-dimension vector for AI embeddings
 ```ts
 import { enumCol, setCol, arrayText, arrayInt, arrayUuid, arrayJson } from "@warlock.js/cascade";
 
-enumCol(["active", "inactive", "pending"])  // ENUM
-setCol(["read", "write", "admin"])          // SET (multi-value)
-arrayText()                                  // TEXT[]   (Postgres)
-arrayInt()                                   // INTEGER[]
-arrayUuid()                                  // UUID[]
-arrayJson()                                  // JSONB[]
+enumCol(["active", "inactive", "pending"]); // ENUM
+setCol(["read", "write", "admin"]); // SET (multi-value)
+arrayText(); // TEXT[]   (Postgres)
+arrayInt(); // INTEGER[]
+arrayUuid(); // UUID[]
+arrayJson(); // JSONB[]
 ```
 
 The array helpers (`arrayInt`, `arrayBigInt`, `arrayFloat`, `arrayDecimal`, `arrayBoolean`, `arrayText`, `arrayDate`, `arrayTimestamp`, `arrayUuid`, `arrayJson`) are Postgres-native array columns. On MongoDB, an embedded array is just a `json()` field.
@@ -341,7 +359,7 @@ export default Migration.alter(
 );
 ```
 
-`raw` runs before the `up` hook. `up` runs after the declarative definitions are applied. This covers the overwhelming majority of "I need a bit of custom logic" cases — reach for the class form only when the migration is *primarily* imperative.
+`raw` runs before the `up` hook. `up` runs after the declarative definitions are applied. This covers the overwhelming majority of "I need a bit of custom logic" cases — reach for the class form only when the migration is _primarily_ imperative.
 
 ## The class form — the narrow escape hatch
 
@@ -396,7 +414,7 @@ Override per migration when an operation can't be transactional (Postgres `CREAT
 ```ts
 export default Migration.create(
   Product,
-  { /* columns */ },
+  {/* columns */},
   {
     transactional: false,
     index: [{ columns: ["sku"], concurrently: true }],
@@ -421,7 +439,7 @@ Because phase wins, ordering between migrations matters most for statements that
 Two migrations with the same timestamp fall through to the name, so keep timestamps unique when the order between them matters. Override explicitly when generating migrations outside the filename convention:
 
 ```ts
-export default Migration.create(User, { /* ... */ }, { createdAt: "2026-05-16T10:00:00Z" });
+export default Migration.create(User, {/* ... */}, { createdAt: "2026-05-16T10:00:00Z" });
 ```
 
 :::caution[`MM-DD` and `DD-MM` are told apart by a guess]
@@ -433,11 +451,7 @@ The parser decides by whether the first field is greater than 12 — a month can
 `npx cascade migrate` is a thin wrapper over Cascade's **Operations API** — a small set of named functions over the migration runner. For CI scripts, test setup, container init, or any embedded use case, call the API directly:
 
 ```ts
-import {
-  connectToDatabase,
-  migrationRunner,
-  runMigrations,
-} from "@warlock.js/cascade";
+import { connectToDatabase, migrationRunner, runMigrations } from "@warlock.js/cascade";
 import databaseConfig from "./config/database";
 import UserMigration from "./src/app/users/models/user/migrations/05-11-2026_10-00-00-user.migration";
 
@@ -451,15 +465,15 @@ await runMigrations();
 
 Every CLI command maps to one Operations API function:
 
-| CLI | Operations API | What it does |
-| --- | -------------- | ------------ |
-| `npx cascade migrate` | `runMigrations()` | Run every pending migration |
-| `npx cascade migrate:rollback` | `rollbackMigrations()` | Roll back the last batch |
-| `npx cascade migrate:rollback --batches 3` | `rollbackMigrations({ batches: 3 })` | Roll back the last `n` batches |
-| `npx cascade migrate:rollback --all` | `rollbackMigrations({ all: true })` | Roll back everything |
-| `npx cascade migrate -f` | `freshMigrate()` | Roll back everything, then re-run |
-| `npx cascade migrate:list` | `listExecutedMigrations()` | Read the `_migrations` tracking table |
-| `npx cascade migrate --sql` | `exportMigrationsSQL()` | Write `.up.sql` / `.down.sql` files; no DB writes |
+| CLI                                        | Operations API                       | What it does                                      |
+| ------------------------------------------ | ------------------------------------ | ------------------------------------------------- |
+| `npx cascade migrate`                      | `runMigrations()`                    | Run every pending migration                       |
+| `npx cascade migrate:rollback`             | `rollbackMigrations()`               | Roll back the last batch                          |
+| `npx cascade migrate:rollback --batches 3` | `rollbackMigrations({ batches: 3 })` | Roll back the last `n` batches                    |
+| `npx cascade migrate:rollback --all`       | `rollbackMigrations({ all: true })`  | Roll back everything                              |
+| `npx cascade migrate -f`                   | `freshMigrate()`                     | Roll back everything, then re-run                 |
+| `npx cascade migrate:list`                 | `listExecutedMigrations()`           | Read the `_migrations` tracking table             |
+| `npx cascade migrate --sql`                | `exportMigrationsSQL()`              | Write `.up.sql` / `.down.sql` files; no DB writes |
 
 Both the standalone `cascade` binary and warlock-core's CLI consume the same Operations API — one code path, two surfaces. Full signatures, options, and return types: [Operations API reference](../reference/operations-api.md). Standalone-CLI installation and `.env` configuration: [CLI guide](../cli/cli.md).
 
@@ -492,11 +506,15 @@ export default Migration.alter(
 ```ts
 export default Migration.create(
   Order,
-  { /* columns */ },
+  {/* columns */},
   {
     transactional: false, // CONCURRENTLY can't run in a transaction
     index: [
-      { columns: ["customer_id", "status"], name: "idx_orders_customer_status", concurrently: true },
+      {
+        columns: ["customer_id", "status"],
+        name: "idx_orders_customer_status",
+        concurrently: true,
+      },
     ],
   },
 );

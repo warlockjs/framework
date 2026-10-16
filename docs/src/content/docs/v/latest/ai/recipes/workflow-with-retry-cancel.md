@@ -32,12 +32,12 @@ const processDoc = ai.workflow<DocInput>({
         attempts: 4,
         backoff: "exponential",
         // Only retry transient failures; bail fast on permanent ones.
-        retryOn: error => isTransient(error),
+        retryOn: (error) => isTransient(error),
         onRetry: (attempt, error) => {
           console.warn(`ocr retry #${attempt} after`, (error as Error).message);
         },
       },
-      run: async ctx => {
+      run: async (ctx) => {
         const text = await ocrService.read(ctx.input.fileUrl);
         ctx.state.text = text;
       },
@@ -46,9 +46,9 @@ const processDoc = ai.workflow<DocInput>({
     ai.step({
       name: "extract",
       agent: extractor,
-      input: ctx => ({ prompt: `Extract structured fields from:\n\n${ctx.state.text}` }),
-      output: { extract: ctx => ctx.agentResult?.data },
-      after: ctx => {
+      input: (ctx) => ({ prompt: `Extract structured fields from:\n\n${ctx.state.text}` }),
+      output: { extract: (ctx) => ctx.agentResult?.data },
+      after: (ctx) => {
         ctx.state.fields = ctx.steps.extract?.output;
       },
     }),
@@ -78,18 +78,18 @@ const processDocWithCleanup = ai.workflow<DocInput>({
     ai.step({
       name: "ocr",
       retry: { attempts: 4, backoff: "exponential", retryOn: isTransient },
-      before: async ctx => {
+      before: async (ctx) => {
         // Reserve an external processing slot before doing the work.
         ctx.state.reservationId = await reservations.acquire(ctx.input.documentId);
       },
-      run: async ctx => {
+      run: async (ctx) => {
         ctx.state.text = await ocrService.read(ctx.input.fileUrl);
       },
-      after: async ctx => {
+      after: async (ctx) => {
         // Happy path: release the slot once OCR succeeds.
         await reservations.release(ctx.state.reservationId as string);
       },
-      onCancel: async ctx => {
+      onCancel: async (ctx) => {
         // Best-effort cleanup when the run is aborted mid-step. Errors here
         // are swallowed + logged — never rethrown.
         if (ctx.state.reservationId) {
@@ -100,7 +100,7 @@ const processDocWithCleanup = ai.workflow<DocInput>({
     ai.step({
       name: "extract",
       agent: extractor,
-      input: ctx => ({ prompt: `Extract fields from:\n\n${ctx.state.text}` }),
+      input: (ctx) => ({ prompt: `Extract fields from:\n\n${ctx.state.text}` }),
     }),
   ],
 });
@@ -156,4 +156,4 @@ What you observe on cancellation:
 - **`retry` wraps `before → run|agent → output → after` — make every phase in that block idempotent.** A throw in `after` re-runs `before` and `run` on the next attempt. The slot reservation above is acquired in `before` and released in `after`, so a retried attempt re-acquires cleanly.
 - **Cancellation is checked at step boundaries; mid-step abort is best-effort.** A synchronous `run` body that's already executing finishes before the between-step check aborts the workflow. For agent steps the signal is forwarded to the provider, but whether the HTTP call actually stops depends on the adapter.
 - **`onCancel` errors are swallowed and logged, never rethrown.** Treat it as best-effort cleanup, not a place for logic that must succeed. If releasing a resource is critical, also reconcile it out-of-band (a sweeper that releases stale reservations).
-- **A step whose retries are *exhausted* goes through `onFailure` (if defined) or halts the workflow — it does not hit `onCancel`.** `onCancel` is strictly for external abort; `onFailure` is for retry exhaustion. Don't conflate the two.
+- **A step whose retries are _exhausted_ goes through `onFailure` (if defined) or halts the workflow — it does not hit `onCancel`.** `onCancel` is strictly for external abort; `onFailure` is for retry exhaustion. Don't conflate the two.

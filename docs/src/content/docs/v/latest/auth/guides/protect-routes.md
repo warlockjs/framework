@@ -28,11 +28,13 @@ router.get("/feed", feedController, {
 });
 
 router.get("/profile", profileController, {
-  middleware: [authMiddleware("user", {
-    source: "cookie",
-    key: "access_token",
-    redirect: { to: "/login", returnUrlParam: "return_to" },
-  })],
+  middleware: [
+    authMiddleware("user", {
+      source: "cookie",
+      key: "access_token",
+      redirect: { to: "/login", returnUrlParam: "return_to" },
+    }),
+  ],
 });
 ```
 
@@ -41,18 +43,21 @@ classes and no default, it throws during setup instead of guessing. `optional:
 true` permits anonymous continuation only. A presented credential is still
 fully verified and hydrates `request.locals.user` when valid. The legacy
 `authMiddleware("user", "cookie:access_token")` form remains valid.
+
 ## Automatic cookie renewal
 
 Opt in on a route with one allowed user type and both cookie descriptors:
 
 ```ts
 router.get("/account", accountController, {
-  middleware: [authMiddleware("user", {
-    source: "cookie",
-    key: "access_token",
-    refresh: { source: "cookie", key: "refresh_token", overlapMs: 5000 },
-    redirect: { to: "/login", returnUrlParam: "return_to" },
-  })],
+  middleware: [
+    authMiddleware("user", {
+      source: "cookie",
+      key: "access_token",
+      refresh: { source: "cookie", key: "refresh_token", overlapMs: 5000 },
+      redirect: { to: "/login", returnUrlParam: "return_to" },
+    }),
+  ],
 });
 ```
 
@@ -115,7 +120,7 @@ const accountController: RequestHandler = async ({ request, response }) => {
 };
 ```
 
-In a hard-gated controller, `request.locals.user` is guaranteed. With `optional: true`, check it before using it. 
+In a hard-gated controller, `request.locals.user` is guaranteed. With `optional: true`, check it before using it.
 
 ## Route-group protection
 
@@ -151,6 +156,7 @@ active successor pair may be reused during the configured duplicate window
 security tradeoff, not general replay acceptance; later old-token reuse revokes
 the family, and family logout invalidates late cookies. It does not solve
 arbitrary out-of-order HTTP cookie delivery.
+
 ## CSRF Origin check for cookie auth
 
 **New in 5.12.** A cookie-sourced credential can be silently replayed cross-site by a browser (a same-site `GET` redirect chain, or a client that ignores `SameSite`) in a way a header token cannot — nothing but your own JS can attach an `Authorization` header, but a browser attaches cookies automatically. To close that gap, `authMiddleware` automatically runs a CSRF Origin check whenever **both** are true:
@@ -185,7 +191,7 @@ This closes the residual CSRF gap that `SameSite=Lax` alone leaves open for cook
 
 ## Default CSRF-Origin guard (applies with or without `authMiddleware`)
 
-**New in 5.17.** The check above only ever ran inside `authMiddleware("cookie:*")` — a cookie-authenticated write reaching any *other* path (an app-owned optional-auth pattern that reads its own `token` cookie directly, without ever calling `authMiddleware`) was never checked at all.
+**New in 5.17.** The check above only ever ran inside `authMiddleware("cookie:*")` — a cookie-authenticated write reaching any _other_ path (an app-owned optional-auth pattern that reads its own `token` cookie directly, without ever calling `authMiddleware`) was never checked at all.
 
 `@warlock.js/core` now runs the same Origin/Referer check at the earliest HTTP seam, before route middleware and before any app handler, for **every** request where:
 

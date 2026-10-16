@@ -85,12 +85,12 @@ Same `.with(...)` you've already seen. Cascade fetches the pivot rows for this p
 Every pivot mutation hangs off one accessor, `model.pivot(relation)`:
 
 ```ts
-await post.pivot("tags").attach([1, 2, 3]);                       // add (skip already-attached)
+await post.pivot("tags").attach([1, 2, 3]); // add (skip already-attached)
 await post.pivot("tags").attach([4], { addedBy: currentUserId }); // + pivot columns
-await post.pivot("tags").detach([2]);                             // remove specific ids
-await post.pivot("tags").detach();                                // remove ALL
-await post.pivot("tags").sync([1, 3, 5]);                         // replace the whole set
-await post.pivot("tags").toggle([1, 7]);                          // flip each
+await post.pivot("tags").detach([2]); // remove specific ids
+await post.pivot("tags").detach(); // remove ALL
+await post.pivot("tags").sync([1, 3, 5]); // replace the whole set
+await post.pivot("tags").toggle([1, 7]); // flip each
 ```
 
 - **`.attach(ids, pivotData?)`** — inserts pivot rows for any ids not already attached. Existing attachments are left alone (no duplicates). The optional `pivotData` writes extra columns on the pivot row itself (`addedBy`, `addedAt`, `order`, ...).
@@ -100,11 +100,11 @@ await post.pivot("tags").toggle([1, 7]);                          // flip each
 
 `model.pivot(relation)` returns the pivot-operations object for that `@BelongsToMany` relation; passing a non-`@BelongsToMany` relation (e.g. a `@BelongsTo`) throws.
 
-The `.pivot("tags")` qualifier is deliberate. `model.pivot("tags").sync(...)` is a *pivot* set-replace; `Model.sync(Target, field)` is the unrelated [denormalization-embed feature](./sync.md). Routing every pivot op through `model.pivot(relation)` keeps the two `sync`s from ever colliding in autocomplete or review.
+The `.pivot("tags")` qualifier is deliberate. `model.pivot("tags").sync(...)` is a _pivot_ set-replace; `Model.sync(Target, field)` is the unrelated [denormalization-embed feature](./sync.md). Routing every pivot op through `model.pivot(relation)` keeps the two `sync`s from ever colliding in autocomplete or review.
 
 > The standalone `createPivotOperations(model, relation)` is still exported from `@warlock.js/cascade` for code that wants to grab the ops object directly (tests, helpers). `model.pivot(relation)` is the ergonomic front for it — same relationship as `transaction()` to `getDatabaseDriver().transaction()`.
 
-These run direct driver operations against the pivot table — no model lifecycle events fire on `Tag` (because Tag itself isn't being inserted/deleted). If you need events on attachment changes, listen on the `Post` events that *cause* the attachment.
+These run direct driver operations against the pivot table — no model lifecycle events fire on `Tag` (because Tag itself isn't being inserted/deleted). If you need events on attachment changes, listen on the `Post` events that _cause_ the attachment.
 
 ### Extra columns on the pivot
 
@@ -121,15 +121,15 @@ Reading them back is currently a separate query against the pivot table — the 
 
 ## Lazy loading — `model.load(...)`
 
-`.with(...)` loads relations as part of the original query. But sometimes you've already fetched the model, and *now* you want to pull in a relation. `load` is the post-hoc version:
+`.with(...)` loads relations as part of the original query. But sometimes you've already fetched the model, and _now_ you want to pull in a relation. `load` is the post-hoc version:
 
 ```ts
 const user = await User.find(id);
 // ... a hundred lines later, after some branching logic ...
 await user.load("posts", "organization");
 
-console.log(user.posts);         // Post[]
-console.log(user.organization);  // Organization | null
+console.log(user.posts); // Post[]
+console.log(user.organization); // Organization | null
 ```
 
 The model loads its missing relations and attaches them to the instance. Calling `load` for a relation that's already loaded is a no-op (Cascade won't re-fetch unless you tell it to).
@@ -150,24 +150,22 @@ Lazy loading is **bad** when:
 
 ```ts
 const user = await User.query()
-  .with("posts", q => {
-    q.where("isPublished", true)
-     .orderBy("createdAt", "desc")
-     .limit(5);
+  .with("posts", (q) => {
+    q.where("isPublished", true).orderBy("createdAt", "desc").limit(5);
   })
   .find(id);
 ```
 
-Now `user.posts` is *the five most recent published posts*, not every post the user ever wrote. The constraint runs inside the related query, after the foreign-key match.
+Now `user.posts` is _the five most recent published posts_, not every post the user ever wrote. The constraint runs inside the related query, after the foreign-key match.
 
 For multiple relations with different constraints, pass an object:
 
 ```ts
 const user = await User.query()
   .with({
-    posts: q => q.where("isPublished", true),
+    posts: (q) => q.where("isPublished", true),
     organization: true,
-    roles: q => q.orderBy("priority"),
+    roles: (q) => q.orderBy("priority"),
   })
   .find(id);
 ```
@@ -176,10 +174,12 @@ const user = await User.query()
 
 ### Nested constraints
 
-When you nest relations (see "Nested eager loading" below), constraints on the *outer* relation apply at that level — they don't cascade:
+When you nest relations (see "Nested eager loading" below), constraints on the _outer_ relation apply at that level — they don't cascade:
 
 ```ts
-User.query().with("posts", q => q.with("comments")).find(id);
+User.query()
+  .with("posts", (q) => q.with("comments"))
+  .find(id);
 // User → posts (constrained how you'd like) → posts.comments (no constraint)
 ```
 
@@ -187,7 +187,7 @@ If you want to constrain the inner relation, pass the constraint at that level:
 
 ```ts
 User.query()
-  .with("posts", q => q.with("comments", c => c.where("approved", true)))
+  .with("posts", (q) => q.with("comments", (c) => c.where("approved", true)))
   .find(id);
 ```
 
@@ -209,7 +209,7 @@ Same shape works with constraints:
 ```ts
 User.query()
   .with({
-    "posts.comments": q => q.where("approved", true),
+    "posts.comments": (q) => q.where("approved", true),
   })
   .find(id);
 ```
@@ -270,15 +270,15 @@ It's a few lines of code; baking polymorphism into the framework adds complexity
 
 Both load related data. They make different tradeoffs:
 
-| Aspect                          | `.with()`                              | `.joinWith()`                          |
-| ------------------------------- | -------------------------------------- | -------------------------------------- |
-| Query count                     | 1 + N (one per relation)               | 1 (single query with JOIN / `$lookup`) |
-| Hydrates to model instances     | ✅ Always                              | ✅ Always                              |
-| Best for `belongsTo` / `hasOne` | ✅ Fine                                | ✅ Often better — fewer round-trips    |
+| Aspect                          | `.with()`                               | `.joinWith()`                          |
+| ------------------------------- | --------------------------------------- | -------------------------------------- |
+| Query count                     | 1 + N (one per relation)                | 1 (single query with JOIN / `$lookup`) |
+| Hydrates to model instances     | ✅ Always                               | ✅ Always                              |
+| Best for `belongsTo` / `hasOne` | ✅ Fine                                 | ✅ Often better — fewer round-trips    |
 | Best for `hasMany`              | ✅ Better — JOIN duplicates parent rows | ❌ Avoid — Cartesian explosion         |
 | Best for `belongsToMany`        | ✅ Better — pivot indirection           | ❌ Not supported the same way          |
-| Per-relation constraints        | ✅ Full callback support               | Limited                                |
-| Cross-table filters             | ❌ Filter is on the related query only | ✅ Can `.where()` on joined columns    |
+| Per-relation constraints        | ✅ Full callback support                | Limited                                |
+| Cross-table filters             | ❌ Filter is on the related query only  | ✅ Can `.where()` on joined columns    |
 
 The rule of thumb: **default to `.with()`**. Reach for `.joinWith()` when:
 
@@ -311,7 +311,7 @@ The [Relationships essentials](../the-basics/03-relationships.md) covers this in
 
 ### Foreign-key naming surprises
 
-Cascade infers foreign keys based on the *relation owner's* perspective (see `key-conventions.ts`):
+Cascade infers foreign keys based on the _relation owner's_ perspective (see `key-conventions.ts`):
 
 - `User`'s `@HasMany(Post) public posts` → looks for `user_id` on `posts`.
 - `Post`'s `@BelongsTo(User) public author` → looks for `author_id` on `posts` (named after the **property name** unless customised).
@@ -332,10 +332,12 @@ If `Post` has `@BelongsTo(User) public author` but `User` doesn't have `@HasMany
 
 ### Eager-loading the wrong relation in lists
 
-Eager loading is a *batch* optimisation. If you fetch 1000 users and `.with("posts")`, Cascade pulls every post for those 1000 users into memory. That's correct for typical "show a list with a few posts each" UIs, but if some users have thousands of posts each, the working set blows up. Use a constraint:
+Eager loading is a _batch_ optimisation. If you fetch 1000 users and `.with("posts")`, Cascade pulls every post for those 1000 users into memory. That's correct for typical "show a list with a few posts each" UIs, but if some users have thousands of posts each, the working set blows up. Use a constraint:
 
 ```ts
-User.query().with("posts", q => q.limit(5)).get();
+User.query()
+  .with("posts", (q) => q.limit(5))
+  .get();
 ```
 
 Or load relations lazily for the small subset that actually needs them.
@@ -345,4 +347,4 @@ Or load relations lazily for the small subset that actually needs them.
 - **The mental-model section** (four layers: schema → migration → relation → query) — [Relationships essentials](../the-basics/03-relationships.md)
 - **Ad-hoc joins** for cross-table queries without declared relations — [Joins guide](./joins.md)
 - **Eager-load via JOIN** (single-query for `belongsTo` / `hasOne`) — `joinWith` reference: [Query Builder API reference](../reference/query-builder-api.md#joinwithrelations)
-- **Recipes for polymorphic, deep trees, and audit-aware relations** — recipes folder *(planned)*
+- **Recipes for polymorphic, deep trees, and audit-aware relations** — recipes folder _(planned)_

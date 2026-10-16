@@ -83,7 +83,9 @@ export function makeTrace(overrides: MakeTraceOverrides = {}): Trace {
 }
 
 /** Build a child {@link TraceSpan} (e.g. a tool span) for nesting. */
-export function makeSpan(overrides: Partial<TraceSpan> & { spanId: string; traceId: string }): TraceSpan {
+export function makeSpan(
+  overrides: Partial<TraceSpan> & { spanId: string; traceId: string },
+): TraceSpan {
   return {
     name: "tool",
     type: "tool",

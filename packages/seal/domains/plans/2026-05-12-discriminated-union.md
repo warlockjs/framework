@@ -14,7 +14,7 @@ The current `v.union()` ([rules/core/union.ts](../../../@warlock.js/seal/src/rul
 
 ```ts
 const email = v.object({ type: v.literal("email"), email: v.string().email() });
-const sms   = v.object({ type: v.literal("sms"),   phone: v.string() });
+const sms = v.object({ type: v.literal("sms"), phone: v.string() });
 const notif = v.union([email, sms]);
 
 await validate(notif, { type: "sms", phone: "555-1234" });
@@ -135,11 +135,13 @@ export class DiscriminatedUnionValidator<
     if (!isPlainObject(data)) {
       return {
         isValid: false,
-        errors: [{
-          type: "discriminatedUnion",
-          error: `Expected object with discriminator "${this.discriminator}"`,
-          input: context.key || "",
-        }],
+        errors: [
+          {
+            type: "discriminatedUnion",
+            error: `Expected object with discriminator "${this.discriminator}"`,
+            input: context.key || "",
+          },
+        ],
         data: undefined,
       };
     }
@@ -148,14 +150,16 @@ export class DiscriminatedUnionValidator<
     const branch = this.branches.get(discriminatorValue);
 
     if (!branch) {
-      const allowed = [...this.branches.keys()].map(k => String(k)).join(", ");
+      const allowed = [...this.branches.keys()].map((k) => String(k)).join(", ");
       return {
         isValid: false,
-        errors: [{
-          type: "discriminatedUnion",
-          error: `Field "${this.discriminator}" must be one of: ${allowed}`,
-          input: this.discriminator,
-        }],
+        errors: [
+          {
+            type: "discriminatedUnion",
+            error: `Field "${this.discriminator}" must be one of: ${allowed}`,
+            input: this.discriminator,
+          },
+        ],
         data: undefined,
       };
     }
@@ -181,7 +185,7 @@ export class DiscriminatedUnionValidator<
    * openai-strict: same shape but every branch's fields appear in required[]
    */
   public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
-    const oneOf = this.validators.map(v => v.toJsonSchema(target));
+    const oneOf = this.validators.map((v) => v.toJsonSchema(target));
 
     const schema: JsonSchemaResult = { oneOf };
 
@@ -223,8 +227,8 @@ Type inference: `Infer<DiscriminatedUnionValidator<K, [A, B, C]>>` should produc
 
 ```ts
 const email = v.object({ type: v.literal("email"), email: v.string().email() });
-const sms   = v.object({ type: v.literal("sms"),   phone: v.string() });
-const push  = v.object({ type: v.literal("push"),  deviceId: v.string() });
+const sms = v.object({ type: v.literal("sms"), phone: v.string() });
+const push = v.object({ type: v.literal("push"), deviceId: v.string() });
 const notif = v.discriminatedUnion("type", [email, sms, push]);
 
 // 1. Valid branch
@@ -252,30 +256,36 @@ await validate(single, { type: "published", title: "x" });
 // expect: both isValid === true
 
 // 6. Construction-time validation
-expect(() => v.discriminatedUnion("type", [
-  v.object({ type: v.literal("a") }),
-  v.object({ type: v.literal("a") }),  // duplicate
-])).toThrow(/duplicate discriminator value/);
+expect(() =>
+  v.discriminatedUnion("type", [
+    v.object({ type: v.literal("a") }),
+    v.object({ type: v.literal("a") }), // duplicate
+  ]),
+).toThrow(/duplicate discriminator value/);
 
-expect(() => v.discriminatedUnion("type", [
-  v.object({ name: v.string() }),  // missing discriminator
-])).toThrow(/missing discriminator field/);
+expect(() =>
+  v.discriminatedUnion("type", [
+    v.object({ name: v.string() }), // missing discriminator
+  ]),
+).toThrow(/missing discriminator field/);
 
-expect(() => v.discriminatedUnion("type", [
-  v.object({ type: v.string() }),  // not a literal
-])).toThrow(/must be v.literal/);
+expect(() =>
+  v.discriminatedUnion("type", [
+    v.object({ type: v.string() }), // not a literal
+  ]),
+).toThrow(/must be v.literal/);
 ```
 
 ## Decisions to lock with Hasan
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Throw at construction-time for invalid configurations? | **Yes — throw eagerly.** Misconfigured discriminated unions are programmer errors, not user-data errors. Failing at schema-build time means tests catch them immediately. |
-| 2 | Allow non-string discriminator values (`true`, `false`, `1`, `2`)? | **Yes.** Literals accept `string | number | boolean`; restricting to strings is arbitrary. Map handles all three identity-wise. |
-| 3 | What error code/type for failures? | **`discriminatedUnion`.** One canonical name for both "missing discriminator" and "unknown discriminator value" — consumers can switch on it. |
-| 4 | Should `matchesType()` peek at discriminator (for use inside `union`)? | **No, return `isPlainObject` only.** Discriminated unions shouldn't be nested inside regular unions — that's an architectural smell. If users do it, the broader `matchesType` is correct (it's an object); error reporting on the inner branch will still happen via `validate()`. |
-| 5 | JSON Schema $defs / shared-schemas factoring? | **Not v1.** Emit inline `oneOf` for simplicity; large schemas might want $defs later. Defer until someone hits the redundancy. |
-| 6 | Naming: `discriminatedUnion` vs `variant` (Valibot's name) vs `tagged`? | **`discriminatedUnion`.** Matches Zod (the most-recognised name); "variant" sounds Rust-y; "tagged" is jargon. |
+| #   | Question                                                                | Recommendation                                                                                                                                                                                                                                                                      |
+| --- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Throw at construction-time for invalid configurations?                  | **Yes — throw eagerly.** Misconfigured discriminated unions are programmer errors, not user-data errors. Failing at schema-build time means tests catch them immediately.                                                                                                           |
+| 2   | Allow non-string discriminator values (`true`, `false`, `1`, `2`)?      | **Yes.** Literals accept `string                                                                                                                                                                                                                                                    | number | boolean`; restricting to strings is arbitrary. Map handles all three identity-wise. |
+| 3   | What error code/type for failures?                                      | **`discriminatedUnion`.** One canonical name for both "missing discriminator" and "unknown discriminator value" — consumers can switch on it.                                                                                                                                       |
+| 4   | Should `matchesType()` peek at discriminator (for use inside `union`)?  | **No, return `isPlainObject` only.** Discriminated unions shouldn't be nested inside regular unions — that's an architectural smell. If users do it, the broader `matchesType` is correct (it's an object); error reporting on the inner branch will still happen via `validate()`. |
+| 5   | JSON Schema $defs / shared-schemas factoring?                           | **Not v1.** Emit inline `oneOf` for simplicity; large schemas might want $defs later. Defer until someone hits the redundancy.                                                                                                                                                      |
+| 6   | Naming: `discriminatedUnion` vs `variant` (Valibot's name) vs `tagged`? | **`discriminatedUnion`.** Matches Zod (the most-recognised name); "variant" sounds Rust-y; "tagged" is jargon.                                                                                                                                                                      |
 
 ## Risks
 
@@ -298,6 +308,7 @@ Landed in commit `fdc5ce6`.
 **What shipped.** `DiscriminatedUnionValidator<K, Branches>` with a key→branch `Map<string|number|boolean, ObjectValidator>` built eagerly in the constructor via `buildBranchMap()`. Construction-time validation throws on: missing discriminator field, non-`v.literal` discriminator, duplicate literal values across branches. `validate()` peeks at `data[discriminator]`, looks up branch, delegates entirely. Plain non-object input returns one clear error; unknown discriminator value returns "must be one of: …". Clone rebuilds the map from cloned branches (correctness — references would shift). `toJsonSchema()` emits `oneOf` of each branch's own schema; `openai-strict` wraps via `wrapNullableStrict`.
 
 **Decisions locked.** All six decisions adopted as-recommended:
+
 - Eager construction-time throwing
 - Allow string/number/boolean discriminator values
 - Single error code `discriminatedUnion`

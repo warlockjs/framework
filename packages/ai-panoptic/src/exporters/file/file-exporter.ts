@@ -108,9 +108,7 @@ class FileTraceWriter {
    * Lines (exactly one record per physical line).
    */
   private serialize(record: TraceRecord): string {
-    const json = this.pretty
-      ? JSON.stringify(record, undefined, 2)
-      : JSON.stringify(record);
+    const json = this.pretty ? JSON.stringify(record, undefined, 2) : JSON.stringify(record);
 
     return `${json}\n`;
   }

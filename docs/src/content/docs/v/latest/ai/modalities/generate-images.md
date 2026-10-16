@@ -53,9 +53,9 @@ Every AI verb returns the same discriminated envelope. For images:
 type ImageResult = {
   type: "image";
   data?: { images: GeneratedImage[] }; // undefined on failure
-  error?: AIError;                     // undefined on success — NEVER thrown
-  usage: Usage;                        // tokens (gpt-image) + cost when priced
-  report: ImageReport;                 // type:"image", model, imageCount, lineage
+  error?: AIError; // undefined on success — NEVER thrown
+  usage: Usage; // tokens (gpt-image) + cost when priced
+  report: ImageReport; // type:"image", model, imageCount, lineage
 };
 
 type GeneratedImage =
@@ -73,14 +73,14 @@ The options are provider-neutral. Each adapter maps the ones its API supports an
 await ai.image({
   model,
   prompt: "an isometric office desk, soft studio lighting",
-  count: 2,             // n images
-  size: "1024x1024",    // OpenAI WxH (also resolves per-size pricing)
-  quality: "high",      // OpenAI quality tier
-  aspectRatio: "16:9",  // Imagen ratio
+  count: 2, // n images
+  size: "1024x1024", // OpenAI WxH (also resolves per-size pricing)
+  quality: "high", // OpenAI quality tier
+  aspectRatio: "16:9", // Imagen ratio
   negativePrompt: "blurry, watermark", // Imagen
-  format: "png",        // output container hint
-  signal,               // AbortSignal
-  observe: collector,   // route the report to an Observer
+  format: "png", // output container hint
+  signal, // AbortSignal
+  observe: collector, // route the report to an Observer
   sessionId: "checkout-123",
   options: { background: "transparent" }, // provider-specific passthrough
 });
@@ -136,7 +136,7 @@ Like every adapter, Google does **not** guard the model id: the id selects a rou
 No test calls the live API, so the evidence comes in two tiers. **Measured here:** a `gemini-*` image id that returns `404 … is not supported for predict` on the Imagen transport reached the model on `generateContent` and came back with a quota error (HTTP 429) — the endpoint accepts the id. **Reported by the maintainer:** with billing enabled on the project, an image came back end-to-end from an application running a locally linked build. **Still unknown:** whether these models report token usage — no `usageMetadata` from a successful image call has been seen, so verify `usage` against your own model before relying on `{ input, output }` pricing.
 :::
 
-Google has **deprecated `generateImages`**, the transport behind the `imagen-*` path: *"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead."* Nothing breaks today, but prefer a `gemini-` id for new work.
+Google has **deprecated `generateImages`**, the transport behind the `imagen-*` path: _"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead."_ Nothing breaks today, but prefer a `gemini-` id for new work.
 
 ## Cost-truth — one rollup, two metering models
 

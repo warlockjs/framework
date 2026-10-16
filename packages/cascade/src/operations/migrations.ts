@@ -78,9 +78,7 @@ export async function freshMigrate(): Promise<MigrationResult[]> {
  * await exportMigrationsSQL();
  * await exportMigrationsSQL({ pendingOnly: true, compact: true });
  */
-export async function exportMigrationsSQL(
-  options: ExportMigrationsSQLOptions = {},
-): Promise<void> {
+export async function exportMigrationsSQL(options: ExportMigrationsSQLOptions = {}): Promise<void> {
   return migrationRunner.exportSQL(options);
 }
 

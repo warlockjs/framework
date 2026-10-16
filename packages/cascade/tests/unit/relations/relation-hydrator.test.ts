@@ -11,14 +11,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { Model } from "../../../src/model/model";
-import {
-  cleanupModelsRegistery,
-  registerModelInRegistry,
-} from "../../../src/model/register-model";
-import {
-  RelationHydrator,
-  type ModelSnapshot,
-} from "../../../src/relations/relation-hydrator";
+import { cleanupModelsRegistery, registerModelInRegistry } from "../../../src/model/register-model";
+import { RelationHydrator, type ModelSnapshot } from "../../../src/relations/relation-hydrator";
 import type { RelationDefinition } from "../../../src/relations/types";
 import { createMockDriver } from "../../utils/test-helpers";
 

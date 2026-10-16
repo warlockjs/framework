@@ -1117,9 +1117,7 @@ describe("proof 12 — every setup attempt is bounded by `tests.setupTimeout`", 
 
     const { setupTest } = await importFreshLifecycle();
 
-    await expect(setupTest({ connectors: true })).rejects.toThrow(
-      /did not finish within 500ms/,
-    );
+    await expect(setupTest({ connectors: true })).rejects.toThrow(/did not finish within 500ms/);
 
     // No second entry: an exceeded bound fires, it is not rescheduled for time
     // the attempt has already burned.

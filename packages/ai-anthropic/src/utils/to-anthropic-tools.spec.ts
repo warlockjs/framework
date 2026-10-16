@@ -7,7 +7,10 @@ import { toAnthropicTools } from "./to-anthropic-tools";
  * a fixed JSON Schema — enough for `extractJsonSchema` to resolve a
  * real object schema without pulling in a schema library.
  */
-function schemaTool(name: string, jsonSchema: Record<string, unknown>): ToolConfig<unknown, unknown> {
+function schemaTool(
+  name: string,
+  jsonSchema: Record<string, unknown>,
+): ToolConfig<unknown, unknown> {
   return {
     name,
     description: `${name} tool`,

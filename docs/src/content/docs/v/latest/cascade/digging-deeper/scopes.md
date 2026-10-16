@@ -25,11 +25,11 @@ export class User extends Model<UserSchema> {
 
   static {
     // Global scopes — applied to every User query
-    this.addGlobalScope("notDeleted", q => q.whereNull("deletedAt"));
+    this.addGlobalScope("notDeleted", (q) => q.whereNull("deletedAt"));
 
     // Local scopes — opt-in by name
-    this.addScope("active", q => q.where("status", "active"));
-    this.addScope("admins", q => q.where("role", "admin"));
+    this.addScope("active", (q) => q.where("status", "active"));
+    this.addScope("admins", (q) => q.where("role", "admin"));
   }
 }
 ```
@@ -61,16 +61,16 @@ If the scope depends on request context (current tenant, current user), the call
 ```ts
 User.addGlobalScope(
   "tenant",
-  query => query.where("tenantId", tenantId),
+  (query) => query.where("tenantId", tenantId),
   { timing: "before" }, // default
 );
 ```
 
-`timing` controls whether the scope's where-clauses are added *before* the user's query operations or *after*. Default is `"before"`. Most scopes don't care — `before` is the right choice unless you specifically need your filter to run after the query has had its other where-clauses applied.
+`timing` controls whether the scope's where-clauses are added _before_ the user's query operations or _after_. Default is `"before"`. Most scopes don't care — `before` is the right choice unless you specifically need your filter to run after the query has had its other where-clauses applied.
 
 ### Disabling global scopes
 
-Sometimes you need the unfiltered view — an admin page that *should* see soft-deleted rows, a cross-tenant report. Two methods:
+Sometimes you need the unfiltered view — an admin page that _should_ see soft-deleted rows, a cross-tenant report. Two methods:
 
 ```ts
 // Disable a specific scope:
@@ -95,7 +95,7 @@ Rare in app code, useful in tests where you want to assert against unscoped data
 
 ## Local scopes
 
-Local scopes are *named*, *opt-in* query fragments. Declare them in the same `static {}` block:
+Local scopes are _named_, _opt-in_ query fragments. Declare them in the same `static {}` block:
 
 ```ts
 static {
@@ -114,7 +114,7 @@ Local scopes don't run automatically. You opt in per query.
 
 Two reasons local scopes earn their keep:
 
-1. **Naming.** `User.query().scope("activeAdmins")` is the same query as a four-method chain, but the name documents *intent* — your controllers read closer to English.
+1. **Naming.** `User.query().scope("activeAdmins")` is the same query as a four-method chain, but the name documents _intent_ — your controllers read closer to English.
 2. **Reuse.** The same definition lives in one place. When the definition of "active" changes from `status === 'active'` to `status === 'active' AND deletedAt IS NULL`, you update the scope, not every caller.
 
 ### Scopes with arguments
@@ -154,14 +154,14 @@ Order matters for `where`s vs `orWhere`s (as it does in any query builder), but 
 
 ## When to reach for each
 
-| Situation                                                | Use            |
-| -------------------------------------------------------- | -------------- |
-| Tenant isolation across the entire app                   | Global scope   |
-| Soft-delete filtering ("hide `deletedAt != null`")       | Global scope   |
-| "Active records by default" for a model with status flags| Global scope   |
-| Named filters reused in many places                      | Local scope    |
-| Query fragment with parameters                           | Local scope    |
-| A one-off filter only used in one controller             | Inline `.where()` — no scope needed |
+| Situation                                                 | Use                                 |
+| --------------------------------------------------------- | ----------------------------------- |
+| Tenant isolation across the entire app                    | Global scope                        |
+| Soft-delete filtering ("hide `deletedAt != null`")        | Global scope                        |
+| "Active records by default" for a model with status flags | Global scope                        |
+| Named filters reused in many places                       | Local scope                         |
+| Query fragment with parameters                            | Local scope                         |
+| A one-off filter only used in one controller              | Inline `.where()` — no scope needed |
 
 ## Common patterns
 
@@ -175,7 +175,7 @@ export class Post extends Model<PostSchema> {
   public static deleteStrategy = "soft";
 
   static {
-    this.addGlobalScope("notDeleted", q => q.whereNull("deletedAt"));
+    this.addGlobalScope("notDeleted", (q) => q.whereNull("deletedAt"));
   }
 }
 
@@ -207,7 +207,7 @@ When you want to apply a scope only conditionally, pair `.scope()` with `.when()
 ```ts
 const search = (filters: { onlyActive?: boolean }) =>
   User.query()
-    .when(filters.onlyActive, q => q.scope("active"))
+    .when(filters.onlyActive, (q) => q.scope("active"))
     .get();
 ```
 

@@ -109,9 +109,7 @@ describe("ownResolve — relative & absolute imports", () => {
 describe("ownResolve — tsconfig paths aliases", () => {
   it("probes each alias candidate and returns the first that exists", () => {
     const matcher = (specifier: string) =>
-      specifier === "app/users/user.model"
-        ? ["/proj/src/app/users/user.model"]
-        : [];
+      specifier === "app/users/user.model" ? ["/proj/src/app/users/user.model"] : [];
     const fileExists = fsWith("/proj/src/app/users/user.model.ts");
 
     const resolved = ownResolve("app/users/user.model", "file:///proj/a.ts", matcher, fileExists);

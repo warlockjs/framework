@@ -11,11 +11,11 @@ Cascade declares relations with **native** decorators — `@RegisterModel`, `@Be
 SyntaxError: Invalid or unexpected token
 ```
 
-The cause is two transforms that don't understand each other. Vite 8 transpiles `.ts` with **oxc**, which only lowers *legacy* (`experimentalDecorators`) decorators — it leaves native ones in place. Then Vite's SSR `moduleRunnerTransform` rewrites the decorator's imported name into `@(0, __vite_ssr_import__.RegisterModel)()` — which is no longer valid decorator syntax. V8 throws on the first decorated model it evaluates, and your whole suite is dead before a single test runs.
+The cause is two transforms that don't understand each other. Vite 8 transpiles `.ts` with **oxc**, which only lowers _legacy_ (`experimentalDecorators`) decorators — it leaves native ones in place. Then Vite's SSR `moduleRunnerTransform` rewrites the decorator's imported name into `@(0, __vite_ssr_import__.RegisterModel)()` — which is no longer valid decorator syntax. V8 throws on the first decorated model it evaluates, and your whole suite is dead before a single test runs.
 
-`lowerStage3Decorators()` fixes it by getting **esbuild** to lower the decorators *first*.
+`lowerStage3Decorators()` fixes it by getting **esbuild** to lower the decorators _first_.
 
-⚠ **Changed in 4.13.0 — the import is a subpath now.** The plugin used to be re-exported from the package root; it is not any more, because that put the Vite integration into every application's production module graph. `import { lowerStage3Decorators } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/vite` to the specifier and nothing else changes.**
+⚠ **Changed in 4.13.0 — the import is a subpath now.** The plugin used to be re-exported from the package root; it is not any more, because that put the Vite integration into every application's production module graph. `import { lowerStage3Decorators } from "@warlock.js/core"` now fails with _"has no exported member"_ — **add `/vite` to the specifier and nothing else changes.**
 
 ## Use it
 
@@ -45,7 +45,7 @@ It's the **same esbuild transform the production `tsx`/build path uses**, so a f
 
 ## Things NOT to do
 
-- **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower *legacy* decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.
+- **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower _legacy_ decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.
 - **Don't put it after `@mongez/vite`** — it must run `pre`, before any other transform. Keep it first.
 - **Don't set `experimentalDecorators: true`** anywhere in the test tsconfig — Cascade's decorators are native (Stage-3), not legacy. Legacy mode changes their call signature and breaks `context.kind` / `context.metadata`.
 

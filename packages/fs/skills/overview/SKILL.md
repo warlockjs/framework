@@ -76,7 +76,7 @@ Load when you want the grouped/OO surface, a read-modify-write (patch a file or 
 
 ## What this package deliberately doesn't do
 
-- **Globbing.** Use `tinyglobby` / `fast-glob`. Adding a glob engine here would double the surface for one use case. (Recursive listing/traversal *is* covered — `fs.dirs.walk` and `fs.dirs.list*({ recursive })`.)
+- **Globbing.** Use `tinyglobby` / `fast-glob`. Adding a glob engine here would double the surface for one use case. (Recursive listing/traversal _is_ covered — `fs.dirs.walk` and `fs.dirs.list*({ recursive })`.)
 - **Watching.** Use `chokidar` or `node:fs.watch` directly. Watchers have their own lifecycle that doesn't fit the one-shot utility shape.
 - **Permissions / chmod / chown.** Out of scope. Reach for `node:fs/promises`'s `chmod` / `chown` directly when you need them.
 - **Streaming pipelines beyond hashing.** This isn't a general streams library; it's a wrapper for the common one-shot file operations.

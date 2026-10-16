@@ -7,11 +7,11 @@ description: 'Test a Warlock page with Vitest: call a page `loader` and a page `
 
 A page is three plain things, and each is tested at the cheapest level that covers it:
 
-| What | How | Needs a server? |
-| --- | --- | --- |
-| `loader` and `action` | Call the exported function with a small fake context, mock the service it calls | No |
-| The page component | `renderToString` it inside `LocaleProvider` with the `data` the loader would return | No |
-| The whole route (middleware, validation, document) | `testGet` against the real test server | Yes |
+| What                                               | How                                                                                 | Needs a server? |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------- |
+| `loader` and `action`                              | Call the exported function with a small fake context, mock the service it calls     | No              |
+| The page component                                 | `renderToString` it inside `LocaleProvider` with the `data` the loader would return | No              |
+| The whole route (middleware, validation, document) | `testGet` against the real test server                                              | Yes             |
 
 The first two are fast, need no database and no running app. Reach for the third only for what they cannot see.
 
@@ -42,6 +42,7 @@ Two consequences for page specs:
   ```
 
   Run it with `vitest run --config vitest.web.config.ts`. If a page imports through the `app/...` or `web/...` path aliases, give this config the same `plugins` as `vite.config.ts`; the specs below use relative imports only.
+
 - **JSX needs the tsconfig.** The generated `tsconfig.json` has `"jsx": "react-jsx"` and `include: ["src", ...]`. A spec outside `src/` is transformed with the classic JSX runtime and fails with `React is not defined`; keep specs under `src/`.
 
 ## The page under test

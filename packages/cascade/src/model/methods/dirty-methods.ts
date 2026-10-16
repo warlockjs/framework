@@ -8,7 +8,9 @@ export function checkIsDirty(model: Model, column: string): boolean {
   return model.dirtyTracker.isDirty(column);
 }
 
-export function getDirtyColumnsWithValues(model: Model): Record<string, { oldValue: unknown; newValue: unknown }> {
+export function getDirtyColumnsWithValues(
+  model: Model,
+): Record<string, { oldValue: unknown; newValue: unknown }> {
   return model.dirtyTracker.getDirtyColumnsWithValues();
 }
 

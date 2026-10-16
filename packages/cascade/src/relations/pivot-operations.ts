@@ -285,8 +285,7 @@ export class PivotOperations {
     const conventions = this.relationDefaults;
     const relatedModelName = resolveModelName(this.definition.model);
     const pivotTable =
-      this.definition.pivot ??
-      inferPivotTable(this.modelClass.name, relatedModelName, conventions);
+      this.definition.pivot ?? inferPivotTable(this.modelClass.name, relatedModelName, conventions);
     const RelatedModel = resolveModelClass(this.definition.model);
     const localKey = this.definition.pivotLocalKey ?? this.modelClass.primaryKey ?? "id";
     const pivotLocalKey =
@@ -330,7 +329,6 @@ export class PivotOperations {
 
     return ids;
   }
-
 }
 
 // ============================================================================

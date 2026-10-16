@@ -23,7 +23,7 @@ npm install @warlock.js/scheduler
 - **Per-job timezone** — pin a job to an IANA timezone; DST handled automatically
 - **Typed events** — `job:start` / `job:complete` / `job:error` / `job:skip` / `scheduler:tick` / `scheduler:started` / `scheduler:stopped`
 - **Graceful shutdown** — wait for in-flight jobs with a configurable timeout
-- **Drift-compensated ticks** — the cadence between tick *starts* stays close to the configured interval, not `interval + work-time`
+- **Drift-compensated ticks** — the cadence between tick _starts_ stays close to the configured interval, not `interval + work-time`
 
 ## 30-line example
 
@@ -49,9 +49,7 @@ scheduler.addJob(
     .retry(3, 1000),
 );
 
-scheduler.addJob(
-  job("heartbeat", pingExternalService).everyMinutes(5),
-);
+scheduler.addJob(job("heartbeat", pingExternalService).everyMinutes(5));
 
 scheduler.start();
 

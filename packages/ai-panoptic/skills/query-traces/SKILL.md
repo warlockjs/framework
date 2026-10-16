@@ -5,7 +5,7 @@ description: 'Retain @warlock.js/ai-panoptic traces in a queryable store — in-
 
 # Query traces — the in-memory queryable store
 
-The collector fans every completed `Trace` out to its exporters. A **trace store** is one such sink that *retains* traces so you can answer observability questions after the fact: pull one run by id, list every run for a session, slice failed runs in a time window, or roll usage + cost across any of those slices.
+The collector fans every completed `Trace` out to its exporters. A **trace store** is one such sink that _retains_ traces so you can answer observability questions after the fact: pull one run by id, list every run for a session, slice failed runs in a time window, or roll usage + cost across any of those slices.
 
 `createInMemoryTraceStore()` returns an object that satisfies **both** `TraceStoreContract` and `ExporterContract` — so wiring it into a collector is a single `collector.use(store)` and the store fills as traces complete.
 
@@ -35,12 +35,12 @@ const spend = store.aggregate({ sessionId: "session-42" });
 
 ```ts
 interface TraceStoreContract {
-  add(trace: Trace): void;                 // ingest; overwrites same traceId
+  add(trace: Trace): void; // ingest; overwrites same traceId
   get(traceId: string): Trace | undefined; // one run by id
-  query(filter?: TraceQuery): Trace[];     // matching traces, newest-started first
+  query(filter?: TraceQuery): Trace[]; // matching traces, newest-started first
   aggregate(filter?: TraceQuery): TraceAggregate; // usage + cost + status rollup
-  readonly size: number;                   // retained count
-  clear(): void;                           // drop everything
+  readonly size: number; // retained count
+  clear(): void; // drop everything
 }
 ```
 
@@ -54,11 +54,11 @@ Every field is optional and **ANDed** together — an absent field is "don't car
 
 ```ts
 type TraceQuery = {
-  traceId?: string;                         // exact one run
-  sessionId?: string;                       // every run for a session
-  status?: ReportStatus | ReportStatus[];   // single status or membership set
-  startedAfter?: string | Date;             // inclusive lower bound on root startedAt
-  startedBefore?: string | Date;            // inclusive upper bound on root startedAt
+  traceId?: string; // exact one run
+  sessionId?: string; // every run for a session
+  status?: ReportStatus | ReportStatus[]; // single status or membership set
+  startedAfter?: string | Date; // inclusive lower bound on root startedAt
+  startedBefore?: string | Date; // inclusive upper bound on root startedAt
 };
 ```
 
@@ -87,12 +87,12 @@ Time bounds compare against each trace's root `startedAt`, **inclusive on both e
 
 ```ts
 type TraceAggregate = {
-  traces: number;        // matched count
-  completed: number;     // root status === "completed"
-  failed: number;        // root status === "failed"
-  cancelled: number;     // root status === "cancelled"
-  usage: Usage;          // summed token usage (input/output/total always present)
-  cost?: ModelPricing;   // merged per-channel USD, or undefined if no trace was priced
+  traces: number; // matched count
+  completed: number; // root status === "completed"
+  failed: number; // root status === "failed"
+  cancelled: number; // root status === "cancelled"
+  usage: Usage; // summed token usage (input/output/total always present)
+  cost?: ModelPricing; // merged per-channel USD, or undefined if no trace was priced
   totalDuration: number; // summed wall-clock ms
 };
 ```
@@ -111,7 +111,7 @@ const totalUsd =
 
 Notes that matter when reading the numbers:
 
-- **`usage`** sums each trace's *root* `Usage` (already a rollup of own cost + children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
+- **`usage`** sums each trace's _root_ `Usage` (already a rollup of own cost + children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
 - **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number), merged with the framework's own cost-rollup logic — an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
 - **`completed` + `failed` + `cancelled` need not equal `traces`** — non-terminal statuses (`awaiting-input`, `max-iterations`) count toward `traces` but none of the three headline counters.
 - An empty match returns a zeroed aggregate (`usage` all `0`, `cost` `undefined`, `totalDuration` `0`).
@@ -147,13 +147,13 @@ const store = createCacheTraceStore(async () => {
   return driver;
 });
 
-await store.ready();   // hydrate the in-memory mirror from a prior run
-collector.use(store);  // fills as traces complete; reads stay synchronous
+await store.ready(); // hydrate the in-memory mirror from a prior run
+collector.use(store); // fills as traces complete; reads stay synchronous
 
 const failed = store.query({ status: "failed" }); // queryable like any store
 ```
 
-**Write-through over a sync contract.** The store keeps the same insertion-ordered in-memory **mirror** the in-memory store uses and serves every read (`get` / `query` / `aggregate` / `size`) from it synchronously — the dashboard polls these and can't await a cache. Writes go **through**: `add` updates the mirror immediately, then *fire-and-forget* persists the trace + a newest-first index to the cache. So:
+**Write-through over a sync contract.** The store keeps the same insertion-ordered in-memory **mirror** the in-memory store uses and serves every read (`get` / `query` / `aggregate` / `size`) from it synchronously — the dashboard polls these and can't await a cache. Writes go **through**: `add` updates the mirror immediately, then _fire-and-forget_ persists the trace + a newest-first index to the cache. So:
 
 - **Reads never wait on the cache** — the mirror is the runtime source of truth; the cache is the durable backing store.
 - **A flaky cache never throws into the hot path** — a rejected write is routed to the optional `onError` hook and swallowed; the trace stays visible in the mirror for the life of the process, it just won't survive a restart.
@@ -161,20 +161,21 @@ const failed = store.query({ status: "failed" }); // queryable like any store
 
 ```ts
 type CacheDriverInput =
-  | CacheDriver           // a live driver
+  | CacheDriver // a live driver
   | (() => CacheDriver | Promise<CacheDriver>); // lazy (sync or async) factory
 
 type CacheTraceStoreOptions = {
-  prefix?: string;   // key namespace; per-trace keys `${prefix}:trace:${id}`,
-                     // index at `${prefix}:index`. Default "panoptic".
+  prefix?: string; // key namespace; per-trace keys `${prefix}:trace:${id}`,
+  // index at `${prefix}:index`. Default "panoptic".
   capacity?: number; // FIFO cap (oldest-ingested evicted from cache + mirror);
-                     // absent / 0 = unbounded.
+  // absent / 0 = unbounded.
   onError?: (error: unknown) => void; // swallowed cache-write failures land here.
 };
 
-type CacheTraceStoreHandle = TraceStoreContract & ExporterContract & {
-  ready(): Promise<void>; // hydrate the mirror from the cache on startup
-};
+type CacheTraceStoreHandle = TraceStoreContract &
+  ExporterContract & {
+    ready(): Promise<void>; // hydrate the mirror from the cache on startup
+  };
 ```
 
 Ordering uses an **internal monotonic counter**, not `Date.now()`, so the persisted index stays a stable total order even when many traces land in the same millisecond — FIFO eviction stays honest across a restart.

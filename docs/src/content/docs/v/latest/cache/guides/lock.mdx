@@ -25,11 +25,13 @@ Replaces the manual `try` / `finally` + `onConflict: "create"` pattern. Same sem
 ## When to use
 
 Reach for `cache.lock()` when:
+
 - A task should run on only one server at a time (cron jobs, imports, migrations).
 - Two requests shouldn't process the same thing twice (payment processing, webhook dedup).
 - You're about to write the `try { … } finally { cache.remove(lockKey); }` boilerplate for the nth time.
 
 Don't use `lock` for:
+
 - **Memoizing a function's result** — use [`cached()`](/v/latest/cache/cached/) or [`remember()`](/v/latest/cache/stampede-prevention/) instead.
 - **Cross-server `update()` coordination** — `update()` is already an atomic compare-and-set on `redis` and `pg`; see [Atomic Operations](/v/latest/cache/atomic-operations/). No lock needed.
 
@@ -38,9 +40,7 @@ Don't use `lock` for:
 `cache.lock()` returns a **discriminated union** — the `acquired` flag tells you whether `fn` ran. This disambiguates "fn returned undefined" from "we didn't run at all":
 
 ```ts
-type LockOutcome<T> =
-  | { acquired: true; value: T }
-  | { acquired: false };
+type LockOutcome<T> = { acquired: true; value: T } | { acquired: false };
 ```
 
 Pattern-match on it with TypeScript narrowing:
@@ -74,10 +74,8 @@ Accepts either a number of seconds or a human-readable duration string (`"30s"`,
 ### 2. Options form — add an `owner` label
 
 ```ts
-await cache.lock(
-  "lock.payments.batch",
-  { ttl: "5m", owner: "worker.payments-2" },
-  async () => processBatch(),
+await cache.lock("lock.payments.batch", { ttl: "5m", owner: "worker.payments-2" }, async () =>
+  processBatch(),
 );
 ```
 
@@ -88,11 +86,7 @@ Release is an ownership-checked compare-and-delete (atomic on memory, Redis and 
 ### 3. Options form — per-call driver override
 
 ```ts
-await cache.lock(
-  "lock.audit",
-  { ttl: "1m", driver: "redis" },
-  async () => writeAuditLog(),
-);
+await cache.lock("lock.audit", { ttl: "1m", driver: "redis" }, async () => writeAuditLog());
 ```
 
 Routes the whole op (acquire + release) through the named driver without mutating `currentDriver`. Same semantics as `set`'s `driver` option.
@@ -135,10 +129,8 @@ Every server fires the cron at 3am; only one acquires the lock and runs. The res
 app.post("/webhooks/stripe", async (req, res) => {
   const eventId = req.body.id;
 
-  const outcome = await cache.lock(
-    `webhook.stripe.${eventId}`,
-    "24h",
-    async () => processStripeEvent(req.body),
+  const outcome = await cache.lock(`webhook.stripe.${eventId}`, "24h", async () =>
+    processStripeEvent(req.body),
   );
 
   if (!outcome.acquired) {
@@ -176,15 +168,15 @@ async function runDailyReport(date: string) {
 
 ## Driver support
 
-| Driver | Support | Semantics |
-|--------|:-:|-----------|
-| `redis` | ✅ Native | Redis `SET … NX EX` — cross-server atomic; release via Lua compare-and-delete |
-| `pg` | ✅ Native | `INSERT … ON CONFLICT` — cross-server atomic; release via one `DELETE … WHERE value = …` |
-| `memory` | ✅ Synchronous check-and-insert | Exclusive within one process |
-| `memoryExtended` | ✅ Synchronous check-and-insert | Exclusive within one process |
-| `lru` | ✅ Emulated | In-process only |
-| `file` | ✅ Exclusive create | Single-host only; not safe across multiple servers |
-| `null` | ✅ Always acquires | No-op driver — `fn` always runs, no coordination |
+| Driver           |             Support             | Semantics                                                                                |
+| ---------------- | :-----------------------------: | ---------------------------------------------------------------------------------------- |
+| `redis`          |            ✅ Native            | Redis `SET … NX EX` — cross-server atomic; release via Lua compare-and-delete            |
+| `pg`             |            ✅ Native            | `INSERT … ON CONFLICT` — cross-server atomic; release via one `DELETE … WHERE value = …` |
+| `memory`         | ✅ Synchronous check-and-insert | Exclusive within one process                                                             |
+| `memoryExtended` | ✅ Synchronous check-and-insert | Exclusive within one process                                                             |
+| `lru`            |           ✅ Emulated           | In-process only                                                                          |
+| `file`           |       ✅ Exclusive create       | Single-host only; not safe across multiple servers                                       |
+| `null`           |       ✅ Always acquires        | No-op driver — `fn` always runs, no coordination                                         |
 
 On non-shared drivers, "distributed" means "across callers in the same process." To lock across servers, use `redis` or `pg`.
 

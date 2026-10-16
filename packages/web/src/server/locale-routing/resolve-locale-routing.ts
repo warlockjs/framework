@@ -81,7 +81,9 @@ export function resolveLocaleRouting(localeRoutingConfig?: LocaleRoutingConfig):
  * it is absent at build time too. Without the app's locale config the fallback
  * is `none`, exactly what the global path has always produced.
  */
-export function resolveClientLocaleRoutingFallback(localeRoutingConfig?: LocaleRoutingConfig): LocaleRouting {
+export function resolveClientLocaleRoutingFallback(
+  localeRoutingConfig?: LocaleRoutingConfig,
+): LocaleRouting {
   if (!Array.isArray(config.key<unknown>("app.localeCodes"))) {
     return { strategy: "none", codes: [], defaultLocale: "" };
   }

@@ -12,7 +12,11 @@ Wire the resolver once; web never imports auth.
 import type { Auth } from "@warlock.js/auth";
 import { pageSession } from "@warlock.js/auth";
 
-export default { session: pageSession({ project: (user: Auth) => ({ id: user.id, name: user.get<string>("name") }) }) };
+export default {
+  session: pageSession({
+    project: (user: Auth) => ({ id: user.id, name: user.get<string>("name") }),
+  }),
+};
 ```
 
 `project` is required; only its result reaches the browser as the payload's optional `session` key. Type it by augmenting `SessionRegistry { user; model }` in module `"@warlock.js/web"`.
@@ -22,7 +26,10 @@ import { useUser } from "@warlock.js/web";
 import { requireGuest, requireUser } from "@warlock.js/web/session";
 
 // account page
-export const accountConfig = { route: "/account", middleware: [requireUser({ loginPath: "/login" })] };
+export const accountConfig = {
+  route: "/account",
+  middleware: [requireUser({ loginPath: "/login" })],
+};
 
 // login page
 export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
@@ -74,18 +81,18 @@ The page is typed as guarded only when the generator can prove it from source. T
 
 These do **not** count (the page stays unguarded in the types and `guard` is not emitted):
 
-| Not a guard                                                          | Example                                               |
-| -------------------------------------------------------------------- | ----------------------------------------------------- |
-| a spread into the array                                              | `middleware: [...guards]`                             |
-| `middleware` that is not an array literal (identifier, call)        | `middleware: guards`                                  |
-| a guard behind a conditional                                         | `middleware: [isPrivate ? requireUser() : audit]`     |
-| a wrapper call around it                                             | `middleware: [withAudit(requireUser())]`              |
-| an identifier in the array                                           | `middleware: [guard]`                                 |
-| `requireGuest()`                                                     | `middleware: [requireGuest()]`                        |
-| `config.action.middleware`                                           | only the page's action is guarded                     |
-| a type-only import of `requireUser`, or one from any other module   | `import type { requireUser } ...`                     |
-| a namespace or member call                                           | `session.requireUser()`                               |
-| the loader form `requireUser(ctx)` inside a loader                   | it guards at runtime but is not seen by the generator |
+| Not a guard                                                       | Example                                               |
+| ----------------------------------------------------------------- | ----------------------------------------------------- |
+| a spread into the array                                           | `middleware: [...guards]`                             |
+| `middleware` that is not an array literal (identifier, call)      | `middleware: guards`                                  |
+| a guard behind a conditional                                      | `middleware: [isPrivate ? requireUser() : audit]`     |
+| a wrapper call around it                                          | `middleware: [withAudit(requireUser())]`              |
+| an identifier in the array                                        | `middleware: [guard]`                                 |
+| `requireGuest()`                                                  | `middleware: [requireGuest()]`                        |
+| `config.action.middleware`                                        | only the page's action is guarded                     |
+| a type-only import of `requireUser`, or one from any other module | `import type { requireUser } ...`                     |
+| a namespace or member call                                        | `session.requireUser()`                               |
+| the loader form `requireUser(ctx)` inside a loader                | it guards at runtime but is not seen by the generator |
 
 The not-found page is never guarded. A guard the generator cannot prove still works at runtime; only the types stay loose (`useUser()` returns `null`-able).
 In dev, a file the generator cannot parse reads as unguarded rather than breaking boot.

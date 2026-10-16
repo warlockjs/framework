@@ -52,7 +52,7 @@ export function dashboard(
     );
   }
 
-  const allowedHosts = (options.allowedHosts ?? defaultAllowedHosts(host)).map(h =>
+  const allowedHosts = (options.allowedHosts ?? defaultAllowedHosts(host)).map((h) =>
     h.toLowerCase(),
   );
 

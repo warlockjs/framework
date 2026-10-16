@@ -58,7 +58,10 @@ export function attachReasoningReplay(
   const metadata: ResponsesReplayMetadata = { model, reasoningItems: replayable };
 
   return [
-    { ...first, providerMetadata: { ...first.providerMetadata, [RESPONSES_METADATA_KEY]: metadata } },
+    {
+      ...first,
+      providerMetadata: { ...first.providerMetadata, [RESPONSES_METADATA_KEY]: metadata },
+    },
     ...rest,
   ];
 }

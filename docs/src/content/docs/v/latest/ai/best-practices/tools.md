@@ -7,7 +7,7 @@ description: How to design tools the model can call without breaking your system
 
 The pillar this page answers: **how do you design a tool so a non-deterministic model can call it safely — without passing garbage, double-executing, or wedging the agent when something fails?**
 
-A tool is the one place where the model reaches into your system and *does* something. The model decides *when* to call it and *what* to pass — and the model is wrong sometimes. Your job is to make the tool impossible to misuse: a schema tight enough that bad arguments never reach `execute`, a body narrow enough to reason about, side effects that survive a retry, and errors the agent can read and recover from. This page is the opinionated version of those levers, every example grounded in the real `ai.tool` surface.
+A tool is the one place where the model reaches into your system and _does_ something. The model decides _when_ to call it and _what_ to pass — and the model is wrong sometimes. Your job is to make the tool impossible to misuse: a schema tight enough that bad arguments never reach `execute`, a body narrow enough to reason about, side effects that survive a retry, and errors the agent can read and recover from. This page is the opinionated version of those levers, every example grounded in the real `ai.tool` surface.
 
 Everything below is one running example: a small set of tools for a storefront support agent — searching a catalog, applying a discount, and notifying ops.
 
@@ -47,8 +47,8 @@ const applyDiscount = ai.tool({
   name: "apply_discount",
   input: v.object({
     orderId: v.string(),
-    reason: v.string(),   // model invents "because_i_said_so"
-    percent: v.number(),  // model passes -10, or 9999
+    reason: v.string(), // model invents "because_i_said_so"
+    percent: v.number(), // model passes -10, or 9999
   }),
   execute: async ({ orderId, reason, percent }) => {
     // You now re-implement the schema by hand, and throw on failure —
@@ -59,7 +59,7 @@ const applyDiscount = ai.tool({
 });
 ```
 
-> When a schema field rejects the model's argument, the agent records a `SchemaValidationError` on that trip's `ToolCall.error` and feeds it back to the model as a tool error — the model gets a turn to fix its own arguments and retry. A precise schema is therefore *also* a cheaper one: the correction loop is the model's job, not yours, and the model only learns the rule once you've written it into the schema. See [Define tools](/v/latest/ai/tools/define-tools/) for the full `name` / `description` / `input` / `execute` contract.
+> When a schema field rejects the model's argument, the agent records a `SchemaValidationError` on that trip's `ToolCall.error` and feeds it back to the model as a tool error — the model gets a turn to fix its own arguments and retry. A precise schema is therefore _also_ a cheaper one: the correction loop is the model's job, not yours, and the model only learns the rule once you've written it into the schema. See [Define tools](/v/latest/ai/tools/define-tools/) for the full `name` / `description` / `input` / `execute` contract.
 
 ## Keep each tool single-purpose — one verb, one job
 
@@ -91,7 +91,7 @@ const applyDiscount = ai.tool({
 });
 ```
 
-**Avoid this — a god-tool with a mode switch and an everything-schema.** A single `manage_order` that branches on an `action` field forces every field to be optional (because each is required only for *some* actions), which defeats the precise-schema rule above and hands the model a tool it routinely calls with the wrong shape.
+**Avoid this — a god-tool with a mode switch and an everything-schema.** A single `manage_order` that branches on an `action` field forces every field to be optional (because each is required only for _some_ actions), which defeats the precise-schema rule above and hands the model a tool it routinely calls with the wrong shape.
 
 ```ts
 // Anti-pattern: one tool, many jobs, a schema that can't constrain anything.
@@ -100,12 +100,14 @@ const manageOrder = ai.tool({
   description: "Search, discount, refund, cancel, or email about an order.",
   input: v.object({
     action: v.enum(["search", "discount", "refund", "cancel", "notify"]),
-    query: v.string().optional(),     // only for search
-    orderId: v.string().optional(),   // only for the order actions
-    percent: v.int().optional(),      // only for discount — now unbounded again
+    query: v.string().optional(), // only for search
+    orderId: v.string().optional(), // only for the order actions
+    percent: v.int().optional(), // only for discount — now unbounded again
   }),
   execute: async (input) => {
-    switch (input.action) { /* five unrelated jobs in one body */ }
+    switch (input.action) {
+      /* five unrelated jobs in one body */
+    }
   },
 });
 ```
@@ -114,7 +116,7 @@ const manageOrder = ai.tool({
 
 ## Use silent mode for fire-and-forget side effects — don't pay for a follow-up generation
 
-By default a tool runs in `mode: "feedback"`: the agent dispatches it, appends the result as a `role: "tool"` message, and runs **another** LLM trip so the model can read the result and reply. That second trip is exactly what you want when the reply depends on the result (a search, a lookup). It is pure waste when the tool is a side effect the model's reply doesn't depend on — persisting a slot-fill, pinning a locale, firing telemetry. `mode: "silent"` closes the feedback leg: when *every* tool call in a generation is silent, the loop terminates after dispatch instead of paying for a trip whose only input is `{ ok: true }`.
+By default a tool runs in `mode: "feedback"`: the agent dispatches it, appends the result as a `role: "tool"` message, and runs **another** LLM trip so the model can read the result and reply. That second trip is exactly what you want when the reply depends on the result (a search, a lookup). It is pure waste when the tool is a side effect the model's reply doesn't depend on — persisting a slot-fill, pinning a locale, firing telemetry. `mode: "silent"` closes the feedback leg: when _every_ tool call in a generation is silent, the loop terminates after dispatch instead of paying for a trip whose only input is `{ ok: true }`.
 
 **Do this — mark pure side-effect tools `silent`.** The model already knows what to say; the tool just records something on the side.
 
@@ -149,11 +151,11 @@ const recordResolution = ai.tool({
 });
 ```
 
-> Silent is strictly the *LLM-feedback* channel — the tool still runs to completion through middleware (logging, cost tracking), so observability isn't lost. Two constraints make a tool a good silent candidate: it must be **cheap and fast** (the HTTP request stays open until it resolves) and **idempotent** (silent tools have no channel to report failure back to the model). And mind the provider split: when a silent tool is the *only* call in a turn, OpenAI models often emit no prose alongside it, so the user sees nothing — pair it with a feedback tool, or skip silent mode, when the user needs a visible reply. The full rule set and the per-provider behavior table live in the [silent tools recipe](/v/latest/ai/recipes/silent-tools/).
+> Silent is strictly the _LLM-feedback_ channel — the tool still runs to completion through middleware (logging, cost tracking), so observability isn't lost. Two constraints make a tool a good silent candidate: it must be **cheap and fast** (the HTTP request stays open until it resolves) and **idempotent** (silent tools have no channel to report failure back to the model). And mind the provider split: when a silent tool is the _only_ call in a turn, OpenAI models often emit no prose alongside it, so the user sees nothing — pair it with a feedback tool, or skip silent mode, when the user needs a visible reply. The full rule set and the per-provider behavior table live in the [silent tools recipe](/v/latest/ai/recipes/silent-tools/).
 
 ## Pass system-only data through `ctx.artifacts` — don't round-trip IDs through the model
 
-A tool's *return value* is what the model reads and reasons over. Some of what a tool produces is not for the model at all — renderable UI blocks, citation records, file handles, the raw rows behind a summary. Stuffing that into the return value forces the model to read it, pay tokens for it, and (worse) round-trip identifiers back to you on the next call so you can re-hydrate them — a brittle loop where the model copies an ID it should never have seen. `execute` takes an optional second argument, a `ToolContext` with a mutable `artifacts` bag. Write system-only data there; it reaches your system, never the LLM.
+A tool's _return value_ is what the model reads and reasons over. Some of what a tool produces is not for the model at all — renderable UI blocks, citation records, file handles, the raw rows behind a summary. Stuffing that into the return value forces the model to read it, pay tokens for it, and (worse) round-trip identifiers back to you on the next call so you can re-hydrate them — a brittle loop where the model copies an ID it should never have seen. `execute` takes an optional second argument, a `ToolContext` with a mutable `artifacts` bag. Write system-only data there; it reaches your system, never the LLM.
 
 **Do this — return the minimal summary for the model, push the rest to `ctx.artifacts`.** The model reasons over a small, clean payload; your UI layer reads the full records off the artifacts bag after the run.
 
@@ -191,7 +193,7 @@ const searchCatalog = ai.tool({
 });
 ```
 
-> The artifacts bag is the supported side-channel by design (decisions §35). Under a supervisor it starts empty per iteration, accumulates writes from every tool call, and merges into supervisor state via `artifactsSchema` at iteration end — so the bag's shape is *typed* when a supervisor declares the schema. Standalone, the framework supplies `{ artifacts: {} }` and your writes are harmless. Either way the rule is the same: the return value is the model's, `ctx.artifacts` is the system's, and the two channels never cross.
+> The artifacts bag is the supported side-channel by design (decisions §35). Under a supervisor it starts empty per iteration, accumulates writes from every tool call, and merges into supervisor state via `artifactsSchema` at iteration end — so the bag's shape is _typed_ when a supervisor declares the schema. Standalone, the framework supplies `{ artifacts: {} }` and your writes are harmless. Either way the rule is the same: the return value is the model's, `ctx.artifacts` is the system's, and the two channels never cross.
 
 ## Make `execute` idempotent — the model may call it twice
 
@@ -235,7 +237,7 @@ const notifyOps = ai.tool({
 });
 ```
 
-> This matters most for silent tools, which have *no* way to report a failure back to the model — so a partial failure can never be corrected by the agent and must be safe to re-run. Treat any tool with an external side effect (a charge, an email, a webhook) as something that will be called more than once, and key its effect on the input. The mechanics are the same idempotency-key discipline you'd use for any retryable external call.
+> This matters most for silent tools, which have _no_ way to report a failure back to the model — so a partial failure can never be corrected by the agent and must be safe to re-run. Treat any tool with an external side effect (a charge, an email, a webhook) as something that will be called more than once, and key its effect on the input. The mechanics are the same idempotency-key discipline you'd use for any retryable external call.
 
 ## Surface errors so the agent can recover — throw a clear message, don't swallow
 
@@ -297,11 +299,11 @@ execute: async ({ orderId, percent }) => {
 },
 ```
 
-> Let the error propagate — `execute` should throw, not catch-and-mask. The agent's job is to wrap it as a `ToolExecutionError` (carrying `toolName`, and `tripIndex` stamped by the dispatching agent) and give the model the message. Reserve `try / catch` inside a tool for *enriching* the error with context before re-throwing, never for hiding it. See [Define tools](/v/latest/ai/tools/define-tools/) for the full error taxonomy — `SchemaValidationError` for bad arguments, `ToolExecutionError` for a crashed body.
+> Let the error propagate — `execute` should throw, not catch-and-mask. The agent's job is to wrap it as a `ToolExecutionError` (carrying `toolName`, and `tripIndex` stamped by the dispatching agent) and give the model the message. Reserve `try / catch` inside a tool for _enriching_ the error with context before re-throwing, never for hiding it. See [Define tools](/v/latest/ai/tools/define-tools/) for the full error taxonomy — `SchemaValidationError` for bad arguments, `ToolExecutionError` for a crashed body.
 
 ## Lazily import heavy SDKs — keep the dependency off the boot path
 
-A tool that talks to S3, a payment provider, or a vector database pulls in a heavy SDK. Importing that SDK at the top of the file makes it a hard load-time dependency: every process that imports your tools module pays the import cost, and a deployment that never calls that tool still has to have the package installed or it crashes on boot. Import the SDK *inside* `execute`, on first use, and the cost moves to the call that actually needs it — the tool that's never called never loads its SDK.
+A tool that talks to S3, a payment provider, or a vector database pulls in a heavy SDK. Importing that SDK at the top of the file makes it a hard load-time dependency: every process that imports your tools module pays the import cost, and a deployment that never calls that tool still has to have the package installed or it crashes on boot. Import the SDK _inside_ `execute`, on first use, and the cost moves to the call that actually needs it — the tool that's never called never loads its SDK.
 
 **Do this — `await import(...)` the heavy dependency inside `execute`.** The module loads lazily, on the first call, and only in processes that actually invoke the tool.
 

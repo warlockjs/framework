@@ -182,7 +182,10 @@ describe("mergeEsbuildPatches — across contributors", () => {
   });
 
   it("concatenates and dedupes external", () => {
-    const merged = mergeEsbuildPatches({ external: ["react", "vite"] }, { external: ["vite", "react-dom"] });
+    const merged = mergeEsbuildPatches(
+      { external: ["react", "vite"] },
+      { external: ["vite", "react-dom"] },
+    );
 
     expect(merged.external).toEqual(["react", "vite", "react-dom"]);
   });

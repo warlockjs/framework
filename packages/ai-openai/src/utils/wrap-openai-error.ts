@@ -165,10 +165,7 @@ function isTimeout(thrown: unknown, shape: OpenAIErrorShape): boolean {
  * to redeclare them. Never includes `cause` — that lives on
  * `error.cause`.
  */
-function buildContext(
-  thrown: unknown,
-  shape: OpenAIErrorShape,
-): Record<string, unknown> {
+function buildContext(thrown: unknown, shape: OpenAIErrorShape): Record<string, unknown> {
   const context: Record<string, unknown> = {};
 
   if (shape.status !== undefined) {

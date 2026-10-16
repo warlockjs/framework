@@ -106,7 +106,6 @@ const config: NotificationConfig = {
 `@warlock.js/queue` is dynamically imported the first time `.queue()` runs —
 notifications never pays for it unless `bullmqQueue()` is configured.
 
-
 ## Dashboard (optional)
 
 ```sh
@@ -149,7 +148,10 @@ warning, so local development stays frictionless.
 > import { getHttpServer } from "@warlock.js/core";
 > import { queueDashboard } from "@warlock.js/queue";
 >
-> await queueDashboard(getHttpServer(), { basePath: "/admin/queues", middleware: [authMiddleware("admin")] });
+> await queueDashboard(getHttpServer(), {
+>   basePath: "/admin/queues",
+>   middleware: [authMiddleware("admin")],
+> });
 > ```
 
 ## License

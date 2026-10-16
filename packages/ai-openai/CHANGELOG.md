@@ -15,7 +15,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `providerOptions.openai.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Responses models expose native input-token preflight through `countTokens()`; Chat Completions keeps offline estimates separate.
 
-
 ## 5.30.0 - 2026-10-16
 
 ### Changed
@@ -103,6 +102,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed
@@ -173,7 +173,7 @@ changelogs.
 
 ### Changed
 
-- **`openai` moves from `^6.34.0` to `^7.4.0`.** The runtime was unaffected: the full suite — 13 files / 208 tests — passed on 7.4.0 *before* any of the type fixes below were made, so nothing about the wire shape this adapter sends or the responses it reads changed across the major. Every fix in this release is a compile-time one.
+- **`openai` moves from `^6.34.0` to `^7.4.0`.** The runtime was unaffected: the full suite — 13 files / 208 tests — passed on 7.4.0 _before_ any of the type fixes below were made, so nothing about the wire shape this adapter sends or the responses it reads changed across the major. Every fix in this release is a compile-time one.
 - **`OpenAI.Images.ImageGenerateParamsBase` is no longer reachable upstream** — openai 7 split image generation into `ImageGenerateParamsNonStreaming` / `ImageGenerateParamsStreaming` and stopped re-exporting the shared `Base` interface from the `Images` namespace. `image.ts` now sources its `quality` / `output_format` / `background` value types from `ImageGenerateParamsNonStreaming`, which is what the request body was already typed as and what the non-streaming `images.generate` overload accepts. The three fields are inherited from `Base` unchanged, so the accepted values are identical.
 - **`ChatCompletionTool` became a union** (`ChatCompletionFunctionTool | ChatCompletionCustomTool`) now that Chat Completions carries custom tools. `.function` is no longer reachable without the `type` discriminant, so the tool-conversion specs narrow on `type === "function"` and throw on anything else — a custom-tool regression fails loudly rather than silently skipping the assertion it used to make.
 

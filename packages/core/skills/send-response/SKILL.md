@@ -361,7 +361,6 @@ then have their idle connections reaped. A hand-written hijacked writer that set
 its own Connection header must preserve close during drain rather than overwrite
 it with keep-alive. Headers already on the wire cannot be changed.
 
-
 On HTTP/2, SSE and stream helpers omit connection-specific and Transfer-Encoding
 headers. Graceful drain sends GOAWAY and closes sessions once active streams finish;
 HTTP/1.1 keeps its existing Connection: close behavior. HTTP/1.0 uses close-delimited responses without Transfer-Encoding. The shutdown timeout still

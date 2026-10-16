@@ -83,7 +83,8 @@ describe("cacheMiddleware — per-request key isolation", () => {
 
   it("gives different users different keys/responses and never mutates the options", async () => {
     const options = {
-      cacheKey: (request: Request) => `profile:${(request as unknown as { userId: string }).userId}`,
+      cacheKey: (request: Request) =>
+        `profile:${(request as unknown as { userId: string }).userId}`,
       withLocale: false,
       ttl: 60,
       tags: (request: Request) => [`u:${(request as unknown as { userId: string }).userId}`],

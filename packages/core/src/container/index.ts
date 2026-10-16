@@ -10,10 +10,7 @@ import {
 import type { DevelopmentAppModules } from "./development-app-modules";
 import type { DevelopmentModelModules } from "./development-model-modules";
 
-export type {
-  DevelopmentAppModuleEntry,
-  DevelopmentAppModules,
-} from "./development-app-modules";
+export type { DevelopmentAppModuleEntry, DevelopmentAppModules } from "./development-app-modules";
 export type {
   DevelopmentModelModuleEntry,
   DevelopmentModelModules,

@@ -19,7 +19,7 @@ describe("insertImportInSortedPosition", () => {
   const WEB = `import { webConnector } from "@warlock.js/web/connector";`;
 
   function importSpecifiersOf(source: string): string[] {
-    return [...source.matchAll(/from\s+"([^"]+)";/g)].map(match => match[1] as string);
+    return [...source.matchAll(/from\s+"([^"]+)";/g)].map((match) => match[1] as string);
   }
 
   it("places the import AFTER earlier-sorting ones — the case the scaffolder actually hits", () => {

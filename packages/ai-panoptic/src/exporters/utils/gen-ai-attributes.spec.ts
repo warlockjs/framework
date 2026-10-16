@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeSpan } from "../test-support/make-trace";
-import {
-  GEN_AI_ATTRIBUTES,
-  toGenAiAttributes,
-  WARLOCK_ATTRIBUTES,
-} from "./gen-ai-attributes";
+import { GEN_AI_ATTRIBUTES, toGenAiAttributes, WARLOCK_ATTRIBUTES } from "./gen-ai-attributes";
 
 describe("toGenAiAttributes", () => {
   it("should map token usage onto GenAI convention keys", () => {

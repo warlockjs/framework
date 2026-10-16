@@ -31,9 +31,7 @@ interface FetchCall {
  * tool reads `response.body` as a stream, so we hand it a real `Response`
  * (Node 18+ provides the WHATWG `Response`).
  */
-function stubFetch(
-  responder: (call: FetchCall) => Response | Promise<Response>,
-): FetchCall[] {
+function stubFetch(responder: (call: FetchCall) => Response | Promise<Response>): FetchCall[] {
   const calls: FetchCall[] = [];
 
   vi.stubGlobal(
@@ -95,18 +93,17 @@ describe("httpRequestTool", () => {
 
     expect(typeof action).toBe("function");
     expect(
-      typeof action === "function"
-        ? action({ method: "POST", url: "https://api.test/x" })
-        : action,
+      typeof action === "function" ? action({ method: "POST", url: "https://api.test/x" }) : action,
     ).toBe("Requesting POST https://api.test/x");
   });
 
   it("issues a GET by default and returns status + lower-cased headers", async () => {
-    const calls = stubFetch(() =>
-      new Response("ok", {
-        status: 201,
-        headers: { "Content-Type": "text/plain", "X-Trace": "abc" },
-      }),
+    const calls = stubFetch(
+      () =>
+        new Response("ok", {
+          status: 201,
+          headers: { "Content-Type": "text/plain", "X-Trace": "abc" },
+        }),
     );
 
     const { data, error } = await httpRequestTool().invoke({ url: "https://api.test/health" });

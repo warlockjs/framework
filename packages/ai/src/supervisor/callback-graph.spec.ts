@@ -107,7 +107,8 @@ describe("ai.supervisor — callback-only graph (LangGraph-style)", () => {
 
           // Read prior iteration's classify output via the iterations trace.
           const classifyOutput = ctx.iterations[0]?.result.classify?.output as
-            { category: string } | undefined;
+            | { category: string }
+            | undefined;
           const category = classifyOutput?.category ?? "other";
 
           const target = category === "billing" ? "billing-agent" : "kb-agent";
@@ -127,7 +128,8 @@ describe("ai.supervisor — callback-only graph (LangGraph-style)", () => {
           });
 
           const lookupOutput = ctx.iterations[1]?.result.lookup?.output as
-            { lookup: string } | undefined;
+            | { lookup: string }
+            | undefined;
 
           const reply = await ctx.intents["responder-agent"].execute();
 

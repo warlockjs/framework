@@ -93,7 +93,15 @@
  * that documents it. It is intentionally simple (no import resolution, no
  * structural comparison) and reported separately from compiler diagnostics.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -143,7 +151,12 @@ export interface ExtractedBlock {
 }
 
 export type ClassifiedBlock =
-  | { kind: "compile"; block: ExtractedBlock; virtualPath: string; reason: "titled" | "untitled-with-import" }
+  | {
+      kind: "compile";
+      block: ExtractedBlock;
+      virtualPath: string;
+      reason: "titled" | "untitled-with-import";
+    }
   | { kind: "skip"; block: ExtractedBlock; reason: string };
 
 export interface CompiledFileResult {
@@ -235,7 +248,7 @@ export function extractFencedBlocks(markdown: string, skill: DiscoveredSkill): E
     const [, lang, info, body] = match;
     const line = markdown.slice(0, match.index).split("\n").length;
     const titleMatch = TITLE_ATTR_RE.exec(info);
-    const rawTitle = titleMatch ? titleMatch[1] ?? titleMatch[2] ?? "" : undefined;
+    const rawTitle = titleMatch ? (titleMatch[1] ?? titleMatch[2] ?? "") : undefined;
     const titlePath = rawTitle && PATH_LIKE_TITLE.test(rawTitle) ? rawTitle : undefined;
     blocks.push({ skill, index, lang: lang as BlockLang, info, body, line, titlePath });
     index += 1;
@@ -253,7 +266,12 @@ const HAS_IMPORT_RE = /^\s*import\s/m;
  */
 export function classifyBlock(block: ExtractedBlock): ClassifiedBlock {
   if (block.titlePath) {
-    return { kind: "compile", block, virtualPath: normalizeVirtualPath(block.titlePath), reason: "titled" };
+    return {
+      kind: "compile",
+      block,
+      virtualPath: normalizeVirtualPath(block.titlePath),
+      reason: "titled",
+    };
   }
   if (HAS_IMPORT_RE.test(block.body)) {
     const ext = block.lang === "tsx" ? "tsx" : "ts";
@@ -297,7 +315,11 @@ export function planSkillCompileUnit(
 } {
   const files = new Map<string, ExtractedBlock>();
   const skipped: Array<{ block: ExtractedBlock; reason: string }> = [];
-  const duplicateTitles: Array<{ block: ExtractedBlock; titlePath: string; syntheticPath: string }> = [];
+  const duplicateTitles: Array<{
+    block: ExtractedBlock;
+    titlePath: string;
+    syntheticPath: string;
+  }> = [];
 
   for (const block of blocks) {
     const classified = classifyBlock(block);
@@ -391,7 +413,11 @@ interface WrittenSkillUnit {
  * at directly; the actual gate run compiles from `compileManySkills` below,
  * which reads its OWN shared config, not this one.
  */
-function writeSkillUnit(skill: DiscoveredSkill, packages: WorkspacePackage[], gateTmpRoot: string): WrittenSkillUnit {
+function writeSkillUnit(
+  skill: DiscoveredSkill,
+  packages: WorkspacePackage[],
+  gateTmpRoot: string,
+): WrittenSkillUnit {
   const markdown = readFileSync(skill.filePath, "utf8");
   const blocks = extractFencedBlocks(markdown, skill);
   const { files, skipped, duplicateTitles } = planSkillCompileUnit(skill, blocks);
@@ -438,7 +464,11 @@ const APP_ALIAS_CANDIDATES: ReadonlyArray<readonly [string, ts.Extension]> = [
   ["/index.tsx", ts.Extension.Tsx],
 ];
 
-function resolveAppAlias(moduleName: string, containingFile: string, gateTmpRoot: string): ts.ResolvedModuleFull | undefined {
+function resolveAppAlias(
+  moduleName: string,
+  containingFile: string,
+  gateTmpRoot: string,
+): ts.ResolvedModuleFull | undefined {
   if (!moduleName.startsWith("app/") && !moduleName.startsWith("web/")) return undefined;
   const skillRoot = skillRootForFile(gateTmpRoot, containingFile);
   if (!skillRoot) return undefined;
@@ -466,7 +496,11 @@ function resolveAppAlias(moduleName: string, containingFile: string, gateTmpRoot
  */
 const sharedSourceFileCache = new Map<string, ts.SourceFile>();
 
-function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string, packages: WorkspacePackage[]): ts.CompilerHost {
+function createCombinedHost(
+  options: ts.CompilerOptions,
+  gateTmpRoot: string,
+  packages: WorkspacePackage[],
+): ts.CompilerHost {
   const host = ts.createCompilerHost(options, true);
   const gateTmpNormalized = normalizeForCompare(gateTmpRoot);
 
@@ -477,7 +511,12 @@ function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string, pa
       const cached = sharedSourceFileCache.get(fileName);
       if (cached) return cached;
     }
-    const sourceFile = originalGetSourceFile(fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+    const sourceFile = originalGetSourceFile(
+      fileName,
+      languageVersionOrOptions,
+      onError,
+      shouldCreateNewSourceFile,
+    );
     if (cacheable && sourceFile) sharedSourceFileCache.set(fileName, sourceFile);
     return sourceFile;
   };
@@ -486,8 +525,18 @@ function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string, pa
     moduleNames.map((moduleName) => {
       const alias = resolveAppAlias(moduleName, containingFile, gateTmpRoot);
       if (alias) return alias;
-      const resolved = ts.resolveModuleName(moduleName, containingFile, options, host).resolvedModule;
-      if (resolved || moduleName.startsWith(".") || moduleName.startsWith("app/") || moduleName.startsWith("web/")) {
+      const resolved = ts.resolveModuleName(
+        moduleName,
+        containingFile,
+        options,
+        host,
+      ).resolvedModule;
+      if (
+        resolved ||
+        moduleName.startsWith(".") ||
+        moduleName.startsWith("app/") ||
+        moduleName.startsWith("web/")
+      ) {
         return resolved;
       }
       // pnpm keeps dependencies/devDependencies beside their owning package.
@@ -497,7 +546,8 @@ function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string, pa
       const packageDir = skillRoot && path.basename(path.dirname(skillRoot));
       const owner = packages.find((pkg) => pkg.dir === packageDir);
       return owner
-        ? ts.resolveModuleName(moduleName, path.join(owner.absPath, "__skill__.ts"), options, host).resolvedModule
+        ? ts.resolveModuleName(moduleName, path.join(owner.absPath, "__skill__.ts"), options, host)
+            .resolvedModule
         : undefined;
     });
 
@@ -507,7 +557,10 @@ function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string, pa
 function formatDiagnostic(diagnostic: ts.Diagnostic): string {
   const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
   const file = diagnostic.file;
-  const position = file && diagnostic.start !== undefined ? file.getLineAndCharacterOfPosition(diagnostic.start) : undefined;
+  const position =
+    file && diagnostic.start !== undefined
+      ? file.getLineAndCharacterOfPosition(diagnostic.start)
+      : undefined;
   const location = position ? `(${position.line + 1},${position.character + 1})` : "";
   const fileLabel = file ? path.basename(file.fileName) : "";
   return `${fileLabel}${location}: error TS${diagnostic.code}: ${message}`;
@@ -526,7 +579,11 @@ function formatDiagnostic(diagnostic: ts.Diagnostic): string {
  * merely asserted. Every written path is returned on every result so a stale
  * run is detectable by inspecting them.
  */
-export function compileManySkills(skills: DiscoveredSkill[], packages: WorkspacePackage[], gateTmpRoot: string): SkillCompileResult[] {
+export function compileManySkills(
+  skills: DiscoveredSkill[],
+  packages: WorkspacePackage[],
+  gateTmpRoot: string,
+): SkillCompileResult[] {
   const units = skills.map((skill) => writeSkillUnit(skill, packages, gateTmpRoot));
   const allWritten = units.flatMap((u) => u.written);
   // Declaration merging changes the meaning of shared package types. Keep
@@ -535,12 +592,19 @@ export function compileManySkills(skills: DiscoveredSkill[], packages: Workspace
     unit.written.some(({ block }) => /\bdeclare\s+(?:module|global)\b/.test(block.body)),
   );
   const plainUnits = units.filter((unit) => !augmentingUnits.includes(unit));
-  const compileGroups = [plainUnits.flatMap((unit) => unit.written), ...augmentingUnits.map((unit) => unit.written)];
+  const compileGroups = [
+    plainUnits.flatMap((unit) => unit.written),
+    ...augmentingUnits.map((unit) => unit.written),
+  ];
 
   let diagnosticsByFile = new Map<string, string[]>();
   if (allWritten.length > 0) {
     const sharedTsconfigPath = path.join(gateTmpRoot, "tsconfig.json");
-    writeFileSync(sharedTsconfigPath, `${JSON.stringify(buildTsconfig(packages), null, 2)}\n`, "utf8");
+    writeFileSync(
+      sharedTsconfigPath,
+      `${JSON.stringify(buildTsconfig(packages), null, 2)}\n`,
+      "utf8",
+    );
     const configFile = ts.readConfigFile(sharedTsconfigPath, ts.sys.readFile);
     if (configFile.error) {
       throw new Error(
@@ -549,10 +613,16 @@ export function compileManySkills(skills: DiscoveredSkill[], packages: Workspace
     }
     const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, gateTmpRoot);
     const host = createCombinedHost(parsed.options, gateTmpRoot, packages);
-    const diagnostics = compileGroups.filter((group) => group.length > 0).flatMap((group) => {
-      const program = ts.createProgram({ rootNames: group.map((written) => written.absolutePath), options: parsed.options, host });
-      return ts.getPreEmitDiagnostics(program);
-    });
+    const diagnostics = compileGroups
+      .filter((group) => group.length > 0)
+      .flatMap((group) => {
+        const program = ts.createProgram({
+          rootNames: group.map((written) => written.absolutePath),
+          options: parsed.options,
+          host,
+        });
+        return ts.getPreEmitDiagnostics(program);
+      });
 
     const gateTmpNormalized = normalizeForCompare(gateTmpRoot);
     for (const diagnostic of diagnostics) {
@@ -586,7 +656,11 @@ export function compileManySkills(skills: DiscoveredSkill[], packages: Workspace
 }
 
 /** Compiles a single skill. A thin wrapper over `compileManySkills` used by tests and any future per-skill CLI filter. */
-export function compileSkill(skill: DiscoveredSkill, packages: WorkspacePackage[], gateTmpRoot: string): SkillCompileResult {
+export function compileSkill(
+  skill: DiscoveredSkill,
+  packages: WorkspacePackage[],
+  gateTmpRoot: string,
+): SkillCompileResult {
   return compileManySkills([skill], packages, gateTmpRoot)[0];
 }
 
@@ -676,7 +750,9 @@ export function countFailuresByPackage(report: GateReport): PackageFailureCount[
     const failed = result.files.filter((file) => file.diagnostics.length > 0).length;
     byDir.set(dir, (byDir.get(dir) ?? 0) + failed);
   }
-  return [...byDir.entries()].map(([dir, failed]) => ({ dir, failed })).sort((a, b) => a.dir.localeCompare(b.dir));
+  return [...byDir.entries()]
+    .map(([dir, failed]) => ({ dir, failed }))
+    .sort((a, b) => a.dir.localeCompare(b.dir));
 }
 
 export interface RatchetReport {
@@ -698,12 +774,17 @@ export interface RatchetReport {
  * unmeasured allowance is never silently treated as zero, matching
  * `strictness-gate.ts`); any cross-skill type/path conflict fails (hard zero).
  */
-export function evaluateRatchet(report: GateReport, allowances: Record<string, number>): RatchetReport {
+export function evaluateRatchet(
+  report: GateReport,
+  allowances: Record<string, number>,
+): RatchetReport {
   const counts = countFailuresByPackage(report);
   const rows = counts.map(({ dir, failed }) => {
     const allowance = allowances[dir];
     if (allowance === undefined) {
-      throw new Error(`No skill-snippet allowance recorded for package '${dir}'. Add it to ${path.basename(ALLOWANCES_PATH)}.`);
+      throw new Error(
+        `No skill-snippet allowance recorded for package '${dir}'. Add it to ${path.basename(ALLOWANCES_PATH)}.`,
+      );
     }
     return { dir, failed, allowance, over: failed - allowance };
   });
@@ -723,7 +804,9 @@ function formatReport(report: GateReport): { text: string; failed: boolean } {
   let totalFailed = 0;
   const failures: string[] = [];
 
-  lines.push(`skill-snippet-gate: ${report.packages.length} package(s) with skills, ${report.skills.length} SKILL.md file(s).`);
+  lines.push(
+    `skill-snippet-gate: ${report.packages.length} package(s) with skills, ${report.skills.length} SKILL.md file(s).`,
+  );
   lines.push(`packages: ${report.packages.map((p) => p.dir).join(", ")}`);
   lines.push("");
 
@@ -737,7 +820,9 @@ function formatReport(report: GateReport): { text: string; failed: boolean } {
         totalPassed += 1;
       } else {
         totalFailed += 1;
-        failures.push(`FAIL ${skillLabel} :: ${file.virtualPath} (written to ${file.absolutePath})`);
+        failures.push(
+          `FAIL ${skillLabel} :: ${file.virtualPath} (written to ${file.absolutePath})`,
+        );
         for (const d of file.diagnostics) failures.push(`    ${d}`);
       }
     }
@@ -772,15 +857,28 @@ function formatReport(report: GateReport): { text: string; failed: boolean } {
 }
 
 function formatRatchet(ratchet: RatchetReport): string {
-  const lines: string[] = ["--- ratchet (failing compiled snippets / allowance; baseline may only go DOWN) ---"];
+  const lines: string[] = [
+    "--- ratchet (failing compiled snippets / allowance; baseline may only go DOWN) ---",
+  ];
   for (const row of ratchet.rows) {
-    const status = row.over > 0 ? ` OVER by ${row.over}` : row.failed < row.allowance ? ` (${row.allowance - row.failed} under — lower the baseline)` : " OK";
+    const status =
+      row.over > 0
+        ? ` OVER by ${row.over}`
+        : row.failed < row.allowance
+          ? ` (${row.allowance - row.failed} under — lower the baseline)`
+          : " OK";
     lines.push(`  ${row.dir}: ${row.failed} / ${row.allowance}${status}`);
   }
   lines.push("");
   lines.push(`total failing: ${ratchet.totalFailed} / ${ratchet.totalAllowance} allowance`);
-  lines.push(`cross-skill type/path conflicts: ${ratchet.typePathConflicts} (hard zero — never allowanced)`);
-  lines.push(ratchet.failed ? "RATCHET FAILED: a package is OVER its allowance (a NEW failure) or a conflict exists." : "RATCHET OK: no package exceeds its recorded baseline.");
+  lines.push(
+    `cross-skill type/path conflicts: ${ratchet.typePathConflicts} (hard zero — never allowanced)`,
+  );
+  lines.push(
+    ratchet.failed
+      ? "RATCHET FAILED: a package is OVER its allowance (a NEW failure) or a conflict exists."
+      : "RATCHET OK: no package exceeds its recorded baseline.",
+  );
   return lines.join("\n");
 }
 

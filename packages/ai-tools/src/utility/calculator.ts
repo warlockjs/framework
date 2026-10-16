@@ -132,10 +132,7 @@ function isDigit(char: string): boolean {
  * @throws CalculatorError `type: "syntax"` if the consumed run is not a
  *   valid finite number (e.g. a lone `.` or `1e` with no exponent).
  */
-function readNumber(
-  expression: string,
-  start: number,
-): { value: number; nextIndex: number } {
+function readNumber(expression: string, start: number): { value: number; nextIndex: number } {
   let index = start;
 
   while (index < expression.length && isDigit(expression[index])) {
@@ -206,10 +203,9 @@ function evaluate(tokens: Token[]): number {
     const left = values.pop();
 
     if (left === undefined || right === undefined) {
-      throw new CalculatorError(
-        `Operator "${operator}" is missing an operand.`,
-        { type: "syntax" },
-      );
+      throw new CalculatorError(`Operator "${operator}" is missing an operand.`, {
+        type: "syntax",
+      });
     }
 
     values.push(OPERATORS[operator].apply(left, right));
@@ -244,10 +240,9 @@ function evaluate(tokens: Token[]): number {
     if (token.type === "paren") {
       if (token.value === "(") {
         if (!expectOperand) {
-          throw new CalculatorError(
-            'Unexpected "(" — it cannot directly follow a value.',
-            { type: "syntax" },
-          );
+          throw new CalculatorError('Unexpected "(" — it cannot directly follow a value.', {
+            type: "syntax",
+          });
         }
 
         // A unary sign in front of a parenthesized group is modeled by
@@ -266,10 +261,7 @@ function evaluate(tokens: Token[]): number {
 
       // token.value === ")"
       if (expectOperand) {
-        throw new CalculatorError(
-          'Unexpected ")" — an operand was expected.',
-          { type: "syntax" },
-        );
+        throw new CalculatorError('Unexpected ")" — an operand was expected.', { type: "syntax" });
       }
 
       let foundOpen = false;
@@ -308,10 +300,9 @@ function evaluate(tokens: Token[]): number {
         continue;
       }
 
-      throw new CalculatorError(
-        `Operator "${token.value}" has no left-hand operand.`,
-        { type: "syntax" },
-      );
+      throw new CalculatorError(`Operator "${token.value}" has no left-hand operand.`, {
+        type: "syntax",
+      });
     }
 
     const incoming = OPERATORS[token.value];
@@ -326,8 +317,7 @@ function evaluate(tokens: Token[]): number {
       const topSpec = OPERATORS[top];
       const higher = topSpec.precedence > incoming.precedence;
       const equalLeft =
-        topSpec.precedence === incoming.precedence &&
-        incoming.associativity === "left";
+        topSpec.precedence === incoming.precedence && incoming.associativity === "left";
 
       if (higher || equalLeft) {
         applyTop();
@@ -343,10 +333,7 @@ function evaluate(tokens: Token[]): number {
   }
 
   if (expectOperand) {
-    throw new CalculatorError(
-      "Expression ends with an operator or is empty.",
-      { type: "syntax" },
-    );
+    throw new CalculatorError("Expression ends with an operator or is empty.", { type: "syntax" });
   }
 
   while (operators.length > 0) {
@@ -408,7 +395,7 @@ export function calculatorTool(
       "Evaluate an arithmetic expression and return the numeric result. " +
       "Supports + - * / % ^, parentheses, unary +/-, and decimal or " +
       "scientific-notation numbers. Does not support variables or " +
-      "functions — pass a literal expression like \"(3 + 4) * 2\".",
+      'functions — pass a literal expression like "(3 + 4) * 2".',
     input: inputSchema,
     async execute(input) {
       const tokens = tokenize(input.expression);

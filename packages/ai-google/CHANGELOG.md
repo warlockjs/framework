@@ -15,7 +15,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `providerOptions.google.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight. Vertex counts system instructions and tools; unsupported Developer API system/tool and cached-content counts fail explicitly.
 
-
 ## 5.30.0 - 2026-10-16
 
 ### Changed
@@ -93,6 +92,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed
@@ -166,7 +166,7 @@ changelogs.
 
 ### Deprecated
 
-- **Google has deprecated `generateImages`, the transport the `imagen-*` path still uses.** Verbatim from the `@google/genai` runtime warning: *"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead. See https://ai.google.dev/gemini-api/docs/deprecations#imagen-models and https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/image-generation#generate-images"* (`editImage` carries the same notice.) Nothing breaks today and the Imagen path is unchanged, but it is on a clock: new image work should prefer a `gemini-` id. The warning is emitted by `@google/genai` ≥ 2.17; with the bump below, this package now prints it whenever the `imagen-*` path is used
+- **Google has deprecated `generateImages`, the transport the `imagen-*` path still uses.** Verbatim from the `@google/genai` runtime warning: _"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead. See https://ai.google.dev/gemini-api/docs/deprecations#imagen-models and https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/image-generation#generate-images"_ (`editImage` carries the same notice.) Nothing breaks today and the Imagen path is unchanged, but it is on a clock: new image work should prefer a `gemini-` id. The warning is emitted by `@google/genai` ≥ 2.17; with the bump below, this package now prints it whenever the `imagen-*` path is used
 
 ### Changed
 

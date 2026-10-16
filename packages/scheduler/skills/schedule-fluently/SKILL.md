@@ -9,24 +9,24 @@ Chainable methods on a `Job` instance. Each method returns `this` for chaining; 
 
 ## Preset intervals
 
-| Method               | Equivalent of            | Notes                          |
-| -------------------- | ------------------------ | ------------------------------ |
-| `.everySecond()`     | `.every(1, "second")`    | High frequency — use sparingly |
-| `.everySeconds(N)`   | `.every(N, "second")`    |                                |
-| `.everyMinute()`     | `.every(1, "minute")`    |                                |
-| `.everyMinutes(N)`   | `.every(N, "minute")`    |                                |
-| `.everyHour()`       | `.every(1, "hour")`      |                                |
-| `.everyHours(N)`     | `.every(N, "hour")`      |                                |
-| `.everyDay()`        | `.every(1, "day")`       | Same as `.daily()`             |
-| `.daily()`           | `.every(1, "day")`       |                                |
-| `.twiceDaily()`      | `.every(12, "hour")`     | Every 12 hours                 |
-| `.everyWeek()`       | `.every(1, "week")`      | Same as `.weekly()`            |
-| `.weekly()`          | `.every(1, "week")`      |                                |
-| `.everyMonth()`      | `.every(1, "month")`     | Same as `.monthly()`           |
-| `.monthly()`         | `.every(1, "month")`     |                                |
-| `.everyYear()`       | `.every(1, "year")`      | Same as `.yearly()`            |
-| `.yearly()`          | `.every(1, "year")`      |                                |
-| `.always()`          | `.every(1, "minute")`    | Continuous "tick" jobs         |
+| Method             | Equivalent of         | Notes                          |
+| ------------------ | --------------------- | ------------------------------ |
+| `.everySecond()`   | `.every(1, "second")` | High frequency — use sparingly |
+| `.everySeconds(N)` | `.every(N, "second")` |                                |
+| `.everyMinute()`   | `.every(1, "minute")` |                                |
+| `.everyMinutes(N)` | `.every(N, "minute")` |                                |
+| `.everyHour()`     | `.every(1, "hour")`   |                                |
+| `.everyHours(N)`   | `.every(N, "hour")`   |                                |
+| `.everyDay()`      | `.every(1, "day")`    | Same as `.daily()`             |
+| `.daily()`         | `.every(1, "day")`    |                                |
+| `.twiceDaily()`    | `.every(12, "hour")`  | Every 12 hours                 |
+| `.everyWeek()`     | `.every(1, "week")`   | Same as `.weekly()`            |
+| `.weekly()`        | `.every(1, "week")`   |                                |
+| `.everyMonth()`    | `.every(1, "month")`  | Same as `.monthly()`           |
+| `.monthly()`       | `.every(1, "month")`  |                                |
+| `.everyYear()`     | `.every(1, "year")`   | Same as `.yearly()`            |
+| `.yearly()`        | `.every(1, "year")`   |                                |
+| `.always()`        | `.every(1, "minute")` | Continuous "tick" jobs         |
 
 ## Custom intervals — `.every(value, unit)`
 
@@ -44,7 +44,7 @@ Units: `"second" | "minute" | "hour" | "day" | "week" | "month" | "year"`.
 
 ```ts
 job("nightly", fn).daily().at("03:00");
-job("midday",  fn).daily().at("12:30:15");
+job("midday", fn).daily().at("12:30:15");
 ```
 
 **Validation.** `.at()` throws if the format is malformed (`"foo"`, `"9-30"`), or any component is out of range (hour > 23, minute > 59, second > 59).
@@ -56,7 +56,7 @@ Day-of-week (string) or day-of-month (number 1–31):
 ```ts
 job("monday-standup", task).weekly().on("monday");
 job("mid-month-sync", task).monthly().on(15);
-job("end-of-month",   task).monthly().on(31);    // see beginOf/endOf for the right way
+job("end-of-month", task).monthly().on(31); // see beginOf/endOf for the right way
 ```
 
 Valid day-of-week strings: `"sunday"`, `"monday"`, `"tuesday"`, `"wednesday"`, `"thursday"`, `"friday"`, `"saturday"`.
@@ -69,14 +69,14 @@ Valid day-of-week strings: `"sunday"`, `"monday"`, `"tuesday"`, `"wednesday"`, `
 
 Both accept `"day" | "month" | "year"`.
 
-| Method               | Fires at                                          |
-| -------------------- | ------------------------------------------------- |
-| `beginOf("day")`     | 00:00 every day                                   |
-| `endOf("day")`       | 23:59 every day                                   |
-| `beginOf("month")`   | 1st of every month at 00:00                       |
-| `endOf("month")`     | Last day of every month at 23:59 (**dynamic**)    |
-| `beginOf("year")`    | January 1 at 00:00 every year                     |
-| `endOf("year")`      | December 31 at 23:59 every year                   |
+| Method             | Fires at                                       |
+| ------------------ | ---------------------------------------------- |
+| `beginOf("day")`   | 00:00 every day                                |
+| `endOf("day")`     | 23:59 every day                                |
+| `beginOf("month")` | 1st of every month at 00:00                    |
+| `endOf("month")`   | Last day of every month at 23:59 (**dynamic**) |
+| `beginOf("year")`  | January 1 at 00:00 every year                  |
+| `endOf("year")`    | December 31 at 23:59 every year                |
 
 **`endOf("month")` is dynamic** — recomputes per cycle, so a job defined in February (28 days) still fires on March 31, April 30, etc. Leap years pick Feb 29 correctly.
 
@@ -92,12 +92,12 @@ Every fluent method recomputes `nextRun` at the end. Putting `.at()` before `.da
 
 ```ts
 job("good", fn)
-  .weekly()              // interval
-  .on("monday")          // day
-  .at("09:00")           // time
-  .inTimezone("UTC")     // timezone
-  .preventOverlap()      // execution
-  .retry(3, 1000);       // execution
+  .weekly() // interval
+  .on("monday") // day
+  .at("09:00") // time
+  .inTimezone("UTC") // timezone
+  .preventOverlap() // execution
+  .retry(3, 1000); // execution
 ```
 
 ## Inline registration — `scheduler.newJob()`
@@ -105,10 +105,7 @@ job("good", fn)
 For one-liners, the scheduler exposes a `newJob()` shortcut that creates, registers, and returns the job in one call:
 
 ```ts
-scheduler
-  .newJob("cleanup", cleanupFn)
-  .daily()
-  .at("03:00");
+scheduler.newJob("cleanup", cleanupFn).daily().at("03:00");
 ```
 
 To register several pre-built jobs at once, `scheduler.addJobs([...])` is the batch counterpart to `addJob` (both are chainable and preserve insertion order):
@@ -127,11 +124,11 @@ If the scheduler is already running, every job added via `addJob` / `addJobs` is
 ```ts
 const j = scheduler.getJob("nightly-cleanup");
 
-j?.nextRun?.toISOString();   // next scheduled run (Dayjs)
-j?.lastRun?.toISOString();   // last attempt — success OR failure
-j?.isRunning;                // currently executing?
-j?.intervals;                // { every?, day?, dayOfMonthMode?, month?, time? } (readonly)
-j?.cronExpression;           // null if using fluent API
+j?.nextRun?.toISOString(); // next scheduled run (Dayjs)
+j?.lastRun?.toISOString(); // last attempt — success OR failure
+j?.isRunning; // currently executing?
+j?.intervals; // { every?, day?, dayOfMonthMode?, month?, time? } (readonly)
+j?.cronExpression; // null if using fluent API
 ```
 
 ## See also

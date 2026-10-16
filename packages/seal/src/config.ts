@@ -6,13 +6,9 @@
 
 import type { AttributeTranslation, RuleTranslation } from "./types";
 
-export type TranslateRuleCallback = (
-  ruleTranslation: RuleTranslation,
-) => string;
+export type TranslateRuleCallback = (ruleTranslation: RuleTranslation) => string;
 
-export type TranslateAttributeCallback = (
-  attributeTranslation: AttributeTranslation,
-) => string;
+export type TranslateAttributeCallback = (attributeTranslation: AttributeTranslation) => string;
 
 export type SealConfig = {
   /**

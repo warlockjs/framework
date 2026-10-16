@@ -3,7 +3,7 @@ title: "Recipe — Semantic recall of past answers"
 description: Store past question-answer pairs and recall the most similar one on a new question, using ai.memory's semantic tier over a cache driver with an embedder.
 ---
 
-Your support bot answers the same questions a hundred different ways: *"How do I reset my password?"*, *"I forgot my password"*, *"can't log in, need a new password"*. They are the same question wearing different words — and you have already written a good answer to it. The trick is recognizing that a brand-new phrasing *means* the same thing as one you have answered before, then reusing that answer.
+Your support bot answers the same questions a hundred different ways: _"How do I reset my password?"_, _"I forgot my password"_, _"can't log in, need a new password"_. They are the same question wearing different words — and you have already written a good answer to it. The trick is recognizing that a brand-new phrasing _means_ the same thing as one you have answered before, then reusing that answer.
 
 This is **semantic recall**: store each answered question paired with its answer, then on a new question retrieve the closest prior pair by meaning rather than by exact text. `ai.memory`'s semantic tier does exactly this — it embeds the text into a vector and asks a `@warlock.js/cache` driver for the nearest stored entries via the driver's `.similar()`. This recipe shows the full wiring: the embedder that turns text into vectors, the cache driver that indexes them, and the store/recall calls that tie them together.
 
@@ -55,7 +55,7 @@ const qaRecall = ai.memory({
 
 ## Store a question-answer pair
 
-Each pair is one memory: the `text` is what gets embedded and searched against, the `metadata` carries the answer (and anything else) back verbatim on recall. Embed the *question* — that is what future questions will be compared to — and stash the answer in `metadata`.
+Each pair is one memory: the `text` is what gets embedded and searched against, the `metadata` carries the answer (and anything else) back verbatim on recall. Embed the _question_ — that is what future questions will be compared to — and stash the answer in `metadata`.
 
 ```ts
 type QAPair = {
@@ -106,9 +106,7 @@ async function answerFromRecall(question: string): Promise<string | undefined> {
 
   const answer = best.metadata?.answer as string | undefined;
 
-  console.log(
-    `recalled "${best.text}" @ score ${best.score.toFixed(3)} for "${question}"`,
-  );
+  console.log(`recalled "${best.text}" @ score ${best.score.toFixed(3)} for "${question}"`);
 
   return answer;
 }
@@ -154,7 +152,7 @@ async function answerLive(question: string): Promise<string> {
 }
 ```
 
-The loop: recall → on a hit, reuse the stored answer for free; on a miss, answer live and remember the new pair so the *next* phrasing of it is a hit.
+The loop: recall → on a hit, reuse the stored answer for free; on a miss, answer live and remember the new pair so the _next_ phrasing of it is a hit.
 
 ## Production notes
 
@@ -162,7 +160,7 @@ The loop: recall → on a hit, reuse the stored answer for free; on a miss, answ
 - **`threshold` is the whole game.** Too low and you reuse a confidently-wrong answer; too high and you never get a hit. Tune it against real query pairs — `0.82` is a reasonable starting point for `text-embedding-3-small`. `recall` returns an empty array (never throws) when nothing clears the bar, so a miss is just `hits.length === 0`.
 - **`namespace` isolates and lets you wipe.** Every key is prefixed with the namespace, and recall filters to that prefix — so one driver can hold many independent recall sets. `qaRecall.clear()` drops just this namespace's entries, leaving sibling caches untouched.
 - **Prefer this over raw `.similar()` unless you need the control.** Under the hood `ai.memory` calls `store.set(key, value, { vector })` to index and `store.similar(vector, { topK, threshold })` to retrieve — the same delegation the `semanticCache` middleware uses. Drop to the raw driver only when you need custom keys, tag filters, or to co-locate vectors with other cached data; otherwise let `memory` own the embed + namespace + scoring.
-- **This pairs naturally with `ai.middleware.semanticCache`.** When you want the *agent itself* to skip the model call on a near-duplicate prompt (rather than managing the pairs by hand), reach for the middleware. Use this hand-rolled recall when you need the stored answer addressable as data — e.g. to show "we answered this before" or to let a human edit the canned reply.
+- **This pairs naturally with `ai.middleware.semanticCache`.** When you want the _agent itself_ to skip the model call on a near-duplicate prompt (rather than managing the pairs by hand), reach for the middleware. Use this hand-rolled recall when you need the stored answer addressable as data — e.g. to show "we answered this before" or to let a human edit the canned reply.
 
 ## Related
 

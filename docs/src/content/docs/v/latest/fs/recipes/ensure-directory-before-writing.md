@@ -25,7 +25,7 @@ No `ensureDir` call, no `ENOENT`. `putJson`, `append`, `create`, and the handle
 methods all inherit this.
 
 :::note[Opting out]
-Auto-parenting is the default. If you want a write to *fail* when the folder is
+Auto-parenting is the default. If you want a write to _fail_ when the folder is
 missing — a guard against typo'd paths — pass `{ ensureDir: false }`.
 :::
 
@@ -54,7 +54,7 @@ contents but keeps the directory (and its permissions) in place:
 import { fs } from "@warlock.js/fs";
 
 await fs.dirs.ensure("dist");
-await fs.dirs.empty("dist");   // wipe contents, keep the folder
+await fs.dirs.empty("dist"); // wipe contents, keep the folder
 ```
 
 Prefer `empty` over remove-then-recreate when something else already holds a

@@ -368,13 +368,21 @@ describe("auto-flush", () => {
     const originalOn = process.on.bind(process);
     const originalOff = process.off.bind(process);
 
-    vi.spyOn(process, "on").mockImplementation(((event: string, handler: (...args: unknown[]) => void) => {
+    vi.spyOn(process, "on").mockImplementation(((
+      event: string,
+      handler: (...args: unknown[]) => void,
+    ) => {
       registered.push({ event, handler });
       return process;
     }) as typeof process.on);
 
-    vi.spyOn(process, "off").mockImplementation(((event: string, handler: (...args: unknown[]) => void) => {
-      const index = registered.findIndex((entry) => entry.event === event && entry.handler === handler);
+    vi.spyOn(process, "off").mockImplementation(((
+      event: string,
+      handler: (...args: unknown[]) => void,
+    ) => {
+      const index = registered.findIndex(
+        (entry) => entry.event === event && entry.handler === handler,
+      );
 
       if (index >= 0) {
         registered.splice(index, 1);
@@ -1034,9 +1042,7 @@ describe("Logger — default secret redaction", () => {
 
     await instance.error("payments", "charge", error);
 
-    expect((channel.received[0]!.message as any).config.headers.Authorization).toBe(
-      "[REDACTED]",
-    );
+    expect((channel.received[0]!.message as any).config.headers.Authorization).toBe("[REDACTED]");
   });
 
   it("does not mutate the caller's context", async () => {

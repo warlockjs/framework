@@ -13,9 +13,7 @@ sidebar:
 ```ts
 import { herald } from "@warlock.js/herald";
 
-await herald()
-  .channel("user.created")
-  .publish({ userId: 1, email: "ada@example.com" });
+await herald().channel("user.created").publish({ userId: 1, email: "ada@example.com" });
 ```
 
 Three things happen under the hood:
@@ -36,8 +34,8 @@ type UserPayload = {
 
 const channel = herald().channel<UserPayload>("user.created");
 
-await channel.publish({ userId: 1, email: "ada@example.com" });   // ✅
-await channel.publish({ userId: "1" });                            // ❌ compile error
+await channel.publish({ userId: 1, email: "ada@example.com" }); // ✅
+await channel.publish({ userId: "1" }); // ❌ compile error
 ```
 
 In a real codebase, define the payload type in a shared file (`shared/events/user.ts`) and import it from both producer and consumer. That's the contract; drift between sides causes silent payload corruption — and the schema option below catches it at the boundary.
@@ -67,10 +65,10 @@ The schema also runs on the **consume** side, so if some other producer pushes a
 
 ```ts
 await channel.publish(payload, {
-  priority: 5,              // 0-9, higher = served first (queue must support priority)
-  expiration: 60_000,       // ms — message expires if not consumed in time
-  delay: 5_000,             // ms — delayed delivery (requires rabbitmq-delayed-message-exchange plugin)
-  persistent: true,         // survive broker restart (default true)
+  priority: 5, // 0-9, higher = served first (queue must support priority)
+  expiration: 60_000, // ms — message expires if not consumed in time
+  delay: 5_000, // ms — delayed delivery (requires rabbitmq-delayed-message-exchange plugin)
+  persistent: true, // survive broker restart (default true)
   correlationId: "req-123", // tag for tracing across services
   headers: {
     tenantId: "42",
@@ -81,15 +79,15 @@ await channel.publish(payload, {
 
 All `PublishOptions` fields:
 
-| Field | Type | Default | What it does |
-| --- | --- | --- | --- |
-| `priority` | `number` | unset | Priority hint (0–9). Higher served first. The queue must be declared with `x-max-priority` for it to matter — out of scope of `ChannelOptions` today; assert manually via the raw channel if needed. |
-| `ttl` | `number` | unset | Per-message TTL in ms. (Not yet wired through to amqplib in the current driver — use `expiration` instead.) |
-| `expiration` | `number` | unset | Message expires after this many ms if not consumed. Mapped to AMQP `expiration`. |
-| `delay` | `number` | unset | Sets `x-delay` header for the [delayed-message exchange plugin](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange). No-op without the plugin. |
-| `persistent` | `boolean` | `true` | Marks the message persistent. Survives broker restart paired with a durable queue. |
-| `correlationId` | `string` | unset | Free-form ID — used by request-and-respond, also useful for cross-service tracing. |
-| `headers` | `Record<string, string>` | unset | Free-form headers. Consumer reads via `message.metadata.headers`. |
+| Field           | Type                     | Default | What it does                                                                                                                                                                                         |
+| --------------- | ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `priority`      | `number`                 | unset   | Priority hint (0–9). Higher served first. The queue must be declared with `x-max-priority` for it to matter — out of scope of `ChannelOptions` today; assert manually via the raw channel if needed. |
+| `ttl`           | `number`                 | unset   | Per-message TTL in ms. (Not yet wired through to amqplib in the current driver — use `expiration` instead.)                                                                                          |
+| `expiration`    | `number`                 | unset   | Message expires after this many ms if not consumed. Mapped to AMQP `expiration`.                                                                                                                     |
+| `delay`         | `number`                 | unset   | Sets `x-delay` header for the [delayed-message exchange plugin](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange). No-op without the plugin.                                            |
+| `persistent`    | `boolean`                | `true`  | Marks the message persistent. Survives broker restart paired with a durable queue.                                                                                                                   |
+| `correlationId` | `string`                 | unset   | Free-form ID — used by request-and-respond, also useful for cross-service tracing.                                                                                                                   |
+| `headers`       | `Record<string, string>` | unset   | Free-form headers. Consumer reads via `message.metadata.headers`.                                                                                                                                    |
 
 Headers are the right place for routing or filtering info — `tenantId`, `source`, feature flags. Just don't put secrets in them; they travel in plaintext (encrypted only by TLS in transit, not at rest in the broker).
 

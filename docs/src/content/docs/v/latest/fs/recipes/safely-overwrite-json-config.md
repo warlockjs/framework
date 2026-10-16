@@ -37,10 +37,14 @@ new value from the old one — bump a counter, push into an array — reach for
 ```ts title="src/bump-build.ts"
 import { fs } from "@warlock.js/fs";
 
-await fs.files.editJson("config.json", (cfg) => ({
-  ...cfg,
-  builds: cfg.builds + 1,
-}), { atomic: true });
+await fs.files.editJson(
+  "config.json",
+  (cfg) => ({
+    ...cfg,
+    builds: cfg.builds + 1,
+  }),
+  { atomic: true },
+);
 ```
 
 :::tip[Missing file? Seed it first]
@@ -50,9 +54,9 @@ returns the parsed doc or creates it from your fallback, never truncating an
 existing file.
 :::
 
-## What atomic does *not* do
+## What atomic does _not_ do
 
-`atomic` makes the *write* safe to observe. It does **not** lock the
+`atomic` makes the _write_ safe to observe. It does **not** lock the
 read-modify-write pair — two callers can both read the same starting state and
 one write silently wins. `@warlock.js/fs` has no file locking by design.
 

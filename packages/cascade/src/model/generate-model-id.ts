@@ -15,8 +15,7 @@ export async function generateModelId<TModel extends Model>(
     return undefined;
   }
 
-  const randomInt = (min: number, max: number) =>
-    Math.floor(Math.random() * (max - min + 1)) + min;
+  const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
   const initialId = ModelClass.initialId
     ? ModelClass.initialId
     : ModelClass.randomInitialId

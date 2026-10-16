@@ -40,25 +40,25 @@ Every field is optional with a safe default:
 
 ```ts
 type DashboardOptions = {
-  port?: number;     // default 4319 — pass 0 for an OS-assigned ephemeral port
-  host?: string;     // default "127.0.0.1" — loopback only
+  port?: number; // default 4319 — pass 0 for an OS-assigned ephemeral port
+  host?: string; // default "127.0.0.1" — loopback only
   basePath?: string; // default "/" — mount prefix for the UI + every /api route
-  open?: boolean;    // default false — open the default browser once listening
-  title?: string;    // default "Panoptic" — shown in the page header
-  authToken?: string;      // require `Authorization: Bearer <token>` (page route also accepts `?token=`) — REQUIRED off-loopback
+  open?: boolean; // default false — open the default browser once listening
+  title?: string; // default "Panoptic" — shown in the page header
+  authToken?: string; // require `Authorization: Bearer <token>` (page route also accepts `?token=`) — REQUIRED off-loopback
   allowedHosts?: string[]; // Host-header allowlist (DNS-rebind guard) — defaults to the loopback names
 };
 ```
 
-| Option | Default | Notes |
-| --- | --- | --- |
-| `port` | `4319` | Pass `0` for an ephemeral port — the real one comes back on the handle's `port`. A port already in use rejects with a clear `port … in use` error, not a raw `EADDRINUSE`. |
-| `host` | `"127.0.0.1"` | Loopback only by default — see the [security note](#security-loopback-only-by-default). |
-| `basePath` | `"/"` | A non-root value (e.g. `"/panoptic"`) prefixes both the page and every `/api/...` route. Normalized to leading-and-trailing-slash form internally. |
-| `open` | `false` | Best-effort browser launch via the platform opener; a launch failure never rejects the start. |
-| `title` | `"Panoptic"` | Baked into the served page header at start time. |
-| `authToken` | _unset_ | When set, every request must present `Authorization: Bearer <token>` or gets `401`; `?token=<token>` is accepted **only on the HTML page route** — the JSON API routes are header-only, since the page load is the one request that structurally can't carry a header. The comparison uses `crypto.timingSafeEqual` (constant-time, length-checked first), not `===`, so a network-reachable dashboard can't leak the token to a timing attack. **Required** when `host` is non-loopback — starting off-loopback without one rejects at `dashboard()`. |
-| `allowedHosts` | loopback names | `Host`-header allowlist defending against DNS-rebinding; a request whose `Host` isn't listed gets `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind — list your expected host(s) for a non-loopback one. |
+| Option         | Default        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `port`         | `4319`         | Pass `0` for an ephemeral port — the real one comes back on the handle's `port`. A port already in use rejects with a clear `port … in use` error, not a raw `EADDRINUSE`.                                                                                                                                                                                                                                                                                                                                                                             |
+| `host`         | `"127.0.0.1"`  | Loopback only by default — see the [security note](#security-loopback-only-by-default).                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `basePath`     | `"/"`          | A non-root value (e.g. `"/panoptic"`) prefixes both the page and every `/api/...` route. Normalized to leading-and-trailing-slash form internally.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `open`         | `false`        | Best-effort browser launch via the platform opener; a launch failure never rejects the start.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `title`        | `"Panoptic"`   | Baked into the served page header at start time.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `authToken`    | _unset_        | When set, every request must present `Authorization: Bearer <token>` or gets `401`; `?token=<token>` is accepted **only on the HTML page route** — the JSON API routes are header-only, since the page load is the one request that structurally can't carry a header. The comparison uses `crypto.timingSafeEqual` (constant-time, length-checked first), not `===`, so a network-reachable dashboard can't leak the token to a timing attack. **Required** when `host` is non-loopback — starting off-loopback without one rejects at `dashboard()`. |
+| `allowedHosts` | loopback names | `Host`-header allowlist defending against DNS-rebinding; a request whose `Host` isn't listed gets `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind — list your expected host(s) for a non-loopback one.                                                                                                                                                                                                                                                                                                                      |
 
 ## The low-level `dashboard(store, options)`
 
@@ -81,9 +81,9 @@ await handle.close();
 
 ```ts
 type DashboardHandle = {
-  readonly url: string;          // resolved http://host:port{basePath}
-  readonly port: number;         // resolved port — the real one when port: 0
-  close(): Promise<void>;        // stop the server, release the port
+  readonly url: string; // resolved http://host:port{basePath}
+  readonly port: number; // resolved port — the real one when port: 0
+  close(): Promise<void>; // stop the server, release the port
 };
 ```
 
@@ -110,11 +110,11 @@ The served page is dependency-free vanilla JS that polls the JSON API and render
 
 The dashboard server exposes three **read-only** `GET` routes under `basePath` (all under `{basePath}api`). They're a thin shell over the [trace store](/v/latest/ai/observability/querying-traces/), so you can also curl them or build your own UI:
 
-| Route | Backed by | Returns |
-| --- | --- | --- |
-| `GET {base}api/traces` | `store.query(parseQuery(searchParams))` | Matching traces, newest-started first. |
-| `GET {base}api/traces/:id` | `store.get(id)` | One `Trace` by id, or `404 { error: "trace_not_found" }`. |
-| `GET {base}api/aggregate` | `store.aggregate(parseQuery(searchParams))` | The `TraceAggregate` rollup for the filter. |
+| Route                      | Backed by                                   | Returns                                                   |
+| -------------------------- | ------------------------------------------- | --------------------------------------------------------- |
+| `GET {base}api/traces`     | `store.query(parseQuery(searchParams))`     | Matching traces, newest-started first.                    |
+| `GET {base}api/traces/:id` | `store.get(id)`                             | One `Trace` by id, or `404 { error: "trace_not_found" }`. |
+| `GET {base}api/aggregate`  | `store.aggregate(parseQuery(searchParams))` | The `TraceAggregate` rollup for the filter.               |
 
 The query string maps onto a [`TraceQuery`](/v/latest/ai/observability/querying-traces/#filtering-with-tracequery): `traceId`, `sessionId`, `status` (**repeatable** — `?status=failed&status=cancelled`), `startedAfter`, and `startedBefore`. Unknown params and unknown `status` tokens are dropped. So filtering is just a query string:
 

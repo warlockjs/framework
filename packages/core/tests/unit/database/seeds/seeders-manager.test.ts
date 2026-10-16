@@ -73,9 +73,7 @@ describe("SeedersManager.run — track()", () => {
 
     await manager.run();
 
-    const log = memory
-      .rowsOf(seedsTableName)
-      .find((row) => row.name === "users");
+    const log = memory.rowsOf(seedsTableName).find((row) => row.name === "users");
 
     expect(log?.lastRunRecordsCreated).toBe(3);
     expect(log?.totalRecordsCreated).toBe(3);
@@ -186,9 +184,7 @@ describe("SeedersManager.run — backward compatibility", () => {
 
     await manager.run();
 
-    const log = memory
-      .rowsOf(seedsTableName)
-      .find((row) => row.name === "legacy-count");
+    const log = memory.rowsOf(seedsTableName).find((row) => row.name === "legacy-count");
 
     expect(log?.lastRunRecordsCreated).toBe(7);
     expect(memory.rowsOf(seedRecordsTableName)).toHaveLength(0);
@@ -207,9 +203,7 @@ describe("SeedersManager.run — backward compatibility", () => {
 
     await manager.run();
 
-    const log = memory
-      .rowsOf(seedsTableName)
-      .find((row) => row.name === "legacy-void");
+    const log = memory.rowsOf(seedsTableName).find((row) => row.name === "legacy-void");
 
     expect(log).toBeDefined();
     expect(log?.lastRunRecordsCreated).toBe(0);

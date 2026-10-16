@@ -54,9 +54,7 @@ export function optionalNumberField(): FieldValidator<number | undefined> {
     }
 
     return {
-      issues: [
-        { message: `"${key}" must be a finite number when provided`, path: [key] },
-      ],
+      issues: [{ message: `"${key}" must be a finite number when provided`, path: [key] }],
     };
   };
 }
@@ -84,9 +82,7 @@ type ObjectShape<T> = {
  *   maxResults: optionalNumberField(),
  * });
  */
-export function objectSchema<T extends object>(
-  shape: ObjectShape<T>,
-): StandardSchemaV1<T> {
+export function objectSchema<T extends object>(shape: ObjectShape<T>): StandardSchemaV1<T> {
   return {
     "~standard": {
       version: 1,

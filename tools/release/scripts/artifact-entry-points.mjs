@@ -26,14 +26,14 @@ export function assertArtifactContainsItsEntryPoints(manifest, entries, name) {
   for (const target of targets) {
     const normalized = normalizeTarget(target, name);
     const exists = normalized.includes("*")
-      ? [...available].some(entry => wildcardTargetExpression(normalized).test(entry))
+      ? [...available].some((entry) => wildcardTargetExpression(normalized).test(entry))
       : available.has(normalized);
     if (!exists) missing.push(target);
   }
   if (missing.length > 0) {
     throw new Error(
       `${name}: the artifact names entry points it does not contain: ` +
-        missing.map(target => `missing packed entry target ${target}`).join(", "),
+        missing.map((target) => `missing packed entry target ${target}`).join(", "),
     );
   }
 }

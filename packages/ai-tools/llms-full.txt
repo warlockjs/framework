@@ -55,20 +55,21 @@ The `server` argument is discriminated by `type`:
 
 ```ts
 ai.mcp(server, {
-  namePrefix: "github.",                       // prepended to every remote tool name
-  filter: (name) => name.startsWith("issues_"),// only adapt tools whose name passes
-  timeoutMs: 30_000,                           // per tools/call deadline (default 30s)
+  namePrefix: "github.", // prepended to every remote tool name
+  filter: (name) => name.startsWith("issues_"), // only adapt tools whose name passes
+  timeoutMs: 30_000, // per tools/call deadline (default 30s)
 });
 ```
 
 - **`namePrefix`** is the collision mitigation — there is **no runtime tool-name collision guard** (the agent resolves a tool by first name match), so the author owns uniqueness. Prefix remote tools to keep them distinct from local ones.
-- **`filter`** receives each tool's *unprefixed* name; return `false` to drop it.
+- **`filter`** receives each tool's _unprefixed_ name; return `false` to drop it.
 
 ## What `tools()` does
 
 `client.tools()` is lazy and cached: the **first** call runs the `initialize` handshake, sends `notifications/initialized`, then `tools/list`, and maps each descriptor into a `ToolContract`. Repeat calls return the cached array without re-handshaking.
 
 For each remote tool:
+
 1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (Ajv-backed — `ajv` is an optional peer needed only for the client);
 2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
 3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
@@ -121,10 +122,10 @@ description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a ra
 import "@warlock.js/ai-tools";
 import { ai } from "@warlock.js/ai";
 
-const server = ai.mcp.serve(
-  [ai.tools.calculator(), ai.tools.dateTime()],
-  { name: "warlock-utils", transport: { type: "stdio" } },
-);
+const server = ai.mcp.serve([ai.tools.calculator(), ai.tools.dateTime()], {
+  name: "warlock-utils",
+  transport: { type: "stdio" },
+});
 
 await server.start();
 // ...later, on teardown:
@@ -147,10 +148,10 @@ The tools are snapshotted at construction (`source.tools()` is called once), so 
 
 ```ts
 ai.mcp.serve(source, {
-  name: "warlock-utils",          // advertised in the initialize response (required)
-  version: "1.0.0",               // default: the package version
-  transport: { type: "stdio" },   // default: stdio
-  schemaTarget: "draft-2020-12",  // JSON-Schema dialect for each tool's inputSchema
+  name: "warlock-utils", // advertised in the initialize response (required)
+  version: "1.0.0", // default: the package version
+  transport: { type: "stdio" }, // default: stdio
+  schemaTarget: "draft-2020-12", // JSON-Schema dialect for each tool's inputSchema
 });
 ```
 
@@ -186,7 +187,7 @@ const response = await handler.handle(jsonRpcRequest); // request → response, 
 
 ## Errors
 
-`McpTransportError` covers serve-side failures (`type: "connect"` when `start()` is asked to bind an unsupported transport; `type: "protocol"` for a malformed `tools/call` or an unknown tool name). Tool-level failures are *not* errors here — they come back as `isError: true` results, exactly as MCP expects.
+`McpTransportError` covers serve-side failures (`type: "connect"` when `start()` is asked to bind an unsupported transport; `type: "protocol"` for a malformed `tools/call` or an unknown tool name). Tool-level failures are _not_ errors here — they come back as `isError: true` results, exactly as MCP expects.
 
 ## See also
 
@@ -227,17 +228,17 @@ const agent = ai.agent({
 });
 ```
 
-The construction `options` are the **rails** — they bound what the model may do; the model supplies the per-call inputs *within* those rails. Least-privilege is just array composition: hand an agent only the tools (and only the methods/hosts) it needs.
+The construction `options` are the **rails** — they bound what the model may do; the model supplies the per-call inputs _within_ those rails. Least-privilege is just array composition: hand an agent only the tools (and only the methods/hosts) it needs.
 
 ## The five tools
 
-| Factory | Name | Model input | Returns |
-|---|---|---|---|
-| `ai.tools.webSearch(options)` | `web_search` | `{ query, maxResults? }` | `{ results: { title, url, snippet, score? }[] }` |
-| `ai.tools.fetchUrl(options?)` | `fetch_url` | `{ url }` | `{ url, status, content, truncated }` |
-| `ai.tools.http(options?)` | `http_request` | `{ method?, url, headers?, body? }` | `{ status, headers, body, truncated }` |
-| `ai.tools.calculator(options?)` | `calculator` | `{ expression }` | `{ result }` |
-| `ai.tools.dateTime(options?)` | `date_time` | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }` |
+| Factory                         | Name           | Model input                                                    | Returns                                          |
+| ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }` |
+| `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated }`            |
+| `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`           |
+| `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                     |
+| `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                      |
 
 ## `web_search` — pick a provider, supply a key
 
@@ -252,7 +253,12 @@ ai.tools.webSearch({ provider: "tavily", apiKey: process.env.TAVILY_API_KEY, max
 ## `fetch_url` — read a page you have the URL for
 
 ```ts
-ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 500_000, timeoutMs: 10_000 });
+ai.tools.fetchUrl({
+  extract: "text",
+  allowHosts: ["docs.stripe.com"],
+  maxBytes: 500_000,
+  timeoutMs: 10_000,
+});
 ```
 
 - `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`. **`"text"`/`"markdown"` lazily import the `@mozilla/readability` + `jsdom` optional peers** — a missing peer is a `WebToolError` of type `"missing-peer"` carrying the `npm install @mozilla/readability jsdom` string. `"html"` needs nothing.
@@ -267,7 +273,7 @@ ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 
 ai.tools.http({
   baseUrl: "https://api.stripe.com",
   allowHosts: ["api.stripe.com"],
-  allowMethods: ["GET", "POST"],            // default ["GET"] — mutating methods are opt-in
+  allowMethods: ["GET", "POST"], // default ["GET"] — mutating methods are opt-in
   headers: { authorization: `Bearer ${process.env.STRIPE_KEY}` },
   timeoutMs: 15_000,
   maxBytes: 1_000_000,
@@ -276,6 +282,7 @@ ai.tools.http({
 ```
 
 All guardrails are enforced **before the network call** and surface as a typed `HttpPolicyError`:
+
 - a method outside `allowMethods` → `"method-not-allowed"`;
 - a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
 - an unresolvable URL → `"invalid-url"`.
@@ -296,9 +303,15 @@ Supports `+ - * / % ^`, unary signs, parentheses, and decimal/scientific literal
 
 ```ts
 await ai.tools.dateTime().invoke({ op: "now", format: "iso" });
-await ai.tools.dateTime().invoke({ op: "add", iso: "2026-06-22T00:00:00Z", amount: 3, unit: "days" });
-await ai.tools.dateTime().invoke({ op: "diff", iso: "2026-06-22T00:00:00Z", to: "2026-06-25T00:00:00Z", unit: "days" }); // "3"
-await ai.tools.dateTime({ defaultTimeZone: "Africa/Cairo" }).invoke({ op: "format", iso: "2026-06-22T12:00:00Z", format: "datetime" });
+await ai.tools
+  .dateTime()
+  .invoke({ op: "add", iso: "2026-06-22T00:00:00Z", amount: 3, unit: "days" });
+await ai.tools
+  .dateTime()
+  .invoke({ op: "diff", iso: "2026-06-22T00:00:00Z", to: "2026-06-25T00:00:00Z", unit: "days" }); // "3"
+await ai.tools
+  .dateTime({ defaultTimeZone: "Africa/Cairo" })
+  .invoke({ op: "format", iso: "2026-06-22T12:00:00Z", format: "datetime" });
 ```
 
 - `op`: `"now"` / `"add"` / `"diff"` / `"format"`. `format`: `"iso"` (default), `"date"`, `"time"`, `"datetime"`.
@@ -313,7 +326,9 @@ Every failure above is thrown inside the tool handler, caught by the framework's
 ```ts
 import { WebToolError } from "@warlock.js/ai-tools";
 
-const { error } = await ai.tools.fetchUrl({ allowHosts: ["docs.stripe.com"] }).invoke({ url: "http://evil.test" });
+const { error } = await ai.tools
+  .fetchUrl({ allowHosts: ["docs.stripe.com"] })
+  .invoke({ url: "http://evil.test" });
 if (error instanceof WebToolError && error.type === "denied-host") {
   // rejected before any network call
 }

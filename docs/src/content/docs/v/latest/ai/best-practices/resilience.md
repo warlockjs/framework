@@ -7,11 +7,11 @@ description: Keep an AI feature standing when a provider rate-limits, a step fla
 
 The pillar this page answers: **when a provider rate-limits, a step flakes, a budget blows, or a user closes the tab — does your AI feature degrade gracefully, or does it fail the request and burn credit on the way down?**
 
-LLM calls fail in ways ordinary function calls don't: a 429 mid-incident, a slow upstream that never returns, a runaway tool loop that quietly spends two dollars per request. Resilience here is not one feature — it's a small set of disciplines, each matched to a specific failure mode. The throughline: `execute()` never throws, every failure is a *typed* `AIError`, and you react to the type, not a substring of the message.
+LLM calls fail in ways ordinary function calls don't: a 429 mid-incident, a slow upstream that never returns, a runaway tool loop that quietly spends two dollars per request. Resilience here is not one feature — it's a small set of disciplines, each matched to a specific failure mode. The throughline: `execute()` never throws, every failure is a _typed_ `AIError`, and you react to the type, not a substring of the message.
 
 ## The running scenario
 
-A document-ingestion feature for a SaaS product. A user uploads a contract; the system OCRs it (a flaky third-party call), then runs an LLM extraction pass to pull structured fields, and writes the result back. It runs on OpenAI with an Anthropic account on standby. The user can cancel from the UI, and finance has capped what one extraction is allowed to cost. Every recommendation below is about keeping *that* feature standing when one of its moving parts fails.
+A document-ingestion feature for a SaaS product. A user uploads a contract; the system OCRs it (a flaky third-party call), then runs an LLM extraction pass to pull structured fields, and writes the result back. It runs on OpenAI with an Anthropic account on standby. The user can cancel from the UI, and finance has capped what one extraction is allowed to cost. Every recommendation below is about keeping _that_ feature standing when one of its moving parts fails.
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -33,7 +33,7 @@ const result = await extractor.execute(`Extract fields from:\n\n${ocrText}`);
 
 if (result.error) {
   logger.error("extraction failed", {
-    code: result.error.code,         // stable AIErrorCode string
+    code: result.error.code, // stable AIErrorCode string
     category: result.error.category, // coarse ErrorCategory for dashboards
   });
 
@@ -56,11 +56,11 @@ try {
 }
 ```
 
-> The single documented exception is `OrchestratorConfigError`, which throws *synchronously at construction* (not from `execute()`) so a misconfigured `ai.orchestrator(...)` fails fast at boot rather than at the first request. Every *runtime* failure — provider, tool, schema, budget, cancellation — surfaces on `result.error`. See the [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) for the full never-throw contract.
+> The single documented exception is `OrchestratorConfigError`, which throws _synchronously at construction_ (not from `execute()`) so a misconfigured `ai.orchestrator(...)` fails fast at boot rather than at the first request. Every _runtime_ failure — provider, tool, schema, budget, cancellation — surfaces on `result.error`. See the [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) for the full never-throw contract.
 
 ## Branch on the typed `AIError` taxonomy — never string-match the message
 
-Every error the framework surfaces is an `AIError` subclass with a stable `code` and a coarse `category`. Message *text* is for humans and changes between SDK versions; `code` and `category` are the public contract. Matching `error.message.includes("rate limit")` is a latent bug — it breaks the day a provider rewords its 429, and it can't tell a rate-limit apart from an auth failure that happens to mention "limit." Branch on the type and the retry decision falls out of it.
+Every error the framework surfaces is an `AIError` subclass with a stable `code` and a coarse `category`. Message _text_ is for humans and changes between SDK versions; `code` and `category` are the public contract. Matching `error.message.includes("rate limit")` is a latent bug — it breaks the day a provider rewords its 429, and it can't tell a rate-limit apart from an auth failure that happens to mention "limit." Branch on the type and the retry decision falls out of it.
 
 **Do this — dispatch on `instanceof` (or `error.code`) and let the type carry the typed fields.** A rate-limit knows its own `retryAfter`; a context-length error knows the model's `limit`. The taxonomy hands you the data you need to react.
 
@@ -102,10 +102,14 @@ For dashboards and metrics, the coarser `category` is the right grain — `code`
 metrics.increment("ai.error", { category: result.error.category });
 
 switch (result.error.category) {
-  case "rate-limit": return retryWithBackoff();
-  case "timeout":    return retryOnce();
-  case "auth":       return escalate();        // not retryable
-  case "budget":     return degradeToCheaper();
+  case "rate-limit":
+    return retryWithBackoff();
+  case "timeout":
+    return retryOnce();
+  case "auth":
+    return escalate(); // not retryable
+  case "budget":
+    return degradeToCheaper();
 }
 ```
 
@@ -119,11 +123,11 @@ if (result.error?.message.toLowerCase().includes("rate limit")) {
 }
 ```
 
-> The retryability of each code is part of the taxonomy, not a judgement call: `rate-limit` and `timeout` are transient (retry with backoff); `auth`, `quota`, `content-filter`, and the various `drift` / `config` / `cancelled` codes are *not* retryable — retrying only delays the inevitable. The [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) has the full code → retryable table.
+> The retryability of each code is part of the taxonomy, not a judgement call: `rate-limit` and `timeout` are transient (retry with backoff); `auth`, `quota`, `content-filter`, and the various `drift` / `config` / `cancelled` codes are _not_ retryable — retrying only delays the inevitable. The [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) has the full code → retryable table.
 
 ## Wrap the model in `ai.fallbackModel` for provider failover — it's a failover, not a default
 
-When OpenAI has a regional incident and starts returning 429s and timeouts, every extraction fails for the duration. `ai.fallbackModel` wraps an ordered model list and advances to the next model only on a *transient* provider error, so a provider blip degrades to the backup instead of failing the user. The trap is reaching for it as a cost or quality lever — it does nothing on the happy path, where the primary always answers.
+When OpenAI has a regional incident and starts returning 429s and timeouts, every extraction fails for the duration. `ai.fallbackModel` wraps an ordered model list and advances to the next model only on a _transient_ provider error, so a provider blip degrades to the backup instead of failing the user. The trap is reaching for it as a cost or quality lever — it does nothing on the happy path, where the primary always answers.
 
 **Do this — order it primary-first, and let the default transient set decide failover.** The first model serves every healthy request; the backup exists for the minutes the primary is down. With no `retryOn`, the chain advances only on rate-limit, timeout, and generic 5xx — exactly the failures a different provider can plausibly absorb.
 
@@ -151,7 +155,7 @@ for (const attempt of resilientModel.lastAttempts) {
 }
 ```
 
-**Avoid this — failing over on non-transient errors, or leaning on the fallback as a normal model.** A bad API key, an oversized prompt, or a content-filter block fails *identically* on every downstream model, so failing over on them only burns the backup's budget on input that can't succeed. The default already excludes them — don't widen `retryOn` to catch them.
+**Avoid this — failing over on non-transient errors, or leaning on the fallback as a normal model.** A bad API key, an oversized prompt, or a content-filter block fails _identically_ on every downstream model, so failing over on them only burns the backup's budget on input that can't succeed. The default already excludes them — don't widen `retryOn` to catch them.
 
 ```ts
 // Anti-pattern: retrying everything sends a bad key / oversized prompt down
@@ -162,11 +166,11 @@ const greedy = ai.fallbackModel(
 );
 ```
 
-> `fallbackModel` advances *instantly* with no backoff of its own — it owns "try a different provider," not "wait and retry this one." For a rate-limit you usually want both: a backoff (retry the same provider after `error.retryAfter`) layered around the agent, and a fallback for when the provider stays down. And a *quality* complaint ("answers are weak") is never a fallback problem — the backup only fires on transient failures, so fix the primary model or prompt instead. See the [provider-fallback recipe](/v/latest/ai/recipes/cost-provider-fallback/) for narrowing `retryOn` and the streaming caveat (failover only before the first chunk).
+> `fallbackModel` advances _instantly_ with no backoff of its own — it owns "try a different provider," not "wait and retry this one." For a rate-limit you usually want both: a backoff (retry the same provider after `error.retryAfter`) layered around the agent, and a fallback for when the provider stays down. And a _quality_ complaint ("answers are weak") is never a fallback problem — the backup only fires on transient failures, so fix the primary model or prompt instead. See the [provider-fallback recipe](/v/latest/ai/recipes/cost-provider-fallback/) for narrowing `retryOn` and the streaming caveat (failover only before the first chunk).
 
 ## Retry transient step failures with backoff — keep the predicate narrow
 
-The OCR call is flaky: an occasional `ETIMEDOUT` or `ECONNRESET` that succeeds on the next try. Failing the whole run on the first network blip is the wrong reflex. A workflow step's `retry` block retries with bounded backoff, and `retryOn` keeps the retries pointed at *transient* failures only — a permanent 4xx-style error should fail immediately instead of burning every attempt waiting out a backoff that can't help.
+The OCR call is flaky: an occasional `ETIMEDOUT` or `ECONNRESET` that succeeds on the next try. Failing the whole run on the first network blip is the wrong reflex. A workflow step's `retry` block retries with bounded backoff, and `retryOn` keeps the retries pointed at _transient_ failures only — a permanent 4xx-style error should fail immediately instead of burning every attempt waiting out a backoff that can't help.
 
 **Do this — bound the retries and gate them with a transient-only predicate.** Exponential backoff spreads the attempts (500ms, 1s, 2s, …, capped at 30s); `retryOn` returning `false` short-circuits the remaining attempts the instant the error is permanent.
 
@@ -180,19 +184,19 @@ const processDoc = ai.workflow<{ documentId: string; fileUrl: string }>({
         attempts: 4,
         backoff: "exponential",
         // Only retry transient network failures; bail fast on the rest.
-        retryOn: error => isTransient(error),
+        retryOn: (error) => isTransient(error),
         onRetry: (attempt, error) => {
           logger.warn(`ocr retry #${attempt}`, { message: (error as Error).message });
         },
       },
-      run: async ctx => {
+      run: async (ctx) => {
         ctx.state.text = await ocrService.read(ctx.input.fileUrl);
       },
     }),
     ai.step({
       name: "extract",
       agent: extractor,
-      input: ctx => ({ prompt: `Extract fields from:\n\n${ctx.state.text}` }),
+      input: (ctx) => ({ prompt: `Extract fields from:\n\n${ctx.state.text}` }),
     }),
   ],
 });
@@ -211,7 +215,7 @@ function isTransient(error: unknown): boolean {
 ai.step({
   name: "ocr",
   retry: { attempts: 4, backoff: "none" }, // no retryOn → retries bad input too
-  run: async ctx => {
+  run: async (ctx) => {
     ctx.state.text = await ocrService.read(ctx.input.fileUrl);
   },
 });
@@ -221,7 +225,7 @@ ai.step({
 
 ## Cap spend with budget middleware — a runaway loop must not burn credit
 
-The one failure mode that costs *real money* is a tool loop that keeps re-asking the model — it spends dollars and seconds before anyone notices, and you find out from the invoice, not an alert. `ai.middleware.budget` caps cumulative usage per execution and aborts with a typed `BudgetExceededError` the instant a cap is breached, so the worst case is bounded no matter how the model misbehaves.
+The one failure mode that costs _real money_ is a tool loop that keeps re-asking the model — it spends dollars and seconds before anyone notices, and you find out from the invoice, not an alert. `ai.middleware.budget` caps cumulative usage per execution and aborts with a typed `BudgetExceededError` the instant a cap is breached, so the worst case is bounded no matter how the model misbehaves.
 
 **Do this — put a hard cap on every agent that has tools, and read the breach numerically.** The error exposes `actual` / `limit` / `unit` as typed fields, so there's no message to parse when you alert.
 
@@ -249,7 +253,9 @@ const result = await guardedExtractor.execute(input);
 if (result.error instanceof BudgetExceededError) {
   // Numeric breach detail — no string parsing.
   metrics.increment("ai.budget.breach", { unit: result.error.unit });
-  console.warn(`budget breach: ${result.error.actual} ${result.error.unit} (cap ${result.error.limit})`);
+  console.warn(
+    `budget breach: ${result.error.actual} ${result.error.unit} (cap ${result.error.limit})`,
+  );
 }
 ```
 
@@ -264,11 +270,11 @@ const extractor = ai.agent({
 });
 ```
 
-> Roll a budget out in `warn` mode first (`onExceeded: "warn"` logs once on the first breach and lets the run finish) so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, the declarative `contract` clause with `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the *next* turn to a cheaper agent. The budget is per-*execution*, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets-and-slo recipe](/v/latest/ai/recipes/cost-budgets-and-slo/) for the SLO contract and the soft-fallback path.
+> Roll a budget out in `warn` mode first (`onExceeded: "warn"` logs once on the first breach and lets the run finish) so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, the declarative `contract` clause with `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the _next_ turn to a cheaper agent. The budget is per-_execution_, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets-and-slo recipe](/v/latest/ai/recipes/cost-budgets-and-slo/) for the SLO contract and the soft-fallback path.
 
 ## Honor `AbortSignal` for user-cancel and deadlines
 
-A user who closes the tab, or a request that blows its deadline, should stop the run — not keep paying for an extraction nobody is waiting for. Pass an `AbortSignal` to `execute` and the run terminates at the next trip (or step) boundary; the agent surfaces an `AgentCancelledError` (category `"cancelled"`), the workflow a `WorkflowCancelledError`. Both are *caller-driven* and explicitly **not** retryable — a cancel is a decision, not a failure to recover from.
+A user who closes the tab, or a request that blows its deadline, should stop the run — not keep paying for an extraction nobody is waiting for. Pass an `AbortSignal` to `execute` and the run terminates at the next trip (or step) boundary; the agent surfaces an `AgentCancelledError` (category `"cancelled"`), the workflow a `WorkflowCancelledError`. Both are _caller-driven_ and explicitly **not** retryable — a cancel is a decision, not a failure to recover from.
 
 **Do this — thread one signal through, and distinguish a cancel from a genuine failure.** Wire the same controller to a UI "Cancel" button and a deadline timer; on the result, branch the cancellation class away from real errors so you don't retry a stop the user asked for.
 

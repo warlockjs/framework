@@ -24,9 +24,7 @@ describe("resolveContactScaffold", () => {
 
     expect(plan.writeController).toBe(false);
     expect(plan.writeRoutes).toBe(true);
-    expect(plan.messages.join("\n")).toContain(
-      "src/app/contact/controllers/contact.controller.ts",
-    );
+    expect(plan.messages.join("\n")).toContain("src/app/contact/controllers/contact.controller.ts");
   });
 
   it("does not write an existing routes.ts, and names it in the report", () => {

@@ -561,7 +561,13 @@ export class PostgresQueryBuilder<T = unknown>
 
     // Relation-existence ops are rewritten later by `applyHasRelations()`, which
     // only looks at top-level ops, so they stay outside the groups.
-    const HAS_OP_TYPES = new Set(["has", "whereHas", "orWhereHas", "doesntHave", "whereDoesntHave"]);
+    const HAS_OP_TYPES = new Set([
+      "has",
+      "whereHas",
+      "orWhereHas",
+      "doesntHave",
+      "whereDoesntHave",
+    ]);
     const isFilter = (op: Op): boolean =>
       /^(or)?where/i.test(op.type) && !HAS_OP_TYPES.has(op.type);
 
@@ -1008,7 +1014,9 @@ export class PostgresQueryBuilder<T = unknown>
     this.applyPendingScopes();
     // Scalar reads bypass model hydration — the aggregate row is not a model.
     this.hydrateCallback = undefined;
-    const result = await this.selectRaw(`SUM(${this.driver.dialect.quoteIdentifier(field)}) as sum`).first<{ sum: string }>();
+    const result = await this.selectRaw(
+      `SUM(${this.driver.dialect.quoteIdentifier(field)}) as sum`,
+    ).first<{ sum: string }>();
     return parseFloat(result?.sum ?? "0");
   }
 

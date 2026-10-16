@@ -5,16 +5,7 @@ import { NO_DATABASE } from "./features/database-drivers";
 import { buildHelpText } from "./flags/definitions";
 import { packageRoot } from "./helpers/paths";
 
-const valueFlags = [
-  "name",
-  "db",
-  "pm",
-  "features",
-  "ai",
-  "agents",
-  "stack",
-  "lint",
-];
+const valueFlags = ["name", "db", "pm", "features", "ai", "agents", "stack", "lint"];
 
 const HELP_TEXT = buildHelpText();
 
@@ -37,12 +28,8 @@ export function parseFlags(argv: string[]): CliFlags {
     }
 
     const equalIndex = arg.indexOf("=");
-    const key = (equalIndex === -1 ? arg : arg.slice(0, equalIndex)).replace(
-      /^-+/,
-      "",
-    );
-    let value: string | undefined =
-      equalIndex === -1 ? undefined : arg.slice(equalIndex + 1);
+    const key = (equalIndex === -1 ? arg : arg.slice(0, equalIndex)).replace(/^-+/, "");
+    let value: string | undefined = equalIndex === -1 ? undefined : arg.slice(equalIndex + 1);
 
     // Value-taking flags may use either `--key=value` or `--key value`.
     if (valueFlags.includes(key) && value === undefined) {
@@ -129,7 +116,7 @@ function splitList(value: string | undefined): string[] {
 
   return value
     .split(",")
-    .map(item => item.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
 }
 
@@ -139,8 +126,7 @@ function splitList(value: string | undefined): string[] {
  * side-effect-free exit.
  */
 export function packageVersion(): string {
-  return (getJsonFile(packageRoot("package.json")) as { version: string })
-    .version;
+  return (getJsonFile(packageRoot("package.json")) as { version: string }).version;
 }
 
 export default function createApp() {
@@ -166,9 +152,7 @@ export default function createApp() {
   // banner (there is no banner after this point).
   Promise.resolve(createNewApp(flags)).catch((error: unknown) => {
     console.error();
-    console.error(
-      `  create-warlock failed: ${(error as Error)?.message ?? String(error)}`,
-    );
+    console.error(`  create-warlock failed: ${(error as Error)?.message ?? String(error)}`);
     console.error();
 
     process.exit(1);

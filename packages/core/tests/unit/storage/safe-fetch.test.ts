@@ -250,7 +250,7 @@ describe("safeFetchToBuffer — redirect re-validation (SSRF hop check)", () => 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("issues every hop with redirect: \"manual\" so the platform never auto-follows", async () => {
+  it('issues every hop with redirect: "manual" so the platform never auto-follows', async () => {
     const fetchSpy = vi.fn(async (_input: string | URL, init?: RequestInit) => {
       expect(init?.redirect).toBe("manual");
       return streamingResponse(1);

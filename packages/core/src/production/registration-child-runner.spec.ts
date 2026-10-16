@@ -19,7 +19,10 @@ class FakeChild extends EventEmitter {
 
 const RESULT = "test:result";
 
-function run(child: FakeChild, overrides: Partial<RegistrationChildRunOptions<{ value: string }>> = {}) {
+function run(
+  child: FakeChild,
+  overrides: Partial<RegistrationChildRunOptions<{ value: string }>> = {},
+) {
   return runRegistrationChild<{ value: string }>({
     cwd: "C:/app",
     request: { version: 1, cwd: "C:/app" },

@@ -4,14 +4,14 @@ Performance measurement utility. Wraps sync/async function execution with timing
 
 ## Key Files
 
-| File                     | Purpose                                                                          |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| `benchmark.ts`           | `measure()` — times execution, classifies latency, fires hooks, records to sinks |
+| File                     | Purpose                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| `benchmark.ts`           | `measure()` — times execution, classifies latency, fires hooks, records to sinks   |
 | `profiler.ts`            | `BenchmarkProfiler` — ring-buffer percentiles (p50/p90/p95/p99), counts, errorRate |
-| `benchmark-snapshots.ts` | `BenchmarkSnapshots` — bounded raw result capture (error/value/all)              |
-| `channels/`              | `BenchmarkChannel` implementations (`ConsoleChannel`, `NoopChannel`)             |
-| `types.ts`               | `BenchmarkOptions`, `BenchmarkResult`, `BenchmarkConfigurations`, stats types     |
-| `index.ts`               | Barrel export                                                                    |
+| `benchmark-snapshots.ts` | `BenchmarkSnapshots` — bounded raw result capture (error/value/all)                |
+| `channels/`              | `BenchmarkChannel` implementations (`ConsoleChannel`, `NoopChannel`)               |
+| `types.ts`               | `BenchmarkOptions`, `BenchmarkResult`, `BenchmarkConfigurations`, stats types      |
+| `index.ts`               | Barrel export                                                                      |
 
 ## Key Exports
 

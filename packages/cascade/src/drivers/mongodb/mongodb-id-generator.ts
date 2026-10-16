@@ -126,9 +126,7 @@ export class MongoIdGenerator implements IdGeneratorContract {
    * // ids[0] is the first id, ids[99] the last; getLastId("users") === ids[99]
    * ```
    */
-  public async generateNextIds(
-    options: GenerateIdOptions & { count: number },
-  ): Promise<number[]> {
+  public async generateNextIds(options: GenerateIdOptions & { count: number }): Promise<number[]> {
     const { table, initialId = 1, incrementIdBy = 1, count } = options;
 
     if (count <= 0) {
@@ -205,9 +203,7 @@ export class MongoIdGenerator implements IdGeneratorContract {
       const lastId = result?.id;
 
       if (typeof lastId !== "number") {
-        throw new Error(
-          `Failed to reserve an id block for "${table}": counter returned no id.`,
-        );
+        throw new Error(`Failed to reserve an id block for "${table}": counter returned no id.`);
       }
 
       return lastId;
@@ -270,10 +266,9 @@ export class MongoIdGenerator implements IdGeneratorContract {
   private async createCounterIndex(): Promise<void> {
     try {
       const database = this.driver.getDatabase();
-      await database.collection(this.counterCollection).createIndex(
-        { collection: 1 },
-        { unique: true, name: "collection_unique" },
-      );
+      await database
+        .collection(this.counterCollection)
+        .createIndex({ collection: 1 }, { unique: true, name: "collection_unique" });
     } catch {
       // Best-effort — see ensureIndexes(). Degrade gracefully without the index.
     }

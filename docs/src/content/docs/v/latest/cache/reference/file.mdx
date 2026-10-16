@@ -6,15 +6,18 @@ slug: v/latest/cache/file
 The File Cache Driver stores cached data as files on disk. Each cache key is a directory containing a `cache.json` file.
 
 ## When to Use
+
 - Local development
 - Need persistence across restarts, but don't want to set up Redis
 - Small to medium-sized cache needs
 
 ## Best For
+
 - Caching API responses, config, or data that should survive restarts
 - Environments where Redis is not available
 
 ## Limitations
+
 - Slower than memory or Redis for large caches
 - Not suitable for distributed/multi-server setups
 - Manual cleanup of expired files only happens on access
@@ -22,6 +25,7 @@ The File Cache Driver stores cached data as files on disk. Each cache key is a d
 - `cache.list()` works but is O(n) with disk I/O per operation. Avoid large lists on the file driver.
 
 ## Alternatives
+
 - [Memory Cache Driver](/v/latest/cache/memory/): Fast, but not persistent
 - [Redis Cache Driver](/v/latest/cache/redis/): Distributed, production-grade
 
@@ -51,12 +55,13 @@ export default cacheConfigurations;
 ```
 
 ## Options
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `directory` | string \| Function | `storagePath("cache")` | Directory for cache files |
-| `fileName` | string \| Function | `"cache.json"` | File name for cache data |
-| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
-| `ttl` | number \| string | `0` | Default TTL — seconds or a duration string (`"1h"`, `"7d"`). `0` means no expiration. |
+
+| Option         | Type               | Default                | Description                                                                           |
+| -------------- | ------------------ | ---------------------- | ------------------------------------------------------------------------------------- |
+| `directory`    | string \| Function | `storagePath("cache")` | Directory for cache files                                                             |
+| `fileName`     | string \| Function | `"cache.json"`         | File name for cache data                                                              |
+| `globalPrefix` | string \| Function | `undefined`            | Global prefix for all cache keys                                                      |
+| `ttl`          | number \| string   | `0`                    | Default TTL — seconds or a duration string (`"1h"`, `"7d"`). `0` means no expiration. |
 
 ### Directory Configuration
 
@@ -117,6 +122,7 @@ Always use absolute paths for the `directory` option. Relative paths can cause i
 ## Example Usage
 
 ## Storing and Retrieving Data
+
 ```ts
 import { cache } from "@warlock.js/cache";
 
@@ -145,10 +151,12 @@ Each cache entry is stored in its own directory with a JSON file containing the 
 Cache keys can carry untrusted input (a `cached()` auto-key derived from a request param, for example), so the file driver never lets a key choose its own path. `%`, `/`, and `\` in a key are percent-encoded before the on-disk directory is built — a key like `../../etc` becomes an inert directory name, not a path traversal — and the resolved path is additionally asserted to stay inside the configured `directory` (the cache root), throwing `CacheError` otherwise. `removeNamespace(ns)` also clears dotted sibling keys (`ns.a`, `ns.b`, …), not just a directory literally named `ns`.
 
 ## Expired Cache
+
 - Expired cache is only removed when accessed.
 - For automatic cleanup, consider a background job or use Redis.
 
 ## Troubleshooting
+
 - **Cache not persistent?** Check your `directory` path and permissions.
 - **Performance issues?** For large caches, use [Redis](/v/latest/cache/redis/) or [Memory](/v/latest/cache/memory/) drivers.
 

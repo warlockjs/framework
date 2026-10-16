@@ -60,7 +60,10 @@ describe("BedrockSDK", () => {
       pricing: { "amazon.nova-pro-v1:0": { input: 0.8, output: 3.2 } },
     });
 
-    expect(sdk.model({ name: "amazon.nova-pro-v1:0" }).pricing).toEqual({ input: 0.8, output: 3.2 });
+    expect(sdk.model({ name: "amazon.nova-pro-v1:0" }).pricing).toEqual({
+      input: 0.8,
+      output: 3.2,
+    });
     expect(
       sdk.model({ name: "amazon.nova-pro-v1:0", pricing: { input: 1, output: 2 } }).pricing,
     ).toEqual({ input: 1, output: 2 });

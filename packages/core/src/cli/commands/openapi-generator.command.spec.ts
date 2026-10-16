@@ -29,7 +29,11 @@ describe("warlock generate.openapi", () => {
   beforeEach(async () => {
     hoisted.root = await mkdtemp(path.join(tmpdir(), "warlock-openapi-cli-"));
     hoisted.collectOpenApiDocument.mockReset();
-    hoisted.collectOpenApiDocument.mockResolvedValue({ version: 1, document, warnings: ["GET /a: gap"] });
+    hoisted.collectOpenApiDocument.mockResolvedValue({
+      version: 1,
+      document,
+      warnings: ["GET /a: gap"],
+    });
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
@@ -76,7 +80,12 @@ describe("warlock generate.openapi", () => {
   it("honours --out, --title, --server and --include-pages", async () => {
     await openApiGeneratorCommand.execute({
       args: [],
-      options: { out: "docs/api.json", title: "Shop", server: "https://x.test", includePages: true },
+      options: {
+        out: "docs/api.json",
+        title: "Shop",
+        server: "https://x.test",
+        includePages: true,
+      },
     } as never);
 
     expect(JSON.parse(await readFile(path.join(hoisted.root, "docs", "api.json"), "utf8"))).toEqual(

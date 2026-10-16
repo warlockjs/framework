@@ -86,4 +86,7 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 
 - The `implement-resolver` topic — write a resolver for your own storage.
 - The `manage-roles` topic — assign / revoke with the ejected table.
+
+```
+
 ```

@@ -39,30 +39,26 @@ export function createInMemoryDriver() {
     return { id: row.id };
   });
 
-  const insertMany = vi.fn(
-    async (table: string, documents: Record<string, unknown>[]) => {
-      const rows: Row[] = [];
+  const insertMany = vi.fn(async (table: string, documents: Record<string, unknown>[]) => {
+    const rows: Row[] = [];
 
-      for (const document of documents) {
-        const row = { id: nextId++, ...document } as Row;
-        ensure(table).push(row);
-        rows.push(row);
-      }
+    for (const document of documents) {
+      const row = { id: nextId++, ...document } as Row;
+      ensure(table).push(row);
+      rows.push(row);
+    }
 
-      return rows.map((row) => ({ id: row.id }));
-    },
-  );
+    return rows.map((row) => ({ id: row.id }));
+  });
 
-  const deleteMany = vi.fn(
-    async (table: string, filter: Record<string, unknown> = {}) => {
-      const rows = ensure(table);
-      const keep = rows.filter((row) => !matches(row, filter));
-      const deleted = rows.length - keep.length;
-      tables.set(table, keep);
+  const deleteMany = vi.fn(async (table: string, filter: Record<string, unknown> = {}) => {
+    const rows = ensure(table);
+    const keep = rows.filter((row) => !matches(row, filter));
+    const deleted = rows.length - keep.length;
+    tables.set(table, keep);
 
-      return deleted;
-    },
-  );
+    return deleted;
+  });
 
   const queryBuilder = vi.fn((table: string) => {
     const filters: Record<string, unknown> = {};

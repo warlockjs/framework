@@ -50,9 +50,9 @@ describe("MemoryCacheDriver — v2 set options", () => {
     });
 
     it("rejects ttl and expiresAt together", async () => {
-      await expect(
-        driver.set("a", 1, { ttl: "1h", expiresAt: Date.now() + 1000 }),
-      ).rejects.toThrow(CacheConfigurationError);
+      await expect(driver.set("a", 1, { ttl: "1h", expiresAt: Date.now() + 1000 })).rejects.toThrow(
+        CacheConfigurationError,
+      );
     });
 
     it("rejects expiresAt in the past", async () => {

@@ -17,7 +17,7 @@ import { cache } from "@warlock.js/cache";
 async function runNightlyImport() {
   const outcome = await cache.lock(
     "lock.nightly-import",
-    { ttl: "10m", driver: "redis" },   // ttl is the crash safety-net
+    { ttl: "10m", driver: "redis" }, // ttl is the crash safety-net
     async () => {
       await importEverything();
       return "done";
@@ -29,7 +29,7 @@ async function runNightlyImport() {
     return;
   }
 
-  console.log("import finished:", outcome.value);   // "done"
+  console.log("import finished:", outcome.value); // "done"
 }
 ```
 
@@ -45,7 +45,7 @@ wrapped function legitimately returns `undefined`.
 
 The lock auto-releases when `fn` finishes (success **or** throw — release is in
 a `finally`). The `ttl` is the safety net for the case where the process
-*crashes* mid-job and never reaches the release: the lock self-expires after
+_crashes_ mid-job and never reaches the release: the lock self-expires after
 `ttl` so the job isn't wedged forever. Set it comfortably longer than the
 job's worst-case runtime.
 

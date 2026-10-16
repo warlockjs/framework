@@ -21,7 +21,7 @@ Seal exposes a plugin system so you can add validator methods without forking th
 import type { SealPlugin } from "@warlock.js/seal";
 
 type SealPlugin = {
-  name: string;          // unique identifier — duplicates warn and skip install
+  name: string; // unique identifier — duplicates warn and skip install
   version?: string;
   description?: string;
   install: (context: { name: string; version?: string }) => void | Promise<void>;
@@ -59,8 +59,8 @@ import { registerPlugin, unregisterPlugin, hasPlugin, getInstalledPlugins } from
 await registerPlugin(slugPlugin);
 // console.warn if "slug" is already installed; otherwise install() runs and the plugin is tracked.
 
-hasPlugin("slug");           // → true
-getInstalledPlugins();       // → [slugPlugin]
+hasPlugin("slug"); // → true
+getInstalledPlugins(); // → [slugPlugin]
 
 await unregisterPlugin("slug");
 // runs slugPlugin.uninstall?.(); removes from registry.
@@ -163,8 +163,8 @@ For a method that creates a **new validator** (not chained from an existing one)
 ## Introspection — checking what's loaded
 
 ```ts
-hasPlugin("slug");                 // boolean
-getInstalledPlugins();             // SealPlugin[]
+hasPlugin("slug"); // boolean
+getInstalledPlugins(); // SealPlugin[]
 ```
 
 Use these in startup diagnostics or in tests that need to assert a plugin is registered before exercising a method that depends on it.
@@ -176,7 +176,6 @@ Use these in startup diagnostics or in tests that need to assert a plugin is reg
 - Don't make the plugin's `install` function depend on shared state mutable from elsewhere. Plugins should be idempotent — installing twice (or registering across hot-reloads) should not break anything.
 - Don't ship a plugin that overrides a built-in method without a clear reason. If you must, `uninstall` should restore the original — but the better path is a different method name.
 - Don't author one plugin per method. Group related methods (e.g. "country-specific validators") into one plugin so the install/uninstall lifecycle is coherent.
-
 
 ## Returning validated rule output
 

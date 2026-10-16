@@ -71,7 +71,10 @@ describe("discoverPages guard", () => {
     ["a conditional", "export const config = { middleware: [on ? requireUser() : audit] };"],
     ["a wrapper call", "export const config = { middleware: [wrap(requireUser())] };"],
     ["requireGuest()", "export const config = { middleware: [requireGuest()] };"],
-    ["action-only middleware", "export const config = { action: { middleware: [requireUser()] } };"],
+    [
+      "action-only middleware",
+      "export const config = { action: { middleware: [requireUser()] } };",
+    ],
   ])("does not treat %s as a guard", (_case, declaration) => {
     const appRoot = makeAppTree({
       "src/web/root.tsx": APP,
@@ -206,6 +209,8 @@ describe("readPageGuard (dev installer)", () => {
       }),
     ).toBe("user");
     expect(readPageGuard({ pageFile: path.join(web, "own.page.tsx"), layouts: [] })).toBe("user");
-    expect(readPageGuard({ pageFile: path.join(web, "broken.page.tsx"), layouts: [] })).toBeUndefined();
+    expect(
+      readPageGuard({ pageFile: path.join(web, "broken.page.tsx"), layouts: [] }),
+    ).toBeUndefined();
   });
 });

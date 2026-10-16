@@ -43,7 +43,11 @@ describe("Database Validation Rules", () => {
         options: { model: User },
       } as any;
 
-      const result = await databaseModelRule.validate?.call({ ...databaseModelRule, context }, user, context);
+      const result = await databaseModelRule.validate?.call(
+        { ...databaseModelRule, context },
+        user,
+        context,
+      );
 
       expect(result).toEqual({ isValid: true });
     });
@@ -59,7 +63,11 @@ describe("Database Validation Rules", () => {
         options: { model: { name: "User" } },
       } as any;
 
-      const result = await databaseModelRule.validate?.call({ ...databaseModelRule, context }, notAModel, context);
+      const result = await databaseModelRule.validate?.call(
+        { ...databaseModelRule, context },
+        notAModel,
+        context,
+      );
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -90,7 +98,11 @@ describe("Database Validation Rules", () => {
         options: {},
       } as any;
 
-      const result = await databaseModelRule.validate?.call({ ...databaseModelRule, context }, null, context);
+      const result = await databaseModelRule.validate?.call(
+        { ...databaseModelRule, context },
+        null,
+        context,
+      );
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -113,7 +125,11 @@ describe("Database Validation Rules", () => {
         options: { model: Post },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, posts, context);
+      const result = await databaseModelsRule.validate?.call(
+        { ...databaseModelsRule, context },
+        posts,
+        context,
+      );
 
       expect(result).toEqual({ isValid: true });
     });
@@ -134,7 +150,11 @@ describe("Database Validation Rules", () => {
         options: { model: Comment },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, mixed, context);
+      const result = await databaseModelsRule.validate?.call(
+        { ...databaseModelsRule, context },
+        mixed,
+        context,
+      );
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -150,7 +170,11 @@ describe("Database Validation Rules", () => {
         options: { model: { name: "Item" } },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, notArray, context);
+      const result = await databaseModelsRule.validate?.call(
+        { ...databaseModelsRule, context },
+        notArray,
+        context,
+      );
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -172,7 +196,11 @@ describe("Database Validation Rules", () => {
         options: { model: "Product" }, // String reference
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, products, context);
+      const result = await databaseModelsRule.validate?.call(
+        { ...databaseModelsRule, context },
+        products,
+        context,
+      );
 
       expect(result).toEqual({ isValid: true });
     });
@@ -210,7 +238,11 @@ describe("Database Validation Rules", () => {
         options: { model: Tag },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, [], context);
+      const result = await databaseModelsRule.validate?.call(
+        { ...databaseModelsRule, context },
+        [],
+        context,
+      );
 
       expect(result).toEqual({ isValid: true });
     });

@@ -17,7 +17,7 @@ Modern JS apps generate IDs as one of:
 
 Today a user has to write `v.string().pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-...$/)` per ID type. Error messages are generic ("must match pattern"). JSON Schema gets the regex but no `format: "uuid"` hint that downstream tools recognize.
 
-Real cost is small — a 50-line PR ships all four — but the *signal* is "seal cares about modern JS" vs "seal feels like a Laravel port from 2018".
+Real cost is small — a 50-line PR ships all four — but the _signal_ is "seal cares about modern JS" vs "seal feels like a Laravel port from 2018".
 
 ## Scope
 
@@ -38,14 +38,14 @@ Real cost is small — a 50-line PR ships all four — but the *signal* is "seal
 
 ## Format references
 
-| ID format | Regex (canonical) | JSON Schema |
-|---|---|---|
-| UUID (any version) | `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i` | `format: "uuid"` |
-| UUID v4 | `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i` | `format: "uuid"` + pattern |
-| CUID2 | `/^[a-z][a-z0-9]{23}$/` (24 chars total, lowercase) | `pattern: "..."` |
-| CUID1 (legacy) | `/^c[a-z0-9]{24,}$/` (variable, starts with c) | `pattern: "..."` |
-| ULID | `/^[0-9A-HJKMNP-TV-Z]{26}$/` (Crockford base32, no I/L/O/U) | `pattern: "..."` |
-| nanoid | `/^[A-Za-z0-9_-]{N}$/` where N = length (default 21) | `pattern: "..."` |
+| ID format          | Regex (canonical)                                                          | JSON Schema                |
+| ------------------ | -------------------------------------------------------------------------- | -------------------------- |
+| UUID (any version) | `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`        | `format: "uuid"`           |
+| UUID v4            | `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i` | `format: "uuid"` + pattern |
+| CUID2              | `/^[a-z][a-z0-9]{23}$/` (24 chars total, lowercase)                        | `pattern: "..."`           |
+| CUID1 (legacy)     | `/^c[a-z0-9]{24,}$/` (variable, starts with c)                             | `pattern: "..."`           |
+| ULID               | `/^[0-9A-HJKMNP-TV-Z]{26}$/` (Crockford base32, no I/L/O/U)                | `pattern: "..."`           |
+| nanoid             | `/^[A-Za-z0-9_-]{N}$/` where N = length (default 21)                       | `pattern: "..."`           |
 
 UUID version-specific regexes adjust the 13th char (version digit) and 17th char (variant nibble). Detail in implementation.
 
@@ -153,60 +153,60 @@ if (cuidOpts) {
 
 ```ts
 // UUID — any version
-v.string().uuid()
+v.string().uuid();
 //   ✓ "550e8400-e29b-41d4-a716-446655440000"
 //   ✓ "550E8400-E29B-41D4-A716-446655440000" (case-insensitive)
 //   ✗ "not-a-uuid"
 //   ✗ "550e8400-e29b-41d4-a716"  (truncated)
 
 // UUID — v4 specifically
-v.string().uuid(4)
+v.string().uuid(4);
 //   ✓ "550e8400-e29b-41d4-a716-446655440000"  (note 4 in 13th char, 8/9/a/b variant)
 //   ✗ "550e8400-e29b-71d4-a716-446655440000"  (v7-shaped)
 
 // CUID2 (default)
-v.string().cuid()
+v.string().cuid();
 //   ✓ "tz4a98xxat96iws9zmbrgj3a"
 //   ✗ "Tz4a98xxat96iws9zmbrgj3a"  (uppercase first char)
 //   ✗ "abc"                        (too short)
 
 // CUID1 legacy
-v.string().cuid({ version: 1 })
+v.string().cuid({ version: 1 });
 //   ✓ "ck123abc456def789ghi012jk"  (starts with c, ≥25 chars)
 
 // ULID
-v.string().ulid()
+v.string().ulid();
 //   ✓ "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 //   ✗ "01ARZ3NDEKTSV4RRFFQ69G5FAv"  (lowercase)
 //   ✗ "01ARZ3NDEKTSV4RRFFQ69G5FAI"  (I is excluded in Crockford)
 
 // nanoid — default length
-v.string().nanoid()
+v.string().nanoid();
 //   ✓ "V1StGXR8_Z5jdHi6B-myT"  (21 chars, URL-safe)
 //   ✗ "V1StGXR8_Z5jdHi6B-my"   (20 chars — too short)
 
 // nanoid — custom length
-v.string().nanoid(10)
+v.string().nanoid(10);
 //   ✓ "V1StGXR8_Z"  (10 chars)
 //   ✗ "V1StGXR8_Z5jdHi6B-myT" (21 chars)
 
 // JSON Schema
-v.string().uuid().toJsonSchema()
+v.string().uuid().toJsonSchema();
 // → { type: "string", format: "uuid" }
 
-v.string().cuid().toJsonSchema()
+v.string().cuid().toJsonSchema();
 // → { type: "string", pattern: "^[a-z][a-z0-9]{23}$" }
 ```
 
 ## Decisions to lock with Hasan
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | CUID default version (1 or 2)? | **CUID2.** Current spec; CUID1 is officially deprecated by the original author (see [github.com/paralleldrive/cuid2](https://github.com/paralleldrive/cuid2)). Don't make new users learn the old format. |
-| 2 | UUID method signature — `.uuid(4)` or `.uuid({ version: 4 })`? | **`.uuid(4)`.** Matches Zod's signature; one-arg case (the common case) reads cleaner. Object form is fine for libraries needing many options; UUID doesn't have many. |
-| 3 | Ship KSUID too? | **No, v1.** Niche. Add later if a user asks. |
-| 4 | Validate UUID variant nibble (8/9/a/b)? | **Yes, per RFC 4122.** Strict regex catches "looks-like-UUID-but-not-valid" cases. Trivial cost. |
-| 5 | Naming — `.uuid()` vs `.guid()` (Yup/Joi style)? | **`.uuid()`.** GUID is the Microsoft-flavoured name; UUID is the spec and the dominant JS-world term. Add `.guid()` as an alias if someone asks. |
+| #   | Question                                                       | Recommendation                                                                                                                                                                                            |
+| --- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | CUID default version (1 or 2)?                                 | **CUID2.** Current spec; CUID1 is officially deprecated by the original author (see [github.com/paralleldrive/cuid2](https://github.com/paralleldrive/cuid2)). Don't make new users learn the old format. |
+| 2   | UUID method signature — `.uuid(4)` or `.uuid({ version: 4 })`? | **`.uuid(4)`.** Matches Zod's signature; one-arg case (the common case) reads cleaner. Object form is fine for libraries needing many options; UUID doesn't have many.                                    |
+| 3   | Ship KSUID too?                                                | **No, v1.** Niche. Add later if a user asks.                                                                                                                                                              |
+| 4   | Validate UUID variant nibble (8/9/a/b)?                        | **Yes, per RFC 4122.** Strict regex catches "looks-like-UUID-but-not-valid" cases. Trivial cost.                                                                                                          |
+| 5   | Naming — `.uuid()` vs `.guid()` (Yup/Joi style)?               | **`.uuid()`.** GUID is the Microsoft-flavoured name; UUID is the spec and the dominant JS-world term. Add `.guid()` as an alias if someone asks.                                                          |
 
 ## Risks
 
@@ -237,6 +237,7 @@ Four matching methods on `StringValidator`: `.uuid(version?, msg?)`, `.cuid({ ve
 **JSON Schema mapping.** UUID maps to `format: "uuid"` (widely supported). CUID/ULID/nanoid fall back to `pattern` since no widely-supported format keyword exists. Patterns reflect the version/length options.
 
 **Decisions locked.** All five decisions adopted as-recommended:
+
 - CUID2 as default (not legacy CUID1)
 - Positional `.uuid(4)` signature (not options object)
 - No KSUID v1

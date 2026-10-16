@@ -67,17 +67,20 @@ describe.skipIf(!hasGolden)("tsx-4.21 equivalence (golden replay)", () => {
     ? readFileSync(goldenPath, "utf8")
         .trim()
         .split("\n")
-        .map(line => JSON.parse(line) as {
-          specifier: string;
-          parentURL: string | undefined;
-          url: string;
-          format: string | undefined;
-        })
+        .map(
+          (line) =>
+            JSON.parse(line) as {
+              specifier: string;
+              parentURL: string | undefined;
+              url: string;
+              format: string | undefined;
+            },
+        )
     : [];
 
   // De-dup identical (specifier, parentURL) pairs.
   const seen = new Set<string>();
-  const cases = records.filter(r => {
+  const cases = records.filter((r) => {
     const k = `${r.specifier}|${r.parentURL ?? ""}`;
     if (seen.has(k)) return false;
     seen.add(k);

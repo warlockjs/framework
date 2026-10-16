@@ -1,6 +1,6 @@
 ---
 name: multi-site
-description: 'Configure one @warlock.js/web app to serve several fixed-host and resolver-selected sites from `src/web/$sites/<name>/`: separate roots, `web.sites`, `web.resolveHost`, `resolveCache`, `basePath`, `unknownHost`, and `request.site`. Use for: marketing plus dashboard domains, white-label tenant domains, or tenant admin under a host path. Not this package → API host restrictions and middleware: @warlock.js/core; tenant query scoping: @warlock.js/cascade; per-tenant theme rendering: the `multi-theme` topic.'
+description: "Configure one @warlock.js/web app to serve several fixed-host and resolver-selected sites from `src/web/$sites/<name>/`: separate roots, `web.sites`, `web.resolveHost`, `resolveCache`, `basePath`, `unknownHost`, and `request.site`. Use for: marketing plus dashboard domains, white-label tenant domains, or tenant admin under a host path. Not this package → API host restrictions and middleware: @warlock.js/core; tenant query scoping: @warlock.js/cascade; per-tenant theme rendering: the `multi-theme` topic."
 ---
 
 # One app, multiple sites

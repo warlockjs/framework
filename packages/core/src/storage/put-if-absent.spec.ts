@@ -31,9 +31,7 @@ describe("putIfAbsent() wrappers", () => {
     await expect(storage.putIfAbsent("x", "a/b.txt")).rejects.toThrow(/"fake"/);
 
     const scoped = new ScopedStorage({ name: "fake" } as unknown as StorageDriverContract);
-    await expect(scoped.putIfAbsent("x", "a/b.txt")).rejects.toBeInstanceOf(
-      StorageCapabilityError,
-    );
+    await expect(scoped.putIfAbsent("x", "a/b.txt")).rejects.toBeInstanceOf(StorageCapabilityError);
   });
 
   it("emits the put events on success", async () => {

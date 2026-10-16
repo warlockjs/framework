@@ -43,7 +43,11 @@ export async function installSsrFetchTimeout(vite: ViteDevServer, option?: numbe
   });
 
   vite.ssrLoadModule = (moduleId) =>
-    withSsrFetchTimeout(() => fetchingModuleId ?? moduleId, () => runner.import(moduleId), timeoutMs);
+    withSsrFetchTimeout(
+      () => fetchingModuleId ?? moduleId,
+      () => runner.import(moduleId),
+      timeoutMs,
+    );
 
   const close = vite.close.bind(vite);
   vite.close = async () => {

@@ -77,30 +77,30 @@ For multi-file uploads, use an array schema (`v.array(v.file())`) — the valida
 
 From `@warlock.js/core/src/http/uploaded-file.ts`:
 
-| Member                              | Returns                | Notes                                                  |
-| ----------------------------------- | ---------------------- | ------------------------------------------------------ |
-| `file.name`                         | `string`               | sanitized original filename                            |
-| `file.mimeType`                     | `string`               | e.g. `"image/jpeg"`                                    |
-| `file.extension`                    | `string`               | lowercased, no dot — e.g. `"jpg"`                      |
-| `file.isImage` / `isVideo` / `isAudio` | `boolean`           | MIME-type prefix checks                                |
-| `await file.size()`                 | `number` (bytes)       | buffers the file on first call                         |
-| `await file.buffer()`               | `Buffer`               | cached after first call                                |
-| `await file.dimensions()`           | `{ width?, height? }`  | empty object if not an image                           |
-| `await file.metadata()`             | `{ name, mimeType, extension, size, width?, height? }` | one-shot metadata |
-| `await file.toImage()`              | `Image`                | for advanced transforms outside the fluent API         |
-| `await file.toJSON()`               | metadata + base64      | for serialization / debugging                          |
+| Member                                 | Returns                                                | Notes                                          |
+| -------------------------------------- | ------------------------------------------------------ | ---------------------------------------------- |
+| `file.name`                            | `string`                                               | sanitized original filename                    |
+| `file.mimeType`                        | `string`                                               | e.g. `"image/jpeg"`                            |
+| `file.extension`                       | `string`                                               | lowercased, no dot — e.g. `"jpg"`              |
+| `file.isImage` / `isVideo` / `isAudio` | `boolean`                                              | MIME-type prefix checks                        |
+| `await file.size()`                    | `number` (bytes)                                       | buffers the file on first call                 |
+| `await file.buffer()`                  | `Buffer`                                               | cached after first call                        |
+| `await file.dimensions()`              | `{ width?, height? }`                                  | empty object if not an image                   |
+| `await file.metadata()`                | `{ name, mimeType, extension, size, width?, height? }` | one-shot metadata                              |
+| `await file.toImage()`                 | `Image`                                                | for advanced transforms outside the fluent API |
+| `await file.toJSON()`                  | metadata + base64                                      | for serialization / debugging                  |
 
 Image transforms (chainable, no-op for non-images):
 
-| Method                          | Notes                                  |
-| ------------------------------- | -------------------------------------- |
-| `.resize(width, height?)`       | proportional if `height` omitted       |
-| `.format(format)`               | `"jpeg" | "png" | "webp" | "avif" | ...` — extension is auto-updated |
-| `.quality(1–100)`               | JPEG/WebP/AVIF only                    |
-| `.rotate(deg)`                  | positive = clockwise                   |
-| `.blur(sigma?)`                 | default `3`, min `0.3`                 |
-| `.grayscale()`                  | —                                      |
-| `.transform(opts | callback)`   | full sharp/`ImageTransformOptions` control |
+| Method                    | Notes                            |
+| ------------------------- | -------------------------------- |
+| `.resize(width, height?)` | proportional if `height` omitted |
+| `.format(format)`         | `"jpeg"                          | "png"                                      | "webp" | "avif" | ...` — extension is auto-updated |
+| `.quality(1–100)`         | JPEG/WebP/AVIF only              |
+| `.rotate(deg)`            | positive = clockwise             |
+| `.blur(sigma?)`           | default `3`, min `0.3`           |
+| `.grayscale()`            | —                                |
+| `.transform(opts          | callback)`                       | full sharp/`ImageTransformOptions` control |
 
 Save:
 
@@ -112,7 +112,7 @@ await file.saveAs(fullPath, options?);  // explicit path, returns StorageFile
 Driver selection:
 
 ```ts
-await file.use("s3").save("avatars");        // single upload
+await file.use("s3").save("avatars"); // single upload
 await file.use("r2").saveAs("cdn/x.webp");
 ```
 
@@ -122,15 +122,15 @@ await file.use("r2").saveAs("cdn/x.webp");
 type SaveOptions = {
   name?: "random" | "original" | string; // default "random"
   prefix?:
-    | true                                  // default datetime prefix
-    | string                                // static prefix
+    | true // default datetime prefix
+    | string // static prefix
     | {
-        format?: string;                    // dayjs-style format
+        format?: string; // dayjs-style format
         randomLength?: number;
-        as?: "file" | "directory";          // default "file"
+        as?: "file" | "directory"; // default "file"
       };
   driver?: StorageDriverName;
-  validate?: FileValidationOptions;         // throws on mismatch
+  validate?: FileValidationOptions; // throws on mismatch
 };
 ```
 
@@ -166,12 +166,12 @@ await file.saveAs("avatars/profile-123.png");
 ```ts
 const stored = await file.save("avatars");
 
-stored.path;          // "avatars/x7k9m2p4.webp" (after format transform)
-stored.url;           // public URL (driver-dependent)
+stored.path; // "avatars/x7k9m2p4.webp" (after format transform)
+stored.url; // public URL (driver-dependent)
 await stored.size();
 await stored.mimeType();
 stored.extension;
-await stored.data();  // full info object incl. hash
+await stored.data(); // full info object incl. hash
 ```
 
 `StorageFile` is the standard handle returned by every `Storage.put()` / `UploadedFile.save()` call. Use it from then on — the `UploadedFile` is best discarded after save.
@@ -278,9 +278,7 @@ Each chain produces a fresh transform — but `UploadedFile` is stateful, so do 
 ### Saving to S3 with a content type override
 
 ```ts
-const file = await uploadedFile
-  .use("s3")
-  .save("documents", { name: "original" });
+const file = await uploadedFile.use("s3").save("documents", { name: "original" });
 
 // or, full storage layer:
 await storage.use("s3").put(await uploadedFile.buffer(), "documents/report.pdf", {

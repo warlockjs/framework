@@ -55,7 +55,10 @@ describe("fetchLatestVersion", () => {
   });
 
   it("resolves undefined on a non-200 response", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })),
+    );
 
     await expect(fetchLatestVersion("@warlock.js/core")).resolves.toBeUndefined();
   });

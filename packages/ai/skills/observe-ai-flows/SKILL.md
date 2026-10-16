@@ -20,12 +20,16 @@ export interface Observer {
 `observe?: boolean | Observer` (`FlowObserveOption`) is accepted on **`ai.agent`, `ai.workflow`, `ai.supervisor`, and `ai.team`** (a team forwards it verbatim to the supervisor it desugars into):
 
 ```ts
-const collector: Observer = { collect(report) { exporter.send(report); } };
+const collector: Observer = {
+  collect(report) {
+    exporter.send(report);
+  },
+};
 
-ai.agent({ model, observe: true });       // → the globally registered observers, even if observe-all is off
-ai.agent({ model, observe: false });      // → opt out entirely, even when observe-all is on
-ai.agent({ model, observe: collector });  // → a flow-LOCAL collector; only this flow's report, only to it
-ai.agent({ model });                      // → undefined: follow the global observe-all flag
+ai.agent({ model, observe: true }); // → the globally registered observers, even if observe-all is off
+ai.agent({ model, observe: false }); // → opt out entirely, even when observe-all is on
+ai.agent({ model, observe: collector }); // → a flow-LOCAL collector; only this flow's report, only to it
+ai.agent({ model }); // → undefined: follow the global observe-all flag
 ```
 
 Resolution (`resolveObservers(observe)`):
@@ -41,16 +45,20 @@ Resolution (`resolveObservers(observe)`):
 
 ```ts
 import {
-  registerObserver, getObservers, setObserveAll, isObserveAll, clearObservers,
+  registerObserver,
+  getObservers,
+  setObserveAll,
+  isObserveAll,
+  clearObservers,
 } from "@warlock.js/ai";
 
-registerObserver(collector);  // an observability tool registers ONE collector when its config is applied
-getObservers();               // read-only snapshot of the registered observers (do not mutate)
+registerObserver(collector); // an observability tool registers ONE collector when its config is applied
+getObservers(); // read-only snapshot of the registered observers (do not mutate)
 
-setObserveAll(true);          // "observe every flow by default" — flows without their own `observe` get observed
-isObserveAll();               // read the flag (default false — opt-in observability)
+setObserveAll(true); // "observe every flow by default" — flows without their own `observe` get observed
+isObserveAll(); // read the flag (default false — opt-in observability)
 
-clearObservers();             // test-only: reset observers + the observe-all flag for spec isolation
+clearObservers(); // test-only: reset observers + the observe-all flag for spec isolation
 ```
 
 `observeAll` defaults to `false` (opt-in). A flow that never sets `observe` is observed **only** when observe-all is on; individual flows still opt out with `observe: false`.
@@ -78,7 +86,7 @@ An observability tool reacts to its own augmented config slot without core impor
 import { onConfigApplied, getAIConfig } from "@warlock.js/ai";
 
 onConfigApplied((config) => applyPanopticConfig(config.panoptic)); // react on every config merge
-applyPanopticConfig(getAIConfig().panoptic);                        // catch a pre-set config
+applyPanopticConfig(getAIConfig().panoptic); // catch a pre-set config
 ```
 
 A misbehaving listener's throw is swallowed (same swallow-on-throw discipline as the observer hooks). This mirrors the `Observer` registry's dependency inversion: a tool flips `setObserveAll(true)` and calls `registerObserver(...)` from inside its `onConfigApplied` listener.

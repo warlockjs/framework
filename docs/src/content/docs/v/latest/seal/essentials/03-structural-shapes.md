@@ -20,7 +20,7 @@ v.object({
 
 - **Required by default.** `.optional()` to opt out. The inferred type marks optional keys with `?`.
 - **Cross-field rules live here.** `.sameAs("password")`, `.requiredIf("role", "admin")` resolve siblings against the parent `v.object`. Without a parent, sibling resolution silently passes.
-- **Unknown keys are rejected by default** — validation fails with *"The schema contains unknown keys: …"*. Toggle behavior:
+- **Unknown keys are rejected by default** — validation fails with _"The schema contains unknown keys: …"_. Toggle behavior:
   - `.allowUnknown()` — forward extras as-is.
   - `.stripUnknown()` — drop extras and return the clean object instead of failing.
   - `.allow("trackingId", "_meta")` — whitelist specific extras.
@@ -28,10 +28,12 @@ v.object({
 Rejecting is the right default for **inbound** payloads. For an **outbound** DTO — a record that legitimately carries internal fields you don't want to expose — reach for `.stripUnknown()`:
 
 ```ts
-const publicArticle = v.object({
-  id: v.string(),
-  title: v.string(),
-}).stripUnknown();
+const publicArticle = v
+  .object({
+    id: v.string(),
+    title: v.string(),
+  })
+  .stripUnknown();
 
 const { isValid, data } = await v.validate(publicArticle, record);
 // record had version / authorId / status; data has only id + title
@@ -63,9 +65,9 @@ const auditFields = v.object({
 userBase.merge(auditFields);
 
 // Subset / superset
-userBase.pick("email", "name");           // only those two keys
-userBase.without("passwordHash");         // drop one
-userBase.partial("email");                // mark specific keys optional
+userBase.pick("email", "name"); // only those two keys
+userBase.without("passwordHash"); // drop one
+userBase.partial("email"); // mark specific keys optional
 userBase.requiredFields("email", "name"); // force-required specific keys
 ```
 
@@ -74,9 +76,9 @@ These return new validators — the source is untouched.
 ## `v.array` — homogeneous lists
 
 ```ts
-v.array(v.string())          // type: string[]
-v.array(userSchema)          // type: User[]
-v.array(v.array(v.int()))    // type: number[][] — nests naturally
+v.array(v.string()); // type: string[]
+v.array(userSchema); // type: User[]
+v.array(v.array(v.int())); // type: number[][] — nests naturally
 ```
 
 The inner validator runs against each element. Failure on any element fails the array.
@@ -84,17 +86,17 @@ The inner validator runs against each element. Failure on any element fails the 
 Length and uniqueness constraints:
 
 ```ts
-v.array(v.string()).minLength(1).maxLength(10)
-v.array(v.string()).length(5)        // exactly 5 items
-v.array(v.string()).unique()         // no duplicates
+v.array(v.string()).minLength(1).maxLength(10);
+v.array(v.string()).length(5); // exactly 5 items
+v.array(v.string()).unique(); // no duplicates
 ```
 
 ## `v.record` — homogeneous values, dynamic keys
 
 ```ts
-v.record(v.int())                          // type: Record<string, number>
-v.record(v.object({ count: v.int() }))     // type: Record<string, { count: number }>
-v.record()                                 // type: Record<string, any>
+v.record(v.int()); // type: Record<string, number>
+v.record(v.object({ count: v.int() })); // type: Record<string, { count: number }>
+v.record(); // type: Record<string, any>
 ```
 
 Reach for `v.record` when keys are dynamic (user-supplied, dictionary-style) but values share a schema. If keys are also constrained (e.g. only `"draft" | "published"`), use `v.object` with literal keys instead — the constraint lives in the type.
@@ -102,8 +104,8 @@ Reach for `v.record` when keys are dynamic (user-supplied, dictionary-style) but
 ## `v.tuple` — positional types
 
 ```ts
-v.tuple([v.string(), v.int(), v.boolean()])  // type: [string, number, boolean]
-v.tuple([v.literal("ok"), v.string()])       // type: ["ok", string]
+v.tuple([v.string(), v.int(), v.boolean()]); // type: [string, number, boolean]
+v.tuple([v.literal("ok"), v.string()]); // type: ["ok", string]
 ```
 
 Each position has its own validator. The array length must match the tuple length. Pair with `v.literal` at position 0 for result-tuple patterns (`["ok", data]` vs `["error", message]`).
@@ -111,7 +113,7 @@ Each position has its own validator. The array length must match the tuple lengt
 ## `v.union` — one of N validators (untagged)
 
 ```ts
-v.union([v.string(), v.int()])  // type: string | number
+v.union([v.string(), v.int()]); // type: string | number
 ```
 
 The first type-matching branch wins, picked via each branch's `matchesType()`. Use for unions of **scalar** types where matching against the JS type is enough to disambiguate.
@@ -122,8 +124,8 @@ For object-vs-object unions, reach for `v.discriminatedUnion` instead — `match
 
 ```ts
 const email = v.object({ type: v.literal("email"), email: v.string().email() });
-const sms   = v.object({ type: v.literal("sms"),   phone: v.string() });
-const push  = v.object({ type: v.literal("push"),  deviceId: v.string() });
+const sms = v.object({ type: v.literal("sms"), phone: v.string() });
+const push = v.object({ type: v.literal("push"), deviceId: v.string() });
 
 const notification = v.discriminatedUnion("type", [email, sms, push]);
 
@@ -183,16 +185,16 @@ The [recursive schemas recipe](../recipes/recursive-schemas.md) covers mutual re
 
 ## Quick map
 
-| Want | Reach for |
-| --- | --- |
-| Fixed-shape record | `v.object({...})` |
-| Dynamic keys, same value shape | `v.record(valueSchema)` |
-| List of items | `v.array(itemSchema)` |
-| Position-typed array | `v.tuple([a, b, c])` |
-| One of N scalar types | `v.union([...])` |
-| One of N object shapes with a tag field | `v.discriminatedUnion(key, [...])` |
-| Self-referencing or forward reference | `v.lazy(() => schema)` |
-| One of N constants | `v.literal(...values)` (not structural — a primitive) |
+| Want                                    | Reach for                                             |
+| --------------------------------------- | ----------------------------------------------------- |
+| Fixed-shape record                      | `v.object({...})`                                     |
+| Dynamic keys, same value shape          | `v.record(valueSchema)`                               |
+| List of items                           | `v.array(itemSchema)`                                 |
+| Position-typed array                    | `v.tuple([a, b, c])`                                  |
+| One of N scalar types                   | `v.union([...])`                                      |
+| One of N object shapes with a tag field | `v.discriminatedUnion(key, [...])`                    |
+| Self-referencing or forward reference   | `v.lazy(() => schema)`                                |
+| One of N constants                      | `v.literal(...values)` (not structural — a primitive) |
 
 ## Related
 

@@ -54,7 +54,9 @@ const result = await agent.execute("Summarize the attached 200-page filing.");
 
 if (result.error instanceof BudgetExceededError) {
   // The subclass exposes the breach numerically — no message parsing.
-  console.warn(`budget breach: ${result.error.actual} ${result.error.unit} (cap ${result.error.limit})`);
+  console.warn(
+    `budget breach: ${result.error.actual} ${result.error.unit} (cap ${result.error.limit})`,
+  );
 }
 ```
 
@@ -201,10 +203,10 @@ Since no model exposes a portable pre-flight cost estimate, the middleware reser
 
 ### Stores
 
-| Store | Scope | Notes |
-|---|---|---|
-| `memoryScopedBudgetStore()` | one process | Serializes each ledger key in-process. No setup. |
-| `cacheScopedBudgetStore({ ... })` | multi-node | Lazily loads the optional `@warlock.js/cache` peer and uses its atomic `update` primitive. Deployment-wide enforcement needs a cache driver whose `update` is cross-node atomic. |
+| Store                                                                         | Scope               | Notes                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `memoryScopedBudgetStore()`                                                   | one process         | Serializes each ledger key in-process. No setup.                                                                                                                                                                                                                                                                                               |
+| `cacheScopedBudgetStore({ ... })`                                             | multi-node          | Lazily loads the optional `@warlock.js/cache` peer and uses its atomic `update` primitive. Deployment-wide enforcement needs a cache driver whose `update` is cross-node atomic.                                                                                                                                                               |
 | `cascadeScopedBudgetStore({ model })` / `cascadeScopedBudgetStore({ table })` | multi-node, durable | Lazily loads the optional `@warlock.js/cascade` peer. Pass your own `model`, or a `table` name to have it create one. The backing table/collection needs a **unique `(key, windowStart, unit)` index** — the store upserts the ledger row with `$setOnInsert: { used: 0 }`, then conditionally increments only while `used <= limit - amount`. |
 
 ```ts

@@ -95,13 +95,13 @@ Already shipped in [`a332816`](#). Sub-parser produces WHERE-fragment with its o
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Resolve relation def in parser or builder? | **Builder.** Matches `selectRelatedColumns`, keeps parser pure. |
-| 2 | `EXISTS` vs `IN (SELECT id FROM ...)`? | **EXISTS.** Better planner short-circuit, avoids materialising id list. |
-| 3 | `has(rel, ">=", 1)` — alias for `has(rel)`? | **Yes.** `has(rel)` is semantically `has(rel, ">=", 1)` — emit EXISTS for the no-op case. |
-| 4 | Constraint with `orderBy`/`limit` — drop or error? | **Silently drop with dev-warn.** Matches withCount precedent. |
-| 5 | belongsToMany constraint targets pivot or related? | **Related.** Matches withCount precedent. |
+| #   | Question                                           | Recommendation                                                                            |
+| --- | -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1   | Resolve relation def in parser or builder?         | **Builder.** Matches `selectRelatedColumns`, keeps parser pure.                           |
+| 2   | `EXISTS` vs `IN (SELECT id FROM ...)`?             | **EXISTS.** Better planner short-circuit, avoids materialising id list.                   |
+| 3   | `has(rel, ">=", 1)` — alias for `has(rel)`?        | **Yes.** `has(rel)` is semantically `has(rel, ">=", 1)` — emit EXISTS for the no-op case. |
+| 4   | Constraint with `orderBy`/`limit` — drop or error? | **Silently drop with dev-warn.** Matches withCount precedent.                             |
+| 5   | belongsToMany constraint targets pivot or related? | **Related.** Matches withCount precedent.                                                 |
 
 ## Verification
 
@@ -121,6 +121,7 @@ Already shipped in [`a332816`](#). Sub-parser produces WHERE-fragment with its o
 **Approach refined from the plan.** The plan recommended option (b) "builder pre-resolves and emits a richer op". The actual implementation went one step further: the builder TRANSLATES the has-family ops into existing `whereRaw` / `orWhereRaw` ops at execute time, so the parser doesn't need any new cases at all. Same pattern as `applyJoinRelations` and `applyCountRelations`. Net effect: parser stays pure (no schema awareness), translation logic lives next to its siblings, and the existing parser type-union entries for `has`/`whereHas`/etc become harmless dead code.
 
 **Implementation locations:**
+
 - `applyHasRelations()` private method on `PostgresQueryBuilder` — scans operations for has-family ops and rewrites them in-place via `Array.map`, preserving position so AND/OR booleans stay correctly slotted.
 - `translateHasOp(op)` — resolves the relation definition, resolves the related model class, dispatches to `buildHasSubquery`.
 - `buildHasSubquery(opType, ...)` — branches on relation type (hasMany/hasOne/belongsTo/belongsToMany), builds the FROM + JOIN-condition + WHERE fragments, wraps with EXISTS / NOT EXISTS / COUNT-comparison.
@@ -153,6 +154,7 @@ Already shipped in [`a332816`](#). Sub-parser produces WHERE-fragment with its o
 **Conscious code duplication.** `buildHasSubquery` duplicates the four-relation-type branching of `buildCountSubquery` (FROM + JOIN-condition construction). Not extracted to a shared helper in this PR to keep the withCount work fresh and testable. Once polymorphic + through relations land, the four-way duplication makes consolidation worth doing — tracked as a follow-up under the planned Postgres relations-pipeline extraction.
 
 **Not addressed (separate plans / out of scope):**
+
 - `joinWith` belongsTo/hasOne constraint where-clause drop — separate plan.
 - Mongo whereHas execution — same gap as Mongo withCount; separate follow-up.
 - `has` with constraint callback — not in the contract today; defer.

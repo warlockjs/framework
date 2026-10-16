@@ -126,10 +126,7 @@ describe("generateRepository — output", () => {
     await expect(generateRepository(data(["users/user"]))).resolves.toBeUndefined();
     expect(exitSpy).not.toHaveBeenCalled();
 
-    const repo = await readFile(
-      appPathFor("users", "repositories", "user.repository.ts"),
-      "utf-8",
-    );
+    const repo = await readFile(appPathFor("users", "repositories", "user.repository.ts"), "utf-8");
 
     expect(repo).toContain("export class UsersRepository extends RepositoryManager<User");
     expect(repo).toContain("public source = User;");
@@ -143,10 +140,7 @@ describe("generateResource — output", () => {
     await expect(generateResource(data(["users/user"]))).resolves.toBeUndefined();
     expect(exitSpy).not.toHaveBeenCalled();
 
-    const resource = await readFile(
-      appPathFor("users", "resources", "user.resource.ts"),
-      "utf-8",
-    );
+    const resource = await readFile(appPathFor("users", "resources", "user.resource.ts"), "utf-8");
 
     expect(resource).toContain('import { Resource, type ResourceSchema } from "@warlock.js/core"');
     expect(resource).toContain("export class UserResource extends Resource");

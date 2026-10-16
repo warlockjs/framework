@@ -51,12 +51,12 @@ DeepSeekModelConfig {
 
 ## Models
 
-| Model               | Notes                                                                 |
-| ------------------- | --------------------------------------------------------------------- |
-| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap. Reasoning **off**.    |
+| Model               | Notes                                                                       |
+| ------------------- | --------------------------------------------------------------------------- |
+| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap. Reasoning **off**.          |
 | `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                       |
-| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                      |
+| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                             |
+| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                            |
 
 DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are understood by the capability inference. `deepseek.model({ name })` accepts any id the upstream serves. `DEEPSEEK_CHAT_MODELS` exports the informational list.
 
@@ -64,23 +64,23 @@ DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire
 
 Capabilities are inferred from the DeepSeek model **name** (via `inferReasoningCapability` / `inferVisionCapability`) and injected as explicit flags before delegating — an explicit value always wins.
 
-| Capability         | Default                                                                                 |
-| ------------------ | --------------------------------------------------------------------------------------- |
-| `reasoning`        | `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. |
-| `vision`           | `false` for every DeepSeek model — no chat model documents image input (mid-2026).      |
+| Capability         | Default                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `reasoning`        | `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`.  |
+| `vision`           | `false` for every DeepSeek model — no chat model documents image input (mid-2026).             |
 | `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` forces a loose mode. |
-| `promptCaching`    | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`.                |
+| `promptCaching`    | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`.                      |
 
 ```ts
-deepseek.model({ name: "deepseek-chat", reasoning: true });     // force the thinking flag
+deepseek.model({ name: "deepseek-chat", reasoning: true }); // force the thinking flag
 deepseek.model({ name: "deepseek-reasoner", reasoning: false }); // suppress it
 ```
 
 ## Reasoning effort
 
 ```ts
-const model = deepseek.model({ name: "deepseek-reasoner" });        // reasoning auto-true
-await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+const model = deepseek.model({ name: "deepseek-reasoner" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 `reasoning.effort` maps to the OpenAI-compatible `reasoning_effort` param and is dropped for a non-reasoning model.

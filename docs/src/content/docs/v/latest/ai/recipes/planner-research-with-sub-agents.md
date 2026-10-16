@@ -3,7 +3,7 @@ title: "Recipe — Research with sub-agents"
 description: A planner that delegates each research subtask to a fresh ai.spawnSubAgent — a single-use agent with its own prompt, tools, and a first-class per-task budget so one runaway delegate can't overrun the whole run.
 ---
 
-You are building a market-research assistant. A goal like *"Compare the three leading vector databases on pricing, scaling, and ecosystem"* fans out into several independent investigations — one per database, plus a synthesis pass. You want each investigation to run in its own clean context (no cross-contamination between the Pinecone notes and the Weaviate notes) and, crucially, you want a *hard cost ceiling per investigation* so a single sub-agent that gets stuck in a tool loop can never blow the budget for the whole report.
+You are building a market-research assistant. A goal like _"Compare the three leading vector databases on pricing, scaling, and ecosystem"_ fans out into several independent investigations — one per database, plus a synthesis pass. You want each investigation to run in its own clean context (no cross-contamination between the Pinecone notes and the Weaviate notes) and, crucially, you want a _hard cost ceiling per investigation_ so a single sub-agent that gets stuck in a tool loop can never blow the budget for the whole report.
 
 `ai.spawnSubAgent` is the primitive for exactly this. It's a thin wrapper: each call builds a brand-new `ai.agent` — its own system prompt, tools, and conversation, and (when you set `budget`) a `budget` middleware that aborts the moment a cap is crossed — then runs the task once. The fresh-conversation start is just ordinary new-instance behavior; the genuine convenience is the first-class per-task budget plus the build-run-discard shape. Wrap a spawn behind a planner capability and the planner can generate a plan that delegates each subtask to a single-use, budgeted delegate, while still rolling every spawn's cost and trace up into one unified report.
 
@@ -34,14 +34,20 @@ const researchModel = openai.model({ name: "gpt-4o-mini" });
  * envelope, so the planner rolls its `usage` and `report` up uniformly.
  */
 const investigate = {
-  async execute(task: string, options?: { signal?: AbortSignal; sessionId?: string }): Promise<AgentResult> {
+  async execute(
+    task: string,
+    options?: { signal?: AbortSignal; sessionId?: string },
+  ): Promise<AgentResult> {
     return ai.spawnSubAgent({
       name: "researcher",
       model: researchModel,
       task,
-      systemPrompt: ai.systemPrompt()
+      systemPrompt: ai
+        .systemPrompt()
         .persona("You are a focused research analyst.")
-        .instruction("Use web_search to gather facts. Report findings as terse bullet points with sources."),
+        .instruction(
+          "Use web_search to gather facts. Report findings as terse bullet points with sources.",
+        ),
       tools: [webSearchTool],
       // Hard per-spawn ceiling. The sub-agent's budget middleware aborts
       // the instant either cap is crossed — isolated from every other spawn.
@@ -56,20 +62,20 @@ const investigate = {
 
 ### Anatomy of a spawn spec
 
-`SpawnSubAgentSpec` is the full surface of one delegation. Every field below feeds the fresh `agent()` that the spawn builds internally — there is no other agent involved, so what you put on the spec *is* the entire delegate.
+`SpawnSubAgentSpec` is the full surface of one delegation. Every field below feeds the fresh `agent()` that the spawn builds internally — there is no other agent involved, so what you put on the spec _is_ the entire delegate.
 
-| Field | Type | What it sets |
-| --- | --- | --- |
-| `name` | `string` | Stable identifier for the spawned agent (shows up in its report node). |
-| `model` | `ModelContract` | The model this delegate runs against — can differ per spawn. |
-| `task` | `string` | The single instruction run through the sub-agent's `execute()`. |
-| `systemPrompt` | `SystemPromptContract \| string` | The delegate's *own* persona + instructions, scoped to its subtask. |
-| `tools` | `AgentToolEntry[]` | The delegate's *own* tool set — never the parent's. |
-| `maxTrips` | `number` | Per-spawn round-trip cap. |
-| `budget` | `BudgetOptions` | The per-spawn spend ceiling (see below). |
-| `output` | `StandardSchemaV1` | A `@warlock.js/seal` schema validated into the delegate's `result.data`. |
-| `signal` | `AbortSignal` | Cancellation handle threaded into the delegate's run. |
-| `sessionId` | `string` | Stamped onto the delegate's report tree so it groups under the parent session. |
+| Field          | Type                             | What it sets                                                                   |
+| -------------- | -------------------------------- | ------------------------------------------------------------------------------ |
+| `name`         | `string`                         | Stable identifier for the spawned agent (shows up in its report node).         |
+| `model`        | `ModelContract`                  | The model this delegate runs against — can differ per spawn.                   |
+| `task`         | `string`                         | The single instruction run through the sub-agent's `execute()`.                |
+| `systemPrompt` | `SystemPromptContract \| string` | The delegate's _own_ persona + instructions, scoped to its subtask.            |
+| `tools`        | `AgentToolEntry[]`               | The delegate's _own_ tool set — never the parent's.                            |
+| `maxTrips`     | `number`                         | Per-spawn round-trip cap.                                                      |
+| `budget`       | `BudgetOptions`                  | The per-spawn spend ceiling (see below).                                       |
+| `output`       | `StandardSchemaV1`               | A `@warlock.js/seal` schema validated into the delegate's `result.data`.       |
+| `signal`       | `AbortSignal`                    | Cancellation handle threaded into the delegate's run.                          |
+| `sessionId`    | `string`                         | Stamped onto the delegate's report tree so it groups under the parent session. |
 
 The `budget` field is a `BudgetOptions` object, not a number — the same shape the standalone `budget()` middleware takes. At least one cap must be present (a budget with no cap is a no-op):
 
@@ -80,9 +86,9 @@ budget: {
 }
 ```
 
-Either or both. `maxTokens` always enforces. `maxCostUSD` resolves an explicit budget price first, then the model/SDK's `ModelPricing`; if neither exists it fails closed before the first call with `BudgetExceededError` (unless `onUnpriced: "allow"` explicitly opts out). Internally the spawn attaches the `budget` middleware *only when* `budget` is set — so the common no-budget delegation stays a plain agent with zero overhead, and the moment a cap is crossed the delegate aborts at the next trip boundary with a `BudgetExceededError` on its `result.error`.
+Either or both. `maxTokens` always enforces. `maxCostUSD` resolves an explicit budget price first, then the model/SDK's `ModelPricing`; if neither exists it fails closed before the first call with `BudgetExceededError` (unless `onUnpriced: "allow"` explicitly opts out). Internally the spawn attaches the `budget` middleware _only when_ `budget` is set — so the common no-budget delegation stays a plain agent with zero overhead, and the moment a cap is crossed the delegate aborts at the next trip boundary with a `BudgetExceededError` on its `result.error`.
 
-Because every one of these fields is consumed by a brand-new `agent()` per call, two spawns share nothing: not the system prompt, not the tool list, not the conversation history, and not the budget ledger. Two `investigate` delegations running back-to-back each start from an empty conversation and an empty budget counter. Be precise about *why*, though: that separation isn't special machinery — it's just two different `ai.agent()` instances behaving the way any two agents do. What `spawnSubAgent` genuinely packages is the **per-task budget** as a first-class field plus the one-shot build-run-discard shape; the clean-slate start is ordinary new-instance behavior you'd get from constructing an agent yourself.
+Because every one of these fields is consumed by a brand-new `agent()` per call, two spawns share nothing: not the system prompt, not the tool list, not the conversation history, and not the budget ledger. Two `investigate` delegations running back-to-back each start from an empty conversation and an empty budget counter. Be precise about _why_, though: that separation isn't special machinery — it's just two different `ai.agent()` instances behaving the way any two agents do. What `spawnSubAgent` genuinely packages is the **per-task budget** as a first-class field plus the one-shot build-run-discard shape; the clean-slate start is ordinary new-instance behavior you'd get from constructing an agent yourself.
 
 The synthesis step is a plain agent — no delegation, it just reads the gathered notes and writes the comparison.
 
@@ -91,9 +97,12 @@ const synthesizer = ai.agent({
   name: "synthesizer",
   description: "Combine independent research notes into one comparison.",
   model: openai.model({ name: "gpt-4o" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a senior analyst writing a buyer's comparison.")
-    .instruction("Produce a clear side-by-side comparison. Cite the sources from the notes. No filler."),
+    .instruction(
+      "Produce a clear side-by-side comparison. Cite the sources from the notes. No filler.",
+    ),
   maxTrips: 2,
 });
 ```
@@ -159,12 +168,12 @@ console.log(`\nWhole-run total: ${usage.total} tokens`);
 A likely run:
 
 1. **Plan generation** — the planner emits, say, four steps: three `investigate` delegations (one per database) and one `synthesize`.
-2. **Steps 0–2** — each `investigate` step spawns a *fresh* sub-agent. Each gets its own `web_search` loop, its own conversation, and its own `{ maxTokens: 8_000, maxCostUSD: 0.05 }` ceiling. If the Weaviate spawn loops on tool calls and crosses its cap, *only that spawn* aborts with a `BudgetExceededError` — the other spawns are untouched.
+2. **Steps 0–2** — each `investigate` step spawns a _fresh_ sub-agent. Each gets its own `web_search` loop, its own conversation, and its own `{ maxTokens: 8_000, maxCostUSD: 0.05 }` ceiling. If the Weaviate spawn loops on tool calls and crosses its cap, _only that spawn_ aborts with a `BudgetExceededError` — the other spawns are untouched.
 3. **Step 3** — `synthesize` runs the synthesizer agent. The planner threads the three investigations' outputs into its input context, so it writes the comparison from the gathered notes.
 
 ## Aggregating sub-agent outputs back into the parent
 
-A delegate runs in isolation — but its result has to come *back* and feed the work that follows. There are two distinct aggregation paths, and which one you get depends on whether the spawns are ordered planner steps or hand-run in parallel.
+A delegate runs in isolation — but its result has to come _back_ and feed the work that follows. There are two distinct aggregation paths, and which one you get depends on whether the spawns are ordered planner steps or hand-run in parallel.
 
 ### Inside the planner — automatic, output-threaded
 
@@ -216,7 +225,7 @@ for (const snapshot of report.executedSteps) {
 
 ### Outside the planner — you aggregate explicitly
 
-When you run the spawns yourself (the `Promise.allSettled` fan-out shown below), there is no planner to thread outputs forward — *you* collect them. Each spawn returns its own `AgentResult`, and you reduce those into whatever shape the next stage needs. The parallel block already does exactly this: it filters out budgeted-out spawns by checking `result.error`, pulls each surviving delegate's `result.text`, and joins them into one `notes` string you then hand to the synthesizer agent yourself:
+When you run the spawns yourself (the `Promise.allSettled` fan-out shown below), there is no planner to thread outputs forward — _you_ collect them. Each spawn returns its own `AgentResult`, and you reduce those into whatever shape the next stage needs. The parallel block already does exactly this: it filters out budgeted-out spawns by checking `result.error`, pulls each surviving delegate's `result.text`, and joins them into one `notes` string you then hand to the synthesizer agent yourself:
 
 ```ts
 const comparison = await synthesizer.execute(
@@ -231,7 +240,7 @@ The trade-off is explicit control for explicit work: you decide which delegates'
 
 ## Why per-spawn budgets, not one shared cap
 
-A single budget over the whole run can be exhausted by one greedy delegate before the others even start. Per-spawn budgets are the opposite contract: each sub-agent carries *its own* isolated ledger, so the failure of one investigation is contained to that investigation. The planner still records the failed step (and marks the steps after it `skipped`, since it stops at the first failure) — you see exactly which delegate overspent in `report.executedSteps`.
+A single budget over the whole run can be exhausted by one greedy delegate before the others even start. Per-spawn budgets are the opposite contract: each sub-agent carries _its own_ isolated ledger, so the failure of one investigation is contained to that investigation. The planner still records the failed step (and marks the steps after it `skipped`, since it stops at the first failure) — you see exactly which delegate overspent in `report.executedSteps`.
 
 If you want partial-failure tolerance instead — keep going even when one investigation busts its budget — run the spawns yourself with `Promise.allSettled` rather than as ordered planner steps:
 
@@ -265,27 +274,27 @@ Pass a shared `sessionId` to every spawn so their report trees group under one c
 
 ## When to spawn vs just call an agent
 
-`ai.spawnSubAgent` constructs a fresh `agent()` per call (plus a budget middleware when budgeted) and runs it once. Reach for it when you want a named, single-use delegation with its own spend cap. The deciding question is: *does this subtask want a clean-slate agent of its own and a separate spend ceiling — and is a throwaway agent worth it to get them?*
+`ai.spawnSubAgent` constructs a fresh `agent()` per call (plus a budget middleware when budgeted) and runs it once. Reach for it when you want a named, single-use delegation with its own spend cap. The deciding question is: _does this subtask want a clean-slate agent of its own and a separate spend ceiling — and is a throwaway agent worth it to get them?_
 
 **Spawn a sub-agent when:**
 
 - **You want context isolation.** The subtask should run from a clean slate, with no exposure to the caller's conversation history and no chance of polluting it — the Pinecone investigation must not see the Weaviate notes, and vice versa. A fresh spawn guarantees the empty-conversation start.
-- **You want a hard per-subtask budget.** You need a delegated subtask to carry *its own* `maxTokens` / `maxCostUSD` ceiling so a runaway tool loop is contained to that subtask. This is what `spawnSubAgent` makes ergonomic — a first-class `budget` field. (You *can* get the same with a plain `ai.agent({ middleware: [ai.middleware.budget(...)] })`; the spawn just saves the wiring and bundles it with the one-shot run.)
+- **You want a hard per-subtask budget.** You need a delegated subtask to carry _its own_ `maxTokens` / `maxCostUSD` ceiling so a runaway tool loop is contained to that subtask. This is what `spawnSubAgent` makes ergonomic — a first-class `budget` field. (You _can_ get the same with a plain `ai.agent({ middleware: [ai.middleware.budget(...)] })`; the spawn just saves the wiring and bundles it with the one-shot run.)
 - **The subtask needs a different persona, tool set, or model.** A focused research delegate gets `web_search` and a "terse analyst" persona; the parent has neither. Each spawn's `systemPrompt` / `tools` / `model` are its own, so divergent delegates don't require divergent long-lived agents.
 - **You're fanning out repeatable, independent units of work** — one per subject, per document, per shard — and want each to roll its cost and trace up into one unified report.
 
 **Just call an agent (or run a tool) directly when:**
 
-- **The work is part of one continuous reasoning thread.** If the step should *build on* the caller's accumulated conversation rather than start fresh, keep it in the same agent — spawning would throw that context away. The `synthesizer` above is exactly this: it's a plain `ai.agent`, not a spawn, because there's nothing to isolate.
+- **The work is part of one continuous reasoning thread.** If the step should _build on_ the caller's accumulated conversation rather than start fresh, keep it in the same agent — spawning would throw that context away. The `synthesizer` above is exactly this: it's a plain `ai.agent`, not a spawn, because there's nothing to isolate.
 - **You don't need a separate spend cap.** If the existing run-level budget already covers the step, a spawn's per-subtask ledger buys you nothing.
 - **It's a single deterministic call** — a tool, a one-shot extraction, a formatting pass. Wrapping it in a whole agent loop is overhead with no payoff; call the tool or agent directly.
 
-Rule of thumb: **spawn when you want a named single-use delegation with its own spend cap; otherwise call the agent or tool inline.** The strongest single signal is a *per-subtask budget requirement* — not because you couldn't wire `ai.middleware.budget` onto a plain agent yourself, but because `spawnSubAgent` makes that the one-line default for a throwaway delegate.
+Rule of thumb: **spawn when you want a named single-use delegation with its own spend cap; otherwise call the agent or tool inline.** The strongest single signal is a _per-subtask budget requirement_ — not because you couldn't wire `ai.middleware.budget` onto a plain agent yourself, but because `spawnSubAgent` makes that the one-line default for a throwaway delegate.
 
 ## Production notes
 
-- **It's a thin wrapper, not a sandbox.** Each spawn is a plain new `ai.agent()` run once — its fresh conversation and own tools/prompt/budget-ledger are ordinary new-instance behavior, not special isolation (every `ai.agent()` already has them). What `spawnSubAgent` adds is packaging: a first-class per-task `budget`, the build-run-discard shape, and a `report` that slots under the caller's `report.children[]` so cost and traces roll up uniformly. It's also a *narrower* surface than `agent.execute` — one-shot, with no `history`, `placeholders`, per-call events, or `repair`.
-- **`budget` vs `maxTrips`.** `budget` caps *spend* (`maxTokens` and/or `maxCostUSD`) and aborts at the trip boundary the moment a cap is crossed. `maxTrips` caps *round-trips*, not spend — a sub-agent can exhaust its trips while well under budget, or bust its budget on a single expensive trip. Set both for belt-and-suspenders.
+- **It's a thin wrapper, not a sandbox.** Each spawn is a plain new `ai.agent()` run once — its fresh conversation and own tools/prompt/budget-ledger are ordinary new-instance behavior, not special isolation (every `ai.agent()` already has them). What `spawnSubAgent` adds is packaging: a first-class per-task `budget`, the build-run-discard shape, and a `report` that slots under the caller's `report.children[]` so cost and traces roll up uniformly. It's also a _narrower_ surface than `agent.execute` — one-shot, with no `history`, `placeholders`, per-call events, or `repair`.
+- **`budget` vs `maxTrips`.** `budget` caps _spend_ (`maxTokens` and/or `maxCostUSD`) and aborts at the trip boundary the moment a cap is crossed. `maxTrips` caps _round-trips_, not spend — a sub-agent can exhaust its trips while well under budget, or bust its budget on a single expensive trip. Set both for belt-and-suspenders.
 - **`maxCostUSD` needs pricing.** An explicit budget price wins; otherwise the cap uses pricing configured on the SDK adapter or per model. Without either, it fails closed before the first model call; use `onUnpriced: "allow"` only to deliberately opt out. See the cost-tracking recipe for wiring pricing.
 - **Typed sub-agent output.** Pass `output` (a `@warlock.js/seal` schema) in the spawn spec to validate the sub-agent's result into typed `result.data` — handy when a delegate must return structured findings rather than prose.
 - **Cancellation and sessions thread through.** `signal` and `sessionId` on the spawn spec are forwarded into the sub-agent run; when you spawn from inside a planner capability, forward the planner's own `options.signal` / `options.sessionId` (as the capability above does) so a cancelled planner run cancels its in-flight delegates and every spawn shares the run's session id.

@@ -47,15 +47,15 @@ The export is `defineConfig(...)` — a helper that gives you full type inferenc
 
 The contrast with `src/config/*`:
 
-| You want to...                                       | File                                  |
-| ---------------------------------------------------- | ------------------------------------- |
-| Change the HTTP port your app listens on             | `src/config/http.ts` → `port: ...`    |
-| Add a new CLI command to `pnpm warlock`              | `warlock.config.ts` → `cli.commands`  |
-| Configure your cache driver                          | `src/config/cache.ts`                 |
-| Skip dev-server health checks                        | `warlock.config.ts` → `devServer.healthCheckers: false` |
-| Pull migrations from `@warlock.js/auth`              | `warlock.config.ts` → `database.migrations` |
-| Set mailer SMTP credentials                          | `src/config/mail.ts`                  |
-| Tune the production bundler's minify/sourcemap       | `warlock.config.ts` → `build`         |
+| You want to...                                 | File                                                    |
+| ---------------------------------------------- | ------------------------------------------------------- |
+| Change the HTTP port your app listens on       | `src/config/http.ts` → `port: ...`                      |
+| Add a new CLI command to `pnpm warlock`        | `warlock.config.ts` → `cli.commands`                    |
+| Configure your cache driver                    | `src/config/cache.ts`                                   |
+| Skip dev-server health checks                  | `warlock.config.ts` → `devServer.healthCheckers: false` |
+| Pull migrations from `@warlock.js/auth`        | `warlock.config.ts` → `database.migrations`             |
+| Set mailer SMTP credentials                    | `src/config/mail.ts`                                    |
+| Tune the production bundler's minify/sourcemap | `warlock.config.ts` → `build`                           |
 
 The shorthand: `warlock.config.ts` is the framework's setup; `src/config/*` is the app's setup. If a config field is consumed by the framework BEFORE app code loads (the dev server, the build pipeline, the CLI, migrations the framework discovers at startup), it lives here. Otherwise it lives in `src/config/*`.
 
@@ -92,14 +92,14 @@ build: {
 }
 ```
 
-| Field           | Default                  | Purpose                                                                 |
-| --------------- | ------------------------ | ----------------------------------------------------------------------- |
-| `outdir`  | `<cwd>/dist`             | Where the bundled output goes (alias: `outDirectory`)                   |
-| `outFile`       | `"app.js"`               | The name of the bundled file                                            |
-| `minify`        | `true`                   | Whether the production bundle is minified                               |
-| `sourcemap`     | `true`                   | Sourcemap mode — `true`, `false`, `"inline"`, or `"linked"`             |
-| `singleBundle`  | `false`                  | Inline dependencies into one runnable file — see below                  |
-| `esmShim`       | `true`                   | Recreate `require` / `__filename` / `__dirname` for bundled CommonJS    |
+| Field          | Default      | Purpose                                                              |
+| -------------- | ------------ | -------------------------------------------------------------------- |
+| `outdir`       | `<cwd>/dist` | Where the bundled output goes (alias: `outDirectory`)                |
+| `outFile`      | `"app.js"`   | The name of the bundled file                                         |
+| `minify`       | `true`       | Whether the production bundle is minified                            |
+| `sourcemap`    | `true`       | Sourcemap mode — `true`, `false`, `"inline"`, or `"linked"`          |
+| `singleBundle` | `false`      | Inline dependencies into one runnable file — see below               |
+| `esmShim`      | `true`       | Recreate `require` / `__filename` / `__dirname` for bundled CommonJS |
 
 `outDirectory` is accepted as an alias for `outdir`. Earlier docs used that name while the code only ever read `outdir`, so configs written from them were silently ignored — both work now, and `outdir` wins if you set both.
 
@@ -173,15 +173,15 @@ devServer: {
 }
 ```
 
-| Field                  | Default                                                                    | Purpose                                                          |
-| ---------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `watch.include`        | `["**/*.{ts,tsx}"]`                                                        | Glob patterns the file watcher tracks                            |
-| `watch.exclude`        | `["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"]`     | Patterns to ignore                                               |
-| `healthCheckers`       | (enabled with defaults)                                                    | Built-in switches, custom checker array, or `false` to disable             |
-| `generateTypings`      | `true`                                                                     | Auto-regenerate ConfigRegistry / route typings on dev-server boot |
-| `checkForUpdates`      | `true`                                                                     | Check npm for a newer `@warlock.js/core` at dev-server start      |
-| `restartOnConfigChange`| `true`                                                                     | Restart the dev server when `warlock.config.ts` or `.env*` changes|
-| `transpileCacheDebug`  | `false`                                                                    | Name cache files by source path for debugging the transpile cache|
+| Field                   | Default                                                                | Purpose                                                            |
+| ----------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `watch.include`         | `["**/*.{ts,tsx}"]`                                                    | Glob patterns the file watcher tracks                              |
+| `watch.exclude`         | `["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"]` | Patterns to ignore                                                 |
+| `healthCheckers`        | (enabled with defaults)                                                | Built-in switches, custom checker array, or `false` to disable     |
+| `generateTypings`       | `true`                                                                 | Auto-regenerate ConfigRegistry / route typings on dev-server boot  |
+| `checkForUpdates`       | `true`                                                                 | Check npm for a newer `@warlock.js/core` at dev-server start       |
+| `restartOnConfigChange` | `true`                                                                 | Restart the dev server when `warlock.config.ts` or `.env*` changes |
+| `transpileCacheDebug`   | `false`                                                                | Name cache files by source path for debugging the transpile cache  |
 
 You'll usually leave these alone. The defaults are tuned for typical TypeScript projects.
 
@@ -272,16 +272,16 @@ Earlier than anything else. The framework reads `warlock.config.ts` before any s
 Practically, that means `warlock.config.ts` reads:
 
 ```ts
-import { defineConfig } from "@warlock.js/core";              // ✅ framework helper
-import { authMigrations } from "@warlock.js/auth";            // ✅ package export
-import { join } from "node:path";                             // ✅ Node builtin
+import { defineConfig } from "@warlock.js/core"; // ✅ framework helper
+import { authMigrations } from "@warlock.js/auth"; // ✅ package export
+import { join } from "node:path"; // ✅ Node builtin
 ```
 
 But not:
 
 ```ts
-import { config } from "@warlock.js/core";                    // ❌ not yet loaded
-import { User } from "src/app/users/models/user";             // ❌ app code not imported
+import { config } from "@warlock.js/core"; // ❌ not yet loaded
+import { User } from "src/app/users/models/user"; // ❌ app code not imported
 ```
 
 If you find yourself wanting one of these in `warlock.config.ts`, you've probably mixed up which config layer this is. Push the read to `src/config/*` or to module init code.
@@ -292,7 +292,7 @@ A config may import its own local TypeScript that does not depend on app state �
 
 ```ts
 import { LocalConnector } from "./src/connectors/local"; // ✅ extensionless
-import { storageRoot } from "app/shared/paths";          // ✅ tsconfig paths alias
+import { storageRoot } from "app/shared/paths"; // ✅ tsconfig paths alias
 ```
 
 `warlock dev` resolves these through its loader. Where the runtime cannot import the config as written — `build`/`start` on Node without native TypeScript, or native type stripping meeting an extensionless or aliased import, or TypeScript it cannot strip (an `enum`, a parameter property) — Core bundles the config with its **local** import graph through esbuild and imports that once:
@@ -326,7 +326,7 @@ const isCI = process.env.CI === "true";
 
 export default defineConfig({
   build: {
-    minify: !isCI,             // skip minify during CI builds (faster, easier to diff)
+    minify: !isCI, // skip minify during CI builds (faster, easier to diff)
     sourcemap: isCI ? "linked" : true,
   },
 });

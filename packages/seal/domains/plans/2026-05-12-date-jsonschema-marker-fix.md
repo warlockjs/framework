@@ -11,18 +11,14 @@
 The current `toJsonSchema()` on `DateValidator` tries to detect whether `.toDateOnly()` or `.toTimeOnly()` transformers were applied so it can emit `format: "date"` or `format: "time"` instead of the default `"date-time"`:
 
 ```ts
-const hasToDateOnly = this.dataTransformers.some((t: any) =>
-  t.toString().includes("YYYY-MM-DD")
-);
+const hasToDateOnly = this.dataTransformers.some((t: any) => t.toString().includes("YYYY-MM-DD"));
 if (hasToDateOnly) schema.format = "date";
 
-const hasToTimeOnly = this.dataTransformers.some((t: any) =>
-  t.toString().includes("HH:mm:ss")
-);
+const hasToTimeOnly = this.dataTransformers.some((t: any) => t.toString().includes("HH:mm:ss"));
 if (hasToTimeOnly) schema.format = "time";
 ```
 
-This inspects the *source code* of the transformer function via `.toString()` and searches for a literal substring. Any minifier (terser, swc-mangle, esbuild with `--minify`) renames symbols and rewrites string literals — `"YYYY-MM-DD"` is preserved (it's a literal in the source), so this *may* still work, **but only if the minifier doesn't inline / hoist / mangle the transformer body in any way that changes the source-code shape**. Specifically:
+This inspects the _source code_ of the transformer function via `.toString()` and searches for a literal substring. Any minifier (terser, swc-mangle, esbuild with `--minify`) renames symbols and rewrites string literals — `"YYYY-MM-DD"` is preserved (it's a literal in the source), so this _may_ still work, **but only if the minifier doesn't inline / hoist / mangle the transformer body in any way that changes the source-code shape**. Specifically:
 
 - swc and esbuild can inline single-use functions, removing the closure that produces a clean `.toString()` output
 - Some minifiers replace named functions with arrow-prop equivalents whose `.toString()` differs
@@ -99,11 +95,11 @@ Rationale for the `__` prefix: signals "internal/runtime, not user-facing" witho
 
 ## Decisions to lock with Hasan
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Use string marker `__jsonSchemaFormat` or symbol? | **String.** Easier to debug, no impact on minification. Symbol gains nothing real here. |
-| 2 | Should this be exposed as public API (so users can hint formats for custom transformers)? | **No, v1.** Keep `__`-prefixed internal. If users need this, add an `outputFormat(format: string)` public method later. YAGNI. |
-| 3 | Lock the convention "transformers that influence JSON Schema must declare a marker" anywhere? | **Add to `domains/seal/design/decisions.md` § 3** post-merge. One line: "transformers that influence JSON Schema generation must declare their effect via `options.__jsonSchemaFormat` (or similar marker). Inspecting transformer source code is forbidden." |
+| #   | Question                                                                                      | Recommendation                                                                                                                                                                                                                                                |
+| --- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Use string marker `__jsonSchemaFormat` or symbol?                                             | **String.** Easier to debug, no impact on minification. Symbol gains nothing real here.                                                                                                                                                                       |
+| 2   | Should this be exposed as public API (so users can hint formats for custom transformers)?     | **No, v1.** Keep `__`-prefixed internal. If users need this, add an `outputFormat(format: string)` public method later. YAGNI.                                                                                                                                |
+| 3   | Lock the convention "transformers that influence JSON Schema must declare a marker" anywhere? | **Add to `domains/seal/design/decisions.md` § 3** post-merge. One line: "transformers that influence JSON Schema generation must declare their effect via `options.__jsonSchemaFormat` (or similar marker). Inspecting transformer source code is forbidden." |
 
 ## Verification
 

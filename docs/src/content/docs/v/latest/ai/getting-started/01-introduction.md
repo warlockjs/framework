@@ -37,8 +37,8 @@ The ladder is the spine, but the package is wider than four verbs. Around the pr
 ```ts
 type ExecuteResult<T> = {
   type: "agent" | "workflow" | "supervisor";
-  data?: T;        // structured output when a schema was supplied
-  text?: string;   // raw final LLM text (agent only)
+  data?: T; // structured output when a schema was supplied
+  text?: string; // raw final LLM text (agent only)
   report: BaseReport;
   usage: Usage;
   error?: AIError;

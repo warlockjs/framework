@@ -21,7 +21,7 @@ const MAX_ITEMS = 20;
 async function recordActivity(userId: number, event: ActivityEvent) {
   const feed = cache.list<ActivityEvent>(`user.${userId}.activity`);
 
-  await feed.unshift(event);        // newest at the head
+  await feed.unshift(event); // newest at the head
   await feed.trim(0, MAX_ITEMS - 1); // keep the first 20, drop the rest
 }
 ```
@@ -37,8 +37,8 @@ async function recordActivity(userId: number, event: ActivityEvent) {
 ```ts
 const feed = cache.list<ActivityEvent>(`user.${userId}.activity`);
 
-const latest = await feed.all();          // all (≤ 20) items, newest first
-const topFive = await feed.slice(0, 5);   // first 5, end-exclusive like Array.slice
+const latest = await feed.all(); // all (≤ 20) items, newest first
+const topFive = await feed.slice(0, 5); // first 5, end-exclusive like Array.slice
 const count = await feed.length();
 ```
 
@@ -50,7 +50,7 @@ clears their notifications:
 ```ts
 const feed = cache.list<ActivityEvent>(`user.${userId}.activity`);
 
-await feed.clear();   // removes the whole list
+await feed.clear(); // removes the whole list
 ```
 
 :::note Feeds and TTL

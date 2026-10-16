@@ -73,20 +73,20 @@ await connectToBroker({
   host: process.env.ANALYTICS_HOST,
 });
 
-herald().channel("emails").publish({ /* ... */ });           // → notifications
-herald("analytics").channel("events").publish({ /* ... */ }); // → analytics
+herald().channel("emails").publish({/* ... */}); // → notifications
+herald("analytics").channel("events").publish({/* ... */}); // → analytics
 ```
 
 `connectToBroker` defaults `isDefault` to `true`, and the registry promotes the most-recently-registered default. So when you register more than one broker, mark the secondaries `isDefault: false` — otherwise the last one wins and `herald()` returns the wrong broker.
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Publishing messages — single + batch + publish options (priority, ttl, delay, persistent, headers) | the `publish-message` topic |
-| Subscribing to messages — handler signature, message context (ack/nack/retry), prefetch, retry policy, dead-letter | the `consume-message` topic |
-| Request/response (RPC) — `channel.request(...)` + `channel.respond(...)` for synchronous-style calls over a message bus | the `request-and-respond` topic |
-| Schema-validated channels — `.channel(name, { schema })` with `@warlock.js/seal` | See the `seal-basics` topic of the `warlock-js-seal` skill + skills below |
+| If the task is about…                                                                                                   | Load                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Publishing messages — single + batch + publish options (priority, ttl, delay, persistent, headers)                      | the `publish-message` topic                                               |
+| Subscribing to messages — handler signature, message context (ack/nack/retry), prefetch, retry policy, dead-letter      | the `consume-message` topic                                               |
+| Request/response (RPC) — `channel.request(...)` + `channel.respond(...)` for synchronous-style calls over a message bus | the `request-and-respond` topic                                           |
+| Schema-validated channels — `.channel(name, { schema })` with `@warlock.js/seal`                                        | See the `seal-basics` topic of the `warlock-js-seal` skill + skills below |
 
 ## Things NOT to do
 

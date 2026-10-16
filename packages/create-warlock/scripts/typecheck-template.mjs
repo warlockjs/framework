@@ -26,7 +26,9 @@ const tsc = spawnSync(
 );
 
 if (tsc.status !== 0) {
-  console.error("\ntemplates/warlock/ does not typecheck against this checkout's framework source.\n");
+  console.error(
+    "\ntemplates/warlock/ does not typecheck against this checkout's framework source.\n",
+  );
 }
 
 process.exit(tsc.status ?? 1);

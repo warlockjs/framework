@@ -185,7 +185,9 @@ export class LevelErrorBoundary extends Component<
   }
 }
 
-function boundaryOf(module: ClientProjectedModule): ComponentType<PageErrorBoundaryProps> | undefined {
+function boundaryOf(
+  module: ClientProjectedModule,
+): ComponentType<PageErrorBoundaryProps> | undefined {
   const boundary = module.ErrorBoundary;
 
   return typeof boundary === "function"

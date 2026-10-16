@@ -62,9 +62,9 @@ Lower-level access — most apps don't need this. Reach for it when you're imple
 const result = await userSchema["~standard"].validate(rawData);
 
 if ("value" in result) {
-  result.value;   // success — the validated data
+  result.value; // success — the validated data
 } else {
-  result.issues;  // [{ message, path: [{ key }, ...] }, ...]
+  result.issues; // [{ message, path: [{ key }, ...] }, ...]
 }
 ```
 
@@ -135,7 +135,7 @@ signature first so direct `~standard.validate()` calls also return typed output.
 
 `@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing `v.object({...})` works directly — the factory returns the same generic object class.
 
-If you see *"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"*, the answer isn't to widen the schema. It's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema.
+If you see _"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"_, the answer isn't to widen the schema. It's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema.
 
 ## Why seal forks the Standard Schema types
 

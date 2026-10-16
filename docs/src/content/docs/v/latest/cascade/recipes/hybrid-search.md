@@ -5,7 +5,7 @@ sidebar:
   label: "Hybrid search — vector + full-text"
 ---
 
-Pure vector search is great for semantic similarity ("find me FAQs about *refund-like* concepts") but loses on exact-keyword precision ("the product code `SKU-4429` exactly"). Pure full-text is the inverse. **Hybrid search** runs both, then re-ranks the union — best of both worlds.
+Pure vector search is great for semantic similarity ("find me FAQs about _refund-like_ concepts") but loses on exact-keyword precision ("the product code `SKU-4429` exactly"). Pure full-text is the inverse. **Hybrid search** runs both, then re-ranks the union — best of both worlds.
 
 This recipe combines `.similarTo()` and `.whereFullText()` results with a simple linear combination of scores. Cascade owns the two queries; you own the re-ranking math.
 

@@ -56,11 +56,7 @@ export type OtelSpan = {
  * with a name, a `{ startTime }` options object, and a parent context.
  */
 export type OtelTracer = {
-  startSpan(
-    name: string,
-    options: { startTime?: OtelTimeInput },
-    context?: OtelContext,
-  ): OtelSpan;
+  startSpan(name: string, options: { startTime?: OtelTimeInput }, context?: OtelContext): OtelSpan;
 };
 
 /**

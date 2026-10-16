@@ -10,23 +10,21 @@ Cascade's query builder isn't only for finding records — it crunches numbers t
 ## Scalar aggregates
 
 ```ts
-const total      = await Order.count();                  // count is static on the model
-const revenue    = await Order.query().sum("total");
-const avgTicket  = await Order.query().avg("total");
-const cheapest   = await Order.query().min("total");
-const priciest   = await Order.query().max("total");
+const total = await Order.count(); // count is static on the model
+const revenue = await Order.query().sum("total");
+const avgTicket = await Order.query().avg("total");
+const cheapest = await Order.query().min("total");
+const priciest = await Order.query().max("total");
 
 // Filtered
-const monthRevenue = await Order.query()
-  .whereDateAfter("created_at", startOfMonth)
-  .sum("total");
+const monthRevenue = await Order.query().whereDateAfter("created_at", startOfMonth).sum("total");
 ```
 
 Each returns a single number (`Promise<number>`). Only `count` is a static shortcut on the model; `sum` / `avg` / `min` / `max` (and the date helpers) are query-builder methods — reach them via `Order.query()` or chain off `Order.where(...)`. Date filters take a single date: `whereDate(field, value)` (exact day, time ignored), `whereDateAfter` / `whereDateBefore` (one-sided), `whereDateBetween(field, [a, b])` (range) — there is no 3-arg `whereDate(field, op, value)`. By Cascade convention the scalar terminators return **`0` on zero rows — not `null`** — so you can use the result directly without a null guard.
 
 ## Grouped rollups — two-arg `groupBy(fields, aggregates)`
 
-To compute aggregates *per group*, pass a second argument to `groupBy`: an object mapping output aliases to aggregate expressions. Build the expressions with the `$agg` helpers:
+To compute aggregates _per group_, pass a second argument to `groupBy`: an object mapping output aliases to aggregate expressions. Build the expressions with the `$agg` helpers:
 
 ```ts
 import { $agg } from "@warlock.js/cascade";
@@ -59,8 +57,8 @@ import { $agg, $expr } from "@warlock.js/cascade";
 
 const revenue = await OrderItem.query()
   .groupBy("product_id", {
-    revenue: $agg.sum($expr.mul("price", "quantity")),                       // SUM(price * quantity)
-    net:     $agg.sum($expr.mul($expr.sub($expr.lit(1), "discount"), "price")),// SUM((1 - discount) * price)
+    revenue: $agg.sum($expr.mul("price", "quantity")), // SUM(price * quantity)
+    net: $agg.sum($expr.mul($expr.sub($expr.lit(1), "discount"), "price")), // SUM((1 - discount) * price)
   })
   .get();
 ```
@@ -108,7 +106,7 @@ const monthly = await Order.query()
 
 ## `.having(...)` — filter groups by a computed aggregate
 
-`.where()` filters rows *before* grouping (cheap, uses indexes). `.having()` filters *after* aggregation, by the alias you defined:
+`.where()` filters rows _before_ grouping (cheap, uses indexes). `.having()` filters _after_ aggregation, by the alias you defined:
 
 ```ts
 const big = await Order.query()
@@ -137,14 +135,27 @@ The `orderBy` reference matches the alias from the aggregates object.
 const rows = await Post.query().unwind("tags").where("tags", "news").lean().get();
 
 // Keep posts with no tags; record each tag's position
-await Post.query().unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" }).get();
+await Post.query()
+  .unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" })
+  .get();
 
 // Computed field, existing fields kept
-await Post.query().addFields({ score: { $add: ["$likes", "$shares"] } }).orderBy("score", "desc").get();
+await Post.query()
+  .addFields({ score: { $add: ["$likes", "$shares"] } })
+  .orderBy("score", "desc")
+  .get();
 
 // Pipeline $lookup
-await Post.query().join({ table: "comments", localField: "id", foreignField: "postId",
-  alias: "approved", pipeline: [{ $match: { approved: true } }] }).lean().get();
+await Post.query()
+  .join({
+    table: "comments",
+    localField: "id",
+    foreignField: "postId",
+    alias: "approved",
+    pipeline: [{ $match: { approved: true } }],
+  })
+  .lean()
+  .get();
 ```
 
 `unwind()` returns several rows for one stored document. Use `.lean()` when you only read them. `addFields` expressions are raw aggregation expressions: write them in code, never from request data. Computed columns in the output also work with `selectRaw({ alias: expr })` (`$project`). There is no `$facet` method yet.
@@ -156,7 +167,7 @@ Raw stages: `joinRaw({ $lookup: { from, let, pipeline, as } })` (or an array of 
 ## Gotchas
 
 - **`where` vs `having`.** Row filters go in `.where()` (before grouping, index-friendly); aggregate filters go in `.having()`.
-- **Empty sets.** Scalar terminators return `0` on zero rows (above). For *grouped* reports, a group with no rows simply doesn't appear — a report over an empty range returns `[]`, not a row of zeros.
+- **Empty sets.** Scalar terminators return `0` on zero rows (above). For _grouped_ reports, a group with no rows simply doesn't appear — a report over an empty range returns `[]`, not a row of zeros.
 - **Don't `.all()` then `array.reduce`.** Always push aggregates to the database.
 
 ## See also

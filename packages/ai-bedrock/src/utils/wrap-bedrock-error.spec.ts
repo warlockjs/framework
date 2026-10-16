@@ -35,9 +35,9 @@ describe("wrapBedrockError", () => {
   });
 
   it("maps AccessDeniedException / 401 / 403 to ProviderAuthError", () => {
-    expect(wrapBedrockError(awsError({ name: "AccessDeniedException", httpStatusCode: 403 }))).toBeInstanceOf(
-      ProviderAuthError,
-    );
+    expect(
+      wrapBedrockError(awsError({ name: "AccessDeniedException", httpStatusCode: 403 })),
+    ).toBeInstanceOf(ProviderAuthError);
     expect(wrapBedrockError(awsError({ name: "X", httpStatusCode: 401 }))).toBeInstanceOf(
       ProviderAuthError,
     );
@@ -80,9 +80,9 @@ describe("wrapBedrockError", () => {
     expect(
       wrapBedrockError(awsError({ name: "ResourceNotFoundException", httpStatusCode: 404 })),
     ).toBeInstanceOf(InvalidRequestError);
-    expect(wrapBedrockError(awsError({ name: "ConflictException", httpStatusCode: 409 }))).toBeInstanceOf(
-      InvalidRequestError,
-    );
+    expect(
+      wrapBedrockError(awsError({ name: "ConflictException", httpStatusCode: 409 })),
+    ).toBeInstanceOf(InvalidRequestError);
     expect(wrapBedrockError(awsError({ name: "Weird", httpStatusCode: 422 }))).toBeInstanceOf(
       InvalidRequestError,
     );
@@ -115,9 +115,9 @@ describe("wrapBedrockError", () => {
   });
 
   it("maps a bare 403 with no recognized name to ProviderAuthError", () => {
-    expect(wrapBedrockError(awsError({ name: "SomethingElse", httpStatusCode: 403 }))).toBeInstanceOf(
-      ProviderAuthError,
-    );
+    expect(
+      wrapBedrockError(awsError({ name: "SomethingElse", httpStatusCode: 403 })),
+    ).toBeInstanceOf(ProviderAuthError);
   });
 
   it("prioritizes ServiceQuotaExceededException over its 4xx status", () => {
@@ -168,15 +168,15 @@ describe("wrapBedrockError", () => {
   });
 
   it("maps server-side faults (5xx, ModelError, ServiceUnavailable) to ProviderError", () => {
-    expect(wrapBedrockError(awsError({ name: "InternalServerException", httpStatusCode: 500 }))).toBeInstanceOf(
-      ProviderError,
-    );
+    expect(
+      wrapBedrockError(awsError({ name: "InternalServerException", httpStatusCode: 500 })),
+    ).toBeInstanceOf(ProviderError);
     expect(
       wrapBedrockError(awsError({ name: "ServiceUnavailableException", httpStatusCode: 503 })),
     ).toBeInstanceOf(ProviderError);
-    expect(wrapBedrockError(awsError({ name: "ModelErrorException", httpStatusCode: 424 }))).toBeInstanceOf(
-      InvalidRequestError,
-    );
+    expect(
+      wrapBedrockError(awsError({ name: "ModelErrorException", httpStatusCode: 424 })),
+    ).toBeInstanceOf(InvalidRequestError);
   });
 
   it("preserves cause and attaches status / name / requestId to context", () => {

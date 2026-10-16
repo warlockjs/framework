@@ -21,10 +21,14 @@ describe("BaseValidator translated attributes", () => {
   });
 
   it.each([
-    ["required before translated attributes", () =>
-      v.string().required().transAttributes({ input: "validation.attributes.name" })],
-    ["translated attributes before required", () =>
-      v.string().transAttributes({ input: "validation.attributes.name" }).required()],
+    [
+      "required before translated attributes",
+      () => v.string().required().transAttributes({ input: "validation.attributes.name" }),
+    ],
+    [
+      "translated attributes before required",
+      () => v.string().transAttributes({ input: "validation.attributes.name" }).required(),
+    ],
   ])("resolves required labels lazily when %s", async (_name, makeValidator) => {
     const validator = makeValidator();
     const schema = v.object({ name: validator });

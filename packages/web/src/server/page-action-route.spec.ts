@@ -283,12 +283,9 @@ describe("page actions (real Fastify, real pipeline)", () => {
     );
 
     // 13. a page that opted in to public caching never lets an action be cached.
-    mountPage(
-      server,
-      "/__action-cached",
-      pageModule({ action: () => ({ ok: true }) }),
-      { cache: { public: true, maxAge: 120, serverCache: true } },
-    );
+    mountPage(server, "/__action-cached", pageModule({ action: () => ({ ok: true }) }), {
+      cache: { public: true, maxAge: 120, serverCache: true },
+    });
     mountPage(server, "/__action-public", pageModule({ action: () => ({ ok: true }) }), {
       cache: { public: true, maxAge: 120 },
     });
@@ -665,4 +662,3 @@ describe("page actions (real Fastify, real pipeline)", () => {
     expect(rejected.statusCode).toBe(422);
   });
 });
-

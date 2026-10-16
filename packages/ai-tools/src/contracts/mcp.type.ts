@@ -82,9 +82,7 @@ export interface McpClient {
  * can enumerate its `ToolContract`s (a built agent / supervisor /
  * orchestrator), or a literal array of contracts.
  */
-export type McpServeSource =
-  | { tools(): ToolContract[] }
-  | ToolContract[];
+export type McpServeSource = { tools(): ToolContract[] } | ToolContract[];
 
 /**
  * Where an `ai.mcp.serve` server listens. Discriminated by `type`.
@@ -92,9 +90,7 @@ export type McpServeSource =
  * - `"stdio"` — serve JSON-RPC over this process's stdin/stdout.
  * - `"http"` — serve Streamable HTTP on `port`.
  */
-export type McpServeTransport =
-  | { type: "stdio" }
-  | { type: "http"; port: number };
+export type McpServeTransport = { type: "stdio" } | { type: "http"; port: number };
 
 /**
  * Options for `ai.mcp.serve(source, options)` (Direction B: local
@@ -199,10 +195,7 @@ export interface JsonRpcResponse<TResult = unknown> {
 /**
  * Any inbound JSON-RPC message the transport may surface.
  */
-export type JsonRpcMessage =
-  | JsonRpcRequest
-  | JsonRpcNotification
-  | JsonRpcResponse;
+export type JsonRpcMessage = JsonRpcRequest | JsonRpcNotification | JsonRpcResponse;
 
 /**
  * One tool descriptor as returned by an MCP server's `tools/list`. Its

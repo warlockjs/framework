@@ -83,7 +83,8 @@ export class GoogleImageModel implements ImageModelContract {
     // OpenAI's WxH `size`, so we honor only an explicit passthrough.
     if (typeof options?.imageSize === "string") config.imageSize = options.imageSize;
     if (typeof options?.personGeneration === "string") {
-      config.personGeneration = options.personGeneration as GenerateImagesConfig["personGeneration"];
+      config.personGeneration =
+        options.personGeneration as GenerateImagesConfig["personGeneration"];
     }
 
     this.logger.debug(LOG_MODULE, "image.request", "models.generateImages", {

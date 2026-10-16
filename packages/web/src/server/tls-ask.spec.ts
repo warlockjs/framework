@@ -31,9 +31,9 @@ describe("createTlsAskHandler", () => {
     await expect(ask({ domain: "missing.com", request })).resolves.toEqual({ status: 404 });
   });
 
-  it.each([undefined, "", "https://acme.com", "acme.com/path", "acme .com"]) (
+  it.each([undefined, "", "https://acme.com", "acme.com/path", "acme .com"])(
     "rejects an absent or invalid domain %#",
-    async domain => {
+    async (domain) => {
       const ask = createTlsAskHandler({ sites: fixed });
       await expect(ask({ domain, request })).resolves.toEqual({ status: 400 });
     },

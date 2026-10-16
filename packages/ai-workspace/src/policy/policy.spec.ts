@@ -116,9 +116,7 @@ describe("resolveInJail", () => {
     const sibling = `${jailRoot}-evil`;
     mkdirSync(sibling, { recursive: true });
 
-    await expect(resolveInJail(basePolicy(), sibling)).rejects.toBeInstanceOf(
-      WorkspacePolicyError,
-    );
+    await expect(resolveInJail(basePolicy(), sibling)).rejects.toBeInstanceOf(WorkspacePolicyError);
   });
 
   it("allows an extra root listed in allowPaths", async () => {
@@ -150,9 +148,7 @@ describe("resolveInJail", () => {
   it("rejects a denyPaths bare-directory match (blocks its contents)", async () => {
     const policy = basePolicy({ denyPaths: [".git"] });
 
-    await expect(resolveInJail(policy, ".git/config")).rejects.toBeInstanceOf(
-      WorkspacePolicyError,
-    );
+    await expect(resolveInJail(policy, ".git/config")).rejects.toBeInstanceOf(WorkspacePolicyError);
   });
 
   it("rejects a denyPaths single-segment wildcard (.env*)", async () => {

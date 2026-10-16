@@ -8,7 +8,7 @@ sidebar:
 
 The router is how URLs become handlers. In Warlock it's a singleton — you import `router` from `@warlock.js/core` and call `.get(...)` / `.post(...)` / a group / a resource chain. Every call registers a route synchronously; the framework collects them at boot and binds them to Fastify.
 
-The point of this page is the *shape* — what's available, where it lives, and the patterns you'll see in every Warlock module. Deep details (rate limiting, route names, source-file tracking for HMR) live in [Routing — deep dive](./routing-deep.md).
+The point of this page is the _shape_ — what's available, where it lives, and the patterns you'll see in every Warlock module. Deep details (rate limiting, route names, source-file tracking for HMR) live in [Routing — deep dive](./routing-deep.md).
 
 ## Where routes live
 
@@ -52,7 +52,7 @@ router.patch(path, handler);
 router.delete(path, handler);
 router.head(path, handler);
 router.options(path, handler);
-router.any(path, handler);    // matches all methods
+router.any(path, handler); // matches all methods
 ```
 
 Most apps need the top five. `head` / `options` / `any` are there when you reach for them.
@@ -94,11 +94,11 @@ A whole module typically prefixes its URLs with `/<module-name>`. Use `router.pr
 
 ```ts
 router.prefix("/products", () => {
-  router.get("/", listProductsController);          // GET    /products
-  router.get("/:id", getProductController);         // GET    /products/:id
-  router.post("/", createProductController);        // POST   /products
-  router.patch("/:id", updateProductController);    // PATCH  /products/:id
-  router.delete("/:id", deleteProductController);   // DELETE /products/:id
+  router.get("/", listProductsController); // GET    /products
+  router.get("/:id", getProductController); // GET    /products/:id
+  router.post("/", createProductController); // POST   /products
+  router.patch("/:id", updateProductController); // PATCH  /products/:id
+  router.delete("/:id", deleteProductController); // DELETE /products/:id
 });
 ```
 
@@ -135,13 +135,13 @@ router.group(
 
 Three options:
 
-| Option       | What it does                                       |
-| ------------ | -------------------------------------------------- |
-| `prefix`     | Prepended to every route inside                    |
-| `middleware` | Applied to every route inside, in array order      |
-| `name`       | Route-name prefix (used for URL generation)        |
+| Option       | What it does                                  |
+| ------------ | --------------------------------------------- |
+| `prefix`     | Prepended to every route inside               |
+| `middleware` | Applied to every route inside, in array order |
+| `name`       | Route-name prefix (used for URL generation)   |
 
-Middleware runs in array order *before* the controller. If you stack `[rateLimitMiddleware, authMiddleware]`, rate-limiting runs first.
+Middleware runs in array order _before_ the controller. If you stack `[rateLimitMiddleware, authMiddleware]`, rate-limiting runs first.
 
 ## The `guarded()` convention
 
@@ -185,24 +185,24 @@ For a standard CRUD resource, `router.route(path)` returns a builder with five n
 ```ts
 router
   .route("/products")
-  .list(listProductsController)        // GET    /products
-  .show(getProductController)          // GET    /products/:id
-  .create(createProductController)     // POST   /products
-  .update(updateProductController)     // PUT    /products/:id
-  .destroy(removeProductController);   // DELETE /products/:id
+  .list(listProductsController) // GET    /products
+  .show(getProductController) // GET    /products/:id
+  .create(createProductController) // POST   /products
+  .update(updateProductController) // PUT    /products/:id
+  .destroy(removeProductController); // DELETE /products/:id
 ```
 
 Each method returns the builder so you can chain. Methods you don't call don't register — list-only resources stop at `.list(...)`.
 
 The slots map to method + path like this:
 
-| Slot         | Method | Path                  | Typical use     |
-| ------------ | ------ | --------------------- | --------------- |
-| `.list(h)`   | GET    | `/products`           | paginated list  |
-| `.show(h)`   | GET    | `/products/:id`       | get one         |
-| `.create(h)` | POST   | `/products`           | create new      |
-| `.update(h)` | PUT    | `/products/:id`       | replace one     |
-| `.destroy(h)`| DELETE | `/products/:id`       | delete one      |
+| Slot          | Method | Path            | Typical use    |
+| ------------- | ------ | --------------- | -------------- |
+| `.list(h)`    | GET    | `/products`     | paginated list |
+| `.show(h)`    | GET    | `/products/:id` | get one        |
+| `.create(h)`  | POST   | `/products`     | create new     |
+| `.update(h)`  | PUT    | `/products/:id` | replace one    |
+| `.destroy(h)` | DELETE | `/products/:id` | delete one     |
 
 There's also `.patch(h)`, `.patchOne(h)`, `.getOne(h)`, and a `.crud({ ... })` shorthand for passing every handler in one object — see [Routing — deep dive](./routing-deep.md).
 
@@ -258,11 +258,11 @@ router.prefix("/auth", () => {
 
 ```ts
 router.version(1, () => {
-  router.get("/users", listUsersV1);    // /v1/users
+  router.get("/users", listUsersV1); // /v1/users
 });
 
 router.version(2, () => {
-  router.get("/users", listUsersV2);    // /v2/users
+  router.get("/users", listUsersV2); // /v2/users
 });
 ```
 
@@ -271,7 +271,7 @@ Combine with prefix and group as needed.
 ## Gotchas
 
 - **Never import `routes.ts` from anywhere.** The framework auto-loads it. Importing it double-registers every route.
-- **Order matters for static-vs-param overlap.** Register `router.get("/products/featured", ...)` *before* `router.get("/products/:id", ...)` if you want `featured` to be a literal match, not `:id = "featured"`. Easier rule: use distinct paths when you can.
+- **Order matters for static-vs-param overlap.** Register `router.get("/products/featured", ...)` _before_ `router.get("/products/:id", ...)` if you want `featured` to be a literal match, not `:id = "featured"`. Easier rule: use distinct paths when you can.
 - **Don't put logic in `routes.ts`.** It's a registration file. If you want conditional registration (env-flagged endpoints), do it inside the controller, not by branching at registration time — branching breaks the dev-server's HMR diff.
 - **Middleware in `group` runs in array order**, then the controller. `[rateLimitMiddleware, authMiddleware]` means rate-limit first, auth second.
 
@@ -285,6 +285,7 @@ Combine with prefix and group as needed.
 ## Next
 
 Continue to **[Controllers](./03-controllers.md)** to see how a handler reads inputs and shapes responses.
+
 ## Named API route metadata
 
 Name an API route when a browser form needs to address it by a stable contract:

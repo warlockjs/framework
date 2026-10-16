@@ -42,10 +42,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const packageRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-);
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const templateRoot = path.join(packageRoot, "templates", "warlock");
 
 /**
@@ -131,9 +128,7 @@ for (const file of files) {
 }
 
 if (shouldWrite) {
-  console.log(
-    `template formatter gate: ${files.length} file(s) formatted in place.`,
-  );
+  console.log(`template formatter gate: ${files.length} file(s) formatted in place.`);
   process.exit(0);
 }
 
@@ -155,6 +150,4 @@ if (defective.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  `template formatter gate: ${files.length} file(s) checked, all formatted.`,
-);
+console.log(`template formatter gate: ${files.length} file(s) checked, all formatted.`);

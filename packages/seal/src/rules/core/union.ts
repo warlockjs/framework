@@ -50,9 +50,7 @@ export const unionRule: SchemaRule<{ validators: BaseValidator[] }> = {
     // All failed or no validator matched the type
     if (allErrors.length > 0) {
       // At least one validator matched type but failed validation
-      this.context.errorMessage = firstErrorOnly
-        ? allErrors[0]
-        : allErrors.join("; ");
+      this.context.errorMessage = firstErrorOnly ? allErrors[0] : allErrors.join("; ");
     }
 
     return invalidRule(this, context);

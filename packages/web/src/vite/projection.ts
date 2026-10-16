@@ -481,7 +481,11 @@ function objectProperties(object: any): any[] {
 
 function propertyKeyName(property: any): string | undefined {
   const key = property.key;
-  return key?.type === "Identifier" ? key.name : key?.type === "StringLiteral" ? key.value : undefined;
+  return key?.type === "Identifier"
+    ? key.name
+    : key?.type === "StringLiteral"
+      ? key.value
+      : undefined;
 }
 
 function unwrapExpression(node: any): any {

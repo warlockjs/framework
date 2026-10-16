@@ -94,10 +94,7 @@ export function parseCreatedAt(createdAt: string): Date | undefined {
  *
  * Returns `undefined` when the timestamps do not settle the comparison.
  */
-export function compareCreatedAt(
-  a: string | undefined,
-  b: string | undefined,
-): number | undefined {
+export function compareCreatedAt(a: string | undefined, b: string | undefined): number | undefined {
   const dateA = a ? parseCreatedAt(a) : undefined;
   const dateB = b ? parseCreatedAt(b) : undefined;
 

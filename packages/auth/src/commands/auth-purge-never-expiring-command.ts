@@ -96,7 +96,9 @@ export function registerAuthPurgeNeverExpiringCommand() {
 
       if (dryRun) {
         console.log(
-          colors.cyan("Dry run — nothing deleted. Re-run without --dry-run to revoke these tokens."),
+          colors.cyan(
+            "Dry run — nothing deleted. Re-run without --dry-run to revoke these tokens.",
+          ),
         );
 
         return;

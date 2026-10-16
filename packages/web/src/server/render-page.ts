@@ -434,7 +434,8 @@ function buildBoundaryElement(
 ): ReactNode {
   const { boundary, error } = record;
   const Boundary = triple[boundary.boundaryLevel].ErrorBoundary as
-    ((props: PageErrorBoundaryProps) => ReactNode) | undefined;
+    | ((props: PageErrorBoundaryProps) => ReactNode)
+    | undefined;
 
   const element = Boundary
     ? createElement(Boundary, { error, status: record.statusCode ?? 500 })
@@ -651,15 +652,19 @@ function reportErrorPageFailure(
       ? ""
       : ` (a CONSEQUENCE of the earlier error, not the root cause; ROOT CAUSE: ${describeRootCause(rootCause)})`;
 
-  reportServerError(`the application error page itself failed while rendering ${where}${consequence}`, thrown, {
-    kind: "error-page",
-    phase: "error-page",
-    routeName: route?.name,
-    routePath: route?.path,
-    pathname: pathnameFromRequest(request),
-    method: request.method,
-    requestId: request.id,
-  });
+  reportServerError(
+    `the application error page itself failed while rendering ${where}${consequence}`,
+    thrown,
+    {
+      kind: "error-page",
+      phase: "error-page",
+      routeName: route?.name,
+      routePath: route?.path,
+      pathname: pathnameFromRequest(request),
+      method: request.method,
+      requestId: request.id,
+    },
+  );
 }
 
 /**
@@ -1243,7 +1248,6 @@ async function finishRender(
       body = renderWithContext(element);
       break;
     } catch (thrown) {
-
       // Floor first: whatever we do next (escalate to a boundary, fall to the
       // framework terminal), the throw must not vanish. See reportRenderError.
       reportRenderError(bundle.route, thrown, request);

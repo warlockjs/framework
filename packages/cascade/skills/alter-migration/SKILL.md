@@ -17,15 +17,19 @@ Use `Migration.alter` to evolve an existing table — adding or dropping columns
 import { Migration, text } from "@warlock.js/cascade";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  add: {
-    phone: text().nullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      phone: text().nullable(),
+    },
   },
-}, {
-  down() {
-    this.dropColumn("phone");
+  {
+    down() {
+      this.dropColumn("phone");
+    },
   },
-});
+);
 ```
 
 ---
@@ -55,21 +59,25 @@ import { Migration, text, integer, bool, uuid } from "@warlock.js/cascade";
 import { Organization } from "app/organizations/models/organization";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  add: {
-    phone:           text().nullable(),
-    login_attempts:  integer().notNullable().default(0),
-    is_verified:     bool().notNullable().default(false),
-    organization_id: uuid().references(Organization.table).onDelete("cascade").notNullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      phone: text().nullable(),
+      login_attempts: integer().notNullable().default(0),
+      is_verified: bool().notNullable().default(false),
+      organization_id: uuid().references(Organization.table).onDelete("cascade").notNullable(),
+    },
   },
-}, {
-  down() {
-    this.dropColumn("phone");
-    this.dropColumn("login_attempts");
-    this.dropColumn("is_verified");
-    this.dropColumn("organization_id");
+  {
+    down() {
+      this.dropColumn("phone");
+      this.dropColumn("login_attempts");
+      this.dropColumn("is_verified");
+      this.dropColumn("organization_id");
+    },
   },
-});
+);
 ```
 
 Column helpers (`text`, `integer`, `bool`, `uuid`, `double`, `json`, `timestamp`, `date`, …) are imported from `@warlock.js/cascade` and support the same modifier chain as in `Migration.create`.
@@ -77,31 +85,39 @@ Column helpers (`text`, `integer`, `bool`, `uuid`, `double`, `json`, `timestamp`
 ### `drop` — remove columns
 
 ```ts
-export default Migration.alter(User, {
-  drop: ["legacy_token", "old_avatar_url"],
-}, {
-  down() {
-    // re-add with the original definition if rollback is meaningful
-    this.text("legacy_token").nullable();
-    this.text("old_avatar_url").nullable();
+export default Migration.alter(
+  User,
+  {
+    drop: ["legacy_token", "old_avatar_url"],
   },
-});
+  {
+    down() {
+      // re-add with the original definition if rollback is meaningful
+      this.text("legacy_token").nullable();
+      this.text("old_avatar_url").nullable();
+    },
+  },
+);
 ```
 
 ### `rename` — rename columns
 
 ```ts
-export default Migration.alter(Post, {
-  rename: {
-    body:      "content",
-    thumb_url: "thumbnail_url",
+export default Migration.alter(
+  Post,
+  {
+    rename: {
+      body: "content",
+      thumb_url: "thumbnail_url",
+    },
   },
-}, {
-  down() {
-    this.renameColumn("content",       "body");
-    this.renameColumn("thumbnail_url", "thumb_url");
+  {
+    down() {
+      this.renameColumn("content", "body");
+      this.renameColumn("thumbnail_url", "thumb_url");
+    },
   },
-});
+);
 ```
 
 ### `modify` — change column type or nullability
@@ -110,17 +126,21 @@ export default Migration.alter(Post, {
 import { Migration, string } from "@warlock.js/cascade";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  modify: {
-    // widen email from text to varchar(320) and keep not-null
-    email: string(320).notNullable(),
+export default Migration.alter(
+  User,
+  {
+    modify: {
+      // widen email from text to varchar(320) and keep not-null
+      email: string(320).notNullable(),
+    },
   },
-}, {
-  down() {
-    // revert to unbounded text
-    this.text("email").notNullable();
+  {
+    down() {
+      // revert to unbounded text
+      this.text("email").notNullable();
+    },
   },
-});
+);
 ```
 
 > `modify` re-declares the column. Include every modifier you want to keep (`.notNullable()`, `.default(…)`, etc.) — the declaration replaces the old one entirely.
@@ -132,29 +152,37 @@ export default Migration.alter(User, {
 ### Regular indexes — `addIndex` / `dropIndex`
 
 ```ts
-export default Migration.alter(Order, {
-  // single column
-  addIndex: [{ columns: "status" }],
-}, {
-  down() {
-    this.dropIndex("status");
+export default Migration.alter(
+  Order,
+  {
+    // single column
+    addIndex: [{ columns: "status" }],
   },
-});
+  {
+    down() {
+      this.dropIndex("status");
+    },
+  },
+);
 ```
 
 ```ts
 // composite index with an explicit name
-export default Migration.alter(Order, {
-  addIndex: [
-    { columns: ["organization_id", "status"], name: "idx_org_status" },
-    { columns: "created_at" },
-  ],
-}, {
-  down() {
-    this.dropIndex("idx_org_status");
-    this.dropIndex("created_at");
+export default Migration.alter(
+  Order,
+  {
+    addIndex: [
+      { columns: ["organization_id", "status"], name: "idx_org_status" },
+      { columns: "created_at" },
+    ],
   },
-});
+  {
+    down() {
+      this.dropIndex("idx_org_status");
+      this.dropIndex("created_at");
+    },
+  },
+);
 ```
 
 `dropIndex` accepts a name string or a columns array:
@@ -168,63 +196,79 @@ export default Migration.alter(Order, {
 `options.concurrently: true` builds the index without locking the table (Postgres):
 
 ```ts
-addIndex: [{ columns: "email", options: { concurrently: true } }]
+addIndex: [{ columns: "email", options: { concurrently: true } }];
 ```
 
 ### Unique constraints — `addUnique` / `dropUnique`
 
 ```ts
 // promote an indexed column to unique
-export default Migration.alter(User, {
-  addUnique: [{ columns: "email" }],
-}, {
-  down() {
-    this.dropUnique("email");
+export default Migration.alter(
+  User,
+  {
+    addUnique: [{ columns: "email" }],
   },
-});
+  {
+    down() {
+      this.dropUnique("email");
+    },
+  },
+);
 ```
 
 Composite unique constraint:
 
 ```ts
-export default Migration.alter(Membership, {
-  addUnique: [{ columns: ["organization_id", "user_id"], name: "uq_org_member" }],
-}, {
-  down() {
-    this.dropUnique(["organization_id", "user_id"]);
+export default Migration.alter(
+  Membership,
+  {
+    addUnique: [{ columns: ["organization_id", "user_id"], name: "uq_org_member" }],
   },
-});
+  {
+    down() {
+      this.dropUnique(["organization_id", "user_id"]);
+    },
+  },
+);
 ```
 
 Downgrade a unique to a plain index (the pattern used in this session):
 
 ```ts
-export default Migration.alter(User, {
-  dropUnique: [["email"]],
-  addIndex:   [{ columns: "email", name: "users_email_index" }],
-}, {
-  down() {
-    this.dropIndex("users_email_index");
-    this.unique("email");
+export default Migration.alter(
+  User,
+  {
+    dropUnique: [["email"]],
+    addIndex: [{ columns: "email", name: "users_email_index" }],
   },
-});
+  {
+    down() {
+      this.dropIndex("users_email_index");
+      this.unique("email");
+    },
+  },
+);
 ```
 
 ### Expression indexes — `addExpressionIndex` (Postgres)
 
 ```ts
-export default Migration.alter(User, {
-  addExpressionIndex: [
-    { expressions: "lower(email)",          name: "idx_email_ci" },
-    { expressions: "lower(name)",           name: "idx_name_ci" },
-    { expressions: ["year(created_at)", "status"] },
-  ],
-}, {
-  down() {
-    this.dropIndex("idx_email_ci");
-    this.dropIndex("idx_name_ci");
+export default Migration.alter(
+  User,
+  {
+    addExpressionIndex: [
+      { expressions: "lower(email)", name: "idx_email_ci" },
+      { expressions: "lower(name)", name: "idx_name_ci" },
+      { expressions: ["year(created_at)", "status"] },
+    ],
   },
-});
+  {
+    down() {
+      this.dropIndex("idx_email_ci");
+      this.dropIndex("idx_name_ci");
+    },
+  },
+);
 ```
 
 ---
@@ -234,30 +278,38 @@ export default Migration.alter(User, {
 ### Full-text — `addFullText` / `dropFullText`
 
 ```ts
-export default Migration.alter(Article, {
-  addFullText: [
-    {
-      columns: ["title", "body"],
-      options: { name: "ft_article_search", language: "english" },
-    },
-  ],
-}, {
-  down() {
-    this.dropFullText("ft_article_search");
+export default Migration.alter(
+  Article,
+  {
+    addFullText: [
+      {
+        columns: ["title", "body"],
+        options: { name: "ft_article_search", language: "english" },
+      },
+    ],
   },
-});
+  {
+    down() {
+      this.dropFullText("ft_article_search");
+    },
+  },
+);
 ```
 
 ### Geo-spatial — `addGeoIndex` / `dropGeoIndex`
 
 ```ts
-export default Migration.alter(Store, {
-  addGeoIndex: [{ column: "location" }],
-}, {
-  down() {
-    this.dropGeoIndex("location");
+export default Migration.alter(
+  Store,
+  {
+    addGeoIndex: [{ column: "location" }],
   },
-});
+  {
+    down() {
+      this.dropGeoIndex("location");
+    },
+  },
+);
 ```
 
 Options: `{ name?, type?: "2dsphere" | "2d", min?, max? }`
@@ -265,16 +317,22 @@ Options: `{ name?, type?: "2dsphere" | "2d", min?, max? }`
 ### Vector (AI embeddings) — `addVectorIndex` / `dropVectorIndex`
 
 ```ts
-export default Migration.alter(Document, {
-  addVectorIndex: [{
-    column: "embedding",
-    options: { dimensions: 1536, similarity: "cosine", name: "idx_doc_embedding" },
-  }],
-}, {
-  down() {
-    this.dropVectorIndex("embedding");
+export default Migration.alter(
+  Document,
+  {
+    addVectorIndex: [
+      {
+        column: "embedding",
+        options: { dimensions: 1536, similarity: "cosine", name: "idx_doc_embedding" },
+      },
+    ],
   },
-});
+  {
+    down() {
+      this.dropVectorIndex("embedding");
+    },
+  },
+);
 ```
 
 Similarity options: `"cosine"` | `"euclidean"` | `"dotProduct"`.
@@ -284,13 +342,17 @@ Similarity options: `"cosine"` | `"euclidean"` | `"dotProduct"`.
 Expires documents automatically after a fixed duration:
 
 ```ts
-export default Migration.alter(Session, {
-  addTTLIndex: [{ column: "created_at", expireAfterSeconds: 86400 }], // 24 h
-}, {
-  down() {
-    this.dropTTLIndex("created_at");
+export default Migration.alter(
+  Session,
+  {
+    addTTLIndex: [{ column: "created_at", expireAfterSeconds: 86400 }], // 24 h
   },
-});
+  {
+    down() {
+      this.dropTTLIndex("created_at");
+    },
+  },
+);
 ```
 
 ---
@@ -306,17 +368,21 @@ import { Migration } from "@warlock.js/cascade";
 import { Team } from "app/teams/models/team";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  addForeign: [
-    { column: "team_id",  references: Team,     onDelete: "cascade" },
-    { column: "owner_id", references: "users",  on: "id", onDelete: "setNull" },
-  ],
-}, {
-  down() {
-    this.dropForeign("team_id",  Team.table);
-    this.dropForeign("owner_id", "users");
+export default Migration.alter(
+  User,
+  {
+    addForeign: [
+      { column: "team_id", references: Team, onDelete: "cascade" },
+      { column: "owner_id", references: "users", on: "id", onDelete: "setNull" },
+    ],
   },
-});
+  {
+    down() {
+      this.dropForeign("team_id", Team.table);
+      this.dropForeign("owner_id", "users");
+    },
+  },
+);
 ```
 
 `onDelete` / `onUpdate` values: `"cascade"` | `"restrict"` | `"setNull"` | `"noAction"`. Both default to `"restrict"` when omitted.
@@ -324,23 +390,27 @@ export default Migration.alter(User, {
 Drop by constraint name when you named it manually:
 
 ```ts
-dropForeign: [{ columnOrConstraint: "fk_my_custom_name" }]
+dropForeign: [{ columnOrConstraint: "fk_my_custom_name" }];
 ```
 
 ### CHECK constraints — `addCheck` / `dropCheck`
 
 ```ts
-export default Migration.alter(Product, {
-  addCheck: [
-    { name: "price_positive",    expression: "price_cents >= 0" },
-    { name: "stock_non_negative", expression: "stock >= 0" },
-  ],
-}, {
-  down() {
-    this.dropCheck("price_positive");
-    this.dropCheck("stock_non_negative");
+export default Migration.alter(
+  Product,
+  {
+    addCheck: [
+      { name: "price_positive", expression: "price_cents >= 0" },
+      { name: "stock_non_negative", expression: "stock >= 0" },
+    ],
   },
-});
+  {
+    down() {
+      this.dropCheck("price_positive");
+      this.dropCheck("stock_non_negative");
+    },
+  },
+);
 ```
 
 ---
@@ -350,16 +420,20 @@ export default Migration.alter(Product, {
 Use `raw` when you need a one-off SQL statement alongside declarative changes (e.g. backfilling a new column in the same migration when the table is small):
 
 ```ts
-export default Migration.alter(User, {
-  add: {
-    full_name: text().nullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      full_name: text().nullable(),
+    },
+    raw: `UPDATE users SET full_name = first_name || ' ' || last_name`,
   },
-  raw: `UPDATE users SET full_name = first_name || ' ' || last_name`,
-}, {
-  down() {
-    this.dropColumn("full_name");
+  {
+    down() {
+      this.dropColumn("full_name");
+    },
   },
-});
+);
 ```
 
 Pass an array for multiple statements:
@@ -368,7 +442,7 @@ Pass an array for multiple statements:
 raw: [
   `UPDATE users SET status = 'active' WHERE status IS NULL`,
   `UPDATE users SET role = 'member' WHERE role IS NULL`,
-]
+];
 ```
 
 ---
@@ -377,24 +451,24 @@ raw: [
 
 `Migration.alter` **never** auto-infers rollback. Supply `down()` in options whenever you want `cascade migrate:rollback` to work. Inside `down()`, `this` is a full `Migration` instance — every class-form builder is available:
 
-| Operation | Class-form call in `down()` |
-|---|---|
-| Drop an added column | `this.dropColumn("name")` |
-| Re-add a dropped column | `this.text("name").nullable()` |
-| Undo a rename | `this.renameColumn("new", "old")` |
-| Undo a column modify | `this.text("col").notNullable()` |
-| Drop a plain index (by name) | `this.dropIndex("idx_name")` |
-| Drop a plain index (by columns) | `this.dropIndex(["col_a", "col_b"])` |
-| Drop a unique constraint | `this.dropUnique("email")` or `this.dropUnique(["a", "b"])` |
-| Add a unique constraint back | `this.unique("email")` |
-| Add a plain index back | `this.index("email", "idx_name")` |
-| Drop a foreign key | `this.dropForeign("col", "ref_table")` |
-| Drop a CHECK constraint | `this.dropCheck("constraint_name")` |
-| Drop full-text index | `this.dropFullText("ft_name")` |
-| Drop geo index | `this.dropGeoIndex("column")` |
-| Drop vector index | `this.dropVectorIndex("column")` |
-| Drop TTL index | `this.dropTTLIndex("column")` |
-| Raw SQL | `this.raw("SQL statement")` |
+| Operation                       | Class-form call in `down()`                                 |
+| ------------------------------- | ----------------------------------------------------------- |
+| Drop an added column            | `this.dropColumn("name")`                                   |
+| Re-add a dropped column         | `this.text("name").nullable()`                              |
+| Undo a rename                   | `this.renameColumn("new", "old")`                           |
+| Undo a column modify            | `this.text("col").notNullable()`                            |
+| Drop a plain index (by name)    | `this.dropIndex("idx_name")`                                |
+| Drop a plain index (by columns) | `this.dropIndex(["col_a", "col_b"])`                        |
+| Drop a unique constraint        | `this.dropUnique("email")` or `this.dropUnique(["a", "b"])` |
+| Add a unique constraint back    | `this.unique("email")`                                      |
+| Add a plain index back          | `this.index("email", "idx_name")`                           |
+| Drop a foreign key              | `this.dropForeign("col", "ref_table")`                      |
+| Drop a CHECK constraint         | `this.dropCheck("constraint_name")`                         |
+| Drop full-text index            | `this.dropFullText("ft_name")`                              |
+| Drop geo index                  | `this.dropGeoIndex("column")`                               |
+| Drop vector index               | `this.dropVectorIndex("column")`                            |
+| Drop TTL index                  | `this.dropTTLIndex("column")`                               |
+| Raw SQL                         | `this.raw("SQL statement")`                                 |
 
 If a migration is genuinely irreversible, throw inside `down()` so accidental rollbacks fail loudly:
 
@@ -410,28 +484,32 @@ If a migration is genuinely irreversible, throw inside `down()` so accidental ro
 
 ## Options (`MigrationAlterOptions`)
 
-| Key | Type | Purpose |
-|---|---|---|
-| `down` | `(this: Migration) => void \| Promise<void>` | Rollback logic (not auto-inferred) |
-| `up` | `(this: Migration) => void \| Promise<void>` | Extra imperative logic to run after declarative changes |
-| `order` | `number` | Execution order override (default `0`) |
-| `createdAt` | `string` | ISO timestamp override for migration name ordering |
-| `transactional` | `boolean` | Wrap the migration in a DB transaction |
+| Key             | Type                                         | Purpose                                                 |
+| --------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `down`          | `(this: Migration) => void \| Promise<void>` | Rollback logic (not auto-inferred)                      |
+| `up`            | `(this: Migration) => void \| Promise<void>` | Extra imperative logic to run after declarative changes |
+| `order`         | `number`                                     | Execution order override (default `0`)                  |
+| `createdAt`     | `string`                                     | ISO timestamp override for migration name ordering      |
+| `transactional` | `boolean`                                    | Wrap the migration in a DB transaction                  |
 
 The `up` hook runs **after** the declarative schema changes, making it useful for data backfills or conditional DDL that depends on the added schema:
 
 ```ts
-export default Migration.alter(User, {
-  add: { verified_at: timestamp().nullable() },
-}, {
-  up() {
-    // backfill: mark existing confirmed users as verified
-    this.raw(`UPDATE users SET verified_at = updated_at WHERE status = 'confirmed'`);
+export default Migration.alter(
+  User,
+  {
+    add: { verified_at: timestamp().nullable() },
   },
-  down() {
-    this.dropColumn("verified_at");
+  {
+    up() {
+      // backfill: mark existing confirmed users as verified
+      this.raw(`UPDATE users SET verified_at = updated_at WHERE status = 'confirmed'`);
+    },
+    down() {
+      this.dropColumn("verified_at");
+    },
   },
-});
+);
 ```
 
 ---
@@ -445,48 +523,58 @@ import { Migration, uuid } from "@warlock.js/cascade";
 import { Team } from "app/teams/models/team";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  add: {
-    team_id: uuid().nullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      team_id: uuid().nullable(),
+    },
+    addForeign: [{ column: "team_id", references: Team, onDelete: "setNull" }],
+    addIndex: [{ columns: "team_id" }],
   },
-  addForeign: [
-    { column: "team_id", references: Team, onDelete: "setNull" },
-  ],
-  addIndex: [{ columns: "team_id" }],
-}, {
-  down() {
-    this.dropForeign("team_id", Team.table);
-    this.dropIndex("team_id");
-    this.dropColumn("team_id");
+  {
+    down() {
+      this.dropForeign("team_id", Team.table);
+      this.dropIndex("team_id");
+      this.dropColumn("team_id");
+    },
   },
-});
+);
 ```
 
 ### Swap unique → plain index
 
 ```ts
-export default Migration.alter(User, {
-  dropUnique: [["email"]],
-  addIndex:   [{ columns: "email", name: "users_email_index" }],
-}, {
-  down() {
-    this.dropIndex("users_email_index");
-    this.unique("email");
+export default Migration.alter(
+  User,
+  {
+    dropUnique: [["email"]],
+    addIndex: [{ columns: "email", name: "users_email_index" }],
   },
-});
+  {
+    down() {
+      this.dropIndex("users_email_index");
+      this.unique("email");
+    },
+  },
+);
 ```
 
 ### Rename + widen a column
 
 ```ts
-export default Migration.alter(Post, {
-  rename: { body: "content" },
-  modify: { content: text().notNullable() },
-}, {
-  down() {
-    this.renameColumn("content", "body");
+export default Migration.alter(
+  Post,
+  {
+    rename: { body: "content" },
+    modify: { content: text().notNullable() },
   },
-});
+  {
+    down() {
+      this.renameColumn("content", "body");
+    },
+  },
+);
 ```
 
 ### Multiple operations in one migration
@@ -494,22 +582,26 @@ export default Migration.alter(Post, {
 Combine freely — all operations run in a single `up()` call:
 
 ```ts
-export default Migration.alter(Product, {
-  add:    { sku: text().unique().notNullable() },
-  drop:   ["old_code"],
-  rename: { price: "price_cents" },
-  modify: { price_cents: integer().notNullable() },
-  addIndex:  [{ columns: ["category_id", "status"], name: "idx_cat_status" }],
-  addCheck:  [{ name: "price_non_negative", expression: "price_cents >= 0" }],
-}, {
-  down() {
-    this.dropCheck("price_non_negative");
-    this.dropIndex("idx_cat_status");
-    this.renameColumn("price_cents", "price");
-    this.text("old_code").nullable();
-    this.dropColumn("sku");
+export default Migration.alter(
+  Product,
+  {
+    add: { sku: text().unique().notNullable() },
+    drop: ["old_code"],
+    rename: { price: "price_cents" },
+    modify: { price_cents: integer().notNullable() },
+    addIndex: [{ columns: ["category_id", "status"], name: "idx_cat_status" }],
+    addCheck: [{ name: "price_non_negative", expression: "price_cents >= 0" }],
   },
-});
+  {
+    down() {
+      this.dropCheck("price_non_negative");
+      this.dropIndex("idx_cat_status");
+      this.renameColumn("price_cents", "price");
+      this.text("old_code").nullable();
+      this.dropColumn("sku");
+    },
+  },
+);
 ```
 
 ---

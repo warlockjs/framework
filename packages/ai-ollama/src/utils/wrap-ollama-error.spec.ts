@@ -24,11 +24,15 @@ describe("wrapOllamaError", () => {
 
   it("maps connection-refused (daemon down) to ProviderError", () => {
     expect(
-      wrapOllamaError({ name: "TypeError", message: "fetch failed", cause: { code: "ECONNREFUSED" } }),
+      wrapOllamaError({
+        name: "TypeError",
+        message: "fetch failed",
+        cause: { code: "ECONNREFUSED" },
+      }),
     ).toBeInstanceOf(ProviderError);
-    expect(wrapOllamaError({ message: "request to http://127.0.0.1:11434 ECONNREFUSED" })).toBeInstanceOf(
-      ProviderError,
-    );
+    expect(
+      wrapOllamaError({ message: "request to http://127.0.0.1:11434 ECONNREFUSED" }),
+    ).toBeInstanceOf(ProviderError);
   });
 
   it("maps timeouts to ProviderTimeoutError", () => {
@@ -51,9 +55,9 @@ describe("wrapOllamaError", () => {
 
   it("prefers timeout over connection-refused when both could match", () => {
     // AbortError name short-circuits before the connection-refused probe.
-    expect(
-      wrapOllamaError({ name: "AbortError", message: "fetch failed" }),
-    ).toBeInstanceOf(ProviderTimeoutError);
+    expect(wrapOllamaError({ name: "AbortError", message: "fetch failed" })).toBeInstanceOf(
+      ProviderTimeoutError,
+    );
   });
 
   it("maps 401 / 403 to ProviderAuthError", () => {

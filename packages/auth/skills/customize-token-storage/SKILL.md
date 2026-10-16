@@ -5,7 +5,7 @@ description: 'Override the persisted AccessToken / RefreshToken models to add co
 
 # Customize token storage
 
-The package ships `AccessToken` and `RefreshToken` models and runs the whole token flow through their **named statics** — `issue`, `findByToken`, `activeFor`, `revokeAllFor`, etc. The auth service never references a column name directly; it resolves the *active* model from config. So you change token storage by **registering a subclass**, not by forking.
+The package ships `AccessToken` and `RefreshToken` models and runs the whole token flow through their **named statics** — `issue`, `findByToken`, `activeFor`, `revokeAllFor`, etc. The auth service never references a column name directly; it resolves the _active_ model from config. So you change token storage by **registering a subclass**, not by forking.
 
 Reach for this when you need an extra column on the token tables — the common case is a tenant key (`organization_id`) so tokens are partitioned per organization, or richer device metadata.
 
@@ -56,7 +56,12 @@ export class AppAccessToken extends AccessToken {
 Refresh tokens follow the same shape — extend `refreshTokenSchema`, and override `issue(user, token, options)` (`options` is `{ familyId, expiresAt, deviceInfo? }`) the same way, copying the base fields plus your column.
 
 ```ts title="src/app/auth/models/app-refresh-token.ts"
-import { RefreshToken, refreshTokenSchema, type Auth, type RefreshTokenIssueOptions } from "@warlock.js/auth";
+import {
+  RefreshToken,
+  refreshTokenSchema,
+  type Auth,
+  type RefreshTokenIssueOptions,
+} from "@warlock.js/auth";
 import { v } from "@warlock.js/seal";
 
 export class AppRefreshToken extends RefreshToken {
@@ -88,12 +93,12 @@ import { AppRefreshToken } from "app/auth/models/app-refresh-token";
 export default {
   userType: { user: User },
   accessToken: {
-    model: AppAccessToken,            // ← the override
+    model: AppAccessToken, // ← the override
     secret: env("JWT_SECRET"),
     expiresIn: "1h",
   },
   refreshToken: {
-    model: AppRefreshToken,           // ← the override
+    model: AppRefreshToken, // ← the override
     secret: env("JWT_REFRESH_SECRET"),
     expiresIn: "30d",
   },
@@ -114,7 +119,7 @@ See the `write-migration` topic of the `warlock-js-cascade` skill for the migrat
 
 ## Why all three — the strict-mode trap
 
-This is the failure people hit. Cascade's `strictMode: "strip"` **drops any field your schema doesn't declare** before the INSERT. So if you set `organization_id` in `issue()` but don't add it to the schema (step 1), the value is silently stripped, and a NOT-NULL `organization_id` column then **fails the INSERT**. The chain is: `issue()` sets it → the *schema* must declare it so it survives → the *migration* must create the column. All three, or nothing.
+This is the failure people hit. Cascade's `strictMode: "strip"` **drops any field your schema doesn't declare** before the INSERT. So if you set `organization_id` in `issue()` but don't add it to the schema (step 1), the value is silently stripped, and a NOT-NULL `organization_id` column then **fails the INSERT**. The chain is: `issue()` sets it → the _schema_ must declare it so it survives → the _migration_ must create the column. All three, or nothing.
 
 ## You do NOT need read-side scoping
 
@@ -124,23 +129,23 @@ Token lookups go by the unique `token` string (`findByToken`), which already uni
 
 Your subclass inherits and may override these statics — the service calls them, never raw queries:
 
-| Static | Role |
-| --- | --- |
-| `issue(user, token, …)` | persist a freshly-signed token (override to add columns) |
-| `findByToken(token)` | look a row up by its token string |
-| `findForUser(user, token)` | a user-scoped lookup (logout) |
-| `activeFor(user)` | active, unexpired sessions, newest-first |
-| `revokeAllFor(user)` / `revokeFamily(id)` | revoke a set, returning the revoked rows |
-| `enforceMax(user, max)` | cap concurrent refresh tokens |
-| `purgeExpired()` | delete expired rows (CLI cleanup) |
+| Static                                         | Role                                                     |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| `issue(user, token, …)`                        | persist a freshly-signed token (override to add columns) |
+| `findByToken(token)`                           | look a row up by its token string                        |
+| `findForUser(user, token)`                     | a user-scoped lookup (logout)                            |
+| `activeFor(user)`                              | active, unexpired sessions, newest-first                 |
+| `revokeAllFor(user)` / `revokeFamily(id)`      | revoke a set, returning the revoked rows                 |
+| `enforceMax(user, max)`                        | cap concurrent refresh tokens                            |
+| `purgeExpired()`                               | delete expired rows (CLI cleanup)                        |
 | `findNeverExpiring()` / `purgeNeverExpiring()` | find/delete rows that can never expire (CLI remediation) |
 
 Plus two instance getters, both of which the route gate consults on every request:
 
-| Getter | Role |
-| --- | --- |
-| `isExpired` | whether the row's persisted expiry has passed — **the middleware rejects the request when this is `true`** |
-| `neverExpires` | whether nothing can ever retire the row (unusable `expires_at`, or a token with no `exp` claim) |
+| Getter         | Role                                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| `isExpired`    | whether the row's persisted expiry has passed — **the middleware rejects the request when this is `true`** |
+| `neverExpires` | whether nothing can ever retire the row (unusable `expires_at`, or a token with no `exp` claim)            |
 
 If you rename a column, override the statics **and these getters** so they map to your name — the service depends on the method, not the column.
 
@@ -155,6 +160,6 @@ If you rename a column, override the statics **and these getters** so they map t
 
 ## See also
 
-- The `customize-user-type` topic — multiple user *types* (a different axis from token *storage*).
+- The `customize-user-type` topic — multiple user _types_ (a different axis from token _storage_).
 - The `manage-tokens` topic — the token lifecycle your statics power.
 - The `define-model` topic of the `warlock-js-cascade` skill — extending models and schemas.

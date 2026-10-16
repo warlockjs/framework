@@ -34,10 +34,7 @@ export class MockVideoModel implements VideoModelContract {
     public readonly pricing?: VideoModelPricing,
   ) {}
 
-  public async generate(
-    prompt: string,
-    options?: VideoOptions,
-  ): Promise<VideoGenerationResponse> {
+  public async generate(prompt: string, options?: VideoOptions): Promise<VideoGenerationResponse> {
     this.calls.push({ prompt, options });
 
     const response = this.responses[Math.min(this.callIndex, this.responses.length - 1)] ?? {};
@@ -48,7 +45,11 @@ export class MockVideoModel implements VideoModelContract {
     }
 
     return {
-      video: response.video ?? { type: "url", url: "https://mock/video.mp4", mediaType: "video/mp4" },
+      video: response.video ?? {
+        type: "url",
+        url: "https://mock/video.mp4",
+        mediaType: "video/mp4",
+      },
       usage: response.usage ?? { input: 0, output: 0, total: 0 },
       durationSeconds: response.durationSeconds ?? options?.durationSeconds ?? 5,
     };

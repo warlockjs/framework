@@ -19,6 +19,7 @@ cascade migrate:export-sql      # write .up.sql / .down.sql instead of executing
 ```
 
 Flags:
+
 - `migrate` — `-f/--fresh` (drop everything and re-run), `-s/--sql` (export SQL instead of executing), `--pending-only`, `-c/--compact`, `-p/--path <glob>`
 - `migrate:rollback` — `-a/--all` (roll back everything), `--batches N`, `-p/--path <glob>`
 - `migrate:export-sql` — `--pending-only`, `-c/--compact`, `-p/--path <glob>`
@@ -102,16 +103,16 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 
 ## Common task → command
 
-| You want to… | Command |
-|---|---|
-| Run all pending migrations | `cascade migrate` |
-| Drop everything and re-run | `cascade migrate -f` |
-| Roll back the last batch | `cascade migrate:rollback` |
-| Roll back everything | `cascade migrate:rollback --all` |
-| Generate SQL without executing | `cascade migrate --sql` |
-| Generate SQL for pending only | `cascade migrate --sql --pending-only` |
-| See what's been executed | `cascade migrate:list` |
-| Run from a non-default folder | `cascade migrate -p "<glob>"` |
+| You want to…                   | Command                                |
+| ------------------------------ | -------------------------------------- |
+| Run all pending migrations     | `cascade migrate`                      |
+| Drop everything and re-run     | `cascade migrate -f`                   |
+| Roll back the last batch       | `cascade migrate:rollback`             |
+| Roll back everything           | `cascade migrate:rollback --all`       |
+| Generate SQL without executing | `cascade migrate --sql`                |
+| Generate SQL for pending only  | `cascade migrate --sql --pending-only` |
+| See what's been executed       | `cascade migrate:list`                 |
+| Run from a non-default folder  | `cascade migrate -p "<glob>"`          |
 
 ## Things NOT to do
 

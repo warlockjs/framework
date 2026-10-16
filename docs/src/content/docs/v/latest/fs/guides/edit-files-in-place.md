@@ -37,8 +37,8 @@ const md = await fs.files.get("README.md");
 await fs.files.put("README.md", md.replaceAll("4.6", "4.7"));
 ```
 
-Same result, but `edit` names the pattern for you: the argument *is* the
-current contents, the return value *is* the new contents. Nothing to
+Same result, but `edit` names the pattern for you: the argument _is_ the
+current contents, the return value _is_ the new contents. Nothing to
 mistype, nothing to forget to write back.
 
 ## `editJson(path, obj => obj)` — transform a JSON document
@@ -66,7 +66,7 @@ await fs.files.editJson<Manifest>("manifest.json", (m) => ({
 
 :::tip[Reach for `editJson` when the change depends on the old value]
 Bumping a number, appending to a list, renaming a key based on another
-key — anything where the new value is *computed from* the current one is
+key — anything where the new value is _computed from_ the current one is
 `editJson`'s job. If you're just setting known fields, [`mergeJson`](#mergejsonpath-partial--deep--patch-a-config-object)
 is shorter.
 :::
@@ -135,7 +135,7 @@ to evolve it from there.
 
 ## `appendJsonLine(path, value)` — NDJSON logs
 
-Not every JSON file is one document. A log is a *stream* of records, one
+Not every JSON file is one document. A log is a _stream_ of records, one
 per line — [NDJSON](https://github.com/ndjson/ndjson-spec). `appendJsonLine`
 serializes one value and appends it as a single line.
 
@@ -150,7 +150,7 @@ Each call adds exactly one line:
 {"type":"login","at":1719800600000}
 ```
 
-This is *not* the same as pushing into an array with `editJson`. The array
+This is _not_ the same as pushing into an array with `editJson`. The array
 approach re-reads and re-writes the entire file on every append — O(n) and
 increasingly slow as the log grows. `appendJsonLine` just appends bytes.
 
@@ -161,14 +161,14 @@ you never hold the whole log in memory.
 
 ## The JSON family — pick the right one
 
-| Method | When |
-| --- | --- |
-| `getJson(path, { schema?, default? })` | read a document (optionally validate + fall back when missing) |
-| `putJson(path, value, { indent? })` | overwrite the whole document |
-| `mergeJson(path, partial, { deep? })` | set a few known fields; leave the rest (shallow, or `deep`) |
-| `editJson(path, fn)` | transform based on the old value — bump, compute, push into an array |
-| `ensureJson(path, fallback)` | read it, or create it if missing |
-| `appendJsonLine(path, value)` | one record per line (a log) — **not** one document |
+| Method                                 | When                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| `getJson(path, { schema?, default? })` | read a document (optionally validate + fall back when missing)       |
+| `putJson(path, value, { indent? })`    | overwrite the whole document                                         |
+| `mergeJson(path, partial, { deep? })`  | set a few known fields; leave the rest (shallow, or `deep`)          |
+| `editJson(path, fn)`                   | transform based on the old value — bump, compute, push into an array |
+| `ensureJson(path, fallback)`           | read it, or create it if missing                                     |
+| `appendJsonLine(path, value)`          | one record per line (a log) — **not** one document                   |
 
 Rough rule: reading → `getJson`; replacing → `putJson`; patching known
 fields → `mergeJson`; computing from the current value → `editJson`;
@@ -188,7 +188,7 @@ await pkg.mergeJson({ private: true });
 :::caution[These are sugar, not a lock]
 The whole family read-then-writes. Two callers editing the same file in
 parallel will **race** — last write wins, and an update can be silently
-lost. The `{ atomic: true }` option only makes the *write* atomic; it does
+lost. The `{ atomic: true }` option only makes the _write_ atomic; it does
 **not** make the read+write pair atomic. `@warlock.js/fs` has no file
 locking. For state shared across processes, serialize the writes yourself
 or reach for a real lock.

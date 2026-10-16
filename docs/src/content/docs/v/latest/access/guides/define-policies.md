@@ -15,9 +15,11 @@ Put policies in the owning module's `policies/` folder — an order policy lives
 ```ts title="src/app/orders/policies/index.ts"
 import { definePolicy } from "@warlock.js/access";
 
-definePolicy("orders.update", (user, order, ctx) =>
-  order.get("organization_id") === ctx.tenant &&
-  (order.get("customer_id") === user.id || ctx.hasRole("manager")),
+definePolicy(
+  "orders.update",
+  (user, order, ctx) =>
+    order.get("organization_id") === ctx.tenant &&
+    (order.get("customer_id") === user.id || ctx.hasRole("manager")),
 );
 ```
 
@@ -51,8 +53,9 @@ Policies **deny further** — they can never let a user past a permission they d
 ```ts
 await authorize(user, "orders.refund", { resource: order, amount: 5000 });
 
-definePolicy("orders.refund", (user, order, ctx) =>
-  ctx.hasRole("manager") || (ctx.amount as number) <= 1000,
+definePolicy(
+  "orders.refund",
+  (user, order, ctx) => ctx.hasRole("manager") || (ctx.amount as number) <= 1000,
 );
 ```
 

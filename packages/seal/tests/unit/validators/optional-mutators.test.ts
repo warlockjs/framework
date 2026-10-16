@@ -5,7 +5,10 @@ describe("optional fields with mutators", () => {
     const mutator = vi.fn((value) => value);
     const trimmed = await validate(v.object({ photo: v.string().trim().optional() }), {});
     const lowercased = await validate(v.object({ photo: v.string().lowercase().optional() }), {});
-    const custom = await validate(v.object({ photo: v.string().addMutator(mutator).optional() }), {});
+    const custom = await validate(
+      v.object({ photo: v.string().addMutator(mutator).optional() }),
+      {},
+    );
 
     expect(trimmed).toMatchObject({ isValid: true, data: {} });
     expect(lowercased).toMatchObject({ isValid: true, data: {} });
@@ -14,10 +17,9 @@ describe("optional fields with mutators", () => {
   });
 
   it("accepts null for a nullable optional field with mutators", async () => {
-    const result = await validate(
-      v.object({ photo: v.string().trim().nullable().optional() }),
-      { photo: null },
-    );
+    const result = await validate(v.object({ photo: v.string().trim().nullable().optional() }), {
+      photo: null,
+    });
 
     expect(result).toMatchObject({ isValid: true, data: { photo: null } });
   });

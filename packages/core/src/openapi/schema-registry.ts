@@ -175,7 +175,9 @@ export class SchemaRegistry {
         return this.resourceRef(config);
       }
 
-      this.warn(`${context.path}: a resolver function has no static shape and is documented as {}.`);
+      this.warn(
+        `${context.path}: a resolver function has no static shape and is documented as {}.`,
+      );
 
       return {};
     }
@@ -200,7 +202,10 @@ export class SchemaRegistry {
     return {};
   }
 
-  private lazyFieldSchema(lazy: { resolve(): unknown }, context: ResourceFieldContext): OpenApiSchema {
+  private lazyFieldSchema(
+    lazy: { resolve(): unknown },
+    context: ResourceFieldContext,
+  ): OpenApiSchema {
     let resolved: unknown;
 
     try {

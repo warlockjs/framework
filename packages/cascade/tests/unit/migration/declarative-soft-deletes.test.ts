@@ -3,10 +3,7 @@ import { dateTime, string } from "../../../src/migration/column-helpers";
 import { Migration } from "../../../src/migration/migration";
 import { Model } from "../../../src/model/model";
 import type { DeleteStrategy } from "../../../src/types";
-import {
-  createMockDataSource,
-  createTestModelClass,
-} from "../../utils/test-helpers";
+import { createMockDataSource, createTestModelClass } from "../../utils/test-helpers";
 
 /**
  * Build a plain Model subclass WITHOUT mocking `getDataSource`, so the resolver
@@ -22,9 +19,7 @@ function makeModel(
   class TestModel extends Model {
     public static table = "soft_delete_test";
     public static deleteStrategy = config.deleteStrategy;
-    public static deletedAtColumn = (config.deletedAtColumn ?? "deletedAt") as
-      | string
-      | false;
+    public static deletedAtColumn = (config.deletedAtColumn ?? "deletedAt") as string | false;
   }
 
   return TestModel;
@@ -53,12 +48,9 @@ function find(columns: Array<{ name: string }>, name: string) {
 
 describe("Migration.create — soft-delete auto-wiring", () => {
   it("wires the deletedAt column when the model strategy is soft", async () => {
-    const Migration_ = Migration.create(
-      makeModel({ deleteStrategy: "soft" }) as any,
-      {
-        title: string(),
-      },
-    );
+    const Migration_ = Migration.create(makeModel({ deleteStrategy: "soft" }) as any, {
+      title: string(),
+    });
 
     const columns = await addedColumns(Migration_);
     const deletedAt = find(columns, "deletedAt");
@@ -69,12 +61,9 @@ describe("Migration.create — soft-delete auto-wiring", () => {
   });
 
   it("does not wire the column when the strategy is permanent", async () => {
-    const Migration_ = Migration.create(
-      makeModel({ deleteStrategy: "permanent" }) as any,
-      {
-        title: string(),
-      },
-    );
+    const Migration_ = Migration.create(makeModel({ deleteStrategy: "permanent" }) as any, {
+      title: string(),
+    });
 
     const columns = await addedColumns(Migration_);
 
@@ -94,11 +83,7 @@ describe("Migration.create — soft-delete auto-wiring", () => {
   it("wires the column from the data source defaultDeleteStrategy", async () => {
     const dataSource = createMockDataSource({ defaultDeleteStrategy: "soft" });
     // Model has no static strategy — it must come from the data source default.
-    const model = createTestModelClass(
-      "FromDataSource",
-      { table: "from_ds" },
-      dataSource,
-    );
+    const model = createTestModelClass("FromDataSource", { table: "from_ds" }, dataSource);
 
     const Migration_ = Migration.create(model as any, { title: string() });
     const columns = await addedColumns(Migration_);
@@ -146,12 +131,9 @@ describe("Migration.create — soft-delete auto-wiring", () => {
   });
 
   it("does not duplicate a deletedAt column already declared in the map", async () => {
-    const Migration_ = Migration.create(
-      makeModel({ deleteStrategy: "soft" }) as any,
-      {
-        deletedAt: dateTime().nullable(),
-      },
-    );
+    const Migration_ = Migration.create(makeModel({ deleteStrategy: "soft" }) as any, {
+      deletedAt: dateTime().nullable(),
+    });
 
     const columns = await addedColumns(Migration_);
     const matches = columns.filter((column) => column.name === "deletedAt");

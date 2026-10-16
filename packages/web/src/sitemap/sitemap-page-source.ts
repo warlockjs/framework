@@ -18,4 +18,5 @@ export type SitemapPageSourceEntry = ListedRoutablePage & {
 
 /** Every routable page, excluding the not-found/error page. May resolve sync or async. */
 export type SitemapPageSource = () =>
-  Promise<readonly SitemapPageSourceEntry[]> | readonly SitemapPageSourceEntry[];
+  | Promise<readonly SitemapPageSourceEntry[]>
+  | readonly SitemapPageSourceEntry[];

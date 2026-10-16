@@ -81,13 +81,19 @@ export class PostgresDialect implements SqlDialectContract {
     // Split on dots for qualified names (schema.table.column)
     const parts = identifier.split(".");
     return parts
-      .map((part) => `"${(this.naming === "snake_case" ? camelToSnake(part) : part).replace(/"/g, '""')}"`)
+      .map(
+        (part) =>
+          `"${(this.naming === "snake_case" ? camelToSnake(part) : part).replace(/"/g, '""')}"`,
+      )
       .join(".");
   }
 
   /** Quote a table identifier without applying the column naming policy. */
   public quoteTableIdentifier(identifier: string): string {
-    return identifier.split(".").map((part) => `"${part.replace(/"/g, '""')}"`).join(".");
+    return identifier
+      .split(".")
+      .map((part) => `"${part.replace(/"/g, '""')}"`)
+      .join(".");
   }
 
   /**
@@ -448,7 +454,9 @@ function toSafeInteger(value: unknown, label: string): number {
  */
 function toFiniteNumber(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("PostgresDialect: column expression literal must be a finite number or boolean");
+    throw new Error(
+      "PostgresDialect: column expression literal must be a finite number or boolean",
+    );
   }
 
   return value;

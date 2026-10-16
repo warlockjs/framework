@@ -24,7 +24,7 @@ describe("MistralSDK", () => {
     expect(innerClient(sdk).baseURL).toBe("https://api.mistral.ai/v1");
   });
 
-  it("defaults the provider label to \"mistral\" on produced models", () => {
+  it('defaults the provider label to "mistral" on produced models', () => {
     const sdk = new MistralSDK({ apiKey: "test-key" });
     expect(sdk.model({ name: "mistral-large-latest" }).provider).toBe("mistral");
   });

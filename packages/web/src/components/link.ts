@@ -99,27 +99,54 @@ type LinkDestinationProps = {
 };
 
 type TypedRouteDestination = HasGeneratedPageRoutes extends true
-  ? | {
-        [Name in RegisteredPageRouteName]: {} extends PageRouteParams<Name>
-          ? | { to: Name; href?: never; email?: never; tel?: never; params?: PageRouteParams<Name> }
-            | { href: Name; to?: never; email?: never; tel?: never; params?: PageRouteParams<Name> }
-          : | { to: Name; href?: never; email?: never; tel?: never; params: PageRouteParams<Name> }
-            | { href: Name; to?: never; email?: never; tel?: never; params: PageRouteParams<Name> };
-      }[RegisteredPageRouteName]
-    | {
-        to: RuntimeRouteName;
-        href?: never;
-        email?: never;
-        tel?: never;
-        params?: Record<string, RouteParamValue>;
-      }
-    | {
-        href: RuntimeRouteName;
-        to?: never;
-        email?: never;
-        tel?: never;
-        params?: Record<string, RouteParamValue>;
-      }
+  ?
+      | {
+          [Name in RegisteredPageRouteName]: {} extends PageRouteParams<Name>
+            ?
+                | {
+                    to: Name;
+                    href?: never;
+                    email?: never;
+                    tel?: never;
+                    params?: PageRouteParams<Name>;
+                  }
+                | {
+                    href: Name;
+                    to?: never;
+                    email?: never;
+                    tel?: never;
+                    params?: PageRouteParams<Name>;
+                  }
+            :
+                | {
+                    to: Name;
+                    href?: never;
+                    email?: never;
+                    tel?: never;
+                    params: PageRouteParams<Name>;
+                  }
+                | {
+                    href: Name;
+                    to?: never;
+                    email?: never;
+                    tel?: never;
+                    params: PageRouteParams<Name>;
+                  };
+        }[RegisteredPageRouteName]
+      | {
+          to: RuntimeRouteName;
+          href?: never;
+          email?: never;
+          tel?: never;
+          params?: Record<string, RouteParamValue>;
+        }
+      | {
+          href: RuntimeRouteName;
+          to?: never;
+          email?: never;
+          tel?: never;
+          params?: Record<string, RouteParamValue>;
+        }
   : never;
 type LiteralRouteDestination =
   | {
@@ -140,20 +167,21 @@ type LiteralRouteDestination =
     };
 type LegacyRouteDestination = HasGeneratedPageRoutes extends true
   ? never
-  : | {
-        to: string;
-        href?: never;
-        email?: never;
-        tel?: never;
-        params?: Record<string, RouteParamValue>;
-      }
-    | {
-        href: string;
-        to?: never;
-        email?: never;
-        tel?: never;
-        params?: Record<string, RouteParamValue>;
-      };
+  :
+      | {
+          to: string;
+          href?: never;
+          email?: never;
+          tel?: never;
+          params?: Record<string, RouteParamValue>;
+        }
+      | {
+          href: string;
+          to?: never;
+          email?: never;
+          tel?: never;
+          params?: Record<string, RouteParamValue>;
+        };
 
 /**
  * EXACTLY ONE destination, enforced by the type.
@@ -439,10 +467,7 @@ function looksLikeFile(url: string): boolean {
 
 const ROUTE_ARGUMENT_PROPS = ["params", "query"] as const;
 
-function resolveDestination(
-  props: LinkDestinationProps,
-  locale?: false | string,
-): Destination {
+function resolveDestination(props: LinkDestinationProps, locale?: false | string): Destination {
   const provided = DESTINATION_PROPS.filter((name) => props[name] !== undefined);
 
   if (provided.length > 1) throw new AmbiguousLinkDestinationError(provided);

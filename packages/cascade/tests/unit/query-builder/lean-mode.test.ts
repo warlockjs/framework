@@ -50,12 +50,12 @@ describe.each(["postgres", "mongodb"] as const)("lean read mode (%s builder)", (
       driver.queryBuilder = (table: string) => new PostgresQueryBuilder(table, dataSource);
     } else {
       // On the prototype so clones (paginate/chunk) execute against it too.
-      vi.spyOn(MongoQueryBuilder.prototype as never, "execute").mockImplementation(async function (
-        this: { operations: unknown[] },
-      ) {
-        this.operations = [];
-        return rawRows();
-      } as never);
+      vi.spyOn(MongoQueryBuilder.prototype as never, "execute").mockImplementation(
+        async function (this: { operations: unknown[] }) {
+          this.operations = [];
+          return rawRows();
+        } as never,
+      );
       driver.queryBuilder = (table: string) => new MongoQueryBuilder(table, dataSource);
     }
 

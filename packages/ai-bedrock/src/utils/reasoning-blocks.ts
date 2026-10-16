@@ -52,7 +52,9 @@ export function fromReasoningMetadata(value: unknown): ContentBlock | undefined 
   }
 
   if (value.type === "redacted" && typeof value.data === "string" && isBase64(value.data)) {
-    return { reasoningContent: { redactedContent: new Uint8Array(Buffer.from(value.data, "base64")) } };
+    return {
+      reasoningContent: { redactedContent: new Uint8Array(Buffer.from(value.data, "base64")) },
+    };
   }
 
   return undefined;

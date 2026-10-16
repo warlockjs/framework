@@ -15,10 +15,7 @@ description: 'Framework logging delegated to @warlock.js/logger — every primit
 import { log, ConsoleLog, FileLog } from "@warlock.js/logger";
 
 log.configure({
-  channels: [
-    new ConsoleLog(),
-    new FileLog({ chunk: "daily" }),
-  ],
+  channels: [new ConsoleLog(), new FileLog({ chunk: "daily" })],
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
 });
 
@@ -44,13 +41,13 @@ log.info("ai.agent", "trip.started", "agent starting trip", { tripIndex, model }
 
 ## Level mapping
 
-| Level | Framework usage |
-| --- | --- |
-| `debug` | Internals (request/response bodies, token counts per trip) |
-| `info` | Milestones (agent starting, agent completed) |
-| `warn` | Retries, repair attempts, recoverable tool failures |
-| `error` | Terminal failures surfaced via `result.error` |
-| `success` | Tool-call success |
+| Level     | Framework usage                                            |
+| --------- | ---------------------------------------------------------- |
+| `debug`   | Internals (request/response bodies, token counts per trip) |
+| `info`    | Milestones (agent starting, agent completed)               |
+| `warn`    | Retries, repair attempts, recoverable tool failures        |
+| `error`   | Terminal failures surfaced via `result.error`              |
+| `success` | Tool-call success                                          |
 
 Streaming deltas are intentionally **not** logged at token granularity — trip boundaries carry the same information at readable volume.
 
@@ -58,16 +55,16 @@ Streaming deltas are intentionally **not** logged at token granularity — trip 
 
 ### Agent
 
-| Action | Level | Context |
-|---|---|---|
-| `agent.starting` | `info` | inputLength, model, maxTrips |
-| `trip.started` | `debug` | tripIndex |
-| `tool.calling` | `debug` | tool name, action, tripIndex |
-| `tool.called` | `success` | tool name, duration, tripIndex |
-| `tool.failed` | `warn` | tool name, error code, tripIndex |
-| `repair.attempting` | `warn` | tripIndex, validation issues |
-| `agent.completed` | `info` | totalUsage, totalDuration, trip count |
-| `agent.error` | `error` | error code, message, stack |
+| Action              | Level     | Context                               |
+| ------------------- | --------- | ------------------------------------- |
+| `agent.starting`    | `info`    | inputLength, model, maxTrips          |
+| `trip.started`      | `debug`   | tripIndex                             |
+| `tool.calling`      | `debug`   | tool name, action, tripIndex          |
+| `tool.called`       | `success` | tool name, duration, tripIndex        |
+| `tool.failed`       | `warn`    | tool name, error code, tripIndex      |
+| `repair.attempting` | `warn`    | tripIndex, validation issues          |
+| `agent.completed`   | `info`    | totalUsage, totalDuration, trip count |
+| `agent.error`       | `error`   | error code, message, stack            |
 
 ### Workflow
 
@@ -89,9 +86,9 @@ Redaction is a `@warlock.js/logger` feature — configure once on the logger, ap
 log.configure({
   redact: {
     paths: [
-      "context.messages",          // prompts
-      "context.input",              // user input
-      "context.apiKey",             // never log this anyway, but defense-in-depth
+      "context.messages", // prompts
+      "context.input", // user input
+      "context.apiKey", // never log this anyway, but defense-in-depth
     ],
   },
 });
@@ -124,7 +121,9 @@ import { log, LogChannel } from "@warlock.js/logger";
 class Capture extends LogChannel {
   public name = "capture";
   public entries: any[] = [];
-  public log(data) { this.entries.push(data); }
+  public log(data) {
+    this.entries.push(data);
+  }
 }
 
 const capture = new Capture();

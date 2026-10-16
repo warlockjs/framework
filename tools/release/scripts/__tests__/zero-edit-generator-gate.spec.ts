@@ -338,7 +338,7 @@ describe("zero-edit generator matrix", () => {
         { ...fixture.context, onlyFeatures: ["bogus"] },
         fixture.dependencies,
       ),
-      error => {
+      (error) => {
         const message = (error as Error).message;
         assert.match(message, /unknown feature\(s\): bogus/);
         assert.match(message, /alpha/);
@@ -416,7 +416,11 @@ describe("zero-edit generator matrix", () => {
     );
     assert.ok(appCommands.some((command) => command.args[1] === "install"));
     for (const command of appCommands) {
-      assert.equal(command.env?.NODE_ENV, "development", `npm ${command.args[1]} in ${command.cwd}`);
+      assert.equal(
+        command.env?.NODE_ENV,
+        "development",
+        `npm ${command.args[1]} in ${command.cwd}`,
+      );
     }
   });
 });

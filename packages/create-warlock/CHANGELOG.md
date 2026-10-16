@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Scaffolder source formatting and tests use the workspace Oxfmt configuration, including standalone installs; template formatting continues to use each generated app toolchain.
+
 - Group feature selection preserves explicit unticks when selecting the remaining group, and returns the category cursor to the group last edited.
 - Oxc scaffolds configure VS Code format-on-save and lint fixes with the official Oxc extension and recommend installing it. Prettier/ESLint editor settings remain in default scaffolds. Every flag reference and headless error example now includes `--lint`.
 
@@ -119,6 +121,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed

@@ -458,7 +458,9 @@ async function getJson(url, what) {
   const result = await httpRequest(url);
 
   if (result.status !== 200) {
-    throw new Error(`${what}: GET ${url} returned ${result.status}: ${JSON.stringify(result.body.slice(0, 300))}`);
+    throw new Error(
+      `${what}: GET ${url} returned ${result.status}: ${JSON.stringify(result.body.slice(0, 300))}`,
+    );
   }
 
   return parseJsonBody(result, what);
@@ -519,7 +521,9 @@ async function waitForPortFree(port) {
     await delay(500);
   }
 
-  throw new Error(`port ${port} is busy: still accepting connections after ${TIMEOUTS.portRelease}ms`);
+  throw new Error(
+    `port ${port} is busy: still accepting connections after ${TIMEOUTS.portRelease}ms`,
+  );
 }
 
 /** Starts a server, runs `body` against it, and always stops it. */
@@ -602,7 +606,10 @@ function rewritePackageJson(blogDir, specFor, overrides) {
     delete pkg.dependencies[DEVTOOLS_PACKAGE];
   }
 
-  pkg.devDependencies = { ...(pkg.devDependencies ?? {}), [DEVTOOLS_PACKAGE]: specFor(DEVTOOLS_PACKAGE) };
+  pkg.devDependencies = {
+    ...(pkg.devDependencies ?? {}),
+    [DEVTOOLS_PACKAGE]: specFor(DEVTOOLS_PACKAGE),
+  };
   rewritten[DEVTOOLS_PACKAGE] = pkg.devDependencies[DEVTOOLS_PACKAGE];
 
   // pnpm 11 ignores package.json `pnpm.*` settings (pnpm CHANGELOG, "pnpm no
@@ -632,7 +639,9 @@ function ensureReleaseAgeExclude(lines) {
   }
 
   if (!/^minimumReleaseAgeExclude:\s*$/.test(lines[keyIndex])) {
-    throw new Error("pnpm-workspace.yaml: minimumReleaseAgeExclude is not a block list; cannot extend it safely");
+    throw new Error(
+      "pnpm-workspace.yaml: minimumReleaseAgeExclude is not a block list; cannot extend it safely",
+    );
   }
 
   const entries = [];
@@ -642,7 +651,11 @@ function ensureReleaseAgeExclude(lines) {
   }
 
   const alreadyExcluded = entries.some(
-    (entry) => entry.replace(/^\s*-\s*/, "").replace(/^['"]|['"]\s*$/g, "").trim() === "@warlock.js/*",
+    (entry) =>
+      entry
+        .replace(/^\s*-\s*/, "")
+        .replace(/^['"]|['"]\s*$/g, "")
+        .trim() === "@warlock.js/*",
   );
 
   if (alreadyExcluded) {
@@ -657,7 +670,9 @@ function ensureReleaseAgeExclude(lines) {
 
 function appendOverrides(lines, overrides) {
   if (lines.some((line) => /^overrides:/.test(line))) {
-    throw new Error("pnpm-workspace.yaml already has an overrides block; refusing to merge into it blindly");
+    throw new Error(
+      "pnpm-workspace.yaml already has an overrides block; refusing to merge into it blindly",
+    );
   }
 
   while (lines.length > 0 && lines.at(-1).trim() === "") {
@@ -696,7 +711,9 @@ function pnpmStoreDir(blogDir) {
   const storeDir = path.join(blogDir, "node_modules", ".pnpm");
 
   if (!fs.existsSync(storeDir)) {
-    throw new Error(`no node_modules/.pnpm in ${blogDir}; cannot count physical @warlock.js/core copies`);
+    throw new Error(
+      `no node_modules/.pnpm in ${blogDir}; cannot count physical @warlock.js/core copies`,
+    );
   }
 
   return storeDir;
@@ -736,13 +753,17 @@ function verifyInstalledFamily(blogDir, version) {
   }
 
   if (mismatches.length > 0) {
-    throw new Error(`installed @warlock.js/* versions differ from ${version}:\n  ${mismatches.join("\n  ")}`);
+    throw new Error(
+      `installed @warlock.js/* versions differ from ${version}:\n  ${mismatches.join("\n  ")}`,
+    );
   }
 
   const coreDirs = familyDirs.filter((dir) => dir.startsWith("@warlock.js+core@"));
 
   if (coreDirs.length !== 1) {
-    throw new Error(`expected exactly one physical @warlock.js/core, found ${coreDirs.length}: ${coreDirs.join(", ")}`);
+    throw new Error(
+      `expected exactly one physical @warlock.js/core, found ${coreDirs.length}: ${coreDirs.join(", ")}`,
+    );
   }
 
   return { topLevel, storeEntries: familyDirs.length, coreDirs };
@@ -768,14 +789,18 @@ async function installFamily(context, details) {
 
   details.packageJson = rewritePackageJson(blogDir, specFor, tarballSpecs);
   details.workspaceYaml = patchWorkspaceYaml(blogDir, tarballSpecs);
-  log(`package.json: ${Object.keys(details.packageJson.rewritten).length} @warlock.js/* specs set (${mode})`);
+  log(
+    `package.json: ${Object.keys(details.packageJson.rewritten).length} @warlock.js/* specs set (${mode})`,
+  );
   log(`pnpm-workspace.yaml: ${details.workspaceYaml.releaseAge}`);
 
   fs.rmSync(path.join(blogDir, "pnpm-lock.yaml"), { force: true });
   await runPnpm(context, "pnpm-install", ["install", "--no-frozen-lockfile"], TIMEOUTS.install);
 
   details.installed = verifyInstalledFamily(blogDir, version);
-  log(`installed: every @warlock.js/* is ${version}, one physical core (${details.installed.coreDirs[0]})`);
+  log(
+    `installed: every @warlock.js/* is ${version}, one physical core (${details.installed.coreDirs[0]})`,
+  );
 
   if (!fs.existsSync(context.warlockBin)) {
     throw new Error(`warlock bin missing after install: ${context.warlockBin}`);
@@ -848,7 +873,11 @@ function writeCiEnv(context, details) {
 
 async function wireDevtools(context, details) {
   const before = readJson(path.join(context.blogDir, "package.json"));
-  const output = await runWarlock(context, "warlock-add-devtools", ["add", "devtools", "--no-install"]);
+  const output = await runWarlock(context, "warlock-add-devtools", [
+    "add",
+    "devtools",
+    "--no-install",
+  ]);
   const after = readJson(path.join(context.blogDir, "package.json"));
 
   // `add devtools` only records a devDependency; there is no config to eject
@@ -861,16 +890,21 @@ async function wireDevtools(context, details) {
   }
 
   if (after.dependencies?.[DEVTOOLS_PACKAGE]) {
-    throw new Error("warlock add devtools put devtools in dependencies; it must stay a dev dependency");
+    throw new Error(
+      "warlock add devtools put devtools in dependencies; it must stay a dev dependency",
+    );
   }
 
   if (!output.includes(LINES.alreadyInstalled)) {
-    throw new Error(`warlock add devtools did not report "${LINES.alreadyInstalled}"\n${tail(output)}`);
+    throw new Error(
+      `warlock add devtools did not report "${LINES.alreadyInstalled}"\n${tail(output)}`,
+    );
   }
 
   const warlockConfig = path.join(context.blogDir, "warlock.config.ts");
   details.devtoolsSpec = after.devDependencies[DEVTOOLS_PACKAGE];
-  details.namedInWarlockConfig = fs.existsSync(warlockConfig) && fs.readFileSync(warlockConfig, "utf8").includes("devtools");
+  details.namedInWarlockConfig =
+    fs.existsSync(warlockConfig) && fs.readFileSync(warlockConfig, "utf8").includes("devtools");
 }
 
 // ─── step 4: typings + typecheck ─────────────────────────────────────────────
@@ -915,15 +949,27 @@ async function resetDatabase(context) {
     "reset-database",
     "psql",
     [
-      "-h", host,
-      "-p", String(port),
-      "-U", username,
-      "-d", "postgres",
-      "-v", "ON_ERROR_STOP=1",
-      "-c", `DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`,
-      "-c", `CREATE DATABASE "${name}"`,
+      "-h",
+      host,
+      "-p",
+      String(port),
+      "-U",
+      username,
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`,
+      "-c",
+      `CREATE DATABASE "${name}"`,
     ],
-    { cwd: context.blogDir, logsDir: context.logsDir, timeoutMs: TIMEOUTS.command, env: { PGPASSWORD: password } },
+    {
+      cwd: context.blogDir,
+      logsDir: context.logsDir,
+      timeoutMs: TIMEOUTS.command,
+      env: { PGPASSWORD: password },
+    },
   );
 }
 
@@ -940,7 +986,9 @@ async function waitForRecordedRequest(server, timeoutMs) {
     assertStillRunning(server, "the /posts request in devtools");
 
     const list = await getJson(`${BASE_URL}${DEVTOOLS_PATH}/api/requests`, "devtools request list");
-    const found = list.find((summary) => isPostsRequest(summary) && summary.durationMs !== undefined);
+    const found = list.find(
+      (summary) => isPostsRequest(summary) && summary.durationMs !== undefined,
+    );
 
     if (found) {
       return found;
@@ -989,10 +1037,13 @@ async function inspectPostsRequest(server, details) {
   } catch (error) {
     // Tells an evicted/replaced record apart from a request that never
     // reached the detail route.
-    const listAgain = await getJson(`${BASE_URL}${DEVTOOLS_PATH}/api/requests`, "devtools request list").catch(
-      (listError) => errorMessage(listError),
-    );
-    const ids = Array.isArray(listAgain) ? listAgain.map((row) => `${row.id} ${row.method} ${row.path}`) : listAgain;
+    const listAgain = await getJson(
+      `${BASE_URL}${DEVTOOLS_PATH}/api/requests`,
+      "devtools request list",
+    ).catch((listError) => errorMessage(listError));
+    const ids = Array.isArray(listAgain)
+      ? listAgain.map((row) => `${row.id} ${row.method} ${row.path}`)
+      : listAgain;
     throw new Error(`${errorMessage(error)}
 list now: ${JSON.stringify(ids).slice(0, 1500)}`);
   }
@@ -1012,7 +1063,9 @@ list now: ${JSON.stringify(ids).slice(0, 1500)}`);
   const missing = REQUIRED_DEV_PHASES.filter((name) => !phases.includes(name));
 
   if (missing.length > 0) {
-    throw new Error(`the /posts request is missing phases ${missing.join(", ")} (has: ${phases.join(", ")})`);
+    throw new Error(
+      `the /posts request is missing phases ${missing.join(", ")} (has: ${phases.join(", ")})`,
+    );
   }
 
   if (request.queries.length === 0) {
@@ -1025,7 +1078,10 @@ list now: ${JSON.stringify(ids).slice(0, 1500)}`);
     throw new Error("the /posts request has no explainable Postgres SELECT");
   }
 
-  details.explain = { queryId: explainable.id, planNodes: await explainQuery(request.id, explainable.id) };
+  details.explain = {
+    queryId: explainable.id,
+    planNodes: await explainQuery(request.id, explainable.id),
+  };
 }
 
 async function checkDevtoolsInDev(context, details) {
@@ -1040,7 +1096,9 @@ async function checkDevtoolsInDev(context, details) {
     const dashboard = await httpRequest(`${BASE_URL}${DEVTOOLS_PATH}`);
 
     if (dashboard.status !== 200 || !dashboard.contentType.includes("text/html")) {
-      throw new Error(`GET ${DEVTOOLS_PATH} in dev returned ${dashboard.status} ${dashboard.contentType}`);
+      throw new Error(
+        `GET ${DEVTOOLS_PATH} in dev returned ${dashboard.status} ${dashboard.contentType}`,
+      );
     }
 
     const page = await httpRequest(`${BASE_URL}/posts`, { timeoutMs: TIMEOUTS.firstDevPage });
@@ -1077,16 +1135,28 @@ const POSTMAN_SCHEMA = "https://schema.getpostman.com/json/collection/v2.1.0/col
  * Scalar and Swagger UI pages that render it.
  */
 async function checkApiDocsInDev(details) {
-  const openapi = await getJson(`${BASE_URL}${DEVTOOLS_PATH}/api/openapi.json`, "devtools OpenAPI document");
+  const openapi = await getJson(
+    `${BASE_URL}${DEVTOOLS_PATH}/api/openapi.json`,
+    "devtools OpenAPI document",
+  );
   const paths = Object.keys(openapi?.paths ?? {}).length;
 
   if (!String(openapi?.openapi ?? "").startsWith("3.1") || paths === 0) {
-    throw new Error(`devtools OpenAPI document is not 3.1 with paths (openapi=${openapi?.openapi}, paths=${paths})`);
+    throw new Error(
+      `devtools OpenAPI document is not 3.1 with paths (openapi=${openapi?.openapi}, paths=${paths})`,
+    );
   }
 
-  const collection = await getJson(`${BASE_URL}${DEVTOOLS_PATH}/api/postman.json`, "devtools Postman collection");
+  const collection = await getJson(
+    `${BASE_URL}${DEVTOOLS_PATH}/api/postman.json`,
+    "devtools Postman collection",
+  );
 
-  if (collection?.info?.schema !== POSTMAN_SCHEMA || !Array.isArray(collection.item) || collection.item.length === 0) {
+  if (
+    collection?.info?.schema !== POSTMAN_SCHEMA ||
+    !Array.isArray(collection.item) ||
+    collection.item.length === 0
+  ) {
     throw new Error(
       `devtools Postman collection is not a non-empty v2.1.0 collection (schema=${collection?.info?.schema}, items=${collection?.item?.length})`,
     );
@@ -1096,11 +1166,17 @@ async function checkApiDocsInDev(details) {
     const page = await httpRequest(`${BASE_URL}${DEVTOOLS_PATH}${docsPath}`);
 
     if (page.status !== 200 || !page.contentType.includes("text/html")) {
-      throw new Error(`GET ${DEVTOOLS_PATH}${docsPath} in dev returned ${page.status} ${page.contentType}`);
+      throw new Error(
+        `GET ${DEVTOOLS_PATH}${docsPath} in dev returned ${page.status} ${page.contentType}`,
+      );
     }
   }
 
-  details.apiDocs = { openapi: openapi.openapi, paths, postmanTopLevelItems: collection.item.length };
+  details.apiDocs = {
+    openapi: openapi.openapi,
+    paths,
+    postmanTopLevelItems: collection.item.length,
+  };
 }
 
 // ─── step 7: production + browser smoke ──────────────────────────────────────
@@ -1114,21 +1190,30 @@ function pathOf(url) {
 }
 
 function watchBrowserErrors(page, smoke) {
-  page.on("pageerror", (error) => smoke.pageErrors.push({ name: error.name, message: error.message }));
+  page.on("pageerror", (error) =>
+    smoke.pageErrors.push({ name: error.name, message: error.message }),
+  );
   page.on("console", (message) => {
-    const isExpected404 = pathOf(message.location().url) === MISSING_PAGE && message.text().includes("404");
+    const isExpected404 =
+      pathOf(message.location().url) === MISSING_PAGE && message.text().includes("404");
 
     if (message.type() === "error" && !isExpected404) {
       smoke.consoleErrors.push({ path: pathOf(message.location().url), text: message.text() });
     }
   });
   page.on("requestfailed", (request) =>
-    smoke.requestFailures.push({ path: pathOf(request.url()), error: request.failure()?.errorText ?? "unknown" }),
+    smoke.requestFailures.push({
+      path: pathOf(request.url()),
+      error: request.failure()?.errorText ?? "unknown",
+    }),
   );
 }
 
 async function visitPage(page, pagePath, smoke) {
-  const response = await page.goto(BASE_URL + pagePath, { waitUntil: "domcontentloaded", timeout: 15 * SECOND });
+  const response = await page.goto(BASE_URL + pagePath, {
+    waitUntil: "domcontentloaded",
+    timeout: 15 * SECOND,
+  });
   const vessel = page.locator("#vessel");
   await vessel.waitFor({ state: "attached", timeout: 5 * SECOND });
   const text = (await vessel.innerText()).trim();
@@ -1159,7 +1244,12 @@ async function checkClientNavigation(page, smoke) {
   await page.waitForLoadState("networkidle");
 
   const text = (await page.locator("#vessel").innerText()).trim();
-  smoke.navigation = { from: "/posts", href, finalPath: pathOf(page.url()), vesselHasText: text.length > 0 };
+  smoke.navigation = {
+    from: "/posts",
+    href,
+    finalPath: pathOf(page.url()),
+    vesselHasText: text.length > 0,
+  };
 
   if (smoke.navigation.finalPath !== href || !smoke.navigation.vesselHasText) {
     throw new Error("client post navigation did not produce a hydrated detail view");
@@ -1187,7 +1277,13 @@ async function checkResponsiveForms(page, smoke) {
     await form.waitFor({ state: "visible", timeout: 5 * SECOND });
     const box = await form.boundingBox();
     const controls = await form.locator("input, textarea, button").count();
-    smoke.responsiveForms.push({ path: formPath, selector, visible: Boolean(box), width: box?.width ?? 0, controls });
+    smoke.responsiveForms.push({
+      path: formPath,
+      selector,
+      visible: Boolean(box),
+      width: box?.width ?? 0,
+      controls,
+    });
 
     if (!box || box.width <= 0 || box.width > MOBILE_WIDTH || controls === 0) {
       throw new Error(`${formPath} form is not usable at ${MOBILE_WIDTH}px`);
@@ -1246,7 +1342,9 @@ async function assertDevtoolsRefusedInProduction(details) {
     statuses[devtoolsPath] = (await httpRequest(BASE_URL + devtoolsPath)).status;
 
     if (statuses[devtoolsPath] !== 404) {
-      throw new Error(`production GET ${devtoolsPath} returned ${statuses[devtoolsPath]}, expected 404`);
+      throw new Error(
+        `production GET ${devtoolsPath} returned ${statuses[devtoolsPath]}, expected 404`,
+      );
     }
   }
 
@@ -1257,13 +1355,28 @@ async function checkProduction(context, details) {
   await runPnpm(context, "build", ["run", "build"], TIMEOUTS.build);
 
   const server = await withServer(context, "warlock-start", ["start"], async (server) => {
-    details.banner = await waitForOutput(server, readyBannerPattern(context.version), TIMEOUTS.prodBoot, "ready banner");
+    details.banner = await waitForOutput(
+      server,
+      readyBannerPattern(context.version),
+      TIMEOUTS.prodBoot,
+      "ready banner",
+    );
     await waitForHttpOk(server, `${BASE_URL}/health/live`, 30 * SECOND);
     log(`production server is up: ${details.banner}`);
 
-    details.smoke = { pages: [], navigation: null, guards: [], responsiveForms: [], pageErrors: [], consoleErrors: [], requestFailures: [] };
+    details.smoke = {
+      pages: [],
+      navigation: null,
+      guards: [],
+      responsiveForms: [],
+      pageErrors: [],
+      consoleErrors: [],
+      requestFailures: [],
+    };
     await runBrowserSmoke(context, details.smoke);
-    log(`browser smoke passed: ${details.smoke.pages.length} pages, ${details.smoke.responsiveForms.length} forms`);
+    log(
+      `browser smoke passed: ${details.smoke.pages.length} pages, ${details.smoke.responsiveForms.length} forms`,
+    );
 
     await assertDevtoolsRefusedInProduction(details);
 
@@ -1273,7 +1386,9 @@ async function checkProduction(context, details) {
   const output = server.output();
 
   if (output.includes(LINES.devtoolsReady)) {
-    throw new Error(`production log contains "${LINES.devtoolsReady}"; devtools mounted outside development`);
+    throw new Error(
+      `production log contains "${LINES.devtoolsReady}"; devtools mounted outside development`,
+    );
   }
 
   // `warlock start` never registers devtools (the only registration site is
@@ -1301,8 +1416,18 @@ async function checkWorkerRole(context, details) {
     .some((module) => fs.existsSync(path.join(context.blogDir, "src", "app", module, "worker.ts")));
 
   await withServer(context, "warlock-start-worker", ["start", "--role=worker"], async (server) => {
-    await waitForOutput(server, readyBannerPattern(context.version), TIMEOUTS.prodBoot, "ready banner");
-    await waitForOutput(server, new RegExp(escapeRegExp(LINES.workerReady)), 10 * SECOND, "worker ready line");
+    await waitForOutput(
+      server,
+      readyBannerPattern(context.version),
+      TIMEOUTS.prodBoot,
+      "ready banner",
+    );
+    await waitForOutput(
+      server,
+      new RegExp(escapeRegExp(LINES.workerReady)),
+      10 * SECOND,
+      "worker ready line",
+    );
     // Give a wrongly bound listener time to show up before probing.
     await delay(3 * SECOND);
     assertStillRunning(server, "the port probe");
@@ -1326,7 +1451,12 @@ async function checkWorkerRole(context, details) {
 
 async function checkApiRole(context, details) {
   await withServer(context, "warlock-start-api", ["start", "--role=api"], async (server) => {
-    await waitForOutput(server, readyBannerPattern(context.version), TIMEOUTS.prodBoot, "ready banner");
+    await waitForOutput(
+      server,
+      readyBannerPattern(context.version),
+      TIMEOUTS.prodBoot,
+      "ready banner",
+    );
 
     const api = await waitForHttpOk(server, `${BASE_URL}/api/posts`, 30 * SECOND);
     parseJsonBody(api, "--role=api GET /api/posts");
@@ -1393,7 +1523,9 @@ function stopEverythingOnSignal() {
 }
 
 async function main() {
-  const evidencePath = process.env.EVIDENCE_PATH ? path.resolve(process.env.EVIDENCE_PATH) : undefined;
+  const evidencePath = process.env.EVIDENCE_PATH
+    ? path.resolve(process.env.EVIDENCE_PATH)
+    : undefined;
   const evidence = { check: "blog", startedAt: new Date().toISOString(), steps: [] };
 
   stopEverythingOnSignal();
@@ -1412,7 +1544,14 @@ async function main() {
     const context = {
       ...inputs,
       logsDir,
-      warlockBin: path.join(inputs.blogDir, "node_modules", "@warlock.js", "core", "bin", "warlock.js"),
+      warlockBin: path.join(
+        inputs.blogDir,
+        "node_modules",
+        "@warlock.js",
+        "core",
+        "bin",
+        "warlock.js",
+      ),
     };
 
     Object.assign(evidence, {
@@ -1430,10 +1569,18 @@ async function main() {
     await runStep(evidence, "add devtools", (details) => wireDevtools(context, details));
     await runStep(evidence, "typings + tsc", (details) => typecheck(context, details));
     await runStep(evidence, "migrate + seed", (details) => migrateAndSeed(context, details));
-    await runStep(evidence, "dev: devtools records a page request", (details) => checkDevtoolsInDev(context, details));
-    await runStep(evidence, "production: build, start, smoke, devtools 404", (details) => checkProduction(context, details));
-    await runStep(evidence, "deploy in parts: --role=worker", (details) => checkWorkerRole(context, details));
-    await runStep(evidence, "deploy in parts: --role=api", (details) => checkApiRole(context, details));
+    await runStep(evidence, "dev: devtools records a page request", (details) =>
+      checkDevtoolsInDev(context, details),
+    );
+    await runStep(evidence, "production: build, start, smoke, devtools 404", (details) =>
+      checkProduction(context, details),
+    );
+    await runStep(evidence, "deploy in parts: --role=worker", (details) =>
+      checkWorkerRole(context, details),
+    );
+    await runStep(evidence, "deploy in parts: --role=api", (details) =>
+      checkApiRole(context, details),
+    );
 
     evidence.result = "passed";
     log("PASSED");

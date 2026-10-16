@@ -154,7 +154,11 @@ class SharedBackendDriver extends MemoryCacheDriver {
   public constructor() {
     super();
     SharedBackendDriver.instances++;
-    const self = this as unknown as { entries: Map<unknown, unknown>; expiry: Map<unknown, unknown>; tagIndex: unknown };
+    const self = this as unknown as {
+      entries: Map<unknown, unknown>;
+      expiry: Map<unknown, unknown>;
+      tagIndex: unknown;
+    };
     self.entries = sharedEntries;
     self.expiry = sharedExpiry;
     sharedTagIndex ??= self.tagIndex;
@@ -233,7 +237,11 @@ describe("page cache deployment namespace (shared backends)", () => {
 
     // The memory driver stores flat keys (cache 5.20), so assert the segment
     // on the flat key rather than on a nested object tree.
-    expect([...sharedEntries.keys()].some((stored) => String(stored).startsWith("warlock.page.acme-prod."))).toBe(true);
+    expect(
+      [...sharedEntries.keys()].some((stored) =>
+        String(stored).startsWith("warlock.page.acme-prod."),
+      ),
+    ).toBe(true);
 
     await bootDeployment({ driver: SharedBackendDriver, globalPrefix: "acme-staging" });
     expect(await getPageCacheEntry(key)).toBeUndefined();

@@ -3,13 +3,7 @@ import { validate } from "../../../src/factory/validate";
 import { v } from "../../../src/factory/validators";
 import { isIP, isIPv4, isIPv6 } from "../../../src/rules/string/ip";
 
-const validIPv4 = [
-  "192.168.1.1",
-  "255.255.255.255",
-  "0.0.0.0",
-  "127.0.0.1",
-  "10.0.0.1",
-];
+const validIPv4 = ["192.168.1.1", "255.255.255.255", "0.0.0.0", "127.0.0.1", "10.0.0.1"];
 
 const invalidIPv4 = [
   "1.2.3.4.5", // 5 octets

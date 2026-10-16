@@ -41,7 +41,10 @@ describe("downloadFileFromUrl", () => {
   });
 
   it("adds the URL extension once when the name has none", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("x")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("x")),
+    );
 
     await downloadFileFromUrl("http://93.184.216.34/pic.png", dir, "avatar");
 

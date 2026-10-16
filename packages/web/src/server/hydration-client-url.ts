@@ -146,7 +146,10 @@ export function resolveSiteHydrationClientUrls(options: {
   const urls: Record<string, string> = {};
 
   for (const site of options.sites) {
-    const file = findSiteHydrationEntryFile(manifest as Parameters<typeof findSiteHydrationEntryFile>[0], site);
+    const file = findSiteHydrationEntryFile(
+      manifest as Parameters<typeof findSiteHydrationEntryFile>[0],
+      site,
+    );
 
     if (file === undefined) {
       throw new WebClientManifestEntryMissingError(manifestPath, hydrationSiteEntryName(site));

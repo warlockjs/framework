@@ -31,9 +31,7 @@ describe("read/write — content edge cases", () => {
 
   it("round-trips a large multi-line payload", async () => {
     const target = path.join(dir, "big.txt");
-    const payload = Array.from({ length: 5000 }, (_, index) => `line ${index}`).join(
-      "\n",
-    );
+    const payload = Array.from({ length: 5000 }, (_, index) => `line ${index}`).join("\n");
 
     await putFileAsync(target, payload);
     expect(await getFileAsync(target)).toBe(payload);
@@ -72,9 +70,7 @@ describe("JSON read/write — shapes + sync formatting", () => {
     const target = path.join(dir, "sync-pretty.json");
     putJsonFile(target, { name: "warlock", nested: { ok: true } });
 
-    expect(getFile(target)).toBe(
-      '{\n  "name": "warlock",\n  "nested": {\n    "ok": true\n  }\n}',
-    );
+    expect(getFile(target)).toBe('{\n  "name": "warlock",\n  "nested": {\n    "ok": true\n  }\n}');
   });
 
   it("round-trips a top-level array", async () => {

@@ -8,7 +8,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { cmpVersionDesc } from "./generate-changelog.mjs";
 
-function assertDesc(/** @type {string} */ higher, /** @type {string} */ lower, /** @type {string} */ msg) {
+function assertDesc(
+  /** @type {string} */ higher,
+  /** @type {string} */ lower,
+  /** @type {string} */ msg,
+) {
   assert.ok(cmpVersionDesc(higher, lower) < 0, `${msg}: expected ${higher} before ${lower}`);
   assert.ok(cmpVersionDesc(lower, higher) > 0, `${msg}: expected ${lower} after ${higher}`);
 }

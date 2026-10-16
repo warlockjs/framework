@@ -64,9 +64,8 @@ describe("concurrencyLimitMiddleware", () => {
   beforeEach(async () => {
     // Fresh module so the process-local `counters` map starts empty per test.
     vi.resetModules();
-    ({ concurrencyLimitMiddleware } = await import(
-      "../../../src/http/middleware/concurrency-limit.middleware"
-    ));
+    ({ concurrencyLimitMiddleware } =
+      await import("../../../src/http/middleware/concurrency-limit.middleware"));
   });
 
   afterEach(() => {

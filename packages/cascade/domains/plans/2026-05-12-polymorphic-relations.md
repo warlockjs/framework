@@ -76,12 +76,12 @@ Laravel lets you map `"Post"` → `"posts"` or even `"1"` to keep `_type` column
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Default column suffix `_type`/`_id` or configurable convention? | **`_type` + `_id`.** Match Laravel/Rails. Configurable per-relation via options. |
-| 2 | `_type` value: model class name, table name, or custom string? | **Class name** — directly maps via `getModelFromRegistry`. |
-| 3 | `morphTo` joinWith — error or fall back to with()? | **Throw** with a clear message pointing to `with()`. Fallback magic hides cost. |
-| 4 | Eager-load N model types in `loadMorphTo` — sequential or parallel? | **Parallel** via `Promise.all`. Each is an independent query against a different table. |
+| #   | Question                                                            | Recommendation                                                                          |
+| --- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | Default column suffix `_type`/`_id` or configurable convention?     | **`_type` + `_id`.** Match Laravel/Rails. Configurable per-relation via options.        |
+| 2   | `_type` value: model class name, table name, or custom string?      | **Class name** — directly maps via `getModelFromRegistry`.                              |
+| 3   | `morphTo` joinWith — error or fall back to with()?                  | **Throw** with a clear message pointing to `with()`. Fallback magic hides cost.         |
+| 4   | Eager-load N model types in `loadMorphTo` — sequential or parallel? | **Parallel** via `Promise.all`. Each is an independent query against a different table. |
 
 ## Verification
 

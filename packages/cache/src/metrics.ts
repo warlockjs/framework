@@ -1,7 +1,4 @@
-import type {
-  CacheEventData,
-  CacheMetricsSnapshot,
-} from "./types";
+import type { CacheEventData, CacheMetricsSnapshot } from "./types";
 
 /**
  * Default size of the circular latency-sample buffer. 1000 samples covers

@@ -7,7 +7,15 @@
   },
   "rules": {
     // Public override signatures and catch clauses intentionally keep unused parameters.
-    "no-unused-vars": ["error", { "args": "none", "caughtErrors": "none", "ignoreRestSiblings": true, "varsIgnorePattern": "^_" }],
+    "no-unused-vars": [
+      "error",
+      {
+        "args": "none",
+        "caughtErrors": "none",
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ],
     // Framework renderers use createElement's typed props object, including children.
     "react/no-children-prop": "off",
     // Snapshot arrays are intentional when callbacks can mutate a live collection.

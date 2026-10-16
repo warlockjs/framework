@@ -5,7 +5,7 @@ import { assertResolvedSite, normalizeHost, validateSitesConfig } from "./valida
 const resolveHost: HostResolver = () => null;
 
 const codes = (sites: SitesConfig, resolver?: HostResolver, unknownHost?: string) =>
-  validateSitesConfig({ sites, resolveHost: resolver, unknownHost }).map(error => error.code);
+  validateSitesConfig({ sites, resolveHost: resolver, unknownHost }).map((error) => error.code);
 
 const realEstate: SitesConfig = {
   landing: { hosts: ["estates.app", "www.estates.app"] },
@@ -17,21 +17,23 @@ const realEstate: SitesConfig = {
 describe("validateSitesConfig", () => {
   it("accepts the Real-Estate config", () => {
     expect(validateSitesConfig({ sites: realEstate, resolveHost })).toEqual([]);
-    expect(
-      validateSitesConfig({ sites: realEstate, resolveHost, unknownHost: "landing" }),
-    ).toEqual([]);
+    expect(validateSitesConfig({ sites: realEstate, resolveHost, unknownHost: "landing" })).toEqual(
+      [],
+    );
   });
 
   it("SITE_KEY_INVALID", () => {
     const errors = validateSitesConfig({
       sites: { Bad_Key: { hosts: ["a.com"] } },
     });
-    expect(errors.map(e => e.code)).toEqual(["SITE_KEY_INVALID"]);
+    expect(errors.map((e) => e.code)).toEqual(["SITE_KEY_INVALID"]);
     expect(errors[0].message).toContain("Bad_Key");
   });
 
   it("reports that pages was removed", () => {
-    const sites = { landing: { pages: "(marketing)", hosts: ["estates.app"] } } as unknown as SitesConfig;
+    const sites = {
+      landing: { pages: "(marketing)", hosts: ["estates.app"] },
+    } as unknown as SitesConfig;
 
     expect(validateSitesConfig({ sites })).toEqual([
       {
@@ -54,7 +56,13 @@ describe("validateSitesConfig", () => {
   });
 
   it("SITE_HOST_INVALID", () => {
-    for (const host of ["Acme.com", "https://acme.com", "acme.com:8080", "acme.com/x", "*.acme.com"]) {
+    for (const host of [
+      "Acme.com",
+      "https://acme.com",
+      "acme.com:8080",
+      "acme.com/x",
+      "*.acme.com",
+    ]) {
       expect(codes({ a: { hosts: [host] } })).toEqual(["SITE_HOST_INVALID"]);
     }
   });
@@ -77,16 +85,12 @@ describe("validateSitesConfig", () => {
 
   it("SITE_BASEPATH_INVALID", () => {
     for (const basePath of ["admin", "/admin/", "/"]) {
-      expect(codes({ a: { hosts: ["a.com"], basePath } })).toEqual([
-        "SITE_BASEPATH_INVALID",
-      ]);
+      expect(codes({ a: { hosts: ["a.com"], basePath } })).toEqual(["SITE_BASEPATH_INVALID"]);
     }
   });
 
   it("DYNAMIC_SITE_WITHOUT_RESOLVER", () => {
-    expect(codes({ t: { dynamic: true } })).toEqual([
-      "DYNAMIC_SITE_WITHOUT_RESOLVER",
-    ]);
+    expect(codes({ t: { dynamic: true } })).toEqual(["DYNAMIC_SITE_WITHOUT_RESOLVER"]);
   });
 
   it("RESOLVER_WITHOUT_DYNAMIC_SITE", () => {

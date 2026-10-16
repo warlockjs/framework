@@ -19,6 +19,7 @@ export class NullChannel extends LogChannel {
 ```
 
 Then:
+
 ```ts
 log.addChannel(new NullChannel());
 ```
@@ -27,16 +28,16 @@ That's a working channel. `LogChannel` provides the scaffolding; you only need t
 
 ## What `LogChannel` gives you
 
-| Thing | Who provides it |
-|---|---|
-| `name`, `description`, `terminal` | You (fields on your subclass) |
-| `log(data)` | **You must implement** — abstract |
-| `flushSync()` | You (optional sync drain — only if you buffer) |
-| `flush()` | You (optional async drain — only if you buffer over async I/O) |
-| `init()` | You (optional async hook — see below) |
-| `shouldBeLogged(data)` | `LogChannel` — combines `levels` + `filter` |
-| `config<K>(key)` | `LogChannel` — merges user config with `defaultConfigurations` |
-| `getDateAndTimeFormat()` | `LogChannel` — returns resolved `dateFormat` |
+| Thing                             | Who provides it                                                |
+| --------------------------------- | -------------------------------------------------------------- |
+| `name`, `description`, `terminal` | You (fields on your subclass)                                  |
+| `log(data)`                       | **You must implement** — abstract                              |
+| `flushSync()`                     | You (optional sync drain — only if you buffer)                 |
+| `flush()`                         | You (optional async drain — only if you buffer over async I/O) |
+| `init()`                          | You (optional async hook — see below)                          |
+| `shouldBeLogged(data)`            | `LogChannel` — combines `levels` + `filter`                    |
+| `config<K>(key)`                  | `LogChannel` — merges user config with `defaultConfigurations` |
+| `getDateAndTimeFormat()`          | `LogChannel` — returns resolved `dateFormat`                   |
 
 ## Complete example — SlackLog
 
@@ -54,7 +55,7 @@ export class SlackLog extends LogChannel<SlackConfig> {
   public description = "Posts errors + warnings to a Slack webhook";
 
   public async log(data: LoggingData) {
-    if (!this.shouldBeLogged(data)) return;   // ← inherit levels + filter
+    if (!this.shouldBeLogged(data)) return; // ← inherit levels + filter
 
     await fetch(this.config("webhookUrl"), {
       method: "POST",
@@ -85,9 +86,7 @@ log.setChannels([
 Override `protected async init()` for one-time setup — open a socket, connect to a DB, prepare a write stream. Runs automatically after construction (inside a `setTimeout(0)`); `isInitialized` flips to `true` once resolved.
 
 ```ts
-export class DatabaseLog extends LogChannel<
-  BasicLogConfigurations & { connectionString: string }
-> {
+export class DatabaseLog extends LogChannel<BasicLogConfigurations & { connectionString: string }> {
   public name = "database";
   private client!: SomeDbClient;
 
@@ -123,7 +122,9 @@ export class BatchHttpLog extends LogChannel<BasicLogConfigurations & { url: str
     // so a follow-up async drain can recover it next boot.
   }
 
-  private async drain() { /* async post to this.config("url") */ }
+  private async drain() {
+    /* async post to this.config("url") */
+  }
 }
 ```
 
@@ -143,7 +144,7 @@ export class BatchHttpLog extends LogChannel<BasicLogConfigurations & { url: str
   }
 
   public async flush() {
-    await this.drain();   // awaited by log.flush() on shutdown
+    await this.drain(); // awaited by log.flush() on shutdown
   }
 
   private async drain() {
@@ -175,7 +176,7 @@ class MinimalSlack implements LogContract {
 
   public async log(data: LoggingData) {
     if (data.type !== "error") return;
-    await fetch(process.env.SLACK_WEBHOOK!, { /* ... */ });
+    await fetch(process.env.SLACK_WEBHOOK!, {/* ... */});
   }
 }
 ```

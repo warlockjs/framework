@@ -124,9 +124,9 @@ expectTypeOf<PageLoaderContext<undefined, undefined, "account.unknown">["session
 expectTypeOf<PageLoaderContext<undefined, undefined, string>["session"]>().toEqualTypeOf<
   { user: AccountUser | null; model: AccountModel | null } | undefined
 >();
-expectTypeOf<PageLoaderContext<undefined, undefined, "account.show" | "about">["session"]>().toEqualTypeOf<
-  { user: AccountUser | null; model: AccountModel | null } | undefined
->();
+expectTypeOf<
+  PageLoaderContext<undefined, undefined, "account.show" | "about">["session"]
+>().toEqualTypeOf<{ user: AccountUser | null; model: AccountModel | null } | undefined>();
 
 // A guarded context keeps everything else a page loader receives.
 expectTypeOf<PageLoaderContext<undefined, typeof route>["route"]>().toEqualTypeOf<

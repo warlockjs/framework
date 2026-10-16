@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-const poolConfigs: Array<{ types?: { getTypeParser: (oid: number) => (value: string | null) => unknown } }> = [];
+const poolConfigs: Array<{
+  types?: { getTypeParser: (oid: number) => (value: string | null) => unknown };
+}> = [];
 const globalInt8Parser = (value: string | null) => (value === null ? null : `global:${value}`);
 
 vi.mock("pg", () => {

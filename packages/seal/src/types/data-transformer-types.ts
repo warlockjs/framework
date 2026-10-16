@@ -18,10 +18,7 @@ export type TransformerCallback = (
  * First param: the data to transform
  * Second param: validation context
  */
-export type SimpleTransformerCallback = (
-  data: any,
-  context: SchemaContext,
-) => any | Promise<any>;
+export type SimpleTransformerCallback = (data: any, context: SchemaContext) => any | Promise<any>;
 
 /**
  * Contextualized transformer - internal storage

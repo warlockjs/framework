@@ -47,7 +47,8 @@ npm install kafkajs
 - App code that reaches the client bundle (including page and layout modules) must not value-import `@warlock.js/herald` — Gate A refuses the build.
 - A type-only import (`import type { ... } from "@warlock.js/herald"`) is allowed — it carries no runtime edge.
 - Server loaders, controllers, and modules may import it freely.
-```
+
+````
 
 ## 🚀 Quick Start
 
@@ -76,7 +77,7 @@ herald()
     console.log("User created:", message.payload.userId);
     await ctx.ack();
   });
-```
+````
 
 ## 🎯 Core Concepts
 
@@ -189,8 +190,8 @@ Connect to a message broker and register it:
 ```typescript
 const broker = await connectToBroker({
   driver: "rabbitmq",
-  name: "default",       // Optional, defaults to "default"
-  isDefault: true,       // Optional, defaults to true
+  name: "default", // Optional, defaults to "default"
+  isDefault: true, // Optional, defaults to true
   host: "localhost",
   port: 5672,
   username: "guest",
@@ -269,13 +270,13 @@ channel.subscribe(async (message, ctx) => {
 
 ```typescript
 await channel.subscribe(handler, {
-  group: "my-consumer-group",  // Consumer group/tag
-  prefetch: 10,                // Concurrency
-  autoAck: false,              // Manual ack (recommended)
-  exclusive: false,            // Exclusive consumer
+  group: "my-consumer-group", // Consumer group/tag
+  prefetch: 10, // Concurrency
+  autoAck: false, // Manual ack (recommended)
+  exclusive: false, // Exclusive consumer
   retry: {
     maxRetries: 3,
-    delay: 1000,               // Or: (attempt) => attempt * 1000
+    delay: 1000, // Or: (attempt) => attempt * 1000
   },
   deadLetter: {
     channel: "channel.failed",
@@ -288,11 +289,11 @@ await channel.subscribe(handler, {
 
 ```typescript
 await channel.publish(payload, {
-  priority: 5,           // 0-9 (9 highest)
-  ttl: 60000,            // Time-to-live in ms
-  delay: 5000,           // Delayed delivery
-  persistent: true,      // Survive broker restart
-  correlationId: "123",  // For tracking
+  priority: 5, // 0-9 (9 highest)
+  ttl: 60000, // Time-to-live in ms
+  delay: 5000, // Delayed delivery
+  persistent: true, // Survive broker restart
+  correlationId: "123", // For tracking
   headers: { key: "value" },
 });
 ```
@@ -301,7 +302,7 @@ await channel.publish(payload, {
 
 ### RabbitMQ
 
-```typescript
+````typescript
 ### RabbitMQ
 
 ```typescript
@@ -315,7 +316,7 @@ await connectToBroker({
   // Or use URI
   uri: "amqp://guest:guest@localhost:5672/",
 });
-```
+````
 
 ### Kafka (Coming Soon)
 

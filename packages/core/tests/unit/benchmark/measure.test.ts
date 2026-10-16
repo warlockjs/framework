@@ -27,7 +27,10 @@ describe("Benchmark Module - measure()", () => {
     // The claim is "milliseconds, not seconds or microseconds". A real sleep
     // made this flaky (a 50ms timer measured 48ms on a CI runner), so the
     // clock is controlled: 50.4ms between start and end rounds to 50.
-    const now = vi.spyOn(performance, "now").mockReturnValueOnce(1_000).mockReturnValueOnce(1_050.4);
+    const now = vi
+      .spyOn(performance, "now")
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_050.4);
 
     try {
       const result = await measure("test", async () => "done");

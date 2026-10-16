@@ -14,7 +14,11 @@ import type { QueryEvent } from "../contracts/database-driver.contract";
  * - `query`: Emitted when a registered driver's query settles
  */
 export type DataSourceRegistryEvent =
-  "registered" | "default-registered" | "connected" | "disconnected" | "query";
+  | "registered"
+  | "default-registered"
+  | "connected"
+  | "disconnected"
+  | "query";
 
 /**
  * Callback signature for registry events.

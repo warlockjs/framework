@@ -4,15 +4,15 @@ Production build tooling. Uses esbuild to bundle the application for production 
 
 ## Key Files
 
-| File                      | Purpose                                                                |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `production-builder.ts`   | `ProductionBuilder` — configures esbuild and drains configured connector build contributions |
-| `build-app-production.ts` | Entry point function `buildAppForProduction()`                         |
-| `build-contributions.ts`  | Validates and sequentially runs connector `build.generate` / `build.emit` hooks; merges narrow esbuild patches |
-| `esbuild-plugins.ts`      | Custom esbuild plugins for the production bundle                       |
-| `promote-dist.ts`         | Temp write target, and the staged move-aside / rename-in / commit / rollback promotion |
-| `dist-build-manifest.ts`  | Writes and reads `.warlock-build.json`, the build-success marker       |
-| `assert-dist-ready-to-start.ts` | Whether `dist` is fit for `warlock start`, and the reason when it is not |
+| File                            | Purpose                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `production-builder.ts`         | `ProductionBuilder` — configures esbuild and drains configured connector build contributions                   |
+| `build-app-production.ts`       | Entry point function `buildAppForProduction()`                                                                 |
+| `build-contributions.ts`        | Validates and sequentially runs connector `build.generate` / `build.emit` hooks; merges narrow esbuild patches |
+| `esbuild-plugins.ts`            | Custom esbuild plugins for the production bundle                                                               |
+| `promote-dist.ts`               | Temp write target, and the staged move-aside / rename-in / commit / rollback promotion                         |
+| `dist-build-manifest.ts`        | Writes and reads `.warlock-build.json`, the build-success marker                                               |
+| `assert-dist-ready-to-start.ts` | Whether `dist` is fit for `warlock start`, and the reason when it is not                                       |
 
 ## Key Exports
 

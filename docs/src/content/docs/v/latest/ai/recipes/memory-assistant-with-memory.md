@@ -3,11 +3,11 @@ title: "Recipe — A personal assistant that remembers you"
 description: Wire ai.memory (working + semantic tiers) into an orchestrator so a personal assistant recalls user preferences across turns and across sessions.
 ---
 
-You are building "Atlas", a personal assistant a single user talks to every day. The complaint that ships it to production is always the same: *"I told it last week I'm vegetarian, and it still suggested a steakhouse."* The assistant has no memory beyond the messages you hand it each turn, and you don't want to stuff a user's entire history into every prompt.
+You are building "Atlas", a personal assistant a single user talks to every day. The complaint that ships it to production is always the same: _"I told it last week I'm vegetarian, and it still suggested a steakhouse."_ The assistant has no memory beyond the messages you hand it each turn, and you don't want to stuff a user's entire history into every prompt.
 
 This recipe wires `ai.memory` into an orchestrator so Atlas does three things automatically:
 
-1. **Recalls** the preferences most relevant to the current message *before* it answers.
+1. **Recalls** the preferences most relevant to the current message _before_ it answers.
 2. **Remembers** the outcome of each turn so a later turn can recall it.
 3. Keeps a fast **working** scratchpad for the current session, while durable **semantic** recall survives across sessions via a vector store.
 
@@ -58,7 +58,10 @@ Seed a few known preferences up front. `remember` accepts a single item or an ar
 
 ```ts
 await assistantMemory.remember([
-  { text: "The user is vegetarian and avoids all meat and fish.", metadata: { source: "onboarding" } },
+  {
+    text: "The user is vegetarian and avoids all meat and fish.",
+    metadata: { source: "onboarding" },
+  },
   { text: "The user prefers concise, bullet-point answers.", metadata: { source: "onboarding" } },
   { text: "The user lives in Berlin and uses metric units.", metadata: { source: "onboarding" } },
 ]);
@@ -88,9 +91,7 @@ const atlas = ai.orchestrator<AssistantState>({
         const recalled = (ctx.context.memories as RecalledMemory[] | undefined) ?? [];
 
         // Surface the recalled preferences as a context block the model reads.
-        const remembered = recalled
-          .map((memory) => `- ${memory.text}`)
-          .join("\n");
+        const remembered = recalled.map((memory) => `- ${memory.text}`).join("\n");
 
         const reply = await composeReply(String(ctx.input), remembered);
 
@@ -141,7 +142,7 @@ async function composeReply(message: string, remembered: string): Promise<string
 
 ## Use it across turns
 
-A `sessionId` ties turns to one conversation, and `history` is the prior messages (the framework never persists messages itself — you own that store). The memory wiring is what carries preferences *across* sessions, even when the message history is empty.
+A `sessionId` ties turns to one conversation, and `history` is the prior messages (the framework never persists messages itself — you own that store). The memory wiring is what carries preferences _across_ sessions, even when the message history is empty.
 
 ```ts
 // Turn 1 — Atlas recalls the seeded vegetarian preference.

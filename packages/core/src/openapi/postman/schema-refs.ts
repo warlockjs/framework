@@ -15,7 +15,9 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 export function refName(schema: OpenApiSchema): string | undefined {
   const ref = schema.$ref;
 
-  return typeof ref === "string" && ref.startsWith(REF_PREFIX) ? ref.slice(REF_PREFIX.length) : undefined;
+  return typeof ref === "string" && ref.startsWith(REF_PREFIX)
+    ? ref.slice(REF_PREFIX.length)
+    : undefined;
 }
 
 /**
@@ -50,7 +52,9 @@ export function primaryType(schema: OpenApiSchema): string | undefined {
   }
 
   if (Array.isArray(type)) {
-    const concrete = type.find((member): member is string => typeof member === "string" && member !== "null");
+    const concrete = type.find(
+      (member): member is string => typeof member === "string" && member !== "null",
+    );
 
     return concrete ?? (type.includes("null") ? "null" : undefined);
   }

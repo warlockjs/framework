@@ -3,10 +3,7 @@ import { CacheManager } from "./cache-manager";
 import { MemoryCacheDriver } from "./drivers/memory-cache-driver";
 import { NullCacheDriver } from "./drivers/null-cache-driver";
 import type { DriverClass } from "./types";
-import {
-  CacheConfigurationError,
-  CacheDriverNotInitializedError,
-} from "./types";
+import { CacheConfigurationError, CacheDriverNotInitializedError } from "./types";
 
 describe("CacheManager", () => {
   let manager: CacheManager;
@@ -32,9 +29,9 @@ describe("CacheManager", () => {
       await expect(manager.setMany({ a: 1 })).rejects.toThrow(CacheDriverNotInitializedError);
       await expect(manager.increment("x")).rejects.toThrow(CacheDriverNotInitializedError);
       await expect(manager.decrement("x")).rejects.toThrow(CacheDriverNotInitializedError);
-      await expect(
-        manager.remember("x", 60, async () => "v"),
-      ).rejects.toThrow(CacheDriverNotInitializedError);
+      await expect(manager.remember("x", 60, async () => "v")).rejects.toThrow(
+        CacheDriverNotInitializedError,
+      );
       await expect(manager.removeNamespace("x")).rejects.toThrow(CacheDriverNotInitializedError);
       expect(() => manager.parseKey("x")).toThrow(CacheDriverNotInitializedError);
       expect(() => manager.options).toThrow(CacheDriverNotInitializedError);
@@ -120,9 +117,9 @@ describe("CacheManager", () => {
     it("conflicting reload with non-empty options throws", async () => {
       await manager.load("memory", { globalPrefix: "first" });
 
-      await expect(
-        manager.load("memory", { globalPrefix: "second" }),
-      ).rejects.toThrow(CacheConfigurationError);
+      await expect(manager.load("memory", { globalPrefix: "second" })).rejects.toThrow(
+        CacheConfigurationError,
+      );
     });
 
     it("re-load with an empty options object is treated as no options", async () => {
@@ -141,9 +138,9 @@ describe("CacheManager", () => {
     it("driver() throws on conflicting re-load with options", async () => {
       await manager.driver("memory", { globalPrefix: "first" });
 
-      await expect(
-        manager.driver("memory", { globalPrefix: "second" }),
-      ).rejects.toThrow(CacheConfigurationError);
+      await expect(manager.driver("memory", { globalPrefix: "second" })).rejects.toThrow(
+        CacheConfigurationError,
+      );
     });
 
     it("use(instance, options) silently ignores the options arg", async () => {
@@ -158,9 +155,7 @@ describe("CacheManager", () => {
     });
 
     it("unregistered name with runtime options still throws CacheConfigurationError", async () => {
-      await expect(
-        manager.load("ghost", { whatever: 1 }),
-      ).rejects.toThrow(CacheConfigurationError);
+      await expect(manager.load("ghost", { whatever: 1 })).rejects.toThrow(CacheConfigurationError);
     });
   });
 

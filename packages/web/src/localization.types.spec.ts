@@ -24,11 +24,15 @@ describe("useTrans() public types", () => {
 
   it("accepts a converter and still types the result as string", () => {
     function probe(trans: Translate) {
-      const viaConverter = trans("anything", { count: 2 }, (translation, placeholders: { count: number }) => {
-        expectTypeOf(translation).toEqualTypeOf<string>();
+      const viaConverter = trans(
+        "anything",
+        { count: 2 },
+        (translation, placeholders: { count: number }) => {
+          expectTypeOf(translation).toEqualTypeOf<string>();
 
-        return `${translation} ${placeholders.count}`;
-      });
+          return `${translation} ${placeholders.count}`;
+        },
+      );
 
       expectTypeOf(viaConverter).toEqualTypeOf<string>();
     }

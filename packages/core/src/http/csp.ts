@@ -191,9 +191,7 @@ export function mergeCspDirectives(
   const scriptSrc = merged["script-src"] ?? [];
   const nonceSource = `'nonce-${nonce}'`;
 
-  merged["script-src"] = scriptSrc.includes(nonceSource)
-    ? scriptSrc
-    : [...scriptSrc, nonceSource];
+  merged["script-src"] = scriptSrc.includes(nonceSource) ? scriptSrc : [...scriptSrc, nonceSource];
 
   return merged;
 }

@@ -10,11 +10,11 @@ Every Cascade model carries a dirty tracker that records which fields you've cha
 ## The main reads
 
 ```ts
-user.hasChanges();           // boolean — any field changed (or removed)?
-user.isDirty("email");       // boolean — specifically this column?
+user.hasChanges(); // boolean — any field changed (or removed)?
+user.isDirty("email"); // boolean — specifically this column?
 
-user.getDirtyColumns();      // string[] — names of changed columns
-user.getRemovedColumns();    // string[] — columns explicitly unset since load
+user.getDirtyColumns(); // string[] — names of changed columns
+user.getRemovedColumns(); // string[] — columns explicitly unset since load
 
 user.getDirtyColumnsWithValues();
 // Record<string, { oldValue, newValue }> — the full diff, old + new per column
@@ -59,9 +59,9 @@ await AuditLog.create({
 
 ```ts
 user.set("name", "Augusta");
-user.isDirty("name");        // true
+user.isDirty("name"); // true
 await user.save();
-user.isDirty("name");        // false — tracker reset to the just-saved state
+user.isDirty("name"); // false — tracker reset to the just-saved state
 ```
 
 `save()` resets the tracker's baseline to the persisted state. Subsequent `isDirty()` checks measure changes since the last `save()`, not since the original load.
@@ -103,12 +103,12 @@ for (const [field, { oldValue, newValue }] of Object.entries(dirty)) {
 
 ```ts
 // plain object → merged key-by-key, siblings survive
-user.merge({ profile: { age: 26 } });     // profile.city untouched
-user.getDirtyColumns();                    // ["profile.age"]
+user.merge({ profile: { age: 26 } }); // profile.city untouched
+user.getDirtyColumns(); // ["profile.age"]
 
 // Date → replaced, not merged
 conversation.merge({ lastOutboundAt: new Date() });
-conversation.getDirtyColumns();            // ["lastOutboundAt"]
+conversation.getDirtyColumns(); // ["lastOutboundAt"]
 ```
 
 :::note[Fixed in 4.9.1]

@@ -327,8 +327,16 @@ describe("aggregateByType", () => {
 
   it("sums tokens (usage.total) and cost (per-trace traceCost) per type", () => {
     const traces = [
-      makeTrace({ traceId: "a", type: "agent", usage: { input: 10, output: 5, total: 15, cost: { input: 0.01, output: 0.02 } } }),
-      makeTrace({ traceId: "b", type: "agent", usage: { input: 20, output: 10, total: 30, cost: { input: 0.03, output: 0.04 } } }),
+      makeTrace({
+        traceId: "a",
+        type: "agent",
+        usage: { input: 10, output: 5, total: 15, cost: { input: 0.01, output: 0.02 } },
+      }),
+      makeTrace({
+        traceId: "b",
+        type: "agent",
+        usage: { input: 20, output: 10, total: 30, cost: { input: 0.03, output: 0.04 } },
+      }),
     ];
 
     const [agentStat] = aggregateByType(traces);

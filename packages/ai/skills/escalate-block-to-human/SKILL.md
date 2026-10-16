@@ -16,7 +16,7 @@ const policy = ai.guardrail({
   escalation: {
     async onBlock(event) {
       await reviewQueue.enqueue({
-        phase: event.phase,   // "input" | "output" | "tool"
+        phase: event.phase, // "input" | "output" | "tool"
         reason: event.reason, // the detector's human-readable reason
       });
     },
@@ -28,18 +28,18 @@ const agent = ai.agent({ model, middleware: [policy] });
 
 ## When `onBlock` fires
 
-`onBlock` fires **only** for a verdict of `{ type: "block", escalate: true }` — not for an ordinary `block`, and never for `allow` / `redact` / `flag`. It is **awaited before** the `GuardrailViolationError` is thrown, so your handler runs to completion (enqueue succeeds, the page is sent) before the error surfaces on `result.error`. The run still aborts: escalation is a *signal*, not a recovery — `execute()` returns with `result.error` populated as usual.
+`onBlock` fires **only** for a verdict of `{ type: "block", escalate: true }` — not for an ordinary `block`, and never for `allow` / `redact` / `flag`. It is **awaited before** the `GuardrailViolationError` is thrown, so your handler runs to completion (enqueue succeeds, the page is sent) before the error surfaces on `result.error`. The run still aborts: escalation is a _signal_, not a recovery — `execute()` returns with `result.error` populated as usual.
 
 ## The `GuardrailBlockEvent` payload
 
 `onBlock(event)` receives:
 
-| Field | Type | Meaning |
-|---|---|---|
-| `phase` | `"input" \| "output" \| "tool"` | where the block fired |
-| `reason` | `string` | the detector's human-readable reason |
-| `matches` | `readonly GuardrailMatch[] \| undefined` | what tripped the rule (rule id, span, label), when reported |
-| `ctx` | `MiddlewareTripContext` | the live trip context — `state`, `messages`, `agent`, `model`, `signal` |
+| Field     | Type                                     | Meaning                                                                 |
+| --------- | ---------------------------------------- | ----------------------------------------------------------------------- |
+| `phase`   | `"input" \| "output" \| "tool"`          | where the block fired                                                   |
+| `reason`  | `string`                                 | the detector's human-readable reason                                    |
+| `matches` | `readonly GuardrailMatch[] \| undefined` | what tripped the rule (rule id, span, label), when reported             |
+| `ctx`     | `MiddlewareTripContext`                  | the live trip context — `state`, `messages`, `agent`, `model`, `signal` |
 
 `ctx` lets the handler enrich the review item with run context (session id from `ctx.state`, the offending messages, etc.).
 
@@ -69,7 +69,11 @@ const wirePolicy: GuardrailDetector = {
 const policy = ai.guardrail({
   tool: [wirePolicy],
   toolNames: ["initiate_transfer"],
-  escalation: { async onBlock(e) { await approvals.request(e); } },
+  escalation: {
+    async onBlock(e) {
+      await approvals.request(e);
+    },
+  },
 });
 ```
 
@@ -77,7 +81,7 @@ A `check()` may be sync or async (async = call an external service); the guard a
 
 ## A plain callback by design
 
-`escalation.onBlock` is a **plain callback** — `ai-guard` takes **no** dependency on the deferred durable human-step machinery (suspend/resume). The callback is the decoupling seam: inside it you wire your own review queue, and (where your stack supports it) a `workflow.resume(...)` loop. This package only emits the *signal*; it does not own durable suspension. When the typed human-step handoff ships, `onBlock` upgrades to it without a breaking change here.
+`escalation.onBlock` is a **plain callback** — `ai-guard` takes **no** dependency on the deferred durable human-step machinery (suspend/resume). The callback is the decoupling seam: inside it you wire your own review queue, and (where your stack supports it) a `workflow.resume(...)` loop. This package only emits the _signal_; it does not own durable suspension. When the typed human-step handoff ships, `onBlock` upgrades to it without a breaking change here.
 
 ## See also
 

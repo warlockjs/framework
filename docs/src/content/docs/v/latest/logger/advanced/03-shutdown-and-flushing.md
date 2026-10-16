@@ -26,15 +26,15 @@ The first two are **asynchronous** (Node streams), as is `log.flush()`. Only `lo
 
 Anything in the buffer when the process terminates without a synchronous flush:
 
-| Exit path | Buffered entries lost? |
-| --- | --- |
-| Normal `process.exit()` | **Yes** — unless you called `log.flushSync()` first |
-| Uncaught exception without a handler | **Yes** |
-| `SIGINT` / `SIGTERM` without a handler | **Yes** |
-| OS-level kill (`kill -9`, OOM) | **Yes** — unavoidable |
-| `log.info(...)` then `process.exit()` | **Yes** — `log.info` returns as soon as the entry is handed to each channel; it never waits for the write |
+| Exit path                              | Buffered entries lost?                                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Normal `process.exit()`                | **Yes** — unless you called `log.flushSync()` first                                                       |
+| Uncaught exception without a handler   | **Yes**                                                                                                   |
+| `SIGINT` / `SIGTERM` without a handler | **Yes**                                                                                                   |
+| OS-level kill (`kill -9`, OOM)         | **Yes** — unavoidable                                                                                     |
+| `log.info(...)` then `process.exit()`  | **Yes** — `log.info` returns as soon as the entry is handed to each channel; it never waits for the write |
 
-The asynchronous 5-second flush provides *eventual* durability while the process is alive. It does not help at shutdown.
+The asynchronous 5-second flush provides _eventual_ durability while the process is alive. It does not help at shutdown.
 
 ## Logging is fire-and-forget
 
@@ -70,10 +70,10 @@ Every buffered channel drains before the process exits. You can also call `log.e
 
 **What each event does:**
 
-| Event | Behavior |
-| --- | --- |
+| Event                                                    | Behavior                                                                                                                             |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `SIGINT` / `SIGTERM` / `SIGHUP` / `SIGBREAK` / `SIGUSR2` | Flush, then re-raise the signal so Node's default exit behavior runs (exit code 128 + signal number, same as if you had no handler). |
-| `beforeExit` | Flush in place. Node exits on its own afterwards — no re-raise. |
+| `beforeExit`                                             | Flush in place. Node exits on its own afterwards — no re-raise.                                                                      |
 
 :::tip[Default recommendation]
 `["SIGINT", "SIGTERM", "beforeExit"]` covers local `Ctrl+C`, container stop, and natural-exit paths. Add `SIGHUP` if you expect terminal disconnects, or `SIGUSR2` if you use nodemon/pm2 restart.
@@ -122,12 +122,12 @@ process.once("SIGTERM", gracefulShutdown);
 
 `flush()` is bounded: it resolves after `timeout` ms (default 5000, exported as `DEFAULT_FLUSH_TIMEOUT_MS`) even if a channel is still draining, and reports each such channel to `onChannelError`. Pick a timeout that fits inside your shutdown budget; pass `Infinity` only when nothing can hang.
 
-| | `flushSync()` | `flush()` |
-| --- | --- | --- |
-| I/O | synchronous — blocks the loop | asynchronous — awaited |
-| Safe in a re-raising signal handler | yes | no — the signal exits before the promise settles |
-| Used by `autoFlushOn` | yes | no |
-| Reach for it when | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
+|                                     | `flushSync()`                         | `flush()`                                                    |
+| ----------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
+| I/O                                 | synchronous — blocks the loop         | asynchronous — awaited                                       |
+| Safe in a re-raising signal handler | yes                                   | no — the signal exits before the promise settles             |
+| Used by `autoFlushOn`               | yes                                   | no                                                           |
+| Reach for it when                   | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
 
 :::note[autoFlushOn always uses flushSync]
 The handlers installed by `autoFlushOn` call `flushSync()` — re-raising a signal can't wait on a promise. If a channel needs async delivery on shutdown, drive `await log.flush()` from your own handler and leave that signal out of `autoFlushOn`.
@@ -138,18 +138,10 @@ The handlers installed by `autoFlushOn` call `flushSync()` — re-raising a sign
 If you use [`captureAnyUnhandledRejection()`](./02-capturing-unhandled-errors/), include `"beforeExit"` in `autoFlushOn` so the terminal error entry reaches disk before Node tears down:
 
 ```ts title="src/index.ts"
-import {
-  log,
-  ConsoleLog,
-  FileLog,
-  captureAnyUnhandledRejection,
-} from "@warlock.js/logger";
+import { log, ConsoleLog, FileLog, captureAnyUnhandledRejection } from "@warlock.js/logger";
 
 log.configure({
-  channels: [
-    new ConsoleLog(),
-    new FileLog({ chunk: "daily", levels: ["error", "warn"] }),
-  ],
+  channels: [new ConsoleLog(), new FileLog({ chunk: "daily", levels: ["error", "warn"] })],
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
 });
 

@@ -35,7 +35,10 @@ export async function attachTracingSource(
         name: phase.name,
         durationMs: phase.durationMs,
         startedAt: phase.startedAt ?? performance.timeOrigin + performance.now() - phase.durationMs,
-        attrs: phase.attrs === undefined ? undefined : (toSafeValue(phase.attrs) as Record<string, unknown>),
+        attrs:
+          phase.attrs === undefined
+            ? undefined
+            : (toSafeValue(phase.attrs) as Record<string, unknown>),
       });
     },
     onRequestEnd(ctx: TracingContext, result: TracingRequestEndInfo) {

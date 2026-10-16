@@ -75,7 +75,9 @@ describe("MongoDB integration — model CRUD", () => {
     expect(refreshed!.get("age")).toBe(26);
     expect(refreshed!.get("name")).toBe("Carol");
 
-    const stored = await harness.db.collection<{ age: number }>(COLLECTION).findOne({ id: user.id });
+    const stored = await harness.db
+      .collection<{ age: number }>(COLLECTION)
+      .findOne({ id: user.id });
 
     expect(stored!.age).toBe(26);
   });

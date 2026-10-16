@@ -9,7 +9,7 @@ sidebar:
 The bug everyone hits once: `fs.files.get("./data/seed.json")` works from the
 project root, then breaks the moment a script runs from a different directory
 or a cron job runs from `/`. Relative strings resolve against `process.cwd()` —
-the *working directory*, not the file the code lives in.
+the _working directory_, not the file the code lives in.
 
 The facade's fix: anchor a `Directory` handle once, then let it build child
 paths for you.
@@ -34,7 +34,7 @@ Windows (`\`) and POSIX (`/`) — no hand-concatenating with `+` and `/`.
 
 ## Anchor to the current module (ESM)
 
-When a path must resolve next to *the module that references it* — a seeder, a
+When a path must resolve next to _the module that references it_ — a seeder, a
 template loader — anchor the handle to the file's own directory instead of the
 cwd:
 
@@ -66,7 +66,7 @@ await manifest.putJson({ version: 1 });
 :::note[fs does not sandbox — storage does]
 `fs.dir(root).file("..", "..", "etc/passwd")` will happily resolve outside
 `root`. The facade builds and normalizes paths; it does **not** contain them.
-If you're resolving *untrusted* segments (an upload name, a user-supplied key),
+If you're resolving _untrusted_ segments (an upload name, a user-supplied key),
 put your storage layer in front — sandboxing a base directory is its job, not
 the fs facade's.
 :::

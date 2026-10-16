@@ -20,9 +20,9 @@ Provider adapter that turns a local (or self-hosted) Ollama server into a vendor
 ```ts
 import { OllamaSDK } from "@warlock.js/ai-ollama";
 
-const ollama = new OllamaSDK();                                  // local default host
+const ollama = new OllamaSDK(); // local default host
 const remote = new OllamaSDK({ host: "http://gpu-box.internal:11434" });
-const gated  = new OllamaSDK({
+const gated = new OllamaSDK({
   host: "https://ollama.internal",
   headers: { Authorization: `Bearer ${process.env.OLLAMA_TOKEN}` },
 });
@@ -33,20 +33,20 @@ const gated  = new OllamaSDK({
 ## Producing a model
 
 ```ts
-ollama.model({ name: "llama3.1" })
-ollama.model({ name: "qwen2.5:14b", temperature: 0.2 })
-ollama.model({ name: "llama3.2-vision", maxTokens: 1024 })
+ollama.model({ name: "llama3.1" });
+ollama.model({ name: "qwen2.5:14b", temperature: 0.2 });
+ollama.model({ name: "llama3.2-vision", maxTokens: 1024 });
 ```
 
 ## Capabilities — what's auto-set
 
-| Flag | Default |
-| --- | --- |
-| `structuredOutput` | `true` (via Ollama's native `format` JSON-schema field) |
-| `vision` | Inferred from model tag substring. `true` for `llava`, `bakllava`, `*-vision`, `moondream`, `minicpm-v`, `qwen2-vl`, `qwen2.5-vl`, `llama4`, `gemma3`; `false` otherwise. |
-| `reasoning` | Inferred from model tag substring. `true` for `deepseek-r1`, `qwq`, `qwen3`, `magistral`, `phi4-reasoning`, `phi4-mini-reasoning`, `cogito`, `smallthinker`, `exaone-deep`, `gpt-oss`; `false` otherwise. |
-| `promptCaching` | `false` — Ollama has no provider-side prompt cache. |
-| `audio` / `pdf` | `false` — the Ollama chat API takes no audio / PDF content parts. |
+| Flag               | Default                                                                                                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `structuredOutput` | `true` (via Ollama's native `format` JSON-schema field)                                                                                                                                                   |
+| `vision`           | Inferred from model tag substring. `true` for `llava`, `bakllava`, `*-vision`, `moondream`, `minicpm-v`, `qwen2-vl`, `qwen2.5-vl`, `llama4`, `gemma3`; `false` otherwise.                                 |
+| `reasoning`        | Inferred from model tag substring. `true` for `deepseek-r1`, `qwq`, `qwen3`, `magistral`, `phi4-reasoning`, `phi4-mini-reasoning`, `cogito`, `smallthinker`, `exaone-deep`, `gpt-oss`; `false` otherwise. |
+| `promptCaching`    | `false` — Ollama has no provider-side prompt cache.                                                                                                                                                       |
+| `audio` / `pdf`    | `false` — the Ollama chat API takes no audio / PDF content parts.                                                                                                                                         |
 
 Explicit config always wins (`vision`, `structuredOutput`, `reasoning` overrides on `ollama.model({ … })`).
 
@@ -55,9 +55,9 @@ Explicit config always wins (`vision`, `structuredOutput`, `reasoning` overrides
 For thinking-capable families the adapter maps `ModelCallOptions.reasoning` onto Ollama's `think` request flag (`boolean | 'low' | 'medium' | 'high'`):
 
 ```ts
-ollama.model({ name: "deepseek-r1:7b" })
-await model.complete(messages, { reasoning: { effort: "high" } });   // → chat({ think: "high" })
-await model.complete(messages, { reasoning: { maxTokens: 2048 } });  // → chat({ think: true })
+ollama.model({ name: "deepseek-r1:7b" });
+await model.complete(messages, { reasoning: { effort: "high" } }); // → chat({ think: "high" })
+await model.complete(messages, { reasoning: { maxTokens: 2048 } }); // → chat({ think: true })
 ```
 
 - `reasoning.effort` (`low` / `medium` / `high`) passes straight through to `think`.
@@ -102,7 +102,7 @@ A multipart user message collapses to a single `content` string + an `images` ar
 ```ts
 const embedder = ollama.embedder({ name: "nomic-embed-text" });
 const { vector } = await embedder.embed("Hello world");
-const { vectors } = await embedder.embedMany(["a", "b"]);   // single batched call
+const { vectors } = await embedder.embedMany(["a", "b"]); // single batched call
 const truncated = ollama.embedder({ name: "mxbai-embed-large", dimensions: 512 });
 ```
 
@@ -124,13 +124,13 @@ Wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. The `ollama` client
 ## Token counting & usage (cost-truth)
 
 ```ts
-await ollama.count("some text")  // approximate heuristic, offline
+await ollama.count("some text"); // approximate heuristic, offline
 ```
 
 Per-call `Usage` comes from the chat response's `prompt_eval_count` (→ `input`) and `eval_count` (→ `output`); `total` is their sum. The adapter reports usage **truthfully** — it never fabricates a field Ollama doesn't return:
 
 - `cachedTokens` / `cacheWriteTokens` — **always undefined**. Ollama has no provider prompt cache, so there is no cache-hit or cache-write accounting (honest absence, not a false `0`).
-- `reasoningTokens` — **always undefined**. Reasoning models emit their thinking as the `message.thinking` *string*, but the wire format carries **no separate reasoning-token count** — those tokens are already folded into `eval_count`. The adapter does not estimate a count from the thinking text.
+- `reasoningTokens` — **always undefined**. Reasoning models emit their thinking as the `message.thinking` _string_, but the wire format carries **no separate reasoning-token count** — those tokens are already folded into `eval_count`. The adapter does not estimate a count from the thinking text.
 - `cost` — populated only when a `ModelPricing` is configured (local Ollama is free, so usually undefined).
 
 ## Provider body options
@@ -158,7 +158,6 @@ so include any neutral sampling settings you want to retain in that object.
 
 Ollama's chat transport has no native preflight token-count endpoint, so its
 model has no `countTokens` method. `sdk.count(text)` remains an offline estimate.
-
 
 ## When NOT to use this skill
 

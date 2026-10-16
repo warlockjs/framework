@@ -78,9 +78,9 @@ Read the parsed values from the `options` argument inside your action:
 
 ```ts
 action: async ({ options, args }) => {
-  console.log(options.from);     // "2026-01-01"
-  console.log(options.to);       // today's date
-  console.log(args);             // positional args (no flags)
+  console.log(options.from); // "2026-01-01"
+  console.log(options.to); // today's date
+  console.log(args); // positional args (no flags)
 };
 ```
 
@@ -102,17 +102,17 @@ preload: {
 
 The fields, in the order you'll reach for them:
 
-| Field             | Effect                                                                                                                       |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `env: true`       | Loads `.env` / `.env.local`. Skip when `bootstrap: true`.                                                                    |
-| `config: true`    | Loads every file under `src/config/`.                                                                                        |
-| `config: ["x"]`   | Loads only `src/config/x.ts`.                                                                                                |
-| `connectors: true`     | Starts the early-phase built-in connectors (DB, cache, storage, logger, mailer).                                        |
-| `connectors: ["x"]`    | Starts only the named connectors. Bypasses phase splitting — you're saying "I know exactly what I want."                |
-| `bootstrap: true`      | Runs the full bootstrap flow (env + bootstrap script + all auto-loaded files). Slowest; reaches the closest to "real app." |
-| `prestart: true`       | Runs `src/app/prestart.ts` after bootstrap + config (if it exists).                                                     |
-| `runtimeStrategy`      | Forces `"production"` or `"development"` mode (default: detected from `NODE_ENV`).                                       |
-| `environemnt`          | Overrides the environment (`"production"`, `"development"`, `"test"`).                                                  |
+| Field               | Effect                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `env: true`         | Loads `.env` / `.env.local`. Skip when `bootstrap: true`.                                                                  |
+| `config: true`      | Loads every file under `src/config/`.                                                                                      |
+| `config: ["x"]`     | Loads only `src/config/x.ts`.                                                                                              |
+| `connectors: true`  | Starts the early-phase built-in connectors (DB, cache, storage, logger, mailer).                                           |
+| `connectors: ["x"]` | Starts only the named connectors. Bypasses phase splitting — you're saying "I know exactly what I want."                   |
+| `bootstrap: true`   | Runs the full bootstrap flow (env + bootstrap script + all auto-loaded files). Slowest; reaches the closest to "real app." |
+| `prestart: true`    | Runs `src/app/prestart.ts` after bootstrap + config (if it exists).                                                        |
+| `runtimeStrategy`   | Forces `"production"` or `"development"` mode (default: detected from `NODE_ENV`).                                         |
+| `environemnt`       | Overrides the environment (`"production"`, `"development"`, `"test"`).                                                     |
 
 For our report command, we need DB access and that's all — so `env`, the `database` config, and the `database` connector. We skip `bootstrap` because we don't need routes or HTTP.
 
@@ -161,9 +161,13 @@ export default command({
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     console.log();
-    console.log(`  ${colors.green("Total revenue")}      ${colors.bold(`$${totalRevenue.toFixed(2)}`)}`);
+    console.log(
+      `  ${colors.green("Total revenue")}      ${colors.bold(`$${totalRevenue.toFixed(2)}`)}`,
+    );
     console.log(`  ${colors.green("Total orders")}       ${colors.bold(String(totalOrders))}`);
-    console.log(`  ${colors.green("Average order")}      ${colors.bold(`$${averageOrderValue.toFixed(2)}`)}`);
+    console.log(
+      `  ${colors.green("Average order")}      ${colors.bold(`$${averageOrderValue.toFixed(2)}`)}`,
+    );
     console.log();
   },
 });
@@ -223,10 +227,7 @@ export function registerJWTSecretGeneratorCommand() {
 And the consumer wires it via `warlock.config.ts`:
 
 ```ts title="warlock.config.ts"
-import {
-  registerAuthCleanupCommand,
-  registerJWTSecretGeneratorCommand,
-} from "@warlock.js/auth";
+import { registerAuthCleanupCommand, registerJWTSecretGeneratorCommand } from "@warlock.js/auth";
 import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({

@@ -47,7 +47,7 @@ const trackShipmentTool = ai.tool({
 const updatePreferencesTool = ai.tool({
   name: "update_preferences",
   description: "Persist a customer's preference change (language, currency, notifications).",
-  mode: "silent",                              // model never sees the return
+  mode: "silent", // model never sees the return
   input: v.object({
     language: v.string().optional(),
     currency: v.string().optional(),
@@ -77,10 +77,13 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const support = ai.agent({
   name: "customer-support",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a calm, helpful customer support agent for Acme Corp.")
     .instruction("Always look up the order before answering questions about it.")
-    .instruction("When the customer mentions a preference change, call `update_preferences` alongside your reply."),
+    .instruction(
+      "When the customer mentions a preference change, call `update_preferences` alongside your reply.",
+    ),
   tools: [lookupOrderTool, trackShipmentTool, updatePreferencesTool],
   maxTrips: 5,
 });
@@ -124,7 +127,7 @@ execute: async ({ orderId }) => {
     throw new Error("orderId must look like A-####");
   }
   // ...
-}
+};
 ```
 
 The model gets a chance to retry with a corrected input. Inspect the failure on the tool call's `error` field — each tool dispatch is a `type: "tool"` child of `report.children`.

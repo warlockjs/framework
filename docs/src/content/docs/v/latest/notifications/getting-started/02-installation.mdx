@@ -39,7 +39,7 @@ import { Notification } from "app/notifications/models/notification/notification
 
 const config: NotificationConfig = {
   channels: {
-    mail:     mailChannel({ from: "no-reply@store.com" }),
+    mail: mailChannel({ from: "no-reply@store.com" }),
     database: inApp.configure({ model: Notification }),
   },
   // optional gates:

@@ -42,7 +42,8 @@ const anthropic = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY! });
 export const docsAgent = ai.agent({
   name: "docs-qa",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You answer questions about the Warlock framework.")
     .instruction("Be concise. If unsure, say so — never invent an API."),
 });
@@ -59,9 +60,9 @@ const judgeAgent = ai.agent({
   name: "eval-judge",
   model: anthropic.model({ name: "claude-sonnet-4-5" }),
   output: verdictSchema,
-  systemPrompt: ai.systemPrompt().persona(
-    "You are a strict grader. Score answers 0..1 and return the JSON verdict.",
-  ),
+  systemPrompt: ai
+    .systemPrompt()
+    .persona("You are a strict grader. Score answers 0..1 and return the JSON verdict."),
 });
 ```
 

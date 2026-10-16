@@ -5,7 +5,7 @@ sidebar:
   label: "MongoDB replica set for local dev"
 ---
 
-MongoDB transactions require a **replica set** — a single-node `mongod` running with `--replSet` and one `rs.initiate()` call is enough. Plain `mongod --dbpath /data/db` won't work; the moment your code calls `transaction()`, the driver errors out with *"Transaction numbers are only allowed on a replica set member or mongos"*.
+MongoDB transactions require a **replica set** — a single-node `mongod` running with `--replSet` and one `rs.initiate()` call is enough. Plain `mongod --dbpath /data/db` won't work; the moment your code calls `transaction()`, the driver errors out with _"Transaction numbers are only allowed on a replica set member or mongos"_.
 
 This recipe shows the cheapest way to get transactions working in local development. Production replica sets are a different story — multiple nodes, primary election, oplog sizing — and out of scope here.
 
@@ -102,7 +102,7 @@ async function smokeTest() {
 }
 ```
 
-If you see no error, transactions are working. If you see *"Transaction numbers are only allowed on a replica set member"*, the replica set isn't initiated — re-run `rs.initiate(...)` or check the Docker healthcheck.
+If you see no error, transactions are working. If you see _"Transaction numbers are only allowed on a replica set member"_, the replica set isn't initiated — re-run `rs.initiate(...)` or check the Docker healthcheck.
 
 ## Production replica sets
 

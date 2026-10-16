@@ -56,16 +56,13 @@ export const userContext = new UserContext();
 ### `run()` — scoped execution
 
 ```ts
-await userContext.run(
-  { userId: "123", role: "admin", tenantId: "acme" },
-  async () => {
-    // Context is available throughout this async scope and any awaited calls inside it.
-    const userId = userContext.get("userId");   // "123"
-    const role = userContext.get("role");       // "admin"
+await userContext.run({ userId: "123", role: "admin", tenantId: "acme" }, async () => {
+  // Context is available throughout this async scope and any awaited calls inside it.
+  const userId = userContext.get("userId"); // "123"
+  const role = userContext.get("role"); // "admin"
 
-    await someAsyncOperation();                  // context propagates through awaits
-  },
-);
+  await someAsyncOperation(); // context propagates through awaits
+});
 ```
 
 Use `run()` when you have a clear scope boundary (a request handler, a job, a CLI command). The context is auto-cleaned when the callback returns.
@@ -80,7 +77,7 @@ function authMiddleware(req, res, next) {
     tenantId: req.headers["x-tenant-id"],
   });
 
-  next();   // context lives for the rest of the request
+  next(); // context lives for the rest of the request
 }
 ```
 
@@ -100,9 +97,9 @@ If there's no current store, `update` creates one with the partial (cast to the 
 ## Reading
 
 ```ts
-const userId = userContext.get("userId");         // TStore[K] | undefined
-const store = userContext.getStore();              // TStore | undefined
-const inside = userContext.hasContext();           // boolean
+const userId = userContext.get("userId"); // TStore[K] | undefined
+const store = userContext.getStore(); // TStore | undefined
+const inside = userContext.hasContext(); // boolean
 ```
 
 `get` is the daily-use accessor. `getStore` returns the whole record. `hasContext` distinguishes "key absent" from "no context at all" (which matters for safety checks at the framework boundary).
@@ -110,7 +107,7 @@ const inside = userContext.hasContext();           // boolean
 ## Writing within a context
 
 ```ts
-userContext.set("role", "admin");                  // sugar for update({ role: "admin" })
+userContext.set("role", "admin"); // sugar for update({ role: "admin" })
 ```
 
 Only call `set` inside an active context. Outside one, it enters a new context with just that key set — usually not what you want.
@@ -186,9 +183,7 @@ You can call `context.run(store, fn)` directly when you only have one context. W
 ```ts
 // ❌ Without the manager — fragile, easy to forget a layer
 await requestContext.run(reqStore, async () =>
-  databaseContext.run(dbStore, async () =>
-    tenantContext.run(tenantStore, async () => handle()),
-  ),
+  databaseContext.run(dbStore, async () => tenantContext.run(tenantStore, async () => handle())),
 );
 
 // ✅ With the manager — one call, deterministic order
@@ -250,11 +245,11 @@ function contextMiddleware(req, res, next) {
 ## Lookup + introspection
 
 ```ts
-contextManager.hasContext("tenant");                // boolean
+contextManager.hasContext("tenant"); // boolean
 const tenant = contextManager.getContext<TenantContext>("tenant");
 // returns the registered instance or undefined
-contextManager.unregister("debug");                  // remove a context
-contextManager.clearAll();                           // clear stores on every context
+contextManager.unregister("debug"); // remove a context
+contextManager.clearAll(); // clear stores on every context
 ```
 
 `getContext<T>` returns the registered instance cast to `T` (the generic is constrained to `Context<any>`, so pass the concrete context class — `getContext<TenantContext>("tenant")`). It's an unchecked cast: an unknown `name` returns `undefined`, and a wrong type argument won't be caught at runtime. Useful in shared utilities that want to read from a context without importing it at the call site.
@@ -265,10 +260,10 @@ contextManager.clearAll();                           // clear stores on every co
 
 ```ts
 contextManager
-  .register("trace", traceContext)        // outermost — runs first
+  .register("trace", traceContext) // outermost — runs first
   .register("request", requestContext)
   .register("database", databaseContext)
-  .register("tenant", tenantContext);     // innermost — runs last, inside all others
+  .register("tenant", tenantContext); // innermost — runs last, inside all others
 ```
 
 ## Real-world: multi-tenant request lifecycle
@@ -379,17 +374,18 @@ singleton and run them all together with a single call. Covers
 `clearAll`, `getContext` / `hasContext`.
 
 Load when several contexts apply to the same scope (request + database
-+ trace + tenant) and you'd otherwise nest `run()` calls by hand.
+
+- trace + tenant) and you'd otherwise nest `run()` calls by hand.
 
 ## Two operating modes — when to pick which
 
-| Situation | Reach for |
-| --- | --- |
-| Framework gives you a callback to wrap | `context.run(store, callback)` |
-| Framework expects middleware that returns synchronously (Express, etc.) | `context.enter(store)` |
-| You have 2+ contexts active for the same request | `contextManager.runAll(stores, callback)` |
-| Middleware-style with 2+ contexts | `contextManager.enterAll(stores)` then `clearAll()` at end |
-| You only have one context and the framework cooperates | Single `context.run(...)`. Skip the manager. |
+| Situation                                                               | Reach for                                                  |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Framework gives you a callback to wrap                                  | `context.run(store, callback)`                             |
+| Framework expects middleware that returns synchronously (Express, etc.) | `context.enter(store)`                                     |
+| You have 2+ contexts active for the same request                        | `contextManager.runAll(stores, callback)`                  |
+| Middleware-style with 2+ contexts                                       | `contextManager.enterAll(stores)` then `clearAll()` at end |
+| You only have one context and the framework cooperates                  | Single `context.run(...)`. Skip the manager.               |
 
 ## What this package deliberately doesn't do
 

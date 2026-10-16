@@ -5,7 +5,7 @@ description: "@warlock.js/seal overview for orientation and choosing the focused
 
 # `@warlock.js/seal` — overview
 
-A type-safe, framework-agnostic validation library. You build a schema with the `v` factory, run it with `validate(schema, data)`, and pull the static type out with `Infer<typeof schema>`. One schema is the runtime check *and* the TypeScript type *and* (optionally) a JSON Schema.
+A type-safe, framework-agnostic validation library. You build a schema with the `v` factory, run it with `validate(schema, data)`, and pull the static type out with `Infer<typeof schema>`. One schema is the runtime check _and_ the TypeScript type _and_ (optionally) a JSON Schema.
 
 Standalone — no framework required. Ships built-in with `@warlock.js/core`, which adds framework-specific validators (file uploads, database existence/uniqueness rules) on top.
 
@@ -28,31 +28,39 @@ Eight task skills. Most schemas only need `seal-basics` + `pick-seal-primitive` 
 ### Foundations
 
 #### `seal-basics`
+
 Start here. The `v` factory, `validate(schema, data)`, and `Infer<typeof schema>`.
 
 ### Building schemas
 
 #### `pick-seal-primitive`
+
 Choose the right primitive — `string` / `int` / `literal` / `date` / `enum` / `computed` / `managed` / `instanceof` / `any`. Covers the close calls (`string` vs `scalar`, `int` vs `number`, `literal` vs `enum`).
 
 #### `define-structural-shape`
+
 Compose `v.object` / `v.array` / `v.record` / `v.tuple` / `v.union` / `v.discriminatedUnion` / `v.lazy` — object schemas, dynamic-keyed records, tagged unions, recursive shapes.
 
 #### `compose-seal-modifiers`
+
 Cross-cutting modifiers — `.optional` / `.nullable` / `.default` / `.catch` / `.omit` / membership rules — plus the mutator-vs-transformer pipeline and `Infer.Input` vs `Infer.Output`.
 
 ### Output + interop
 
 #### `handle-seal-errors`
+
 Read a `ValidationResult` — `isValid`, `errors[]`, `data`. Branch on `error.type`, customize messages, hook translation.
 
 #### `generate-json-schema`
+
 `schema.toJsonSchema(target)` — draft-2020-12 / draft-07 / openapi-3.0 / openai-strict. For OpenAI structured outputs, OpenAPI specs, any JSON-Schema consumer.
 
 #### `bridge-standard-schema`
+
 Standard Schema interop — why a `StandardSchemaV1<T>` slot might reject a schema, object input/output class parameters and primitive factory intersections, Cascade `Model<TSchema>` variance. For migrating off `as unknown as` casts.
 
 #### `extend-seal-with-plugins`
+
 Author a plugin to add validator methods (`.slug`, `.postalCode`, …) — the `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation.
 
 ## Configuration

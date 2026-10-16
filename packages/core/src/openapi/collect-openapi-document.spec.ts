@@ -34,16 +34,27 @@ function collect(child: FakeChild, options: Parameters<typeof collectOpenApiDocu
 describe("collectOpenApiDocument", () => {
   it("sends the OpenAPI request options to the registration child and returns the document", async () => {
     const child = new FakeChild();
-    const result = collect(child, { title: "Shop", server: "https://api.shop.test", includePages: true });
+    const result = collect(child, {
+      title: "Shop",
+      server: "https://api.shop.test",
+      includePages: true,
+    });
 
-    child.emit("message", { type: "route-registration:progress", module: "src/app/users/routes.ts" });
+    child.emit("message", {
+      type: "route-registration:progress",
+      module: "src/app/users/routes.ts",
+    });
     child.emit("message", {
       type: "openapi-registration:document",
       result: { version: 1, document, warnings: ["GET /x: something"] },
     });
     child.emit("close", 0);
 
-    await expect(result).resolves.toEqual({ version: 1, document, warnings: ["GET /x: something"] });
+    await expect(result).resolves.toEqual({
+      version: 1,
+      document,
+      warnings: ["GET /x: something"],
+    });
     expect(child.send).toHaveBeenCalledWith({
       version: 1,
       cwd: "C:/app",
@@ -64,9 +75,7 @@ describe("collectOpenApiDocument", () => {
     child.emit("close", 0);
     await result;
 
-    expect(child.send).toHaveBeenCalledWith(
-      expect.objectContaining({ openapi: { version: 1 } }),
-    );
+    expect(child.send).toHaveBeenCalledWith(expect.objectContaining({ openapi: { version: 1 } }));
   });
 
   it.each([

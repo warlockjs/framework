@@ -96,7 +96,10 @@ async function answer(question: string) {
   // optional: drop low-similarity hits in code
   const relevant = context.filter((document) => document.score >= 0.75);
 
-  const prompt = buildPrompt(question, relevant.map((document) => document.body));
+  const prompt = buildPrompt(
+    question,
+    relevant.map((document) => document.body),
+  );
   return ai.complete(prompt);
 }
 ```
@@ -105,11 +108,11 @@ A score threshold isn't a query option — filter on the `score` column in code 
 
 ## Driver support
 
-| Driver | Vector |
-| --- | --- |
-| Postgres (with `CREATE EXTENSION vector`) | ✅ pgvector + IVFFlat index |
+| Driver                                         | Vector                               |
+| ---------------------------------------------- | ------------------------------------ |
+| Postgres (with `CREATE EXTENSION vector`)      | ✅ pgvector + IVFFlat index          |
 | MongoDB Atlas (paid tier + Atlas Search index) | ✅ `$vectorSearch` aggregation stage |
-| MongoDB community / self-hosted / local | ❌ Atlas-only |
+| MongoDB community / self-hosted / local        | ❌ Atlas-only                        |
 
 For local dev with MongoDB, develop the vector path against Postgres + pgvector.
 

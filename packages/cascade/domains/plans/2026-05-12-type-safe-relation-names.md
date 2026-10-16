@@ -33,10 +33,7 @@ DX win is real: typo prevention, autocomplete on relation names, refactor safety
   Combined with `as const` at the model declaration site to preserve literal keys.
 - [ ] Add a `RelationNames<TModel>` type helper:
   ```ts
-  type RelationNames<TModel> =
-    TModel extends { relations: infer R }
-      ? keyof R & string
-      : string;
+  type RelationNames<TModel> = TModel extends { relations: infer R } ? keyof R & string : string;
   ```
 - [ ] Constrain `with`/`joinWith`/`withCount`/`load` overloads to accept `RelationNames<this> | NestedRelationName<this>` (dot-notation: `${RelationNames<this>}.${string}`)
 - [ ] Update [`Model.with`](../../../@warlock.js/cascade/src/model/model.ts:1305) static overloads
@@ -68,12 +65,11 @@ This is a small ceremony cost. Document it.
 If `static relations` is not declared, fall back to `string`:
 
 ```ts
-type RelationNames<TModel> =
-  TModel extends { relations: infer R }
-    ? R extends Record<string, RelationDefinition>
-      ? keyof R & string
-      : string
-    : string;
+type RelationNames<TModel> = TModel extends { relations: infer R }
+  ? R extends Record<string, RelationDefinition>
+    ? keyof R & string
+    : string
+  : string;
 ```
 
 Don't break existing models that haven't migrated to `as const`.
@@ -94,12 +90,12 @@ Bonus: `with("posts", q => ...)` — `q` is currently `QueryBuilderContract<unkn
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Require `as const` on relation declarations? | **Yes — opt-in.** Without it, fall back to `string`. Backward compat. |
-| 2 | Validate dot-notation paths recursively? | **First segment only.** Recursive validation is too complex for v1. |
-| 3 | Infer constraint callback's QB generic type? | **Defer to v2.** Bigger refactor. |
-| 4 | Where does `RelationNames` live? | **`relations/types.ts`.** Co-locates with `RelationDefinition`. |
+| #   | Question                                     | Recommendation                                                        |
+| --- | -------------------------------------------- | --------------------------------------------------------------------- |
+| 1   | Require `as const` on relation declarations? | **Yes — opt-in.** Without it, fall back to `string`. Backward compat. |
+| 2   | Validate dot-notation paths recursively?     | **First segment only.** Recursive validation is too complex for v1.   |
+| 3   | Infer constraint callback's QB generic type? | **Defer to v2.** Bigger refactor.                                     |
+| 4   | Where does `RelationNames` live?             | **`relations/types.ts`.** Co-locates with `RelationDefinition`.       |
 
 ## Verification
 
@@ -120,6 +116,7 @@ Bonus: `with("posts", q => ...)` — `q` is currently `QueryBuilderContract<unkn
 4. Updated overloads on `with` / `joinWith` / `withCount` / `load` / `has` / `whereHas` / etc.
 
 This needs a focused session because:
+
 - Every overload signature in the contract + model + query-builder needs careful refactor
 - `ChildModel<TModel>` generic plumbing is touched by every static factory method
 - Likely to surface pre-existing typos in `src/app/**` that will need fixing

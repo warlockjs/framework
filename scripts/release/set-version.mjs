@@ -171,7 +171,9 @@ function main() {
       writeFileSync(file, updated);
       console.log(`release:version: moved the pinned framework versions in ${relative}`);
     } else {
-      console.log(`release:version: ${relative} pins no framework version (the scaffolder sets it)`);
+      console.log(
+        `release:version: ${relative} pins no framework version (the scaffolder sets it)`,
+      );
     }
   }
 

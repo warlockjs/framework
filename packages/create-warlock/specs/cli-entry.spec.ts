@@ -30,13 +30,7 @@ afterEach(() => {
 
 describe("createApp (binary entry)", () => {
   it("drops node + script argv and forwards the parsed flags to createNewApp", () => {
-    process.argv = [
-      "node",
-      "create-app.js",
-      "my-app",
-      "--db=postgres",
-      "--yes",
-    ];
+    process.argv = ["node", "create-app.js", "my-app", "--db=postgres", "--yes"];
 
     createApp();
 
@@ -111,7 +105,7 @@ describe("parseFlags — additional edge cases", () => {
 
   it.each([["--pm"], ["--pm="]])(
     "preserves an explicitly valueless %s for command validation",
-    flag => {
+    (flag) => {
       expect(parseFlags(["app", flag]).pm).toBe("");
     },
   );
@@ -141,13 +135,8 @@ describe("parseFlags — additional edge cases", () => {
   });
 
   it("parses --agents as a comma-separated list, in both = and spaced forms", () => {
-    expect(parseFlags(["app", "--agents=claude,cursor"]).agents).toEqual([
-      "claude",
-      "cursor",
-    ]);
-    expect(parseFlags(["app", "--agents", "claude"]).agents).toEqual([
-      "claude",
-    ]);
+    expect(parseFlags(["app", "--agents=claude,cursor"]).agents).toEqual(["claude", "cursor"]);
+    expect(parseFlags(["app", "--agents", "claude"]).agents).toEqual(["claude"]);
   });
 
   it("parses --stack in both = and spaced forms", () => {
@@ -184,12 +173,7 @@ describe("--help lists every flag together with its default", () => {
   it("lists the accepted prefixed AI keys, including capability packages", () => {
     const help = buildHelpText();
 
-    for (const key of [
-      "ai-openai",
-      "ai-tools",
-      "ai-panoptic",
-      "ai-workspace",
-    ]) {
+    for (const key of ["ai-openai", "ai-tools", "ai-panoptic", "ai-workspace"]) {
       expect(help).toContain(key);
     }
 
@@ -210,9 +194,7 @@ describe("createApp — --help / --version early exit", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => undefined) as never);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
   });
 
@@ -264,13 +246,7 @@ describe("createApp — --help / --version early exit", () => {
   });
 
   it("--help wins over a positional project name and other flags", () => {
-    process.argv = [
-      "node",
-      "create-app.js",
-      "my-app",
-      "--db=postgres",
-      "--help",
-    ];
+    process.argv = ["node", "create-app.js", "my-app", "--db=postgres", "--help"];
 
     createApp();
 

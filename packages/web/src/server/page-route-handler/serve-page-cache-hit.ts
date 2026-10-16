@@ -25,7 +25,10 @@ type SelectedPageSite = {
  * request host returns `"bypass"` — no lookup and no store. Without `app.url`
  * (or if it is unparsable), the request host is used.
  */
-export function resolvePageCacheHost(requestHost: string, site?: SelectedPageSite): string | "bypass" {
+export function resolvePageCacheHost(
+  requestHost: string,
+  site?: SelectedPageSite,
+): string | "bypass" {
   if (site !== undefined) return requestHost.toLowerCase();
 
   const configured = config.get("app.url") as string | undefined;
@@ -71,7 +74,7 @@ export async function resolvePageCacheHitOrMiss(options: {
   translationsRevision?: string;
   /** Runs app, layout and page middleware; called only when a HIT was found. */
   middlewareGate?: () => Promise<"passed" | "sent" | "blocked">;
-}):Promise<PageCacheLookupOutcome> {
+}): Promise<PageCacheLookupOutcome> {
   const { request, response, cache, credentialedRequest, pageCacheVariant } = options;
 
   if (request.method !== "GET") {

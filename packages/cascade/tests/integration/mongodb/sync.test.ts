@@ -49,7 +49,9 @@ describe("MongoDB integration — schema operations (migration driver)", () => {
   });
 
   /** Read live indexes for the collection, keyed by index name. */
-  async function getIndexes(collection: string): Promise<
+  async function getIndexes(
+    collection: string,
+  ): Promise<
     Map<string, { key: Record<string, unknown>; unique?: boolean; expireAfterSeconds?: number }>
   > {
     const indexes = await harness.db.collection(collection).indexes();
@@ -262,6 +264,8 @@ describe("MongoDB integration — schema operations (migration driver)", () => {
       .sort({ id: 1 })
       .toArray();
 
-    expect(docs.every((doc) => doc.new_name !== undefined && doc.old_name === undefined)).toBe(true);
+    expect(docs.every((doc) => doc.new_name !== undefined && doc.old_name === undefined)).toBe(
+      true,
+    );
   });
 });

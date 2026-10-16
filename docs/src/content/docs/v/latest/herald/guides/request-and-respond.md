@@ -19,10 +19,7 @@ type TaxReply = { tax: number; currency: string };
 // Caller
 const reply = await herald()
   .channel<TaxRequest>("compute.tax")
-  .request<TaxReply>(
-    { amount: 1000, country: "US" },
-    { timeout: 30_000 },
-  );
+  .request<TaxReply>({ amount: 1000, country: "US" }, { timeout: 30_000 });
 
 console.log(reply.tax, reply.currency);
 
@@ -66,12 +63,12 @@ Pick a sane number:
 
 ## When to use it vs HTTP
 
-| Use HTTP | Use request/respond |
-| --- | --- |
-| Stateless, fast, idempotent ops | Slow / queued ops where the caller can wait |
+| Use HTTP                                           | Use request/respond                               |
+| -------------------------------------------------- | ------------------------------------------------- |
+| Stateless, fast, idempotent ops                    | Slow / queued ops where the caller can wait       |
 | Public API surface — frontend or third-party calls | Internal service-to-service backend orchestration |
-| Sub-100ms latency budget | Variable duration, queueing helps |
-| You want a load balancer's request routing | You want a queue's backpressure |
+| Sub-100ms latency budget                           | Variable duration, queueing helps                 |
+| You want a load balancer's request routing         | You want a queue's backpressure                   |
 
 The bus adds at least one broker hop in each direction (round-trip), so it's almost never faster than HTTP for a single request. The wins are: persistent retries, backpressure across the worker pool, the same connection moves async events and sync requests, no separate HTTP load balancer / proxy / cert story.
 

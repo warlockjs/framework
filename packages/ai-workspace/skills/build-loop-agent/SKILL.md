@@ -1,6 +1,6 @@
 ---
 name: build-loop-agent
-description: 'Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, ''agent that fixes a failing test'', ''make the suite green'', ''coding agent that edits a repo'', ''build-loop agent'', ''self-correcting agent'', ''read-only code reviewer'', ''scaffold then hand off to an agent'', ''share one workspace across a supervisor'', ''least-privilege agent tools'', ''errors as tool data''; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — the `use-a-workspace` topic; the agent loop / maxTrips / events themselves — the `run-ai-agent` topic of the `warlock-js-ai` skill.'
+description: "Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, 'agent that fixes a failing test', 'make the suite green', 'coding agent that edits a repo', 'build-loop agent', 'self-correcting agent', 'read-only code reviewer', 'scaffold then hand off to an agent', 'share one workspace across a supervisor', 'least-privilege agent tools', 'errors as tool data'; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — the `use-a-workspace` topic; the agent loop / maxTrips / events themselves — the `run-ai-agent` topic of the `warlock-js-ai` skill."
 ---
 
 # Build a build-loop agent — read → edit → run tests, until green
@@ -19,8 +19,8 @@ const ws = ai.workspace({
 
 const dev = ai.agent({
   model,
-  tools: ws.tools.all(),   // read_file, edit_file, write_file, run_shell, run_tests, grep, glob
-  maxTrips: 25,            // give the loop room to iterate
+  tools: ws.tools.all(), // read_file, edit_file, write_file, run_shell, run_tests, grep, glob
+  maxTrips: 25, // give the loop room to iterate
 });
 
 await dev.execute("`npm test` fails on the cart-total suite. Make it green.");
@@ -43,7 +43,7 @@ Override the base command per agent: `ws.tools.runTests({ command: "vitest run" 
 
 ### A read-only reviewer
 
-A reviewer should never write or run a shell. Pick exactly the read tools, or hand it a `readonly()` projection (which omits the mutating tools *and* rejects the mutating direct methods):
+A reviewer should never write or run a shell. Pick exactly the read tools, or hand it a `readonly()` projection (which omits the mutating tools _and_ rejects the mutating direct methods):
 
 ```ts
 const reviewer = ai.agent({
@@ -61,8 +61,8 @@ ai.agent({ model, tools: ws.readonly().tools.all() }); // read_file + grep + glo
 `scope(subdir)` narrows the jail so a per-package agent can't reach outside it — one sub-agent per package, isolated blast radius:
 
 ```ts
-const apiDev  = ai.agent({ model, tools: ws.scope("packages/api").tools.all() });
-const webDev  = ai.agent({ model, tools: ws.scope("packages/web").tools.all() });
+const apiDev = ai.agent({ model, tools: ws.scope("packages/api").tools.all() });
+const webDev = ai.agent({ model, tools: ws.scope("packages/web").tools.all() });
 ```
 
 ## Scaffold from code, then hand off

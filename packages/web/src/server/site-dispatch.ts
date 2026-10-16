@@ -12,7 +12,13 @@
  * Path matching reuses the web's own matcher (`matchClientRoute`); this module
  * writes no matcher of its own.
  */
-import { Application, requestContext, type HttpContext, type Request, type Router } from "@warlock.js/core";
+import {
+  Application,
+  requestContext,
+  type HttpContext,
+  type Request,
+  type Router,
+} from "@warlock.js/core";
 import { matchClientRoute } from "../client/runtime/matcher";
 import type { ClientPageEntry } from "../client/runtime/types";
 import {
@@ -89,7 +95,13 @@ function currentSiteFor(request: Request | undefined): CurrentSite | undefined {
 
 export type SiteDispatch = {
   /** Adds one page registration (a path plus the handler single-site mode would register). */
-  add(site: string, method: Method, path: string, handler: PageRouteHandler, sourceFile?: string): void;
+  add(
+    site: string,
+    method: Method,
+    path: string,
+    handler: PageRouteHandler,
+    sourceFile?: string,
+  ): void;
   /** Sets the site's `*` not-found page handler. */
   setNotFound(site: string, handler: PageRouteHandler): void;
   /** Registers the one catch-all handler per method. Call once, after every `add`. */
@@ -146,7 +158,7 @@ function tableOf(tables: Map<string, Map<Method, SiteTable>>, site: string, meth
   let table = byMethod.get(method);
 
   if (!table) {
-      table = { entries: [], handlers: new Map(), files: new Map() };
+    table = { entries: [], handlers: new Map(), files: new Map() };
     byMethod.set(method, table);
   }
 
@@ -226,7 +238,12 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
     add(site, method, path, handler, sourceFile) {
       const table = tableOf(tables, site, method);
 
-      table.entries.push({ type: "page", name: `${site}:${path}`, path, load: async () => ({}) as never });
+      table.entries.push({
+        type: "page",
+        name: `${site}:${path}`,
+        path,
+        load: async () => ({}) as never,
+      });
       table.handlers.set(path, handler);
       if (sourceFile !== undefined) table.files.set(path, sourceFile);
     },
@@ -234,7 +251,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
       notFoundHandlers.set(site, handler);
     },
     register(router) {
-      const appRoutes = router.list().filter(route => !route.isPage);
+      const appRoutes = router.list().filter((route) => !route.isPage);
       const shadowed: string[] = [];
 
       for (const [site, methods] of tables) {
@@ -242,7 +259,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
           for (const entry of table.entries) {
             const pageIdentity = routeIdentityKey({ method, path: entry.path });
             const appRoute = appRoutes.find(
-              route =>
+              (route) =>
                 route.method === method &&
                 routeIdentityKey({ method: route.method, path: route.path }) === pageIdentity,
             );

@@ -48,7 +48,9 @@ import { expect } from "vitest";
 export async function expectNoUnreadNotifications(user: Auth) {
   const client = await actingAs(user);
   try {
-    const body = await expectJson<{ count: number }>(await client.get("/notifications/unread-count"));
+    const body = await expectJson<{ count: number }>(
+      await client.get("/notifications/unread-count"),
+    );
     expect(body.count).toBe(0);
   } finally {
     await client.dispose();

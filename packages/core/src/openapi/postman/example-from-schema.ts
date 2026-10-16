@@ -1,5 +1,11 @@
 import type { OpenApiSchema } from "../types";
-import { isRecord, primaryType, refName, resolveSchema, type SchemaComponents } from "./schema-refs";
+import {
+  isRecord,
+  primaryType,
+  refName,
+  resolveSchema,
+  type SchemaComponents,
+} from "./schema-refs";
 
 const STRING_FORMAT_EXAMPLES: Record<string, string> = {
   email: "user@example.com",
@@ -50,7 +56,11 @@ function mergeExamples(parts: unknown[]): unknown {
 /**
  * `undefined` marks a `$ref` cycle: the caller omits the property, or yields an empty array.
  */
-function generate(schema: unknown, components: SchemaComponents, stack: readonly string[]): unknown {
+function generate(
+  schema: unknown,
+  components: SchemaComponents,
+  stack: readonly string[],
+): unknown {
   if (!isRecord(schema)) {
     return null;
   }
@@ -91,7 +101,8 @@ function generate(schema: unknown, components: SchemaComponents, stack: readonly
     const branches = schema[key];
 
     if (Array.isArray(branches) && branches.length > 0) {
-      const branch = branches.find((candidate) => !isNullBranch(candidate, components)) ?? branches[0];
+      const branch =
+        branches.find((candidate) => !isNullBranch(candidate, components)) ?? branches[0];
 
       return generate(branch, components, stack);
     }

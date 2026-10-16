@@ -62,9 +62,7 @@ let harnessCounter = 0;
  * exactly as application code would. Routes added here are auto-tagged with the
  * harness `sourceFile` so `close()` can remove only them.
  */
-export async function bootHarness(
-  register: (router: Router) => void,
-): Promise<HttpHarness> {
+export async function bootHarness(register: (router: Router) => void): Promise<HttpHarness> {
   const router = Router.getInstance();
   const sourceFile = `integration-http-${harnessCounter++}`;
 

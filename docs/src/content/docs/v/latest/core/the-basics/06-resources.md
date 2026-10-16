@@ -211,20 +211,20 @@ const json = new UserResource(user).toJSON(); // typed as UserJson
 
 `ResourceOutput<R>` accepts the resource class or an instance (`InstanceType<typeof UserResource>`). How each schema entry is typed:
 
-| Schema entry                                                          | Output type                                                                 |
-| --------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"`    | `string`                                                                    |
-| `"number"`, `"float"`, `"int"`                                        | `number`                                                                    |
-| `"boolean"`                                                           | `boolean`                                                                   |
-| `"date"`                                                              | `{ iso: string; format: string; timestamp: number; humanTime: string }`     |
-| `"object"`, `"array"`                                                 | `Record<string, unknown>`, `unknown[]`                                      |
-| `"x[]"`                                                               | an array of the base type                                                   |
-| `"x?"`                                                                | the base type or `null`. The key is always present, never optional.         |
-| a nested resource, `lazy(() => R)`                                    | that resource's output, as one object (even if the model holds an array)    |
-| `"self"`, `"self[]"`                                                  | this resource's own output, or an array of it                               |
-| `["inputKey", "cast"]`                                                | the cast's type                                                             |
-| a resolver function                                                   | its return type (an `any` return becomes `unknown`)                         |
-| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`)   | `unknown`                                                                   |
+| Schema entry                                                        | Output type                                                              |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"`  | `string`                                                                 |
+| `"number"`, `"float"`, `"int"`                                      | `number`                                                                 |
+| `"boolean"`                                                         | `boolean`                                                                |
+| `"date"`                                                            | `{ iso: string; format: string; timestamp: number; humanTime: string }`  |
+| `"object"`, `"array"`                                               | `Record<string, unknown>`, `unknown[]`                                   |
+| `"x[]"`                                                             | an array of the base type                                                |
+| `"x?"`                                                              | the base type or `null`. The key is always present, never optional.      |
+| a nested resource, `lazy(() => R)`                                  | that resource's output, as one object (even if the model holds an array) |
+| `"self"`, `"self[]"`                                                | this resource's own output, or an array of it                            |
+| `["inputKey", "cast"]`                                              | the cast's type                                                          |
+| a resolver function                                                 | its return type (an `any` return becomes `unknown`)                      |
+| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`) | `unknown`                                                                |
 
 The type reflects the schema, not the data. Mark a field `?` when the model might not have a value.
 

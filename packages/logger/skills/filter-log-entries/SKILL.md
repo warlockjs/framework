@@ -38,7 +38,7 @@ For the common "drop everything below X" case, skip the per-channel `levels` arr
 log.setMinLevel("info");
 // debug entries are dropped before fan-out — no channel ever sees them.
 
-log.configure({ minLevel: "warn" });   // shorthand inside configure()
+log.configure({ minLevel: "warn" }); // shorthand inside configure()
 ```
 
 Severity ordering: `debug < info ≈ success < warn < error < fatal`. `success` is treated as informational severity — `setMinLevel("warn")` drops it. `fatal` is strictly above `error`, so `setMinLevel("fatal")` admits only fatal entries (handy for "page me only on fatal" routing).
@@ -46,7 +46,7 @@ Severity ordering: `debug < info ≈ success < warn < error < fatal`. `success` 
 Pass `undefined` to clear:
 
 ```ts
-log.setMinLevel(undefined);   // accept everything again
+log.setMinLevel(undefined); // accept everything again
 ```
 
 This runs **before** the channel loop — cheaper than per-channel `levels` filters when you want a uniform floor. Per-channel `levels` and `filter` still run on top for channels that need a tighter or differently-shaped rule.

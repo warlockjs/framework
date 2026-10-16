@@ -1206,7 +1206,14 @@ export type CacheData = {
 export type DriverClass = new () => CacheDriver<any, any>;
 
 type DefaultDrivers =
-  "redis" | "file" | "memory" | "memoryExtended" | "null" | "lru" | "pg" | "mock";
+  | "redis"
+  | "file"
+  | "memory"
+  | "memoryExtended"
+  | "null"
+  | "lru"
+  | "pg"
+  | "mock";
 
 type MergeWithDefaultDrivers<T> = T extends undefined ? DefaultDrivers : DefaultDrivers | T;
 

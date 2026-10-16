@@ -328,7 +328,7 @@ authMiddleware("user", "cookie:accessToken");
 
 export default {
   userType: { user: User },
-  canAuthenticate: user => accountPolicy.canAuthenticate(user),
+  canAuthenticate: (user) => accountPolicy.canAuthenticate(user),
 };
 ```
 

@@ -38,23 +38,23 @@ Bedrock authenticates via the **AWS credential chain, not an API key** — there
 `name` is the Bedrock **model id or inference-profile id**:
 
 ```ts
-bedrock.model({ name: "anthropic.claude-sonnet-4-5-20250929-v1:0" })
-bedrock.model({ name: "us.amazon.nova-pro-v1:0", temperature: 0.2 })
-bedrock.model({ name: "meta.llama3-1-8b-instruct-v1:0", maxTokens: 1024 })
+bedrock.model({ name: "anthropic.claude-sonnet-4-5-20250929-v1:0" });
+bedrock.model({ name: "us.amazon.nova-pro-v1:0", temperature: 0.2 });
+bedrock.model({ name: "meta.llama3-1-8b-instruct-v1:0", maxTokens: 1024 });
 ```
 
 Uses the model-agnostic **Converse / ConverseStream** API — one wire mapping covers every Bedrock family (Claude, Nova, Llama, Mistral, Cohere) instead of per-family `InvokeModel` body shapes.
 
 ## Capabilities — what's auto-set
 
-| Flag | Default |
-| --- | --- |
-| `structuredOutput` | `true` (via Converse `outputConfig.textFormat`) |
-| `vision` | Inferred from model id substring. `true` for Claude 3/3.5/3.7/4, Nova Lite/Pro/Premier, Llama 3.2-11B/90B, Llama 4. |
-| `reasoning` | Inferred from model id. `true` for Claude 3.7 + Claude 4 (Sonnet/Opus/Haiku) — they expose a configurable thinking budget on Converse. |
-| `promptCaching` | Inferred from model id. `true` for Claude 3.5+/3.7/4 and Nova Micro/Lite/Pro/Premier — the families that honor Converse `cachePoint`. |
-| `pdf` | Inferred from model id. `true` for Claude 3+ and Nova Lite/Pro/Premier (Converse `document` blocks). |
-| `audio` | `false` by default — Converse does not accept audio blocks for the families this adapter targets. Pass `audio: true` for a confirmed audio model. |
+| Flag               | Default                                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `structuredOutput` | `true` (via Converse `outputConfig.textFormat`)                                                                                                   |
+| `vision`           | Inferred from model id substring. `true` for Claude 3/3.5/3.7/4, Nova Lite/Pro/Premier, Llama 3.2-11B/90B, Llama 4.                               |
+| `reasoning`        | Inferred from model id. `true` for Claude 3.7 + Claude 4 (Sonnet/Opus/Haiku) — they expose a configurable thinking budget on Converse.            |
+| `promptCaching`    | Inferred from model id. `true` for Claude 3.5+/3.7/4 and Nova Micro/Lite/Pro/Premier — the families that honor Converse `cachePoint`.             |
+| `pdf`              | Inferred from model id. `true` for Claude 3+ and Nova Lite/Pro/Premier (Converse `document` blocks).                                              |
+| `audio`            | `false` by default — Converse does not accept audio blocks for the families this adapter targets. Pass `audio: true` for a confirmed audio model. |
 
 Explicit config always wins — every flag is overridable per model, e.g. `bedrock.model({ name, reasoning: false, promptCaching: true, pdf: false, audio: true })`.
 
@@ -122,7 +122,7 @@ Object-root `responseSchema` + `structuredOutput`-capable → `outputConfig.text
 ```ts
 const embedder = bedrock.embedder({ name: "amazon.titan-embed-text-v2:0" });
 const { vector } = await embedder.embed("Hello world");
-const { vectors } = await embedder.embedMany(["a", "b"]);   // N sequential calls
+const { vectors } = await embedder.embedMany(["a", "b"]); // N sequential calls
 ```
 
 Targets the **Titan Text Embeddings** family via `InvokeModel`. **Titan has no batch endpoint** — `embedMany` issues one request per input sequentially and aggregates token usage. Cohere-on-Bedrock batch embeddings use an incompatible body shape and are out of scope — use the OpenAI adapter when batch throughput matters.
@@ -143,7 +143,7 @@ Raw AWS SDK exceptions are wrapped into the typed `@warlock.js/ai` `AIError` hie
 ## Token counting
 
 ```ts
-await bedrock.count("some text")  // approximate heuristic, offline
+await bedrock.count("some text"); // approximate heuristic, offline
 ```
 
 Per-model tokenizers differ across Bedrock families.
@@ -158,12 +158,14 @@ const bedrock = new BedrockSDK({
   pricing: {
     // USD per 1M tokens. Key = exact Bedrock model id / inference-profile id.
     "anthropic.claude-sonnet-4-5-20250929-v1:0": { input: 3, output: 15 },
-    "us.amazon.nova-pro-v1:0":                    { input: 0.8, output: 3.2 },
+    "us.amazon.nova-pro-v1:0": { input: 0.8, output: 3.2 },
   },
 });
 
-const { usage } = await ai.agent({ model: bedrock.model({ name: "us.amazon.nova-pro-v1:0" }) }).execute("hi");
-usage.cost;  // per-channel USD breakdown of THIS run, computed from tokens × pricing[model]
+const { usage } = await ai
+  .agent({ model: bedrock.model({ name: "us.amazon.nova-pro-v1:0" }) })
+  .execute("hi");
+usage.cost; // per-channel USD breakdown of THIS run, computed from tokens × pricing[model]
 ```
 
 Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricing })`) > SDK registry > `undefined` (no cost computed). When the same model id appears under a cross-region inference profile, list each id you actually invoke (`us.`, `eu.`, `apac.` prefixes are distinct keys). See the `pick-ai-provider` topic of the `warlock-js-ai` skill.
@@ -172,14 +174,14 @@ Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricin
 
 Both `complete()` and `stream()` normalize Converse's `TokenUsage` into the neutral `Usage` shape:
 
-| Converse `TokenUsage` field | Neutral `Usage` field | Notes |
-| --- | --- | --- |
-| `inputTokens` | `usage.input` | Includes cached read tokens. |
-| `outputTokens` | `usage.output` | |
-| `totalTokens` | `usage.total` | Falls back to `input + output` when absent. |
-| `cacheReadInputTokens` | `usage.cachedTokens` | Only when `> 0`. Cache-hit reads — price at `pricing.cachedInput`. |
-| `cacheWriteInputTokens` | `usage.cacheWriteTokens` | Only when `> 0`. One-time cache write — price at `pricing.cachedOutput`. |
-| — | `usage.reasoningTokens` | **Never set** — Converse exposes no reasoning-token count. |
+| Converse `TokenUsage` field | Neutral `Usage` field    | Notes                                                                    |
+| --------------------------- | ------------------------ | ------------------------------------------------------------------------ |
+| `inputTokens`               | `usage.input`            | Includes cached read tokens.                                             |
+| `outputTokens`              | `usage.output`           |                                                                          |
+| `totalTokens`               | `usage.total`            | Falls back to `input + output` when absent.                              |
+| `cacheReadInputTokens`      | `usage.cachedTokens`     | Only when `> 0`. Cache-hit reads — price at `pricing.cachedInput`.       |
+| `cacheWriteInputTokens`     | `usage.cacheWriteTokens` | Only when `> 0`. One-time cache write — price at `pricing.cachedOutput`. |
+| —                           | `usage.reasoningTokens`  | **Never set** — Converse exposes no reasoning-token count.               |
 
 Set `cachedInput` / `cachedOutput` in `ModelPricing` to have cache reads/writes billed at their distinct rates. Read-side accounting (`cachedTokens` / `cacheWriteTokens`) is populated whenever Bedrock reports it, independent of whether you sent a `cacheControl` breakpoint.
 
@@ -218,7 +220,6 @@ if (model.countTokens) {
   const inputTokens = await model.countTokens(messages, options);
 }
 ```
-
 
 ## When NOT to use this skill
 

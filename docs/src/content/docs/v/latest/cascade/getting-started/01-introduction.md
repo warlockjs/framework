@@ -8,7 +8,7 @@ sidebar:
 
 Most ORMs ask you to reach through something — a query builder, a client, a repository — before you can talk to your data. Cascade skips the middleman. `User.where("status", "active").get()` runs straight off the model. And the same schema definition you write once does triple duty: your TypeScript type, your runtime validator, and your database shape. One source of truth, three jobs.
 
-This page shows what makes Cascade different in 30 seconds, the mental model that explains everything else, and points at what's *not* in scope so you know what you're signing up for.
+This page shows what makes Cascade different in 30 seconds, the mental model that explains everything else, and points at what's _not_ in scope so you know what you're signing up for.
 
 ## The 30-second look
 
@@ -45,7 +45,7 @@ first.id; // generated id, exposed directly
 Three things to notice before we move on:
 
 1. `userSchema` is your runtime validator. `UserSchema` is your TypeScript type. Same definition, no duplication — change a field once and both update.
-2. `User.create(...)` and `User.where(...)` run *on the class*. No client to import, no repository to wire up, no query builder to instantiate. The model is the query entry point, and what comes back is typed against your schema.
+2. `User.create(...)` and `User.where(...)` run _on the class_. No client to import, no repository to wire up, no query builder to instantiate. The model is the query entry point, and what comes back is typed against your schema.
 3. The driver is configuration. Point Cascade at MongoDB or Postgres — that code block doesn't change.
 
 ## What you'll get
@@ -83,7 +83,7 @@ The class wraps the schema and inherits the query API. There's no separate `db.c
 
 Switching the driver is configuration, not code. Point Cascade at MongoDB or Postgres; the schema, the class, and every query you wrote against it stay exactly where they are.
 
-## What Cascade is *not*
+## What Cascade is _not_
 
 Three things worth being explicit about, so you know what you're signing up for:
 

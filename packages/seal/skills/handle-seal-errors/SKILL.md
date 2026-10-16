@@ -9,13 +9,13 @@ description: 'Read `ValidationResult` — `isValid`, `errors[]`, `data`. Branch 
 
 ```ts
 type TypedValidationResult<TData> =
-  | { isValid: true; data: TData; errors: ValidationError[] }   // TData = Infer.Output<typeof schema>
+  | { isValid: true; data: TData; errors: ValidationError[] } // TData = Infer.Output<typeof schema>
   | { isValid: false; data: undefined; errors: ValidationError[] };
 
 type ValidationError = {
-  type: string;          // rule type that failed — "required", "email", "min", "string", ...
-  error: string;         // resolved message (translated, with attribute substitution)
-  input: string;         // input field name — "email" or "address.city"
+  type: string; // rule type that failed — "required", "email", "min", "string", ...
+  error: string; // resolved message (translated, with attribute substitution)
+  input: string; // input field name — "email" or "address.city"
 };
 ```
 
@@ -34,7 +34,7 @@ const schema = v.object({
 const result = await validate(schema, input);
 
 if (result.isValid) {
-  return result.data;  // typed as the inferred shape (post-transformer)
+  return result.data; // typed as the inferred shape (post-transformer)
 }
 
 return {
@@ -49,15 +49,13 @@ return {
 const result = await validate(schema, input);
 
 if (!result.isValid) {
-  const emailMissing = result.errors.find(
-    e => e.input === "email" && e.type === "required",
-  );
+  const emailMissing = result.errors.find((e) => e.input === "email" && e.type === "required");
   if (emailMissing) {
     return { redirect: "/signup", reason: "no email" };
   }
 
   const ageInvalid = result.errors.find(
-    e => e.input === "age" && (e.type === "int" || e.type === "min"),
+    (e) => e.input === "age" && (e.type === "int" || e.type === "min"),
   );
   if (ageInvalid) {
     return { error: "Age must be 13 or older" };
@@ -73,18 +71,18 @@ These are the strings you'll see in `error.type`:
 
 The `type` is the rule's own `name` field — not the method you called. Several methods map to one shared rule name (e.g. `.min()` / `.minLength()` on a string both surface as `minLength`; `.sameAs()` surfaces as `equalsField`). The table below lists the actual `type` strings:
 
-| Type | Produced by |
-| --- | --- |
-| `required`, `present` | `.required()`, `.present()` (note: `.optional()` has no error type — it clears the required rule) |
-| `requiredIf`, `requiredWith`, `requiredWithout`, `requiredUnless` | conditional required methods |
-| `string`, `number`, `int`, `float`, `boolean`, `scalar`, `object`, `array`, `date` | type guards from `matchesType` |
-| `minLength`, `maxLength`, `betweenLength`, `length` | string / array length rules (`.min`/`.max` on a string alias to `minLength`/`maxLength`) |
-| `min`, `max`, `betweenNumbers` | number range rules (`.min`/`.max`/`.between` on a number) |
-| `email`, `url`, `uuid`, `pattern`, `matches` | string format rules (`.pattern()` → `pattern`) |
-| `literal`, `enum`, `in`, `allowedValues`, `notAllowedValues` | value-membership rules (`.oneOf` aliases `in`; `.notIn`/`.forbids` → `notAllowedValues`; `.allowsOnly` → `allowedValues`) |
-| `instanceof` | `v.instanceof(Ctor)` |
-| `equalsField`, `notEqualsField` | cross-field equality (`.sameAs` → `equalsField`; `.differentFrom` → `notEqualsField`) |
-| `minDate`, `maxDate`, `beforeField`, `afterField`, `today`, `past`, `future`, `weekDay`, `weekend`, `businessDay`, `birthday` | date rules (`.min`/`.max` → `minDate`/`maxDate`; `.before`/`.after` → `beforeField`/`afterField`) |
+| Type                                                                                                                          | Produced by                                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `required`, `present`                                                                                                         | `.required()`, `.present()` (note: `.optional()` has no error type — it clears the required rule)                         |
+| `requiredIf`, `requiredWith`, `requiredWithout`, `requiredUnless`                                                             | conditional required methods                                                                                              |
+| `string`, `number`, `int`, `float`, `boolean`, `scalar`, `object`, `array`, `date`                                            | type guards from `matchesType`                                                                                            |
+| `minLength`, `maxLength`, `betweenLength`, `length`                                                                           | string / array length rules (`.min`/`.max` on a string alias to `minLength`/`maxLength`)                                  |
+| `min`, `max`, `betweenNumbers`                                                                                                | number range rules (`.min`/`.max`/`.between` on a number)                                                                 |
+| `email`, `url`, `uuid`, `pattern`, `matches`                                                                                  | string format rules (`.pattern()` → `pattern`)                                                                            |
+| `literal`, `enum`, `in`, `allowedValues`, `notAllowedValues`                                                                  | value-membership rules (`.oneOf` aliases `in`; `.notIn`/`.forbids` → `notAllowedValues`; `.allowsOnly` → `allowedValues`) |
+| `instanceof`                                                                                                                  | `v.instanceof(Ctor)`                                                                                                      |
+| `equalsField`, `notEqualsField`                                                                                               | cross-field equality (`.sameAs` → `equalsField`; `.differentFrom` → `notEqualsField`)                                     |
+| `minDate`, `maxDate`, `beforeField`, `afterField`, `today`, `past`, `future`, `weekDay`, `weekend`, `businessDay`, `birthday` | date rules (`.min`/`.max` → `minDate`/`maxDate`; `.before`/`.after` → `beforeField`/`afterField`)                         |
 
 If you write custom rules, the `type` name you set on the rule object is what shows up here. Pick stable, kebab-or-camel-case names — they become a public API.
 
@@ -116,7 +114,7 @@ For attribute display names ("email" → "Email Address"), use `.attributes({ em
 
 ## When to throw
 
-Don't wrap `validate()` in try/catch for *validation* failures — those land in `result.errors`. The only thing that *throws* is a programming bug:
+Don't wrap `validate()` in try/catch for _validation_ failures — those land in `result.errors`. The only thing that _throws_ is a programming bug:
 
 - A rule's callback threw (e.g. you wrote `async validate() { throw new Error(...) }`).
 - A transformer threw on output.
@@ -132,7 +130,7 @@ If you're surfacing seal errors through HTTP / RPC, the typical shape is:
 if (!result.isValid) {
   return reply.code(422).send({
     error: "validation_failed",
-    fields: result.errors.map(e => ({
+    fields: result.errors.map((e) => ({
       field: e.input,
       type: e.type,
       message: e.error,

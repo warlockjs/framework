@@ -29,10 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  */
 
 const repoRoot = path.resolve(__dirname, "../../../../..");
-const imageEntry = path
-  .resolve(__dirname, "../../../src/image/index.ts")
-  .split(path.sep)
-  .join("/");
+const imageEntry = path.resolve(__dirname, "../../../src/image/index.ts").split(path.sep).join("/");
 
 /**
  * Run a snippet in a fresh Node ESM process and return its exit code + stderr.

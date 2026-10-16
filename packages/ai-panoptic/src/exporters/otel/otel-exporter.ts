@@ -112,10 +112,7 @@ function resolveTracer(options: OtelExporterOptions): OtelTracer {
     return options.tracer;
   }
 
-  return OtelApi.trace.getTracer(
-    options.tracerName ?? DEFAULT_TRACER_NAME,
-    options.tracerVersion,
-  );
+  return OtelApi.trace.getTracer(options.tracerName ?? DEFAULT_TRACER_NAME, options.tracerVersion);
 }
 
 /**
@@ -152,11 +149,7 @@ function emitSpan(
  * Set the GenAI + Warlock attributes on the OTel span, defaulting
  * `gen_ai.system` from the exporter options when the span carried none.
  */
-function applyAttributes(
-  otelSpan: OtelSpan,
-  span: TraceSpan,
-  options: OtelExporterOptions,
-): void {
+function applyAttributes(otelSpan: OtelSpan, span: TraceSpan, options: OtelExporterOptions): void {
   const attributes = toGenAiAttributes(span);
 
   if (options.system !== undefined && attributes[GEN_AI_ATTRIBUTES.system] === undefined) {

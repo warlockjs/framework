@@ -35,9 +35,7 @@ export function applyNullable(schema: JsonSchemaResult, target: JsonSchemaTarget
 
   if (target === "draft-2020-12" || target === "openai-strict") {
     const baseType = schema.type as string | string[] | undefined;
-    schema.type = Array.isArray(baseType)
-      ? [...baseType, "null"]
-      : [baseType as string, "null"];
+    schema.type = Array.isArray(baseType) ? [...baseType, "null"] : [baseType as string, "null"];
     return;
   }
 
@@ -102,6 +100,6 @@ export function getRuleOptions(
   rules: Array<{ name: string; context: { options: Record<string, unknown> } }>,
   ruleName: string,
 ): Record<string, unknown> | undefined {
-  const rule = rules.find(r => r.name === ruleName);
+  const rule = rules.find((r) => r.name === ruleName);
   return rule?.context?.options as Record<string, unknown> | undefined;
 }

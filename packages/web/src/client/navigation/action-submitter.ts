@@ -144,9 +144,7 @@ export function createActionSubmitter(runtime: ActionSubmitRuntime): ActionSubmi
           payload: result.payload,
           tree,
           routeSource:
-            result.payload.name === previous.payload.name
-              ? previous.routeSource
-              : result.payload,
+            result.payload.name === previous.payload.name ? previous.routeSource : result.payload,
         },
         complete,
       );
@@ -289,7 +287,9 @@ export function serializeFormData(formData: FormData): string {
 let connected: ActionSubmitter | undefined;
 
 /** Installed by the navigation runtime at mount, torn down with `undefined`. */
-export function connectActionSubmitter(next: ActionSubmitter | undefined): ActionSubmitter | undefined {
+export function connectActionSubmitter(
+  next: ActionSubmitter | undefined,
+): ActionSubmitter | undefined {
   const previous = connected;
 
   connected = next;

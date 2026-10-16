@@ -49,5 +49,4 @@ describe("exists", () => {
     expect(fileExists(filePath)).toBe(true);
     expect(directoryExists(subdir)).toBe(true);
   });
-
 });

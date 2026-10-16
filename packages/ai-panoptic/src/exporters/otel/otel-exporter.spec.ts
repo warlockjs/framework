@@ -93,9 +93,7 @@ describe("otelExporter", () => {
   it("should set GenAI token attributes", async () => {
     const exporter = otelExporter();
 
-    await exporter.export(
-      makeTrace(makeSpan({ usage: { input: 10, output: 20, total: 30 } })),
-    );
+    await exporter.export(makeTrace(makeSpan({ usage: { input: 10, output: 20, total: 30 } })));
 
     expect(recorded[0].attributes["gen_ai.usage.input_tokens"]).toBe(10);
     expect(recorded[0].attributes["gen_ai.usage.output_tokens"]).toBe(20);
@@ -112,9 +110,7 @@ describe("otelExporter", () => {
   it("should not override a span-supplied gen_ai.system", async () => {
     const exporter = otelExporter({ system: "openai" });
 
-    await exporter.export(
-      makeTrace(makeSpan({ attributes: { "gen_ai.system": "anthropic" } })),
-    );
+    await exporter.export(makeTrace(makeSpan({ attributes: { "gen_ai.system": "anthropic" } })));
 
     expect(recorded[0].attributes["gen_ai.system"]).toBe("anthropic");
   });

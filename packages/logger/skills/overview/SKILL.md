@@ -32,52 +32,63 @@ Eleven task skills cover everything. Load the one that matches your job — most
 ### Foundations
 
 #### `logger-basics`
+
 Start here. The `log` singleton, the six levels (`debug` / `info` / `warn` / `error` / `success` / `fatal`), how fan-out works, the `module / action / message / context` shape every entry carries.
 
 #### `configure-logger`
+
 Wire channels at boot — `log.addChannel`, `log.setChannels`, `log.configure({ channels, autoFlushOn, redact, minLevel })`. Branch on `NODE_ENV`, replace the channel list, isolate a library's logger from the host singleton.
 
 ### Channels
 
 #### `pick-log-channel`
+
 Pick one of the four built-ins: `ConsoleLog` (terminal, colored), `FileLog` (plain `.log` on disk with rotation), `JSONFileLog` (structured JSON for aggregators — Datadog, Loki, ELK), `SentryLog` (errors + breadcrumbs to Sentry; `@sentry/node` is an optional peer).
 
 #### `ship-logs-to-sentry`
+
 The `SentryLog` channel in depth — event-vs-breadcrumb level mapping, dual init modes (reuse an existing client or pass `options`), draining via `Sentry.flush(timeout)`, behavior when the optional peer isn't installed.
 
 #### `write-custom-log-channel`
+
 Extend `LogChannel<Options>` for sinks the built-ins don't cover — Slack, HTTP endpoint, in-memory buffer, database. The lazy `init()` lifecycle (`setTimeout(0)`), the `terminal: true/false` ANSI-stripping behavior, and the difference between `flush()` (async, network) and `flushSync()` (sync, files) are subtle — read this skill before subclassing.
 
 ### Production concerns
 
 #### `redact-sensitive-log-fields`
+
 Strip secrets before they reach a sink. Logger-wide `setRedact({ paths, censor })` is the security floor; per-channel `redact` configs add paths (never remove). Dotted-glob paths (`*`, `**`); censor as string or function `(value, path) => any`.
 
 #### `filter-log-entries`
+
 Drop entries before they cost anything. Logger-wide `setMinLevel("info")` is the fast path; per-channel `levels` array + `filter` predicate for fine control.
 
 #### `flush-logs-on-shutdown`
+
 Buffered channels need explicit drain. `log.flushSync()` (sync) for file channels — also wired by `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])`. `await log.flush()` (async) for network/async channels like `SentryLog` — the only path that can await an HTTPS round-trip on a graceful shutdown.
 
 #### `capture-unhandled-errors`
+
 `captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`, process kept alive) and `uncaughtException` (→ `log.fatal("app", ...)` then `process.exit(1)` — restoring the non-zero exit the listener would otherwise suppress, so a fatal crash never becomes a silent `exit 0`; opt out with `{ exitOnUncaughtException: false }`). It flushes before exiting and falls back to `console.error` when no terminal channel is set. One call at startup.
 
 ### Ergonomics + testing
 
 #### `use-log-helpers`
+
 Two shortcuts every `Logger` exposes: `log.assert(condition, module, action, message, context?)` logs an error only when the condition is falsy (free on the happy path); `log.timer(module, action)` returns an end-function that emits `info` with a measured `durationMs`.
 
 #### `test-logging-code`
+
 Silence the logger globally in tests via `log.setChannels([])` in `setupFiles`. Assert specific entries with a capturing `LogChannel` subclass — it proves an entry was actually delivered through the pipeline (filters, redaction), not merely that a method was called, and it isolates cleanly by swapping `log.channels`.
 
 ## Built-in channels at a glance
 
-| Channel | Sink | `terminal` | Buffered |
-| --- | --- | --- | --- |
-| `ConsoleLog` | `process.stdout` | `true` (colors kept) | no |
-| `FileLog` | `.log` files | `false` (ANSI stripped) | yes (5s timer or 100-entry buffer) |
-| `JSONFileLog` | `.json` files | `false` (ANSI stripped) | yes (same buffering) |
-| `SentryLog` | Sentry events + breadcrumbs | `false` | via the Sentry SDK's own transport (`@sentry/node` is an optional peer) |
+| Channel       | Sink                        | `terminal`              | Buffered                                                                |
+| ------------- | --------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `ConsoleLog`  | `process.stdout`            | `true` (colors kept)    | no                                                                      |
+| `FileLog`     | `.log` files                | `false` (ANSI stripped) | yes (5s timer or 100-entry buffer)                                      |
+| `JSONFileLog` | `.json` files               | `false` (ANSI stripped) | yes (same buffering)                                                    |
+| `SentryLog`   | Sentry events + breadcrumbs | `false`                 | via the Sentry SDK's own transport (`@sentry/node` is an optional peer) |
 
 `terminal: true` is the flag that decides whether the channel sees raw colored messages or stripped plain text. Custom channels: pick `true` if you write to a terminal, `false` for anything else.
 

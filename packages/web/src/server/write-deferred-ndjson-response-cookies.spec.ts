@@ -25,6 +25,6 @@ describe("writeDeferredNdjsonResponse() cookies", () => {
     const setCookie = http.reply.appliedHeaders["set-cookie"];
     const values = Array.isArray(setCookie) ? setCookie : [String(setCookie)];
 
-    expect(values.some(value => value.startsWith("ab_bucket="))).toBe(true);
+    expect(values.some((value) => value.startsWith("ab_bucket="))).toBe(true);
   });
 });

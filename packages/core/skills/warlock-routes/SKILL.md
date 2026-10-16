@@ -25,14 +25,14 @@ The `METHOD` column is verb-colored (GET green, POST blue, PUT/PATCH yellow, DEL
 
 ## Columns
 
-| Column   | Meaning                                                                       |
-| -------- | ----------------------------------------------------------------------------- |
-| `METHOD` | HTTP verb; a wildcard `all` route lists as `ALL`.                             |
-| `PATH`   | Full request path (group prefix already folded in).                           |
-| `NAME`   | Route name, or `—` when unnamed.                                              |
-| `ACTION` | Handler function name (`anonymous` for an unnamed handler).                   |
-| `MW`     | Count of middleware attached to the route.                                    |
-| `SOURCE` | Source file the route registered from, or `—`.                               |
+| Column   | Meaning                                                     |
+| -------- | ----------------------------------------------------------- |
+| `METHOD` | HTTP verb; a wildcard `all` route lists as `ALL`.           |
+| `PATH`   | Full request path (group prefix already folded in).         |
+| `NAME`   | Route name, or `—` when unnamed.                            |
+| `ACTION` | Handler function name (`anonymous` for an unnamed handler). |
+| `MW`     | Count of middleware attached to the route.                  |
+| `SOURCE` | Source file the route registered from, or `—`.              |
 
 ## Filters
 
@@ -55,7 +55,14 @@ npx warlock routes --json
 
 ```json
 [
-  { "method": "GET", "path": "/users", "name": "users.list", "action": "index", "middleware": 2, "source": "app/users/routes.ts" }
+  {
+    "method": "GET",
+    "path": "/users",
+    "name": "users.list",
+    "action": "index",
+    "middleware": 2,
+    "source": "app/users/routes.ts"
+  }
 ]
 ```
 
@@ -94,7 +101,7 @@ already claimed by another method). Run `warlock routes` to see the registered n
 
 **A clean baseline is now expected immediately after a successful `warlock build`.** Through 5.1, running `routes:diff` on an untouched checkout right after a green build reported drift, because the manifest recorded the catch-all as `"*"` while the router serves it as `"/*"`. The manifest is now written through the router's own path normalizer, so the two sides agree and a clean tree reports clean. If you see drift on a tree you have not edited since building, that is a bug worth reporting — it is no longer the expected greeting.
 
-⚠ **What a clean diff does NOT prove.** The manifest records what each page's name was **derived** as, not what it was **registered** as. `warlock build` never boots connectors, so it cannot see the API routes a page name might collide with; when a name is already claimed by another method the router appends a `.<method>` suffix at registration, and the comparison accepts that suffix rather than reporting it as drift. So `Page routes match` means *the page surface did not move since the build* — it does not mean *no page route name collided*. Use `warlock routes` to see the names as actually registered.
+⚠ **What a clean diff does NOT prove.** The manifest records what each page's name was **derived** as, not what it was **registered** as. `warlock build` never boots connectors, so it cannot see the API routes a page name might collide with; when a name is already claimed by another method the router appends a `.<method>` suffix at registration, and the comparison accepts that suffix rather than reporting it as drift. So `Page routes match` means _the page surface did not move since the build_ — it does not mean _no page route name collided_. Use `warlock routes` to see the names as actually registered.
 
 or, on drift:
 
@@ -116,7 +123,7 @@ and exits non-zero.
 
 ## Gotchas
 
-- **No connectors are started.** The list reflects what's *registered*, not what would connect. It never opens a DB/cache/socket.
+- **No connectors are started.** The list reflects what's _registered_, not what would connect. It never opens a DB/cache/socket.
 - **An empty table is a tell.** `No routes registered` is the same signal `warlock doctor`'s `routes` check warns on — a route module likely failed to load.
 - **`MW` counts, it doesn't name.** It's a "is this route guarded?" signal; for the actual chain, read the route definition.
 - **`ACTION` is the handler function name.** A controller method shows its method name; an inline anonymous handler shows `anonymous`.

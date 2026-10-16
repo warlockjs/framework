@@ -24,12 +24,12 @@ function harness(generate: () => Promise<void> = async () => undefined) {
 
   const ports: TypingsGenerationPorts = {
     generate: vi.fn(generate),
-    info: text => messages.push({ level: "info", text }),
-    success: text => messages.push({ level: "success", text }),
-    error: text => messages.push({ level: "error", text }),
+    info: (text) => messages.push({ level: "info", text }),
+    success: (text) => messages.push({ level: "success", text }),
+    error: (text) => messages.push({ level: "error", text }),
   };
 
-  return { ports, messages, at: (level: string) => messages.filter(m => m.level === level) };
+  return { ports, messages, at: (level: string) => messages.filter((m) => m.level === level) };
 }
 
 describe("runTypingsGeneration — the happy path", () => {

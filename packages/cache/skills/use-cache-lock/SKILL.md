@@ -38,9 +38,7 @@ TTL rules: a number or a bare numeric string (`"90"`) is **seconds**; `"500ms"` 
 ## Return shape — discriminated union
 
 ```ts
-type LockOutcome<T> =
-  | { acquired: true; value: T }
-  | { acquired: false };
+type LockOutcome<T> = { acquired: true; value: T } | { acquired: false };
 ```
 
 Unambiguous even when `fn` returns `undefined`. Narrow with TS:
@@ -49,7 +47,7 @@ Unambiguous even when `fn` returns `undefined`. Narrow with TS:
 const outcome = await cache.lock("lock.x", "1m", async () => compute());
 
 if (outcome.acquired) {
-  console.log(outcome.value);   // typed
+  console.log(outcome.value); // typed
 } else {
   console.log("someone else is running");
 }
@@ -60,19 +58,15 @@ if (outcome.acquired) {
 ### Cron on only one server
 
 ```ts
-cron.daily("3am", () =>
-  cache.lock("lock.cleanup", "30m", () => db.cleanup()),
-);
+cron.daily("3am", () => cache.lock("lock.cleanup", "30m", () => db.cleanup()));
 ```
 
 ### Idempotent webhook
 
 ```ts
 app.post("/webhooks/stripe", async (req, res) => {
-  const outcome = await cache.lock(
-    `webhook.stripe.${req.body.id}`,
-    "24h",
-    () => processStripeEvent(req.body),
+  const outcome = await cache.lock(`webhook.stripe.${req.body.id}`, "24h", () =>
+    processStripeEvent(req.body),
   );
 
   if (!outcome.acquired) {
@@ -97,13 +91,13 @@ await cache.lock(
 
 ## Driver behavior
 
-| Driver | Cross-process safe? |
-|--------|:-:|
-| `redis` | ✅ Native `SET … NX EX`, Lua release |
-| `pg` | ✅ `INSERT … ON CONFLICT`, one-statement release |
+| Driver                              |                Cross-process safe?                |
+| ----------------------------------- | :-----------------------------------------------: |
+| `redis`                             |       ✅ Native `SET … NX EX`, Lua release        |
+| `pg`                                | ✅ `INSERT … ON CONFLICT`, one-statement release  |
 | `memory` / `memoryExtended` / `lru` | ❌ In-process only (exclusive within the process) |
-| `file` | ⚠️ Single-host only (exclusive create) |
-| `null` | n/a — always "acquires" |
+| `file`                              |      ⚠️ Single-host only (exclusive create)       |
+| `null`                              |              n/a — always "acquires"              |
 
 ## Gotchas
 

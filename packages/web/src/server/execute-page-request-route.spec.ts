@@ -14,7 +14,11 @@ vi.mock("../shared", () => ({
   sealShared: vi.fn(async () => Object.freeze({ ...shared })),
 }));
 
-import { connectPageContext, executePageRequest, type PageRouteEntry } from "./execute-page-request";
+import {
+  connectPageContext,
+  executePageRequest,
+  type PageRouteEntry,
+} from "./execute-page-request";
 
 const site = { key: "blog", host: "blog.test", basePath: "" };
 
@@ -68,7 +72,11 @@ describe("ctx.route (the matched page's route)", () => {
       routes: [entry],
       matched: { entry, params: { id: "7" } },
       createHttp: () =>
-        httpFor({ site, route: { name: "web-site-dispatch-get", path: "/*" }, params: { id: "7" } }),
+        httpFor({
+          site,
+          route: { name: "web-site-dispatch-get", path: "/*" },
+          params: { id: "7" },
+        }),
     });
 
     const route = { name: "posts.show", path: "/posts/7", params: { id: "7" } };

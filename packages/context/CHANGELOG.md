@@ -81,6 +81,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed
@@ -162,11 +163,11 @@ changelogs.
 
 ### Security
 
-- **`update()` and `set()` now drop `__proto__` / `constructor` / `prototype` keys instead of merging them.** `update()` merged with `Object.assign(store, updates)`, which does not create a `__proto__` property — it invokes the inherited setter and reparents the store. An app that forwards request-shaped data into a context (`tenantContext.update(req.body)`, or `set(key, value)` with a caller-supplied key — both close to patterns the README shows) therefore handed a body of `{"__proto__":{"isAdmin":true}}` a way to pollute `Object.prototype` for the whole process. Because the polluted object is a *shared* context store, that turns an app-level slip into a cross-request, cross-tenant authorization problem: every later lookup of a missing property anywhere in the process resolves through the attacker's object
+- **`update()` and `set()` now drop `__proto__` / `constructor` / `prototype` keys instead of merging them.** `update()` merged with `Object.assign(store, updates)`, which does not create a `__proto__` property — it invokes the inherited setter and reparents the store. An app that forwards request-shaped data into a context (`tenantContext.update(req.body)`, or `set(key, value)` with a caller-supplied key — both close to patterns the README shows) therefore handed a body of `{"__proto__":{"isAdmin":true}}` a way to pollute `Object.prototype` for the whole process. Because the polluted object is a _shared_ context store, that turns an app-level slip into a cross-request, cross-tenant authorization problem: every later lookup of a missing property anywhere in the process resolves through the attacker's object
 
   Dangerous keys are dropped rather than throwing — a request that trips this must not be able to take the process down — and the rest of the payload merges as before. Symbol keys and object identity for clean payloads are unchanged (the payload is only copied when a dangerous key is actually present). `run()` / `enter()`, where the caller supplies the whole store rather than merging into a shared one, are untouched
 
-  This closes the prototype vector, not the broader one: merging unvalidated input into a context still lets an attacker choose what your context *says*. Validate before you merge
+  This closes the prototype vector, not the broader one: merging unvalidated input into a context still lets an attacker choose what your context _says_. Validate before you merge
 
 ## 4.12.0
 

@@ -1230,9 +1230,7 @@ export function assertArtifactResolves(artifactDirectory, name = path.basename(a
     const results = targets.map((target) => resolve(target));
 
     if (results.every((result) => !result.ok)) {
-      failures.push(
-        `  ${key} → none of the fallback targets resolve: ${targets.join(", ")}`,
-      );
+      failures.push(`  ${key} → none of the fallback targets resolve: ${targets.join(", ")}`);
     }
   }
 
@@ -1365,15 +1363,7 @@ async function main() {
 
       await run(
         process.execPath,
-        [
-          resolvePkgistCli(),
-          "build",
-          member,
-          "--no-publish",
-          "--no-git",
-          "--bump",
-          targetVersion,
-        ],
+        [resolvePkgistCli(), "build", member, "--no-publish", "--no-git", "--bump", targetVersion],
         { cwd: builderDirectory },
       );
     }
@@ -1393,10 +1383,7 @@ async function main() {
   // artifact that does not contain what its manifest promises, and both the
   // normal and reuse paths converge here having just located the core build.
   log("Verifying the built core artifact resolves every entry point its manifest declares");
-  assertArtifactResolves(
-    path.join(coreBuildsDirectory, latestCoreVersion()),
-    "@warlock.js/core",
-  );
+  assertArtifactResolves(path.join(coreBuildsDirectory, latestCoreVersion()), "@warlock.js/core");
 
   const version = await packFramework();
 
@@ -1435,7 +1422,9 @@ async function main() {
 
   log("Verifying teardown reaped the process and released the port");
   await assertTeardownComplete(pid, acceptancePort);
-  console.log(`  port ${acceptancePort} released; wrapper ${pid} gone (wrapper check is narrow — see assertTeardownComplete)`);
+  console.log(
+    `  port ${acceptancePort} released; wrapper ${pid} gone (wrapper check is narrow — see assertTeardownComplete)`,
+  );
 
   if (baselineOnly) {
     log("NEGATIVE — an undeclared import must fail the build");

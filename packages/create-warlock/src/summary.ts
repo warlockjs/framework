@@ -13,10 +13,7 @@ export type Decisions = {
  * each decision — required because almost every choice is now a default
  * rather than a prompt, so this is the only place a user sees them.
  */
-export function printDecisionsSummary({
-  packageManager,
-  options,
-}: Decisions): void {
+export function printDecisionsSummary({ packageManager, options }: Decisions): void {
   const databaseLabel = getDatabaseLabel(options.databaseDriver);
 
   const headline = [
@@ -28,11 +25,7 @@ export function printDecisionsSummary({
 
   console.log();
   console.log(colors.cyan(headline));
-  console.log(
-    colors.cyan(
-      summarizeFeatures([...options.features, ...options.aiProviders]),
-    ),
-  );
+  console.log(colors.cyan(summarizeFeatures([...options.features, ...options.aiProviders])));
   console.log(
     colors.dim(
       "  change these — package manager: --pm, database: --db/--no-db, agents: --agents, " +

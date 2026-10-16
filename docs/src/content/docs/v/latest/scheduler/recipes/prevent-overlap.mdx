@@ -49,14 +49,12 @@ duplicate.
 
 This is the most common reason the recipe earns its keep — kick the
 queue once at startup so you do not wait five minutes for the first
-drain, *and* schedule it normally:
+drain, _and_ schedule it normally:
 
 ```ts
 import { scheduler, job } from "@warlock.js/scheduler";
 
-const drainJob = job("drain-queue", drainQueueOnce)
-  .everyMinutes(5)
-  .preventOverlap();
+const drainJob = job("drain-queue", drainQueueOnce).everyMinutes(5).preventOverlap();
 
 scheduler.addJob(drainJob);
 

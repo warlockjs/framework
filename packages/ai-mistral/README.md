@@ -54,12 +54,12 @@ MistralModelConfig {
 
 The headline `-latest` aliases are exported as `MISTRAL_MODELS`, grouped by role:
 
-| Family | Aliases | Notes |
-| --- | --- | --- |
-| `chat` | `mistral-large-latest`, `mistral-medium-latest`, `mistral-small-latest` | General-purpose multimodal flagship / mid / small |
-| `vision` | `pixtral-large-latest`, `pixtral-12b` | Dedicated multimodal (image input) |
-| `reasoning` | `magistral-medium-latest`, `magistral-small-latest` | Chain-of-thought reasoning |
-| `embedding` | `mistral-embed` | Via the OpenAI-compatible `/v1/embeddings` |
+| Family      | Aliases                                                                 | Notes                                             |
+| ----------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
+| `chat`      | `mistral-large-latest`, `mistral-medium-latest`, `mistral-small-latest` | General-purpose multimodal flagship / mid / small |
+| `vision`    | `pixtral-large-latest`, `pixtral-12b`                                   | Dedicated multimodal (image input)                |
+| `reasoning` | `magistral-medium-latest`, `magistral-small-latest`                     | Chain-of-thought reasoning                        |
+| `embedding` | `mistral-embed`                                                         | Via the OpenAI-compatible `/v1/embeddings`        |
 
 `mistral.model()` accepts any id string, so version-pinned ids (`mistral-large-2512`, `magistral-medium-2509`) work just as well — capability inference keys off the family fragment, not the alias list.
 
@@ -67,16 +67,16 @@ The headline `-latest` aliases are exported as `MISTRAL_MODELS`, grouped by role
 
 The wrapper injects **Mistral-aware** capability inference before delegating to the OpenAI adapter, because the OpenAI prefix lists (`gpt-4o`, `o3`, …) never match Mistral names. An explicit value always wins over inference.
 
-| Capability | Default |
-| --- | --- |
-| `vision` | Inferred from the model name — `true` for the `pixtral` family and the recent multimodal generations (`mistral-large`, `mistral-medium`, `ministral-3`); `false` otherwise. |
-| `reasoning` | Inferred from the model name — `true` for the `magistral` family and the hybrid `mistral-small` generation; `false` otherwise. Drives whether `reasoning.effort` maps to `reasoning_effort` on the wire. |
-| `structuredOutput` | `true`, unless `responseFormat` is forced to `"json_object"` / `"text"`. |
+| Capability         | Default                                                                                                                                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vision`           | Inferred from the model name — `true` for the `pixtral` family and the recent multimodal generations (`mistral-large`, `mistral-medium`, `ministral-3`); `false` otherwise.                              |
+| `reasoning`        | Inferred from the model name — `true` for the `magistral` family and the hybrid `mistral-small` generation; `false` otherwise. Drives whether `reasoning.effort` maps to `reasoning_effort` on the wire. |
+| `structuredOutput` | `true`, unless `responseFormat` is forced to `"json_object"` / `"text"`.                                                                                                                                 |
 
 ```ts
-mistral.model({ name: "pixtral-large-latest" });            // vision auto-true
-mistral.model({ name: "magistral-medium-latest" });         // reasoning auto-true
-mistral.model({ name: "some-fine-tune", vision: true });    // explicit override
+mistral.model({ name: "pixtral-large-latest" }); // vision auto-true
+mistral.model({ name: "magistral-medium-latest" }); // reasoning auto-true
+mistral.model({ name: "some-fine-tune", vision: true }); // explicit override
 ```
 
 ## Embeddings

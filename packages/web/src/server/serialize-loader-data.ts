@@ -71,9 +71,7 @@ export function serializeLoaderData(value: unknown, request: Request): unknown {
   }
 
   if (Symbol.iterator in value) {
-    const items = Array.from(value as Iterable<unknown>, (item) =>
-      serializeItem(item, request),
-    );
+    const items = Array.from(value as Iterable<unknown>, (item) => serializeItem(item, request));
     return items.some(isThenable) ? Promise.all(items) : items;
   }
 

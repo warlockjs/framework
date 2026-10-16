@@ -29,21 +29,21 @@ A herald channel is a **named pub/sub endpoint**. Today the RabbitMQ driver maps
 
 The first time you call `channel.publish` or `channel.subscribe`, herald lazily asserts the queue with these defaults:
 
-| Option | Default | Why |
-| --- | --- | --- |
-| `durable` | `true` | Queue survives broker restart. |
-| `autoDelete` | `false` | Queue sticks around when last consumer disconnects. |
-| `exclusive` | `false` | Multiple connections can subscribe. |
-| `messageTtl` | unset | Messages never expire by queue policy. |
-| `maxLength` | unset | Queue can grow unbounded — you set policy if needed. |
+| Option       | Default | Why                                                  |
+| ------------ | ------- | ---------------------------------------------------- |
+| `durable`    | `true`  | Queue survives broker restart.                       |
+| `autoDelete` | `false` | Queue sticks around when last consumer disconnects.  |
+| `exclusive`  | `false` | Multiple connections can subscribe.                  |
+| `messageTtl` | unset   | Messages never expire by queue policy.               |
+| `maxLength`  | unset   | Queue can grow unbounded — you set policy if needed. |
 
 Override any of these by passing options on the first access:
 
 ```ts
 const channel = herald().channel<OrderPayload>("orders", {
   durable: true,
-  messageTtl: 60_000,        // messages expire after 1 minute in queue
-  maxLength: 10_000,         // oldest evicted after 10k
+  messageTtl: 60_000, // messages expire after 1 minute in queue
+  maxLength: 10_000, // oldest evicted after 10k
   deadLetter: {
     channel: "orders.failed",
   },
@@ -75,7 +75,7 @@ On the receive side, the handler gets a `Message<TPayload>` with this shape:
 type Message<TPayload> = {
   readonly metadata: MessageMetadata;
   readonly payload: TPayload;
-  readonly raw?: unknown;          // raw AMQP message, escape hatch
+  readonly raw?: unknown; // raw AMQP message, escape hatch
 };
 
 type MessageMetadata = {
@@ -108,24 +108,24 @@ In other words, you can write a handler that never touches `ctx` and it still wo
 await channel.subscribe(async (message, ctx) => {
   try {
     await sendEmail(message.payload);
-    await ctx.ack();          // success
+    await ctx.ack(); // success
   } catch (error) {
     if (isTransient(error)) {
-      await ctx.nack(true);   // requeue
+      await ctx.nack(true); // requeue
     } else {
-      await ctx.reject();     // permanent failure → DLQ if configured
+      await ctx.reject(); // permanent failure → DLQ if configured
     }
   }
 });
 ```
 
-| `ctx` call | Effect |
-| --- | --- |
-| `ctx.ack()` | Message removed from queue. |
-| `ctx.nack(true)` | Message requeued — broker redelivers. |
-| `ctx.nack(false)` / `ctx.reject()` | Message dropped (or sent to DLQ if configured). |
-| `ctx.retry(delayMs)` | Message republished with a retry counter; goes to DLQ when `maxRetries` exceeded. |
-| `ctx.reply(payload)` | Sends `payload` to the original requester (only for [request-and-respond](../guides/request-and-respond.md)). |
+| `ctx` call                         | Effect                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ctx.ack()`                        | Message removed from queue.                                                                                   |
+| `ctx.nack(true)`                   | Message requeued — broker redelivers.                                                                         |
+| `ctx.nack(false)` / `ctx.reject()` | Message dropped (or sent to DLQ if configured).                                                               |
+| `ctx.retry(delayMs)`               | Message republished with a retry counter; goes to DLQ when `maxRetries` exceeded.                             |
+| `ctx.reply(payload)`               | Sends `payload` to the original requester (only for [request-and-respond](../guides/request-and-respond.md)). |
 
 `autoAck: true` in `SubscribeOptions` switches to AMQP's native `noAck: true` — the broker considers every delivered message acked the moment it leaves the queue. **Don't use this for messages that matter** — a crash mid-handling loses the message.
 

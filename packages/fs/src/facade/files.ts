@@ -95,9 +95,10 @@ function deepMerge(target: unknown, source: unknown): unknown {
   for (const [key, value] of Object.entries(source)) {
     if (DANGEROUS_KEYS.has(key)) continue;
 
-    output[key] = isPlainObject(value) && isPlainObject(output[key])
-      ? deepMerge(output[key], value)
-      : stripDangerousKeys(value);
+    output[key] =
+      isPlainObject(value) && isPlainObject(output[key])
+        ? deepMerge(output[key], value)
+        : stripDangerousKeys(value);
   }
 
   return output;
@@ -141,11 +142,7 @@ async function getJson<T = unknown>(path: string, options?: ReadJsonOptions<T>):
 }
 
 /** Write a file. Routes Buffers / `{ atomic }` through the atomic writer. */
-async function put(
-  path: string,
-  content: string | Buffer,
-  options?: WriteOptions,
-): Promise<void> {
+async function put(path: string, content: string | Buffer, options?: WriteOptions): Promise<void> {
   if (options?.overwrite === false && (await pathExistsAsync(path))) {
     throw new Error(`fs.files: refusing to overwrite existing path "${path}" (overwrite:false)`);
   }
@@ -176,7 +173,11 @@ async function putJson(path: string, value: unknown, options?: WriteJsonOptions)
 }
 
 /** Create a file, refusing to overwrite an existing one (`put` with `overwrite:false`). */
-async function create(path: string, content: string | Buffer, options?: WriteOptions): Promise<void> {
+async function create(
+  path: string,
+  content: string | Buffer,
+  options?: WriteOptions,
+): Promise<void> {
   await put(path, content, { ...options, overwrite: false });
 }
 
@@ -234,14 +235,26 @@ function hash(path: string, algorithm?: HashAlgorithm): Promise<string> {
   return hashFileAsync(path, algorithm);
 }
 
-async function append(path: string, content: string | Buffer, options?: WriteOptions): Promise<void> {
+async function append(
+  path: string,
+  content: string | Buffer,
+  options?: WriteOptions,
+): Promise<void> {
   if (options?.ensureDir !== false) {
     await ensureDirectoryAsync(nodePath.dirname(path));
   }
-  await appendFile(path, content, typeof content === "string" ? (options?.encoding ?? "utf-8") : undefined);
+  await appendFile(
+    path,
+    content,
+    typeof content === "string" ? (options?.encoding ?? "utf-8") : undefined,
+  );
 }
 
-async function prepend(path: string, content: string | Buffer, options?: WriteOptions): Promise<void> {
+async function prepend(
+  path: string,
+  content: string | Buffer,
+  options?: WriteOptions,
+): Promise<void> {
   let existing = "";
   try {
     existing = await getFileAsync(path);

@@ -14,8 +14,8 @@ The everyday case for listings with page numbers:
 ```ts
 const page = await User.paginate({ page: 1, limit: 20 });
 
-page.data;        // User[]
-page.pagination;  // { total, page, limit, pages }
+page.data; // User[]
+page.pagination; // { total, page, limit, pages }
 ```
 
 `PaginationOptions` is `{ page?, limit? }` — there is no `filter` field; filter by chaining `.where()` before `.paginate()` (below).
@@ -23,9 +23,7 @@ page.pagination;  // { total, page, limit, pages }
 Chain off `.where()` for filtered pagination:
 
 ```ts
-const activePage = await User
-  .where("status", "active")
-  .paginate({ page: 2, limit: 20 });
+const activePage = await User.where("status", "active").paginate({ page: 2, limit: 20 });
 ```
 
 **Cost characteristic.** Offset pagination scans `offset + limit` rows on every page — page 100 with limit 20 scans 2020 rows just to skip 2000. Fine for the first few pages; not great deep in the result set.
@@ -37,9 +35,9 @@ For very large datasets where deep pagination matters:
 ```ts
 const first = await User.query().orderBy("created_at", "desc").cursorPaginate({ limit: 20 });
 
-first.data;                   // User[]
-first.pagination.nextCursor;  // opaque value — pass to the next call
-first.pagination.hasMore;     // boolean
+first.data; // User[]
+first.pagination.nextCursor; // opaque value — pass to the next call
+first.pagination.hasMore; // boolean
 
 const next = await User.query()
   .orderBy("created_at", "desc")

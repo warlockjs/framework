@@ -18,16 +18,16 @@ const m = cache.metrics();
 
 ## What's tracked
 
-| Field | Source |
-|---|---|
-| `hits`, `misses` | `hit` / `miss` events from drivers |
-| `sets` | `set` event fires on every successful write |
-| `removed` | `removed` event on `cache.remove(key)` |
-| `errors` | `error` event (driver failures, SWR background refresh failures, etc.) |
-| `hitRate` | Computed at snapshot time: `hits / (hits + misses)` |
-| `latencyMs.p50/p95/p99` | Sampled by the manager around every `get` / `set` / `remove` |
-| `byDriver` | Same fields broken out per driver name |
-| `startedAt` | Millisecond timestamp the collector last reset |
+| Field                   | Source                                                                 |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `hits`, `misses`        | `hit` / `miss` events from drivers                                     |
+| `sets`                  | `set` event fires on every successful write                            |
+| `removed`               | `removed` event on `cache.remove(key)`                                 |
+| `errors`                | `error` event (driver failures, SWR background refresh failures, etc.) |
+| `hitRate`               | Computed at snapshot time: `hits / (hits + misses)`                    |
+| `latencyMs.p50/p95/p99` | Sampled by the manager around every `get` / `set` / `remove`           |
+| `byDriver`              | Same fields broken out per driver name                                 |
+| `startedAt`             | Millisecond timestamp the collector last reset                         |
 
 ## Lazy attach
 

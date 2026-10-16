@@ -23,7 +23,17 @@
  *     organization_id: uuid().references(Organization.table).notNullable(),
  *   });
  */
-import { bigInteger, boolCol, type ColumnMap, integer, json, string, text, timestamp, uuid } from "@warlock.js/cascade";
+import {
+  bigInteger,
+  boolCol,
+  type ColumnMap,
+  integer,
+  json,
+  string,
+  text,
+  timestamp,
+  uuid,
+} from "@warlock.js/cascade";
 import { type NotificationColumnMapHost, resolveColumnMap } from "../in-app/column-map";
 
 export type NotificationIdType = "uuid" | "bigint" | "integer" | "string";
@@ -39,13 +49,17 @@ export type NotificationColumnsOptions = {
  * (`user_id` recipient + `read_at` read-state).
  */
 export function notificationColumns(options?: NotificationColumnsOptions): ColumnMap;
-export function notificationColumns(model?: NotificationColumnMapHost, options?: NotificationColumnsOptions): ColumnMap;
+export function notificationColumns(
+  model?: NotificationColumnMapHost,
+  options?: NotificationColumnsOptions,
+): ColumnMap;
 export function notificationColumns(
   modelOrOptions?: NotificationColumnMapHost | NotificationColumnsOptions,
   options?: NotificationColumnsOptions,
 ): ColumnMap {
   const model = isNotificationColumnsOptions(modelOrOptions) ? undefined : modelOrOptions;
-  const idType = (isNotificationColumnsOptions(modelOrOptions) ? modelOrOptions : options)?.idType ?? "uuid";
+  const idType =
+    (isNotificationColumnsOptions(modelOrOptions) ? modelOrOptions : options)?.idType ?? "uuid";
   const { recipient, tenant, readAt, isRead } = resolveColumnMap(model?.columnMap);
   const idColumn = getIdColumn(idType);
 

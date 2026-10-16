@@ -52,26 +52,26 @@ npx warlock seed --drop=default-roles       # undo just one seeder's records
 
 ```ts
 type Seeder = {
-  name: string;                                // required, used as the registry key
-  enabled?: boolean;                            // default true — set false to skip
-  description?: string;                         // shown in --list output
-  dependsOn?: string[];                         // names of seeds that must run first
-  once?: boolean;                               // skip if a row exists in the `seeds` table
-  order?: number;                               // sort key — lower runs first
-  batchSize?: number;                           // documented; not enforced by the manager
-  run(ctx: SeedContext): Promise<SeedResult | void>;   // your work
+  name: string; // required, used as the registry key
+  enabled?: boolean; // default true — set false to skip
+  description?: string; // shown in --list output
+  dependsOn?: string[]; // names of seeds that must run first
+  once?: boolean; // skip if a row exists in the `seeds` table
+  order?: number; // sort key — lower runs first
+  batchSize?: number; // documented; not enforced by the manager
+  run(ctx: SeedContext): Promise<SeedResult | void>; // your work
 };
 
 type SeedContext = {
-  track: Track;                                 // register created records for --drop
-  now: SeedClock;                               // injectable clock — () => Date, default () => new Date()
-  batchSize: number;                            // from the seeder's batchSize (0 when unset)
+  track: Track; // register created records for --drop
+  now: SeedClock; // injectable clock — () => Date, default () => new Date()
+  batchSize: number; // from the seeder's batchSize (0 when unset)
 };
 
 type SeedClock = () => Date;
 
 type SeedResult = {
-  recordsCreated: number;                       // OPTIONAL fallback when nothing was tracked
+  recordsCreated: number; // OPTIONAL fallback when nothing was tracked
 };
 ```
 
@@ -88,7 +88,7 @@ async run({ track, now }) {
 }
 ```
 
-Inject a fixed clock for deterministic tests or historical back-fills — pass `clock` to `SeedersManager` (`new SeedersManager({ clock: () => new Date("2020-01-01") })`) or, programmatically, to `seedCommandAction(options, { clock })`. Pinning the clock makes every timestamp in the run — seed data *and* the `seeds` log — resolve to that one value.
+Inject a fixed clock for deterministic tests or historical back-fills — pass `clock` to `SeedersManager` (`new SeedersManager({ clock: () => new Date("2020-01-01") })`) or, programmatically, to `seedCommandAction(options, { clock })`. Pinning the clock makes every timestamp in the run — seed data _and_ the `seeds` log — resolve to that one value.
 
 ## `batchSize` — bulk-insert hint
 
@@ -108,9 +108,9 @@ The manager doesn't act on `batchSize` itself — it only hands the value throug
 `track` is how a seed tells the framework which rows it created, so `--drop` can undo them. It has three forms, and **every form returns its first argument** so you can wrap a `create()` call inline:
 
 ```ts
-track(model)                 // single model — reads model.getTableName() + model.id
-track([modelA, modelB])      // bulk — array of models
-track("legacy_table", id)    // raw escape hatch — table name + id, no model
+track(model); // single model — reads model.getTableName() + model.id
+track([modelA, modelB]); // bulk — array of models
+track("legacy_table", id); // raw escape hatch — table name + id, no model
 ```
 
 ```ts
@@ -139,6 +139,7 @@ src/app/
 ```
 
 A seed file that doesn't export a default `Seeder` throws at discovery time:
+
 > `Seeder file <relative> does not export a default seeder.`
 
 Filename convention is `<name>.seed.ts` but the loader doesn't enforce it — any `.ts` inside a `seeds/` folder is picked up. Sticking to the suffix keeps things grep-able.
@@ -169,12 +170,12 @@ Use `once: true` for irreversible "starter" data (the framework's default `roles
 
 Every record you `track()` is written to a `seed_records` table (created on first run via `SeedRecordsTableMigration`):
 
-| Column     | Meaning                                  |
-| ---------- | ---------------------------------------- |
-| `seeder`   | Owning seeder's `name`                   |
-| `table`    | Table the tracked record lives in        |
-| `recordId` | Primary key of the tracked record        |
-| `runAt`    | Wall time the reference was recorded      |
+| Column     | Meaning                              |
+| ---------- | ------------------------------------ |
+| `seeder`   | Owning seeder's `name`               |
+| `table`    | Table the tracked record lives in    |
+| `recordId` | Primary key of the tracked record    |
+| `runAt`    | Wall time the reference was recorded |
 
 `warlock seed --drop` reads those refs and undoes the seed:
 
@@ -191,7 +192,7 @@ What it does, inside a single transaction:
 
 Only **tracked** rows are deleted — records you created without `track()` (or rows added by hand) are untouched. A seed whose `run()` never calls `track()` can't be undone with `--drop`; it has nothing to delete and its log row stays.
 
-`--drop` vs `--fresh`: `--fresh` is the blunt reset (truncates *every* table); `--drop` is surgical (only what a seed tracked). Reach for `--drop` when you want to re-run one seeder without nuking the whole DB.
+`--drop` vs `--fresh`: `--fresh` is the blunt reset (truncates _every_ table); `--drop` is surgical (only what a seed tracked). Reach for `--drop` when you want to re-run one seeder without nuking the whole DB.
 
 ## Ordering
 
@@ -204,7 +205,7 @@ seeder({
 
 seeder({
   name: "default-admin-user",
-  order: 20,         // runs AFTER user-roles (which created the roles it references)
+  order: 20, // runs AFTER user-roles (which created the roles it references)
   // ...
 });
 ```
@@ -213,20 +214,33 @@ The manager sorts by `order` ascending — lower runs first. Seeds without an `o
 
 ### `dependsOn` — topological order
 
-`dependsOn: ["user-roles"]` is **resolved** by the manager: it topologically sorts seeders so every dependency runs before its dependents, *layered over* the numeric `order` tie-break. Among seeders whose dependencies are already satisfied, the lowest `order` (then registration order) runs first.
+`dependsOn: ["user-roles"]` is **resolved** by the manager: it topologically sorts seeders so every dependency runs before its dependents, _layered over_ the numeric `order` tie-break. Among seeders whose dependencies are already satisfied, the lowest `order` (then registration order) runs first.
 
 ```ts
-seeder({ name: "roles", order: 20, async run() { /* ... */ } });
-seeder({ name: "admin-user", dependsOn: ["roles"], order: 10, async run() { /* ... */ } });
+seeder({
+  name: "roles",
+  order: 20,
+  async run() {
+    /* ... */
+  },
+});
+seeder({
+  name: "admin-user",
+  dependsOn: ["roles"],
+  order: 10,
+  async run() {
+    /* ... */
+  },
+});
 // → roles runs FIRST despite its higher order, because admin-user depends on it.
 ```
 
 Two ways it fails loudly:
 
-- **Unknown dependency** — `dependsOn` names a seeder that isn't registered (or is `enabled: false`, since disabled seeds are filtered out *before* resolution) → `UnknownSeederDependencyError`.
+- **Unknown dependency** — `dependsOn` names a seeder that isn't registered (or is `enabled: false`, since disabled seeds are filtered out _before_ resolution) → `UnknownSeederDependencyError`.
 - **Cycle** — `a → b → a` → `SeederDependencyCycleError` (the message includes the cycle path).
 
-Use `dependsOn` to express *hard* ordering constraints and `order` for soft sequencing within a dependency layer.
+Use `dependsOn` to express _hard_ ordering constraints and `order` for soft sequencing within a dependency layer.
 
 ## Transactions
 
@@ -234,7 +248,7 @@ By default, each seed runs inside a transaction. The manager wraps `run({ track 
 
 ```ts
 const result = withTransaction
-  ? await transaction(runSeeder)   // run() + seed_records writes, atomically
+  ? await transaction(runSeeder) // run() + seed_records writes, atomically
   : await runSeeder();
 ```
 
@@ -265,7 +279,7 @@ export default seeder({
     for (const data of seeds) {
       const existing = await Currency.first({ code: data.code });
       if (existing) continue;
-      track(await Currency.create(data));   // count auto-derived from track()
+      track(await Currency.create(data)); // count auto-derived from track()
     }
   },
 });
@@ -283,7 +297,7 @@ import { User } from "../models/user";
 export default seeder({
   name: "default-admin",
   description: "Insert the seed admin user",
-  once: true,                   // never re-run
+  once: true, // never re-run
   dependsOn: ["default-roles"], // roles must exist first
   async run({ track }) {
     const adminRole = await Role.first({ slug: "admin" });

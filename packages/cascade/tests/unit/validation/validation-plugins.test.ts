@@ -92,12 +92,10 @@ describe("validation/plugins", () => {
     it("the same unique() method is shared onto Number and String validators", () => {
       // The plugin copies ScalarValidator's impl onto String/Number prototypes.
       const numberValidator = v.number();
-      expect(
-        typeof (numberValidator as unknown as { unique: unknown }).unique,
-      ).toBe("function");
-      const rule = rulesOf((numberValidator as unknown as { unique: (m: unknown) => unknown }).unique(User)).find(
-        (r) => r.name === "unique",
-      );
+      expect(typeof (numberValidator as unknown as { unique: unknown }).unique).toBe("function");
+      const rule = rulesOf(
+        (numberValidator as unknown as { unique: (m: unknown) => unknown }).unique(User),
+      ).find((r) => r.name === "unique");
       expect(rule!.context.options.Model).toBe(User);
     });
   });

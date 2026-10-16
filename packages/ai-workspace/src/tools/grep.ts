@@ -1,10 +1,5 @@
 import { type ToolContract, tool } from "@warlock.js/ai";
-import {
-  objectSchema,
-  optionalBooleanField,
-  optionalStringField,
-  stringField,
-} from "./schema";
+import { objectSchema, optionalBooleanField, optionalStringField, stringField } from "./schema";
 import type { GrepInput, GrepResult, WorkspaceOps } from "../contracts";
 
 /** Options accepted by {@link makeGrepTool} to customize the vended tool. */

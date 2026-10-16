@@ -131,10 +131,7 @@ describe("SQLGrammar.sort", () => {
   });
 
   it("falls back to the name only when timestamps cannot decide", () => {
-    const statements = [
-      statement(undefined, "b-second"),
-      statement(undefined, "a-first"),
-    ];
+    const statements = [statement(undefined, "b-second"), statement(undefined, "a-first")];
 
     expect(order(statements)).toEqual(["a-first", "b-second"]);
   });

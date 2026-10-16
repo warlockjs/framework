@@ -145,7 +145,9 @@ describe("coreAppModules", () => {
       "utf8",
     );
 
-    const vite = await createViteServer([coreAppModules({ appSrcRoot: path.join(root, "src"), registry, nativeImport })]);
+    const vite = await createViteServer([
+      coreAppModules({ appSrcRoot: path.join(root, "src"), registry, nativeImport }),
+    ]);
 
     try {
       const alsUrl = pathToFileURL(alsFile).href;
@@ -218,8 +220,16 @@ describe("coreAppModules", () => {
     fs.writeFileSync(keep.web, `export const marker = "web";`, "utf8");
     fs.writeFileSync(keep.client, `export const marker = "client";`, "utf8");
     fs.writeFileSync(keep.viteOnly, `export const mode = import.meta.env.MODE;`, "utf8");
-    fs.writeFileSync(keep.stylesheet, `import "./styled.css";\nexport const marker = "css";`, "utf8");
-    fs.writeFileSync(path.join(path.dirname(keep.stylesheet), "styled.css"), `a{color:red}`, "utf8");
+    fs.writeFileSync(
+      keep.stylesheet,
+      `import "./styled.css";\nexport const marker = "css";`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(path.dirname(keep.stylesheet), "styled.css"),
+      `a{color:red}`,
+      "utf8",
+    );
     fs.writeFileSync(keep.clientBound, `export const marker = "bound";`, "utf8");
     fs.writeFileSync(keep.js, `export const marker = "js";`, "utf8");
 
@@ -283,8 +293,12 @@ export const run = () => failPublic();`,
 export { run };`,
       "utf8",
     );
-    fs.writeFileSync(shared("dep-css.ts"), `import "./dep.css";
-export const a = 1;`, "utf8");
+    fs.writeFileSync(
+      shared("dep-css.ts"),
+      `import "./dep.css";
+export const a = 1;`,
+      "utf8",
+    );
     fs.writeFileSync(shared("dep.css"), `a{color:red}`, "utf8");
     fs.writeFileSync(
       shared("via-css.ts"),

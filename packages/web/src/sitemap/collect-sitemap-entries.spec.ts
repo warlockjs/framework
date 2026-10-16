@@ -54,7 +54,12 @@ describe("collectSitemapEntries", () => {
       b: { hosts: ["b.test"] },
     };
 
-    const { items } = await collectSitemapEntries({ appRoot, sites, site: "a", locales: noLocales });
+    const { items } = await collectSitemapEntries({
+      appRoot,
+      sites,
+      site: "a",
+      locales: noLocales,
+    });
 
     expect(items).toEqual([{ entry: { path: "/home" } }]);
   });

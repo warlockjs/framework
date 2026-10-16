@@ -6,8 +6,4 @@ export {
   inferVisionCapability,
   inferReasoningCapability,
 } from "./known-models";
-export type {
-  GroqSDKConfig,
-  GroqModelConfig,
-  GroqEmbedderConfig,
-} from "./config.type";
+export type { GroqSDKConfig, GroqModelConfig, GroqEmbedderConfig } from "./config.type";

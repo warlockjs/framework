@@ -202,11 +202,14 @@ export async function buildHydrationClient(
     ...logger,
     info: (message: string, logOptions?: Parameters<typeof logger.info>[1]) =>
       logger.info(
-        logRoot === undefined ? message : formatBuildLogMessage(message, { viteRoot, logRoot, outDir }),
+        logRoot === undefined
+          ? message
+          : formatBuildLogMessage(message, { viteRoot, logRoot, outDir }),
         logOptions,
       ),
   };
-  const siteNames = options.sites !== undefined && options.sites.length > 0 ? options.sites : undefined;
+  const siteNames =
+    options.sites !== undefined && options.sites.length > 0 ? options.sites : undefined;
   const viteResult = await build({
     root: viteRoot,
     customLogger,

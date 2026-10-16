@@ -78,31 +78,31 @@ Both forms produce the same runtime behaviour. Pick the shorthand unless you nee
 
 Every value in `schema` is one of these:
 
-| Form                                    | What it does                                                        |
-| --------------------------------------- | ------------------------------------------------------------------- |
-| `"string"`                              | Cast type — `String(value)`.                                        |
-| `"int"`                                 | Cast type — `parseInt(value)`. `undefined` on `NaN`.                |
-| `"float"`                               | Cast type — `parseFloat(value)`. `undefined` on `NaN`.              |
-| `"number"`                              | Cast type — `Number(value)`. `undefined` on `NaN`.                  |
-| `"boolean"`                             | Cast type — `Boolean(value)`.                                       |
-| `"date"`                                | Cast type — full date envelope by default (see [Dates](#dates)).     |
-| `"localized"`                           | Pick locale value from `[{ localeCode, value }]` array.             |
-| `"url"`                                 | `url(value)` — relative path → full URL.                            |
-| `"uploadsUrl"`                          | `uploadsUrl(value)` — full URL into uploads bucket.                 |
-| `"storageUrl"`                          | `storage.url(value)` — full URL via current storage disk.           |
-| `"object"`                              | Pass through if non-empty plain object.                             |
-| `"array"`                               | Pass through if array.                                              |
-| `"string[]"`                            | Array of `string` — same for any other cast type.                   |
-| `"string?"`                             | Nullable — `null`/`undefined` → `null`, never omitted.              |
-| `"string[]?"`                           | Nullable array (combo).                                             |
-| `["original_field", "string"]`          | Rename — read `original_field`, output the wire key.                |
-| `OtherResource`                         | Nested resource — calls `new OtherResource(value).toJSON()`.        |
-| `"self"`                                | Recursive self-reference (single value).                            |
-| `"self[]"`                              | Recursive self-reference (array).                                   |
-| `lazy(() => OtherResource)`             | Lazy resource — for circular import graphs.                         |
-| `(value, resource) => any`              | Resolver function — computed/static value.                          |
-| `resource.string()` / `.date()` / ...   | Field builder — fluent API for nullable, default, format, condition. |
-| `resource.arrayOf({ ... })`             | Structured array — sub-schema per item.                             |
+| Form                                  | What it does                                                         |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `"string"`                            | Cast type — `String(value)`.                                         |
+| `"int"`                               | Cast type — `parseInt(value)`. `undefined` on `NaN`.                 |
+| `"float"`                             | Cast type — `parseFloat(value)`. `undefined` on `NaN`.               |
+| `"number"`                            | Cast type — `Number(value)`. `undefined` on `NaN`.                   |
+| `"boolean"`                           | Cast type — `Boolean(value)`.                                        |
+| `"date"`                              | Cast type — full date envelope by default (see [Dates](#dates)).     |
+| `"localized"`                         | Pick locale value from `[{ localeCode, value }]` array.              |
+| `"url"`                               | `url(value)` — relative path → full URL.                             |
+| `"uploadsUrl"`                        | `uploadsUrl(value)` — full URL into uploads bucket.                  |
+| `"storageUrl"`                        | `storage.url(value)` — full URL via current storage disk.            |
+| `"object"`                            | Pass through if non-empty plain object.                              |
+| `"array"`                             | Pass through if array.                                               |
+| `"string[]"`                          | Array of `string` — same for any other cast type.                    |
+| `"string?"`                           | Nullable — `null`/`undefined` → `null`, never omitted.               |
+| `"string[]?"`                         | Nullable array (combo).                                              |
+| `["original_field", "string"]`        | Rename — read `original_field`, output the wire key.                 |
+| `OtherResource`                       | Nested resource — calls `new OtherResource(value).toJSON()`.         |
+| `"self"`                              | Recursive self-reference (single value).                             |
+| `"self[]"`                            | Recursive self-reference (array).                                    |
+| `lazy(() => OtherResource)`           | Lazy resource — for circular import graphs.                          |
+| `(value, resource) => any`            | Resolver function — computed/static value.                           |
+| `resource.string()` / `.date()` / ... | Field builder — fluent API for nullable, default, format, condition. |
+| `resource.arrayOf({ ... })`           | Structured array — sub-schema per item.                              |
 
 Suffix order matters: `[]` before `?`. `"string[]?"` is valid; `"string?[]"` is not.
 
@@ -128,30 +128,30 @@ export class ProductResource extends Resource {
 
 The full builder surface:
 
-| Method                       | What it does                                                           |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| `string(inputKey?)`           | Builder for string cast.                                              |
-| `int(inputKey?)`              | Builder for `parseInt` cast.                                          |
-| `float(inputKey?)`            | Builder for `parseFloat` cast.                                        |
-| `number(inputKey?)`           | Builder for `Number()` cast.                                          |
-| `boolean(inputKey?)`          | Builder for `Boolean()` cast.                                         |
-| `date(inputKey?)`             | Builder for date envelope.                                            |
-| `localized(inputKey?)`        | Builder for localized value.                                          |
-| `url(inputKey?)`              | Builder for `url()` cast.                                             |
-| `uploadsUrl(inputKey?)`       | Builder for `uploadsUrl()` cast.                                      |
-| `arrayOf(schema)`             | Structured-array schema-within-schema.                                |
+| Method                  | What it does                           |
+| ----------------------- | -------------------------------------- |
+| `string(inputKey?)`     | Builder for string cast.               |
+| `int(inputKey?)`        | Builder for `parseInt` cast.           |
+| `float(inputKey?)`      | Builder for `parseFloat` cast.         |
+| `number(inputKey?)`     | Builder for `Number()` cast.           |
+| `boolean(inputKey?)`    | Builder for `Boolean()` cast.          |
+| `date(inputKey?)`       | Builder for date envelope.             |
+| `localized(inputKey?)`  | Builder for localized value.           |
+| `url(inputKey?)`        | Builder for `url()` cast.              |
+| `uploadsUrl(inputKey?)` | Builder for `uploadsUrl()` cast.       |
+| `arrayOf(schema)`       | Structured-array schema-within-schema. |
 
 A builder has these chainable methods:
 
-| Method                  | What it does                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------ |
-| `.nullable()`           | `null`/`undefined` → `null` in output. Otherwise the field is omitted.         |
-| `.array()`              | Map the base type over each element. Same effect as `"<type>[]"` suffix.       |
-| `.default(value)`       | Fallback when the input is undefined/null and the field isn't nullable.        |
-| `.format(format)`       | Date format string (default `"DD-MM-YYYY hh:mm:ss A"`).                        |
-| `.dateOptions(options)` | Customise the date envelope (see [Dates](#dates)).                             |
-| `.setInputKey(key)`     | Read from a different key than the output name.                                |
-| `.when(condition)`      | Conditional — `condition()` returns true → include, false → use default/null.  |
+| Method                  | What it does                                                                  |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `.nullable()`           | `null`/`undefined` → `null` in output. Otherwise the field is omitted.        |
+| `.array()`              | Map the base type over each element. Same effect as `"<type>[]"` suffix.      |
+| `.default(value)`       | Fallback when the input is undefined/null and the field isn't nullable.       |
+| `.format(format)`       | Date format string (default `"DD-MM-YYYY hh:mm:ss A"`).                       |
+| `.dateOptions(options)` | Customise the date envelope (see [Dates](#dates)).                            |
+| `.setInputKey(key)`     | Read from a different key than the output name.                               |
+| `.when(condition)`      | Conditional — `condition()` returns true → include, false → use default/null. |
 
 Wrap a builder up in the schema (it's `ResourceFieldConfig`) — `ResourceFieldBuilder` is exported, so you can `new` it directly:
 
@@ -320,7 +320,7 @@ import { lazy } from "@mongez/reinforcements";
 export const OrderResource = defineResource({
   schema: {
     id: "string",
-    customer: lazy(() => CustomerResource),  // resolved at toJSON() time, not at import time
+    customer: lazy(() => CustomerResource), // resolved at toJSON() time, not at import time
   },
 });
 
@@ -373,7 +373,7 @@ export class OrderResource extends Resource {
   public static schema = {
     id: "string",
     total: "number",
-    lineItems: undefined as any,  // set in boot
+    lineItems: undefined as any, // set in boot
   };
 
   protected boot() {
@@ -518,7 +518,10 @@ A model type cannot reveal its resource on its own (`Model.resource` is loosely 
 ```ts title=".warlock/typings/model-resources.d.ts (generated)"
 declare module "@warlock.js/core" {
   interface ModelResourceRegistry {
-    "User": { model: import("../../src/app/users/models/user.model").User; resource: typeof import("../../src/app/users/resources/user.resource").UserResource };
+    User: {
+      model: import("../../src/app/users/models/user.model").User;
+      resource: typeof import("../../src/app/users/resources/user.resource").UserResource;
+    };
   }
 }
 ```

@@ -8,26 +8,22 @@ slug: v/latest/cache/cached
 ```ts
 import { cached } from "@warlock.js/cache";
 
-const getUser = cached(
-  (id: number) => db.users.find(id),
-  "user",
-  "1h",
-);
+const getUser = cached((id: number) => db.users.find(id), "user", "1h");
 
-await getUser(42);     // cache miss → runs DB query, caches, returns
-await getUser(42);     // cache hit → no DB call
-await getUser.invalidate(42);   // drop "user.42" from the cache
-await getUser(42);     // miss again
+await getUser(42); // cache miss → runs DB query, caches, returns
+await getUser(42); // cache hit → no DB call
+await getUser.invalidate(42); // drop "user.42" from the cache
+await getUser(42); // miss again
 ```
 
 Uses [`remember()`](/v/latest/cache/stampede-prevention/) under the hood — inherits stampede protection for free.
 
 ## When to use `cached` vs `remember`
 
-| Task | Use |
-|------|-----|
-| One-shot "get this value or compute it" | [`cache.remember()`](/v/latest/cache/stampede-prevention/) |
-| Turn an existing function into a cached version you'll call many times | `cached()` |
+| Task                                                                   | Use                                                        |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------- |
+| One-shot "get this value or compute it"                                | [`cache.remember()`](/v/latest/cache/stampede-prevention/) |
+| Turn an existing function into a cached version you'll call many times | `cached()`                                                 |
 
 ## Three shapes
 
@@ -38,16 +34,10 @@ All three put `fn` first and return the same wrapped function type.
 Driver's default TTL. The wrapped function's arguments are auto-appended to the prefix to derive the cache key.
 
 ```ts
-const getFeatured = cached(
-  () => db.products.findFeatured(),
-  "featured-products",
-);
+const getFeatured = cached(() => db.products.findFeatured(), "featured-products");
 // cache key: "featured-products"
 
-const getUser = cached(
-  (id: number) => db.users.find(id),
-  "user",
-);
+const getUser = cached((id: number) => db.users.find(id), "user");
 // getUser(42) → cache key "user.42"
 ```
 
@@ -56,11 +46,7 @@ const getUser = cached(
 Same as #1, with an explicit TTL. Accepts number of seconds or a duration string.
 
 ```ts
-const getUser = cached(
-  (id: number) => db.users.find(id),
-  "user",
-  "1h",
-);
+const getUser = cached((id: number) => db.users.find(id), "user", "1h");
 
 const getOrder = cached(
   (userId: number, orderId: string) => db.orders.find(userId, orderId),
@@ -77,18 +63,16 @@ Custom key function, tags, per-call driver override.
 ```ts
 type Filters = { category: string; sort: string; page: number };
 
-const searchProducts = cached(
-  (filters: Filters) => db.products.search(filters),
-  {
-    key: (filters) => `products.search.${filters.category}.${filters.sort}`,
-    ttl: "15m",
-    tags: ["products"],
-    driver: "redis",
-  },
-);
+const searchProducts = cached((filters: Filters) => db.products.search(filters), {
+  key: (filters) => `products.search.${filters.category}.${filters.sort}`,
+  ttl: "15m",
+  tags: ["products"],
+  driver: "redis",
+});
 ```
 
 Use the options form when:
+
 - The cache key shouldn't include every argument (drop `page` from the key above so paginated calls share a cache entry).
 - You want to attach tags for bulk invalidation.
 - You need to route this wrapper's calls to a non-default driver.
@@ -97,20 +81,20 @@ Use the options form when:
 
 When you use the positional `cached(fn, prefix)` / `cached(fn, prefix, ttl)` form, keys are derived automatically:
 
-| Args shape | Key |
-|------------|-----|
-| No args | `prefix` |
-| Any args | `${prefix}.${hash}` — the first 16 hex chars of the sha1 of a stable JSON encoding of the args |
-| `Map`, `Set`, functions, symbols, class instances, circular refs | `CacheConfigurationError` |
+| Args shape                                                       | Key                                                                                            |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| No args                                                          | `prefix`                                                                                       |
+| Any args                                                         | `${prefix}.${hash}` — the first 16 hex chars of the sha1 of a stable JSON encoding of the args |
+| `Map`, `Set`, functions, symbols, class instances, circular refs | `CacheConfigurationError`                                                                      |
 
 The hash keeps distinct args on distinct keys: `profile("1.private", "")` and `profile("1", "private")`, or `{ q: "x" }` and `("q", "x")`, never share an entry. Object keys are sorted, `Date` becomes an ISO string, `undefined` and `null` are distinct, and `bigint` is encoded as a decimal string.
 
 **Examples:**
 
 ```ts
-getUser()                             // "user"
-getUser(42)                           // "user.<16 hex chars>"
-searchBy({ q: "hello" })              // "search.<16 hex chars>"
+getUser(); // "user"
+getUser(42); // "user.<16 hex chars>"
+searchBy({ q: "hello" }); // "search.<16 hex chars>"
 ```
 
 The exact hash is not part of the contract. Don't build keys by hand; use `.invalidate(...args)`.
@@ -137,8 +121,8 @@ Drop the cache entry for a specific argument combination — uses the same key f
 ```ts
 const getUser = cached((id: number) => db.users.find(id), "user", "1h");
 
-await getUser(42);              // populates "user.42"
-await getUser.invalidate(42);   // drops "user.42"
+await getUser(42); // populates "user.42"
+await getUser.invalidate(42); // drops "user.42"
 ```
 
 :::info Planned for v2.1
@@ -150,11 +134,7 @@ await getUser.invalidate(42);   // drops "user.42"
 ### Memoize a DB lookup
 
 ```ts
-const getUser = cached(
-  (id: number) => db.users.findById(id),
-  "user",
-  "1h",
-);
+const getUser = cached((id: number) => db.users.findById(id), "user", "1h");
 
 // Call wherever you need a user
 const user = await getUser(42);
@@ -167,15 +147,17 @@ await getUser.invalidate(42);
 ### Bulk invalidation via tags
 
 ```ts
-const getUser = cached(
-  (id: number) => db.users.findById(id),
-  { key: (id) => `user.${id}`, ttl: "1h", tags: ["users"] },
-);
+const getUser = cached((id: number) => db.users.findById(id), {
+  key: (id) => `user.${id}`,
+  ttl: "1h",
+  tags: ["users"],
+});
 
-const getPosts = cached(
-  (userId: number) => db.posts.findByUser(userId),
-  { key: (userId) => `posts.by-user.${userId}`, ttl: "30m", tags: ["users", "posts"] },
-);
+const getPosts = cached((userId: number) => db.posts.findByUser(userId), {
+  key: (userId) => `posts.by-user.${userId}`,
+  ttl: "30m",
+  tags: ["users", "posts"],
+});
 
 // After any user-table change, drop every wrapper's cache in one go
 await cache.tags(["users"]).invalidate();
@@ -189,13 +171,10 @@ type Filters = { category: string; sort: string; page: number; pageSize: number 
 // Key ignores `page` so paginated calls for the same filters share an entry.
 // (Only do this if your source function returns ALL pages — otherwise pages
 // would collide. Use this pattern thoughtfully.)
-const getCategoryMeta = cached(
-  (filters: Filters) => db.categories.meta(filters.category),
-  {
-    key: (f) => `category.meta.${f.category}`,
-    ttl: "1h",
-  },
-);
+const getCategoryMeta = cached((filters: Filters) => db.categories.meta(filters.category), {
+  key: (f) => `category.meta.${f.category}`,
+  ttl: "1h",
+});
 ```
 
 ### Cache a remote API call with tags

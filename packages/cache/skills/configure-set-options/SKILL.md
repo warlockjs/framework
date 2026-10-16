@@ -14,7 +14,7 @@ description: 'Configure cache.set''s third argument — ttl, expiresAt, tags, on
 await cache.set("name", "Jane", 600);
 
 // 2. String — human-readable duration, parsed via `ms`
-await cache.set("name", "Jane", "10m");   // "1s", "30m", "1h", "7d", "2 weeks"
+await cache.set("name", "Jane", "10m"); // "1s", "30m", "1h", "7d", "2 weeks"
 
 // 3. Options object
 await cache.set("user:1", user, {
@@ -28,14 +28,14 @@ await cache.set("user:1", user, {
 
 ## Option keys
 
-| Key | Type | Notes |
-| --- | --- | --- |
-| `ttl` | `number \| string` | Relative expiry. Mutually exclusive with `expiresAt`. |
-| `expiresAt` | `number \| Date` | Absolute deadline (epoch ms or Date). Must be in the future. Mutually exclusive with `ttl`. |
-| `tags` | `string[]` | Inline equivalent of `cache.tags([...]).set(...)`. See the `use-cache-tags` topic. |
-| `onConflict` | `"create" \| "update" \| "upsert"` | See below. Default `"upsert"`. |
-| `driver` | `string` | Per-call driver override by registered name. |
-| `vector` | `number[]` | Embedding indexed alongside the entry for `cache.similar()` (see the `use-cache-similarity` topic). Drivers without similarity support throw `CacheUnsupportedError`. |
+| Key          | Type                               | Notes                                                                                                                                                                 |
+| ------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ttl`        | `number \| string`                 | Relative expiry. Mutually exclusive with `expiresAt`.                                                                                                                 |
+| `expiresAt`  | `number \| Date`                   | Absolute deadline (epoch ms or Date). Must be in the future. Mutually exclusive with `ttl`.                                                                           |
+| `tags`       | `string[]`                         | Inline equivalent of `cache.tags([...]).set(...)`. See the `use-cache-tags` topic.                                                                                    |
+| `onConflict` | `"create" \| "update" \| "upsert"` | See below. Default `"upsert"`.                                                                                                                                        |
+| `driver`     | `string`                           | Per-call driver override by registered name.                                                                                                                          |
+| `vector`     | `number[]`                         | Embedding indexed alongside the entry for `cache.similar()` (see the `use-cache-similarity` topic). Drivers without similarity support throw `CacheUnsupportedError`. |
 
 ## TTL parsing
 
@@ -71,8 +71,8 @@ Conditional writes (`"create"` / `"update"`) return a `CacheSetResult`; uncondit
 Both of these throw `CacheConfigurationError`:
 
 ```ts
-await cache.set("k", v, { ttl: "1h", expiresAt: Date.now() + 1000 });  // both set
-await cache.set("k", v, { expiresAt: Date.now() - 1000 });              // past deadline
+await cache.set("k", v, { ttl: "1h", expiresAt: Date.now() + 1000 }); // both set
+await cache.set("k", v, { expiresAt: Date.now() - 1000 }); // past deadline
 ```
 
 ## Inline tags vs `cache.tags([...]).set(...)`
@@ -86,7 +86,7 @@ await cache.set("user:1", user, { tags: ["users", "tenant-42"] });
 // Fluent (useful when you already have a tagged instance)
 const users = cache.tags(["users"]);
 await users.set("user:1", user);
-await users.invalidate();   // drops every key tagged "users"
+await users.invalidate(); // drops every key tagged "users"
 ```
 
 Inline tag semantics are **additive**, never replace. A subsequent `set("user:1", ...)` with no `tags` leaves previous associations intact (the tag index still points to the key), and a `set(..., { tags: [...] })` only appends the key to those tags' index entries — it never removes the key from tags it was bound to earlier. To drop stale bindings, invalidate the old tag explicitly via `cache.tags([...]).invalidate()`.
@@ -96,7 +96,7 @@ Inline tag semantics are **additive**, never replace. A subsequent `set("user:1"
 Every call site using the old positional-TTL shape keeps working:
 
 ```ts
-await cache.set("k", v);           // no TTL — driver default
-await cache.set("k", v, 3600);     // seconds
+await cache.set("k", v); // no TTL — driver default
+await cache.set("k", v, 3600); // seconds
 await cache.set("k", v, undefined); // same as no TTL
 ```

@@ -17,7 +17,9 @@ const policy: WorkspacePolicy = {
  * Build a tool over a mock backend whose `exec` is scripted by exact
  * command line, so every assertion is hermetic and disk-free.
  */
-function makeTool(commands: Record<string, { exitCode?: number; stdout?: string; stderr?: string }>) {
+function makeTool(
+  commands: Record<string, { exitCode?: number; stdout?: string; stderr?: string }>,
+) {
   const backend = createMockBackend({ files: {}, commands });
   const ops = createOps(backend, policy);
 
@@ -107,7 +109,14 @@ describe("makeRunShellTool cancellation", () => {
       exec: async (_command: string, opts?: ExecOptions): Promise<RunShellResult> => {
         received = opts;
 
-        return { exitCode: 0, stdout: "", stderr: "", truncated: false, timedOut: false, cancelled: false };
+        return {
+          exitCode: 0,
+          stdout: "",
+          stderr: "",
+          truncated: false,
+          timedOut: false,
+          cancelled: false,
+        };
       },
     } as unknown as WorkspaceOps;
     const controller = new AbortController();

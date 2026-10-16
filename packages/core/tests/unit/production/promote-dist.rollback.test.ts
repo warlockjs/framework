@@ -21,9 +21,8 @@ vi.mock("@warlock.js/fs", () => ({
   renameFileAsync,
 }));
 
-const { commitDistAsync, rollbackDistAsync, stageDistAsync } = await import(
-  "../../../src/production/promote-dist"
-);
+const { commitDistAsync, rollbackDistAsync, stageDistAsync } =
+  await import("../../../src/production/promote-dist");
 
 describe("stageDistAsync", () => {
   beforeEach(() => {

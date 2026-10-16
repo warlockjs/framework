@@ -52,7 +52,11 @@ const TARBALL = existsSync(LOCAL_TARBALL) ? LOCAL_TARBALL : "@warlock.js/core@5.
 let installRoot: string;
 let coreRoot: string;
 
-function run(command: string, args: readonly string[], cwd: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+function run(
+  command: string,
+  args: readonly string[],
+  cwd: string,
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     // npm.cmd is a shell shim on Windows and only resolves through PATH with
     // a shell; every argument here is a fixed, non-user-controlled literal
@@ -113,7 +117,11 @@ describe("WARLOCK_FEATURE_CATALOG_ADAPTER — real installed core, with red cont
   });
 
   it("emits a schemaVersion 1 installed-core-feature-map catalog the gate's parseFeatureCatalog accepts", async () => {
-    const result = await run(process.execPath, [ADAPTER, "--core-root", coreRoot, "--format", "json"], installRoot);
+    const result = await run(
+      process.execPath,
+      [ADAPTER, "--core-root", coreRoot, "--format", "json"],
+      installRoot,
+    );
     assert.equal(result.exitCode, 0, `adapter exited non-zero: ${result.stderr}`);
 
     const catalog = parseFeatureCatalog(result.stdout, coreRoot);
@@ -126,13 +134,20 @@ describe("WARLOCK_FEATURE_CATALOG_ADAPTER — real installed core, with red cont
   });
 
   it("cross-checks the emitted feature list against the same installed Core's featuresMap", async () => {
-    const result = await run(process.execPath, [ADAPTER, "--core-root", coreRoot, "--format", "json"], installRoot);
+    const result = await run(
+      process.execPath,
+      [ADAPTER, "--core-root", coreRoot, "--format", "json"],
+      installRoot,
+    );
     const catalog = JSON.parse(result.stdout) as { features: string[] };
 
     const featuresModulePath = path.join(coreRoot, "esm", "generations", "features", "index.mjs");
     const installedFeaturesModule = await import(pathToFileURL(featuresModulePath).href);
     const installedFeaturesMap = installedFeaturesModule.featuresMap;
-    assert.ok(installedFeaturesMap && typeof installedFeaturesMap === "object", "installed Core must export featuresMap");
+    assert.ok(
+      installedFeaturesMap && typeof installedFeaturesMap === "object",
+      "installed Core must export featuresMap",
+    );
     const expected = Object.keys(installedFeaturesMap);
 
     assert.deepEqual(
@@ -143,7 +158,11 @@ describe("WARLOCK_FEATURE_CATALOG_ADAPTER — real installed core, with red cont
   });
 
   it("red control: parseFeatureCatalog passes the good catalog, rejects a mismatched coreRoot, and rejects an empty feature list", async () => {
-    const result = await run(process.execPath, [ADAPTER, "--core-root", coreRoot, "--format", "json"], installRoot);
+    const result = await run(
+      process.execPath,
+      [ADAPTER, "--core-root", coreRoot, "--format", "json"],
+      installRoot,
+    );
     const goodCatalog = JSON.parse(result.stdout) as Record<string, unknown>;
 
     assert.doesNotThrow(() => parseFeatureCatalog(JSON.stringify(goodCatalog), coreRoot));

@@ -8,7 +8,12 @@ description: 'The shared SSRF / resource-exhaustion guard every server-side outb
 One `OutboundPolicy` + `guardedFetch` backs **every** server-side HTTP request the framework makes on behalf of user/model-controlled input: `ai.rag.loadWeb`, the remote-text branch of `prepareAttachmentPart` (agent `attachments`), and the skills catalog `urlSource` manifest fetch. A single audited guard instead of N ad-hoc `fetch()` call sites.
 
 ```ts
-import { guardedFetch, fetchTextWithPolicy, assertUrlAllowed, OutboundPolicyError } from "@warlock.js/ai";
+import {
+  guardedFetch,
+  fetchTextWithPolicy,
+  assertUrlAllowed,
+  OutboundPolicyError,
+} from "@warlock.js/ai";
 
 const response = await guardedFetch("https://docs.example.com/page", {
   hostAllowlist: ["docs.example.com"],
@@ -21,22 +26,22 @@ const response = await guardedFetch("https://docs.example.com/page", {
 
 Every field is optional; `resolveOutboundPolicy` fills safe defaults, so an untuned call is already hardened:
 
-| Field | Default | Guards against |
-| --- | --- | --- |
-| `allowedSchemes` | `["https"]` | plaintext / `file:` / `data:` exfil — `http` must be opted in |
-| `hostAllowlist` | unset (any host) | pinning outbound targets to known hosts, e.g. `docs.example.com` allows `a.docs.example.com` |
-| `denyPrivateIPsAfterDNS` | `true` | **the SSRF guard itself** — resolves the host through DNS and rejects loopback / private / link-local / unique-local / cloud-metadata (`169.254.169.254`) addresses; a public hostname that resolves inward is caught |
-| `maxRedirects` | `5` | a redirect chain used to bypass the checks above (4.15.0 — see below) |
-| `maxBytes` | `5_242_880` (5 MiB) | unbounded response bodies |
-| `timeoutMs` | `10_000` | a hung/slow endpoint tying up the request |
-| `signal` | unset | caller-supplied `AbortSignal`, merged with the internal timeout |
-| `fetch` | global `fetch` | inject a stub for tests, or a wrapper enforcing your own app-level rules |
+| Field                    | Default             | Guards against                                                                                                                                                                                                        |
+| ------------------------ | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowedSchemes`         | `["https"]`         | plaintext / `file:` / `data:` exfil — `http` must be opted in                                                                                                                                                         |
+| `hostAllowlist`          | unset (any host)    | pinning outbound targets to known hosts, e.g. `docs.example.com` allows `a.docs.example.com`                                                                                                                          |
+| `denyPrivateIPsAfterDNS` | `true`              | **the SSRF guard itself** — resolves the host through DNS and rejects loopback / private / link-local / unique-local / cloud-metadata (`169.254.169.254`) addresses; a public hostname that resolves inward is caught |
+| `maxRedirects`           | `5`                 | a redirect chain used to bypass the checks above (4.15.0 — see below)                                                                                                                                                 |
+| `maxBytes`               | `5_242_880` (5 MiB) | unbounded response bodies                                                                                                                                                                                             |
+| `timeoutMs`              | `10_000`            | a hung/slow endpoint tying up the request                                                                                                                                                                             |
+| `signal`                 | unset               | caller-supplied `AbortSignal`, merged with the internal timeout                                                                                                                                                       |
+| `fetch`                  | global `fetch`      | inject a stub for tests, or a wrapper enforcing your own app-level rules                                                                                                                                              |
 
 Every violation throws `OutboundPolicyError` with `context` carrying the offending URL/host/address — never a silent fallback.
 
 ## Redirects are never delegated to the platform (4.15.0)
 
-Before 4.15.0, `assertUrlAllowed` validated only the *initial* URL, then handed the request to `fetch` with automatic redirect following — so a URL that passed validation could `3xx` into a private/metadata address or an off-allowlist host with no re-check.
+Before 4.15.0, `assertUrlAllowed` validated only the _initial_ URL, then handed the request to `fetch` with automatic redirect following — so a URL that passed validation could `3xx` into a private/metadata address or an off-allowlist host with no re-check.
 
 `guardedFetch` now issues **every hop** with `redirect: "manual"` and re-runs the `Location` header through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) before following it:
 
@@ -65,11 +70,11 @@ if (!ok) throw new Error(`fetch failed: ${status}`);
 
 ## Who consumes this
 
-| Call site | Entry point | Notes |
-| --- | --- | --- |
-| RAG web loader | `ai.rag.loadWeb(url, { policy })` | the `rag-loaders-and-stores` topic |
-| Remote text attachment | `prepareAttachmentPart` via `agent.execute({ attachments })` | default-DENY — requires `attachmentPolicy.allowRemoteFetch: true`; policy travels as `attachmentPolicy.outbound`. URL *image* attachments are handed to the provider as a URL and never fetched server-side, so they carry no SSRF surface here |
-| Skills catalog manifest | `ai.skills({ sources: [urlSource(url, { policy })] })` | the `use-runtime-skills` topic — the fetched manifest is also runtime-validated record-by-record before being trusted |
+| Call site               | Entry point                                                  | Notes                                                                                                                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RAG web loader          | `ai.rag.loadWeb(url, { policy })`                            | the `rag-loaders-and-stores` topic                                                                                                                                                                                                              |
+| Remote text attachment  | `prepareAttachmentPart` via `agent.execute({ attachments })` | default-DENY — requires `attachmentPolicy.allowRemoteFetch: true`; policy travels as `attachmentPolicy.outbound`. URL _image_ attachments are handed to the provider as a URL and never fetched server-side, so they carry no SSRF surface here |
+| Skills catalog manifest | `ai.skills({ sources: [urlSource(url, { policy })] })`       | the `use-runtime-skills` topic — the fetched manifest is also runtime-validated record-by-record before being trusted                                                                                                                           |
 
 Each call site passes its own `policy` (or `{}` for the strict defaults) — there is no global policy singleton, so tune per source (e.g. `hostAllowlist` for a known-good docs domain vs. an open web crawl).
 

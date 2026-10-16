@@ -114,9 +114,9 @@ describe("RefreshToken validity getters", () => {
 
     expect(buildToken({ expires_at: future, revoked_at: undefined }).isValid).toBe(true);
     expect(buildToken({ expires_at: future, revoked_at: new Date() }).isValid).toBe(false);
-    expect(buildToken({ expires_at: new Date(Date.now() - 1), revoked_at: undefined }).isValid).toBe(
-      false,
-    );
+    expect(
+      buildToken({ expires_at: new Date(Date.now() - 1), revoked_at: undefined }).isValid,
+    ).toBe(false);
   });
 
   it("familyId reads the family_id column", () => {
@@ -233,11 +233,7 @@ describe("RefreshToken statics", () => {
   });
 
   it("enforceMax revokes only the oldest surplus tokens", async () => {
-    const rows = [
-      { revoke: vi.fn() },
-      { revoke: vi.fn() },
-      { revoke: vi.fn() },
-    ];
+    const rows = [{ revoke: vi.fn() }, { revoke: vi.fn() }, { revoke: vi.fn() }];
     modelQuery.mockReturnValue(buildQueryStub(rows));
 
     // 3 active, max 2 → slice(0, 3 - 2 + 1) = oldest 2 revoked, newest kept
@@ -269,7 +265,10 @@ describe("RefreshToken statics", () => {
   });
 
   it("findNeverExpiring selects the rows no date predicate can reach", async () => {
-    const healthy = buildToken({ token: TOKEN_WITH_EXP, expires_at: new Date(Date.now() + 60_000) });
+    const healthy = buildToken({
+      token: TOKEN_WITH_EXP,
+      expires_at: new Date(Date.now() + 60_000),
+    });
     const poisoned = buildToken({ token: TOKEN_WITHOUT_EXP, expires_at: new Date("30dayz") });
 
     modelQuery.mockReturnValue(buildQueryStub([healthy, poisoned]));
@@ -278,7 +277,10 @@ describe("RefreshToken statics", () => {
   });
 
   it("purgeNeverExpiring destroys only the never-expiring rows", async () => {
-    const healthy = buildToken({ token: TOKEN_WITH_EXP, expires_at: new Date(Date.now() + 60_000) });
+    const healthy = buildToken({
+      token: TOKEN_WITH_EXP,
+      expires_at: new Date(Date.now() + 60_000),
+    });
     const poisoned = buildToken({ token: TOKEN_WITHOUT_EXP, expires_at: new Date("30dayz") });
 
     Object.defineProperty(healthy, "destroy", { value: vi.fn() });

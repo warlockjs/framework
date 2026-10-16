@@ -30,10 +30,7 @@ export type {
 } from "./contracts";
 
 // Errors
-export {
-  WorkspaceEditError,
-  WorkspacePolicyError,
-} from "./errors";
+export { WorkspaceEditError, WorkspacePolicyError } from "./errors";
 export type {
   WorkspaceEditErrorOptions,
   WorkspaceEditFailure,

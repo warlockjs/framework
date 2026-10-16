@@ -59,10 +59,7 @@ if (existing) {
 within the delay window collapse into one run:
 
 ```ts
-await sendInvoice.dispatch(
-  { invoiceId },
-  { jobId: `invoice:${invoiceId}`, delay: "30s" },
-);
+await sendInvoice.dispatch({ invoiceId }, { jobId: `invoice:${invoiceId}`, delay: "30s" });
 ```
 
 If five identical triggers arrive within 30 seconds, only the first

@@ -6,7 +6,7 @@ sidebar:
   label: "Troubleshooting"
 ---
 
-The errors you're most likely to hit first, and the one-line fix for each. Most are the framework failing *loud and early* on purpose — a boundary throw beats a silent mid-run surprise.
+The errors you're most likely to hit first, and the one-line fix for each. Most are the framework failing _loud and early_ on purpose — a boundary throw beats a silent mid-run surprise.
 
 ## `ai.openai.model is not a function` (or `ai.openai` is undefined)
 
@@ -28,7 +28,7 @@ Same shape for every adapter — `new AnthropicSDK(...)`, `new BedrockSDK(...)`,
 Those verbs live in **satellite packages** and register onto the shared `ai` object only through a side-effect import. Import the package once (anywhere in your app) and they light up, fully typed:
 
 ```ts
-import "@warlock.js/ai-tools";     // → ai.tools.*, ai.mcp(...)
+import "@warlock.js/ai-tools"; // → ai.tools.*, ai.mcp(...)
 import "@warlock.js/ai-workspace"; // → ai.workspace(...)
 ```
 
@@ -46,7 +46,7 @@ The six flags are `structuredOutput`, `vision`, `reasoning`, `promptCaching`, `a
 
 ## "`execute()` never throws" — but I got an exception
 
-`execute()` funnels *runtime* failures (provider errors, guardrail trips, budget breaches, schema failures) into `result.error` as a typed `AIError`. Branch on it:
+`execute()` funnels _runtime_ failures (provider errors, guardrail trips, budget breaches, schema failures) into `result.error` as a typed `AIError`. Branch on it:
 
 ```ts
 const { data, error } = await agent.execute(input);

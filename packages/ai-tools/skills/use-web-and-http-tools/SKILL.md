@@ -28,17 +28,17 @@ const agent = ai.agent({
 });
 ```
 
-The construction `options` are the **rails** — they bound what the model may do; the model supplies the per-call inputs *within* those rails. Least-privilege is just array composition: hand an agent only the tools (and only the methods/hosts) it needs.
+The construction `options` are the **rails** — they bound what the model may do; the model supplies the per-call inputs _within_ those rails. Least-privilege is just array composition: hand an agent only the tools (and only the methods/hosts) it needs.
 
 ## The five tools
 
-| Factory | Name | Model input | Returns |
-|---|---|---|---|
-| `ai.tools.webSearch(options)` | `web_search` | `{ query, maxResults? }` | `{ results: { title, url, snippet, score? }[] }` |
-| `ai.tools.fetchUrl(options?)` | `fetch_url` | `{ url }` | `{ url, status, content, truncated }` |
-| `ai.tools.http(options?)` | `http_request` | `{ method?, url, headers?, body? }` | `{ status, headers, body, truncated }` |
-| `ai.tools.calculator(options?)` | `calculator` | `{ expression }` | `{ result }` |
-| `ai.tools.dateTime(options?)` | `date_time` | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }` |
+| Factory                         | Name           | Model input                                                    | Returns                                          |
+| ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }` |
+| `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated }`            |
+| `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`           |
+| `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                     |
+| `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                      |
 
 ## `web_search` — pick a provider, supply a key
 
@@ -53,7 +53,12 @@ ai.tools.webSearch({ provider: "tavily", apiKey: process.env.TAVILY_API_KEY, max
 ## `fetch_url` — read a page you have the URL for
 
 ```ts
-ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 500_000, timeoutMs: 10_000 });
+ai.tools.fetchUrl({
+  extract: "text",
+  allowHosts: ["docs.stripe.com"],
+  maxBytes: 500_000,
+  timeoutMs: 10_000,
+});
 ```
 
 - `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`. **`"text"`/`"markdown"` lazily import the `@mozilla/readability` + `jsdom` optional peers** — a missing peer is a `WebToolError` of type `"missing-peer"` carrying the `npm install @mozilla/readability jsdom` string. `"html"` needs nothing.
@@ -68,7 +73,7 @@ ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 
 ai.tools.http({
   baseUrl: "https://api.stripe.com",
   allowHosts: ["api.stripe.com"],
-  allowMethods: ["GET", "POST"],            // default ["GET"] — mutating methods are opt-in
+  allowMethods: ["GET", "POST"], // default ["GET"] — mutating methods are opt-in
   headers: { authorization: `Bearer ${process.env.STRIPE_KEY}` },
   timeoutMs: 15_000,
   maxBytes: 1_000_000,
@@ -77,6 +82,7 @@ ai.tools.http({
 ```
 
 All guardrails are enforced **before the network call** and surface as a typed `HttpPolicyError`:
+
 - a method outside `allowMethods` → `"method-not-allowed"`;
 - a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
 - an unresolvable URL → `"invalid-url"`.
@@ -97,9 +103,15 @@ Supports `+ - * / % ^`, unary signs, parentheses, and decimal/scientific literal
 
 ```ts
 await ai.tools.dateTime().invoke({ op: "now", format: "iso" });
-await ai.tools.dateTime().invoke({ op: "add", iso: "2026-06-22T00:00:00Z", amount: 3, unit: "days" });
-await ai.tools.dateTime().invoke({ op: "diff", iso: "2026-06-22T00:00:00Z", to: "2026-06-25T00:00:00Z", unit: "days" }); // "3"
-await ai.tools.dateTime({ defaultTimeZone: "Africa/Cairo" }).invoke({ op: "format", iso: "2026-06-22T12:00:00Z", format: "datetime" });
+await ai.tools
+  .dateTime()
+  .invoke({ op: "add", iso: "2026-06-22T00:00:00Z", amount: 3, unit: "days" });
+await ai.tools
+  .dateTime()
+  .invoke({ op: "diff", iso: "2026-06-22T00:00:00Z", to: "2026-06-25T00:00:00Z", unit: "days" }); // "3"
+await ai.tools
+  .dateTime({ defaultTimeZone: "Africa/Cairo" })
+  .invoke({ op: "format", iso: "2026-06-22T12:00:00Z", format: "datetime" });
 ```
 
 - `op`: `"now"` / `"add"` / `"diff"` / `"format"`. `format`: `"iso"` (default), `"date"`, `"time"`, `"datetime"`.
@@ -114,7 +126,9 @@ Every failure above is thrown inside the tool handler, caught by the framework's
 ```ts
 import { WebToolError } from "@warlock.js/ai-tools";
 
-const { error } = await ai.tools.fetchUrl({ allowHosts: ["docs.stripe.com"] }).invoke({ url: "http://evil.test" });
+const { error } = await ai.tools
+  .fetchUrl({ allowHosts: ["docs.stripe.com"] })
+  .invoke({ url: "http://evil.test" });
 if (error instanceof WebToolError && error.type === "denied-host") {
   // rejected before any network call
 }

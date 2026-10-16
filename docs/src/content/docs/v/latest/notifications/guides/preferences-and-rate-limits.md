@@ -5,7 +5,7 @@ sidebar:
   label: "Preferences & rate limits"
 ---
 
-Two optional config slots gate the dispatch *before* a channel sends. Both are app-owned — the package reserves the shape and ships no defaults.
+Two optional config slots gate the dispatch _before_ a channel sends. Both are app-owned — the package reserves the shape and ships no defaults.
 
 ## PreferenceProvider — what the user accepts
 
@@ -53,7 +53,8 @@ For each (recipient, channel): preferences run first (unless `force`), then the 
 
 ```ts
 notifications.on("skipped", ({ channel, reason }) =>
-  metrics.inc(`notif.${channel}.skipped.${reason}`));
+  metrics.inc(`notif.${channel}.skipped.${reason}`),
+);
 ```
 
 > For `.queue()` sends, the rate-limit budget is currently consumed at enqueue time; with the herald worker it moves to delivery time.

@@ -62,53 +62,56 @@ type Delivery = { payload: unknown; route: unknown; at: number };
 
 const redisAvailable = await redisTestsAvailable();
 
-describe.skipIf(!redisAvailable)("bullmqQueue (notifications → @warlock.js/queue → channel.send)", () => {
-  const deliveries: Delivery[] = [];
+describe.skipIf(!redisAvailable)(
+  "bullmqQueue (notifications → @warlock.js/queue → channel.send)",
+  () => {
+    const deliveries: Delivery[] = [];
 
-  beforeEach(() => {
-    deliveries.length = 0;
-    setQueueConfig(testQueueConfig());
+    beforeEach(() => {
+      deliveries.length = 0;
+      setQueueConfig(testQueueConfig());
 
-    const mail: Channel<MailPayload> = {
-      name: "mail",
-      route: (notifiable) => notifiable.get("email") as string | undefined,
-      async send({ payload, route }) {
-        deliveries.push({ payload, route, at: performance.now() });
-      },
-    };
+      const mail: Channel<MailPayload> = {
+        name: "mail",
+        route: (notifiable) => notifiable.get("email") as string | undefined,
+        async send({ payload, route }) {
+          deliveries.push({ payload, route, at: performance.now() });
+        },
+      };
 
-    setNotificationConfig({
-      channels: { mail },
-      queue: bullmqQueue({ attempts: 2, backoff: 10 }),
+      setNotificationConfig({
+        channels: { mail },
+        queue: bullmqQueue({ attempts: 2, backoff: 10 }),
+      });
     });
-  });
 
-  afterEach(async () => {
-    await closeQueue({ timeout: 5_000 });
-    resetNotificationConfig();
-  });
-
-  const welcome = defineNotification<{ name: string }>({
-    type: "welcome",
-    via: ["mail"],
-    mail: ({ name }) => ({ subject: `Hi ${name}`, html: "<p>welcome</p>" }) as MailPayload,
-  });
-
-  it("delivers a `.queue()` notification with `delay` only after the delay elapses", async () => {
-    await startWorkers();
-    const queuedAt = performance.now();
-    await welcome.queue(recipient(1, "ada@example.com"), { name: "Ada" }, { delay: "1s" });
-
-    await sleep(500);
-    // A requested sleep is no upper bound when the event loop is delayed.
-    expect(deliveries.filter(({ at }) => at - queuedAt < 950)).toHaveLength(0);
-
-    await waitFor(() => deliveries.length === 1);
-    expect(deliveries).toHaveLength(1);
-    expect(deliveries[0]).toMatchObject({
-      payload: { subject: "Hi Ada" },
-      route: "ada@example.com",
+    afterEach(async () => {
+      await closeQueue({ timeout: 5_000 });
+      resetNotificationConfig();
     });
-    expect(deliveries[0]!.at - queuedAt).toBeGreaterThanOrEqual(950);
-  });
-});
+
+    const welcome = defineNotification<{ name: string }>({
+      type: "welcome",
+      via: ["mail"],
+      mail: ({ name }) => ({ subject: `Hi ${name}`, html: "<p>welcome</p>" }) as MailPayload,
+    });
+
+    it("delivers a `.queue()` notification with `delay` only after the delay elapses", async () => {
+      await startWorkers();
+      const queuedAt = performance.now();
+      await welcome.queue(recipient(1, "ada@example.com"), { name: "Ada" }, { delay: "1s" });
+
+      await sleep(500);
+      // A requested sleep is no upper bound when the event loop is delayed.
+      expect(deliveries.filter(({ at }) => at - queuedAt < 950)).toHaveLength(0);
+
+      await waitFor(() => deliveries.length === 1);
+      expect(deliveries).toHaveLength(1);
+      expect(deliveries[0]).toMatchObject({
+        payload: { subject: "Hi Ada" },
+        route: "ada@example.com",
+      });
+      expect(deliveries[0]!.at - queuedAt).toBeGreaterThanOrEqual(950);
+    });
+  },
+);

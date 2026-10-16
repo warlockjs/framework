@@ -22,7 +22,7 @@ Seal exposes a plugin system so you can add custom validator methods without for
 import type { SealPlugin } from "@warlock.js/seal";
 
 type SealPlugin = {
-  name: string;          // unique identifier — duplicates warn and skip install
+  name: string; // unique identifier — duplicates warn and skip install
   version?: string;
   description?: string;
   install: (context: { name: string; version?: string }) => void | Promise<void>;
@@ -55,18 +55,13 @@ export const slugPlugin: SealPlugin = {
 ## Registering plugins
 
 ```ts
-import {
-  registerPlugin,
-  unregisterPlugin,
-  hasPlugin,
-  getInstalledPlugins,
-} from "@warlock.js/seal";
+import { registerPlugin, unregisterPlugin, hasPlugin, getInstalledPlugins } from "@warlock.js/seal";
 
 await registerPlugin(slugPlugin);
 // Warns and skips if "slug" is already installed; otherwise install() runs.
 
-hasPlugin("slug");           // true
-getInstalledPlugins();       // [slugPlugin]
+hasPlugin("slug"); // true
+getInstalledPlugins(); // [slugPlugin]
 
 await unregisterPlugin("slug");
 // Runs slugPlugin.uninstall?.(); removes from registry.
@@ -125,11 +120,7 @@ export const postalCodePlugin: SealPlugin = {
 
   install() {
     Object.assign(StringValidator.prototype, {
-      postalCode(
-        this: StringValidator,
-        country: keyof typeof PATTERNS,
-        errorMessage?: string,
-      ) {
+      postalCode(this: StringValidator, country: keyof typeof PATTERNS, errorMessage?: string) {
         const pattern = PATTERNS[country];
 
         if (!pattern) {
@@ -148,10 +139,7 @@ Module augmentation:
 ```ts
 declare module "@warlock.js/seal" {
   interface StringValidator {
-    postalCode(
-      country: "US" | "DE" | "UK" | "EG",
-      errorMessage?: string,
-    ): StringValidator;
+    postalCode(country: "US" | "DE" | "UK" | "EG", errorMessage?: string): StringValidator;
   }
 }
 ```
@@ -180,8 +168,8 @@ For a method that creates a **new validator** (not chained from an existing one)
 ## Introspection
 
 ```ts
-hasPlugin("slug");                 // boolean
-getInstalledPlugins();             // SealPlugin[]
+hasPlugin("slug"); // boolean
+getInstalledPlugins(); // SealPlugin[]
 ```
 
 Use these in startup diagnostics or tests that need to assert a plugin is registered before exercising a dependent method.

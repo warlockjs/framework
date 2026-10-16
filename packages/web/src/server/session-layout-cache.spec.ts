@@ -80,7 +80,8 @@ describe("serverCache with a session-dependent layout payload (R5-1)", () => {
       appFile: "app.tsx",
       layoutFile: "layout.tsx",
       pageFile: "page.tsx",
-      loadModule: async (moduleId) => (moduleId === "page.tsx" ? { default: (): null => null } : {}),
+      loadModule: async (moduleId) =>
+        moduleId === "page.tsx" ? { default: (): null => null } : {},
       httpServer: server,
       cache: { public: true, maxAge: 60, serverCache: true, tags: ["slc"] },
     });
@@ -158,7 +159,9 @@ describe("serverCache with a session-dependent layout payload (R5-1)", () => {
 
     expect(guest.body).not.toContain(SECRET);
     expect(guest.body).toContain("guest");
-    expect([...fakeCacheStore.values()].every((v) => !JSON.stringify(v).includes(SECRET))).toBe(true);
+    expect([...fakeCacheStore.values()].every((v) => !JSON.stringify(v).includes(SECRET))).toBe(
+      true,
+    );
   });
 
   it("a guest miss is stored and served to cookie-less guests", async () => {

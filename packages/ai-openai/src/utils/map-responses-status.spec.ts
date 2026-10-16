@@ -30,7 +30,11 @@ describe("mapResponsesFinishReason", () => {
 
   it("treats a missing status as completed", () => {
     expect(
-      mapResponsesFinishReason({ status: undefined, incomplete_details: null, hasToolCalls: false }),
+      mapResponsesFinishReason({
+        status: undefined,
+        incomplete_details: null,
+        hasToolCalls: false,
+      }),
     ).toBe("stop");
   });
 });

@@ -62,7 +62,5 @@ await can(user, "orders.delete", { tenant: "org-acme" });
 For defense in depth, add a policy that confirms the record belongs to the active tenant — so even a misconfigured role can't reach across organizations:
 
 ```ts title="src/app/orders/policies/index.ts"
-definePolicy("orders.update", (user, order, ctx) =>
-  order.get("organization_id") === ctx.tenant,
-);
+definePolicy("orders.update", (user, order, ctx) => order.get("organization_id") === ctx.tenant);
 ```

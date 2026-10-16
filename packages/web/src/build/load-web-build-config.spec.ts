@@ -53,7 +53,7 @@ describe("loadWebBuildConfig", () => {
     );
     fs.writeFileSync(
       path.join(appRoot, "src", "app", "tenants", "resolve-host.ts"),
-      "export const tenantHosts: string[] = [\"acme.test\"];\nexport const resolveHost = () => null;\n",
+      'export const tenantHosts: string[] = ["acme.test"];\nexport const resolveHost = () => null;\n',
       "utf8",
     );
     fs.writeFileSync(
@@ -61,7 +61,7 @@ describe("loadWebBuildConfig", () => {
       [
         'import { resolveHost, tenantHosts } from "app/tenants/resolve-host";',
         "export default {",
-        '  sites: { tenant: { hosts: tenantHosts } },',
+        "  sites: { tenant: { hosts: tenantHosts } },",
         "  resolveHost,",
         "};",
       ].join("\n"),

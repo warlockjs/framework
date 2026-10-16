@@ -198,17 +198,44 @@ describe("long-lived responses during a graceful drain", () => {
   it.each([
     { type: "sse" as const, headers: undefined },
     { type: "stream" as const, headers: undefined },
-    { type: "sse" as const, headers: { "transfer-encoding": "gzip", "content-length": "999", "content-type": "application/json", "keep-alive": "timeout=99", upgrade: "websocket", "proxy-connection": "keep-alive" } },
-    { type: "stream" as const, headers: { "transfer-encoding": "gzip", "content-length": "999", "content-type": "application/json", "keep-alive": "timeout=99", upgrade: "websocket", "proxy-connection": "keep-alive" } },
-  ])("keeps chunked framing and keep-alive for $type with headers $headers", async ({ type, headers }) => {
-    await expect(connectionHeaderFor(type, false, headers, received => {
-      expect(received.get("transfer-encoding")).toBe("chunked");
-      expect(received.get("content-type")).toContain(type === "sse" ? "text/event-stream" : "text/plain");
-      for (const name of ["content-length", "keep-alive", "upgrade", "proxy-connection"]) {
-        expect(received.get(name)).toBeNull();
-      }
-    })).resolves.toBe("keep-alive");
-  });
+    {
+      type: "sse" as const,
+      headers: {
+        "transfer-encoding": "gzip",
+        "content-length": "999",
+        "content-type": "application/json",
+        "keep-alive": "timeout=99",
+        upgrade: "websocket",
+        "proxy-connection": "keep-alive",
+      },
+    },
+    {
+      type: "stream" as const,
+      headers: {
+        "transfer-encoding": "gzip",
+        "content-length": "999",
+        "content-type": "application/json",
+        "keep-alive": "timeout=99",
+        upgrade: "websocket",
+        "proxy-connection": "keep-alive",
+      },
+    },
+  ])(
+    "keeps chunked framing and keep-alive for $type with headers $headers",
+    async ({ type, headers }) => {
+      await expect(
+        connectionHeaderFor(type, false, headers, (received) => {
+          expect(received.get("transfer-encoding")).toBe("chunked");
+          expect(received.get("content-type")).toContain(
+            type === "sse" ? "text/event-stream" : "text/plain",
+          );
+          for (const name of ["content-length", "keep-alive", "upgrade", "proxy-connection"]) {
+            expect(received.get(name)).toBeNull();
+          }
+        }),
+      ).resolves.toBe("keep-alive");
+    },
+  );
 
   async function rawResponse(type: "sse" | "stream", reuse: boolean): Promise<string> {
     server = startHttpServer();
@@ -222,15 +249,25 @@ describe("long-lived responses during a graceful drain", () => {
     });
     await server.listen({ port: 0, host: "127.0.0.1" });
     return new Promise((resolve, reject) => {
-      const socket = createConnection({ host: "127.0.0.1", port: (server!.server.address() as AddressInfo).port });
+      const socket = createConnection({
+        host: "127.0.0.1",
+        port: (server!.server.address() as AddressInfo).port,
+      });
       let wire = "";
       let sentSecond = false;
       socket.setTimeout(2000, () => socket.destroy(new Error("response did not close")));
       socket.once("error", reject);
-      socket.once("connect", () => socket.write(`GET /raw HTTP/1.${reuse ? 1 : 0}\r\nHost: localhost\r\n\r\n`));
-      socket.on("data", chunk => {
+      socket.once("connect", () =>
+        socket.write(`GET /raw HTTP/1.${reuse ? 1 : 0}\r\nHost: localhost\r\n\r\n`),
+      );
+      socket.on("data", (chunk) => {
         wire += chunk.toString();
-        if (reuse && sentSecond && (wire.match(/HTTP\/1\.1 200 OK/g)?.length ?? 0) === 2 && wire.endsWith("0\r\n\r\n")) {
+        if (
+          reuse &&
+          sentSecond &&
+          (wire.match(/HTTP\/1\.1 200 OK/g)?.length ?? 0) === 2 &&
+          wire.endsWith("0\r\n\r\n")
+        ) {
           socket.destroy();
           resolve(wire);
         }
@@ -239,11 +276,14 @@ describe("long-lived responses during a graceful drain", () => {
           socket.write("GET /raw HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
         }
       });
-      socket.once("end", () => { socket.destroy(); resolve(wire); });
+      socket.once("end", () => {
+        socket.destroy();
+        resolve(wire);
+      });
     });
   }
 
-  it.each(["sse", "stream"] as const)("uses close-delimited %s for HTTP/1.0", async type => {
+  it.each(["sse", "stream"] as const)("uses close-delimited %s for HTTP/1.0", async (type) => {
     const wire = await rawResponse(type, false);
     const [headers, body] = wire.split("\r\n\r\n");
     expect(headers.toLowerCase()).not.toContain("transfer-encoding");
@@ -251,7 +291,7 @@ describe("long-lived responses during a graceful drain", () => {
     expect(body).toBe(type === "sse" ? 'event: tick\ndata: "ok"\n\n' : "ok");
   });
 
-  it.each(["sse", "stream"] as const)("reuses the HTTP/1.1 socket after %s end", async type => {
+  it.each(["sse", "stream"] as const)("reuses the HTTP/1.1 socket after %s end", async (type) => {
     const wire = await rawResponse(type, true);
     expect(wire.match(/HTTP\/1\.1 200 OK/g)).toHaveLength(2);
     expect(wire.toLowerCase()).toContain("transfer-encoding: chunked");
@@ -262,33 +302,38 @@ describe("long-lived responses during a graceful drain", () => {
   });
 });
 
-
-it.each(["stream", "sse"] as const)("serves %s over HTTP/2 without connection-specific headers", async type => {
-  const app = Fastify({ http2: true });
-  app.get("/events", async (_request, reply) => {
-    const response = bind(reply as unknown as FastifyReply);
-    response.header("Connection", "keep-alive").header("Transfer-Encoding", "chunked");
-    const stream = type === "sse" ? response.sse({ headers: { Connection: "keep-alive" } }) : response.stream("text/plain", { headers: { Connection: "keep-alive" } });
-    if (type === "sse") (stream as ReturnType<Response["sse"]>).send("tick", { ok: true });
-    else (stream as ReturnType<Response["stream"]>).send("hello");
-    stream.end();
-    return reply;
-  });
-  await app.listen({ port: 0, host: "127.0.0.1" });
-  const client = connect(`http://127.0.0.1:${(app.server.address() as AddressInfo).port}`);
-  try {
-    const request = client.request({ ":path": "/events" });
-    const headers = await new Promise<http.IncomingHttpHeaders>((resolve, reject) => {
-      request.on("response", resolve);
-      request.on("error", reject);
-      request.resume();
-      request.end();
+it.each(["stream", "sse"] as const)(
+  "serves %s over HTTP/2 without connection-specific headers",
+  async (type) => {
+    const app = Fastify({ http2: true });
+    app.get("/events", async (_request, reply) => {
+      const response = bind(reply as unknown as FastifyReply);
+      response.header("Connection", "keep-alive").header("Transfer-Encoding", "chunked");
+      const stream =
+        type === "sse"
+          ? response.sse({ headers: { Connection: "keep-alive" } })
+          : response.stream("text/plain", { headers: { Connection: "keep-alive" } });
+      if (type === "sse") (stream as ReturnType<Response["sse"]>).send("tick", { ok: true });
+      else (stream as ReturnType<Response["stream"]>).send("hello");
+      stream.end();
+      return reply;
     });
-    expect(headers[":status"]).toBe(200);
-    expect(headers.connection).toBeUndefined();
-    expect(headers["transfer-encoding"]).toBeUndefined();
-  } finally {
-    client.destroy();
-    await app.close();
-  }
-});
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const client = connect(`http://127.0.0.1:${(app.server.address() as AddressInfo).port}`);
+    try {
+      const request = client.request({ ":path": "/events" });
+      const headers = await new Promise<http.IncomingHttpHeaders>((resolve, reject) => {
+        request.on("response", resolve);
+        request.on("error", reject);
+        request.resume();
+        request.end();
+      });
+      expect(headers[":status"]).toBe(200);
+      expect(headers.connection).toBeUndefined();
+      expect(headers["transfer-encoding"]).toBeUndefined();
+    } finally {
+      client.destroy();
+      await app.close();
+    }
+  },
+);

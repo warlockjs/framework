@@ -9,7 +9,6 @@ function firstCall<T>(calls: readonly T[]): T {
   return call;
 }
 
-
 type CreateCall = { params: Anthropic.MessageCreateParams; requestOptions: unknown };
 
 /**
@@ -639,10 +638,12 @@ describe("AnthropicModel.complete()", () => {
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "low" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "high" } });
 
-    expect((firstCall(calls).params as { thinking?: { budget_tokens?: number } }).thinking).toEqual({
-      type: "enabled",
-      budget_tokens: 1024,
-    });
+    expect((firstCall(calls).params as { thinking?: { budget_tokens?: number } }).thinking).toEqual(
+      {
+        type: "enabled",
+        budget_tokens: 1024,
+      },
+    );
     expect((calls[1].params as { thinking?: { budget_tokens?: number } }).thinking).toEqual({
       type: "enabled",
       budget_tokens: 12000,
@@ -674,10 +675,12 @@ describe("AnthropicModel.complete()", () => {
 
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { maxTokens: 200 } });
 
-    expect((firstCall(calls).params as { thinking?: { budget_tokens?: number } }).thinking).toEqual({
-      type: "enabled",
-      budget_tokens: 1024,
-    });
+    expect((firstCall(calls).params as { thinking?: { budget_tokens?: number } }).thinking).toEqual(
+      {
+        type: "enabled",
+        budget_tokens: 1024,
+      },
+    );
   });
 
   it("drops temperature when extended thinking is enabled", async () => {

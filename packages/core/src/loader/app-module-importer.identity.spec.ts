@@ -4,7 +4,10 @@ import { IdentityFixture } from "./__fixtures__/identity-fixture";
 import { importAppModule, setAppModuleImporter } from "./app-module-importer";
 
 const fixtureUrl = pathToFileURL(
-  new URL("./__fixtures__/identity-fixture.ts", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
+  new URL("./__fixtures__/identity-fixture.ts", import.meta.url).pathname.replace(
+    /^\/([A-Za-z]:)/,
+    "$1",
+  ),
 ).href;
 
 describe("importAppModule class identity under Vitest", () => {

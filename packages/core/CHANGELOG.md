@@ -31,8 +31,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optional Oxlint background file checks during development. Install Oxlint in the app and add `.oxlintrc.json`, `.oxlintrc.jsonc`, `oxlint.config.ts` or `oxlint.config.mts`; changed files are linted in sequential batches in a worker and JSON diagnostics appear with rule, location and severity. Large boot scans stay within platform command-line limits, tool/config failures include actionable CLI output, and results omit source contents. Both configured ESLint and Oxlint run by default; ESLint still needs only its app configuration and uses core's own dependency. `devServer.healthCheckers` also accepts `{ typescript?, eslint?, oxlint? }` switches while preserving custom arrays and `false`.
 - Real Redis integration coverage for cache-backed HTTP rate-limit stores, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with `WARLOCK_REDIS_INTEGRATION=1`; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys.
 
-
-
 - Image variants support object-storage disks through `resolveImageVariant`, `createUploadedFileController` and `generateImageVariants({ disk, urlPrefix })`. Remote originals retain their driver URL; derivatives are cached locally, with bounded source reads and generation keys that isolate buckets and tenant prefixes. ETag metadata avoids downloads on cache hits; sources without an ETag use content hashes. Concurrent downloads are shared, and ingest downloads once for all variants/formats. The default public uploads controller keeps returning 404 for cloud default disks; an explicit `disk` or `remote: true` deliberately opts a controller into cloud serving.
 - `uploads.images.maxCacheBytes` (default 512 MiB) and `maxCacheAge` (default seven days) bound cached derivatives. Expired hits render again; cleanup removes expired and oldest files, retaining the derivative being returned even when it alone exceeds the byte budget. Writes schedule a coalesced background sweep at most once per minute; hits never walk the cache and the byte budget is eventual. Idle caches are reclaimed after their next generated derivative.
 - SSE supports unnamed events (`send(undefined, data)`) and raw string payloads through a fourth `{ raw: true }` argument, with safe multiline `data:` encoding. SSE and streams accept explicit cache `headers` before flushing while protecting protocol/drain headers and keeping safe cache defaults.
@@ -50,7 +48,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Generator selection prompts reject an empty choices list before opening terminal input; indexed reads retain their validated bounds under stricter compiler checks.
 
 - Framework HTTP/2 servers start with default shutdown options and track sessions even without HTTP/1 idle-connection support. Graceful HTTP/2 drains close sessions after active streams finish without setting forbidden connection headers. SSE and stream helpers omit HTTP/1 framing headers on HTTP/2.
-
 
 - Both sse() and stream() ignore caller Content-Length, Transfer-Encoding, Content-Type, Connection, Keep-Alive, Proxy-Connection and Upgrade option headers. HTTP/1.1 retains chunked framing and reusable connections; HTTP/1.0 remains close-delimited without Transfer-Encoding.
 - Generated Vitest configuration discovers both `.test.ts` and `.spec.ts`, including notification controller specs. Existing apps should use `include: ["src/app/**/*.{test,spec}.ts"]`.
@@ -721,14 +718,14 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
   verbatim and live, and its failure summary now reports whether a cause actually arrived:
   `the cause is printed above, in the application's own output` when output was seen, and
   `no output was captured from the application process — its cause did not reach this
-terminal` when none was. It previously pointed at "above" unconditionally, which on a
+  terminal` when none was. It previously pointed at "above" unconditionally, which on a
   silent child meant pointing at an empty terminal
 
 - **The HTTP connector now preflights its port before binding.** `warlock dev` and
   `warlock start` both go through `HttpConnector.start()`, which now calls
   `assertPortIsAvailable(port, host)` immediately before `listen()`. A collision now
   surfaces as `EADDRINUSE: Port <port> is already in use on <host>. Stop the dev server
-(or whatever else is listening on port <port>) and run again...` — the code and the
+  (or whatever else is listening on port <port>) and run again...` — the code and the
   port named in the same sentence — instead of a bare `EADDRINUSE` thrown from inside
   Fastify with no indication of which port it meant. `EACCES` on the port is treated
   the same way, since "cannot bind" is one problem from the operator's side. The test

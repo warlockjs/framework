@@ -22,12 +22,12 @@ export default Migration.create(Notification, notificationColumns(Notification))
 `notificationColumns(Notification)` reads the model's `columnMap` and returns the
 matching columns:
 
-| columnMap | Columns |
-|---|---|
-| _(none / default)_ | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
-| `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only |
-| `{ isRead: "is_read" }` | swaps `read_at` for `is_read` (indexed boolean) |
-| `{ isRead: "is_read", readAt: "read_at" }` | both read-state columns |
+| columnMap                                          | Columns                                                                     |
+| -------------------------------------------------- | --------------------------------------------------------------------------- |
+| _(none / default)_                                 | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
+| `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only                                        |
+| `{ isRead: "is_read" }`                            | swaps `read_at` for `is_read` (indexed boolean)                             |
+| `{ isRead: "is_read", readAt: "read_at" }`         | both read-state columns                                                     |
 
 The recipient / tenant / read-state column NAMES come from `columnMap`; `type` /
 `title` / `body` / `payload` / `idempotency_key` are fixed. `id` / `createdAt` /
@@ -40,7 +40,10 @@ are `bigint`, `integer`, or strings, pass `idType`; it is applied to every
 identifier column the factory creates:
 
 ```ts
-export default Migration.create(Notification, notificationColumns(Notification, { idType: "bigint" }));
+export default Migration.create(
+  Notification,
+  notificationColumns(Notification, { idType: "bigint" }),
+);
 ```
 
 ## With extras — spread + extend

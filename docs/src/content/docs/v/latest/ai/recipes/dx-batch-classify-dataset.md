@@ -54,7 +54,8 @@ const classifier = ai.agent({
   model: openai.model({ name: "gpt-4o-mini" }),
   output: classificationSchema,
   maxTrips: 1,
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You triage inbound customer-support tickets.")
     .instruction("Pick the single best category and urgency. Be decisive."),
 });
@@ -70,32 +71,27 @@ import type { AgentResult } from "@warlock.js/ai";
 // 10,000 ticket bodies — loaded from CSV, a queue, wherever.
 const tickets: string[] = await loadTicketBodies();
 
-const result = await ai.batch<string, unknown, AgentResult<Classification>>(
-  classifier,
-  tickets,
-  {
-    name: "nightly-triage",
-    concurrency: 8,
-    retry: {
-      attempts: 3,
-      backoff: "exponential",
-      // Don't burn a retry on a deterministic schema/validation failure —
-      // only retry the transient provider-side errors.
-      retryOn: (error) => {
-        const code = (error as { code?: string }).code ?? "";
-        return code === "PROVIDER_RATE_LIMIT" || code === "PROVIDER_UNAVAILABLE";
-      },
-      onRetry: (attempt, error) =>
-        console.warn(`retry #${attempt}:`, (error as Error).message),
+const result = await ai.batch<string, unknown, AgentResult<Classification>>(classifier, tickets, {
+  name: "nightly-triage",
+  concurrency: 8,
+  retry: {
+    attempts: 3,
+    backoff: "exponential",
+    // Don't burn a retry on a deterministic schema/validation failure —
+    // only retry the transient provider-side errors.
+    retryOn: (error) => {
+      const code = (error as { code?: string }).code ?? "";
+      return code === "PROVIDER_RATE_LIMIT" || code === "PROVIDER_UNAVAILABLE";
     },
-    onItem: (item) => {
-      // Fires once per row the moment it settles — stream progress to a log.
-      if (item.status !== "completed") {
-        console.warn(`row ${item.index} ${item.status} after ${item.attempts} attempt(s)`);
-      }
-    },
+    onRetry: (attempt, error) => console.warn(`retry #${attempt}:`, (error as Error).message),
   },
-);
+  onItem: (item) => {
+    // Fires once per row the moment it settles — stream progress to a log.
+    if (item.status !== "completed") {
+      console.warn(`row ${item.index} ${item.status} after ${item.attempts} attempt(s)`);
+    }
+  },
+});
 ```
 
 `ai.batch` is generic over the executable's result type. Pinning the third type parameter to `AgentResult<Classification>` makes each `item.result` fully typed — `item.result?.data` is `Classification | undefined`, not `unknown`.

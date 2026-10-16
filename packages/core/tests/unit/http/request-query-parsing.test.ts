@@ -60,9 +60,9 @@ describe("Request — bracket-notation query parsing", () => {
     });
 
     it("keeps sibling keys at the same depth", () => {
-      expect(
-        parseQuery({ "filter[status]": "active", "filter[tier]": "gold" }),
-      ).toEqual({ filter: { status: "active", tier: "gold" } });
+      expect(parseQuery({ "filter[status]": "active", "filter[tier]": "gold" })).toEqual({
+        filter: { status: "active", tier: "gold" },
+      });
     });
   });
 

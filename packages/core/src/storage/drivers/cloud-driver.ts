@@ -913,7 +913,8 @@ export abstract class CloudDriver<
         Bucket: this.options.bucket,
         CopySource: this.copySource(from),
         Key: to,
-        ...(this.visibilityMode === "acl" && visibility === "public" && { ACL: "public-read" as const }),
+        ...(this.visibilityMode === "acl" &&
+          visibility === "public" && { ACL: "public-read" as const }),
       });
 
       const result = await this.client.send(command);

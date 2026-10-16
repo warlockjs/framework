@@ -12,11 +12,15 @@ describe("routeIdentityKey", () => {
 
   it("keeps optional params distinct from required ones", () => {
     expect(routeIdentityKey({ path: "/blog/:x?" })).toBe(routeIdentityKey({ path: "/blog/:y?" }));
-    expect(routeIdentityKey({ path: "/blog/:x?" })).not.toBe(routeIdentityKey({ path: "/blog/:x" }));
+    expect(routeIdentityKey({ path: "/blog/:x?" })).not.toBe(
+      routeIdentityKey({ path: "/blog/:x" }),
+    );
   });
 
   it("keeps wildcards distinct from params and static segments", () => {
-    expect(routeIdentityKey({ path: "/files/*" })).not.toBe(routeIdentityKey({ path: "/files/:x" }));
+    expect(routeIdentityKey({ path: "/files/*" })).not.toBe(
+      routeIdentityKey({ path: "/files/:x" }),
+    );
     expect(routeIdentityKey({ path: "/files/:rest*" })).not.toBe(
       routeIdentityKey({ path: "/files/:rest" }),
     );

@@ -28,7 +28,7 @@ const DANGEROUS_KEYS = ["__proto__", "constructor", "prototype"] as const;
 function withoutDangerousKeys<T>(updates: T): T {
   if (!updates || typeof updates !== "object") return updates;
 
-  const hasDangerousKey = DANGEROUS_KEYS.some(key =>
+  const hasDangerousKey = DANGEROUS_KEYS.some((key) =>
     Object.prototype.hasOwnProperty.call(updates, key),
   );
 

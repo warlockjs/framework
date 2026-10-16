@@ -18,7 +18,7 @@ Work top to bottom — the order roughly follows boot: secrets first, then the t
 
 ## Request surface (body limits & input)
 
-- [ ] **Check `http.bodyLimit`, and add `middleware.maxBodySize()`** on routes that accept user payloads. **Since 4.13.0 the default is Fastify's own 1 MB** — before that it was 200 GB, which *replaced* Fastify's protection, so an app configuring nothing had effectively no cap. **If you are upgrading from ≤ 4.12.0 and relied on large bodies being accepted, set `bodyLimit` explicitly.** See [Security → hardening checklist](./security.md).
+- [ ] **Check `http.bodyLimit`, and add `middleware.maxBodySize()`** on routes that accept user payloads. **Since 4.13.0 the default is Fastify's own 1 MB** — before that it was 200 GB, which _replaced_ Fastify's protection, so an app configuring nothing had effectively no cap. **If you are upgrading from ≤ 4.12.0 and relied on large bodies being accepted, set `bodyLimit` explicitly.** See [Security → hardening checklist](./security.md).
 - [ ] **Attach a validation schema to every controller that takes input.** Constrain enums, lengths, and required fields so malformed input is rejected before the handler runs. See [Validation](../the-basics/validation.md).
 - [ ] **Sanitize storage keys and locations derived from request input.** Never pass a raw filename / `:id` / `?path=` into `storage.get/put/path`. The local driver rejects paths that escape the storage root, but you should still restrict keys to a known per-tenant prefix and strip `..` segments — and cloud drivers have no filesystem root to contain you, so sanitization is entirely on you there. See [Storage → gotchas](./storage.md).
 

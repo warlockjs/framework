@@ -294,13 +294,13 @@ await placeOrderUseCase(input, {
 });
 ```
 
-| Field         | Use                                              |
-| ------------- | ------------------------------------------------ |
-| `id`          | Override the auto-generated execution id         |
-| `ctx`         | Pre-populated context object                     |
-| `onExecuting` | Invocation-level lifecycle callback              |
-| `onCompleted` | Invocation-level lifecycle callback              |
-| `onError`     | Invocation-level lifecycle callback              |
+| Field         | Use                                      |
+| ------------- | ---------------------------------------- |
+| `id`          | Override the auto-generated execution id |
+| `ctx`         | Pre-populated context object             |
+| `onExecuting` | Invocation-level lifecycle callback      |
+| `onCompleted` | Invocation-level lifecycle callback      |
+| `onError`     | Invocation-level lifecycle callback      |
 
 Invocation-level callbacks fire **first**, before the use-case-level callback, before any global subscribers. The order is: invocation → use-case definition → global.
 

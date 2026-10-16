@@ -50,7 +50,7 @@ describe("composePageModule", () => {
         "src/web/index.page.tsx",
         "src/web/index.setup.ts",
       ),
-    ).toThrow('setup files may export only config, loader, or register');
+    ).toThrow("setup files may export only config, loader, or register");
   });
 
   it("returns the same namespace for the same ui/setup pair so register() runs once", () => {

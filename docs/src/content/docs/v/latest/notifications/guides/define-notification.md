@@ -12,7 +12,10 @@ const orderShipped = defineNotification<{ order: Order }>({
   type: "order.shipped",
   via: ["database", "mail"],
   database: ({ order }) => ({ title: `Order #${order.number} shipped` }),
-  mail: ({ order }, to) => ({ subject: `Order #${order.number}`, html: `<p>Hi ${to.get("name")}</p>` }),
+  mail: ({ order }, to) => ({
+    subject: `Order #${order.number}`,
+    html: `<p>Hi ${to.get("name")}</p>`,
+  }),
 });
 ```
 
@@ -43,21 +46,21 @@ The `database` renderer may omit `type` — it's inherited from `def.type`, so t
 ## Fire it
 
 ```ts
-await orderShipped.send(user, { order });                 // sync, one recipient
-await orderShipped.send([buyer, seller], { order });      // fan-out
+await orderShipped.send(user, { order }); // sync, one recipient
+await orderShipped.send([buyer, seller], { order }); // fan-out
 await orderShipped.queue(user, { order }, { delay: "10m" }); // async (queue dispatcher)
-await orderShipped.only("mail").send(user, { order });    // subset of channels
+await orderShipped.only("mail").send(user, { order }); // subset of channels
 ```
 
 `.send` and `.queue` take an optional 3rd `SendOptions`:
 
-| Option | Effect |
-| --- | --- |
-| `delay` | Reserved — **not honored yet**; both `.send()` and the current `.queue()` worker dispatch immediately (delay-aware delivery is a follow-up) |
-| `locale` | Passed to renderers via `ctx` |
-| `meta` | Passed to renderers + included in every observability event |
-| `idempotencyKey` | Dedupe the in-app row on retry |
-| `force` | Bypass preferences (NOT rate limits) |
+| Option           | Effect                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `delay`          | Reserved — **not honored yet**; both `.send()` and the current `.queue()` worker dispatch immediately (delay-aware delivery is a follow-up) |
+| `locale`         | Passed to renderers via `ctx`                                                                                                               |
+| `meta`           | Passed to renderers + included in every observability event                                                                                 |
+| `idempotencyKey` | Dedupe the in-app row on retry                                                                                                              |
+| `force`          | Bypass preferences (NOT rate limits)                                                                                                        |
 
 ## Failure semantics
 

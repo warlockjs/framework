@@ -6,7 +6,7 @@ sidebar:
   label: "Evaluation and datasets"
 ---
 
-This page is about the **mechanics that turn `agent.eval` into a CI gate**: where the cases come from (`ai.dataset()`), how a run is judged against the last good run (`baseline` / `tolerance` → `report.regression`), and how the result lands in CI (`ai.eval.toJUnit` / `toJSON` / `fromJSON`). For the philosophy of *what* to test and *when*, see [Testing and evals](/v/latest/ai/best-practices/testing-and-evals/); this page is the toolkit those practices stand on.
+This page is about the **mechanics that turn `agent.eval` into a CI gate**: where the cases come from (`ai.dataset()`), how a run is judged against the last good run (`baseline` / `tolerance` → `report.regression`), and how the result lands in CI (`ai.eval.toJUnit` / `toJSON` / `fromJSON`). For the philosophy of _what_ to test and _when_, see [Testing and evals](/v/latest/ai/best-practices/testing-and-evals/); this page is the toolkit those practices stand on.
 
 ## `ai.dataset()` — a taggable, filterable, shardable case set
 
@@ -17,9 +17,7 @@ import { ai } from "@warlock.js/ai";
 
 const ds = ai.dataset({
   name: "support",
-  cases: [
-    { name: "greeting", input: "hi", expected: "Hello", tags: ["smoke"] },
-  ],
+  cases: [{ name: "greeting", input: "hi", expected: "Hello", tags: ["smoke"] }],
   fromFile: "./eval/support.jsonl", // appended after inline `cases`
 });
 
@@ -80,9 +78,9 @@ expect(report.regression?.passed).toBe(true);
 ```ts
 type EvalRegression = {
   regressed: Array<{ name: string; before: number; after: number }>;
-  removed: string[];  // in baseline, absent now
-  added: string[];    // new now, absent in baseline
-  passed: boolean;    // true when `regressed` is empty
+  removed: string[]; // in baseline, absent now
+  added: string[]; // new now, absent in baseline
+  passed: boolean; // true when `regressed` is empty
 };
 ```
 
@@ -141,7 +139,7 @@ describe.runIf(hasKeys)("support-agent quality", () => {
 
     await writeFile("./report.junit.xml", ai.eval.toJUnit(report));
 
-    expect(report.passed).toBe(true);            // every case passed outright
+    expect(report.passed).toBe(true); // every case passed outright
     expect(report.regression?.passed).toBe(true); // nothing got worse vs baseline
   });
 });
@@ -153,4 +151,4 @@ Gate the live quality suite behind `describe.runIf(hasKeys)` so the fast, offlin
 
 - [Testing and evals](/v/latest/ai/best-practices/testing-and-evals/) — the philosophy: split deterministic wiring tests from live quality evals; seed cases from production failures.
 - [Record / replay testing](/v/latest/ai/testing/record-replay-testing/) — make the live eval suite deterministic and free by replaying recorded model calls.
-- [Prompt registry](/v/latest/ai/prompts/prompt-registry/) — `validate()` lints prompt *text*; `agent.eval` measures the *behaviour* it produces.
+- [Prompt registry](/v/latest/ai/prompts/prompt-registry/) — `validate()` lints prompt _text_; `agent.eval` measures the _behaviour_ it produces.

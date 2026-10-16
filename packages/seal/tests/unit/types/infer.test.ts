@@ -23,9 +23,7 @@ describe("Infer (type-level)", () => {
       expectTypeOf<Infer<ReturnType<typeof v.number>>>().toEqualTypeOf<number>();
       expectTypeOf<Infer<ReturnType<typeof v.boolean>>>().toEqualTypeOf<boolean>();
       expectTypeOf<Infer<ReturnType<typeof v.date>>>().toEqualTypeOf<Date>();
-      expectTypeOf<Infer<ReturnType<typeof v.scalar>>>().toEqualTypeOf<
-        string | number | boolean
-      >();
+      expectTypeOf<Infer<ReturnType<typeof v.scalar>>>().toEqualTypeOf<string | number | boolean>();
     });
   });
 

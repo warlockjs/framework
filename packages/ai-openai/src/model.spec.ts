@@ -1382,7 +1382,8 @@ describe("OpenAIModel.stream()", () => {
     const model = new OpenAIModel(client, { name: "o3-mini" });
 
     let final:
-      { input: number; output: number; total: number; reasoningTokens?: number } | undefined;
+      | { input: number; output: number; total: number; reasoningTokens?: number }
+      | undefined;
     for await (const event of model.stream([{ role: "user", content: "hi" }])) {
       if (event.type === "done") final = event.usage;
     }

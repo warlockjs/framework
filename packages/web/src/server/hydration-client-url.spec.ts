@@ -335,9 +335,11 @@ describe("resolveSiteHydrationClientUrls", () => {
   it("refuses by name a site the client build has no entry for", () => {
     const clientDir = makeClientDir(multiSiteManifest);
 
-    expect(() => resolveSiteHydrationClientUrls({ clientDir, sites: ["landing", "platform"] })).toThrow(
-      WebClientManifestEntryMissingError,
+    expect(() =>
+      resolveSiteHydrationClientUrls({ clientDir, sites: ["landing", "platform"] }),
+    ).toThrow(WebClientManifestEntryMissingError);
+    expect(() => resolveSiteHydrationClientUrls({ clientDir, sites: ["platform"] })).toThrow(
+      /hydration-platform/,
     );
-    expect(() => resolveSiteHydrationClientUrls({ clientDir, sites: ["platform"] })).toThrow(/hydration-platform/);
   });
 });

@@ -115,16 +115,16 @@ same nonce reaches the page's `<script>` tags.
 
 ## Which layer holds what
 
-| Setting                                                | Layer                          |
-| ------------------------------------------------------ | ------------------------------ |
-| Build/bundler options (minify, sourcemap, outFile)     | `warlock.config.ts > build`    |
-| Dev server (HMR scope, health checkers, typings)       | `warlock.config.ts > devServer`|
-| Package migrations (external `@warlock.js/*` packages) | `warlock.config.ts > database` |
-| CLI commands (registered via `warlock <cmd>`)          | `warlock.config.ts > cli`      |
-| HTTP server tuning per env (port, host, retry)         | `warlock.config.ts > server`   |
-| HTTP runtime (CORS, cookies, rate limits, upload size) | `src/config/http.ts`           |
-| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`        |
-| Subsystem configs (auth, mail, storage, cache, ai, …)  | `src/config/<name>.ts`         |
+| Setting                                                    | Layer                           |
+| ---------------------------------------------------------- | ------------------------------- |
+| Build/bundler options (minify, sourcemap, outFile)         | `warlock.config.ts > build`     |
+| Dev server (HMR scope, health checkers, typings)           | `warlock.config.ts > devServer` |
+| Package migrations (external `@warlock.js/*` packages)     | `warlock.config.ts > database`  |
+| CLI commands (registered via `warlock <cmd>`)              | `warlock.config.ts > cli`       |
+| HTTP server tuning per env (port, host, retry)             | `warlock.config.ts > server`    |
+| HTTP runtime (CORS, cookies, rate limits, upload size)     | `src/config/http.ts`            |
+| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`             |
+| Subsystem configs (auth, mail, storage, cache, ai, …)      | `src/config/<name>.ts`          |
 
 Heuristic: if the setting changes how the framework **boots, builds, or scaffolds**, it goes in `warlock.config.ts`. If it changes how a **subsystem behaves at runtime**, it goes in `src/config/`.
 
@@ -139,10 +139,10 @@ Heuristic: if the setting changes how the framework **boots, builds, or scaffold
 ```ts
 import { env } from "@warlock.js/core";
 
-env("HTTP_PORT", 3000);             // number
-env("CACHE_LOGGING", false);        // boolean
+env("HTTP_PORT", 3000); // number
+env("CACHE_LOGGING", false); // boolean
 env("BASE_URL", "http://localhost:3000"); // string
-env("REDIS_URL");                   // undefined if unset
+env("REDIS_URL"); // undefined if unset
 ```
 
 `env` is re-exported from `@warlock.js/core` (sourced from `@mongez/dotenv`). Use this — not `process.env.X` — so callers consistently get coerced values.

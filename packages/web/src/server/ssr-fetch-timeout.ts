@@ -52,7 +52,12 @@ export function withSsrFetchTimeout<T>(
 
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
-      reject(new SsrModuleFetchTimeoutError(typeof moduleId === "function" ? moduleId() : moduleId, Date.now() - startedAt));
+      reject(
+        new SsrModuleFetchTimeoutError(
+          typeof moduleId === "function" ? moduleId() : moduleId,
+          Date.now() - startedAt,
+        ),
+      );
     }, timeoutMs);
     timer.unref?.();
   });

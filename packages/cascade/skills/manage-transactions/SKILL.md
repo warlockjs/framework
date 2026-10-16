@@ -92,9 +92,12 @@ Throwing works too (and re-throws to the caller); `ctx.rollback()` is the non-th
 Default is the driver's default (typically `READ COMMITTED`). Request a different level via `isolationLevel`:
 
 ```ts
-await transaction(async () => {
-  /* ... */
-}, { isolationLevel: "SERIALIZABLE" });
+await transaction(
+  async () => {
+    /* ... */
+  },
+  { isolationLevel: "SERIALIZABLE" },
+);
 ```
 
 On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurrent transactions conflict — wrap in retry logic at the caller.
@@ -104,21 +107,24 @@ On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurre
 Pass `settings` to configure PostgreSQL values only for the current transaction. This is useful for row-level security context, timeouts, and schema selection; Cascade applies each value with parameterized `set_config(..., true)`, so it cannot leak back into the pool:
 
 ```ts
-await transaction(async () => {
-  await Invoice.query().get();
-}, {
-  settings: {
-    "app.tenant_id": tenantId,
-    statement_timeout: 5_000,
+await transaction(
+  async () => {
+    await Invoice.query().get();
   },
-});
+  {
+    settings: {
+      "app.tenant_id": tenantId,
+      statement_timeout: 5_000,
+    },
+  },
+);
 ```
 
 ## Row locking — `lockForUpdate({ skipLocked })` (Postgres)
 
 Chain `lockForUpdate()` on any query to emit `SELECT ... FOR UPDATE`: the matched rows are locked until the transaction ends, so no other transaction can modify or lock them. Only meaningful **inside** a transaction — outside one the lock releases immediately.
 
-`{ skipLocked: true }` adds `SKIP LOCKED` — rows another transaction already holds are silently skipped instead of waited on. That is the standard concurrent queue-claim shape: N workers each grab *different* pending rows with no double-processing and no blocking.
+`{ skipLocked: true }` adds `SKIP LOCKED` — rows another transaction already holds are silently skipped instead of waited on. That is the standard concurrent queue-claim shape: N workers each grab _different_ pending rows with no double-processing and no blocking.
 
 ```ts
 import { transaction } from "@warlock.js/cascade";
@@ -184,7 +190,7 @@ const { rows: counts } = await dataSource.raw<{ count: number }>(
 
 ### Native-array columns (`JSONB[]` / `TEXT[]` / `INTEGER[]`)
 
-From a value alone the serializer can't tell a `json` / `jsonb` column (which needs JSON text) from a genuine **native-array** column (`arrayJson()` → `JSONB[]`, `arrayText()` → `TEXT[]`, …, which needs the raw JS array so node-pg emits a `{...}` literal). Guess wrong and Postgres rejects the insert with *"malformed array literal"*.
+From a value alone the serializer can't tell a `json` / `jsonb` column (which needs JSON text) from a genuine **native-array** column (`arrayJson()` → `JSONB[]`, `arrayText()` → `TEXT[]`, …, which needs the raw JS array so node-pg emits a `{...}` literal). Guess wrong and Postgres rejects the insert with _"malformed array literal"_.
 
 **This is handled automatically.** On connect the driver introspects `information_schema` once and remembers which columns are native arrays **per table**, so `arrayText()` / `arrayJson()` columns just work with **no configuration**. Because it's per-table, the same column name being `TEXT[]` in one table and `jsonb` in another is encoded correctly for each; the pgvector all-number array form is still preserved.
 

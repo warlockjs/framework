@@ -16,9 +16,7 @@ const routerMock = vi.hoisted(() => ({
   removeRoutesBySourceFile: vi.fn(),
   // withSourceFile must run the callback so a throwing route file's error
   // propagates exactly as the real router does (it rethrows after logging).
-  withSourceFile: vi.fn(
-    async (_sourceFile: string, callback: () => unknown) => await callback(),
-  ),
+  withSourceFile: vi.fn(async (_sourceFile: string, callback: () => unknown) => await callback()),
 }));
 
 vi.mock("../../../src/router/router", () => ({ router: routerMock }));
@@ -72,10 +70,7 @@ afterAll(() => {
 
 describe("ModuleLoader.loadModule — failure surfacing", () => {
   it("rethrows (as ModuleLoadError) when a route module throws on load", async () => {
-    const path = fixture(
-      "throwing-route.mjs",
-      `throw new Error("route registration blew up");`,
-    );
+    const path = fixture("throwing-route.mjs", `throw new Error("route registration blew up");`);
     const file = fakeFile(path, "src/app/store/routes.ts");
     const loader = new ModuleLoader(collectorWith({}));
 

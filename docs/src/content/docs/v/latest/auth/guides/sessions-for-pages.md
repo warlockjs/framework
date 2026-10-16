@@ -19,16 +19,16 @@ router.get("/me", handler, { middleware: [sessionMiddleware({ optional: true })]
 
 ## Options
 
-| Option | Default |
-|---|---|
-| `project` (`pageSession` only, required) | none |
-| `cookie` | `auth.cookie.name` (`access_token`) |
-| `refreshCookie` | `auth.cookie.refreshName` (`refresh_token`) |
-| `sources` | `["cookie", "header"]` |
-| `renew` | `true` (cookie source only) |
-| `userTypes` | `auth.defaultUserType`; renewal needs exactly one |
-| `maxAge` | `auth.session.maxAge`, else `"30d"` |
-| `overlapMs` | renewal default (5 s, capped at 10 s) |
+| Option                                   | Default                                           |
+| ---------------------------------------- | ------------------------------------------------- |
+| `project` (`pageSession` only, required) | none                                              |
+| `cookie`                                 | `auth.cookie.name` (`access_token`)               |
+| `refreshCookie`                          | `auth.cookie.refreshName` (`refresh_token`)       |
+| `sources`                                | `["cookie", "header"]`                            |
+| `renew`                                  | `true` (cookie source only)                       |
+| `userTypes`                              | `auth.defaultUserType`; renewal needs exactly one |
+| `maxAge`                                 | `auth.session.maxAge`, else `"30d"`               |
+| `overlapMs`                              | renewal default (5 s, capped at 10 s)             |
 
 `sessionMiddleware` also takes `optional` (guests pass with no user instead of a 401) and puts the user on `request.locals.user`.
 
@@ -65,7 +65,12 @@ export const config = {
 } satisfies PageConfig;
 
 export async function action({ request, response }: PageActionContext<typeof config.action>) {
-  const result = await authService.loginWithSessionCookies(request, response, User, request.validated());
+  const result = await authService.loginWithSessionCookies(
+    request,
+    response,
+    User,
+    request.validated(),
+  );
 
   if (!result) return response.unauthorized({ message: "Invalid email or password." });
 
@@ -76,7 +81,11 @@ export async function action({ request, response }: PageActionContext<typeof con
 export const actions = {
   logout: async ({ request, response, session }: PageActionContext) => {
     if (session?.model) {
-      await authService.logout(session.model, request.cookie("access_token"), request.cookie("refresh_token"));
+      await authService.logout(
+        session.model,
+        request.cookie("access_token"),
+        request.cookie("refresh_token"),
+      );
     }
 
     authService.clearSessionCookies(response);

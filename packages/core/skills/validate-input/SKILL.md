@@ -53,29 +53,29 @@ Scaffold with `npx warlock generate.controller <module>/<action> --with-validati
 
 From `@warlock.js/seal` — **always import from seal directly**. `@warlock.js/core` does not re-export `v`/`Infer`.
 
-| Factory                            | Output type                  | Common chain                                     |
-| ---------------------------------- | ---------------------------- | ------------------------------------------------ |
-| `v.string(msg?)`                   | `string`                     | `.min(n)`, `.max(n)`, `.length(n)`, `.pattern(re)`, `.email()`, `.url()`, `.oneOf([...])`, `.trim()`, `.lowercase()`, `.uppercase()` |
-| `v.email(msg?)`                    | `string`                     | (alias of `v.string().email()`)                  |
-| `v.number(msg?)`                   | `number`                     | `.min(n)`, `.max(n)`, `.positive()`              |
-| `v.numeric(msg?)`                  | `number` (accepts numeric strings) | same                                        |
-| `v.int(msg?)`                      | `number` (integer)           | same                                             |
-| `v.float(msg?)`                    | `number`                     | same                                             |
-| `v.boolean(msg?)`                  | `boolean`                    | —                                                |
-| `v.date(msg?)`                     | `Date`                       | —                                                |
-| `v.array(inner, msg?)`             | `T[]`                        | `.minLength(n)`, `.maxLength(n)`                 |
-| `v.object(shape, msg?)`            | `{ ... }`                    | —                                                |
-| `v.record(value, msg?)`            | `Record<string, T>`          | —                                                |
-| `v.tuple([a, b, c], msg?)`         | `[A, B, C]`                  | —                                                |
-| `v.union([a, b], msg?)`            | `A | B`                      | —                                                |
-| `v.discriminatedUnion(key, [...])` | `A | B` (tagged)             | each branch must be `v.object({ key: v.literal(...) })` |
-| `v.enum([...] | EnumObj, msg?)`    | literal union                | —                                                |
-| `v.literal(...values)`             | exact literals               | —                                                |
-| `v.instanceof(Ctor, msg?)`         | `Ctor` instances             | —                                                |
-| `v.lazy(() => schema)`             | recursive/forward refs       | —                                                |
-| `v.file(msg?)`                     | `UploadedFile`               | `.image()`, `.accept(exts)`, `.mimeType(types)`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(n)`, `.maxWidth(n)` — see the `upload-file` topic |
-| `v.computed(callback)`             | derived value                | —                                                |
-| `v.managed(callback)`              | framework-injected value     | —                                                |
+| Factory                            | Output type                        | Common chain                                                                                                                                |
+| ---------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v.string(msg?)`                   | `string`                           | `.min(n)`, `.max(n)`, `.length(n)`, `.pattern(re)`, `.email()`, `.url()`, `.oneOf([...])`, `.trim()`, `.lowercase()`, `.uppercase()`        |
+| `v.email(msg?)`                    | `string`                           | (alias of `v.string().email()`)                                                                                                             |
+| `v.number(msg?)`                   | `number`                           | `.min(n)`, `.max(n)`, `.positive()`                                                                                                         |
+| `v.numeric(msg?)`                  | `number` (accepts numeric strings) | same                                                                                                                                        |
+| `v.int(msg?)`                      | `number` (integer)                 | same                                                                                                                                        |
+| `v.float(msg?)`                    | `number`                           | same                                                                                                                                        |
+| `v.boolean(msg?)`                  | `boolean`                          | —                                                                                                                                           |
+| `v.date(msg?)`                     | `Date`                             | —                                                                                                                                           |
+| `v.array(inner, msg?)`             | `T[]`                              | `.minLength(n)`, `.maxLength(n)`                                                                                                            |
+| `v.object(shape, msg?)`            | `{ ... }`                          | —                                                                                                                                           |
+| `v.record(value, msg?)`            | `Record<string, T>`                | —                                                                                                                                           |
+| `v.tuple([a, b, c], msg?)`         | `[A, B, C]`                        | —                                                                                                                                           |
+| `v.union([a, b], msg?)`            | `A                                 | B`                                                                                                                                          | —                                                       |
+| `v.discriminatedUnion(key, [...])` | `A                                 | B` (tagged)                                                                                                                                 | each branch must be `v.object({ key: v.literal(...) })` |
+| `v.enum([...]                      | EnumObj, msg?)`                    | literal union                                                                                                                               | —                                                       |
+| `v.literal(...values)`             | exact literals                     | —                                                                                                                                           |
+| `v.instanceof(Ctor, msg?)`         | `Ctor` instances                   | —                                                                                                                                           |
+| `v.lazy(() => schema)`             | recursive/forward refs             | —                                                                                                                                           |
+| `v.file(msg?)`                     | `UploadedFile`                     | `.image()`, `.accept(exts)`, `.mimeType(types)`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(n)`, `.maxWidth(n)` — see the `upload-file` topic |
+| `v.computed(callback)`             | derived value                      | —                                                                                                                                           |
+| `v.managed(callback)`              | framework-injected value           | —                                                                                                                                           |
 
 Universal modifiers from `BaseValidator`: `.optional()`, `.nullable()`, `.default(value)`, `.catch(value)`. Note: **there is no `v.url(...)`** at factory level — use `v.string().url(...)`.
 
@@ -193,7 +193,7 @@ The framework calls `response.failedSchema(result)` which sends `422` by default
   "errors": [
     { "input": "email", "error": "The email must be a valid email" },
     { "input": "password", "error": "The password must be at least 6 characters" },
-  ]
+  ],
 }
 ```
 
@@ -296,7 +296,7 @@ updateProductController.validation = {
 ## Gotchas
 
 - **`v.url(...)` does not exist on the factory.** Use `v.string().url(...)`. Same goes for any other rule that's not in the table above — check `BaseValidator` / `StringValidator` first.
-- **`.optional()` and `.required()` are not symmetric.** `.optional()` brands the field as absent-allowed. `.required()` clears the optional flag *and* replaces any prior required rule — read seal's `BaseValidator` source if you need conditional required.
+- **`.optional()` and `.required()` are not symmetric.** `.optional()` brands the field as absent-allowed. `.required()` clears the optional flag _and_ replaces any prior required rule — read seal's `BaseValidator` source if you need conditional required.
 - **`uniqueExceptCurrentId` reads `request.input("id")`.** It only works inside an HTTP context — useless in CLI/job code.
 - **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment.
 - **Import `v`/`Infer` from `@warlock.js/seal`.** Core does not re-export them — `@warlock.js/seal` is the canonical and only home.

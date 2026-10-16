@@ -225,11 +225,18 @@ describe("FileEventHandler — batches are serialized (C2:B11)", () => {
     let releaseFirst!: () => void;
     const updateFile = vi
       .fn()
-      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (releaseFirst = () => resolve(true))))
+      .mockImplementationOnce(
+        () => new Promise<boolean>((resolve) => (releaseFirst = () => resolve(true))),
+      )
       .mockResolvedValue(true);
 
     const handler = new FileEventHandler(
-      { updateFile, addFile: vi.fn(), updateFileDependents: vi.fn(), syncFilesToManifest: vi.fn() } as never,
+      {
+        updateFile,
+        addFile: vi.fn(),
+        updateFileDependents: vi.fn(),
+        syncFilesToManifest: vi.fn(),
+      } as never,
       { save: vi.fn().mockResolvedValue(undefined) } as never,
       {} as never,
       new Map() as never,
@@ -262,7 +269,12 @@ describe("FileEventHandler — non-code include files", () => {
   it("reports a changed .sql include as a restart trigger, outside the module graph", async () => {
     const updateFile = vi.fn().mockResolvedValue(true);
     const handler = new FileEventHandler(
-      { updateFile, addFile: vi.fn(), updateFileDependents: vi.fn(), syncFilesToManifest: vi.fn() } as never,
+      {
+        updateFile,
+        addFile: vi.fn(),
+        updateFileDependents: vi.fn(),
+        syncFilesToManifest: vi.fn(),
+      } as never,
       { save: vi.fn().mockResolvedValue(undefined) } as never,
       {} as never,
       new Map() as never,

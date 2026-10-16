@@ -10,7 +10,8 @@ import type { RouteContext } from "../contracts/supervisor/route-context.type";
  * state without scripting an exact per-iteration sequence.
  */
 export type MockRouterDecision<TState = Record<string, unknown>> =
-  Next | ((context: RouteContext<TState>) => Next);
+  | Next
+  | ((context: RouteContext<TState>) => Next);
 
 /**
  * Behavior when the canned decision queue is exhausted before the

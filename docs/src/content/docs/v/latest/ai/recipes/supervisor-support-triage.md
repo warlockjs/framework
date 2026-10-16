@@ -10,14 +10,14 @@ This recipe builds a three-intent triage supervisor — `billing`, `tech`, `sale
 :::caution[Which triage pattern should I use?]
 Triage has a cost ladder. Pick the **cheapest** pattern your problem actually needs — don't reach for the router loop below until you've ruled out the rows above it. Each step up adds LLM round-trips.
 
-| Pattern | Routing cost | When to use it |
-| --- | --- | --- |
-| Deterministic `route` / `classifier.run` | Zero routing tokens — one specialist call | The intent is known from the input itself (a form field, an enum, a keyword rule). No model picks the route. |
-| Classifier fast-path | ~2 calls — one classify, one specialist | One specialist can answer the whole message, but you need a model to decide *which*. The classifier runs once on iteration zero. |
-| Single agent with tools | One call + tool trips | One agent can handle everything if it can reach for billing/tech lookups as tools, instead of handing off to separate specialist agents. |
-| Router + `evaluate` loop **(this recipe)** | ~2 calls per iteration — router decides, then a specialist runs | One message genuinely needs **multiple** specialists in sequence, and you need a verdict to decide when it's done. |
+| Pattern                                    | Routing cost                                                    | When to use it                                                                                                                           |
+| ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Deterministic `route` / `classifier.run`   | Zero routing tokens — one specialist call                       | The intent is known from the input itself (a form field, an enum, a keyword rule). No model picks the route.                             |
+| Classifier fast-path                       | ~2 calls — one classify, one specialist                         | One specialist can answer the whole message, but you need a model to decide _which_. The classifier runs once on iteration zero.         |
+| Single agent with tools                    | One call + tool trips                                           | One agent can handle everything if it can reach for billing/tech lookups as tools, instead of handing off to separate specialist agents. |
+| Router + `evaluate` loop **(this recipe)** | ~2 calls per iteration — router decides, then a specialist runs | One message genuinely needs **multiple** specialists in sequence, and you need a verdict to decide when it's done.                       |
 
-**This recipe demonstrates the heaviest pattern.** The router re-decides the next specialist on every iteration, so each turn costs a routing call plus a specialist call — justified only when a single message must pass through several specialists (billing *and* tech *and* a resolver). If one specialist can answer the whole message — the common case — use the cheaper [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/) instead.
+**This recipe demonstrates the heaviest pattern.** The router re-decides the next specialist on every iteration, so each turn costs a routing call plus a specialist call — justified only when a single message must pass through several specialists (billing _and_ tech _and_ a resolver). If one specialist can answer the whole message — the common case — use the cheaper [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/) instead.
 :::
 
 ## Setup
@@ -57,19 +57,22 @@ const billingAgent = ai.agent({
     billingFindings: v.string(),
     refundEligible: v.boolean(),
   }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a billing specialist for a SaaS product.")
     .instruction("Diagnose the billing issue and state plainly whether a refund is warranted."),
 });
 
 const techAgent = ai.agent({
   name: "tech",
-  description: "Handles bugs, errors, outages, login failures, and anything that looks like a product defect.",
+  description:
+    "Handles bugs, errors, outages, login failures, and anything that looks like a product defect.",
   model,
   output: v.object({
     techFindings: v.string(),
   }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a technical support engineer.")
     .instruction("Identify the likely root cause and the next diagnostic step. Be concrete."),
 });
@@ -81,7 +84,8 @@ const salesAgent = ai.agent({
   output: v.object({
     salesFindings: v.string(),
   }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a sales advisor.")
     .instruction("Recommend the right plan and explain the upgrade path in one short paragraph."),
 });
@@ -99,7 +103,8 @@ const resolverAgent = ai.agent({
   output: v.object({
     reply: v.string(),
   }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are the support lead who writes the final reply to the customer.")
     .instruction("Write one warm, direct reply. Use these findings:")
     .instruction("Billing: {{billing|none}}")
@@ -139,13 +144,16 @@ const triageRouter = ai.router({
     "findings, route to `resolver` to write the reply. Emit END only after `resolver` runs.",
 });
 
-const supportTriage = ai.supervisor<{ reply: string }, {
-  billingFindings?: string;
-  refundEligible?: boolean;
-  techFindings?: string;
-  salesFindings?: string;
-  reply?: string;
-}>({
+const supportTriage = ai.supervisor<
+  { reply: string },
+  {
+    billingFindings?: string;
+    refundEligible?: boolean;
+    techFindings?: string;
+    salesFindings?: string;
+    reply?: string;
+  }
+>({
   name: "support-triage",
   goal: "Resolve the customer's message with one clear reply, pulling in only the specialists the problem needs.",
   router: triageRouter,

@@ -175,10 +175,10 @@ These mutate the request's parsed payload. The merged `all()` and validated view
 `input()`, `all()`, and `validated()` work the same way however the body
 arrived. Every supported content type is parsed into the same body object:
 
-| Content type | Parsed by | Typical sender |
-| --- | --- | --- |
-| `application/json` | Fastify (built in) | API clients, `fetch` with a JSON body |
-| `multipart/form-data` | `@fastify/multipart` | forms with files. See [Files](#files) |
+| Content type                        | Parsed by                         | Typical sender                                                                                                                         |
+| ----------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `application/json`                  | Fastify (built in)                | API clients, `fetch` with a JSON body                                                                                                  |
+| `multipart/form-data`               | `@fastify/multipart`              | forms with files. See [Files](#files)                                                                                                  |
 | `application/x-www-form-urlencoded` | Warlock's own parser (since 5.16) | plain HTML `<form>` posts, OAuth `form_post` callbacks such as [Sign in with Apple](/v/latest/auth/guides/login-with-providers/#apple) |
 
 For urlencoded bodies, a key sent more than once becomes an array. Every other
@@ -287,7 +287,7 @@ Helpers for "who is this request":
 
 | Property                       | Type                  | Note                                                       |
 | ------------------------------ | --------------------- | ---------------------------------------------------------- |
-| `request.locals.user`                 | your user model       | populated by `authMiddleware`; `undefined` on guest routes |
+| `request.locals.user`          | your user model       | populated by `authMiddleware`; `undefined` on guest routes |
 | `request.id`                   | `string`              | 32-char request id, regenerated per request                |
 | `request.ip`                   | `string`              | client IP (Fastify's parsed value)                         |
 | `request.realIp`               | `string`              | proxy-aware (`x-real-ip` → `x-forwarded-for` → `ip`)       |

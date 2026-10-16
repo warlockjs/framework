@@ -333,7 +333,6 @@ pnpm test -t "creates a product"   # test name pattern
 - [Integration test recipe](../recipes/integration-tests.md) — end-to-end walkthrough of testing a CRUD controller.
 - [`warlock add` features](../cli/cli-commands.md) — what `warlock add test` installs.
 
-
 ### Verify shared rate limits against Redis
 
 Framework contributors can run the cache-backed rate-limit store checks from `packages/core` with `WARLOCK_REDIS_INTEGRATION=1 npx vitest run src/http/rate-limit-cache-store.redis.spec.ts`. The suite connects to `QUEUE_REDIS_HOST` / `QUEUE_REDIS_PORT` (defaults `127.0.0.1:6390`), uses isolated UUID-prefixed keys, and fails if the requested Redis service is unavailable. It exercises separate Redis clients, concurrent counts, preserved window deadlines, aligned window resets, and a seed that actually expires before its atomic increment. Without the opt-in flag it reports a local skip; CI enables it against its Redis service.

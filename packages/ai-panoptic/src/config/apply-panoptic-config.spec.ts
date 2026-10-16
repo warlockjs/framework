@@ -136,7 +136,9 @@ describe("applyPanopticConfig", () => {
   it("reads ai.config().panoptic through setAIConfig + the seam", () => {
     // setAIConfig stores the opaque slot; applying it wires the observer.
     const store = createInMemoryTraceStore();
-    setAIConfig({ panoptic: { exporters: [store as unknown as ExporterContract], observeAll: true } });
+    setAIConfig({
+      panoptic: { exporters: [store as unknown as ExporterContract], observeAll: true },
+    });
 
     applyPanopticConfig({ exporters: [store as unknown as ExporterContract], observeAll: true });
 

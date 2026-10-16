@@ -22,7 +22,11 @@ import type {
 } from "../../contracts/migration-driver.contract";
 import type { MigrationDefaults, UuidStrategy } from "../../types";
 import type { PostgresDriver } from "./postgres-driver";
-import { postgresTTLPurgeComment, registerPostgresTTLPurgeJob, unregisterPostgresTTLPurgeJob } from "./postgres-ttl-purge";
+import {
+  postgresTTLPurgeComment,
+  registerPostgresTTLPurgeJob,
+  unregisterPostgresTTLPurgeJob,
+} from "./postgres-ttl-purge";
 
 /**
  * PostgreSQL Migration Driver.
@@ -669,11 +673,12 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     const indexName = `idx_${table}_ttl_${column}`;
     const quotedIndexName = this.driver.dialect.quoteIdentifier(indexName);
 
-    await this.execute(
-      `CREATE INDEX ${quotedIndexName} ON ${quotedTable} (${quotedColumn})`,
-    );
+    await this.execute(`CREATE INDEX ${quotedIndexName} ON ${quotedTable} (${quotedColumn})`);
 
-    const comment = postgresTTLPurgeComment(table, column, expireAfterSeconds).replaceAll("'", "''");
+    const comment = postgresTTLPurgeComment(table, column, expireAfterSeconds).replaceAll(
+      "'",
+      "''",
+    );
     await this.execute(`COMMENT ON INDEX ${quotedIndexName} IS '${comment}'`);
 
     registerPostgresTTLPurgeJob(this.driver, table, column, expireAfterSeconds);

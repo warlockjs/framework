@@ -89,7 +89,9 @@ import { Link } from "@warlock.js/web";
 // Receives href + onClick from <Link>; it must put them on the element it renders.
 const BrandAnchor = forwardRef<HTMLAnchorElement, AnchorHTMLAttributes<HTMLAnchorElement>>(
   function BrandAnchor({ className, ...props }, ref) {
-    return <a ref={ref} {...props} className={["brand-anchor", className].filter(Boolean).join(" ")} />;
+    return (
+      <a ref={ref} {...props} className={["brand-anchor", className].filter(Boolean).join(" ")} />
+    );
   },
 );
 
@@ -149,7 +151,9 @@ export function NavLink({ activeName, section = false, className, ...link }: Nav
   return (
     <Link
       {...link}
-      className={[className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined}
+      className={
+        [className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined
+      }
       aria-current={isActive ? "page" : undefined}
     />
   );
@@ -198,7 +202,9 @@ export function ClientNavLink({ className, ...link }: LinkProps) {
   return (
     <Link
       {...link}
-      className={[className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined}
+      className={
+        [className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined
+      }
       aria-current={isActive ? "page" : undefined}
     />
   );

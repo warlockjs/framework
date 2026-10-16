@@ -184,7 +184,11 @@ describe("createOps.editFile", () => {
 
   it("replaces a unique occurrence", async () => {
     const ops = createOps(backend, policy());
-    const result = await ops.editFile({ path: "a.ts", oldString: "const b = 2;", newString: "const b = 3;" });
+    const result = await ops.editFile({
+      path: "a.ts",
+      oldString: "const b = 2;",
+      newString: "const b = 3;",
+    });
 
     expect(result.replacements).toBe(1);
     expect(backend.files.get(abs("a.ts"))).toContain("const b = 3;");
@@ -247,7 +251,11 @@ describe("createOps.editFile", () => {
 
   it("returns the post-edit hash", async () => {
     const ops = createOps(backend, policy());
-    const result = await ops.editFile({ path: "a.ts", oldString: "const b = 2;", newString: "const b = 3;" });
+    const result = await ops.editFile({
+      path: "a.ts",
+      oldString: "const b = 2;",
+      newString: "const b = 3;",
+    });
     const updated = backend.files.get(abs("a.ts"))!;
 
     expect(result.hash).toBe(hashString(updated));
@@ -698,8 +706,18 @@ describe("createOps concurrent mutations on one path", () => {
     const { hash } = await ops.readFile("shared.ts");
 
     const results = await Promise.allSettled([
-      ops.editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;", expectHash: hash }),
-      ops.editFile({ path: "shared.ts", oldString: "const b = 2;", newString: "const b = 20;", expectHash: hash }),
+      ops.editFile({
+        path: "shared.ts",
+        oldString: "const a = 1;",
+        newString: "const a = 10;",
+        expectHash: hash,
+      }),
+      ops.editFile({
+        path: "shared.ts",
+        oldString: "const b = 2;",
+        newString: "const b = 20;",
+        expectHash: hash,
+      }),
     ]);
 
     // Which edit takes the lock first is not part of the contract; exactly one
@@ -710,10 +728,9 @@ describe("createOps concurrent mutations on one path", () => {
     expect(applied).toHaveLength(1);
     expect(refused).toHaveLength(1);
     expect(refused[0]).toMatchObject({ reason: { type: "stale-hash" } });
-    expect([
-      "const a = 10;\nconst b = 2;\n",
-      "const a = 1;\nconst b = 20;\n",
-    ]).toContain(backend.files.get(abs("shared.ts")));
+    expect(["const a = 10;\nconst b = 2;\n", "const a = 1;\nconst b = 20;\n"]).toContain(
+      backend.files.get(abs("shared.ts")),
+    );
   });
 
   it("does not hold up mutations of other paths", async () => {
@@ -722,9 +739,11 @@ describe("createOps concurrent mutations on one path", () => {
 
     const order: string[] = [];
     await Promise.all([
-      ops.editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;" }).then(() => {
-        order.push("shared");
-      }),
+      ops
+        .editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;" })
+        .then(() => {
+          order.push("shared");
+        }),
       ops.writeFile("other.ts", "y").then(() => {
         order.push("other");
       }),
@@ -740,7 +759,11 @@ describe("createOps concurrent mutations on one path", () => {
       ops.editFile({ path: "shared.ts", oldString: "missing", newString: "x" }),
     ).rejects.toMatchObject({ type: "not-found" });
 
-    await ops.editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;" });
+    await ops.editFile({
+      path: "shared.ts",
+      oldString: "const a = 1;",
+      newString: "const a = 10;",
+    });
 
     expect(backend.files.get(abs("shared.ts"))).toContain("const a = 10;");
   });

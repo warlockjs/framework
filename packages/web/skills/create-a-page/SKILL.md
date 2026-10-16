@@ -13,7 +13,12 @@ Export a named `ErrorBoundary` from an app, layout, or page module to render a f
 
 ```tsx
 export function ErrorBoundary({ error, status }: { error: unknown; status: number }) {
-  return <main><h1>{status}</h1><p>{String(error)}</p></main>;
+  return (
+    <main>
+      <h1>{status}</h1>
+      <p>{String(error)}</p>
+    </main>
+  );
 }
 ```
 
@@ -357,7 +362,9 @@ the rejected segment.
 Until a catch-all exists, use the terminal wildcard with an explicit `config.route`:
 
 ```tsx
-export const config = { route: { path: "/docs/*", name: "docs.catchAll" } } as const satisfies PageConfig;
+export const config = {
+  route: { path: "/docs/*", name: "docs.catchAll" },
+} as const satisfies PageConfig;
 ```
 
 ## Page-route grammar

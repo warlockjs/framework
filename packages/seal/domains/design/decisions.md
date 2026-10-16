@@ -6,7 +6,7 @@ Decisions taken with reasoning. Use this when a future session wants to "reconsi
 
 ---
 
-## 1. Absent optional fields are *omitted* from `validData`, not undefined-valued
+## 1. Absent optional fields are _omitted_ from `validData`, not undefined-valued
 
 **Date.** 2026-05-12
 
@@ -164,12 +164,13 @@ Any violation throws synchronously. **Misconfigurations are programmer errors, n
 
 **Why.**
 
-- In a typical Warlock.js / HTTP-shaped app, *input typing* (request bodies, DTOs, form payloads) is the dominant usage of `Infer<>` — roughly 4-5× more frequent per entity than output-side usage (Model declarations, validated-data downstream).
+- In a typical Warlock.js / HTTP-shaped app, _input typing_ (request bodies, DTOs, form payloads) is the dominant usage of `Infer<>` — roughly 4-5× more frequent per entity than output-side usage (Model declarations, validated-data downstream).
 - Making the dominant case ergonomic — bare `Infer<>` defaulting to Input — matches the mental model "I marked `.optional()`, so the key is optional". Less surprise for newcomers.
 - The output case isn't penalized — `Infer.Output<>` is discoverable via autocomplete and only ~7 characters longer. Cascade `Model<>` declarations are a smaller, centralised surface where explicit Output reads well.
 - Zod convention (`z.infer<>` = output) is the dominant convention in the wider TS ecosystem. We diverge deliberately: matches Warlock.js stack usage better, accept the migration cost for Zod-trained newcomers. Documented loudly in the skill.
 
 **Trade-off.** Devs from Zod expecting `Infer<>` = output get tripped up once. Mitigated by:
+
 - Loud documentation in SKILL.md, chaining.md, and the optional-fields recipe.
 - TypeScript usually surfaces the difference at the use site (e.g. accessing `result.status` when it's optional triggers a strict-null-check error).
 - The namespace makes the explicit form discoverable: typing `Infer.` in an editor surfaces both `Input` and `Output` immediately.
@@ -186,12 +187,17 @@ Both walkers (`Infer.Input` and `Infer.Output`) read these brands; the divergenc
 ```ts
 // Input: optional whenever any "I won't supply this" brand is present
 type IsInputOptionalKey<V> = V extends
-  | { isOptional: true } | { hasDefault: true } | { hasCatch: true }
-  ? true : false;
+  | { isOptional: true }
+  | { hasDefault: true }
+  | { hasCatch: true }
+  ? true
+  : false;
 
 // Output: optional only when literally .optional() AND no value-guaranteeing brand
 type IsOutputOptionalKey<V> = V extends { isOptional: true }
-  ? IsGuaranteed<V> extends true ? false : true
+  ? IsGuaranteed<V> extends true
+    ? false
+    : true
   : false;
 ```
 

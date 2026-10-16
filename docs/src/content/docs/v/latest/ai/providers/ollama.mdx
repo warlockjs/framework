@@ -30,21 +30,9 @@ with `ollama list`.
 ## Install
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm install @warlock.js/ai @warlock.js/ai-ollama
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-ollama
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-ollama
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm install @warlock.js/ai @warlock.js/ai-ollama ```</TabItem>
+  <TabItem label="yarn">```bash pnpm add @warlock.js/ai @warlock.js/ai-ollama ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm add @warlock.js/ai @warlock.js/ai-ollama ```</TabItem>
 </Tabs>
 
 ## Construct
@@ -128,7 +116,7 @@ ollama.embedder({ name: "nomic-embed-text", dimensions: 512 });
 - **Tool calling** — vendor-neutral `ToolConfig`s map to Ollama
   `tool_calls`. Ollama has no tool-call id concept, so the adapter
   synthesizes the neutral id from the tool name. One consequence:
-  parallel calls to the *same* tool in a single turn share an id — a v1
+  parallel calls to the _same_ tool in a single turn share an id — a v1
   limitation inherent to Ollama's wire format.
 - **Streaming** — `stream()` yields text `delta`s, a `tool-call` per
   function call (Ollama streams a fully-formed call, not partial JSON),

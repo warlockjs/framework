@@ -61,7 +61,7 @@ const supervisor = ai.supervisor({
 
 ## Drive routing with `ai.mockRouter`, not a hand-rolled stub
 
-A supervisor's `route` is a callback that returns the next intent per iteration. You *could* hand-write a closure with a counter, but you'd re-implement exhaustion handling and state-branching every time, slightly differently. `ai.mockRouter` is the canonical double: a canned sequence consumed one decision per iteration, with a typed `onExhausted` policy for what happens past the end of the queue.
+A supervisor's `route` is a callback that returns the next intent per iteration. You _could_ hand-write a closure with a counter, but you'd re-implement exhaustion handling and state-branching every time, slightly differently. `ai.mockRouter` is the canonical double: a canned sequence consumed one decision per iteration, with a typed `onExhausted` policy for what happens past the end of the queue.
 
 **Do this — a canned sequence, with an explicit exhaustion policy when it matters.** `route` and `router` are mutually exclusive on a supervisor, so dropping in `mockRouter` is a clean one-field swap for the LLM router. A function decision reads the live `RouteContext`, so you can branch on accumulated state instead of scripting an exact per-turn sequence.
 
@@ -109,8 +109,14 @@ describe("draft-then-review supervisor", () => {
     const supervisor = ai.supervisor({
       name: "draft-then-review",
       intents: {
-        writer: mockAgent({ name: "writer", responses: [{ content: "draft", finishReason: "stop" }] }),
-        critic: mockAgent({ name: "critic", responses: [{ content: "ship it", finishReason: "stop" }] }),
+        writer: mockAgent({
+          name: "writer",
+          responses: [{ content: "draft", finishReason: "stop" }],
+        }),
+        critic: mockAgent({
+          name: "critic",
+          responses: [{ content: "ship it", finishReason: "stop" }],
+        }),
       },
       route: ai.mockRouter(["writer", "critic", END]),
       maxIterations: 4,
@@ -141,7 +147,7 @@ expect(result).toConverge();
 expect(result).toOutputShape(outputSchema);
 ```
 
-**Avoid this — re-deriving the verdict inline.** Hand-walking the report not only obscures intent, it bakes the report's internal shape into every test, so a report refactor breaks fifty tests instead of one matcher. And it's easy to get subtly wrong — checking only `status === "completed"` misses that `max-iterations` *also* completes, which is exactly the bug `toConverge` exists to catch.
+**Avoid this — re-deriving the verdict inline.** Hand-walking the report not only obscures intent, it bakes the report's internal shape into every test, so a report refactor breaks fifty tests instead of one matcher. And it's easy to get subtly wrong — checking only `status === "completed"` misses that `max-iterations` _also_ completes, which is exactly the bug `toConverge` exists to catch.
 
 ```ts
 // Anti-pattern: the verdict logic, re-implemented (and subtly wrong) in the test.
@@ -152,7 +158,7 @@ expect(result.report.status).toBe("completed"); // passes even on max-iterations
 
 ## Gate prompt and model changes with `agent.eval` plus an LLM judge
 
-Deterministic tests prove the wiring is intact; they say nothing about whether the answer got *better* or *worse*. That's a quality property, and the only honest way to measure it is to run the real agent against fixed cases and score the output. `agent.eval` returns an assertion-friendly `EvalReport` — wrap it in a Vitest test and a prompt regression turns red in CI before it ships. Mix three scorer kinds: cheap deterministic ones (`exact` / `contains`) for factual cases, a `predicate` for structural cases, and an **LLM judge** for the subjective ones with no single right answer.
+Deterministic tests prove the wiring is intact; they say nothing about whether the answer got _better_ or _worse_. That's a quality property, and the only honest way to measure it is to run the real agent against fixed cases and score the output. `agent.eval` returns an assertion-friendly `EvalReport` — wrap it in a Vitest test and a prompt regression turns red in CI before it ships. Mix three scorer kinds: cheap deterministic ones (`exact` / `contains`) for factual cases, a `predicate` for structural cases, and an **LLM judge** for the subjective ones with no single right answer.
 
 **Do this — a fixed case suite, scored, asserted on `report.passed`.** Give the judge a verdict-shaped output schema and a rubric; the runner reads `{ score, passed, reason }` off `result.data`. A case passes only when the agent did not error AND every resolved scorer passed; `report.passed` is the AND across the suite — exactly what you assert.
 
@@ -169,7 +175,8 @@ const anthropic = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY! });
 const docsAgent = ai.agent({
   name: "docs-qa",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You answer questions about the Warlock framework.")
     .instruction("Be concise. If unsure, say so — never invent an API."),
 });
@@ -179,9 +186,9 @@ const judgeAgent = ai.agent({
   name: "eval-judge",
   model: anthropic.model({ name: "claude-sonnet-4-5" }),
   output: v.object({ score: v.number().min(0).max(1), passed: v.boolean(), reason: v.string() }),
-  systemPrompt: ai.systemPrompt().persona(
-    "You are a strict grader. Score answers 0..1 and return the JSON verdict.",
-  ),
+  systemPrompt: ai
+    .systemPrompt()
+    .persona("You are a strict grader. Score answers 0..1 and return the JSON verdict."),
 });
 
 const hasKeys = !!process.env.OPENAI_API_KEY && !!process.env.ANTHROPIC_API_KEY;
@@ -191,20 +198,37 @@ describe.runIf(hasKeys)("docs-qa eval", () => {
     const report = await docsAgent.eval({
       cases: [
         // Factual — deterministic scorer.
-        { name: "schema-builder", input: "What package provides the v schema builder?", expected: "@warlock.js/seal", scorers: [ai.eval.contains()] },
+        {
+          name: "schema-builder",
+          input: "What package provides the v schema builder?",
+          expected: "@warlock.js/seal",
+          scorers: [ai.eval.contains()],
+        },
         // Structural — predicate over the result, not the text.
-        { name: "no-tool-errors", input: "Summarize how supervisors route.", scorers: [
-          ai.eval.predicate((ctx) =>
-            ctx.result.error === undefined &&
-            ctx.result.report.children.every((child) => child.status === "completed"),
-          ),
-        ]},
+        {
+          name: "no-tool-errors",
+          input: "Summarize how supervisors route.",
+          scorers: [
+            ai.eval.predicate(
+              (ctx) =>
+                ctx.result.error === undefined &&
+                ctx.result.report.children.every((child) => child.status === "completed"),
+            ),
+          ],
+        },
         // Subjective — no per-case scorer, so the suite judge grades it.
         { name: "tone-unsure", input: "What is the airspeed of an unladen swallow?" },
       ],
-      judge: { agent: judgeAgent, rubric: "Score 1.0 only if honest about uncertainty and it never invents an API.", passThreshold: 0.7 },
+      judge: {
+        agent: judgeAgent,
+        rubric: "Score 1.0 only if honest about uncertainty and it never invents an API.",
+        passThreshold: 0.7,
+      },
       onFailure: (caseResult) =>
-        console.error(`FAILED ${caseResult.case.name}`, caseResult.scores.map((s) => s.reason)),
+        console.error(
+          `FAILED ${caseResult.case.name}`,
+          caseResult.scores.map((s) => s.reason),
+        ),
     });
 
     expect(report.passed).toBe(true); // true only when EVERY case passed
@@ -224,11 +248,15 @@ The two suites have opposite economics. The deterministic suite (mock SDK, match
 
 ```ts
 // Deterministic: no keys, runs everywhere, every time.
-describe("supervisor wiring", () => { /* mockRouter + matchers */ });
+describe("supervisor wiring", () => {
+  /* mockRouter + matchers */
+});
 
 // Judge: real tokens, real variance — gated on keys, generous threshold.
 const hasKeys = !!process.env.OPENAI_API_KEY && !!process.env.ANTHROPIC_API_KEY;
-describe.runIf(hasKeys)("docs-qa quality", () => { /* agent.eval with judge */ });
+describe.runIf(hasKeys)("docs-qa quality", () => {
+  /* agent.eval with judge */
+});
 ```
 
 **Avoid this — one suite that mixes mock wiring tests and a live judge.** Now your fast unit run needs API keys, costs money on every push, and goes red when the grader has an off day — so the team learns that red doesn't mean broken, and the day a real regression lands, nobody looks.
@@ -253,7 +281,7 @@ A bug you fixed once will come back the moment someone re-tunes the prompt — u
 
 **Avoid this — fixing the prompt and moving on.** With no case, the regression is one well-meaning prompt edit away from returning, and the next person has zero signal that this exact failure ever mattered. An undocumented fix is a fix with a half-life.
 
-> Name regression cases so the name *is* the story — `regression-no-invented-validate-api`, not `case-7`. When it fails in CI six months later, the name alone tells the next engineer what broke and why the case exists.
+> Name regression cases so the name _is_ the story — `regression-no-invented-validate-api`, not `case-7`. When it fails in CI six months later, the name alone tells the next engineer what broke and why the case exists.
 
 ## Seed eval datasets from real Panoptic traces
 
@@ -282,9 +310,9 @@ const seededCases = failed.map((trace, index) => ({
 // Feed seededCases straight into agent.eval({ cases: seededCases, judge: { ... } }).
 ```
 
-**Avoid this — inventing synthetic cases from your imagination of how users phrase things.** Hand-written cases test the failures you *expect*; the ones that bite are the phrasings you never anticipated. A suite seeded from real traces is grounded in real traffic, so it catches the long tail synthetic cases miss — and it grows itself, every time production hits a new failure mode.
+**Avoid this — inventing synthetic cases from your imagination of how users phrase things.** Hand-written cases test the failures you _expect_; the ones that bite are the phrasings you never anticipated. A suite seeded from real traces is grounded in real traffic, so it catches the long tail synthetic cases miss — and it grows itself, every time production hits a new failure mode.
 
-> A `TraceSpan` mirrors the execution report's identity, timing, status, and cost; the request-specific detail (input text, tool args digest, step name) rides in the `attributes` bag the collector populates. So "seed from traces" is really "lift the input from the failed trace's attributes and re-pose it as a case" — the trace tells you *what* failed and on *what input*; you supply the `expected` or the rubric.
+> A `TraceSpan` mirrors the execution report's identity, timing, status, and cost; the request-specific detail (input text, tool args digest, step name) rides in the `attributes` bag the collector populates. So "seed from traces" is really "lift the input from the failed trace's attributes and re-pose it as a case" — the trace tells you _what_ failed and on _what input_; you supply the `expected` or the rubric.
 
 ## Avoid list
 

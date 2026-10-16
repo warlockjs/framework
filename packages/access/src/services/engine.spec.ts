@@ -255,7 +255,9 @@ describe("engine — best-effort cache (write + flush failure)", () => {
 
 describe("engine — ambient tenant + policy helpers", () => {
   it("resolves the ambient tenant via the resolver's resolveTenant into the cache key", async () => {
-    setAccessConfig({ resolver: { resolvePermissions, resolveRoles, resolveTenant: () => "ambient-t" } });
+    setAccessConfig({
+      resolver: { resolvePermissions, resolveRoles, resolveTenant: () => "ambient-t" },
+    });
 
     await check(user, "orders.update");
 

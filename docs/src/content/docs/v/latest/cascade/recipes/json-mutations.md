@@ -75,10 +75,7 @@ You can't just mutate `notifications[i].enabled = false`. Cascade's dirty tracki
 ```ts
 const current = (user.get("preferences.notifications") as Array<unknown>) ?? [];
 
-user.set("preferences.notifications", [
-  ...current,
-  { id: newId, type: "email", enabled: true },
-]);
+user.set("preferences.notifications", [...current, { id: newId, type: "email", enabled: true }]);
 
 await user.save();
 ```

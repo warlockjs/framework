@@ -180,7 +180,10 @@ describe("jwt", () => {
     });
 
     it("stamps an exp claim on refresh tokens when expiresIn is given", async () => {
-      const token = await jwt.generateRefreshToken({ userId: 7 }, { expiresIn: 7 * 24 * 3_600_000 });
+      const token = await jwt.generateRefreshToken(
+        { userId: 7 },
+        { expiresIn: 7 * 24 * 3_600_000 },
+      );
       const decoded = await jwt.verifyRefreshToken<{ exp: number; iat: number }>(token);
 
       expect(decoded.exp).toBeGreaterThan(decoded.iat);
@@ -314,8 +317,14 @@ describe("jwt token id (jti)", () => {
     vi.setSystemTime(new Date("2026-09-25T00:00:00.000Z"));
 
     try {
-      const first = await jwt.generateRefreshToken({ userId: 1, familyId: "f" }, { expiresIn: ONE_HOUR });
-      const second = await jwt.generateRefreshToken({ userId: 1, familyId: "f" }, { expiresIn: ONE_HOUR });
+      const first = await jwt.generateRefreshToken(
+        { userId: 1, familyId: "f" },
+        { expiresIn: ONE_HOUR },
+      );
+      const second = await jwt.generateRefreshToken(
+        { userId: 1, familyId: "f" },
+        { expiresIn: ONE_HOUR },
+      );
 
       expect(first).not.toBe(second);
     } finally {

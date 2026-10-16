@@ -25,7 +25,9 @@ function createFakeCounter(): Counter {
   const findOneAndUpdate = vi.fn(
     async (
       filter: { collection: string },
-      pipeline: Array<{ $set: { id: { $cond: { then: number; else: { $add: [string, number] } } } } }>,
+      pipeline: Array<{
+        $set: { id: { $cond: { then: number; else: { $add: [string, number] } } } };
+      }>,
       _options: unknown,
     ) => {
       const key = filter.collection;
@@ -122,7 +124,12 @@ describe("MongoIdGenerator", () => {
     });
 
     it("leaves the stored counter equal to the block's last id (goal 2, no setLastId)", async () => {
-      await generator.generateNextIds({ table: "users", count: 4, initialId: 10, incrementIdBy: 2 });
+      await generator.generateNextIds({
+        table: "users",
+        count: 4,
+        initialId: 10,
+        incrementIdBy: 2,
+      });
       // first block: 10,12,14,16 -> stored last id is 16
       expect(counter.docs.get("users")).toBe(16);
     });

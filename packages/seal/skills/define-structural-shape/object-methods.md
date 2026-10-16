@@ -9,10 +9,12 @@ These return a new `ObjectValidator` with a transformed schema. The TypeScript i
 ### `.extend(schemaOrValidator)` — add fields, keep config
 
 ```ts
-const baseUser = v.object({
-  name: v.string(),
-  email: v.string().email(),
-}).allowUnknown();
+const baseUser = v
+  .object({
+    name: v.string(),
+    email: v.string().email(),
+  })
+  .allowUnknown();
 
 const adminUser = baseUser.extend({
   role: v.string().oneOf(["admin", "superadmin"]),
@@ -26,10 +28,12 @@ Accepts a plain schema object **or** another `ObjectValidator` (only its schema 
 
 ```ts
 const base = v.object({ name: v.string() }).allowUnknown();
-const audit = v.object({
-  createdAt: v.date(),
-  updatedAt: v.date(),
-}).stripUnknown();
+const audit = v
+  .object({
+    createdAt: v.date(),
+    updatedAt: v.date(),
+  })
+  .stripUnknown();
 
 const merged = base.merge(audit);
 // type: { name; createdAt; updatedAt }
@@ -66,8 +70,8 @@ Returns `ObjectValidator<Omit<TSchema, K>>`. Inverse of `.pick`. Keeps original 
 ### `.partial(...keys?)` — mark fields optional
 
 ```ts
-fullUser.partial()                // every field becomes optional
-fullUser.partial("password")      // only `password` becomes optional
+fullUser.partial(); // every field becomes optional
+fullUser.partial("password"); // only `password` becomes optional
 ```
 
 Walks the schema and applies `.optional()` to each named field (or all if no keys given). `Infer<>` makes those keys optional.
@@ -75,7 +79,7 @@ Walks the schema and applies `.optional()` to each named field (or all if no key
 ### `.requiredFields(...keys?)` — mark fields required
 
 ```ts
-const partialUser = fullUser.partial();    // all optional
+const partialUser = fullUser.partial(); // all optional
 const updateUser = partialUser.requiredFields("id", "email");
 // id and email are required again, others stay optional
 ```
@@ -86,29 +90,31 @@ Inverse of `.partial`.
 
 By default, extra keys in input are silently dropped from `data` (no error, no forward).
 
-| Method | Effect |
-|---|---|
-| `.allowUnknown(allow = true)` | extra **direct-child** keys forward as-is |
-| `.stripUnknown()` | explicit drop (mutator-based — affects `data` shape) |
-| `.allow(...keys)` | whitelist specific extras to forward without validation |
+| Method                        | Effect                                                  |
+| ----------------------------- | ------------------------------------------------------- |
+| `.allowUnknown(allow = true)` | extra **direct-child** keys forward as-is               |
+| `.stripUnknown()`             | explicit drop (mutator-based — affects `data` shape)    |
+| `.allow(...keys)`             | whitelist specific extras to forward without validation |
 
 `.allowUnknown()` only affects direct children — nested objects keep their own policies. For a fully permissive object including nested children, set `.allowUnknown()` on each level.
 
 ### Output DTOs — stripping extras instead of rejecting them
 
-The default is to **reject** unknown keys, which is what you want for inbound payloads. For an *outbound* DTO — where the record legitimately carries internal fields you simply don't want to expose — use `.stripUnknown()`, which drops them and returns the clean object:
+The default is to **reject** unknown keys, which is what you want for inbound payloads. For an _outbound_ DTO — where the record legitimately carries internal fields you simply don't want to expose — use `.stripUnknown()`, which drops them and returns the clean object:
 
 ```ts
-const publicArticle = v.object({
-  id: v.string(),
-  title: v.string(),
-}).stripUnknown();
+const publicArticle = v
+  .object({
+    id: v.string(),
+    title: v.string(),
+  })
+  .stripUnknown();
 
 const { isValid, data } = await v.validate(publicArticle, record);
 // record had version / authorId / status; data has only id + title
 ```
 
-Without `.stripUnknown()` the same record fails with *"The schema contains unknown keys: …"* rather than being cleaned.
+Without `.stripUnknown()` the same record fails with _"The schema contains unknown keys: …"_ rather than being cleaned.
 
 :::note[`data` is `undefined` on failure — since 4.9.2]
 A failed validation returns `data: undefined`, never the input it rejected. Before 4.9.2 an `object` returned the raw input on failure (while `discriminatedUnion` returned `undefined`), so a caller who read `data` without branching on `isValid` forwarded the exact fields the schema existed to exclude. Always branch on `isValid`.
@@ -116,8 +122,8 @@ A failed validation returns `data: undefined`, never the input it rejected. Befo
 
 ## Object-level mutators
 
-| Method | Args | Effect |
-|---|---|---|
+| Method              | Args           | Effect                                           |
+| ------------------- | -------------- | ------------------------------------------------ |
 | `.trim(recursive?)` | default `true` | recursively trim string values across the object |
 
 For per-field mutators, attach on the field validator instead.
@@ -130,7 +136,7 @@ The cross-field methods (`.sameAs`, `.requiredIf`, `.requiredWith`, etc.) are **
 v.object({
   password: v.string(),
   passwordConfirm: v.string().sameAs("password"),
-})
+});
 ```
 
 If you call cross-field rules outside a `v.object`, sibling resolution silently passes — there's nobody to compare against.
@@ -138,7 +144,7 @@ If you call cross-field rules outside a `v.object`, sibling resolution silently 
 ## `Infer<>` semantics
 
 ```ts
-Infer<typeof userSchema>
+Infer<typeof userSchema>;
 // { reqField: T; optField?: T }
 ```
 
@@ -171,10 +177,12 @@ const timestamps = v.object({
 const userWithAudit = baseUser.extend(timestamps);
 
 // Permissive container that forwards extras
-const eventEnvelope = v.object({
-  type: v.literal("user.created", "user.updated"),
-  payload: v.object({}).allowUnknown(),
-}).allowUnknown();
+const eventEnvelope = v
+  .object({
+    type: v.literal("user.created", "user.updated"),
+    payload: v.object({}).allowUnknown(),
+  })
+  .allowUnknown();
 
 // Confirmation pattern with omit
 const signupSchema = v.object({

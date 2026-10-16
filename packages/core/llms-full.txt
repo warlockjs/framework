@@ -18,11 +18,7 @@ A **connector** is a long-lived subsystem owned by the framework: database, HTTP
 ## The shape
 
 ```ts title="src/connectors/queue-connector.ts"
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 
 export class QueueConnector extends BaseConnector {
   public readonly name: ConnectorName = "queue";
@@ -48,14 +44,14 @@ That's the connector class. The file's home is `src/connectors/<name>.ts` by con
 
 ## `BaseConnector` — required surface
 
-| Member          | Type                          | Notes                                                                                |
-| --------------- | ----------------------------- | ------------------------------------------------------------------------------------ |
-| `name`          | `ConnectorName`               | Unique. Used in preload lists (`preload.connectors: ["queue"]`).                     |
-| `priority`      | `number`                      | Lower starts first. See built-in `ConnectorPriority` enum for the existing ordering. |
-| `lifecyclePhase`| `ConnectorLifecyclePhase`     | `Early` (default) or `Late`. See phase semantics below.                              |
-| `watchedFiles`  | `string[]` (protected)        | Relative paths; touching any triggers a restart in dev.                              |
-| `start()`       | `() => Promise<void>`         | The work that brings the subsystem online. Set `this.active = true` on success.     |
-| `shutdown()`    | `() => Promise<void>`         | Inverse — close connections, drain queues. Set `this.active = false`.                |
+| Member           | Type                      | Notes                                                                                |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------------------ |
+| `name`           | `ConnectorName`           | Unique. Used in preload lists (`preload.connectors: ["queue"]`).                     |
+| `priority`       | `number`                  | Lower starts first. See built-in `ConnectorPriority` enum for the existing ordering. |
+| `lifecyclePhase` | `ConnectorLifecyclePhase` | `Early` (default) or `Late`. See phase semantics below.                              |
+| `watchedFiles`   | `string[]` (protected)    | Relative paths; touching any triggers a restart in dev.                              |
+| `start()`        | `() => Promise<void>`     | The work that brings the subsystem online. Set `this.active = true` on success.      |
+| `shutdown()`     | `() => Promise<void>`     | Inverse — close connections, drain queues. Set `this.active = false`.                |
 
 Optional overrides:
 
@@ -69,19 +65,19 @@ Optional overrides:
 
 Lower number = earlier. The built-in ordering, from `ConnectorPriority` in `@warlock.js/core/src/connectors/types.ts`:
 
-| Connector     | Priority | Phase   |
-| ------------- | -------- | ------- |
-| `logger`      | 0        | Early   |
-| `mailer`      | 1        | Early   |
-| `database`    | 2        | Early   |
-| `communicator`| 3        | Early   |
-| `cache`       | 4        | Early   |
-| `http`        | 5        | **Late**|
-| `storage`     | 6        | Early   |
-| `socket`      | 7        | **Late**|
-| `notifications`| 8       | Early   |
-| `access`      | 9        | Early   |
-| `ai`          | 10       | Early   |
+| Connector       | Priority | Phase    |
+| --------------- | -------- | -------- |
+| `logger`        | 0        | Early    |
+| `mailer`        | 1        | Early    |
+| `database`      | 2        | Early    |
+| `communicator`  | 3        | Early    |
+| `cache`         | 4        | Early    |
+| `http`          | 5        | **Late** |
+| `storage`       | 6        | Early    |
+| `socket`        | 7        | **Late** |
+| `notifications` | 8        | Early    |
+| `access`        | 9        | Early    |
+| `ai`            | 10       | Early    |
 
 Pick a number that places your connector where it belongs. If your queue needs the database, set `priority > 2` (e.g. `11`). If you replace the cache, set `< 4` to win.
 
@@ -93,7 +89,7 @@ Negative priorities are fine for "start before everything" — the project's `sr
 
 `ConnectorLifecyclePhase` exists because **HTTP and socket need user code loaded first**: they scan the router (which user `routes.ts` files populate) and the container (which app `main.ts` files mutate). So the framework boots in two passes:
 
-1. **Early phase** runs before user code imports — for things user code needs *at import time* (database/cache so models work, logger so app modules can `log.info`).
+1. **Early phase** runs before user code imports — for things user code needs _at import time_ (database/cache so models work, logger so app modules can `log.info`).
 2. **Late phase** runs after user code imports — for things that consume registrations user code just made (HTTP reads the router, socket reads HTTP's instance).
 
 If your connector is a self-contained service (queue client, scheduler), `Early` is correct. If it depends on app-level registrations, `Late`. Default is `Early` — don't change it without a reason.
@@ -169,11 +165,7 @@ The manager swallows errors from individual `shutdown()`s (logs and continues) �
 ### Queue worker (depends on DB)
 
 ```ts title="src/connectors/queue-worker-connector.ts"
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 import { startWorker, stopWorker } from "app/queue/services/worker.service";
 
 export class QueueWorkerConnector extends BaseConnector {
@@ -199,11 +191,7 @@ export class QueueWorkerConnector extends BaseConnector {
 ### Scheduler (Late — wants the router up first)
 
 ```ts
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 
 export class SchedulerConnector extends BaseConnector {
   public readonly name: ConnectorName = "scheduler";
@@ -239,7 +227,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
 - **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container`, not through imports. Use `container.tryGet("http.server")` when the other connector is genuinely optional (e.g. socket falls back to its own raw server when HTTP isn't configured); use `container.get("http.server")` when its absence would be a bug — it throws a named `ContainerKeyMissingError` instead of handing back `undefined`.
 - **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
-- **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
+- **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does _not_ mean the framework reloads that file first — that's the file orchestrator's job.
 
 ## See also
 
@@ -267,15 +255,15 @@ import { measure } from "@warlock.js/core";
 const result = await measure("db.findUser", () => db.users.findOne({ id }));
 
 if (result.success) {
-  console.log(result.value);          // T
-  console.log(result.latency);        // ms
-  console.log(result.state);          // "excellent" | "good" | "poor"
+  console.log(result.value); // T
+  console.log(result.latency); // ms
+  console.log(result.state); // "excellent" | "good" | "poor"
 } else {
   console.error(result.error);
 }
 ```
 
-`measure()` always *returns* — it never re-throws. The return type is `BenchmarkSuccessResult<T> | BenchmarkErrorResult`, discriminated by `result.success`. The one exception: `shouldBenchmarkError` returning false re-throws (see below).
+`measure()` always _returns_ — it never re-throws. The return type is `BenchmarkSuccessResult<T> | BenchmarkErrorResult`, discriminated by `result.success`. The one exception: `shouldBenchmarkError` returning false re-throws (see below).
 
 ## `BenchmarkResult` — what you get back
 
@@ -341,7 +329,7 @@ await measure("http.outbound", () => fetch(url), {
 
 ## Selective error capture — `shouldBenchmarkError`
 
-Business errors (4xx, validation) are not infrastructure problems and shouldn't pollute your latency stats. Return `false` to *re-throw* the error without producing a benchmark result:
+Business errors (4xx, validation) are not infrastructure problems and shouldn't pollute your latency stats. Return `false` to _re-throw_ the error without producing a benchmark result:
 
 ```ts
 await measure("create-user", () => createUser(input), {
@@ -372,17 +360,16 @@ For high-volume operations where you want p50/p95/p99 rather than per-call hooks
 import { BenchmarkProfiler, ConsoleChannel, measure } from "@warlock.js/core";
 
 const profiler = new BenchmarkProfiler({
-  maxSamples: 1000,                  // ring buffer per operation name
-  channels: [new ConsoleChannel()],  // where stats go on flush()
-  flushEvery: 60_000,                // auto-flush every minute
+  maxSamples: 1000, // ring buffer per operation name
+  channels: [new ConsoleChannel()], // where stats go on flush()
+  flushEvery: 60_000, // auto-flush every minute
 });
 
 for (let i = 0; i < 5; i++) {
-  await measure(
-    "db.findUser",
-    () => db.users.findOne({ id: i }),
-    { profiler, latencyRange: { excellent: 50, poor: 300 } },
-  );
+  await measure("db.findUser", () => db.users.findOne({ id: i }), {
+    profiler,
+    latencyRange: { excellent: 50, poor: 300 },
+  });
 }
 
 const stats = profiler.stats("db.findUser");
@@ -418,7 +405,7 @@ import { BenchmarkSnapshots, measure } from "@warlock.js/core";
 
 const snapshots = new BenchmarkSnapshots({
   maxSnapshots: 100,
-  capture: "error",        // "error" (default, safe) | "value" | "all"
+  capture: "error", // "error" (default, safe) | "value" | "all"
 });
 
 await measure("payment.charge", () => stripe.charge(payload), { snapshotContainer: snapshots });
@@ -432,11 +419,7 @@ const failed = snapshots.getSnapshots("payment.charge");
 ## Globals via `src/config/benchmark.ts`
 
 ```ts title="src/config/benchmark.ts"
-import {
-  BenchmarkProfiler,
-  ConsoleChannel,
-  type BenchmarkConfigurations,
-} from "@warlock.js/core";
+import { BenchmarkProfiler, ConsoleChannel, type BenchmarkConfigurations } from "@warlock.js/core";
 
 const benchmarkConfig: BenchmarkConfigurations = {
   enabled: true,
@@ -487,18 +470,16 @@ const result = await measure(
 import { measure } from "@warlock.js/core";
 import { retry } from "@mongez/reinforcements";
 
-await measure("publish-event", () =>
-  retry(() => bus.publish(event), { attempts: 4, delay: 200 }),
-);
+await measure("publish-event", () => retry(() => bus.publish(event), { attempts: 4, delay: 200 }));
 ```
 
-The `latency` is the *total* time including retries — useful for the SLO you actually care about. (`retry` moved to `@mongez/reinforcements`; `count` is now `attempts` — total tries.)
+The `latency` is the _total_ time including retries — useful for the SLO you actually care about. (`retry` moved to `@mongez/reinforcements`; `count` is now `attempts` — total tries.)
 
 ## Gotchas
 
 - **Name collisions aggregate.** Two calls to `measure("foo", …)` share one profiler bucket. Make `name` specific (`db.findUser`, not `db.query`) so percentiles mean something.
 - **`measure()` doesn't propagate AbortSignal.** If `fn` is cancellable, plumb that through yourself — the wrapper only times.
-- **Don't `measure()` synchronous trivia.** A `Math.round` call isn't worth a microsecond of overhead. Reserve for things that *can* be slow.
+- **Don't `measure()` synchronous trivia.** A `Math.round` call isn't worth a microsecond of overhead. Reserve for things that _can_ be slow.
 - **Snapshots with `"value"` retain references.** If `value` holds a request stream or a large buffer, you've kept it in memory until eviction.
 - **`shouldBenchmarkError` re-throws.** Make sure the caller is ready for that, or set it conservatively (`true` by default).
 
@@ -645,15 +626,15 @@ router.restfulResource("/users", new UsersRestful());
 
 This registers:
 
-| Path        | Verb     | Method        |
-| ----------- | -------- | ------------- |
-| `/users`    | `GET`    | `list()`      |
-| `/users/:id`| `GET`    | `get()`       |
-| `/users`    | `POST`   | `create()`    |
-| `/users/:id`| `PUT`    | `update()`    |
-| `/users/:id`| `PATCH`  | `patch()`     |
-| `/users/:id`| `DELETE` | `delete()`    |
-| `/users`    | `DELETE` | `bulkDelete()`|
+| Path         | Verb     | Method         |
+| ------------ | -------- | -------------- |
+| `/users`     | `GET`    | `list()`       |
+| `/users/:id` | `GET`    | `get()`        |
+| `/users`     | `POST`   | `create()`     |
+| `/users/:id` | `PUT`    | `update()`     |
+| `/users/:id` | `PATCH`  | `patch()`      |
+| `/users/:id` | `DELETE` | `delete()`     |
+| `/users`     | `DELETE` | `bulkDelete()` |
 
 `bulkDelete` expects an array of ids in the `id` field; it 400s otherwise. All actions except `bulkDelete` only register when the corresponding method is defined on the class — `Restful` provides them all by default.
 
@@ -688,11 +669,11 @@ router.restfulResource("/users", new UsersRestful(), {
 
 Override any of these `protected async` methods:
 
-| Hook                            | When                                      |
-| ------------------------------- | ----------------------------------------- |
-| `beforeCreate(request, response, model)` | New model instance, before `create`       |
-| `onCreate(request, response, record)`    | After successful `create`                 |
-| `beforeUpdate(request, response, record, old?)` | Before `update`                    |
+| Hook                                            | When                                |
+| ----------------------------------------------- | ----------------------------------- |
+| `beforeCreate(request, response, model)`        | New model instance, before `create` |
+| `onCreate(request, response, record)`           | After successful `create`           |
+| `beforeUpdate(request, response, record, old?)` | Before `update`                     |
 | `onUpdate(request, response, record, old)`      | After successful `update`           |
 | `beforePatch(request, response, record, old?)`  | Before `patch`                      |
 | `onPatch(request, response, record, old)`       | After successful `patch`            |
@@ -798,11 +779,11 @@ Use URL helpers whenever you need to render a string that goes into a browser, a
 ```ts
 import { url, publicUrl, assetsUrl, uploadsUrl } from "@warlock.js/core";
 
-url();                       // → "http://localhost:3000"
-url("/health");              // → "http://localhost:3000/health"
+url(); // → "http://localhost:3000"
+url("/health"); // → "http://localhost:3000/health"
 
-publicUrl("favicon.ico");    // → "http://localhost:3000/public/favicon.ico"
-assetsUrl("logo.png");       // → "http://localhost:3000/public/assets/logo.png"
+publicUrl("favicon.ico"); // → "http://localhost:3000/public/favicon.ico"
+assetsUrl("logo.png"); // → "http://localhost:3000/public/assets/logo.png"
 uploadsUrl("avatars/42.png"); // → "http://localhost:3000/uploads/avatars/42.png"
 ```
 
@@ -838,13 +819,13 @@ setBaseUrl("https://cdn.example.com");
 
 ## Full inventory
 
-| Helper                | Resolves to                              | Use for                                     |
-| --------------------- | ---------------------------------------- | ------------------------------------------- |
-| `url(path?)`          | `<baseUrl>/<path>`                       | Arbitrary absolute URL on the same host.    |
-| `publicUrl(path?)`    | `<baseUrl>/public/<path>`                | Files served out of the `public/` folder.   |
-| `assetsUrl(path?)`    | `<baseUrl>/public/assets/<path>`         | Assets inside `public/assets/`.             |
-| `uploadsUrl(path?)`   | `<baseUrl>/uploads/<path>`               | User-uploaded files served over HTTP.       |
-| `setBaseUrl(url)`     | (sets the anchor for all of the above)   | Override at runtime — rarely needed.        |
+| Helper              | Resolves to                            | Use for                                   |
+| ------------------- | -------------------------------------- | ----------------------------------------- |
+| `url(path?)`        | `<baseUrl>/<path>`                     | Arbitrary absolute URL on the same host.  |
+| `publicUrl(path?)`  | `<baseUrl>/public/<path>`              | Files served out of the `public/` folder. |
+| `assetsUrl(path?)`  | `<baseUrl>/public/assets/<path>`       | Assets inside `public/assets/`.           |
+| `uploadsUrl(path?)` | `<baseUrl>/uploads/<path>`             | User-uploaded files served over HTTP.     |
+| `setBaseUrl(url)`   | (sets the anchor for all of the above) | Override at runtime — rarely needed.      |
 
 `assetsUrl` is just `publicUrl` with `assets/` prepended — they share the same `/public/` mount point.
 
@@ -854,12 +835,12 @@ setBaseUrl("https://cdn.example.com");
 
 The most common confusion. They look related but resolve completely differently:
 
-| Goal                                          | Helper            | Returns                                     |
-| --------------------------------------------- | ----------------- | ------------------------------------------- |
-| **Read** a file from the filesystem           | `uploadsPath(...)` | `<cwd>/storage/uploads/<path>` (filesystem) |
-| **Render** an `<img src>` for the same file   | `uploadsUrl(...)`  | `<baseUrl>/uploads/<path>` (HTTP URL)       |
-| **Write** to public folder                    | `publicPath(...)`  | `<cwd>/public/<path>` (filesystem)          |
-| **Embed** an asset URL in a response          | `publicUrl(...)`   | `<baseUrl>/public/<path>` (HTTP URL)        |
+| Goal                                        | Helper             | Returns                                     |
+| ------------------------------------------- | ------------------ | ------------------------------------------- |
+| **Read** a file from the filesystem         | `uploadsPath(...)` | `<cwd>/storage/uploads/<path>` (filesystem) |
+| **Render** an `<img src>` for the same file | `uploadsUrl(...)`  | `<baseUrl>/uploads/<path>` (HTTP URL)       |
+| **Write** to public folder                  | `publicPath(...)`  | `<cwd>/public/<path>` (filesystem)          |
+| **Embed** an asset URL in a response        | `publicUrl(...)`   | `<baseUrl>/public/<path>` (HTTP URL)        |
 
 Pick by the consumer:
 
@@ -928,7 +909,7 @@ await sendWebhook({
   url: vendor.callback_url,
   payload: {
     order_id: order.id,
-    receipt_url: url(`/orders/${order.id}/receipt`),  // → "https://api.example.com/orders/42/receipt"
+    receipt_url: url(`/orders/${order.id}/receipt`), // → "https://api.example.com/orders/42/receipt"
   },
 });
 ```
@@ -1083,16 +1064,16 @@ same nonce reaches the page's `<script>` tags.
 
 ## Which layer holds what
 
-| Setting                                                | Layer                          |
-| ------------------------------------------------------ | ------------------------------ |
-| Build/bundler options (minify, sourcemap, outFile)     | `warlock.config.ts > build`    |
-| Dev server (HMR scope, health checkers, typings)       | `warlock.config.ts > devServer`|
-| Package migrations (external `@warlock.js/*` packages) | `warlock.config.ts > database` |
-| CLI commands (registered via `warlock <cmd>`)          | `warlock.config.ts > cli`      |
-| HTTP server tuning per env (port, host, retry)         | `warlock.config.ts > server`   |
-| HTTP runtime (CORS, cookies, rate limits, upload size) | `src/config/http.ts`           |
-| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`        |
-| Subsystem configs (auth, mail, storage, cache, ai, …)  | `src/config/<name>.ts`         |
+| Setting                                                    | Layer                           |
+| ---------------------------------------------------------- | ------------------------------- |
+| Build/bundler options (minify, sourcemap, outFile)         | `warlock.config.ts > build`     |
+| Dev server (HMR scope, health checkers, typings)           | `warlock.config.ts > devServer` |
+| Package migrations (external `@warlock.js/*` packages)     | `warlock.config.ts > database`  |
+| CLI commands (registered via `warlock <cmd>`)              | `warlock.config.ts > cli`       |
+| HTTP server tuning per env (port, host, retry)             | `warlock.config.ts > server`    |
+| HTTP runtime (CORS, cookies, rate limits, upload size)     | `src/config/http.ts`            |
+| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`             |
+| Subsystem configs (auth, mail, storage, cache, ai, …)      | `src/config/<name>.ts`          |
 
 Heuristic: if the setting changes how the framework **boots, builds, or scaffolds**, it goes in `warlock.config.ts`. If it changes how a **subsystem behaves at runtime**, it goes in `src/config/`.
 
@@ -1107,10 +1088,10 @@ Heuristic: if the setting changes how the framework **boots, builds, or scaffold
 ```ts
 import { env } from "@warlock.js/core";
 
-env("HTTP_PORT", 3000);             // number
-env("CACHE_LOGGING", false);        // boolean
+env("HTTP_PORT", 3000); // number
+env("CACHE_LOGGING", false); // boolean
 env("BASE_URL", "http://localhost:3000"); // string
-env("REDIS_URL");                   // undefined if unset
+env("REDIS_URL"); // undefined if unset
 ```
 
 `env` is re-exported from `@warlock.js/core` (sourced from `@mongez/dotenv`). Use this — not `process.env.X` — so callers consistently get coerced values.
@@ -1401,11 +1382,11 @@ Prefer `request.validated()` once a schema is attached — it's typed.
 
 `request.input()` / `.all()` / `.validated()` read the same way regardless of how the body arrived — every content type below feeds the same parsed bag:
 
-| Content type                         | Parsed by                       | Notes                                                                |
-| ------------------------------------ | -------------------------------- | --------------------------------------------------------------------- |
-| `application/json`                   | Fastify (built-in)               | objects/arrays parsed as-is                                           |
-| `multipart/form-data`                | `@fastify/multipart`             | fields + files; see the `upload-file` topic          |
-| `application/x-www-form-urlencoded`  | Warlock's own content-type parser (`http/parse-urlencoded-body.ts`) | plain HTML forms, OAuth `form_post` callbacks (e.g. Apple Sign in)    |
+| Content type                        | Parsed by                                                           | Notes                                                              |
+| ----------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `application/json`                  | Fastify (built-in)                                                  | objects/arrays parsed as-is                                        |
+| `multipart/form-data`               | `@fastify/multipart`                                                | fields + files; see the `upload-file` topic                        |
+| `application/x-www-form-urlencoded` | Warlock's own content-type parser (`http/parse-urlencoded-body.ts`) | plain HTML forms, OAuth `form_post` callbacks (e.g. Apple Sign in) |
 
 For urlencoded bodies: fields decode via `URLSearchParams`. A key sent more than once (`tag=a&tag=b`) becomes an array (`request.input("tag")` → `["a", "b"]`); every other key is a plain string. Bracket-notation keys (`a[b]=1`) are **not** expanded by the urlencoded parser itself — nesting only happens through the same shared bracket-key logic every body type already goes through, so it behaves exactly like a JSON or query-string key of that shape, no differently than today.
 
@@ -1519,12 +1500,12 @@ loginController.responseSchema = {
 
 A body is an object whose values are one of:
 
-| Value                                           | Meaning                                     |
-| ----------------------------------------------- | ------------------------------------------- |
-| a cast string, with the resource suffixes       | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
-| a resource                                      | one `ResourceOutput` object                 |
-| `[Resource]`                                    | an array of that resource                   |
-| a nested plain object of any of the above       | recursed                                    |
+| Value                                     | Meaning                                                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
+| a resource                                | one `ResourceOutput` object                                                                 |
+| `[Resource]`                              | an array of that resource                                                                   |
+| a nested plain object of any of the above | recursed                                                                                    |
 
 The output types follow the same rules as `defineResource` (`ResponseBodyOutput<B>` and `ResponseSchemaOutput<S>` are exported if you need the type of a body or of the whole schema).
 
@@ -1731,7 +1712,7 @@ Run after `generate.module` to fill in gaps or add to an existing module.
 | Command                                         | Alias     | Flags                                                             |
 | ----------------------------------------------- | --------- | ----------------------------------------------------------------- |
 | `warlock generate.module <name>`                | `gen.m`   | `--minimal` (`-m`), `--force`                                     |
-| `warlock generate.controller <module>/<action>` | `gen.c`   | `--with-validation` (also generates the `schema/` file)            |
+| `warlock generate.controller <module>/<action>` | `gen.c`   | `--with-validation` (also generates the `schema/` file)           |
 | `warlock generate.service <module>/<action>`    | `gen.s`   | `--force`                                                         |
 | `warlock generate.model <module>/<entity>`      | `gen.md`  | `--with-resource`, `--table <name>`, `--timestamps`               |
 | `warlock generate.repository <module>/<entity>` | `gen.r`   | `--force`                                                         |
@@ -1740,7 +1721,7 @@ Run after `generate.module` to fill in gaps or add to an existing module.
 
 The DSL for `--add` is `name:type:modifier,…` — see `write-cli-command` and the column-DSL parser in `@warlock.js/core/src/cli/commands/generate/generators/column-dsl-parser.ts`.
 
-Every `generate.*` command (and the master `generate`) also accepts **`--dry-run`** — it prints the files it *would* create and writes nothing. Run it before a full `generate.module` scaffold or any `--force` to preview the blast radius.
+Every `generate.*` command (and the master `generate`) also accepts **`--dry-run`** — it prints the files it _would_ create and writes nothing. Run it before a full `generate.module` scaffold or any `--force` to preview the blast radius.
 
 ## Path alias
 
@@ -1902,20 +1883,20 @@ Default to `defineResource`. Reach for a subclass only when a hook would be ugli
 
 ## Cast types
 
-| Cast        | Source                  | Output                                        |
-| ----------- | ----------------------- | --------------------------------------------- |
-| `string`    | any                     | `String(value)`                               |
-| `number`    | any                     | `Number(value)` (NaN → `undefined` or `null`) |
-| `int`       | any                     | `parseInt(value)`                             |
-| `float`     | any                     | `parseFloat(value)`                           |
-| `boolean`   | any                     | `Boolean(value)`                              |
-| `date`      | `Date` / ISO string     | configurable object (format/iso/timestamp/humanTime) |
-| `localized` | `LocalizedObject[]`     | string for the request's locale               |
-| `url`       | path                    | absolute URL via `url()` helper               |
-| `uploadsUrl`| path                    | absolute URL under the uploads prefix         |
-| `storageUrl`| path                    | absolute URL via `storage.url(...)`           |
-| `object`    | any object              | passes through if non-empty object            |
-| `array`     | any                     | passes through if array                       |
+| Cast         | Source              | Output                                               |
+| ------------ | ------------------- | ---------------------------------------------------- |
+| `string`     | any                 | `String(value)`                                      |
+| `number`     | any                 | `Number(value)` (NaN → `undefined` or `null`)        |
+| `int`        | any                 | `parseInt(value)`                                    |
+| `float`      | any                 | `parseFloat(value)`                                  |
+| `boolean`    | any                 | `Boolean(value)`                                     |
+| `date`       | `Date` / ISO string | configurable object (format/iso/timestamp/humanTime) |
+| `localized`  | `LocalizedObject[]` | string for the request's locale                      |
+| `url`        | path                | absolute URL via `url()` helper                      |
+| `uploadsUrl` | path                | absolute URL under the uploads prefix                |
+| `storageUrl` | path                | absolute URL via `storage.url(...)`                  |
+| `object`     | any object          | passes through if non-empty object                   |
+| `array`      | any                 | passes through if array                              |
 
 ### Suffix modifiers
 
@@ -2081,20 +2062,20 @@ const json = new UserResource(user).toJSON(); // typed as UserJson
 
 How each schema entry is typed:
 
-| Schema entry                                                      | Output type                                                           |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"` | `string`                                                              |
-| `"number"`, `"float"`, `"int"`                                    | `number`                                                              |
-| `"boolean"`                                                       | `boolean`                                                             |
-| `"date"`                                                          | `{ iso: string; format: string; timestamp: number; humanTime: string }` (the default date output) |
-| `"object"` / `"array"`                                            | `Record<string, unknown>` / `unknown[]`                               |
-| `"x[]"`                                                           | array of the base type                                                |
-| `"x?"`                                                            | `T \| null`; the key is always present, never optional               |
-| a nested resource, `lazy(() => R)`                                | that resource's output (one object, even if the model holds an array) |
-| `"self"` / `"self[]"`                                             | this resource's own output / an array of it                           |
-| `["inputKey", "cast"]` tuple                                      | the cast's type                                                       |
-| a resolver function                                               | its return type (an `any` return becomes `unknown`)                   |
-| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`) | `unknown`                                                             |
+| Schema entry                                                        | Output type                                                                                       |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"`  | `string`                                                                                          |
+| `"number"`, `"float"`, `"int"`                                      | `number`                                                                                          |
+| `"boolean"`                                                         | `boolean`                                                                                         |
+| `"date"`                                                            | `{ iso: string; format: string; timestamp: number; humanTime: string }` (the default date output) |
+| `"object"` / `"array"`                                              | `Record<string, unknown>` / `unknown[]`                                                           |
+| `"x[]"`                                                             | array of the base type                                                                            |
+| `"x?"`                                                              | `T \| null`; the key is always present, never optional                                            |
+| a nested resource, `lazy(() => R)`                                  | that resource's output (one object, even if the model holds an array)                             |
+| `"self"` / `"self[]"`                                               | this resource's own output / an array of it                                                       |
+| `["inputKey", "cast"]` tuple                                        | the cast's type                                                                                   |
+| a resolver function                                                 | its return type (an `any` return becomes `unknown`)                                               |
+| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`) | `unknown`                                                                                         |
 
 The type reflects the schema only, not the data: mark a field `?` when the model may not have a value. `boot`, `extend`, `transform` and builders can change the real shape; when they do, state the output with a type argument, which replaces the inferred type:
 
@@ -2145,7 +2126,10 @@ Rules, in the order the runtime applies them:
 ```ts title=".warlock/typings/model-resources.d.ts (generated)"
 declare module "@warlock.js/core" {
   interface ModelResourceRegistry {
-    "User": { model: import("../../src/app/users/models/user.model").User; resource: typeof import("../../src/app/users/resources/user.resource").UserResource };
+    User: {
+      model: import("../../src/app/users/models/user.model").User;
+      resource: typeof import("../../src/app/users/resources/user.resource").UserResource;
+    };
   }
 }
 ```
@@ -2260,10 +2244,10 @@ description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need 
 
 Two helpers, two different jobs:
 
-| Tool                    | Direction  | Algorithm    | Use for                                                        |
-| ----------------------- | ---------- | ------------ | -------------------------------------------------------------- |
-| `encrypt` / `decrypt`   | reversible | AES-256-GCM  | Secrets you need to read back (API keys, OAuth tokens).        |
-| `hmacHash`              | one-way    | HMAC-SHA256  | Deterministic fingerprint for lookup/dedup of encrypted values. |
+| Tool                  | Direction  | Algorithm   | Use for                                                         |
+| --------------------- | ---------- | ----------- | --------------------------------------------------------------- |
+| `encrypt` / `decrypt` | reversible | AES-256-GCM | Secrets you need to read back (API keys, OAuth tokens).         |
+| `hmacHash`            | one-way    | HMAC-SHA256 | Deterministic fingerprint for lookup/dedup of encrypted values. |
 
 Both live in `@warlock.js/core`. For **password hashing** (a one-way job with very different requirements), reach for the `hash-password` topic instead — bcrypt is the right tool there, not encrypt.
 
@@ -2287,9 +2271,9 @@ import type { EncryptionConfigurations } from "@warlock.js/core";
 import { env } from "@warlock.js/core";
 
 const encryptionConfig: EncryptionConfigurations = {
-  key: env("APP_ENCRYPTION_KEY"),     // 64 hex chars = 32 bytes — required
-  algorithm: "aes-256-gcm",            // optional, default
-  hmacKey: env("APP_HMAC_KEY"),       // 64 hex chars — falls back to `key` if absent
+  key: env("APP_ENCRYPTION_KEY"), // 64 hex chars = 32 bytes — required
+  algorithm: "aes-256-gcm", // optional, default
+  hmacKey: env("APP_HMAC_KEY"), // 64 hex chars — falls back to `key` if absent
 };
 
 export default encryptionConfig;
@@ -2324,8 +2308,8 @@ export async function createAiApiKeyService(data: { key: string; organization_id
 
   return AiApiKey.create({
     ...data,
-    key: encrypt(data.key),                // the secret, recoverable
-    hash: hmacHash(data.key),              // the fingerprint, lookup-able
+    key: encrypt(data.key), // the secret, recoverable
+    hash: hmacHash(data.key), // the fingerprint, lookup-able
     last_four_chars: data.key.slice(-4),
   });
 }
@@ -2386,8 +2370,8 @@ log.info("api-key", "used", { fingerprint: hmacHash(apiKey).slice(0, 8) });
 ```ts
 await Model.create({
   key: encrypt(plain),
-  hash: hmacHash(plain),                   // for lookups
-  last_four_chars: plain.slice(-4),         // for UI display ("ending in 1234")
+  hash: hmacHash(plain), // for lookups
+  last_four_chars: plain.slice(-4), // for UI display ("ending in 1234")
 });
 ```
 
@@ -2416,7 +2400,7 @@ Keeps the encryption boundary in one place — controllers and services deal in 
 ```ts
 log.info("ai-api-key", "used", {
   organization_id,
-  fingerprint: hmacHash(apiKey).slice(0, 8),  // first 8 hex chars = enough to correlate
+  fingerprint: hmacHash(apiKey).slice(0, 8), // first 8 hex chars = enough to correlate
 });
 ```
 
@@ -2425,13 +2409,15 @@ You can search logs for the same fingerprint to track usage of a specific key ac
 ### Idempotency keys
 
 ```ts
-const idempotencyKey = hmacHash(JSON.stringify({
-  user_id: user.id,
-  action: "transfer",
-  amount,
-  to,
-  // include a monotonic component if the same exact payload should be allowed twice
-}));
+const idempotencyKey = hmacHash(
+  JSON.stringify({
+    user_id: user.id,
+    action: "transfer",
+    amount,
+    to,
+    // include a monotonic component if the same exact payload should be allowed twice
+  }),
+);
 
 const existing = await idempotencyRepository.first({ key: idempotencyKey });
 if (existing) return existing.get("result");
@@ -2481,12 +2467,12 @@ Routes are read in the same isolated registration child process `warlock build` 
 
 ## Options
 
-| Option            | Default                                        | Meaning                                                      |
-| ----------------- | ---------------------------------------------- | ------------------------------------------------------------ |
-| `--out`, `-o`     | `storage/openapi/openapi.json`                 | Output file, relative to the project root. Parent folders are created. |
-| `--title`         | `name` in `package.json` (else `Warlock API`)  | `info.title`. `info.version` is the `package.json` version (else `0.0.0`); `info.description` is its `description`. |
-| `--server`        | `http://<host>:<port>` from the `http` config  | `servers[0].url`. A wildcard host (`0.0.0.0`, `::`) becomes `localhost`. |
-| `--include-pages` | off                                            | Also document page (SSR) routes; each is a `200` with `text/html`. |
+| Option            | Default                                       | Meaning                                                                                                             |
+| ----------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--out`, `-o`     | `storage/openapi/openapi.json`                | Output file, relative to the project root. Parent folders are created.                                              |
+| `--title`         | `name` in `package.json` (else `Warlock API`) | `info.title`. `info.version` is the `package.json` version (else `0.0.0`); `info.description` is its `description`. |
+| `--server`        | `http://<host>:<port>` from the `http` config | `servers[0].url`. A wildcard host (`0.0.0.0`, `::`) becomes `localhost`.                                            |
+| `--include-pages` | off                                           | Also document page (SSR) routes; each is a `200` with `text/html`.                                                  |
 
 ```bash
 npx warlock generate.openapi --out docs/openapi.json --title "Shop API" --server https://api.shop.test
@@ -2494,18 +2480,18 @@ npx warlock generate.openapi --out docs/openapi.json --title "Shop API" --server
 
 ## What is documented
 
-| Part                    | Source                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| Paths                   | `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head). |
-| `operationId`           | The route `name` (`name.<verb>` when an `all` route expands), else `<verb>_<path_slug>`. Duplicates are renamed with a warning. |
-| Tag                     | The first static path segment (`/users/:id` is tagged `users`).                                  |
-| Summary / description   | The route `label`; the route or handler `description`, plus a line about required user types and the cookie CSRF rule when the route is guarded. |
-| Path parameters         | `validation.params` gives typed ones; a path segment with no schema is a required `string`.       |
-| Request body / query    | `validation.schema`, converted with the Seal schema's JSON Schema output. It is the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request. |
-| Responses               | `handler.responseSchema`, one response per declared status (see below). A route with no 2xx declared gets a `200` description only. |
-| `422`                   | Added when the route has `validation.schema`, shaped by `validation.response` (`errors`, `inputKey`, `inputError`, `status`; `Response.failedSchema` defaults to 422). Stored once as `components.schemas.ValidationFailed`. A route with only `validation.params` gets none. |
-| `401`                   | Added when the route is guarded, as `{ error: string }` (`components.schemas.Unauthorized`). A status you declare yourself is kept. |
-| Security                | `authMiddleware()` tags the middleware it returns with a `Symbol.for("warlock.auth")` descriptor (`{ sources, userTypes }`); core reads it without importing auth. A header source is `bearerAuth` (HTTP bearer), a cookie source is `cookieAuth` (API key in that cookie); header plus cookie is an OR. Only the schemes a route uses are emitted. Middleware without a descriptor adds nothing. |
+| Part                  | Source                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paths                 | `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head).                                                                                                                                                                                                                                                                          |
+| `operationId`         | The route `name` (`name.<verb>` when an `all` route expands), else `<verb>_<path_slug>`. Duplicates are renamed with a warning.                                                                                                                                                                                                                                                                   |
+| Tag                   | The first static path segment (`/users/:id` is tagged `users`).                                                                                                                                                                                                                                                                                                                                   |
+| Summary / description | The route `label`; the route or handler `description`, plus a line about required user types and the cookie CSRF rule when the route is guarded.                                                                                                                                                                                                                                                  |
+| Path parameters       | `validation.params` gives typed ones; a path segment with no schema is a required `string`.                                                                                                                                                                                                                                                                                                       |
+| Request body / query  | `validation.schema`, converted with the Seal schema's JSON Schema output. It is the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request.                                                                                                                                                                   |
+| Responses             | `handler.responseSchema`, one response per declared status (see below). A route with no 2xx declared gets a `200` description only.                                                                                                                                                                                                                                                               |
+| `422`                 | Added when the route has `validation.schema`, shaped by `validation.response` (`errors`, `inputKey`, `inputError`, `status`; `Response.failedSchema` defaults to 422). Stored once as `components.schemas.ValidationFailed`. A route with only `validation.params` gets none.                                                                                                                     |
+| `401`                 | Added when the route is guarded, as `{ error: string }` (`components.schemas.Unauthorized`). A status you declare yourself is kept.                                                                                                                                                                                                                                                               |
+| Security              | `authMiddleware()` tags the middleware it returns with a `Symbol.for("warlock.auth")` descriptor (`{ sources, userTypes }`); core reads it without importing auth. A header source is `bearerAuth` (HTTP bearer), a cookie source is `cookieAuth` (API key in that cookie); header plus cookie is an OR. Only the schemes a route uses are emitted. Middleware without a descriptor adds nothing. |
 
 ### Responses from `responseSchema`
 
@@ -2568,12 +2554,12 @@ npx warlock generate.postman
 # Postman collection written to <root>/storage/postman/collection.json (3 folders, 17 requests). Import it in Postman and set the {{token}} variable.
 ```
 
-| Option            | Default                                   | Meaning                                                            |
-| ----------------- | ----------------------------------------- | ------------------------------------------------------------------ |
-| `--out`, `-o`     | `storage/postman/collection.json`         | Output file, relative to the project root.                          |
-| `--title`         | `name` in `package.json`                  | Collection name; the collection id is a stable hash of it.          |
-| `--server`        | `http://<host>:<port>` from the `http` config | Value of the `{{baseUrl}}` variable.                              |
-| `--include-pages` | off                                       | Also include page (SSR) routes.                                     |
+| Option            | Default                                       | Meaning                                                    |
+| ----------------- | --------------------------------------------- | ---------------------------------------------------------- |
+| `--out`, `-o`     | `storage/postman/collection.json`             | Output file, relative to the project root.                 |
+| `--title`         | `name` in `package.json`                      | Collection name; the collection id is a stable hash of it. |
+| `--server`        | `http://<host>:<port>` from the `http` config | Value of the `{{baseUrl}}` variable.                       |
+| `--include-pages` | off                                           | Also include page (SSR) routes.                            |
 
 What the collection contains:
 
@@ -2648,7 +2634,7 @@ import type { EncryptionConfigurations } from "@warlock.js/core";
 
 const encryptionConfig: EncryptionConfigurations = {
   password: {
-    salt: 12,    // bcrypt rounds — 10–12 is the standard band
+    salt: 12, // bcrypt rounds — 10–12 is the standard band
   },
   // ...other crypto config (key/hmacKey for encrypt/decrypt — see encrypt-data skill)
 };
@@ -2734,7 +2720,7 @@ await user.save({ password: await hashPassword(newPassword) });
 If the model uses `useHashedPassword()`, you can skip the explicit `hashPassword` call:
 
 ```ts
-await user.save({ password: newPassword });  // transformer hashes on save
+await user.save({ password: newPassword }); // transformer hashes on save
 ```
 
 The transformer detects that the field is changing and re-hashes.
@@ -2815,10 +2801,10 @@ Two endpoints and a drain, so a load balancer never routes to an instance that i
 
 The HTTP connector registers them on the Fastify server during boot (before route scanning), so they exist by the time the server listens:
 
-| Path | Probe | 200 when | 503 when |
-| --- | --- | --- | --- |
-| `/health` | liveness | the process is up | shutdown has begun |
-| `/ready` | readiness | booted **and** not shutting down **and** every check passes | before boot, during shutdown, or any failing check |
+| Path      | Probe     | 200 when                                                    | 503 when                                           |
+| --------- | --------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| `/health` | liveness  | the process is up                                           | shutdown has begun                                 |
+| `/ready`  | readiness | booted **and** not shutting down **and** every check passes | before boot, during shutdown, or any failing check |
 
 **Liveness** answers "should the orchestrator RESTART me?" — it ignores dependency checks (a failing DB doesn't mean restart the pod). **Readiness** answers "should the load balancer ROUTE to me?" — it gates on boot completion, shutdown state, and your registered checks.
 
@@ -2835,8 +2821,8 @@ import type { HttpConfigurations } from "@warlock.js/core";
 
 const httpConfigurations: HttpConfigurations = {
   health: {
-    enabled: true,          // default; set false to remove both endpoints
-    path: "/health",        // liveness path
+    enabled: true, // default; set false to remove both endpoints
+    path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
   },
 };
@@ -2886,7 +2872,7 @@ import type { HttpConfigurations } from "@warlock.js/core";
 
 const httpConfigurations: HttpConfigurations = {
   gracefulShutdown: {
-    timeout: 10_000,              // ms to wait for in-flight drain (default 10s)
+    timeout: 10_000, // ms to wait for in-flight drain (default 10s)
     forceCloseConnections: "idle", // close idle keep-alives, let active finish (default)
   },
 };
@@ -2940,11 +2926,11 @@ Cascade declares relations with **native** decorators — `@RegisterModel`, `@Be
 SyntaxError: Invalid or unexpected token
 ```
 
-The cause is two transforms that don't understand each other. Vite 8 transpiles `.ts` with **oxc**, which only lowers *legacy* (`experimentalDecorators`) decorators — it leaves native ones in place. Then Vite's SSR `moduleRunnerTransform` rewrites the decorator's imported name into `@(0, __vite_ssr_import__.RegisterModel)()` — which is no longer valid decorator syntax. V8 throws on the first decorated model it evaluates, and your whole suite is dead before a single test runs.
+The cause is two transforms that don't understand each other. Vite 8 transpiles `.ts` with **oxc**, which only lowers _legacy_ (`experimentalDecorators`) decorators — it leaves native ones in place. Then Vite's SSR `moduleRunnerTransform` rewrites the decorator's imported name into `@(0, __vite_ssr_import__.RegisterModel)()` — which is no longer valid decorator syntax. V8 throws on the first decorated model it evaluates, and your whole suite is dead before a single test runs.
 
-`lowerStage3Decorators()` fixes it by getting **esbuild** to lower the decorators *first*.
+`lowerStage3Decorators()` fixes it by getting **esbuild** to lower the decorators _first_.
 
-⚠ **Changed in 4.13.0 — the import is a subpath now.** The plugin used to be re-exported from the package root; it is not any more, because that put the Vite integration into every application's production module graph. `import { lowerStage3Decorators } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/vite` to the specifier and nothing else changes.**
+⚠ **Changed in 4.13.0 — the import is a subpath now.** The plugin used to be re-exported from the package root; it is not any more, because that put the Vite integration into every application's production module graph. `import { lowerStage3Decorators } from "@warlock.js/core"` now fails with _"has no exported member"_ — **add `/vite` to the specifier and nothing else changes.**
 
 ## Use it
 
@@ -2974,7 +2960,7 @@ It's the **same esbuild transform the production `tsx`/build path uses**, so a f
 
 ## Things NOT to do
 
-- **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower *legacy* decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.
+- **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower _legacy_ decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.
 - **Don't put it after `@mongez/vite`** — it must run `pre`, before any other transform. Keep it first.
 - **Don't set `experimentalDecorators: true`** anywhere in the test tsconfig — Cascade's decorators are native (Stage-3), not legacy. Legacy mode changes their call signature and breaks `context.kind` / `context.metadata`.
 
@@ -3026,16 +3012,16 @@ Adds `sharp` to your dependencies. Skip it and the first `new Image(...)` throws
 ## Constructors
 
 ```ts
-new Image("./avatar.jpg")            // path
-new Image(buffer)                     // Buffer
-new Image(uint8Array)                 // Uint8Array
-new Image(arrayBuffer)                // ArrayBuffer
-new Image(existingSharpInstance)      // wrap a sharp.Sharp you already built
+new Image("./avatar.jpg"); // path
+new Image(buffer); // Buffer
+new Image(uint8Array); // Uint8Array
+new Image(arrayBuffer); // ArrayBuffer
+new Image(existingSharpInstance); // wrap a sharp.Sharp you already built
 
 // Or via static factories:
 Image.fromFile("./avatar.jpg");
 Image.fromBuffer(buffer);
-await Image.fromUrl("https://example.com/photo.jpg");   // @mongez/http under the hood
+await Image.fromUrl("https://example.com/photo.jpg"); // @mongez/http under the hood
 ```
 
 `Image.fromUrl(...)` is the only async factory — it fetches the URL via `@mongez/http` (`responseType: "arrayBuffer"`), then wraps the bytes. The rest are synchronous.
@@ -3044,25 +3030,25 @@ await Image.fromUrl("https://example.com/photo.jpg");   // @mongez/http under th
 
 Every method returns `this` so calls chain. Transforms are descriptors; nothing runs until the output method.
 
-| Method                                       | Effect                                                                       |
-| -------------------------------------------- | ---------------------------------------------------------------------------- |
-| `.resize({ width?, height?, fit?, ... })`    | sharp resize — accepts the full `sharp.ResizeOptions` shape                  |
-| `.crop({ left, top, width, height })`        | extract a region                                                             |
-| `.rotate(deg)`                               | clockwise rotation                                                           |
-| `.flip()`                                    | mirror vertically (top↔bottom)                                               |
-| `.flop()`                                    | mirror horizontally (left↔right)                                             |
-| `.blur(sigma)`                               | gaussian blur (sigma is required, must be ≥ 0.3 — throws otherwise)          |
-| `.sharpen(options?)`                         | sharp's sharpen                                                              |
-| `.grayscale()` / `.blackAndWhite()`          | grayscale (aliases)                                                          |
-| `.tint(color)`                               | color tint                                                                   |
-| `.negate(options?)`                          | invert colors                                                                |
-| `.opacity(value)`                            | 0–100, applied via composite                                                 |
-| `.trim(options?)`                            | trim borders                                                                 |
-| `.watermark(image, options?)`                | overlay one watermark — two positional args (`image` accepts the same inputs as the constructor, plus another `Image`; `options` is `sharp.OverlayOptions`) |
-| `.watermarks([{ image, options }, ...])`     | overlay many — one `WatermarkConfig` object (`{ image, options }`) per entry  |
-| `.format(format)`                            | output format — `"jpeg"`, `"png"`, `"webp"`, `"avif"`, `"tiff"`, `"heif"`, ... |
-| `.quality(1–100)`                            | lossy formats only (`jpeg` / `webp` / `avif` / `tiff` / `heif`); ignored otherwise |
-| `.apply(options)`                            | apply many transforms in one call, in a fixed canonical order                |
+| Method                                    | Effect                                                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.resize({ width?, height?, fit?, ... })` | sharp resize — accepts the full `sharp.ResizeOptions` shape                                                                                                 |
+| `.crop({ left, top, width, height })`     | extract a region                                                                                                                                            |
+| `.rotate(deg)`                            | clockwise rotation                                                                                                                                          |
+| `.flip()`                                 | mirror vertically (top↔bottom)                                                                                                                              |
+| `.flop()`                                 | mirror horizontally (left↔right)                                                                                                                            |
+| `.blur(sigma)`                            | gaussian blur (sigma is required, must be ≥ 0.3 — throws otherwise)                                                                                         |
+| `.sharpen(options?)`                      | sharp's sharpen                                                                                                                                             |
+| `.grayscale()` / `.blackAndWhite()`       | grayscale (aliases)                                                                                                                                         |
+| `.tint(color)`                            | color tint                                                                                                                                                  |
+| `.negate(options?)`                       | invert colors                                                                                                                                               |
+| `.opacity(value)`                         | 0–100, applied via composite                                                                                                                                |
+| `.trim(options?)`                         | trim borders                                                                                                                                                |
+| `.watermark(image, options?)`             | overlay one watermark — two positional args (`image` accepts the same inputs as the constructor, plus another `Image`; `options` is `sharp.OverlayOptions`) |
+| `.watermarks([{ image, options }, ...])`  | overlay many — one `WatermarkConfig` object (`{ image, options }`) per entry                                                                                |
+| `.format(format)`                         | output format — `"jpeg"`, `"png"`, `"webp"`, `"avif"`, `"tiff"`, `"heif"`, ...                                                                              |
+| `.quality(1–100)`                         | lossy formats only (`jpeg` / `webp` / `avif` / `tiff` / `heif`); ignored otherwise                                                                          |
+| `.apply(options)`                         | apply many transforms in one call, in a fixed canonical order                                                                                               |
 
 `apply(options)` accepts an `ImageTransformOptions` object — every transform above as a key. Useful when transforms come from config or a request payload.
 
@@ -3071,10 +3057,10 @@ Every method returns `this` so calls chain. Transforms are descriptors; nothing 
 Each of these fires the pipeline exactly once and returns the result. Subsequent calls run the pipeline again (operations aren't memoised).
 
 ```ts
-await image.save("./output.webp");          // write to disk; returns the absolute path
-const buffer = await image.toBuffer();      // → Buffer
-const base64 = await image.toBase64();      // → "iVBORw0KGgo..."
-const dataUrl = await image.toDataUrl();    // → "data:image/webp;base64,..."
+await image.save("./output.webp"); // write to disk; returns the absolute path
+const buffer = await image.toBuffer(); // → Buffer
+const base64 = await image.toBase64(); // → "iVBORw0KGgo..."
+const dataUrl = await image.toDataUrl(); // → "data:image/webp;base64,..."
 ```
 
 ## Common patterns
@@ -3386,7 +3372,7 @@ description: 'Memoize async work for one HTTP request with `requestMemo<T>(key, 
 From `core/src/http/context/request-memo.ts`:
 
 ```ts
-export function requestMemo<T>(key: string, fn: () => Promise<T>): Promise<T>
+export function requestMemo<T>(key: string, fn: () => Promise<T>): Promise<T>;
 ```
 
 Import it from the package root:
@@ -3767,30 +3753,30 @@ Twelve helpers, all anchored at `process.cwd()`, all in `@warlock.js/core`. They
 ```ts
 import { appPath, configPath, uploadsPath, storagePath } from "@warlock.js/core";
 
-appPath("orders/routes.ts");           // → <cwd>/src/app/orders/routes.ts
-configPath("http.ts");                  // → <cwd>/src/config/http.ts
-uploadsPath("avatars/42.png");          // → <cwd>/storage/uploads/avatars/42.png
-storagePath("backups/2026-01.tar.gz");  // → <cwd>/storage/backups/2026-01.tar.gz
+appPath("orders/routes.ts"); // → <cwd>/src/app/orders/routes.ts
+configPath("http.ts"); // → <cwd>/src/config/http.ts
+uploadsPath("avatars/42.png"); // → <cwd>/storage/uploads/avatars/42.png
+storagePath("backups/2026-01.tar.gz"); // → <cwd>/storage/backups/2026-01.tar.gz
 ```
 
 Every helper takes any number of path segments and joins them. No-argument calls return the base directory itself.
 
 ## Full inventory
 
-| Helper             | Resolves to                              | Notes                                                              |
-| ------------------ | ---------------------------------------- | ------------------------------------------------------------------ |
-| `rootPath(...p)`   | `<cwd>/<...p>`                           | Also `Application.rootPath`. Base of every other helper.           |
-| `srcPath(...p)`    | `<cwd>/src/<...p>`                       | Also `Application.srcPath`.                                        |
-| `appPath(p?)`      | `<cwd>/src/app/<p>`                      | Also `Application.appPath`. Module roots live here.                |
-| `configPath(...p)` | `<cwd>/src/config/<...p>`                | `src/config/*.ts` subsystem configs.                               |
-| `publicPath(p?)`   | `<cwd>/public/<p>`                       | Also `Application.publicPath`. Static assets served as-is.         |
-| `storagePath(p?)`  | `<cwd>/storage/<p>`                      | Also `Application.storagePath`. Root for framework-managed files.  |
-| `uploadsPath(p?)`  | `<cwd>/storage/uploads/<p>` *(default)*  | Also `Application.uploadsPath`. Honors `config.uploads.root` override (string or function). |
-| `cachePath(p?)`    | `<cwd>/storage/cache/<p>`                | Persistent cache files.                                            |
-| `logsPath(p?)`     | `<cwd>/storage/logs/<p>`                 | Application logs.                                                  |
-| `tempPath(p?)`     | `<cwd>/storage/tmp/<p>`                  | Throw-away scratch.                                                |
+| Helper              | Resolves to                             | Notes                                                                                                                               |
+| ------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `rootPath(...p)`    | `<cwd>/<...p>`                          | Also `Application.rootPath`. Base of every other helper.                                                                            |
+| `srcPath(...p)`     | `<cwd>/src/<...p>`                      | Also `Application.srcPath`.                                                                                                         |
+| `appPath(p?)`       | `<cwd>/src/app/<p>`                     | Also `Application.appPath`. Module roots live here.                                                                                 |
+| `configPath(...p)`  | `<cwd>/src/config/<...p>`               | `src/config/*.ts` subsystem configs.                                                                                                |
+| `publicPath(p?)`    | `<cwd>/public/<p>`                      | Also `Application.publicPath`. Static assets served as-is.                                                                          |
+| `storagePath(p?)`   | `<cwd>/storage/<p>`                     | Also `Application.storagePath`. Root for framework-managed files.                                                                   |
+| `uploadsPath(p?)`   | `<cwd>/storage/uploads/<p>` _(default)_ | Also `Application.uploadsPath`. Honors `config.uploads.root` override (string or function).                                         |
+| `cachePath(p?)`     | `<cwd>/storage/cache/<p>`               | Persistent cache files.                                                                                                             |
+| `logsPath(p?)`      | `<cwd>/storage/logs/<p>`                | Application logs.                                                                                                                   |
+| `tempPath(p?)`      | `<cwd>/storage/tmp/<p>`                 | Throw-away scratch.                                                                                                                 |
 | `warlockPath(...p)` | `<cwd>/.warlock/<...p>`                 | Framework internals (manifest, transpile cache, typings). **Never write app files here** — the framework deletes the folder freely. |
-| `sanitizePath(p)`  | Strips `<>:"/\|?*` from `p`              | Cleans user-supplied filename fragments before joining.            |
+| `sanitizePath(p)`   | Strips `<>:"/\|?*` from `p`             | Cleans user-supplied filename fragments before joining.                                                                             |
 
 ## The aggregate — `paths`
 
@@ -3799,15 +3785,15 @@ For builders or maintenance scripts that shuttle several locations in close prox
 ```ts
 import { paths } from "@warlock.js/core";
 
-paths.root("dist", "app.js");        // → <cwd>/dist/app.js
-paths.app("orders/routes.ts");        // → <cwd>/src/app/orders/routes.ts
-paths.uploads("avatars/42.png");      // → <cwd>/storage/uploads/avatars/42.png
-paths.config("mail.ts");              // → <cwd>/src/config/mail.ts
-paths.cache("queries.bin");           // → <cwd>/storage/cache/queries.bin
-paths.logs("errors.log");             // → <cwd>/storage/logs/errors.log
-paths.temp("tmp-export.csv");         // → <cwd>/storage/tmp/tmp-export.csv
-paths.warlock("manifest.json");       // → <cwd>/.warlock/manifest.json
-paths.sanitize("../etc/passwd");      // → "..etcpasswd"
+paths.root("dist", "app.js"); // → <cwd>/dist/app.js
+paths.app("orders/routes.ts"); // → <cwd>/src/app/orders/routes.ts
+paths.uploads("avatars/42.png"); // → <cwd>/storage/uploads/avatars/42.png
+paths.config("mail.ts"); // → <cwd>/src/config/mail.ts
+paths.cache("queries.bin"); // → <cwd>/storage/cache/queries.bin
+paths.logs("errors.log"); // → <cwd>/storage/logs/errors.log
+paths.temp("tmp-export.csv"); // → <cwd>/storage/tmp/tmp-export.csv
+paths.warlock("manifest.json"); // → <cwd>/.warlock/manifest.json
+paths.sanitize("../etc/passwd"); // → "..etcpasswd"
 ```
 
 Use the named import (`appPath`, `uploadsPath`, ...) when one helper dominates the file; reach for `paths.*` when you're shuttling multiple paths together.
@@ -3820,10 +3806,7 @@ Use the named import (`appPath`, `uploadsPath`, ...) when one helper dominates t
 import { appPath } from "@warlock.js/core";
 import { readFile } from "node:fs/promises";
 
-const template = await readFile(
-  appPath("mailers/templates/welcome.html"),
-  "utf-8",
-);
+const template = await readFile(appPath("mailers/templates/welcome.html"), "utf-8");
 ```
 
 ### Locate a config file
@@ -3870,7 +3853,7 @@ const manifest = warlockPath("manifest.json");
 ```ts title="src/config/uploads.ts"
 export default {
   uploads: {
-    root: "/mnt/uploads",                   // static
+    root: "/mnt/uploads", // static
     // root: (rel) => `/mnt/uploads/${rel}`, // dynamic
   },
 };
@@ -3892,18 +3875,18 @@ The override is applied **inside** `uploadsPath()`. So `Application.uploadsPath`
 
 ## When to use which
 
-| Goal                                       | Helper            |
-| ------------------------------------------ | ----------------- |
-| File inside a module (controllers/services) | `appPath`        |
-| Top-level subsystem config                 | `configPath`      |
-| Static asset served as-is over HTTP        | `publicPath`      |
-| User-uploaded file (avatar, document)      | `uploadsPath`     |
-| Persistent cache for an expensive op       | `cachePath`       |
-| Application log line                       | `logsPath`        |
-| Short-lived scratch (cleaned aggressively) | `tempPath`        |
-| Bundled artifact (build outputs)           | `rootPath("dist", ...)` |
-| Reading a TS source from disk              | `srcPath` / `appPath` |
-| Framework internals (manifest, transpile)  | `warlockPath` *(read-only)* |
+| Goal                                        | Helper                      |
+| ------------------------------------------- | --------------------------- |
+| File inside a module (controllers/services) | `appPath`                   |
+| Top-level subsystem config                  | `configPath`                |
+| Static asset served as-is over HTTP         | `publicPath`                |
+| User-uploaded file (avatar, document)       | `uploadsPath`               |
+| Persistent cache for an expensive op        | `cachePath`                 |
+| Application log line                        | `logsPath`                  |
+| Short-lived scratch (cleaned aggressively)  | `tempPath`                  |
+| Bundled artifact (build outputs)            | `rootPath("dist", ...)`     |
+| Reading a TS source from disk               | `srcPath` / `appPath`       |
+| Framework internals (manifest, transpile)   | `warlockPath` _(read-only)_ |
 
 If you find yourself reaching for `path.join(process.cwd(), ...)` — that's a sign you want one of these helpers instead.
 
@@ -3942,21 +3925,21 @@ description: 'Wrap a flaky operation with `retry(fn, options)` — now provided 
 import { retry } from "@mongez/reinforcements";
 
 const user = await retry(() => fetchUser(id), {
-  attempts: 4,            // TOTAL tries (initial + retries) — default 3
-  delay: 200,             // base ms between attempts
+  attempts: 4, // TOTAL tries (initial + retries) — default 3
+  delay: 200, // base ms between attempts
   backoff: "exponential", // 200, 400, 800 ms
 });
 ```
 
 ## What changed from the old core `retry`
 
-| Old (`@warlock.js/core`)       | New (`@mongez/reinforcements`)                            |
-| ------------------------------ | -------------------------------------------------------- |
-| `count` = **extra** attempts   | `attempts` = **total** attempts (`count + 1`)            |
-| fixed `delay` only             | `delay` + `backoff` (`"linear" \| "exponential" \| fn`)  |
-| —                              | `maxDelay`, `jitter` (`"full" \| "equal"`), `signal`     |
-| `shouldRetry(error, attempt)`  | `shouldRetry(error, attempt)` (kept) + `onError` observe |
-| —                              | `retryable(fn, options)` to pre-bind a reusable wrapper  |
+| Old (`@warlock.js/core`)      | New (`@mongez/reinforcements`)                           |
+| ----------------------------- | -------------------------------------------------------- |
+| `count` = **extra** attempts  | `attempts` = **total** attempts (`count + 1`)            |
+| fixed `delay` only            | `delay` + `backoff` (`"linear" \| "exponential" \| fn`)  |
+| —                             | `maxDelay`, `jitter` (`"full" \| "equal"`), `signal`     |
+| `shouldRetry(error, attempt)` | `shouldRetry(error, attempt)` (kept) + `onError` observe |
+| —                             | `retryable(fn, options)` to pre-bind a reusable wrapper  |
 
 Migration: `count: 3` → `attempts: 4`.
 
@@ -3985,8 +3968,8 @@ await retry(() => fetch(url), {
   attempts: 6,
   delay: 100,
   backoff: "exponential",
-  maxDelay: 2_000,   // never wait more than 2s as backoff grows
-  jitter: "full",    // randomise each delay to avoid thundering herd
+  maxDelay: 2_000, // never wait more than 2s as backoff grows
+  jitter: "full", // randomise each delay to avoid thundering herd
 });
 ```
 
@@ -5364,7 +5347,6 @@ then have their idle connections reaped. A hand-written hijacked writer that set
 its own Connection header must preserve close during drain rather than overwrite
 it with keep-alive. Headers already on the wire cannot be changed.
 
-
 On HTTP/2, SSE and stream helpers omit connection-specific and Transfer-Encoding
 headers. Graceful drain sends GOAWAY and closes sessions once active streams finish;
 HTTP/1.1 keeps its existing Connection: close behavior. HTTP/1.0 uses close-delimited responses without Transfer-Encoding. The shutdown timeout still
@@ -5891,7 +5873,9 @@ import { expect } from "vitest";
 export async function expectNoUnreadNotifications(user: Auth) {
   const client = await actingAs(user);
   try {
-    const body = await expectJson<{ count: number }>(await client.get("/notifications/unread-count"));
+    const body = await expectJson<{ count: number }>(
+      await client.get("/notifications/unread-count"),
+    );
     expect(body.count).toBe(0);
   } finally {
     await client.dispose();
@@ -6681,10 +6665,10 @@ warlock update --check          # same, but exit 1 when behind — a CI gate
 
 `--check` is the CI form — its exit code carries the answer:
 
-| Exit | Meaning                                                              |
-| ---- | -------------------------------------------------------------------- |
-| `0`  | Every `@warlock.js/*` package is current.                            |
-| `1`  | At least one is behind (or the registry could not be reached).       |
+| Exit | Meaning                                                        |
+| ---- | -------------------------------------------------------------- |
+| `0`  | Every `@warlock.js/*` package is current.                      |
+| `1`  | At least one is behind (or the registry could not be reached). |
 
 Both flags imply a dry run, so neither ever writes to `package.json`.
 
@@ -6696,19 +6680,19 @@ What it does, in order:
 4. Rewrites each matching spec, **preserving the range operator**: `^4.2.0` → `^4.3.0`, `~4.2.0` → `~4.3.0`, an exact `4.2.0` → `4.3.0`. Specs that are not a plain semver — `workspace:*`, `*`, `latest`, git/file URLs — are left exactly as written, and any package already at or ahead of latest is skipped.
 5. Runs the project's install to reconcile `node_modules`, chosen by the lockfile present. Skipped with `--no-install`.
 
-| Lockfile                        | Install         | Add (`warlock add`) |
-| ------------------------------- | --------------- | ------------------- |
-| `bun.lock` / `bun.lockb`        | `bun install`   | `bun add`           |
-| `package-lock.json`             | `npm install`   | `npm install`       |
-| `yarn.lock`                     | `yarn install`  | `yarn add`          |
-| `pnpm-lock.yaml`                | `pnpm install`  | `pnpm add`          |
-| *none*                          | `npm install`   | `npm install`       |
+| Lockfile                 | Install        | Add (`warlock add`) |
+| ------------------------ | -------------- | ------------------- |
+| `bun.lock` / `bun.lockb` | `bun install`  | `bun add`           |
+| `package-lock.json`      | `npm install`  | `npm install`       |
+| `yarn.lock`              | `yarn install` | `yarn add`          |
+| `pnpm-lock.yaml`         | `pnpm install` | `pnpm add`          |
+| _none_                   | `npm install`  | `npm install`       |
 
 Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
 
 Re-running on an already-current project is a no-op: nothing resolves as newer, so it prints "All @warlock.js packages are already up to date" and exits without writing or installing.
 
-**Offline is not "up to date".** If *every* registry lookup fails, the command says so and changes nothing:
+**Offline is not "up to date".** If _every_ registry lookup fails, the command says so and changes nothing:
 
 ```
 ⚠ Could not reach the npm registry — no versions were changed. Check your connection and try again.
@@ -6728,7 +6712,7 @@ On start, `warlock dev` checks npm for a newer `@warlock.js/core` and prints a o
 
 Core's version stands in for the whole family (lockstep), so a single lookup is enough. The check is **best-effort and non-blocking** — it runs fire-and-forget after the server is ready, never delays or breaks startup, and stays silent on any failure (offline, registry down, timeout). Its abort budget is 5s, much shorter than the `warlock update` command's, so a hanging network leaves nothing behind.
 
-**The answer is cached for 24 hours** in `.warlock/update-check.json`, so a normal day of dev-server restarts costs one registry lookup rather than one per boot. Three deliberate details: a **failed** lookup is never cached (one flaky moment must not silence the notice for a day), an entry stamped in the *future* is ignored (a clock that moves backwards would otherwise pin the cache as fresh forever), and the entry is **dropped** once `u` actually applies an update, so the next boot compares against the version you just installed.
+**The answer is cached for 24 hours** in `.warlock/update-check.json`, so a normal day of dev-server restarts costs one registry lookup rather than one per boot. Three deliberate details: a **failed** lookup is never cached (one flaky moment must not silence the notice for a day), an entry stamped in the _future_ is ignored (a clock that moves backwards would otherwise pin the cache as fresh forever), and the entry is **dropped** once `u` actually applies an update, so the next boot compares against the version you just installed.
 
 ### The `u` shortcut
 
@@ -6740,11 +6724,11 @@ Pressing `u` on that notice runs the whole upgrade without leaving the dev serve
 
 What happens when it doesn't go to plan:
 
-| Situation                     | Result                                                                       |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| Registry unreachable          | Nothing changes, the server keeps serving, and `u` is re-armed for a retry.   |
+| Situation                     | Result                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Registry unreachable          | Nothing changes, the server keeps serving, and `u` is re-armed for a retry.                              |
 | Install failed                | `package.json` keeps the new versions; `u` is **not** re-armed — finish the install and restart by hand. |
-| Restart could not be launched | The notice tells you to restart manually.                                     |
+| Restart could not be launched | The notice tells you to restart manually.                                                                |
 
 The shortcut is only offered when stdin is an interactive TTY. When it isn't (CI, piped stdin, a process supervisor), the notice falls back to the `Run npx warlock update` line instead — it never silently does nothing.
 
@@ -6781,7 +6765,7 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 - **Non-semver specs are intentionally skipped.** A `workspace:*` or `*` dependency stays as written; `update` will not pin it to a concrete version.
 - **The notice never blocks dev.** If npm is unreachable, `warlock dev` behaves exactly as before — no delay, no error, no notice, and no `u` shortcut.
 - **`u` is not offered without a TTY.** Don't expect it in CI logs or piped output; the notice prints the command instead.
-- **`warlock update` is not `warlock add`.** `add` installs a *new* feature package and runs its setup hooks; `update` only bumps the versions of packages you already depend on.
+- **`warlock update` is not `warlock add`.** `add` installs a _new_ feature package and runs its setup hooks; `update` only bumps the versions of packages you already depend on.
 
 ## See also
 
@@ -6794,7 +6778,7 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 
 ---
 name: upgrade-from-5-29
-description: 'Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, fresh rate-limit counters, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade.'
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, fresh rate-limit counters, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -7003,30 +6987,30 @@ For multi-file uploads, use an array schema (`v.array(v.file())`) — the valida
 
 From `@warlock.js/core/src/http/uploaded-file.ts`:
 
-| Member                              | Returns                | Notes                                                  |
-| ----------------------------------- | ---------------------- | ------------------------------------------------------ |
-| `file.name`                         | `string`               | sanitized original filename                            |
-| `file.mimeType`                     | `string`               | e.g. `"image/jpeg"`                                    |
-| `file.extension`                    | `string`               | lowercased, no dot — e.g. `"jpg"`                      |
-| `file.isImage` / `isVideo` / `isAudio` | `boolean`           | MIME-type prefix checks                                |
-| `await file.size()`                 | `number` (bytes)       | buffers the file on first call                         |
-| `await file.buffer()`               | `Buffer`               | cached after first call                                |
-| `await file.dimensions()`           | `{ width?, height? }`  | empty object if not an image                           |
-| `await file.metadata()`             | `{ name, mimeType, extension, size, width?, height? }` | one-shot metadata |
-| `await file.toImage()`              | `Image`                | for advanced transforms outside the fluent API         |
-| `await file.toJSON()`               | metadata + base64      | for serialization / debugging                          |
+| Member                                 | Returns                                                | Notes                                          |
+| -------------------------------------- | ------------------------------------------------------ | ---------------------------------------------- |
+| `file.name`                            | `string`                                               | sanitized original filename                    |
+| `file.mimeType`                        | `string`                                               | e.g. `"image/jpeg"`                            |
+| `file.extension`                       | `string`                                               | lowercased, no dot — e.g. `"jpg"`              |
+| `file.isImage` / `isVideo` / `isAudio` | `boolean`                                              | MIME-type prefix checks                        |
+| `await file.size()`                    | `number` (bytes)                                       | buffers the file on first call                 |
+| `await file.buffer()`                  | `Buffer`                                               | cached after first call                        |
+| `await file.dimensions()`              | `{ width?, height? }`                                  | empty object if not an image                   |
+| `await file.metadata()`                | `{ name, mimeType, extension, size, width?, height? }` | one-shot metadata                              |
+| `await file.toImage()`                 | `Image`                                                | for advanced transforms outside the fluent API |
+| `await file.toJSON()`                  | metadata + base64                                      | for serialization / debugging                  |
 
 Image transforms (chainable, no-op for non-images):
 
-| Method                          | Notes                                  |
-| ------------------------------- | -------------------------------------- |
-| `.resize(width, height?)`       | proportional if `height` omitted       |
-| `.format(format)`               | `"jpeg" | "png" | "webp" | "avif" | ...` — extension is auto-updated |
-| `.quality(1–100)`               | JPEG/WebP/AVIF only                    |
-| `.rotate(deg)`                  | positive = clockwise                   |
-| `.blur(sigma?)`                 | default `3`, min `0.3`                 |
-| `.grayscale()`                  | —                                      |
-| `.transform(opts | callback)`   | full sharp/`ImageTransformOptions` control |
+| Method                    | Notes                            |
+| ------------------------- | -------------------------------- |
+| `.resize(width, height?)` | proportional if `height` omitted |
+| `.format(format)`         | `"jpeg"                          | "png"                                      | "webp" | "avif" | ...` — extension is auto-updated |
+| `.quality(1–100)`         | JPEG/WebP/AVIF only              |
+| `.rotate(deg)`            | positive = clockwise             |
+| `.blur(sigma?)`           | default `3`, min `0.3`           |
+| `.grayscale()`            | —                                |
+| `.transform(opts          | callback)`                       | full sharp/`ImageTransformOptions` control |
 
 Save:
 
@@ -7038,7 +7022,7 @@ await file.saveAs(fullPath, options?);  // explicit path, returns StorageFile
 Driver selection:
 
 ```ts
-await file.use("s3").save("avatars");        // single upload
+await file.use("s3").save("avatars"); // single upload
 await file.use("r2").saveAs("cdn/x.webp");
 ```
 
@@ -7048,15 +7032,15 @@ await file.use("r2").saveAs("cdn/x.webp");
 type SaveOptions = {
   name?: "random" | "original" | string; // default "random"
   prefix?:
-    | true                                  // default datetime prefix
-    | string                                // static prefix
+    | true // default datetime prefix
+    | string // static prefix
     | {
-        format?: string;                    // dayjs-style format
+        format?: string; // dayjs-style format
         randomLength?: number;
-        as?: "file" | "directory";          // default "file"
+        as?: "file" | "directory"; // default "file"
       };
   driver?: StorageDriverName;
-  validate?: FileValidationOptions;         // throws on mismatch
+  validate?: FileValidationOptions; // throws on mismatch
 };
 ```
 
@@ -7092,12 +7076,12 @@ await file.saveAs("avatars/profile-123.png");
 ```ts
 const stored = await file.save("avatars");
 
-stored.path;          // "avatars/x7k9m2p4.webp" (after format transform)
-stored.url;           // public URL (driver-dependent)
+stored.path; // "avatars/x7k9m2p4.webp" (after format transform)
+stored.url; // public URL (driver-dependent)
 await stored.size();
 await stored.mimeType();
 stored.extension;
-await stored.data();  // full info object incl. hash
+await stored.data(); // full info object incl. hash
 ```
 
 `StorageFile` is the standard handle returned by every `Storage.put()` / `UploadedFile.save()` call. Use it from then on — the `UploadedFile` is best discarded after save.
@@ -7204,9 +7188,7 @@ Each chain produces a fresh transform — but `UploadedFile` is stateful, so do 
 ### Saving to S3 with a content type override
 
 ```ts
-const file = await uploadedFile
-  .use("s3")
-  .save("documents", { name: "original" });
+const file = await uploadedFile.use("s3").save("documents", { name: "original" });
 
 // or, full storage layer:
 await storage.use("s3").put(await uploadedFile.buffer(), "documents/report.pdf", {
@@ -7258,8 +7240,8 @@ if (Application.isProduction) {
 }
 
 const uploadsDir = Application.uploadsPath;
-const uptimeMs   = Application.uptime;
-const version    = Application.version;
+const uptimeMs = Application.uptime;
+const version = Application.version;
 ```
 
 Every member is a getter — values are computed on access, not snapshotted at boot. That's deliberate: tests flip the environment, the dev server flips the runtime strategy, and the framework caches its own version. You always read the current value.
@@ -7267,10 +7249,10 @@ Every member is a getter — values are computed on access, not snapshotted at b
 ## Environment
 
 ```ts
-Application.environment      // "development" | "production" | "test"
-Application.isProduction     // === "production"
-Application.isDevelopment    // === "development"
-Application.isTest           // === "test"
+Application.environment; // "development" | "production" | "test"
+Application.isProduction; // === "production"
+Application.isDevelopment; // === "development"
+Application.isTest; // === "test"
 ```
 
 Backed by `process.env.NODE_ENV`. `setEnvironment` mutates it:
@@ -7291,7 +7273,7 @@ const httpConfigurations: HttpConfigurations = {
     secret: env("COOKIE_SECRET", "super-secret-key-change-me"),
     options: {
       httpOnly: true,
-      secure: Application.isProduction,   // true on prod (HTTPS only), false in dev
+      secure: Application.isProduction, // true on prod (HTTPS only), false in dev
       path: "/",
     },
   },
@@ -7302,13 +7284,13 @@ export default httpConfigurations;
 
 ## Runtime strategy
 
-`runtimeStrategy` is a separate axis from `environment`. It marks how the *framework itself* is running:
+`runtimeStrategy` is a separate axis from `environment`. It marks how the _framework itself_ is running:
 
 - `"development"` — dev server (file watcher, HMR, transpile cache on disk).
 - `"production"` — built bundle running from `dist/`.
 
 ```ts
-Application.runtimeStrategy           // "production" | "development"
+Application.runtimeStrategy; // "production" | "development"
 Application.setRuntimeStrategy("production");
 ```
 
@@ -7318,7 +7300,7 @@ Most app code shouldn't care about `runtimeStrategy` — branch on `environment`
 
 ## Lifecycle: boot & shutdown
 
-`Application.onceBooted(callback)` runs a callback the moment the app is fully booted — every connector in **both** phases is active and all app files (locales, events, main, routes) are loaded. It's the only hook that fires *after* the late phase (http, socket) is up.
+`Application.onceBooted(callback)` runs a callback the moment the app is fully booted — every connector in **both** phases is active and all app files (locales, events, main, routes) are loaded. It's the only hook that fires _after_ the late phase (http, socket) is up.
 
 ```ts
 import { Application } from "@warlock.js/core";
@@ -7328,18 +7310,18 @@ Application.onceBooted(({ environment, runtimeStrategy, bootDurationMs }) => {
 });
 ```
 
-Why a dedicated hook instead of code at the bottom of `main.ts`? **App files load before the late phase.** `main.ts`, `events.ts`, `routes.ts`, and locales are all imported *between* the early and late connector phases — so when `main.ts` runs, http/socket are not listening yet. `onceBooted` defers your callback until the whole sequence finishes, which makes it the safe place to touch `app.http` / `app.socket` from `main.ts`-level code.
+Why a dedicated hook instead of code at the bottom of `main.ts`? **App files load before the late phase.** `main.ts`, `events.ts`, `routes.ts`, and locales are all imported _between_ the early and late connector phases — so when `main.ts` runs, http/socket are not listening yet. `onceBooted` defers your callback until the whole sequence finishes, which makes it the safe place to touch `app.http` / `app.socket` from `main.ts`-level code.
 
-It's a **latch**, not a plain event listener: register before boot and it queues; register *after* boot and it fires on the next microtask. A late subscriber never silently misses the signal.
+It's a **latch**, not a plain event listener: register before boot and it queues; register _after_ boot and it fires on the next microtask. A late subscriber never silently misses the signal.
 
 ```ts
-Application.isBooted;           // boolean — has boot finished?
+Application.isBooted; // boolean — has boot finished?
 await Application.whenBooted(); // Promise<BootContext> — await instead of a callback
 ```
 
 `whenBooted()` is the promise form, resolving with the same `BootContext` (`{ environment, runtimeStrategy, bootDurationMs? }`). `bootDurationMs` is set by the dev server (which times boot) and omitted by the production entry.
 
-The framework fires the latch for you — the dev server and the production bundle each call it once, right after the late phase. App code only ever *reads* it via `onceBooted` / `whenBooted` / `isBooted`; the internal `markBooted` is a framework entry point, not for application use.
+The framework fires the latch for you — the dev server and the production bundle each call it once, right after the late phase. App code only ever _reads_ it via `onceBooted` / `whenBooted` / `isBooted`; the internal `markBooted` is a framework entry point, not for application use.
 
 ### Run something once everything is listening
 
@@ -7381,12 +7363,12 @@ For path helpers (`appPath`, `configPath`, `uploadsPath`, …) anchored at `proc
 The most-used helpers are also surfaced as no-argument getters on `Application`:
 
 ```ts
-Application.rootPath        // <cwd>
-Application.srcPath         // <cwd>/src
-Application.appPath         // <cwd>/src/app
-Application.publicPath      // <cwd>/public
-Application.storagePath     // <cwd>/storage
-Application.uploadsPath     // <cwd>/storage/uploads (or override)
+Application.rootPath; // <cwd>
+Application.srcPath; // <cwd>/src
+Application.appPath; // <cwd>/src/app
+Application.publicPath; // <cwd>/public
+Application.storagePath; // <cwd>/storage
+Application.uploadsPath; // <cwd>/storage/uploads (or override)
 ```
 
 Reach for those when you want the directory itself; reach for the helpers (e.g. `appPath("orders/routes.ts")`) when you need a file inside.
@@ -7394,9 +7376,9 @@ Reach for those when you want the directory itself; reach for the helpers (e.g. 
 ## Version and uptime
 
 ```ts
-Application.version        // "1.0.0" (semver, cached after first read)
-Application.uptime         // ms since process start
-Application.startedAt      // Date object — wall time when the process booted
+Application.version; // "1.0.0" (semver, cached after first read)
+Application.uptime; // ms since process start
+Application.startedAt; // Date object — wall time when the process booted
 ```
 
 `version` is the `@warlock.js/core` package version, lazily loaded once. `uptime` is `process.uptime() * 1000` — the Node-process uptime, not "the framework's uptime." If you spawn workers, each worker has its own.
@@ -7416,13 +7398,13 @@ The project's home page surfaces the version in a footer:
 ```ts
 import { app } from "@warlock.js/core";
 
-app.http        // Fastify instance (after http connector starts)
-app.socket      // socket.io Server (after socket connector starts)
-app.router      // the Router singleton
-app.database    // Cascade's DataSource
+app.http; // Fastify instance (after http connector starts)
+app.socket; // socket.io Server (after socket connector starts)
+app.router; // the Router singleton
+app.database; // Cascade's DataSource
 ```
 
-Each property is a getter backed by the framework's DI container (`container.tryGet("http.server")` etc. — `router` uses `container.get(...)`, which throws instead, since it is never legitimately absent). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. `http`, `socket`, and `database` are thin `container.tryGet(...)` reads, so before the connector boots they return `undefined` (they do **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
+Each property is a getter backed by the framework's DI container (`container.tryGet("http.server")` etc. — `router` uses `container.get(...)`, which throws instead, since it is never legitimately absent). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. `http`, `socket`, and `database` are thin `container.tryGet(...)` reads, so before the connector boots they return `undefined` (they do **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are _late_-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
 
 Typical uses (note: from runtime code, after bootstrap — not at module-import time):
 
@@ -7530,7 +7512,7 @@ cors: {
 - **`version` is `null` until the first `await`.** The version loader is async (it reads `package.json`). On a cold start before any framework code has run `getWarlockVersion()`, `Application.version` returns `null`. The framework does load it during bootstrap, so anywhere downstream of bootstrap is fine — controllers, services, connectors after `start()`. CLI commands without `preload.bootstrap` may see `null`.
 - **`Application` is static, not a DI registration.** Don't try to inject it. There's nothing to inject — it's a class with only static members.
 - **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.tryGet(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`. `app.router` is the exception: it reads via `container.get(...)`, which throws a named `ContainerKeyMissingError` instead of handing back `undefined`, because the router is never a legitimate absence.
-- **`onceBooted` is a latch, not `events.on`.** A callback registered *after* boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
+- **`onceBooted` is a latch, not `events.on`.** A callback registered _after_ boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
 - **`onShutdown` runs before connectors close, not after.** That ordering is deliberate so cleanup can still use db/cache/http — but it means a hook that hangs delays connector teardown (bounded only by your process manager's kill timeout). Keep teardown fast; for HTTP draining the framework already bounds it via `http.gracefulShutdown.timeout`.
 
 ## See also
@@ -8192,11 +8174,11 @@ description: 'Three schema-side helpers — `useHashedPassword()` (bcrypt on sav
 
 Three helpers in `@warlock.js/core` plug into Seal schemas to compute or mutate a field at write time. They sit between "controllers + services" (the mutable-input layer) and "the database row" (the stored state) — so the value the DB sees is always derived, even if the caller didn't think about it.
 
-| Helper | Job | Attaches via | Behavior |
-| --- | --- | --- | --- |
-| `useHashedPassword()` | bcrypt-hash a password field on save | `.addTransformer(useHashedPassword())` on the field | Hash on new row; hash on change; pass through on no-change |
-| `useComputedSlug(field?, scope?)` | Derive a slug from another field | `v.computed(useComputedSlug("title"))` | Compute on every save where the source field is set |
-| `useComputedModel(callback)` | Any custom derived value | `v.computed(useComputedModel(...))` | Runs your callback with `(data, model, context)` |
+| Helper                            | Job                                  | Attaches via                                        | Behavior                                                   |
+| --------------------------------- | ------------------------------------ | --------------------------------------------------- | ---------------------------------------------------------- |
+| `useHashedPassword()`             | bcrypt-hash a password field on save | `.addTransformer(useHashedPassword())` on the field | Hash on new row; hash on change; pass through on no-change |
+| `useComputedSlug(field?, scope?)` | Derive a slug from another field     | `v.computed(useComputedSlug("title"))`              | Compute on every save where the source field is set        |
+| `useComputedModel(callback)`      | Any custom derived value             | `v.computed(useComputedModel(...))`                 | Runs your callback with `(data, model, context)`           |
 
 All three are imported from `@warlock.js/core` (despite living in `src/database/utils.ts` under the hood).
 
@@ -8238,12 +8220,12 @@ password: v.string().addTransformer(useHashedPassword()),
 
 What it does at save time:
 
-| Situation                       | Behavior                                    |
-| ------------------------------- | ------------------------------------------- |
-| New row, password set           | Hash the value before insert.               |
-| Existing row, password changed  | Re-hash the new value.                      |
+| Situation                        | Behavior                                              |
+| -------------------------------- | ----------------------------------------------------- |
+| New row, password set            | Hash the value before insert.                         |
+| Existing row, password changed   | Re-hash the new value.                                |
 | Existing row, password unchanged | Pass through (no re-hashing — stored hash preserved). |
-| Empty / undefined value         | Pass through untouched.                     |
+| Empty / undefined value          | Pass through untouched.                               |
 
 Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See the `hash-password` topic for full bcrypt setup (salt rounds, `npm install bcryptjs`).
 
@@ -8254,7 +8236,7 @@ Without the transformer, every code path that writes a password has to remember:
 ```ts
 await User.create({
   email: input.email,
-  password: await hashPassword(input.password),  // easy to forget
+  password: await hashPassword(input.password), // easy to forget
 });
 ```
 
@@ -8268,17 +8250,17 @@ Pass plaintext to `User.create({ password: input.password })` and the transforme
 slug: v.computed(useComputedSlug("title")),
 ```
 
-- **`field`** *(default `"title"`)* — the source field name to slugify.
-- **`scope`** — `"sibling"` *(default)* or `"global"`. `"sibling"` reads `data[field]` from the same object being saved; `"global"` reads `get(context.allValues, field)` (the root context — useful in nested schemas where the source field lives on a parent).
+- **`field`** _(default `"title"`)_ — the source field name to slugify.
+- **`scope`** — `"sibling"` _(default)_ or `"global"`. `"sibling"` reads `data[field]` from the same object being saved; `"global"` reads `get(context.allValues, field)` (the root context — useful in nested schemas where the source field lives on a parent).
 
 What it does:
 
-| Situation                          | Behavior                                   |
-| ---------------------------------- | ------------------------------------------ |
-| Source field has a value           | Return `slugify(value)` — overwrite the slug. |
-| Source field is empty / undefined  | Return `model.get(field)` — i.e. the model's existing value for the **source** field (e.g. the stored `title`), not the existing slug. |
+| Situation                         | Behavior                                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Source field has a value          | Return `slugify(value)` — overwrite the slug.                                                                                          |
+| Source field is empty / undefined | Return `model.get(field)` — i.e. the model's existing value for the **source** field (e.g. the stored `title`), not the existing slug. |
 
-So if a caller sets `title: "Hello World"` without touching `slug`, the saved row has `slug: "hello-world"`. If they explicitly set `slug: "custom-handle"` AND leave `title` populated, the computed field **still overwrites** with the slugified title — because the source value is set. (Note the empty-source fallback returns `model.get(field)` keyed by the *source* field name, not the slug — a quirk of the implementation; if `title` is also empty on the model you get whatever the source field holds, which may be `undefined`.)
+So if a caller sets `title: "Hello World"` without touching `slug`, the saved row has `slug: "hello-world"`. If they explicitly set `slug: "custom-handle"` AND leave `title` populated, the computed field **still overwrites** with the slugified title — because the source value is set. (Note the empty-source fallback returns `model.get(field)` keyed by the _source_ field name, not the slug — a quirk of the implementation; if `title` is also empty on the model you get whatever the source field holds, which may be `undefined`.)
 
 To allow explicit slug overrides, branch in your service before calling save, or skip the transformer for that one save (model-level mutation).
 
@@ -8322,8 +8304,8 @@ slug: v.computed(useComputedModel((data, model, context) => {
 
 ```ts
 type ComputedCallbackModel = (
-  data: any,         // the schema input being saved
-  model: Model,      // the Cascade model instance
+  data: any, // the schema input being saved
+  model: Model, // the Cascade model instance
   context: SchemaContext,
 ) => any | Promise<any>;
 ```
@@ -8625,7 +8607,7 @@ import { $agg } from "@warlock.js/cascade";
 const byStatus = await ordersRepository.groupBy(
   "status",
   { count: $agg.count(), total: $agg.sum("total") },
-  { paidAfter: "2026-01-01" },   // a filterBy key
+  { paidAfter: "2026-01-01" }, // a filterBy key
 );
 
 // one summary row over the whole filtered set (null when empty)
@@ -8635,7 +8617,7 @@ const summary = await ordersRepository.aggregate(
 );
 ```
 
-`fields` accepts a string, a `string[]`, or a column map; `aggregates` is a map of result alias → aggregate expression. Because filters are applied first, you never have to re-implement `filterBy` logic for a stats endpoint — the same inputs scope the count *and* the sums.
+`fields` accepts a string, a `string[]`, or a column map; `aggregates` is a map of result alias → aggregate expression. Because filters are applied first, you never have to re-implement `filterBy` logic for a stats endpoint — the same inputs scope the count _and_ the sums.
 
 ### Chunking
 
@@ -9067,29 +9049,29 @@ Scaffold with `npx warlock generate.controller <module>/<action> --with-validati
 
 From `@warlock.js/seal` — **always import from seal directly**. `@warlock.js/core` does not re-export `v`/`Infer`.
 
-| Factory                            | Output type                  | Common chain                                     |
-| ---------------------------------- | ---------------------------- | ------------------------------------------------ |
-| `v.string(msg?)`                   | `string`                     | `.min(n)`, `.max(n)`, `.length(n)`, `.pattern(re)`, `.email()`, `.url()`, `.oneOf([...])`, `.trim()`, `.lowercase()`, `.uppercase()` |
-| `v.email(msg?)`                    | `string`                     | (alias of `v.string().email()`)                  |
-| `v.number(msg?)`                   | `number`                     | `.min(n)`, `.max(n)`, `.positive()`              |
-| `v.numeric(msg?)`                  | `number` (accepts numeric strings) | same                                        |
-| `v.int(msg?)`                      | `number` (integer)           | same                                             |
-| `v.float(msg?)`                    | `number`                     | same                                             |
-| `v.boolean(msg?)`                  | `boolean`                    | —                                                |
-| `v.date(msg?)`                     | `Date`                       | —                                                |
-| `v.array(inner, msg?)`             | `T[]`                        | `.minLength(n)`, `.maxLength(n)`                 |
-| `v.object(shape, msg?)`            | `{ ... }`                    | —                                                |
-| `v.record(value, msg?)`            | `Record<string, T>`          | —                                                |
-| `v.tuple([a, b, c], msg?)`         | `[A, B, C]`                  | —                                                |
-| `v.union([a, b], msg?)`            | `A | B`                      | —                                                |
-| `v.discriminatedUnion(key, [...])` | `A | B` (tagged)             | each branch must be `v.object({ key: v.literal(...) })` |
-| `v.enum([...] | EnumObj, msg?)`    | literal union                | —                                                |
-| `v.literal(...values)`             | exact literals               | —                                                |
-| `v.instanceof(Ctor, msg?)`         | `Ctor` instances             | —                                                |
-| `v.lazy(() => schema)`             | recursive/forward refs       | —                                                |
-| `v.file(msg?)`                     | `UploadedFile`               | `.image()`, `.accept(exts)`, `.mimeType(types)`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(n)`, `.maxWidth(n)` — see the `upload-file` topic |
-| `v.computed(callback)`             | derived value                | —                                                |
-| `v.managed(callback)`              | framework-injected value     | —                                                |
+| Factory                            | Output type                        | Common chain                                                                                                                                |
+| ---------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v.string(msg?)`                   | `string`                           | `.min(n)`, `.max(n)`, `.length(n)`, `.pattern(re)`, `.email()`, `.url()`, `.oneOf([...])`, `.trim()`, `.lowercase()`, `.uppercase()`        |
+| `v.email(msg?)`                    | `string`                           | (alias of `v.string().email()`)                                                                                                             |
+| `v.number(msg?)`                   | `number`                           | `.min(n)`, `.max(n)`, `.positive()`                                                                                                         |
+| `v.numeric(msg?)`                  | `number` (accepts numeric strings) | same                                                                                                                                        |
+| `v.int(msg?)`                      | `number` (integer)                 | same                                                                                                                                        |
+| `v.float(msg?)`                    | `number`                           | same                                                                                                                                        |
+| `v.boolean(msg?)`                  | `boolean`                          | —                                                                                                                                           |
+| `v.date(msg?)`                     | `Date`                             | —                                                                                                                                           |
+| `v.array(inner, msg?)`             | `T[]`                              | `.minLength(n)`, `.maxLength(n)`                                                                                                            |
+| `v.object(shape, msg?)`            | `{ ... }`                          | —                                                                                                                                           |
+| `v.record(value, msg?)`            | `Record<string, T>`                | —                                                                                                                                           |
+| `v.tuple([a, b, c], msg?)`         | `[A, B, C]`                        | —                                                                                                                                           |
+| `v.union([a, b], msg?)`            | `A                                 | B`                                                                                                                                          | —                                                       |
+| `v.discriminatedUnion(key, [...])` | `A                                 | B` (tagged)                                                                                                                                 | each branch must be `v.object({ key: v.literal(...) })` |
+| `v.enum([...]                      | EnumObj, msg?)`                    | literal union                                                                                                                               | —                                                       |
+| `v.literal(...values)`             | exact literals                     | —                                                                                                                                           |
+| `v.instanceof(Ctor, msg?)`         | `Ctor` instances                   | —                                                                                                                                           |
+| `v.lazy(() => schema)`             | recursive/forward refs             | —                                                                                                                                           |
+| `v.file(msg?)`                     | `UploadedFile`                     | `.image()`, `.accept(exts)`, `.mimeType(types)`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(n)`, `.maxWidth(n)` — see the `upload-file` topic |
+| `v.computed(callback)`             | derived value                      | —                                                                                                                                           |
+| `v.managed(callback)`              | framework-injected value           | —                                                                                                                                           |
 
 Universal modifiers from `BaseValidator`: `.optional()`, `.nullable()`, `.default(value)`, `.catch(value)`. Note: **there is no `v.url(...)`** at factory level — use `v.string().url(...)`.
 
@@ -9207,7 +9189,7 @@ The framework calls `response.failedSchema(result)` which sends `422` by default
   "errors": [
     { "input": "email", "error": "The email must be a valid email" },
     { "input": "password", "error": "The password must be at least 6 characters" },
-  ]
+  ],
 }
 ```
 
@@ -9310,7 +9292,7 @@ updateProductController.validation = {
 ## Gotchas
 
 - **`v.url(...)` does not exist on the factory.** Use `v.string().url(...)`. Same goes for any other rule that's not in the table above — check `BaseValidator` / `StringValidator` first.
-- **`.optional()` and `.required()` are not symmetric.** `.optional()` brands the field as absent-allowed. `.required()` clears the optional flag *and* replaces any prior required rule — read seal's `BaseValidator` source if you need conditional required.
+- **`.optional()` and `.required()` are not symmetric.** `.optional()` brands the field as absent-allowed. `.required()` clears the optional flag _and_ replaces any prior required rule — read seal's `BaseValidator` source if you need conditional required.
 - **`uniqueExceptCurrentId` reads `request.input("id")`.** It only works inside an HTTP context — useless in CLI/job code.
 - **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment.
 - **Import `v`/`Infer` from `@warlock.js/seal`.** Core does not re-export them — `@warlock.js/seal` is the canonical and only home.
@@ -9495,19 +9477,19 @@ Summary: 5 ok, 1 warn, 0 fail
 
 The default set is `defaultDoctorChecks` (in registration order — runtime-surface checks first, release hygiene last):
 
-| Check | `ok` | `warn` | `fail` |
-| --- | --- | --- | --- |
-| `routes` | ≥ 1 route registered | 0 routes (a route module likely failed to load) | — |
-| `config` | required sections (`app`, `http`) present | — | a required section is missing |
-| `connectors` | manager enumerable; reports registered + active set | — | (only if the probe itself throws) |
-| `optional-peers` | every known optional peer installed | a peer is missing → its feature is unavailable | — |
-| `jwt-secret` | `auth.userType` configured and a JWT signing secret set | — | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
-| `health` | `/health` + `/ready` will be exposed | `http.health.enabled = false` (probes off) | — |
-| `release-hygiene` | `package.json` version matches the top `## x.y.z` CHANGELOG heading | no `CHANGELOG.md`, or no parseable heading | version ≠ top heading |
+| Check             | `ok`                                                                | `warn`                                          | `fail`                                                                                                     |
+| ----------------- | ------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `routes`          | ≥ 1 route registered                                                | 0 routes (a route module likely failed to load) | —                                                                                                          |
+| `config`          | required sections (`app`, `http`) present                           | —                                               | a required section is missing                                                                              |
+| `connectors`      | manager enumerable; reports registered + active set                 | —                                               | (only if the probe itself throws)                                                                          |
+| `optional-peers`  | every known optional peer installed                                 | a peer is missing → its feature is unavailable  | —                                                                                                          |
+| `jwt-secret`      | `auth.userType` configured and a JWT signing secret set             | —                                               | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
+| `health`          | `/health` + `/ready` will be exposed                                | `http.health.enabled = false` (probes off)      | —                                                                                                          |
+| `release-hygiene` | `package.json` version matches the top `## x.y.z` CHANGELOG heading | no `CHANGELOG.md`, or no parseable heading      | version ≠ top heading                                                                                      |
 
 `jwt-secret` is the pre-flight form of the silent first-login 500: when `auth.userType` is set but no signing secret is, every login and token operation fails with a generic 500 at runtime — `doctor` turns that into a `fail` before you ship. It resolves the secret from both the current key (`auth.accessToken.secret`) and the legacy `auth.jwt.secret`, so a project on the older-but-supported shape doesn't trip it. When `auth.userType` isn't configured at all (no auth), the check emits **no line** — it's skipped, not a pass — so it never nags a project that isn't doing auth.
 
-Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what *your* project has installed, not core's own deps.
+Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what _your_ project has installed, not core's own deps.
 
 ## Exit code
 
@@ -9524,21 +9506,21 @@ any fail    → exit 1   (so CI / a release script can gate on it)
 type CheckStatus = "ok" | "warn" | "fail";
 
 type CheckResult = {
-  name: string;     // stable check name, e.g. "routes"
+  name: string; // stable check name, e.g. "routes"
   status: CheckStatus;
-  detail: string;   // one-line, user-facing explanation
+  detail: string; // one-line, user-facing explanation
 };
 
 type DoctorCheck = {
   name: string;
-  run: () => CheckResult | Promise<CheckResult>;   // MUST be read-only
+  run: () => CheckResult | Promise<CheckResult>; // MUST be read-only
 };
 
 type DoctorReport = {
-  results: CheckResult[];                 // in registration order
-  summary: Record<CheckStatus, number>;   // counts per status
-  hasFailures: boolean;                   // true iff any fail
-  exitCode: 0 | 1;                        // 1 when hasFailures, else 0
+  results: CheckResult[]; // in registration order
+  summary: Record<CheckStatus, number>; // counts per status
+  hasFailures: boolean; // true iff any fail
+  exitCode: 0 | 1; // 1 when hasFailures, else 0
 };
 ```
 
@@ -9560,7 +9542,7 @@ import {
 const migrationsCheck: DoctorCheck = {
   name: "migrations",
   async run() {
-    const pending = await countPendingMigrations();   // your read-only probe
+    const pending = await countPendingMigrations(); // your read-only probe
 
     return pending === 0
       ? { name: "migrations", status: "ok", detail: "no pending migrations" }
@@ -9570,8 +9552,8 @@ const migrationsCheck: DoctorCheck = {
 
 const report = await runChecks([...defaultDoctorChecks, migrationsCheck]);
 
-printReport(report);                  // colored, to stdout
-const lines = formatReportLines(report);   // plain strings — snapshot-friendly
+printReport(report); // colored, to stdout
+const lines = formatReportLines(report); // plain strings — snapshot-friendly
 
 if (report.hasFailures) process.exit(report.exitCode);
 ```
@@ -9594,7 +9576,7 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 ## Gotchas
 
-- **`doctor` starts no connectors.** It intentionally does not open DB / cache / socket connections — the `connectors` check reports the *registered* set and which are already active, without forcing any up. Don't expect it to detect a down database.
+- **`doctor` starts no connectors.** It intentionally does not open DB / cache / socket connections — the `connectors` check reports the _registered_ set and which are already active, without forcing any up. Don't expect it to detect a down database.
 - **Optional-peers resolves from the project, not core.** A peer installed only inside core's own `node_modules` still reports as missing — the probe uses `process.cwd()`.
 - **Warnings don't fail the command.** Only a `fail` flips the exit code. Missing optional peers and disabled health endpoints are deliberate-choice `warn`s.
 - **Custom checks must stay read-only.** `run()` runs against a booted-but-not-connected app; mutating state or opening a connection breaks the contract and can hang the command.
@@ -9636,14 +9618,14 @@ The `METHOD` column is verb-colored (GET green, POST blue, PUT/PATCH yellow, DEL
 
 ## Columns
 
-| Column   | Meaning                                                                       |
-| -------- | ----------------------------------------------------------------------------- |
-| `METHOD` | HTTP verb; a wildcard `all` route lists as `ALL`.                             |
-| `PATH`   | Full request path (group prefix already folded in).                           |
-| `NAME`   | Route name, or `—` when unnamed.                                              |
-| `ACTION` | Handler function name (`anonymous` for an unnamed handler).                   |
-| `MW`     | Count of middleware attached to the route.                                    |
-| `SOURCE` | Source file the route registered from, or `—`.                               |
+| Column   | Meaning                                                     |
+| -------- | ----------------------------------------------------------- |
+| `METHOD` | HTTP verb; a wildcard `all` route lists as `ALL`.           |
+| `PATH`   | Full request path (group prefix already folded in).         |
+| `NAME`   | Route name, or `—` when unnamed.                            |
+| `ACTION` | Handler function name (`anonymous` for an unnamed handler). |
+| `MW`     | Count of middleware attached to the route.                  |
+| `SOURCE` | Source file the route registered from, or `—`.              |
 
 ## Filters
 
@@ -9666,7 +9648,14 @@ npx warlock routes --json
 
 ```json
 [
-  { "method": "GET", "path": "/users", "name": "users.list", "action": "index", "middleware": 2, "source": "app/users/routes.ts" }
+  {
+    "method": "GET",
+    "path": "/users",
+    "name": "users.list",
+    "action": "index",
+    "middleware": 2,
+    "source": "app/users/routes.ts"
+  }
 ]
 ```
 
@@ -9705,7 +9694,7 @@ already claimed by another method). Run `warlock routes` to see the registered n
 
 **A clean baseline is now expected immediately after a successful `warlock build`.** Through 5.1, running `routes:diff` on an untouched checkout right after a green build reported drift, because the manifest recorded the catch-all as `"*"` while the router serves it as `"/*"`. The manifest is now written through the router's own path normalizer, so the two sides agree and a clean tree reports clean. If you see drift on a tree you have not edited since building, that is a bug worth reporting — it is no longer the expected greeting.
 
-⚠ **What a clean diff does NOT prove.** The manifest records what each page's name was **derived** as, not what it was **registered** as. `warlock build` never boots connectors, so it cannot see the API routes a page name might collide with; when a name is already claimed by another method the router appends a `.<method>` suffix at registration, and the comparison accepts that suffix rather than reporting it as drift. So `Page routes match` means *the page surface did not move since the build* — it does not mean *no page route name collided*. Use `warlock routes` to see the names as actually registered.
+⚠ **What a clean diff does NOT prove.** The manifest records what each page's name was **derived** as, not what it was **registered** as. `warlock build` never boots connectors, so it cannot see the API routes a page name might collide with; when a name is already claimed by another method the router appends a `.<method>` suffix at registration, and the comparison accepts that suffix rather than reporting it as drift. So `Page routes match` means _the page surface did not move since the build_ — it does not mean _no page route name collided_. Use `warlock routes` to see the names as actually registered.
 
 or, on drift:
 
@@ -9727,7 +9716,7 @@ and exits non-zero.
 
 ## Gotchas
 
-- **No connectors are started.** The list reflects what's *registered*, not what would connect. It never opens a DB/cache/socket.
+- **No connectors are started.** The list reflects what's _registered_, not what would connect. It never opens a DB/cache/socket.
 - **An empty table is a tell.** `No routes registered` is the same signal `warlock doctor`'s `routes` check warns on — a route module likely failed to load.
 - **`MW` counts, it doesn't name.** It's a "is this route guarded?" signal; for the actual chain, read the route definition.
 - **`ACTION` is the handler function name.** A controller method shows its method name; an inline anonymous handler shows `anonymous`.
@@ -9751,7 +9740,7 @@ description: 'Configure Socket.IO via `src/config/socket.ts`, reach the live ser
 
 Warlock wraps `socket.io`'s `Server` in a connector. That connector is in the **late** lifecycle phase — it boots **after** your app code (every module's `main.ts`, `routes.ts`, `events.ts`) has already been imported. The order is: early-phase connectors (logger, mailer, database, cache, storage) → app code is imported → late-phase connectors (http, then socket) boot. The socket server lives in the framework's DI container once it boots — reach it through `app.socket` or `getSocketServer()`.
 
-The practical consequence: **`app.socket` is not yet populated while a module's `main.ts` is being evaluated at import time.** Register connection handlers from code that runs *after* bootstrap completes — a controller, a service, a job — or guard with `getSocketServer()`. (Unlike the router, which collects routes into a standalone registry that the http connector scans on boot, the socket connector does not harvest listeners registered at import time — it just constructs the `Server`.)
+The practical consequence: **`app.socket` is not yet populated while a module's `main.ts` is being evaluated at import time.** Register connection handlers from code that runs _after_ bootstrap completes — a controller, a service, a job — or guard with `getSocketServer()`. (Unlike the router, which collects routes into a standalone registry that the http connector scans on boot, the socket connector does not harvest listeners registered at import time — it just constructs the `Server`.)
 
 ## The shape
 
@@ -9790,8 +9779,8 @@ The framework auto-loads each module's `main.ts` once at boot, but **before** th
 
 ```ts
 export type SocketOptions = {
-  port?: number;     // standalone port (only if HTTP is disabled)
-  options?: ServerOptions;  // forwarded as the 2nd arg to socket.io's `new Server(httpServer, options)`
+  port?: number; // standalone port (only if HTTP is disabled)
+  options?: ServerOptions; // forwarded as the 2nd arg to socket.io's `new Server(httpServer, options)`
 };
 ```
 
@@ -9822,19 +9811,19 @@ Two ways to get the `socket.io` `Server` instance:
 // 1. Via the app runtime accessor — reads container.tryGet("socket")
 import { app } from "@warlock.js/core";
 
-const io = app.socket;            // → Server, or undefined before the socket connector boots
+const io = app.socket; // → Server, or undefined before the socket connector boots
 
 // 2. Via the safe getter — explicit null when the connector hasn't started
 import { getSocketServer } from "@warlock.js/core";
 
-const io = getSocketServer();     // → Server | null
+const io = getSocketServer(); // → Server | null
 ```
 
-Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
+Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that _might_ run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
 
 ## Wiring `connection` handlers
 
-The socket connector boots *after* app code is imported, and it does not collect listeners registered at `main.ts` import time. So register handlers from a function that runs once the server is live — call it from post-bootstrap code, or guard it:
+The socket connector boots _after_ app code is imported, and it does not collect listeners registered at `main.ts` import time. So register handlers from a function that runs once the server is live — call it from post-bootstrap code, or guard it:
 
 ```ts title="src/app/chat/setup-chat-socket.ts"
 import { getSocketServer } from "@warlock.js/core";
@@ -10017,7 +10006,7 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 
 ## Gotchas
 
-- **`app.socket` is `undefined` before the connector starts — it does not throw.** Because socket is a *late*-phase connector, this includes the top level of `main.ts` (imported before late connectors boot). Reading `app.socket.on(...)` there throws a `TypeError` on `undefined`, not a helpful framework error. Safe in controllers, services, jobs, and any post-bootstrap code; use `getSocketServer()` + a null-guard everywhere else.
+- **`app.socket` is `undefined` before the connector starts — it does not throw.** Because socket is a _late_-phase connector, this includes the top level of `main.ts` (imported before late connectors boot). Reading `app.socket.on(...)` there throws a `TypeError` on `undefined`, not a helpful framework error. Safe in controllers, services, jobs, and any post-bootstrap code; use `getSocketServer()` + a null-guard everywhere else.
 - **Register handlers from post-bootstrap code, not at `main.ts` import time.** The socket connector constructs the `Server` but doesn't harvest listeners you registered at import time (unlike routes, which the http connector scans on boot). Wire handlers from a setup function invoked after bootstrap, or guard the registration with `getSocketServer()`.
 - **Re-registration can double-bind.** If a setup function runs more than once (HMR, repeated calls), `io.on("connection", ...)` stacks handlers — guard with an idempotency flag if you observe duplicates.
 - **CORS matters.** Browsers fail Socket.IO connections silently if CORS rejects the upgrade request. Set `options.cors.origin` to the deployed frontend's origin in production.
@@ -10636,26 +10625,26 @@ npx warlock seed --drop=default-roles       # undo just one seeder's records
 
 ```ts
 type Seeder = {
-  name: string;                                // required, used as the registry key
-  enabled?: boolean;                            // default true — set false to skip
-  description?: string;                         // shown in --list output
-  dependsOn?: string[];                         // names of seeds that must run first
-  once?: boolean;                               // skip if a row exists in the `seeds` table
-  order?: number;                               // sort key — lower runs first
-  batchSize?: number;                           // documented; not enforced by the manager
-  run(ctx: SeedContext): Promise<SeedResult | void>;   // your work
+  name: string; // required, used as the registry key
+  enabled?: boolean; // default true — set false to skip
+  description?: string; // shown in --list output
+  dependsOn?: string[]; // names of seeds that must run first
+  once?: boolean; // skip if a row exists in the `seeds` table
+  order?: number; // sort key — lower runs first
+  batchSize?: number; // documented; not enforced by the manager
+  run(ctx: SeedContext): Promise<SeedResult | void>; // your work
 };
 
 type SeedContext = {
-  track: Track;                                 // register created records for --drop
-  now: SeedClock;                               // injectable clock — () => Date, default () => new Date()
-  batchSize: number;                            // from the seeder's batchSize (0 when unset)
+  track: Track; // register created records for --drop
+  now: SeedClock; // injectable clock — () => Date, default () => new Date()
+  batchSize: number; // from the seeder's batchSize (0 when unset)
 };
 
 type SeedClock = () => Date;
 
 type SeedResult = {
-  recordsCreated: number;                       // OPTIONAL fallback when nothing was tracked
+  recordsCreated: number; // OPTIONAL fallback when nothing was tracked
 };
 ```
 
@@ -10672,7 +10661,7 @@ async run({ track, now }) {
 }
 ```
 
-Inject a fixed clock for deterministic tests or historical back-fills — pass `clock` to `SeedersManager` (`new SeedersManager({ clock: () => new Date("2020-01-01") })`) or, programmatically, to `seedCommandAction(options, { clock })`. Pinning the clock makes every timestamp in the run — seed data *and* the `seeds` log — resolve to that one value.
+Inject a fixed clock for deterministic tests or historical back-fills — pass `clock` to `SeedersManager` (`new SeedersManager({ clock: () => new Date("2020-01-01") })`) or, programmatically, to `seedCommandAction(options, { clock })`. Pinning the clock makes every timestamp in the run — seed data _and_ the `seeds` log — resolve to that one value.
 
 ## `batchSize` — bulk-insert hint
 
@@ -10692,9 +10681,9 @@ The manager doesn't act on `batchSize` itself — it only hands the value throug
 `track` is how a seed tells the framework which rows it created, so `--drop` can undo them. It has three forms, and **every form returns its first argument** so you can wrap a `create()` call inline:
 
 ```ts
-track(model)                 // single model — reads model.getTableName() + model.id
-track([modelA, modelB])      // bulk — array of models
-track("legacy_table", id)    // raw escape hatch — table name + id, no model
+track(model); // single model — reads model.getTableName() + model.id
+track([modelA, modelB]); // bulk — array of models
+track("legacy_table", id); // raw escape hatch — table name + id, no model
 ```
 
 ```ts
@@ -10723,6 +10712,7 @@ src/app/
 ```
 
 A seed file that doesn't export a default `Seeder` throws at discovery time:
+
 > `Seeder file <relative> does not export a default seeder.`
 
 Filename convention is `<name>.seed.ts` but the loader doesn't enforce it — any `.ts` inside a `seeds/` folder is picked up. Sticking to the suffix keeps things grep-able.
@@ -10753,12 +10743,12 @@ Use `once: true` for irreversible "starter" data (the framework's default `roles
 
 Every record you `track()` is written to a `seed_records` table (created on first run via `SeedRecordsTableMigration`):
 
-| Column     | Meaning                                  |
-| ---------- | ---------------------------------------- |
-| `seeder`   | Owning seeder's `name`                   |
-| `table`    | Table the tracked record lives in        |
-| `recordId` | Primary key of the tracked record        |
-| `runAt`    | Wall time the reference was recorded      |
+| Column     | Meaning                              |
+| ---------- | ------------------------------------ |
+| `seeder`   | Owning seeder's `name`               |
+| `table`    | Table the tracked record lives in    |
+| `recordId` | Primary key of the tracked record    |
+| `runAt`    | Wall time the reference was recorded |
 
 `warlock seed --drop` reads those refs and undoes the seed:
 
@@ -10775,7 +10765,7 @@ What it does, inside a single transaction:
 
 Only **tracked** rows are deleted — records you created without `track()` (or rows added by hand) are untouched. A seed whose `run()` never calls `track()` can't be undone with `--drop`; it has nothing to delete and its log row stays.
 
-`--drop` vs `--fresh`: `--fresh` is the blunt reset (truncates *every* table); `--drop` is surgical (only what a seed tracked). Reach for `--drop` when you want to re-run one seeder without nuking the whole DB.
+`--drop` vs `--fresh`: `--fresh` is the blunt reset (truncates _every_ table); `--drop` is surgical (only what a seed tracked). Reach for `--drop` when you want to re-run one seeder without nuking the whole DB.
 
 ## Ordering
 
@@ -10788,7 +10778,7 @@ seeder({
 
 seeder({
   name: "default-admin-user",
-  order: 20,         // runs AFTER user-roles (which created the roles it references)
+  order: 20, // runs AFTER user-roles (which created the roles it references)
   // ...
 });
 ```
@@ -10797,20 +10787,33 @@ The manager sorts by `order` ascending — lower runs first. Seeds without an `o
 
 ### `dependsOn` — topological order
 
-`dependsOn: ["user-roles"]` is **resolved** by the manager: it topologically sorts seeders so every dependency runs before its dependents, *layered over* the numeric `order` tie-break. Among seeders whose dependencies are already satisfied, the lowest `order` (then registration order) runs first.
+`dependsOn: ["user-roles"]` is **resolved** by the manager: it topologically sorts seeders so every dependency runs before its dependents, _layered over_ the numeric `order` tie-break. Among seeders whose dependencies are already satisfied, the lowest `order` (then registration order) runs first.
 
 ```ts
-seeder({ name: "roles", order: 20, async run() { /* ... */ } });
-seeder({ name: "admin-user", dependsOn: ["roles"], order: 10, async run() { /* ... */ } });
+seeder({
+  name: "roles",
+  order: 20,
+  async run() {
+    /* ... */
+  },
+});
+seeder({
+  name: "admin-user",
+  dependsOn: ["roles"],
+  order: 10,
+  async run() {
+    /* ... */
+  },
+});
 // → roles runs FIRST despite its higher order, because admin-user depends on it.
 ```
 
 Two ways it fails loudly:
 
-- **Unknown dependency** — `dependsOn` names a seeder that isn't registered (or is `enabled: false`, since disabled seeds are filtered out *before* resolution) → `UnknownSeederDependencyError`.
+- **Unknown dependency** — `dependsOn` names a seeder that isn't registered (or is `enabled: false`, since disabled seeds are filtered out _before_ resolution) → `UnknownSeederDependencyError`.
 - **Cycle** — `a → b → a` → `SeederDependencyCycleError` (the message includes the cycle path).
 
-Use `dependsOn` to express *hard* ordering constraints and `order` for soft sequencing within a dependency layer.
+Use `dependsOn` to express _hard_ ordering constraints and `order` for soft sequencing within a dependency layer.
 
 ## Transactions
 
@@ -10818,7 +10821,7 @@ By default, each seed runs inside a transaction. The manager wraps `run({ track 
 
 ```ts
 const result = withTransaction
-  ? await transaction(runSeeder)   // run() + seed_records writes, atomically
+  ? await transaction(runSeeder) // run() + seed_records writes, atomically
   : await runSeeder();
 ```
 
@@ -10849,7 +10852,7 @@ export default seeder({
     for (const data of seeds) {
       const existing = await Currency.first({ code: data.code });
       if (existing) continue;
-      track(await Currency.create(data));   // count auto-derived from track()
+      track(await Currency.create(data)); // count auto-derived from track()
     }
   },
 });
@@ -10867,7 +10870,7 @@ import { User } from "../models/user";
 export default seeder({
   name: "default-admin",
   description: "Insert the seed admin user",
-  once: true,                   // never re-run
+  once: true, // never re-run
   dependsOn: ["default-roles"], // roles must exist first
   async run({ track }) {
     const adminRole = await Role.first({ slug: "admin" });
@@ -11008,16 +11011,16 @@ onExecuting → guards → schema → before → handler → after → onComplet
                                   └ retry + benchmark wrap the handler only ┘
 ```
 
-| Phase         | Signature                                                              | Notes                                                                            |
-| ------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `onExecuting` | `(ctx: UseCaseOnExecutingContext) => void`                            | Fires first (once). `ctx` carries `id`, `name`, `data`, `schema`, `startedAt`.    |
-| `guards`      | `(data: Readonly<Input>, ctx: Ctx) => void \| Promise<void>`          | Authorization / precondition checks. **Throw to abort.** Enrich `ctx`, don't mutate `data`. |
-| `schema`      | `ObjectValidator` (seal `v.object(...)`)                              | Runs after guards. Failures throw `BadSchemaUseCaseError` and skip the handler.   |
-| `before`      | `(data: Input, ctx) => Input \| Promise<Input>`                       | Runs after schema. Sequential — each return becomes the next's input.            |
-| `handler`     | `(data: Input, ctx) => Promise<Output>`                               | The work. Receives the post-`before` payload. Retry + benchmark wrap **this**.   |
-| `after`       | `(output: Output, ctx) => void \| Promise<void>`                      | Fire-and-forget side effects on success. Errors are logged, never re-thrown.     |
-| `onCompleted` | `(result: UseCaseResult<Output>) => void`                            | Lifecycle event with the full `UseCaseResult` snapshot.                          |
-| `onError`     | `(ctx: UseCaseErrorResult) => void`                                  | Lifecycle event with the error + execution metadata.                            |
+| Phase         | Signature                                                    | Notes                                                                                       |
+| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `onExecuting` | `(ctx: UseCaseOnExecutingContext) => void`                   | Fires first (once). `ctx` carries `id`, `name`, `data`, `schema`, `startedAt`.              |
+| `guards`      | `(data: Readonly<Input>, ctx: Ctx) => void \| Promise<void>` | Authorization / precondition checks. **Throw to abort.** Enrich `ctx`, don't mutate `data`. |
+| `schema`      | `ObjectValidator` (seal `v.object(...)`)                     | Runs after guards. Failures throw `BadSchemaUseCaseError` and skip the handler.             |
+| `before`      | `(data: Input, ctx) => Input \| Promise<Input>`              | Runs after schema. Sequential — each return becomes the next's input.                       |
+| `handler`     | `(data: Input, ctx) => Promise<Output>`                      | The work. Receives the post-`before` payload. Retry + benchmark wrap **this**.              |
+| `after`       | `(output: Output, ctx) => void \| Promise<void>`             | Fire-and-forget side effects on success. Errors are logged, never re-thrown.                |
+| `onCompleted` | `(result: UseCaseResult<Output>) => void`                    | Lifecycle event with the full `UseCaseResult` snapshot.                                     |
+| `onError`     | `(ctx: UseCaseErrorResult) => void`                          | Lifecycle event with the error + execution metadata.                                        |
 
 `ctx` is a `UseCaseContext` shared across every phase. With the optional `Ctx` generic (`useCase<Output, Input, MyCtx>`) it's typed end-to-end; guards write `ctx.currentUser`, the handler reads it.
 
@@ -11037,7 +11040,7 @@ type UseCase<Output, Input, Ctx = UseCaseContext> = {
   onExecuting?: (ctx: UseCaseOnExecutingContext) => void;
   onCompleted?: (result: UseCaseResult<Output>) => void;
   onError?: (ctx: UseCaseErrorResult) => void;
-  retry?: RetryOptions;                 // from @mongez/reinforcements
+  retry?: RetryOptions; // from @mongez/reinforcements
   benchmark?: boolean | BenchmarkOptions;
   broadcast?: boolean | { event?: string; output?: (output, result) => unknown };
 };
@@ -11053,7 +11056,7 @@ Defaults come from `config.get("use-cases")` (`src/config/use-cases.ts`); per-us
 export const flakyApiCallUseCase = useCase({
   name: "external.callFlakyApi",
   retry: {
-    attempts: 4,                         // initial try + 3 retries
+    attempts: 4, // initial try + 3 retries
     delay: 500,
     backoff: "exponential",
     shouldRetry: (error) => !(error instanceof ValidationError), // skip 4xx
@@ -11086,7 +11089,7 @@ export const createUserUseCase = useCase({
   name: "users.create",
   schema: createUserSchema,
   handler: async (data) => User.create(data),
-  broadcast: true,                       // → channel "users.create", payload = output as-is
+  broadcast: true, // → channel "users.create", payload = output as-is
 });
 
 // Project / rename to avoid leaking sensitive fields:
@@ -11095,7 +11098,7 @@ export const signupUseCase = useCase({
   schema: signupSchema,
   handler: async (data) => signupService(data),
   broadcast: {
-    event: "auth.signup",                // custom channel name (default = use case name)
+    event: "auth.signup", // custom channel name (default = use case name)
     output: (result) => ({ id: result.id, email: result.email }), // never the raw model
   },
 });
@@ -11107,7 +11110,7 @@ import { heraldBroadcast } from "@warlock.js/herald";
 
 export default {
   broadcast: {
-    enabled: true,                       // global kill-switch
+    enabled: true, // global kill-switch
     channels: [heraldBroadcast({ broker: "default" })],
   },
 } satisfies UseCaseConfigurations;
@@ -11209,8 +11212,8 @@ Global listeners exist too — `globalUseCasesEvents.onExecuting(...)` / `onComp
 
 ```ts
 export default {
-  benchmark: true,                       // benchmark every handler by default
-  log: false,                            // per-step debug logging via @warlock.js/logger
+  benchmark: true, // benchmark every handler by default
+  log: false, // per-step debug logging via @warlock.js/logger
   history: { enabled: true, ttl: 3600, maxEntries: 100 },
   broadcast: { enabled: false, channels: [] },
 } satisfies UseCaseConfigurations;
@@ -11220,8 +11223,8 @@ export default {
 
 ```ts
 await placeOrderUseCase(input, {
-  id: "order-tracking-123",              // override auto-generated execution id
-  ctx: { currentUser: user },            // pre-populate context for guards
+  id: "order-tracking-123", // override auto-generated execution id
+  ctx: { currentUser: user }, // pre-populate context for guards
   onCompleted: (result) => log.debug("done", result.benchmarkResult),
   onError: ({ error }) => log.error("failed", error),
 });
@@ -11231,10 +11234,10 @@ Per-invocation callbacks fire first, then use-case-level, then globals. The retu
 
 ## Use case vs service vs controller
 
-| Layer      | What it owns                                                              | When to use                                |
-| ---------- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| Controller | Pull from `request`, return via `response.<helper>()`                     | Always — the HTTP edge.                    |
-| Service    | One unit of work, plain async function, no observability magic           | Most CRUD; one or two model touches.       |
+| Layer      | What it owns                                                             | When to use                                                                                                         |
+| ---------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Controller | Pull from `request`, return via `response.<helper>()`                    | Always — the HTTP edge.                                                                                             |
+| Service    | One unit of work, plain async function, no observability magic           | Most CRUD; one or two model touches.                                                                                |
 | Use case   | Guards/validation/handler/after + retry + benchmark + broadcast + events | Cross-cutting concerns, multi-service orchestration, anything called from multiple transports (HTTP + CLI + queue). |
 
 Don't reach for `useCase` for a 5-line service — the ceremony outweighs the benefit.
@@ -11257,6 +11260,5 @@ For the plain-function flavour (`warlock generate.use-case <module>/<verb-noun>`
 
 - The `create-controller` topic — the usual next step: invoke this use case from an HTTP controller.
 - The `publish-message` topic of the `warlock-js-herald` skill — the message bus the `broadcast` adapter publishes to (cross-package).
-
 
 

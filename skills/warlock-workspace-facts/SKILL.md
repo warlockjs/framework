@@ -9,13 +9,13 @@ description: Hard-won operational facts about the Warlock.js framework monorepo 
 
 ## Layout
 
-| Path | What it is |
-| --- | --- |
-| `packages/<name>` | One published package each: `@warlock.js/<name>`, plus `create-warlock`. |
-| `docs/` | The documentation site (Astro + Starlight), deployed to warlock.js.org. |
-| `tools/release/` | The release runner (`@mongez/pkgist` + gate scripts). npm-managed with its own `package-lock.json`, deliberately **outside** the pnpm workspace. |
-| `scripts/` | Workspace-wide checks: `check-spec-coverage.mjs`, `ci/affected-packages.mjs`. |
-| `.github/workflows/` | CI, docs, create-warlock and release pipelines. |
+| Path                 | What it is                                                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/<name>`    | One published package each: `@warlock.js/<name>`, plus `create-warlock`.                                                                         |
+| `docs/`              | The documentation site (Astro + Starlight), deployed to warlock.js.org.                                                                          |
+| `tools/release/`     | The release runner (`@mongez/pkgist` + gate scripts). npm-managed with its own `package-lock.json`, deliberately **outside** the pnpm workspace. |
+| `scripts/`           | Workspace-wide checks: `check-spec-coverage.mjs`, `ci/affected-packages.mjs`.                                                                    |
+| `.github/workflows/` | CI, docs, create-warlock and release pipelines.                                                                                                  |
 
 - Install once at the root: `pnpm install` (pnpm 11.24.0, Node ≥ 22.15). `linkWorkspacePackages: true` links every `@warlock.js/*` dependency to the package in this repository, never to npm.
 - `packages/create-warlock` carries its **own** `pnpm-workspace.yaml` and lockfile: pnpm run from inside it treats it as a standalone project, which is how its own CI proves the scaffolder works without the monorepo.
@@ -92,3 +92,11 @@ reject before opening stdin.
 Release quality commands force `WARLOCK_REDIS_INTEGRATION=1`, so local release
 gates require Redis just like release CI. Mocked configured-port reporting cases
 mock the availability preflight too; their port numbers never need to be free.
+
+## Repository formatting
+
+Use the root Oxfmt configuration for repository source, including scaffolder
+source. `pnpm format:check` is the CI check; `pnpm format` writes it. Preserve
+BOMs and generated-byte oracles. Generated app templates retain their separate
+Prettier/Oxc checks. Import sorting stays disabled: Oxfmt does not replace the
+TypeScript-aware organize-imports plugin's full behavior.

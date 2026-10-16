@@ -282,10 +282,7 @@ describe("panoptic", () => {
 
       expect(mw.supervisor?.after).toBeDefined();
 
-      mw.supervisor?.after?.(
-        {} as never,
-        { report: rootReport({ type: "supervisor" }) } as never,
-      );
+      mw.supervisor?.after?.({} as never, { report: rootReport({ type: "supervisor" }) } as never);
       await observe.flush();
 
       expect(exporter.traces).toHaveLength(1);

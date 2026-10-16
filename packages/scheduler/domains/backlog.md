@@ -14,6 +14,7 @@ Roadmap of capabilities the package does not yet ship. Ranked by impact: top ite
 A 5-field expression can parse cleanly yet never match — e.g. `0 0 30 2 *` (Feb 30). `nextRun()` then scans forward `maxIterations = 366 * 24 * 60 = 527,040` passes before throwing `"Could not find next run time…"`. Measured ~3.4 s of synchronous CPU per call on a dev machine. If such an expression reaches a live tick (a cron job built from user/config input), it stalls the event loop for seconds before failing.
 
 **Options.**
+
 - Detect impossible day-of-month / month combinations at parse time and throw eagerly (cheapest, most user-friendly). `30 2`, `31 {2,4,6,9,11}`, `29 2` only valid in leap years.
 - Or lower the scan bound to ~4 years of minutes and accept that genuinely-rare-but-real expressions still resolve.
 
@@ -62,7 +63,7 @@ A hung job + `preventOverlap()` = the job never runs again because `_isRunning` 
 ```ts
 job("flaky-import", importFn)
   .everyHours(1)
-  .timeout(5 * 60_000)   // abort after 5 minutes, mark as failed
+  .timeout(5 * 60_000) // abort after 5 minutes, mark as failed
   .preventOverlap();
 ```
 
@@ -107,8 +108,8 @@ Removing + re-adding loses state and is awkward for admin UIs.
 
 ```ts
 const job = scheduler.getJob("noisy-report");
-job?.pause();   // skip until resumed; nextRun stays calculated
-job?.resume();  // recompute nextRun and resume firing
+job?.pause(); // skip until resumed; nextRun stays calculated
+job?.resume(); // recompute nextRun and resume firing
 ```
 
 ---
@@ -140,10 +141,7 @@ Standard cron compatibility. Implementation: rewrite tokens before `_parseField`
 If the process is down across a scheduled time, current behavior silently skips. Should be opt-in:
 
 ```ts
-job("daily-report", reportFn)
-  .daily()
-  .at("09:00")
-  .runOnRecover();   // if start() happens after 09:00 today, fire immediately
+job("daily-report", reportFn).daily().at("09:00").runOnRecover(); // if start() happens after 09:00 today, fire immediately
 ```
 
 Pairs with #9 (persistent `lastRun`).
@@ -170,9 +168,7 @@ Stores `{ jobName, lastRun, lastSuccess, lastError }` per job.
 Prevents the thundering-herd problem when many jobs share `everyHour()` — they all fire at the top of the hour and slam the same downstream system.
 
 ```ts
-job("send-digest", sendDigest)
-  .everyHour()
-  .withJitter(30_000);   // add 0-30 s random offset to nextRun
+job("send-digest", sendDigest).everyHour().withJitter(30_000); // add 0-30 s random offset to nextRun
 ```
 
 Implementation: after `_determineNextRun`, add `random(0, jitterMs)` to `nextRun`.

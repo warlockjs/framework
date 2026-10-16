@@ -82,7 +82,12 @@ function manifestModule(entry: {
   setupModule?: Record<string, unknown>;
   setupSourceFile?: string;
 }): Record<string, unknown> {
-  return composePageModule(entry.module, entry.setupModule, entry.sourceFile, entry.setupSourceFile);
+  return composePageModule(
+    entry.module,
+    entry.setupModule,
+    entry.sourceFile,
+    entry.setupSourceFile,
+  );
 }
 
 /** The exports this module reads off a layout module namespace. */
@@ -169,29 +174,31 @@ function installSitePagesFromManifest(
     const entry = manifest.sites[site];
 
     if (entry === undefined) {
-      throw new Error(`installPageRoutesFromManifest: the page manifest has no entry for site "${site}".`);
+      throw new Error(
+        `installPageRoutesFromManifest: the page manifest has no entry for site "${site}".`,
+      );
     }
 
     const siteInstalled = installPageRoutesFromManifest(
-        {
-          ...options,
-          siteDispatch: undefined,
-          router: siteRegistrationRouter(dispatch, site, siteConfig.basePath ?? ""),
-          manifest: {
-            ...manifest,
-            sites: undefined,
-            errorPage: entry.errorPage,
-            app: {
-              ...entry.app,
-              ...(entry.appSetup === undefined
-                ? {}
-                : { setupModule: entry.appSetup.module, setupSourceFile: entry.appSetup.sourceFile }),
-            },
-            pages: manifest.pages.filter((page) => page.site === site),
+      {
+        ...options,
+        siteDispatch: undefined,
+        router: siteRegistrationRouter(dispatch, site, siteConfig.basePath ?? ""),
+        manifest: {
+          ...manifest,
+          sites: undefined,
+          errorPage: entry.errorPage,
+          app: {
+            ...entry.app,
+            ...(entry.appSetup === undefined
+              ? {}
+              : { setupModule: entry.appSetup.module, setupSourceFile: entry.appSetup.sourceFile }),
           },
+          pages: manifest.pages.filter((page) => page.site === site),
         },
-        { site, localeRouting: siteConfig.localeRouting },
-      );
+      },
+      { site, localeRouting: siteConfig.localeRouting },
+    );
     installed.push(...siteInstalled);
     registerSiteRoutes(site, siteInstalled, sites, "installPageRoutesFromManifest (production)");
   }
@@ -340,7 +347,9 @@ function composeLayoutLevel(
   const hostIndex = page.layouts.indexOf(host);
 
   return composeLayoutModules(
-    page.layouts.map((layout) => normalizePageModule(manifestModule(layout), "layout", layout.sourceFile)),
+    page.layouts.map((layout) =>
+      normalizePageModule(manifestModule(layout), "layout", layout.sourceFile),
+    ),
     hostIndex,
     page.layouts.map((layout) => layout.sourceFile),
   );
@@ -496,7 +505,8 @@ export function installPageRoutesFromManifest(
 
   if (
     notFoundPage !== undefined &&
-    normalizePageModule(manifestModule(notFoundPage), "page", notFoundPage.sourceFile).route !== undefined
+    normalizePageModule(manifestModule(notFoundPage), "page", notFoundPage.sourceFile).route !==
+      undefined
   ) {
     throw new NotFoundPageDeclaresRouteError(notFoundPage.sourceFile);
   }
@@ -606,7 +616,8 @@ export function installPageRoutesFromManifest(
       loadModule: loadModule,
       loadComposedLayout:
         composedLayout === undefined ? undefined : () => Promise.resolve(composedLayout),
-      loadRegistrationLayouts: () => Promise.resolve(page.layouts.map((layout) => manifestModule(layout))),
+      loadRegistrationLayouts: () =>
+        Promise.resolve(page.layouts.map((layout) => manifestModule(layout))),
       hydrationClientModuleUrl,
       hydrationClientModulePreloadUrls,
       loadErrorPage,

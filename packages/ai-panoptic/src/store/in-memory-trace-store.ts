@@ -196,6 +196,8 @@ class InMemoryTraceStore implements TraceStoreContract, ExporterContract {
  * const recentFailures = store.query({ status: "failed" });
  * const sessionSpend = store.aggregate({ sessionId });
  */
-export function createInMemoryTraceStore(options?: InMemoryTraceStoreOptions): TraceStoreContract & ExporterContract {
+export function createInMemoryTraceStore(
+  options?: InMemoryTraceStoreOptions,
+): TraceStoreContract & ExporterContract {
   return new InMemoryTraceStore(options);
 }

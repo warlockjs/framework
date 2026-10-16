@@ -112,14 +112,18 @@ describe("Date period rules - field/sibling forms", () => {
         }),
       });
       expect(
-        (await validate(validator, {
-          g: { from: new Date("2020-01-01"), to: new Date("2025-01-01"), when: "2023-06-15" },
-        })).isValid,
+        (
+          await validate(validator, {
+            g: { from: new Date("2020-01-01"), to: new Date("2025-01-01"), when: "2023-06-15" },
+          })
+        ).isValid,
       ).toBe(true);
       expect(
-        (await validate(validator, {
-          g: { from: new Date("2024-01-01"), to: new Date("2030-01-01"), when: "2023-06-15" },
-        })).isValid,
+        (
+          await validate(validator, {
+            g: { from: new Date("2024-01-01"), to: new Date("2030-01-01"), when: "2023-06-15" },
+          })
+        ).isValid,
       ).toBe(false);
     });
 
@@ -133,9 +137,11 @@ describe("Date period rules - field/sibling forms", () => {
       });
       // from month 5, to month 8, when month 6 → ok
       expect(
-        (await validate(validator, {
-          g: { from: new Date("2023-05-01"), to: new Date("2023-08-01"), when: "2023-06-15" },
-        })).isValid,
+        (
+          await validate(validator, {
+            g: { from: new Date("2023-05-01"), to: new Date("2023-08-01"), when: "2023-06-15" },
+          })
+        ).isValid,
       ).toBe(true);
     });
 
@@ -149,9 +155,11 @@ describe("Date period rules - field/sibling forms", () => {
       });
       // from day 10, to day 20, when day 15 → ok
       expect(
-        (await validate(validator, {
-          g: { from: new Date("2023-06-10"), to: new Date("2023-06-20"), when: "2023-06-15" },
-        })).isValid,
+        (
+          await validate(validator, {
+            g: { from: new Date("2023-06-10"), to: new Date("2023-06-20"), when: "2023-06-15" },
+          })
+        ).isValid,
       ).toBe(true);
     });
 

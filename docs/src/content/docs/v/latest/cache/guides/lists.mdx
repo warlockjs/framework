@@ -35,17 +35,17 @@ const total = await recent.length();
 
 ## API
 
-| Method | Purpose |
-|--------|---------|
-| `push(...items)` | Append to tail. Returns new length. |
-| `unshift(...items)` | Prepend to head. Returns new length. |
-| `pop()` | Remove and return tail. `null` if empty. |
-| `shift()` | Remove and return head. `null` if empty. |
-| `slice(start?, end?)` | View slice. Does not mutate. |
-| `all()` | Full list. |
-| `length()` | Item count. |
-| `trim(start, end)` | Keep only indices `[start, end]` inclusive. |
-| `clear()` | Remove the list. |
+| Method                | Purpose                                     |
+| --------------------- | ------------------------------------------- |
+| `push(...items)`      | Append to tail. Returns new length.         |
+| `unshift(...items)`   | Prepend to head. Returns new length.        |
+| `pop()`               | Remove and return tail. `null` if empty.    |
+| `shift()`             | Remove and return head. `null` if empty.    |
+| `slice(start?, end?)` | View slice. Does not mutate.                |
+| `all()`               | Full list.                                  |
+| `length()`            | Item count.                                 |
+| `trim(start, end)`    | Keep only indices `[start, end]` inclusive. |
+| `clear()`             | Remove the list.                            |
 
 ## Type safety
 
@@ -56,8 +56,8 @@ type Job = { id: string; payload: { userId: number } };
 
 const queue = cache.list<Job>("jobs.pending");
 
-await queue.push({ id: "j1", payload: { userId: 42 } });   // ✓ typed correctly
-await queue.push("not a job" as never);                     // ✗ rejected at the caller
+await queue.push({ id: "j1", payload: { userId: 42 } }); // ✓ typed correctly
+await queue.push("not a job" as never); // ✗ rejected at the caller
 ```
 
 ## Common recipes
@@ -67,8 +67,8 @@ await queue.push("not a job" as never);                     // ✗ rejected at t
 ```ts
 async function recordAudit(entry: AuditEntry) {
   const audit = cache.list<AuditEntry>("audit.recent");
-  await audit.unshift(entry);    // newest at head
-  await audit.trim(0, 999);       // keep most-recent 1000
+  await audit.unshift(entry); // newest at head
+  await audit.trim(0, 999); // keep most-recent 1000
 }
 ```
 
@@ -99,7 +99,7 @@ const top = await stack.pop();
 async function recordMetric(value: number) {
   const window = cache.list<number>("metrics.rolling");
   await window.push(value);
-  await window.trim(-60, -1);    // keep last 60 samples
+  await window.trim(-60, -1); // keep last 60 samples
 }
 ```
 
@@ -111,8 +111,8 @@ When a list drains to zero items — via `pop()`, `shift()`, `trim()`, or `clear
 await recent.push("a");
 await recent.pop();
 
-await cache.get("recent.events");   // null, not []
-await recent.length();               // 0
+await cache.get("recent.events"); // null, not []
+await recent.length(); // 0
 ```
 
 This keeps the store from accumulating empty list entries under keys that briefly held data.
@@ -121,14 +121,14 @@ This keeps the store from accumulating empty list entries under keys that briefl
 
 The current implementation stores the full list as a single cache entry and performs read-mutate-write on every op. That's correct for every driver but **O(n)** per operation.
 
-| Driver | List backing | Op complexity |
-|--------|-------|----|
-| `memory` | In-process array | O(n) |
-| `memoryExtended` | In-process array | O(n) |
-| `lru` | In-process array | O(n) |
-| `file` | JSON file | O(n) + disk I/O |
-| `redis` | Single JSON blob *(today)* | O(n) per op |
-| `null` | n/a | no-op |
+| Driver           | List backing               | Op complexity   |
+| ---------------- | -------------------------- | --------------- |
+| `memory`         | In-process array           | O(n)            |
+| `memoryExtended` | In-process array           | O(n)            |
+| `lru`            | In-process array           | O(n)            |
+| `file`           | JSON file                  | O(n) + disk I/O |
+| `redis`          | Single JSON blob _(today)_ | O(n) per op     |
+| `null`           | n/a                        | no-op           |
 
 :::info Redis native commands coming in v2.1
 The Redis driver currently inherits the default JSON-blob implementation. A native override using `LPUSH` / `RPUSH` / `LRANGE` / `LTRIM` / `LLEN` is planned for v2.1, giving O(1) push/shift/pop and O(log n) range queries. Until then, avoid very large lists on Redis (anything over a few hundred items).

@@ -60,13 +60,7 @@ async function main() {
   }
 
   const coreRoot = await realpath(args.coreRoot);
-  const featuresModulePath = path.join(
-    coreRoot,
-    "esm",
-    "generations",
-    "features",
-    "index.mjs",
-  );
+  const featuresModulePath = path.join(coreRoot, "esm", "generations", "features", "index.mjs");
   const featuresModule = await import(pathToFileURL(featuresModulePath).href);
 
   const featuresMap = featuresModule.featuresMap;

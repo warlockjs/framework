@@ -729,10 +729,7 @@ export class MongoDbDriver implements DriverContract {
     databaseTransactionContext.enter({ session });
     let finished = false;
 
-    const finalize = async (
-      operation: () => Promise<void>,
-      committing = false,
-    ): Promise<void> => {
+    const finalize = async (operation: () => Promise<void>, committing = false): Promise<void> => {
       if (finished) return;
 
       let committedCallbacks: Array<() => void | Promise<void>> = [];

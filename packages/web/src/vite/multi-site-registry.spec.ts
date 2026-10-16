@@ -75,7 +75,9 @@ describe("per-site virtual page registries", () => {
       fs.writeFileSync(full, contents, "utf-8");
     }
 
-    const { load } = hooks(clientPageRegistry({ appRoot, sites: { landing: { hosts: ["a.test"] } } }));
+    const { load } = hooks(
+      clientPageRegistry({ appRoot, sites: { landing: { hosts: ["a.test"] } } }),
+    );
 
     expect(load(resolvedSiteRegistryId("landing"))).toContain("$sites/landing/home.page.tsx");
   });
@@ -134,9 +136,7 @@ describe("per-site virtual page registries", () => {
 
     expect(resolveId(CLIENT_PAGE_REGISTRY_ID)).toBe(RESOLVED_CLIENT_PAGE_REGISTRY_ID);
     expect(resolveId(siteRegistryId("landing"))).toBeUndefined();
-    expect(load(RESOLVED_CLIENT_PAGE_REGISTRY_ID)).toBe(
-      load(RESOLVED_CLIENT_PAGE_REGISTRY_ID),
-    );
+    expect(load(RESOLVED_CLIENT_PAGE_REGISTRY_ID)).toBe(load(RESOLVED_CLIENT_PAGE_REGISTRY_ID));
     expect(load(RESOLVED_CLIENT_PAGE_REGISTRY_ID)).toContain("home.page.tsx");
     expect(load(resolvedSiteRegistryId("landing"))).toBeUndefined();
   });
@@ -171,7 +171,9 @@ describe("hydration entries and manifest lookup", () => {
       },
     };
 
-    expect(findSiteHydrationEntryFile(manifest, "platform")).toBe("assets/hydration-platform-def.js");
+    expect(findSiteHydrationEntryFile(manifest, "platform")).toBe(
+      "assets/hydration-platform-def.js",
+    );
     expect(findSiteHydrationEntryFile(manifest, "missing")).toBeUndefined();
   });
 });
@@ -189,7 +191,10 @@ describe("multi-site build orchestration", () => {
         outDir,
         resolveAliases: [
           { find: "web", replacement: webRoot },
-          { find: "@warlock.js/web/client/runtime", replacement: path.join(webRoot, "src/client/runtime") },
+          {
+            find: "@warlock.js/web/client/runtime",
+            replacement: path.join(webRoot, "src/client/runtime"),
+          },
         ],
         sites: SITES,
       });
@@ -213,9 +218,11 @@ describe("dev invalidation is scoped per site", () => {
     const plugin = clientPageRegistry({ appRoot, sites: SITES });
     const invalidated: string[] = [];
     const modules = new Map(
-      [resolvedSiteRegistryId("landing"), resolvedSiteRegistryId("platform"), RESOLVED_CLIENT_PAGE_REGISTRY_ID].map(
-        (id) => [id, { id }],
-      ),
+      [
+        resolvedSiteRegistryId("landing"),
+        resolvedSiteRegistryId("platform"),
+        RESOLVED_CLIENT_PAGE_REGISTRY_ID,
+      ].map((id) => [id, { id }]),
     );
     const server = {
       environments: {
@@ -255,14 +262,22 @@ describe("build log paths", () => {
     const printed = path.relative(viteRoot, outDir).split(path.sep).join("/");
 
     expect(
-      formatBuildLogMessage(`${printed}/assets/hydration-x.js  10 kB`, { viteRoot, logRoot: appRoot, outDir }),
+      formatBuildLogMessage(`${printed}/assets/hydration-x.js  10 kB`, {
+        viteRoot,
+        logRoot: appRoot,
+        outDir,
+      }),
     ).toBe("dist/client/assets/hydration-x.js  10 kB");
   });
 
   it("leaves messages without the prefix alone", () => {
     const outDir = path.resolve("/a/dist/client");
     expect(
-      formatBuildLogMessage("transforming...", { viteRoot: path.resolve("/b"), logRoot: path.resolve("/a"), outDir }),
+      formatBuildLogMessage("transforming...", {
+        viteRoot: path.resolve("/b"),
+        logRoot: path.resolve("/a"),
+        outDir,
+      }),
     ).toBe("transforming...");
   });
 });

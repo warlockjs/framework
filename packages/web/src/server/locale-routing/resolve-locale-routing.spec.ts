@@ -83,6 +83,8 @@ describe("resolveClientLocaleRoutingFallback — the build-time client registry"
       defaultLocale: "en",
     });
     config.set("app", { localeCodes: [], localeCode: "en" });
-    expect(() => resolveClientLocaleRoutingFallback({ strategy: "prefix" })).toThrow(LocaleRoutingConfigError);
+    expect(() => resolveClientLocaleRoutingFallback({ strategy: "prefix" })).toThrow(
+      LocaleRoutingConfigError,
+    );
   });
 });

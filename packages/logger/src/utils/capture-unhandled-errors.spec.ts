@@ -42,7 +42,10 @@ describe("captureAnyUnhandledRejection", () => {
 
     const originalOn = process.on.bind(process);
 
-    vi.spyOn(process, "on").mockImplementation(((event: string, listener: (...args: unknown[]) => void) => {
+    vi.spyOn(process, "on").mockImplementation(((
+      event: string,
+      listener: (...args: unknown[]) => void,
+    ) => {
       if (event === "unhandledRejection") {
         capturedRejection.push(listener as NodeJS.UnhandledRejectionListener);
       } else if (event === "uncaughtException") {
@@ -57,7 +60,9 @@ describe("captureAnyUnhandledRejection", () => {
     // The uncaughtException path calls process.exit — stub it so the runner is
     // not torn down, and assert on the call instead. console.error is the
     // no-terminal-channel fallback; silence + spy it.
-    exitSpy = vi.spyOn(process, "exit").mockImplementation(((_code?: number) => undefined) as never);
+    exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((_code?: number) => undefined) as never);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     originalChannels = log.channels;

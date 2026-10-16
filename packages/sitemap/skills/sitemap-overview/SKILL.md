@@ -1,6 +1,6 @@
 ---
 name: sitemap-overview
-description: 'Front-door orientation for `@warlock.js/sitemap`: framework-blind `Sitemap` and streaming `SitemapIndex` builders, URL metadata, hreflang, Google image entries, sharding, diagnostics, and atomic publication. Use when adding or debugging sitemap output; Warlock page discovery and `/sitemap.xml` routing belong to `@warlock.js/web`.'
+description: "Front-door orientation for `@warlock.js/sitemap`: framework-blind `Sitemap` and streaming `SitemapIndex` builders, URL metadata, hreflang, Google image entries, sharding, diagnostics, and atomic publication. Use when adding or debugging sitemap output; Warlock page discovery and `/sitemap.xml` routing belong to `@warlock.js/web`."
 ---
 
 # `@warlock.js/sitemap` — overview
@@ -66,16 +66,16 @@ boot refusal entirely: the origin is an argument now, so it cannot be missing.
 Only `path` is required, and it must be a **concrete path** — `/posts/123`,
 never `/posts/:id`. A pattern is not a URL.
 
-| Field | Meaning |
-| --- | --- |
-| `path` | Required. Resolved against `baseUrl`; an absolute URL is used as given. |
-| `name` | Optional route label, for your own diagnostics. Never serialised. |
-| `route` | Optional pattern this URL came from. Feeds `routes()` and `duplicates()`. |
-| `lastmod` | `Date` → W3C datetime. A string is passed through UNTOUCHED, never re-parsed. |
-| `changefreq` | One of the seven protocol values; anything else throws. |
-| `priority` | `0.0`–`1.0`; anything else throws. |
-| `alternates` | `{ hreflang, path }[]` — language versions of this page. |
-| `images` | `{ loc }[]` — absolute HTTP(S) image URLs, including verified external CDNs. |
+| Field        | Meaning                                                                       |
+| ------------ | ----------------------------------------------------------------------------- |
+| `path`       | Required. Resolved against `baseUrl`; an absolute URL is used as given.       |
+| `name`       | Optional route label, for your own diagnostics. Never serialised.             |
+| `route`      | Optional pattern this URL came from. Feeds `routes()` and `duplicates()`.     |
+| `lastmod`    | `Date` → W3C datetime. A string is passed through UNTOUCHED, never re-parsed. |
+| `changefreq` | One of the seven protocol values; anything else throws.                       |
+| `priority`   | `0.0`–`1.0`; anything else throws.                                            |
+| `alternates` | `{ hreflang, path }[]` — language versions of this page.                      |
+| `images`     | `{ loc }[]` — absolute HTTP(S) image URLs, including verified external CDNs.  |
 
 Invalid entries throw `InvalidSitemapEntryError` from `add()`. Paths are
 normalised to carry a leading slash, so `a` and `/a` are ONE entry.
@@ -189,10 +189,10 @@ empty, or already carries that marker. A non-empty, unmarked `outDir` gets
 
 ## Errors
 
-| Error | When |
-| --- | --- |
-| `InvalidBaseUrlError` | `baseUrl` missing, relative, or not `http(s)`. From the constructor. |
-| `InvalidSitemapEntryError` | No path, priority outside `0.0`–`1.0`, unknown `changefreq`, invalid `Date`, alternate with no `hreflang`. From `add()`. |
+| Error                         | When                                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `InvalidBaseUrlError`         | `baseUrl` missing, relative, or not `http(s)`. From the constructor.                                                                  |
+| `InvalidSitemapEntryError`    | No path, priority outside `0.0`–`1.0`, unknown `changefreq`, invalid `Date`, alternate with no `hreflang`. From `add()`.              |
 | `UnownedOutputDirectoryError` | `SitemapIndex.saveTo(outDir)`: `outDir` is non-empty with no `.sitemap-set.json` marker. From `saveTo()`, before anything is written. |
 
 ## Also exported

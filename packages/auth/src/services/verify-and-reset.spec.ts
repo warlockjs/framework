@@ -389,7 +389,9 @@ describe("password reset", () => {
 
     expect(ttl).toBeLessThanOrEqual(3600_000);
     expect(ttl).toBeGreaterThan(3600_000 - 5_000);
-    expect(defined(tokenRows[0], "token row").token_hash).toBe(sha256(lastSent("auth.password-reset")[1].token));
+    expect(defined(tokenRows[0], "token row").token_hash).toBe(
+      sha256(lastSent("auth.password-reset")[1].token),
+    );
   });
 
   it("returns the same result for an unknown email and sends nothing", async () => {

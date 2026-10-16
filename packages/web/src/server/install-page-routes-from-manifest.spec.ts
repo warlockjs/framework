@@ -163,9 +163,19 @@ function install(
 
 describe("production page route installation", () => {
   it("uses each site's own error boundary when installing a multi-site manifest", async () => {
-    const landingError = { module: { default: () => "landing" }, sourceFile: "src/web/$sites/landing/error.page.tsx" };
-    const platformError = { module: { default: () => "platform" }, sourceFile: "src/web/$sites/platform/error.page.tsx" };
-    const landingPage = { ...homePage, site: "landing", sourceFile: "src/web/$sites/landing/index.page.tsx" };
+    const landingError = {
+      module: { default: () => "landing" },
+      sourceFile: "src/web/$sites/landing/error.page.tsx",
+    };
+    const platformError = {
+      module: { default: () => "platform" },
+      sourceFile: "src/web/$sites/platform/error.page.tsx",
+    };
+    const landingPage = {
+      ...homePage,
+      site: "landing",
+      sourceFile: "src/web/$sites/landing/index.page.tsx",
+    };
     const platformPage = {
       ...homePage,
       module: { default: () => null, config: { route: { path: "/", name: "platform.index" } } },
@@ -189,8 +199,14 @@ describe("production page route installation", () => {
       manifest: {
         pages: [landingPage, platformPage],
         sites: {
-          landing: { app: { module: appModule, sourceFile: "src/web/$sites/landing/root.tsx" }, errorPage: landingError },
-          platform: { app: { module: appModule, sourceFile: "src/web/$sites/platform/root.tsx" }, errorPage: platformError },
+          landing: {
+            app: { module: appModule, sourceFile: "src/web/$sites/landing/root.tsx" },
+            errorPage: landingError,
+          },
+          platform: {
+            app: { module: appModule, sourceFile: "src/web/$sites/platform/root.tsx" },
+            errorPage: platformError,
+          },
         },
       },
     });

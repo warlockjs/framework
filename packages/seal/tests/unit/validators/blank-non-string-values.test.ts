@@ -13,30 +13,42 @@ const nonStringValidators = [
 ] as const;
 
 describe("blank values for non-string validators", () => {
-  it.each(nonStringValidators)("omits an optional %s field submitted as blank", async (_name, create) => {
-    const result = await validate(v.object({ value: create().optional() }), { value: "" });
+  it.each(nonStringValidators)(
+    "omits an optional %s field submitted as blank",
+    async (_name, create) => {
+      const result = await validate(v.object({ value: create().optional() }), { value: "" });
 
-    expect(result).toMatchObject({ isValid: true, data: {} });
-  });
+      expect(result).toMatchObject({ isValid: true, data: {} });
+    },
+  );
 
-  it.each(nonStringValidators)("normalizes a blank nullable %s field to null", async (_name, create) => {
-    const result = await validate(v.object({ value: create().nullable() }), { value: "" });
+  it.each(nonStringValidators)(
+    "normalizes a blank nullable %s field to null",
+    async (_name, create) => {
+      const result = await validate(v.object({ value: create().nullable() }), { value: "" });
 
-    expect(result).toMatchObject({ isValid: true, data: { value: null } });
-  });
+      expect(result).toMatchObject({ isValid: true, data: { value: null } });
+    },
+  );
 
-  it.each(nonStringValidators)("reports required for a blank required %s field", async (_name, create) => {
-    const result = await validate(v.object({ value: create().required() }), { value: "" });
+  it.each(nonStringValidators)(
+    "reports required for a blank required %s field",
+    async (_name, create) => {
+      const result = await validate(v.object({ value: create().required() }), { value: "" });
 
-    expect(result.isValid).toBe(false);
-    expect(result.errors.map(error => error.type)).toContain("required");
-  });
+      expect(result.isValid).toBe(false);
+      expect(result.errors.map((error) => error.type)).toContain("required");
+    },
+  );
 
-  it.each(nonStringValidators)("treats whitespace-only input as blank for %s", async (_name, create) => {
-    const result = await validate(v.object({ value: create().optional() }), { value: "  " });
+  it.each(nonStringValidators)(
+    "treats whitespace-only input as blank for %s",
+    async (_name, create) => {
+      const result = await validate(v.object({ value: create().optional() }), { value: "  " });
 
-    expect(result).toMatchObject({ isValid: true, data: {} });
-  });
+      expect(result).toMatchObject({ isValid: true, data: {} });
+    },
+  );
 
   it("keeps blank optional strings as submitted", async () => {
     const result = await validate(v.object({ value: v.string().optional() }), { value: "" });

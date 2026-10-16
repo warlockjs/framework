@@ -34,38 +34,38 @@ new DeepSeekSDK({ apiKey, baseURL: "https://my-gateway/deepseek", provider: "dee
 ## Producing a model
 
 ```ts
-deepseek.model({ name: "deepseek-chat" })            // V3 lineage, non-thinking
-deepseek.model({ name: "deepseek-reasoner" })        // R1 lineage, reasoning-capable
-deepseek.model({ name: "deepseek-chat", temperature: 0.2 })
+deepseek.model({ name: "deepseek-chat" }); // V3 lineage, non-thinking
+deepseek.model({ name: "deepseek-reasoner" }); // R1 lineage, reasoning-capable
+deepseek.model({ name: "deepseek-chat", temperature: 0.2 });
 ```
 
 Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 ## Models
 
-| Model | Notes |
-| --- | --- |
-| `deepseek-chat` | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
-| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default. |
-| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default. |
+| Model               | Notes                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
+| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**.        |
+| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                                    |
+| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                                   |
 
 DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are understood by the capability inference. `deepseek.model({ name })` accepts any id the upstream serves.
 
 ## Capabilities — what's auto-set
 
-| Flag | Default |
-| --- | --- |
-| `reasoning` | Inferred from the DeepSeek model name. `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
-| `vision` | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026). |
-| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode. |
-| `promptCaching` | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI. |
+| Flag               | Default                                                                                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reasoning`        | Inferred from the DeepSeek model name. `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
+| `vision`           | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026).                                                                                                 |
+| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode.                                                                                           |
+| `promptCaching`    | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI.                                                                                         |
 
 **Override any flag explicitly** via `.model({ name, reasoning?, vision?, structuredOutput? })` — an explicit value always wins over the injected inference.
 
 ```ts
-deepseek.model({ name: "deepseek-chat", reasoning: true })   // force thinking flag
-deepseek.model({ name: "deepseek-reasoner", reasoning: false }) // suppress it
+deepseek.model({ name: "deepseek-chat", reasoning: true }); // force thinking flag
+deepseek.model({ name: "deepseek-reasoner", reasoning: false }); // suppress it
 ```
 
 ## Uses the OpenAI-compatible endpoint
@@ -75,8 +75,8 @@ Everything on the wire — Chat Completions request/response shape, streaming lo
 Structured output, reasoning effort, and streaming therefore behave exactly as documented for the OpenAI adapter:
 
 ```ts
-const model = deepseek.model({ name: "deepseek-reasoner" });        // reasoning auto-true
-await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+const model = deepseek.model({ name: "deepseek-reasoner" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 ## Embeddings & images
@@ -112,3 +112,17 @@ Raw errors surface through the wrapped OpenAI adapter's wrapper into the typed `
 - The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; all wire-level behavior.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`.
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison.
+
+## Provider body options and token estimates
+
+This adapter delegates Chat Completions to the OpenAI adapter, so
+`providerOptions.openai.body` adds native Chat request fields. Other provider
+keys are ignored. Plain-object fields merge one level deep with neutral options;
+caller-provided keys win, while arrays, scalars and `null` replace the field.
+The OpenAI adapter's protected conversation, tool and transport fields remain
+protected here too. Send only fields supported by this provider; do not reuse
+OpenAI-only bodies across a mixed-provider fallback chain.
+
+Models from this adapter have no native `countTokens` method. Check
+`model.countTokens` before using an optional native counting capability;
+`sdk.count(text)` is a separate offline estimate.

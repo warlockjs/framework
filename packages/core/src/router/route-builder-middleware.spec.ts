@@ -10,9 +10,12 @@ const cache = async () => undefined;
 function build(builderOptions: any) {
   const calls: any[] = [];
   const router: any = { get: (_p: string, _h: any, options: any) => calls.push(options) };
-  new RouteBuilder(router, "/admin/x", builderOptions).get((() => undefined) as any, {
-    middleware: [cache],
-  } as any);
+  new RouteBuilder(router, "/admin/x", builderOptions).get(
+    (() => undefined) as any,
+    {
+      middleware: [cache],
+    } as any,
+  );
   return calls[0];
 }
 

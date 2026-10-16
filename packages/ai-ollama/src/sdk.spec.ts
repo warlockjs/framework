@@ -55,9 +55,10 @@ describe("OllamaSDK", () => {
     const sdk = new OllamaSDK({ pricing: { "llama3.1": { input: 0, output: 0 } } });
 
     expect(sdk.model({ name: "llama3.1" }).pricing).toEqual({ input: 0, output: 0 });
-    expect(
-      sdk.model({ name: "llama3.1", pricing: { input: 1, output: 2 } }).pricing,
-    ).toEqual({ input: 1, output: 2 });
+    expect(sdk.model({ name: "llama3.1", pricing: { input: 1, output: 2 } }).pricing).toEqual({
+      input: 1,
+      output: 2,
+    });
     expect(sdk.model({ name: "mistral" }).pricing).toBeUndefined();
   });
 

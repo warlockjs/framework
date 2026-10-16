@@ -59,19 +59,19 @@ describe("toBedrockMessages", () => {
   });
 
   it("replays JSON-persisted signed reasoning text before assistant text and tool use", () => {
-    const reasoningBlocks = [
-      { type: "reasoning", text: "considering", signature: "sig_1" },
-    ];
+    const reasoningBlocks = [{ type: "reasoning", text: "considering", signature: "sig_1" }];
     const messages: Message[] = [
       {
         role: "assistant",
         content: "Let me check.",
-        toolCalls: [{
-          id: "tu_1",
-          name: "getWeather",
-          input: { city: "Cairo" },
-          providerMetadata: { bedrock: { reasoningBlocks } },
-        }],
+        toolCalls: [
+          {
+            id: "tu_1",
+            name: "getWeather",
+            input: { city: "Cairo" },
+            providerMetadata: { bedrock: { reasoningBlocks } },
+          },
+        ],
       },
     ];
 
@@ -90,16 +90,22 @@ describe("toBedrockMessages", () => {
   });
 
   it("replays JSON-persisted redacted Bedrock reasoning content byte-exactly", () => {
-    const messages: Message[] = [{
-      role: "assistant",
-      content: "",
-      toolCalls: [{
-        id: "tu_1",
-        name: "lookup",
-        input: {},
-        providerMetadata: { bedrock: { reasoningBlocks: [{ type: "redacted", data: "AQID" }] } },
-      }],
-    }];
+    const messages: Message[] = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "tu_1",
+            name: "lookup",
+            input: {},
+            providerMetadata: {
+              bedrock: { reasoningBlocks: [{ type: "redacted", data: "AQID" }] },
+            },
+          },
+        ],
+      },
+    ];
 
     const persisted = JSON.parse(JSON.stringify(messages)) as Message[];
 
@@ -110,16 +116,22 @@ describe("toBedrockMessages", () => {
   });
 
   it("ignores malformed Bedrock reasoning metadata", () => {
-    const messages: Message[] = [{
-      role: "assistant",
-      content: "",
-      toolCalls: [{
-        id: "tu_1",
-        name: "lookup",
-        input: {},
-        providerMetadata: { bedrock: { reasoningBlocks: [{ type: "redacted", data: "not base64!" }, null] } },
-      }],
-    }];
+    const messages: Message[] = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "tu_1",
+            name: "lookup",
+            input: {},
+            providerMetadata: {
+              bedrock: { reasoningBlocks: [{ type: "redacted", data: "not base64!" }, null] },
+            },
+          },
+        ],
+      },
+    ];
 
     expect(toBedrockMessages(messages).messages[0]?.content).toEqual([
       { toolUse: { toolUseId: "tu_1", name: "lookup", input: {} } },
@@ -148,7 +160,9 @@ describe("toBedrockMessages", () => {
     ];
 
     const result = toBedrockMessages(messages).messages[0];
-    const imageBlock = (result.content as Array<{ image?: { format: string; source: { bytes: Uint8Array } } }>)[1];
+    const imageBlock = (
+      result.content as Array<{ image?: { format: string; source: { bytes: Uint8Array } } }>
+    )[1];
 
     expect(imageBlock.image?.format).toBe("png");
     expect(Buffer.from(imageBlock.image!.source.bytes).toString()).toBe("hello");

@@ -127,6 +127,7 @@ export class KafkaDriver implements BrokerDriverContract {
 ```
 
 Required methods (from `BrokerDriverContract`):
+
 - `connect()` / `disconnect()` — lifecycle
 - `on()` / `off()` — event listeners (`connected`, `disconnected`, `error`, `reconnecting`)
 - `subscribe(Consumer)` / `unsubscribe(Consumer)` — EventConsumer registration
@@ -151,6 +152,7 @@ export class KafkaChannel<TPayload> implements ChannelContract<TPayload> {
 ```
 
 Required methods:
+
 - `publish()` / `publishBatch()` — message sending
 - `subscribe()` — returns `Subscription` with `unsubscribe()`
 - `unsubscribeById()` — cancel specific consumer

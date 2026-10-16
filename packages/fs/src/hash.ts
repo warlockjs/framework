@@ -16,14 +16,11 @@ export type HashAlgorithm = "sha256" | "sha1" | "md5" | "sha512";
  *   const fingerprint = await hashFile("./bundle.js");
  *   const quick = await hashFile("./small.txt", "md5");
  */
-export function hashFileAsync(
-  path: string,
-  algorithm: HashAlgorithm = "sha256",
-): Promise<string> {
+export function hashFileAsync(path: string, algorithm: HashAlgorithm = "sha256"): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash(algorithm);
     const stream = createReadStream(path);
-    stream.on("data", chunk => hash.update(chunk));
+    stream.on("data", (chunk) => hash.update(chunk));
     stream.on("end", () => resolve(hash.digest("hex")));
     stream.on("error", reject);
   });
@@ -59,5 +56,7 @@ export async function hashFileSmallAsync(
   path: string,
   algorithm: HashAlgorithm = "sha256",
 ): Promise<string> {
-  return createHash(algorithm).update(await readFile(path)).digest("hex");
+  return createHash(algorithm)
+    .update(await readFile(path))
+    .digest("hex");
 }

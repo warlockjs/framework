@@ -17,23 +17,23 @@ If you've never touched the config system before, read the getting-started page 
 ```ts
 import { config } from "@warlock.js/core";
 
-config.get("http");                          // → entire HttpConfigurations object
-config.key("http.port");                     // → 3000
-config.key<number>("http.port", 8080);       // → typed read with default
-config.key("http.cors.origin");              // → deep dot-notation
+config.get("http"); // → entire HttpConfigurations object
+config.key("http.port"); // → 3000
+config.key<number>("http.port", 8080); // → typed read with default
+config.key("http.cors.origin"); // → deep dot-notation
 ```
 
-| Method                | When to use                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------ |
-| `config.get(name)`    | Get the whole subsystem config — e.g. when handing it to a third-party SDK as one object |
-| `config.key(path)`    | Get one value by dot-notation path — works for any depth                              |
+| Method             | When to use                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| `config.get(name)` | Get the whole subsystem config — e.g. when handing it to a third-party SDK as one object |
+| `config.key(path)` | Get one value by dot-notation path — works for any depth                                 |
 
 The split is autocomplete-driven. `config.get` autocompletes the top-level subsystem names from the `ConfigRegistry` interface (auto-generated as you add config files). `config.key` accepts any dotted path and is the general-purpose accessor.
 
 Both accept a default value as the second argument:
 
 ```ts
-const port = config.key("http.port", 3000);          // → 3000 if unset
+const port = config.key("http.port", 3000); // → 3000 if unset
 const driver = config.get("cache", { driver: "memory" });
 ```
 
@@ -84,8 +84,8 @@ export default httpConfigurations;
 After this file loads, every consumer can reach for:
 
 ```ts
-config.key("http.port");                  // → 3000 (or the env value)
-config.key("http.cors.origin");           // → "*"
+config.key("http.port"); // → 3000 (or the env value)
+config.key("http.cors.origin"); // → "*"
 config.key("http.cookies.options.secure"); // → true in prod, false in dev
 ```
 
@@ -164,9 +164,9 @@ When `src/config/feature-flags.ts` loads (after boot), the handler runs and prel
 ```ts
 import { env } from "@warlock.js/core";
 
-const port = env("HTTP_PORT", 3000);          // number
-const host = env("HTTP_HOST", "localhost");   // string
-const log = env("DB_LOGGING", false);         // boolean
+const port = env("HTTP_PORT", 3000); // number
+const host = env("HTTP_HOST", "localhost"); // string
+const log = env("DB_LOGGING", false); // boolean
 ```
 
 The coercion logic:
@@ -175,7 +175,7 @@ The coercion logic:
 | ------------ | ----------------------------------------------------------------------------------- |
 | `number`     | `Number(value)` if set, else the default. `NaN` becomes the default.                |
 | `boolean`    | `"true"` → `true`, `"false"` → `false`. Anything else coerces via `Boolean(value)`. |
-| `string`     | The raw env string, or the default if unset.                                         |
+| `string`     | The raw env string, or the default if unset.                                        |
 | no default   | The raw env string (or `undefined`).                                                |
 
 `env` is re-exported from `@mongez/dotenv` — calls flow through that package. The behaviour above is from that package; if you need to verify the exact coercion (especially around odd inputs), check `@mongez/dotenv`'s source.
@@ -185,8 +185,8 @@ The coercion logic:
 If a `.env` line reads `DEBUG=false`, then:
 
 ```ts
-env("DEBUG", true);       // → false (the string "false" is interpreted as the boolean)
-env("DEBUG", "true");     // → "false" (string default; you got the string back)
+env("DEBUG", true); // → false (the string "false" is interpreted as the boolean)
+env("DEBUG", "true"); // → "false" (string default; you got the string back)
 ```
 
 If the default is boolean, you get booleans. If the default is a string, you get strings (and need to check `=== "true"` yourself). The default's TYPE drives the interpretation.
@@ -203,7 +203,7 @@ import { env } from "@warlock.js/core";
 const localeFromEnv = env("DEFAULT_LOCALE");
 
 export default {
-  defaultLocale: localeFromEnv === "null" ? null : localeFromEnv ?? "en",
+  defaultLocale: localeFromEnv === "null" ? null : (localeFromEnv ?? "en"),
 };
 ```
 
@@ -244,7 +244,7 @@ const httpConfigurations: HttpConfigurations = {
     secret: env("COOKIE_SECRET", "super-secret-key-change-me"),
     options: {
       httpOnly: true,
-      secure: Application.isProduction,    // HTTPS-only cookies in prod
+      secure: Application.isProduction, // HTTPS-only cookies in prod
       path: "/",
     },
   },

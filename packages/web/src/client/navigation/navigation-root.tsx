@@ -204,7 +204,7 @@ export function NavigationRoot({
   }, [pages, current.payload.name]);
 
   const applySwap = (next: Current, complete?: () => void): void => {
-    setResetToken(previous => previous + 1);
+    setResetToken((previous) => previous + 1);
 
     /*
       A swap that replaces one still waiting for its commit settles that wait

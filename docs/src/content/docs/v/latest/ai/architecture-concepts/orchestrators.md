@@ -6,7 +6,7 @@ sidebar:
   label: "Orchestrators"
 ---
 
-`ai.orchestrator()` is the top rung of the ladder — a **stateful session manager wrapped around a supervisor**. Where an agent, workflow, or supervisor each handle a single run, an orchestrator owns a *session* that spans many turns: it persists session state, windows and compacts history, detects when the definition drifts out from under a live session, resumes an interrupted turn, and exposes typed built-in commands.
+`ai.orchestrator()` is the top rung of the ladder — a **stateful session manager wrapped around a supervisor**. Where an agent, workflow, or supervisor each handle a single run, an orchestrator owns a _session_ that spans many turns: it persists session state, windows and compacts history, detects when the definition drifts out from under a live session, resumes an interrupted turn, and exposes typed built-in commands.
 
 ```text
 ai.agent()        →  single LLM turn, tool loop, structured output
@@ -22,7 +22,7 @@ ai.orchestrator() →  stateful session-aware orchestration       ← you are he
 - **`supervisor`** — the right specialist is decided per call; you may iterate to a goal within one run.
 - **`orchestrator`** — **the session matters across runs.** A support conversation, a multi-turn assistant, anything where turn N+1 must see what happened in turn N without you re-threading the whole world by hand.
 
-The orchestrator does NOT replace the supervisor — it *delegates* to one. Every "what runs" field you'd give a supervisor (`intents`, `route`/`router`, `evaluate`, `state`, `output`, `initialAgent`, `maxIterations`) is the supervisor's surface spread directly onto the orchestrator config. The orchestrator builds the supervisor lazily per turn and adds the session lifecycle around it.
+The orchestrator does NOT replace the supervisor — it _delegates_ to one. Every "what runs" field you'd give a supervisor (`intents`, `route`/`router`, `evaluate`, `state`, `output`, `initialAgent`, `maxIterations`) is the supervisor's surface spread directly onto the orchestrator config. The orchestrator builds the supervisor lazily per turn and adds the session lifecycle around it.
 
 ## The mental model
 
@@ -48,12 +48,12 @@ Each `execute()` is **one turn**. The session is identified by the `sessionId` s
 
 The orchestrator persists through **two distinct stores**, and confusing them is the most common mistake:
 
-| Store | Holds | When written | Factory |
-| --- | --- | --- | --- |
+| Store               | Holds                                                                                                             | When written                           | Factory                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------- |
 | **CheckpointStore** | Cross-turn **session state** — `state`, `turn_index`, drift `signature`, `last_route`, compaction progress, locks | One row per settled turn (append-only) | `ai.checkpoint.{memory,pg,redis}()` |
-| **SnapshotStore** | The internal supervisor's **mid-turn run state** for `iterate: true` resume | During an in-flight iterating turn | `ai.snapshot.{memory,pg,redis}()` |
+| **SnapshotStore**   | The internal supervisor's **mid-turn run state** for `iterate: true` resume                                       | During an in-flight iterating turn     | `ai.snapshot.{memory,pg,redis}()`   |
 
-A `CheckpointStore` is how the session survives between turns. A `SnapshotStore` is how a single `iterate: true` turn survives a crash *mid-iteration*. You only need a `snapshotStore` when `iterate: true` — the factory throws at construction if you set `iterate: true` without one (or a `defaultSnapshotStore`).
+A `CheckpointStore` is how the session survives between turns. A `SnapshotStore` is how a single `iterate: true` turn survives a crash _mid-iteration_. You only need a `snapshotStore` when `iterate: true` — the factory throws at construction if you set `iterate: true` without one (or a `defaultSnapshotStore`).
 
 Set them per orchestrator, or once globally:
 
@@ -84,7 +84,7 @@ const supportBot = ai.orchestrator<SessionState>({
 
 const result = await supportBot.execute(message, {
   sessionId: "user-42",
-  history: priorTurns,   // you own the message history (Path 2)
+  history: priorTurns, // you own the message history (Path 2)
 });
 
 if (result.report.status === "awaiting-input") {
@@ -92,11 +92,11 @@ if (result.report.status === "awaiting-input") {
 }
 ```
 
-`history` is **required** every call. The framework never persists raw messages itself — you hold them and pass the prior turns in. The orchestrator persists *session state*, not the transcript.
+`history` is **required** every call. The framework never persists raw messages itself — you hold them and pass the prior turns in. The orchestrator persists _session state_, not the transcript.
 
 ## Drift detection
 
-At construction the orchestrator computes a structural **signature** from its definition (name + intent shape + routing). Every checkpoint row stores the signature in force when it was written. On the next turn the orchestrator compares the live signature against the checkpoint's — a mismatch means the definition changed underneath a live session, and it throws `OrchestratorDriftError` *before running anything*, rather than silently corrupting the session.
+At construction the orchestrator computes a structural **signature** from its definition (name + intent shape + routing). Every checkpoint row stores the signature in force when it was written. On the next turn the orchestrator compares the live signature against the checkpoint's — a mismatch means the definition changed underneath a live session, and it throws `OrchestratorDriftError` _before running anything_, rather than silently corrupting the session.
 
 ```ts
 await supportBot.execute(message, { sessionId, history, force: true });
@@ -114,8 +114,8 @@ ai.orchestrator({
   intents,
   route,
   summarize: {
-    afterTurns: 20,           // start compacting once the session crosses 20 turns
-    keep: 8,                  // keep the last 8 messages raw
+    afterTurns: 20, // start compacting once the session crosses 20 turns
+    keep: 8, // keep the last 8 messages raw
     onCompact: async (compaction, { sessionId }) => {
       // apply the produced summary to YOUR message store
       await messages.replaceRange(sessionId, compaction);
@@ -124,7 +124,7 @@ ai.orchestrator({
 });
 ```
 
-Pass a callback instead of the object form for full control. You can also trigger it manually with the `compact` command (below). Either way the *application* of the summary to your message store is your call — the orchestrator computes the compaction; surfacing it stays explicit.
+Pass a callback instead of the object form for full control. You can also trigger it manually with the `compact` command (below). Either way the _application_ of the summary to your message store is your call — the orchestrator computes the compaction; surfacing it stays explicit.
 
 ## Three-tier events
 
@@ -133,17 +133,20 @@ The orchestrator emits its own `orchestrator.*` lifecycle events under the same 
 ```ts
 const supportBot = ai.orchestrator({
   name: "refund-support",
-  intents, route,
-  on: { "orchestrator.turn.routed": (e) => log(e.source, e.raw) },  // tier 1
+  intents,
+  route,
+  on: { "orchestrator.turn.routed": (e) => log(e.source, e.raw) }, // tier 1
 });
 
-const off = supportBot.on("orchestrator.drift.checked", (e) => {     // tier 2
+const off = supportBot.on("orchestrator.drift.checked", (e) => {
+  // tier 2
   if (e.drifted) alert("definition drifted");
 });
 
 await supportBot.execute(message, {
-  sessionId, history,
-  on: { "orchestrator.turn.awaiting-input": (e) => done(e.turnIndex) },  // tier 3 — a clean turn ends here
+  sessionId,
+  history,
+  on: { "orchestrator.turn.awaiting-input": (e) => done(e.turnIndex) }, // tier 3 — a clean turn ends here
 });
 ```
 
@@ -171,7 +174,7 @@ An orchestrator wraps as a tool so an outer agent can drive a whole session insi
 const supportTool = supportBot.asTool({
   description: "Handle a customer support conversation turn",
   inputSchema: v.object({ message: v.string() }),
-  sessionScope: "fresh",   // "fresh" (default) — new session per call
+  sessionScope: "fresh", // "fresh" (default) — new session per call
 });
 
 const concierge = ai.agent({ model, tools: [supportTool] });
@@ -200,7 +203,8 @@ An orchestrator can recall and accumulate **memory** across turns — see [Memor
 ```ts
 ai.orchestrator({
   name: "assistant",
-  intents, route,
+  intents,
+  route,
   memory: ai.memory({
     semantic: { embedder, store },
   }),

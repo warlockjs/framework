@@ -21,17 +21,23 @@ class TestChannel extends LogChannel<TestConfig> {
   }
 
   public exposeShouldBeLogged(data: LoggingData): boolean {
-    return (this as unknown as { shouldBeLogged: (data: LoggingData) => boolean }).shouldBeLogged(data);
+    return (this as unknown as { shouldBeLogged: (data: LoggingData) => boolean }).shouldBeLogged(
+      data,
+    );
   }
 
   public exposeSetConfigurations(config: TestConfig) {
-    return (this as unknown as { setConfigurations: (config: TestConfig) => TestChannel }).setConfigurations(config);
+    return (
+      this as unknown as { setConfigurations: (config: TestConfig) => TestChannel }
+    ).setConfigurations(config);
   }
 
   public exposeGetDateAndTimeFormat() {
-    return (this as unknown as {
-      getDateAndTimeFormat: () => { date: string; time: string };
-    }).getDateAndTimeFormat();
+    return (
+      this as unknown as {
+        getDateAndTimeFormat: () => { date: string; time: string };
+      }
+    ).getDateAndTimeFormat();
   }
 
   public exposeIsInitialized() {

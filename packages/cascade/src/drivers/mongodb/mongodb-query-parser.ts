@@ -925,7 +925,9 @@ export class MongoQueryParser {
         return;
       }
 
-      Object.entries(condition).forEach(([key, value]) => mergeConditionEntry(andFilter, key, value));
+      Object.entries(condition).forEach(([key, value]) =>
+        mergeConditionEntry(andFilter, key, value),
+      );
     };
 
     for (const op of matchOps) {
@@ -1206,7 +1208,9 @@ export class MongoQueryParser {
         return { [field]: { $regex: resolveMongoLikePattern(value as string), $options: "i" } };
       case "notLike":
       case "not like":
-        return { [field]: { $not: { $regex: resolveMongoLikePattern(value as string), $options: "i" } } };
+        return {
+          [field]: { $not: { $regex: resolveMongoLikePattern(value as string), $options: "i" } },
+        };
       case "startsWith":
         return { [field]: { $regex: `^${escapeRegex(String(value))}`, $options: "i" } };
       case "notStartsWith":
@@ -1823,7 +1827,9 @@ export class MongoQueryParser {
           return { $sample: { size: op.data.limit } };
 
         case "orderByRaw":
-          throw new Error("orderByRaw() is not supported by the MongoDB driver; use orderBy() instead.");
+          throw new Error(
+            "orderByRaw() is not supported by the MongoDB driver; use orderBy() instead.",
+          );
       }
     }
 

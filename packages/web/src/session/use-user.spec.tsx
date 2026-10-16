@@ -22,7 +22,11 @@ afterEach(() => {
 function Probe() {
   const user = useUser();
 
-  return createElement("span", null, user === null ? "guest" : String((user as { id: unknown }).id));
+  return createElement(
+    "span",
+    null,
+    user === null ? "guest" : String((user as { id: unknown }).id),
+  );
 }
 
 describe("useUser / installSession", () => {

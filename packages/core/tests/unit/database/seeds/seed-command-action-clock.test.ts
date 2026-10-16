@@ -78,9 +78,9 @@ describe("seedCommandAction — clock override", () => {
     expect(seen).toBe(fixed);
 
     // The same clock stamps the seeds-log metadata.
-    const log = memoryRef.current!.rowsOf(seedsTableName).find(
-      (row) => row.name === "from-command",
-    );
+    const log = memoryRef
+      .current!.rowsOf(seedsTableName)
+      .find((row) => row.name === "from-command");
     expect(log?.firstRunAt).toBe(fixed);
   });
 });

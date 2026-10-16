@@ -15,9 +15,7 @@ export const whenRule: SchemaRule<WhenRuleOptions> = {
     const scope = this.context.options.scope || "global";
 
     const fieldValue =
-      scope === "global"
-        ? get(context.allValues, fieldToCheck)
-        : get(context.parent, fieldToCheck);
+      scope === "global" ? get(context.allValues, fieldToCheck) : get(context.parent, fieldToCheck);
 
     // Convert field value to string for key lookup
     // This handles boolean, number, and string field values
@@ -30,8 +28,7 @@ export const whenRule: SchemaRule<WhenRuleOptions> = {
       }
 
       // Safe error access
-      this.context.errorMessage =
-        result.errors?.[0]?.error || "Validation failed";
+      this.context.errorMessage = result.errors?.[0]?.error || "Validation failed";
       return invalidRule(this, context);
     }
 
@@ -43,8 +40,7 @@ export const whenRule: SchemaRule<WhenRuleOptions> = {
       }
 
       // Safe error access
-      this.context.errorMessage =
-        result.errors?.[0]?.error || "Validation failed";
+      this.context.errorMessage = result.errors?.[0]?.error || "Validation failed";
       return invalidRule(this, context);
     }
 

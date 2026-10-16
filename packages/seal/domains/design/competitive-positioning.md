@@ -10,7 +10,7 @@ This doc is internal. It exists so future planning sessions don't re-derive the 
 
 ## TL;DR
 
-Seal is a **declarative, Laravel-flavoured validator with first-class i18n and a full Standard Schema + JSON Schema bridge**. Its strengths and weaknesses both come from the same place: it optimised for *backend form-validation ergonomics* (Hasan's actual day-job pain) rather than for *frontend bundle size* or *type-system fireworks*. It will read as familiar to Laravel devs and alien to Zod-heads.
+Seal is a **declarative, Laravel-flavoured validator with first-class i18n and a full Standard Schema + JSON Schema bridge**. Its strengths and weaknesses both come from the same place: it optimised for _backend form-validation ergonomics_ (Hasan's actual day-job pain) rather than for _frontend bundle size_ or _type-system fireworks_. It will read as familiar to Laravel devs and alien to Zod-heads.
 
 If positioned as "Zod competitor for general TS use" it loses on bundle size, ecosystem depth, type-inference precision, and maintainer count. If positioned as "**the validator for Warlock.js apps**" — which is the actual scope — it's already differentiated and several capabilities are genuinely ahead of every competitor surveyed.
 
@@ -32,14 +32,14 @@ The strategic positioning that fits these facts: **"Seal is the form-and-API val
 
 ## The competitive landscape
 
-| Library | Differentiator | Where it crushes seal | Where seal crushes it |
-|---|---|---|---|
-| **Zod** | Default for everything; large ecosystem; precise inference | Inference (carries optional/nullable/default into output type); bundle (tree-shakes well at v4); error tree with codes; community/recipes | Cross-field rules, i18n, JSON Schema dialect breadth |
-| **Valibot** | Modular pipe-based design; tiny minimal bundle; Standard Schema since day one | Bundle (you import only what you use, ~1KB minimal); composability; performance | Conditional cross-field surface, declarative API style, batteries-included date handling |
-| **Yup** | Form-validation incumbent (esp. Formik); decent `.when()` | Older + simpler API; React form ecosystem familiarity | Almost everything else — Yup's growth has stalled, no Standard Schema, weaker types |
-| **Joi** | Battle-tested server-side validator (Hapi roots); rich error messages; conditional via `.when()` | Maturity; rule depth in some areas (URI, schema descriptions) | TS inference (Joi has none), cross-field method count, plugin model, bundle (Joi is heavy) |
-| **ArkType** | Parses TS-like type strings ("string|number"); fastest validation; type-first identity | Inference precision (literally executes TS-like syntax at runtime); raw perf | Conventional chained API, conditional cross-field rules, i18n, ergonomics for non-TS-fluent devs |
-| **TypeBox** | JSON Schema-first; fastest at runtime via AJV codegen | Performance for high-throughput APIs; native JSON Schema | Conditional rules, cross-field, transformations, mutators, i18n |
+| Library     | Differentiator                                                                                   | Where it crushes seal                                                                                                                     | Where seal crushes it                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Zod**     | Default for everything; large ecosystem; precise inference                                       | Inference (carries optional/nullable/default into output type); bundle (tree-shakes well at v4); error tree with codes; community/recipes | Cross-field rules, i18n, JSON Schema dialect breadth                                       |
+| **Valibot** | Modular pipe-based design; tiny minimal bundle; Standard Schema since day one                    | Bundle (you import only what you use, ~1KB minimal); composability; performance                                                           | Conditional cross-field surface, declarative API style, batteries-included date handling   |
+| **Yup**     | Form-validation incumbent (esp. Formik); decent `.when()`                                        | Older + simpler API; React form ecosystem familiarity                                                                                     | Almost everything else — Yup's growth has stalled, no Standard Schema, weaker types        |
+| **Joi**     | Battle-tested server-side validator (Hapi roots); rich error messages; conditional via `.when()` | Maturity; rule depth in some areas (URI, schema descriptions)                                                                             | TS inference (Joi has none), cross-field method count, plugin model, bundle (Joi is heavy) |
+| **ArkType** | Parses TS-like type strings ("string                                                             | number"); fastest validation; type-first identity                                                                                         | Inference precision (literally executes TS-like syntax at runtime); raw perf               | Conventional chained API, conditional cross-field rules, i18n, ergonomics for non-TS-fluent devs |
+| **TypeBox** | JSON Schema-first; fastest at runtime via AJV codegen                                            | Performance for high-throughput APIs; native JSON Schema                                                                                  | Conditional rules, cross-field, transformations, mutators, i18n                            |
 
 **No serious competitor ships Laravel-style cross-field conditionals.** Zod's `.refine()` is the workaround. Valibot's `.check()` is similar. Joi's `.when()` is the closest peer but has a fraction of the surface.
 
@@ -64,7 +64,7 @@ Total: **60+ cross-field methods on every validator**, all going through one sha
 
 **Why this matters.** The dirtiest part of any real form is rules like "tax ID required if account type is business AND country is US, but only when compliance flag isn't waived". Zod handles this with `.superRefine()` callbacks that the user has to write inline; Yup with one `.when()` per condition; Joi with a `.when().then().otherwise()` ladder. Seal handles it with a chain that reads like the spec: `v.string().requiredIf("accountType", "business").requiredIf("country", "US").requiredUnless("compliance.waived", true)`.
 
-The *sibling* scope deserves special mention — it solves a problem most validators ignore. When validating `users: v.array(v.object({...}))`, you usually want a child rule to check a *sibling* field (in the same row) rather than a global field. Zod and Valibot make you reach for the parent context explicitly; seal makes it a method suffix.
+The _sibling_ scope deserves special mention — it solves a problem most validators ignore. When validating `users: v.array(v.object({...}))`, you usually want a child rule to check a _sibling_ field (in the same row) rather than a global field. Zod and Valibot make you reach for the parent context explicitly; seal makes it a method suffix.
 
 ### 2. Standard Schema + JSON Schema bridge is the right architecture
 
@@ -88,7 +88,7 @@ Counterpoint: implementation is hand-rolled per validator (each `toJsonSchema()`
 2. Explicit translation key (`transAttributes({ field: "user.email_address" })` → translator)
 3. Auto-translate the raw value (translator(rawValue) as fallback)
 
-Both *rule names* (so "min" → "must be at least :min characters") and *attribute names* (so "email_address" → "Email Address") flow through user-supplied callbacks. Placeholder substitution (`:input`, `:min`, `:field`) is built in with a regex fallback if no translator is configured ([validation-helpers.ts:90](../../../@warlock.js/seal/src/helpers/validation-helpers.ts:90)).
+Both _rule names_ (so "min" → "must be at least :min characters") and _attribute names_ (so "email_address" → "Email Address") flow through user-supplied callbacks. Placeholder substitution (`:input`, `:min`, `:field`) is built in with a regex fallback if no translator is configured ([validation-helpers.ts:90](../../../@warlock.js/seal/src/helpers/validation-helpers.ts:90)).
 
 **Why this matters.** Every other library treats i18n as "pass an `errorMap` and write your own switch". Zod's `errorMap` is per-call; Valibot has no built-in i18n. For the kind of multi-language app Warlock.js is built for, this is a meaningful productivity win.
 
@@ -105,7 +105,7 @@ default → mutators → required check → requiredRule → other rules → tra
 
 Zod blurs this with `.transform()` (post) and `.preprocess()` (pre, but separated from the schema). Valibot does pipes that don't distinguish. Yup mixes `.transform()` for both. Seal's split is mentally cleaner — you can predict where in the pipeline a method runs from its name.
 
-**Caveat.** This only matters if you *use* mutators. The Faq schema you sent me has none. Most users probably never reach for them. But for backend processing (data normalization before persistence), it's the right abstraction.
+**Caveat.** This only matters if you _use_ mutators. The Faq schema you sent me has none. Most users probably never reach for them. But for backend processing (data normalization before persistence), it's the right abstraction.
 
 ### 5. Date validator surface is unmatched
 
@@ -123,7 +123,7 @@ This is genuinely novel. Zod's `.transform()` is per-field; you can't easily der
 
 ### 7. Mutability model is sane
 
-Validators are *immutable by default* — every chain method returns a clone ([base-validator.ts:91](../../../@warlock.js/seal/src/validators/base-validator.ts:91)). Toggle in-place with `.mutable`. This avoids the entire class of "I shared a schema and now my changes leaked" bugs that bite Yup users. Zod also clones; Valibot also clones; seal matches the right defaults here.
+Validators are _immutable by default_ — every chain method returns a clone ([base-validator.ts:91](../../../@warlock.js/seal/src/validators/base-validator.ts:91)). Toggle in-place with `.mutable`. This avoids the entire class of "I shared a schema and now my changes leaked" bugs that bite Yup users. Zod also clones; Valibot also clones; seal matches the right defaults here.
 
 ---
 
@@ -154,7 +154,7 @@ A category schema with `children: Category[]` cannot be expressed in seal. There
 
 ### 3. No `discriminatedUnion()` — unions can't disambiguate by tag
 
-[union-validator.ts](../../../@warlock.js/seal/src/validators/union-validator.ts) + [rules/core/union.ts](../../../@warlock.js/seal/src/rules/core/union.ts) — the union rule iterates validators, calls `matchesType()` to skip mismatched ones, then runs the first type-matching validator and stops. For a union of `v.object({type: v.literal("email"), ...})` and `v.object({type: v.literal("sms"), ...})`, *both* match `matchesType` (object) — the first one wins regardless of payload. Errors come from one branch, not the right branch.
+[union-validator.ts](../../../@warlock.js/seal/src/validators/union-validator.ts) + [rules/core/union.ts](../../../@warlock.js/seal/src/rules/core/union.ts) — the union rule iterates validators, calls `matchesType()` to skip mismatched ones, then runs the first type-matching validator and stops. For a union of `v.object({type: v.literal("email"), ...})` and `v.object({type: v.literal("sms"), ...})`, _both_ match `matchesType` (object) — the first one wins regardless of payload. Errors come from one branch, not the right branch.
 
 Zod's `discriminatedUnion("type", [...])` solves this: peek at the discriminator field, route to the matching branch, report errors from that branch only. ArkType does similar. Valibot has `variant()`.
 
@@ -169,14 +169,14 @@ Zod's `discriminatedUnion("type", [...])` solves this: peek at the discriminator
 ```ts
 export type ValidationResult = {
   isValid: boolean;
-  data: any;                           // ← `any`, not generic
+  data: any; // ← `any`, not generic
   errors: { type: string; error: string; input: string }[];
 };
 ```
 
 Compare to Zod's `z.ZodError` with `issues[]` carrying `{ code, expected, received, path, message, params }` — programmatic handling is one switch on `issue.code`. Seal's `error: string` is the message, not a code; the only discriminator is `type` (the rule name) which isn't stable across versions.
 
-`data: any` is a particular pain point. The Standard Schema bridge gets typing right via the schema's type parameter; but the *direct* `validate()` function returns `any` ([factory/validate.ts:9](../../../@warlock.js/seal/src/factory/validate.ts:9)), forcing every consumer to either cast or call through `~standard`.
+`data: any` is a particular pain point. The Standard Schema bridge gets typing right via the schema's type parameter; but the _direct_ `validate()` function returns `any` ([factory/validate.ts:9](../../../@warlock.js/seal/src/factory/validate.ts:9)), forcing every consumer to either cast or call through `~standard`.
 
 **Impact.** Consumers writing form-error UIs do `errors.map(e => e.error)` and lose any chance of localized messages or per-error UI hints. Cascade and AI integration has to type-cast everything.
 
@@ -232,7 +232,7 @@ Other validators are cleaner about this — string-validator inspects rule names
 - **`embedValidator`** ([cascade/.../embed-validator-plugin.ts](../../../@warlock.js/cascade/src/validation/plugins/embed-validator-plugin.ts)) — adds `v.embed(Model)` / `v.embedMany(Model)` to the factory for embedded-document validation against Cascade models
 - **`filePlugin`** + **`localizedPlugin`** in core — file uploads (`v.file()`) and locale-aware string validation
 
-So the plugin system *does* real work. What survives of the original critique: the **contract is bare**. Every plugin author:
+So the plugin system _does_ real work. What survives of the original critique: the **contract is bare**. Every plugin author:
 
 - Writes their own `Object.assign(ValidatorClass.prototype, {...})` or factory assignment
 - Writes their own `declare module "@warlock.js/seal"` for type augmentation
@@ -284,7 +284,7 @@ If you keep marketing it as "framework-agnostic Zod alternative" (the README's c
 
 ### Recommended priorities
 
-**Tier 1 — fix the type system gap.** The fact that `.nullable()` doesn't show up in `Infer<>` is the single highest-impact correction. Users *think* their types are right and they aren't. Six weeks of effort tops; pays dividends forever.
+**Tier 1 — fix the type system gap.** The fact that `.nullable()` doesn't show up in `Infer<>` is the single highest-impact correction. Users _think_ their types are right and they aren't. Six weeks of effort tops; pays dividends forever.
 
 **Tier 2 — add discriminatedUnion + lazy.** These two unlock real schema patterns (events, trees, threaded data). Both are small features in isolation, but they're the most-cited "missing in seal" complaints from any TS-validator user.
 

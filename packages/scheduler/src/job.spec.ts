@@ -1,15 +1,7 @@
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone.js";
 import utc from "dayjs/plugin/utc.js";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Job, job } from "./job";
 
 beforeAll(() => {
@@ -154,9 +146,7 @@ describe("Job — every() validation", () => {
   });
 
   it("rejects Infinity", () => {
-    expect(() => job("t", noop).every(Infinity, "minute")).toThrow(
-      /positive finite/,
-    );
+    expect(() => job("t", noop).every(Infinity, "minute")).toThrow(/positive finite/);
   });
 
   it("accepts positive integer and decimal values", () => {
@@ -256,12 +246,8 @@ describe("Job — retry() validation", () => {
 
   it("rejects zero / negative / NaN backoff multiplier", () => {
     expect(() => job("t", noop).retry(3, 1000, 0)).toThrow(/backoffMultiplier/);
-    expect(() => job("t", noop).retry(3, 1000, -1)).toThrow(
-      /backoffMultiplier/,
-    );
-    expect(() => job("t", noop).retry(3, 1000, NaN)).toThrow(
-      /backoffMultiplier/,
-    );
+    expect(() => job("t", noop).retry(3, 1000, -1)).toThrow(/backoffMultiplier/);
+    expect(() => job("t", noop).retry(3, 1000, NaN)).toThrow(/backoffMultiplier/);
   });
 });
 
@@ -480,7 +466,7 @@ describe("Job — isDue()", () => {
 
   it("ignores running state — unlike shouldRun(), it is purely time-based", async () => {
     const j = job("t", async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     })
       .everyMinute()
       .preventOverlap();
@@ -525,7 +511,7 @@ describe("Job — shouldRun()", () => {
 
   it("preventOverlap + already running → false", async () => {
     const j = job("t", async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     })
       .everyMinute()
       .preventOverlap();
@@ -908,7 +894,7 @@ describe("Job — waitForCompletion()", () => {
   it("waits until a running job finishes", async () => {
     let finished = false;
     const j = job("t", async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       finished = true;
     }).everyMinute();
 
@@ -926,25 +912,17 @@ describe("Job — waitForCompletion()", () => {
 
   it("resolves ALL concurrent waiters (regression: resolver overwrite bug)", async () => {
     const j = job("t", async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }).everyMinute();
 
     const runPromise = j.run();
     await vi.advanceTimersByTimeAsync(1);
 
-    const waiters = [
-      j.waitForCompletion(),
-      j.waitForCompletion(),
-      j.waitForCompletion(),
-    ];
+    const waiters = [j.waitForCompletion(), j.waitForCompletion(), j.waitForCompletion()];
 
     await vi.advanceTimersByTimeAsync(100);
 
-    await expect(Promise.all(waiters)).resolves.toEqual([
-      undefined,
-      undefined,
-      undefined,
-    ]);
+    await expect(Promise.all(waiters)).resolves.toEqual([undefined, undefined, undefined]);
     await runPromise;
   });
 });
@@ -1082,7 +1060,7 @@ describe("Job — waitForCompletion edge cases", () => {
 
   it("a fresh waiter on a second run is independent of the first", async () => {
     const j = job("t", async () => {
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }).everyMinute();
 
     // First run + waiter.
@@ -1113,13 +1091,10 @@ describe("Job — waitForCompletion edge cases", () => {
 describe("Job — concurrent run() while in flight", () => {
   it("reports isRunning=true mid-flight and false once settled", async () => {
     let observedDuringRun: boolean | null = null;
-    const j = job(
-      "t",
-      async self => {
-        observedDuringRun = self.isRunning;
-        await new Promise(resolve => setTimeout(resolve, 20));
-      },
-    ).everyMinute();
+    const j = job("t", async (self) => {
+      observedDuringRun = self.isRunning;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }).everyMinute();
 
     const promise = j.run();
     await vi.advanceTimersByTimeAsync(1);

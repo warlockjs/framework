@@ -68,7 +68,7 @@ describe("SqlDatabaseDirtyTracker", () => {
 
       expect(tracker.hasChanges()).toBe(true);
       expect(tracker.getRemovedColumns()).toEqual(["user"]);
-      
+
       const dirtyData = tracker.getDirtyColumnsWithValues();
       expect(dirtyData).toHaveProperty("user");
       expect(dirtyData.user?.newValue).toBeUndefined();

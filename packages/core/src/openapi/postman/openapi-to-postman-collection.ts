@@ -10,11 +10,16 @@ import type {
   PostmanItem,
   PostmanRequestItem,
 } from "./postman-types";
-import { collectionBearerAuth, hasBearerScheme, resolveOperationAuth } from "./resolve-operation-auth";
+import {
+  collectionBearerAuth,
+  hasBearerScheme,
+  resolveOperationAuth,
+} from "./resolve-operation-auth";
 import { uuidV5 } from "./uuid-v5";
 
 /** `info.schema` of every collection this converter produces. */
-export const POSTMAN_COLLECTION_SCHEMA = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json";
+export const POSTMAN_COLLECTION_SCHEMA =
+  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json";
 
 /** `{{baseUrl}}` when neither the options nor the document name a server. */
 export const DEFAULT_POSTMAN_BASE_URL = "http://localhost:3000";
@@ -31,10 +36,14 @@ function buildRequestItem(
   const parameters = operation.parameters ?? [];
   const body = buildRequestBody(operation.requestBody, components);
   const { auth, note } = resolveOperationAuth(operation, document.components);
-  const description = [operation.description, note].filter((line): line is string => Boolean(line)).join("\n\n");
+  const description = [operation.description, note]
+    .filter((line): line is string => Boolean(line))
+    .join("\n\n");
 
   const header: PostmanHeader[] = [
-    ...(body?.contentType ? [{ key: "Content-Type", value: body.contentType, type: "text" as const }] : []),
+    ...(body?.contentType
+      ? [{ key: "Content-Type", value: body.contentType, type: "text" as const }]
+      : []),
     ...buildHeaderParameters(parameters, components),
   ];
 
@@ -75,7 +84,9 @@ export function openApiToPostmanCollection(
   options: PostmanCollectionOptions = {},
 ): PostmanCollection {
   const name = options.title ?? document.info.title;
-  const baseUrl = normalizeBaseUrl(options.baseUrl ?? document.servers?.[0]?.url ?? DEFAULT_POSTMAN_BASE_URL);
+  const baseUrl = normalizeBaseUrl(
+    options.baseUrl ?? document.servers?.[0]?.url ?? DEFAULT_POSTMAN_BASE_URL,
+  );
   const root: PostmanItem[] = [];
   const folders = new Map<string, PostmanFolder>();
 

@@ -14,8 +14,8 @@ This guide is the field-level companion to [CRUD basics](../the-basics/01-crud-b
 ```ts
 const user = await User.find(123);
 
-const name = user.get("name");              // any
-const email = user.get("email", "n/a");     // any, with default
+const name = user.get("name"); // any
+const email = user.get("email", "n/a"); // any, with default
 ```
 
 `get` reads a field from the model's data. If the field is absent, it returns the default (or `undefined` if you didn't pass one). This is the canonical reader for instance state.
@@ -36,11 +36,11 @@ Same syntax as the query builder's `.where("profile.address.city", ...)`. No dri
 When you know the column's type, the typed shortcuts return the value already narrowed (and default-typed):
 
 ```ts
-const name = user.string("name");                    // string | undefined
+const name = user.string("name"); // string | undefined
 const nameOrFallback = user.string("name", "Guest"); // string
 
-const age = user.number("age");                      // number | undefined
-const isActive = user.boolean("isActive", false);    // boolean
+const age = user.number("age"); // number | undefined
+const isActive = user.boolean("isActive", false); // boolean
 ```
 
 The unprefixed names (`string`, `number`, `boolean`) keep call sites short. Useful when you want to skip the cast at every read site.
@@ -50,7 +50,7 @@ The unprefixed names (`string`, `number`, `boolean`) keep call sites short. Usef
 The primary key shows up so often that Cascade exposes it as a direct property:
 
 ```ts
-console.log(user.id);    // number | string — same as user.get("id")
+console.log(user.id); // number | string — same as user.get("id")
 ```
 
 No `.get(...)` needed for `id`. Every other column goes through `get`.
@@ -88,7 +88,7 @@ await user.save();
 
 `merge` does a **deep merge** — nested objects are merged, not replaced. So `merge({ profile: { address: { city: "London" } } })` keeps any other keys under `profile.address` (`street`, `postcode`) intact.
 
-If you want a *shallow replace* instead, set the whole field with `set`:
+If you want a _shallow replace_ instead, set the whole field with `set`:
 
 ```ts
 user.set("profile", { address: { city: "London" } }); // wipes existing profile
@@ -109,13 +109,13 @@ Removes the field from the model's data and records it as dirty. On save:
 - **MongoDB** — `$unset` operator removes the field from the document.
 - **Postgres** — the column is nullified (`UPDATE ... SET column = NULL`).
 
-The semantics differ at the storage layer (Mongo can have *absent* fields; SQL columns always exist with NULL), but at the model level it's the same: `user.get("nickname")` will return `undefined` afterwards.
+The semantics differ at the storage layer (Mongo can have _absent_ fields; SQL columns always exist with NULL), but at the model level it's the same: `user.get("nickname")` will return `undefined` afterwards.
 
 ## `increment` / `decrement` — atomic-style numeric updates
 
 ```ts
-user.increment("loginCount");      // +1
-user.increment("loginCount", 5);   // +5
+user.increment("loginCount"); // +1
+user.increment("loginCount", 5); // +5
 user.decrement("creditsRemaining", 10);
 await user.save();
 ```
@@ -133,7 +133,7 @@ await User.whereId(123).increment("loginCount");
 // → UPDATE ... SET loginCount = loginCount + 1 — single statement, no read
 ```
 
-Rule of thumb: the instance form is fine when *only this request* is editing the row (validated user profile, single-writer flows). For counters, rate limits, or anything multi-writer, prefer the query-builder form.
+Rule of thumb: the instance form is fine when _only this request_ is editing the row (validated user profile, single-writer flows). For counters, rate limits, or anything multi-writer, prefer the query-builder form.
 
 :::
 
@@ -151,7 +151,7 @@ Returns a plain object containing just the listed fields. Useful for building AP
 When you read a field that isn't set, three sources can populate the default:
 
 1. **The explicit second argument** to `get` / `string` / `number` / `boolean`: `user.get("status", "active")`.
-2. **The schema's `.default(...)`** validator on the field: `v.enum([...]).default("active")`. This applies during *write* — `create()` and `save()` fill in defaults before persisting — so on subsequent reads the field is set, no default needed.
+2. **The schema's `.default(...)`** validator on the field: `v.enum([...]).default("active")`. This applies during _write_ — `create()` and `save()` fill in defaults before persisting — so on subsequent reads the field is set, no default needed.
 3. **`undefined`** — Cascade doesn't invent values out of nowhere.
 
 The general rule: defaults belong in the **schema** (consistent across every call site), not scattered through `get` calls.
@@ -161,7 +161,7 @@ The general rule: defaults belong in the **schema** (consistent across every cal
 If you have a fresh data object from somewhere and want to swap or merge it into the model wholesale:
 
 ```ts
-user.merge(freshData);             // deep-merge into model.data
+user.merge(freshData); // deep-merge into model.data
 ```
 
 For a complete overwrite you'd usually create a new model instance rather than mutate an existing one — that's clearer than reaching for low-level state replacement.

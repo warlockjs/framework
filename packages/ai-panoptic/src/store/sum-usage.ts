@@ -69,7 +69,10 @@ export function emptyUsage(): Usage {
  * zero — but return `undefined` when both are absent, so an unreported
  * channel stays unreported rather than collapsing to `0`.
  */
-function sumOptional(accumulator: number | undefined, next: number | undefined): number | undefined {
+function sumOptional(
+  accumulator: number | undefined,
+  next: number | undefined,
+): number | undefined {
   if (accumulator === undefined && next === undefined) {
     return undefined;
   }

@@ -79,15 +79,7 @@ function constructTwiceWithFailingSharp(mode: "missing" | "transitive" | "unload
 
   const stdout = execFileSync(
     process.execPath,
-    [
-      "--import",
-      "tsx",
-      "--import",
-      toUrl(hookEntry),
-      "--input-type=module",
-      "--eval",
-      source,
-    ],
+    ["--import", "tsx", "--import", toUrl(hookEntry), "--input-type=module", "--eval", source],
     {
       cwd: repoRoot,
       stdio: "pipe",

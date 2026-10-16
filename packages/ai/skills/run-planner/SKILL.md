@@ -35,8 +35,9 @@ const research = ai.planner({
 
 const { data, report, usage, error } = await research.execute("Compare React vs Vue in 2026");
 
-console.log(report.plan?.summary);          // the LLM's one-line strategy
-for (const step of report.executedSteps) {  // forensic, in execution order
+console.log(report.plan?.summary); // the LLM's one-line strategy
+for (const step of report.executedSteps) {
+  // forensic, in execution order
   console.log(step.step.capability, step.status);
 }
 ```
@@ -55,7 +56,7 @@ for (const step of report.executedSteps) {  // forensic, in execution order
 
 ### Parse-time step ceiling (4.15.0)
 
-`maxSteps` can't be expressed in the strict-mode JSON Schema the planning model is given (no `maxItems`), so a provider/proxy that ignores the prompt's step budget could make the planner deserialize an arbitrarily long `steps[]` array before `PlannerRun`'s tail-truncation logic ever ran — `maxSteps` only trimmed *after* the whole array was already parsed and normalized. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** — rather than truncates — a plan that exceeds it, surfacing `PlannerPlanInvalidError`. The 4× slack keeps the normal case (a model overshooting "at most N steps" slightly) working exactly as before — that overshoot is still truncated to `skipped` steps at execution time, not rejected at parse time. A plan several times its budget is treated as a malfunction worth surfacing, not a prefix worth silently executing.
+`maxSteps` can't be expressed in the strict-mode JSON Schema the planning model is given (no `maxItems`), so a provider/proxy that ignores the prompt's step budget could make the planner deserialize an arbitrarily long `steps[]` array before `PlannerRun`'s tail-truncation logic ever ran — `maxSteps` only trimmed _after_ the whole array was already parsed and normalized. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** — rather than truncates — a plan that exceeds it, surfacing `PlannerPlanInvalidError`. The 4× slack keeps the normal case (a model overshooting "at most N steps" slightly) working exactly as before — that overshoot is still truncated to `skipped` steps at execution time, not rejected at parse time. A plan several times its budget is treated as a malfunction worth surfacing, not a prefix worth silently executing.
 
 ## DAG scheduling — `dag: true` + `maxConcurrency`
 
@@ -66,8 +67,8 @@ const research = ai.planner({
   name: "research",
   model,
   capabilities,
-  dag: true,            // build a DAG from each step's `id` / `dependsOn`
-  maxConcurrency: 4,    // max steps in flight at once. default 4
+  dag: true, // build a DAG from each step's `id` / `dependsOn`
+  maxConcurrency: 4, // max steps in flight at once. default 4
 });
 ```
 
@@ -130,7 +131,7 @@ const final = await planner.execute(goal, { approvedPlan: draft.plan! });
 
 ## Delegating a step with `ai.spawnSubAgent()`
 
-A plan step can hand a bounded subtask to a fresh single-use agent with a hard spend cap via `ai.spawnSubAgent({...})`. It is **not** a planner feature — it's a general one-shot-agent helper (a fresh `ai.agent()` + an optional per-task `budget`, run once) that works identically inside a tool, a workflow step, a supervisor intent, or hand-rolled orchestration. The planner engine never calls it; it's simply a primitive a capability *you* write can reach for. Full coverage: the `run-ai-agent` topic.
+A plan step can hand a bounded subtask to a fresh single-use agent with a hard spend cap via `ai.spawnSubAgent({...})`. It is **not** a planner feature — it's a general one-shot-agent helper (a fresh `ai.agent()` + an optional per-task `budget`, run once) that works identically inside a tool, a workflow step, a supervisor intent, or hand-rolled orchestration. The planner engine never calls it; it's simply a primitive a capability _you_ write can reach for. Full coverage: the `run-ai-agent` topic.
 
 ## Testing
 

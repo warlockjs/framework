@@ -107,7 +107,7 @@ describe("ConsoleLog", () => {
     const levels = ["debug", "info", "warn", "error", "success", "fatal"] as const;
 
     it("pads every level tag to a single, aligned column width", () => {
-      const widths = levels.map(level => {
+      const widths = levels.map((level) => {
         consoleSpy.mockClear();
         new ConsoleLog().log(dataFor({ type: level }));
         const tag = consoleSpy.mock.calls[0]![0] as string;

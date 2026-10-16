@@ -18,9 +18,7 @@ class BareTransport implements McpTransportClient {
   public closed = false;
   public lastNotify: string | undefined;
 
-  public constructor(
-    private readonly responder: (request: JsonRpcRequest) => JsonRpcResponse,
-  ) {}
+  public constructor(private readonly responder: (request: JsonRpcRequest) => JsonRpcResponse) {}
 
   public async request<TResult = unknown>(
     request: JsonRpcRequest,
@@ -201,7 +199,11 @@ describe("HTTP transport — Streamable HTTP over fetch", () => {
 
   it("throws a protocol error on a non-JSON body", async () => {
     stubFetch(
-      () => new Response("<<not json>>", { status: 200, headers: { "content-type": "application/json" } }),
+      () =>
+        new Response("<<not json>>", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
     );
 
     const client = createJsonRpcClient({ type: "http", url: "https://srv.test/mcp" });
@@ -355,9 +357,7 @@ describe("stdio transport — real child process round-trip", () => {
   });
 
   it("surfaces a spawn failure as a connect error", () => {
-    expect(() =>
-      createTransport({ type: "stdio", command: "" }),
-    ).toThrow(McpTransportError);
+    expect(() => createTransport({ type: "stdio", command: "" })).toThrow(McpTransportError);
   });
 
   it("times out a request the server never answers", async () => {

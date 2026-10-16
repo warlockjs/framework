@@ -6,7 +6,7 @@ sidebar:
   label: "Channels & the registry"
 ---
 
-A **channel** is one transport with two jobs: resolve *where* to reach a recipient, and *send* a rendered payload there.
+A **channel** is one transport with two jobs: resolve _where_ to reach a recipient, and _send_ a rendered payload there.
 
 ```ts
 interface Channel<P> {
@@ -47,11 +47,11 @@ declare module "@warlock.js/notifications" {
 
 There is no `routeNotificationFor` on your model. Each channel resolves the recipient's address itself, by convention, overridable in config:
 
-| Channel | Default route | Override |
-| --- | --- | --- |
-| `mail` | `notifiable.get("email")` | `mailChannel({ route: (n) => n.get("workEmail") })` |
-| `database` | `{ id: notifiable.id }` | — (always the id) |
-| custom | whatever your `route()` returns | in the factory |
+| Channel    | Default route                   | Override                                            |
+| ---------- | ------------------------------- | --------------------------------------------------- |
+| `mail`     | `notifiable.get("email")`       | `mailChannel({ route: (n) => n.get("workEmail") })` |
+| `database` | `{ id: notifiable.id }`         | — (always the id)                                   |
+| custom     | whatever your `route()` returns | in the factory                                      |
 
 Recipients are cascade `Model` instances — `.id` and `.get(path)` come for free. Pass a raw string instead of a model for a one-off target:
 
@@ -65,12 +65,12 @@ If a channel **declares** a `route()` resolver and it returns `undefined` (e.g. 
 
 ## Built-in vs custom
 
-| Channel | Status | Backed by |
-| --- | --- | --- |
-| `mail` | shipped | core `sendMail` |
-| `database` | shipped | cascade repository |
-| `whatsapp` / `telegram` / `slack` / `push` | with `@warlock.js/bridges` | bridge providers |
-| anything else | `defineChannel` | your `send()` |
+| Channel                                    | Status                     | Backed by          |
+| ------------------------------------------ | -------------------------- | ------------------ |
+| `mail`                                     | shipped                    | core `sendMail`    |
+| `database`                                 | shipped                    | cascade repository |
+| `whatsapp` / `telegram` / `slack` / `push` | with `@warlock.js/bridges` | bridge providers   |
+| anything else                              | `defineChannel`            | your `send()`      |
 
 Until bridges lands, an HTTP channel (Slack/Discord/internal webhook) is a 30-line [`defineChannel`](../guides/custom-channels.md).
 

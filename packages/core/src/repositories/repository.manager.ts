@@ -191,7 +191,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       this.eventsCallbacks.push(
         ...this.adapter.registerEvents((source: any) => {
           // this.clearCache({ id: source.id });
-          this.clearCache().catch(error => {
+          this.clearCache().catch((error) => {
             console.error("[Repository] cache invalidation failed", error);
           });
         }),

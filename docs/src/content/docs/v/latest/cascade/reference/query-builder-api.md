@@ -7,11 +7,12 @@ sidebar:
 
 This page documents every method on Cascade's `QueryBuilderContract`. It's a **reference**, not a tutorial — each method shows its signature, a one-sentence description, a minimal example, and a link to the guide that teaches the concept.
 
-Use the in-page anchors (or Ctrl-F) when you know the name and just need the signature. For the *why* and *when*, follow the **See also** links into the essentials and guide pages.
+Use the in-page anchors (or Ctrl-F) when you know the name and just need the signature. For the _why_ and _when_, follow the **See also** links into the essentials and guide pages.
 
 :::info — How method blocks are organised
 
 Each method shows:
+
 - **Signature** — the TypeScript signature(s) you can call
 - **What it does** — one sentence, mechanical
 - **Example** — one minimal snippet
@@ -169,8 +170,8 @@ An explicit **`RegExp`** argument is still used as a real pattern, unescaped —
 ```ts
 import { escapeRegex, likePatternToRegexSource } from "@warlock.js/cascade";
 
-escapeRegex("(a+)+$");                  // "\\(a\\+\\)\\+\\$" — literal text
-likePatternToRegexSource("%o'brien%");  // ".*o'brien.*"      — % still a wildcard
+escapeRegex("(a+)+$"); // "\\(a\\+\\)\\+\\$" — literal text
+likePatternToRegexSource("%o'brien%"); // ".*o'brien.*"      — % still a wildcard
 ```
 
 The Postgres driver was already parameterized (`ILIKE $1`) and is unaffected either way.
@@ -248,7 +249,7 @@ orWhereNot(callback: WhereCallback<T>): this
 **What it does:** negate a nested predicate block.
 
 ```ts
-await User.whereNot(q => q.where("status", "banned")).get();
+await User.whereNot((q) => q.where("status", "banned")).get();
 ```
 
 ### `whereExists(...)` / `whereNotExists(...)`
@@ -264,7 +265,7 @@ whereNotExists(field: string): this
 
 ```ts
 await User.whereExists("optionalField").get();
-await User.whereExists(q => q.where("status", "active")).get();
+await User.whereExists((q) => q.where("status", "active")).get();
 ```
 
 ### `whereColumn` / `orWhereColumn` / `whereColumns` / `whereBetweenColumns`
@@ -306,7 +307,7 @@ orWhereRaw(expression: RawExpression, bindings?: unknown[]): this
 
 ```ts
 await User.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }).get(); // MongoDB — object form
-await User.whereRaw("age > ?", [30]).get();                            // SQL — string form, real bindings
+await User.whereRaw("age > ?", [30]).get(); // SQL — string form, real bindings
 ```
 
 :::caution[String form throws on MongoDB — use the object form]
@@ -578,7 +579,9 @@ selectDriverProjection(callback: (projection: Record<string, unknown>) => void):
 **What it does:** mutate the driver's underlying projection object directly. Last-resort escape hatch.
 
 ```ts
-query.selectDriverProjection(p => { p.score = { $meta: "textScore" }; });
+query.selectDriverProjection((p) => {
+  p.score = { $meta: "textScore" };
+});
 ```
 
 ### `deselect(fields)` / `clearSelect()` / `selectAll()` / `selectDefault()`
@@ -635,7 +638,9 @@ unwind(field: string, options?: UnwindOptions): this
 
 ```ts
 await Post.query().unwind("tags").where("tags", "news").lean().get();
-await Post.query().unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" }).get();
+await Post.query()
+  .unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" })
+  .get();
 ```
 
 ### `addFields(fields)` — MongoDB only
@@ -647,7 +652,10 @@ addFields(fields: Record<string, unknown>): this
 **What it does:** add computed fields while keeping every existing field (`$addFields`) — unlike `select()`, nothing already on the document is dropped. Runs in call order alongside other stages. Throws `UnsupportedQueryOperationError` on the Postgres driver.
 
 ```ts
-await Post.query().addFields({ score: { $add: ["$likes", "$shares"] } }).orderBy("score", "desc").get();
+await Post.query()
+  .addFields({ score: { $add: ["$likes", "$shares"] } })
+  .orderBy("score", "desc")
+  .get();
 ```
 
 ---
@@ -738,7 +746,9 @@ query.joinRaw("LEFT JOIN LATERAL (...) e ON true");
 
 // MongoDB: one pipeline stage object, or an array of stage objects, emitted
 // verbatim in call order (`bindings` is unused on this driver)
-query.joinRaw({ $lookup: { from: "profiles", localField: "id", foreignField: "userId", as: "profile" } });
+query.joinRaw({
+  $lookup: { from: "profiles", localField: "id", foreignField: "userId", as: "profile" },
+});
 ```
 
 On MongoDB a non-stage argument (a SQL string, a plain non-stage object, or an empty array) throws `UnsupportedQueryOperationError`.
@@ -775,7 +785,7 @@ with(relations: Record<string, boolean | ((query: QueryBuilderContract) => void)
 ```ts
 await User.query().with("posts", "organization").find(1);
 await User.query()
-  .with({ posts: q => q.where("isPublished", true) })
+  .with({ posts: (q) => q.where("isPublished", true) })
   .find(1);
 ```
 
@@ -809,7 +819,7 @@ await User.query().withCount("posts").get();
 await Post.query()
   .withCount({
     comments: true,
-    "comments as approvedCount": q => q.where("approved", true),
+    "comments as approvedCount": (q) => q.where("approved", true),
   })
   .get();
 ```
@@ -840,7 +850,7 @@ whereDoesntHave(relation: string, callback: (query: QueryBuilderContract) => voi
 
 ```ts
 await User.query()
-  .whereHas("posts", q => q.where("isPublished", true))
+  .whereHas("posts", (q) => q.where("isPublished", true))
   .get();
 ```
 
@@ -1043,8 +1053,7 @@ havingRaw(expression: RawExpression, bindings?: unknown[]): this
 **What it does:** filter the grouped/aggregated results (vs `.where()` which filters before grouping).
 
 ```ts
-query.groupBy("category", { total: $agg.sum("amount") })
-     .having("total", ">", 1000);
+query.groupBy("category", { total: $agg.sum("amount") }).having("total", ">", 1000);
 ```
 
 ---
@@ -1268,7 +1277,10 @@ tap(callback: (builder: this) => void): this
 **What it does:** side-effect into the chain (logging, debugging) without breaking the fluent flow.
 
 ```ts
-query.where("age", ">", 18).tap(q => console.log(q.parse())).get();
+query
+  .where("age", ">", 18)
+  .tap((q) => console.log(q.parse()))
+  .get();
 ```
 
 ### `when<V>(condition, callback, otherwise?)`

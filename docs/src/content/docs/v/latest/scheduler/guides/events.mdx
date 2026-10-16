@@ -29,7 +29,9 @@ scheduler.once("scheduler:started", () => {
 Remove a listener with `.off()`:
 
 ```ts
-function handleError(name: string, error: unknown) { /* ... */ }
+function handleError(name: string, error: unknown) {
+  /* ... */
+}
 
 scheduler.on("job:error", handleError);
 // later…
@@ -69,9 +71,9 @@ scheduler.on("job:complete", (jobName: string, result: JobResult) => {
 ```ts
 type JobResult = {
   success: boolean;
-  duration: number;   // milliseconds
-  error?: unknown;    // present when success is false
-  retries?: number;   // number of retry attempts made
+  duration: number; // milliseconds
+  error?: unknown; // present when success is false
+  retries?: number; // number of retry attempts made
 };
 ```
 
@@ -155,7 +157,7 @@ import { metrics } from "./metrics";
 import { alerts } from "./alerts";
 
 // Timing metrics
-scheduler.on("job:start",    (name)         => metrics.increment(`job.start.${name}`));
+scheduler.on("job:start", (name) => metrics.increment(`job.start.${name}`));
 scheduler.on("job:complete", (name, result) => {
   metrics.increment(`job.success.${name}`);
   metrics.timing(`job.duration.${name}`, result.duration);
@@ -177,7 +179,5 @@ scheduler.on("scheduler:started", () => logger.info("Scheduler started"));
 scheduler.on("scheduler:stopped", () => logger.info("Scheduler stopped"));
 
 // Register jobs and start
-scheduler
-  .addJob(/* ... */)
-  .start();
+scheduler.addJob(/* ... */).start();
 ```

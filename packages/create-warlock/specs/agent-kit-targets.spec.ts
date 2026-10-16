@@ -98,14 +98,14 @@ describe("resolveAgentTargets", () => {
       [AGENT_INTEGRATIONS_DOC_URL]: AGENT_INTEGRATIONS_DOC,
     });
 
-    await expect(
-      resolveAgentTargets(["not-a-real-target"], fetchImpl as any),
-    ).rejects.toThrow(/Unknown agent-kit target\(s\): not-a-real-target/);
+    await expect(resolveAgentTargets(["not-a-real-target"], fetchImpl as any)).rejects.toThrow(
+      /Unknown agent-kit target\(s\): not-a-real-target/,
+    );
 
     cacheFile = undefined;
-    await expect(
-      resolveAgentTargets(["not-a-real-target"], fetchImpl as any),
-    ).rejects.toThrow(/claude/);
+    await expect(resolveAgentTargets(["not-a-real-target"], fetchImpl as any)).rejects.toThrow(
+      /claude/,
+    );
   });
 
   it("fails visibly (never silently falls back) when the fetch fails and there is no cache", async () => {
@@ -114,9 +114,9 @@ describe("resolveAgentTargets", () => {
       throw new Error("network unreachable");
     });
 
-    await expect(
-      resolveAgentTargets(["cursor"], fetchImpl as any),
-    ).rejects.toThrow(/Could not determine the valid agent-kit targets/);
+    await expect(resolveAgentTargets(["cursor"], fetchImpl as any)).rejects.toThrow(
+      /Could not determine the valid agent-kit targets/,
+    );
   });
 
   it("falls back to a previously cached list (not a silent guess — a real prior fetch) when a fresh fetch fails", async () => {
@@ -151,17 +151,13 @@ describe("the remote lookup is bounded", () => {
   it("rejects a promise that never settles, once the bound elapses", async () => {
     const started = Date.now();
 
-    await expect(withTimeout(new Promise(() => {}), 50)).rejects.toThrow(
-      /timed out after 50ms/,
-    );
+    await expect(withTimeout(new Promise(() => {}), 50)).rejects.toThrow(/timed out after 50ms/);
 
     expect(Date.now() - started).toBeLessThan(2000);
   });
 
   it("passes a settled value straight through", async () => {
-    await expect(withTimeout(Promise.resolve("done"), 50)).resolves.toBe(
-      "done",
-    );
+    await expect(withTimeout(Promise.resolve("done"), 50)).resolves.toBe("done");
   });
 
   it("settles the whole lookup within the bound when fetch never responds", async () => {
@@ -170,9 +166,7 @@ describe("the remote lookup is bounded", () => {
     const neverSettles = vi.fn(() => new Promise<Response>(() => {}));
     const started = Date.now();
 
-    await getValidAgentKitTargets(neverSettles as any, 50).catch(
-      () => undefined,
-    );
+    await getValidAgentKitTargets(neverSettles as any, 50).catch(() => undefined);
 
     expect(Date.now() - started).toBeLessThan(2000);
     expect(neverSettles).toHaveBeenCalled();

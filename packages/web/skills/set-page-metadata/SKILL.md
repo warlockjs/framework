@@ -1,6 +1,6 @@
 ---
 name: set-page-metadata
-description: "Set a page's `<head>` with `config.metadata`: title (string, `{ default, template }`, `{ absolute }`), description, keywords, canonical, robots, `openGraph` (siteName, images, article), `twitter`, `image`, `authors`, extra `meta` and `links`, and per-locale `alternates`. Static object vs function of loader data, root/layout/page merge order, and a per-locale recipe with `t()`. Triggers: `config.metadata`, `PageMetadata`, `MetadataInput`, `openGraph`, `og:image`, `twitter:card`, `canonical`, `hreflang`, `alternates`, `UnknownMetadataKeyError`, `DeferredKeyInMetadataError`; \"set the page title\", \"add an og:image\", \"share preview\", \"title template\", \"noindex a page\", \"translate the title\"."
+description: 'Set a page''s `<head>` with `config.metadata`: title (string, `{ default, template }`, `{ absolute }`), description, keywords, canonical, robots, `openGraph` (siteName, images, article), `twitter`, `image`, `authors`, extra `meta` and `links`, and per-locale `alternates`. Static object vs function of loader data, root/layout/page merge order, and a per-locale recipe with `t()`. Triggers: `config.metadata`, `PageMetadata`, `MetadataInput`, `openGraph`, `og:image`, `twitter:card`, `canonical`, `hreflang`, `alternates`, `UnknownMetadataKeyError`, `DeferredKeyInMetadataError`; "set the page title", "add an og:image", "share preview", "title template", "noindex a page", "translate the title".'
 ---
 
 # Warlock — set page metadata
@@ -29,11 +29,11 @@ export default function ProductsPage() {
 
 `metadata` is either a plain object or a function that returns one. The function form runs on the server, after the loader, and receives one object:
 
-| Key      | What it is                                                                                           |
-| -------- | ---------------------------------------------------------------------------------------------------- |
-| `data`   | The loader's data, typed exactly as the component sees it (`Serialized` of the loader return)         |
-| `shared` | The sealed, readonly `shared` payload                                                                 |
-| `route`  | The matched page's `{ name, path, params }`                                                           |
+| Key      | What it is                                                                                                      |
+| -------- | --------------------------------------------------------------------------------------------------------------- |
+| `data`   | The loader's data, typed exactly as the component sees it (`Serialized` of the loader return)                   |
+| `shared` | The sealed, readonly `shared` payload                                                                           |
+| `route`  | The matched page's `{ name, path, params }`                                                                     |
 | `child`  | Layout and root callbacks only: the already-resolved metadata of the level below (`{ kind, metadata, child? }`) |
 
 Give the config the loader's type so `data` is typed. `PageConfig<typeof loader>` reads the loader's type, so the loader may be declared after the config:
@@ -83,21 +83,21 @@ Rules of the function form:
 
 All fields are optional. An unknown key (`tittle`) is a build error naming the file, line and the closest known key, so a typo cannot silently drop a tag.
 
-| Field         | Type                                                                            | Rendered as                                                                  |
-| ------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `title`       | `string`, `{ default?, template? }` or `{ absolute }`                           | `<title>`                                                                    |
-| `description` | `string`                                                                        | `<meta name="description">`                                                  |
-| `keywords`    | `string` or `string[]` (joined with `, `)                                       | `<meta name="keywords">`                                                     |
-| `robots`      | `string`, e.g. `"noindex,nofollow"`                                             | `<meta name="robots">`                                                       |
-| `canonical`   | `string` (path or absolute URL) or `false`                                      | `<link rel="canonical">`                                                     |
-| `viewport`    | `string` or `false`; default `"width=device-width, initial-scale=1"`            | `<meta name="viewport">`, SSR only; client navigation never rewrites it     |
-| `image`       | `string` or `{ url, width?, height?, alt?, type? }`                             | The share image: fallback for `og:image` and `twitter:image`                 |
-| `authors`     | `string`, or an array of `string` / `{ name, url? }`                            | `<meta name="author">` (names joined), plus `<link rel="author">` per `url`  |
-| `openGraph`   | see below                                                                       | `og:*` and `article:*` tags                                                  |
-| `twitter`     | see below                                                                       | `twitter:*` tags                                                             |
-| `meta`        | array of `{ name, content }`, `{ property, content }` or `{ httpEquiv, content }` | Extra `<meta>` tags                                                          |
-| `links`       | array of `{ rel, href, hreflang?, type?, sizes?, media?, as?, crossOrigin?, title? }` | Extra `<link>` tags                                                          |
-| `alternates`  | `Record<string, string>` keyed by locale code plus optional `"x-default"`       | `<link rel="alternate" hreflang="...">`                                      |
+| Field         | Type                                                                                  | Rendered as                                                                 |
+| ------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `title`       | `string`, `{ default?, template? }` or `{ absolute }`                                 | `<title>`                                                                   |
+| `description` | `string`                                                                              | `<meta name="description">`                                                 |
+| `keywords`    | `string` or `string[]` (joined with `, `)                                             | `<meta name="keywords">`                                                    |
+| `robots`      | `string`, e.g. `"noindex,nofollow"`                                                   | `<meta name="robots">`                                                      |
+| `canonical`   | `string` (path or absolute URL) or `false`                                            | `<link rel="canonical">`                                                    |
+| `viewport`    | `string` or `false`; default `"width=device-width, initial-scale=1"`                  | `<meta name="viewport">`, SSR only; client navigation never rewrites it     |
+| `image`       | `string` or `{ url, width?, height?, alt?, type? }`                                   | The share image: fallback for `og:image` and `twitter:image`                |
+| `authors`     | `string`, or an array of `string` / `{ name, url? }`                                  | `<meta name="author">` (names joined), plus `<link rel="author">` per `url` |
+| `openGraph`   | see below                                                                             | `og:*` and `article:*` tags                                                 |
+| `twitter`     | see below                                                                             | `twitter:*` tags                                                            |
+| `meta`        | array of `{ name, content }`, `{ property, content }` or `{ httpEquiv, content }`     | Extra `<meta>` tags                                                         |
+| `links`       | array of `{ rel, href, hreflang?, type?, sizes?, media?, as?, crossOrigin?, title? }` | Extra `<link>` tags                                                         |
+| `alternates`  | `Record<string, string>` keyed by locale code plus optional `"x-default"`             | `<link rel="alternate" hreflang="...">`                                     |
 
 ### Title
 
@@ -111,18 +111,18 @@ A `template` is applied by an ancestor to the title of the level below it, repla
 
 ### `openGraph`
 
-| Key                | Notes                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------- |
-| `title`            | Falls back to the top-level `title`, even when `openGraph` is not set                                    |
-| `description`      | Falls back to the top-level `description`                                                                |
+| Key                | Notes                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `title`            | Falls back to the top-level `title`, even when `openGraph` is not set                                              |
+| `description`      | Falls back to the top-level `description`                                                                          |
 | `type`             | `"website"` (the default whenever any `og:*` tag is emitted), `"article"`, `"product"`, `"profile"`, or any string |
-| `url`              | Falls back to the canonical URL                                                                          |
-| `siteName`         | `og:site_name`                                                                                           |
-| `images`           | Array of `{ url, width?, height?, alt?, type? }`; one `og:image` group each. Wins over `image`           |
-| `image`            | A single URL, kept for compatibility. `images` wins over it                                              |
-| `locale`           | Written as given. Defaults to the request locale (`en-US` becomes `en_US`)                               |
-| `alternateLocales` | `og:locale:alternate`, one tag per entry. Filled from the page's locale alternates when not set          |
-| `article`          | Rendered only when `type` is `"article"`: `publishedTime`, `modifiedTime`, `authors[]`, `section`, `tags[]` |
+| `url`              | Falls back to the canonical URL                                                                                    |
+| `siteName`         | `og:site_name`                                                                                                     |
+| `images`           | Array of `{ url, width?, height?, alt?, type? }`; one `og:image` group each. Wins over `image`                     |
+| `image`            | A single URL, kept for compatibility. `images` wins over it                                                        |
+| `locale`           | Written as given. Defaults to the request locale (`en-US` becomes `en_US`)                                         |
+| `alternateLocales` | `og:locale:alternate`, one tag per entry. Filled from the page's locale alternates when not set                    |
+| `article`          | Rendered only when `type` is `"article"`: `publishedTime`, `modifiedTime`, `authors[]`, `section`, `tags[]`        |
 
 ```tsx
 metadata: ({ data }) => ({

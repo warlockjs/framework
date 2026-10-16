@@ -11,7 +11,12 @@ Slow channels (SMTP, HTTP) shouldn't block a request. Configure a queue and
 ## Wire it
 
 ```ts title="src/config/notifications.ts"
-import { type NotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
+import {
+  type NotificationConfig,
+  heraldQueue,
+  inApp,
+  mailChannel,
+} from "@warlock.js/notifications";
 import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {

@@ -2,7 +2,10 @@ import { pathToFileURL } from "node:url";
 import type { MessagePort } from "node:worker_threads";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { container } from "../container";
-import { DevelopmentAppModuleRegistry, getDevelopmentAppModuleRegistry } from "./app-module-registry";
+import {
+  DevelopmentAppModuleRegistry,
+  getDevelopmentAppModuleRegistry,
+} from "./app-module-registry";
 import { FilesOrchestrator } from "./files-orchestrator";
 import { trackLoaderPortAcks } from "./loader/loader-port-acks";
 

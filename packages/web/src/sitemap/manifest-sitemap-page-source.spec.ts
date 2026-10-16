@@ -192,6 +192,8 @@ describe("createManifestSitemapPageSource with setup modules", () => {
 
     expect(entry.routePath).toBe("/store/products");
     expect(entry.sitemap).toBe(supplier);
-    expect(entry.layoutSitemaps).toEqual([{ sourceFile: "src/web/shop/layout.tsx", declared: false }]);
+    expect(entry.layoutSitemaps).toEqual([
+      { sourceFile: "src/web/shop/layout.tsx", declared: false },
+    ]);
   });
 });

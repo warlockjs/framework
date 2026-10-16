@@ -285,7 +285,10 @@ describe("Restful.bulkDelete", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.bulkDelete({ request: makeRequest({ inputs: { id: "not-array" } }), response: response });
+    await resource.bulkDelete({
+      request: makeRequest({ inputs: { id: "not-array" } }),
+      response: response,
+    });
 
     expect(response.calls[0]).toMatchObject({
       method: "badRequest",
@@ -301,7 +304,10 @@ describe("Restful.bulkDelete", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.bulkDelete({ request: makeRequest({ inputs: { id: ["1", "2"] } }), response: response });
+    await resource.bulkDelete({
+      request: makeRequest({ inputs: { id: ["1", "2"] } }),
+      response: response,
+    });
 
     expect(repository.all).toHaveBeenCalled();
     expect(response.calls.at(-1)).toMatchObject({ method: "success", payload: { deleted: 2 } });

@@ -50,5 +50,5 @@
   // A package whose skill was written today starts clean: its one snippet is
   // self-contained and compiles. This number only ever moves down.
   "sitemap": 0,
-  "web": 0
+  "web": 0,
 }

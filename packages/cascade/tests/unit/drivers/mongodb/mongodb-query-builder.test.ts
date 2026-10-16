@@ -981,9 +981,7 @@ describe("MongoQueryBuilder", () => {
 
     describe("cursor()", () => {
       it("should throw instead of silently ignoring the cursor", () => {
-        expect(() => queryBuilder.cursor("abc123", undefined)).toThrow(
-          "cursor() is not supported",
-        );
+        expect(() => queryBuilder.cursor("abc123", undefined)).toThrow("cursor() is not supported");
         expect(queryBuilder.operations).toHaveLength(0);
       });
     });

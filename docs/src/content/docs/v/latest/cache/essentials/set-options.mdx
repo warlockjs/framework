@@ -30,20 +30,21 @@ See [Duration Strings](/v/latest/cache/quick-start/#duration-strings) for the fu
 
 ## Options reference
 
-| Key | Type | Purpose |
-|-----|------|---------|
-| `ttl` | `number \| string` | Relative expiry. Mutually exclusive with `expiresAt`. |
-| `expiresAt` | `number \| Date` | Absolute deadline. Must be in the future. Mutually exclusive with `ttl`. |
-| `tags` | `string[]` | Inline tag list — equivalent to `cache.tags([...]).set(...)`. |
-| `onConflict` | `"create" \| "update" \| "upsert"` | Conditional-write policy. Defaults to `"upsert"`. |
-| `driver` | `string` | Per-call driver override by registered name. |
-| `vector` | `number[]` | Embedding indexed alongside the entry for [similarity retrieval](/v/latest/cache/similarity/). Drivers without similarity support throw `CacheUnsupportedError`. |
+| Key          | Type                               | Purpose                                                                                                                                                          |
+| ------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ttl`        | `number \| string`                 | Relative expiry. Mutually exclusive with `expiresAt`.                                                                                                            |
+| `expiresAt`  | `number \| Date`                   | Absolute deadline. Must be in the future. Mutually exclusive with `ttl`.                                                                                         |
+| `tags`       | `string[]`                         | Inline tag list — equivalent to `cache.tags([...]).set(...)`.                                                                                                    |
+| `onConflict` | `"create" \| "update" \| "upsert"` | Conditional-write policy. Defaults to `"upsert"`.                                                                                                                |
+| `driver`     | `string`                           | Per-call driver override by registered name.                                                                                                                     |
+| `vector`     | `number[]`                         | Embedding indexed alongside the entry for [similarity retrieval](/v/latest/cache/similarity/). Drivers without similarity support throw `CacheUnsupportedError`. |
 
 :::info Validation rules
+
 - Passing both `ttl` and `expiresAt` throws `CacheConfigurationError`.
 - An `expiresAt` in the past throws `CacheConfigurationError`.
 - Invalid duration strings (`"2 weeksandahalf"`) throw `CacheConfigurationError`.
-:::
+  :::
 
 ## TTL and expiresAt
 
@@ -82,7 +83,7 @@ Controls what happens when the key already exists (or doesn't).
 
 ```ts
 // "create" — set only if the key is missing
-const workerId = `worker.${process.pid}`;    // any identifying value
+const workerId = `worker.${process.pid}`; // any identifying value
 const result = await cache.set("lock.orders", workerId, {
   onConflict: "create",
   ttl: "5m",
@@ -106,7 +107,7 @@ Conditional writes return a `CacheSetResult`:
 ```ts
 type CacheSetResult<T = any> = {
   wasSet: boolean;
-  existing: T | null;  // only populated on "create" rejections
+  existing: T | null; // only populated on "create" rejections
 };
 ```
 
@@ -161,7 +162,7 @@ cache.setCacheConfigurations({
     memory: MemoryCacheDriver,
     redis: RedisCacheDriver,
   },
-  options: { /* ... */ },
+  options: {/* ... */},
 });
 ```
 
@@ -170,16 +171,12 @@ cache.setCacheConfigurations({
 A **distributed lock** makes sure only one process runs a block of code at a time, even across multiple servers. The `onConflict: "create"` pattern is the portable way to build one — native on Redis and Postgres (cross-server), single-process elsewhere. For real work prefer [`cache.lock()`](/v/latest/cache/lock/): it refuses a TTL that never expires and releases only its own lock, so a slow holder can't delete its successor's.
 
 ```ts
-async function withLock<T>(
-  key: string,
-  ttl: string,
-  work: () => Promise<T>,
-): Promise<T | null> {
+async function withLock<T>(key: string, ttl: string, work: () => Promise<T>): Promise<T | null> {
   // process.pid is just an identifying value so you can see which worker
   // holds the lock when debugging. Any unique string works.
   const acquired = await cache.set(key, process.pid, {
     onConflict: "create",
-    ttl,   // safety net: auto-release if we crash before remove()
+    ttl, // safety net: auto-release if we crash before remove()
   });
 
   if (!acquired.wasSet) {
@@ -197,7 +194,7 @@ async function withLock<T>(
 // Usage — build a heavy report, but only run the job on one server even if
 // three servers received the request at the same time.
 const result = await withLock("lock.build-report.42", "2m", async () => {
-  const report = await db.reports.generate(42);   // expensive
+  const report = await db.reports.generate(42); // expensive
   await cache.set("report.42", report, "1h");
   return report;
 });
@@ -210,9 +207,9 @@ See [Stampede Prevention](/v/latest/cache/stampede-prevention/) for the single-n
 Every call site using the old positional-TTL shape still works:
 
 ```ts
-await cache.set("k", v);              // no TTL — driver default
-await cache.set("k", v, 3600);        // seconds
-await cache.set("k", v, undefined);   // same as no TTL
+await cache.set("k", v); // no TTL — driver default
+await cache.set("k", v, 3600); // seconds
+await cache.set("k", v, undefined); // same as no TTL
 ```
 
 ## Related Documentation

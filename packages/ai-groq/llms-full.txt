@@ -31,10 +31,10 @@ const groq = new GroqSDK({ apiKey: process.env.GROQ_API_KEY! });
 ## Producing a model
 
 ```ts
-groq.model({ name: "llama-3.3-70b-versatile" })          // flagship general-purpose text
-groq.model({ name: "llama-3.1-8b-instant" })             // fastest / cheapest small text
-groq.model({ name: "openai/gpt-oss-120b" })              // vision + reasoning auto-true
-groq.model({ name: "deepseek-r1-distill-llama-70b" })    // reasoning auto-true
+groq.model({ name: "llama-3.3-70b-versatile" }); // flagship general-purpose text
+groq.model({ name: "llama-3.1-8b-instant" }); // fastest / cheapest small text
+groq.model({ name: "openai/gpt-oss-120b" }); // vision + reasoning auto-true
+groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
 ```
 
 Returns a `ModelContract` you pass straight into `ai.agent({ model })`. `name` is the Groq-hosted **open-weight** id (the upstream name, e.g. `openai/gpt-oss-120b`), NOT an OpenAI id. Any current Groq model id works — the list above is curated, not an allow-list.
@@ -43,18 +43,18 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`. `name` i
 
 The whole reason this wrapper exists: Groq's ids aren't OpenAI's, so the OpenAI adapter's prefix inference would never fire. `GroqSDK` carries its **own** name lists.
 
-| Flag | Default |
-| --- | --- |
-| `vision` | Inferred from the Groq model id. `true` for `gpt-oss`, `llama-4`, `llama-3.2-*-vision`; `false` otherwise (e.g. `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`). |
-| `reasoning` | Inferred from the Groq model id. `true` for `gpt-oss`, `deepseek-r1` / `deepseek-r1-distill`, `qwq`, `qwen3`; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
-| `structuredOutput` | `true` — Groq accepts OpenAI-style `response_format`. |
-| `promptCaching` | Inherited from the inner OpenAI adapter (`true`; read-side `cachedTokens` accounting). |
+| Flag               | Default                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vision`           | Inferred from the Groq model id. `true` for `gpt-oss`, `llama-4`, `llama-3.2-*-vision`; `false` otherwise (e.g. `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`).              |
+| `reasoning`        | Inferred from the Groq model id. `true` for `gpt-oss`, `deepseek-r1` / `deepseek-r1-distill`, `qwq`, `qwen3`; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
+| `structuredOutput` | `true` — Groq accepts OpenAI-style `response_format`.                                                                                                                            |
+| `promptCaching`    | Inherited from the inner OpenAI adapter (`true`; read-side `cachedTokens` accounting).                                                                                           |
 
 **Override `vision`, `reasoning`, or `structuredOutput` explicitly** via `.model({ name, vision?, reasoning?, structuredOutput? })` — an explicit value always wins over inference.
 
 ```ts
-groq.model({ name: "some-custom-llama", vision: true })  // force on for an unlisted multimodal id
-groq.model({ name: "openai/gpt-oss-120b", reasoning: false }) // pin off
+groq.model({ name: "some-custom-llama", vision: true }); // force on for an unlisted multimodal id
+groq.model({ name: "openai/gpt-oss-120b", reasoning: false }); // pin off
 ```
 
 ## Reasoning (gpt-oss / deepseek-r1 distill)
@@ -63,7 +63,7 @@ Reasoning models accept a discrete effort knob, forwarded by the inner adapter a
 
 ```ts
 const model = groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
-await model.complete(messages, { reasoning: { effort: "high" } });   // → reasoning_effort: "high"
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 - `reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim.
@@ -98,7 +98,7 @@ Resolution at `model()` time: per-model `pricing` (`groq.model({ name, pricing }
 ## Token counting
 
 ```ts
-await groq.count("some text")  // approximate heuristic (delegated), not a real tokenizer
+await groq.count("some text"); // approximate heuristic (delegated), not a real tokenizer
 ```
 
 Good for budgeting; not for billing.

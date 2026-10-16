@@ -1,11 +1,7 @@
 import { stringify } from "devalue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPrefetchCache } from "../../index";
-import {
-  prefetchPageData,
-  resetPrefetchCache,
-  takePrefetchedPageData,
-} from "./prefetch";
+import { prefetchPageData, resetPrefetchCache, takePrefetchedPageData } from "./prefetch";
 import { createRefresher, type RefreshRuntime, type RefreshablePage } from "./refresh";
 
 /**

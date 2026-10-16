@@ -23,7 +23,8 @@ function responseBody(
   components: SchemaComponents,
 ): { body: string; header: PostmanHeader[]; language: PreviewLanguage } {
   const contentTypes = Object.keys(content);
-  const contentType = contentTypes.find((type) => previewLanguage(type) === "json") ?? contentTypes[0];
+  const contentType =
+    contentTypes.find((type) => previewLanguage(type) === "json") ?? contentTypes[0];
   const schema = contentType !== undefined ? content[contentType]?.schema : undefined;
 
   if (contentType === undefined || schema === undefined) {

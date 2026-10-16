@@ -13,10 +13,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { Model } from "../../../src/model/model";
-import {
-  cleanupModelsRegistery,
-  registerModelInRegistry,
-} from "../../../src/model/register-model";
+import { cleanupModelsRegistery, registerModelInRegistry } from "../../../src/model/register-model";
 import { existsRule } from "../../../src/validation/rules/exists-rule";
 import { uniqueRule } from "../../../src/validation/rules/unique-rule";
 import { createMockDriver } from "../../utils/test-helpers";
@@ -47,10 +44,7 @@ function fakeRuleQuery(firstResult: unknown) {
  * with translation slots). We replicate the minimum `invalidRule()` reads so
  * the invalid path renders its message instead of throwing.
  */
-function bindRule(
-  rule: typeof existsRule | typeof uniqueRule,
-  options: Record<string, unknown>,
-) {
+function bindRule(rule: typeof existsRule | typeof uniqueRule, options: Record<string, unknown>) {
   return {
     ...rule,
     context: {

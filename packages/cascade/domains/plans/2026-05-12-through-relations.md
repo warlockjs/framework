@@ -98,12 +98,12 @@ Two-query approach: load intermediates first, collect their PKs, then load targe
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Through chain depth — 2-hop only or N-hop? | **2-hop v1.** N-hop has no real consumer; can extend if needed. |
-| 2 | Default keys — Laravel naming or new? | **Laravel naming** (`firstKey`/`secondKey`/`localKey`/`secondLocalKey`). Familiar to anyone with prior ORM experience. |
-| 3 | Single-JOIN load or two-query load? | **Single-JOIN.** One round-trip; planner-friendly. |
-| 4 | Support `belongsToThrough` (inverse direction)? | **Defer.** Rare in real schemas; can be expressed via two `belongsTo` chains. |
+| #   | Question                                        | Recommendation                                                                                                         |
+| --- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 1   | Through chain depth — 2-hop only or N-hop?      | **2-hop v1.** N-hop has no real consumer; can extend if needed.                                                        |
+| 2   | Default keys — Laravel naming or new?           | **Laravel naming** (`firstKey`/`secondKey`/`localKey`/`secondLocalKey`). Familiar to anyone with prior ORM experience. |
+| 3   | Single-JOIN load or two-query load?             | **Single-JOIN.** One round-trip; planner-friendly.                                                                     |
+| 4   | Support `belongsToThrough` (inverse direction)? | **Defer.** Rare in real schemas; can be expressed via two `belongsTo` chains.                                          |
 
 ## Verification
 

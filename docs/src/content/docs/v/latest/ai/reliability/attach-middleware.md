@@ -120,7 +120,7 @@ ai.middleware.semanticCache({
 
 ### Session-scoped by default
 
-A `semanticCache` is normally built once at app boot and shared by every end user, and a hit is returned as the model's answer with **no LLM call in between** — so without isolation, one caller's merely-*similar* prompt can be served another caller's cached answer, personal context included. `SemanticCacheOptions.scope` defaults to `"session"`: every entry is keyed off the run's `AgentExecuteOptions.sessionId` (as `"session:<id>"`), and a lookup re-checks that key as exact equality on the stored entry before serving it — the cache key alone never authorizes a read.
+A `semanticCache` is normally built once at app boot and shared by every end user, and a hit is returned as the model's answer with **no LLM call in between** — so without isolation, one caller's merely-_similar_ prompt can be served another caller's cached answer, personal context included. `SemanticCacheOptions.scope` defaults to `"session"`: every entry is keyed off the run's `AgentExecuteOptions.sessionId` (as `"session:<id>"`), and a lookup re-checks that key as exact equality on the stored entry before serving it — the cache key alone never authorizes a read.
 
 ```ts
 // Opt back into one shared pool — e.g. a genuinely public FAQ bot where no
@@ -131,7 +131,7 @@ ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" });
 ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) });
 ```
 
-- **`"session"`** (default) — isolated per `sessionId`. A run made *without* a `sessionId` shares one unscoped pool — pass `sessionId` on `agent.execute()` to get the isolation (a supervisor / orchestrator forwards its own automatically).
+- **`"session"`** (default) — isolated per `sessionId`. A run made _without_ a `sessionId` shares one unscoped pool — pass `sessionId` on `agent.execute()` to get the isolation (a supervisor / orchestrator forwards its own automatically).
 - **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior.
 - **a resolver function** — `(context) => key | undefined`; `undefined` falls back to the unscoped pool.
 
@@ -201,10 +201,7 @@ ai.agent({
 Scope `tool.*` hooks to specific tool names. `execute` and `trip` hooks pass through unscoped.
 
 ```ts
-const scoped = ai.middleware.forTool(
-  ["paid_api", "expensive_db"],
-  toolRateLimit({ maxCalls: 5 }),
-);
+const scoped = ai.middleware.forTool(["paid_api", "expensive_db"], toolRateLimit({ maxCalls: 5 }));
 ```
 
 ## Caveats

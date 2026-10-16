@@ -5,7 +5,6 @@ slug: v/latest/cache/quick-start
 
 import { Tabs, TabItem } from "@astrojs/starlight/components";
 
-
 ## Installation
 
 <Tabs>
@@ -40,7 +39,7 @@ import { cache, MemoryCacheDriver } from "@warlock.js/cache";
 cache.setCacheConfigurations({
   default: "memory",
   drivers: { memory: MemoryCacheDriver },
-  options: { memory: { ttl: "1h" } },   // or a number of seconds
+  options: { memory: { ttl: "1h" } }, // or a number of seconds
 });
 await cache.init();
 ```
@@ -55,9 +54,9 @@ A 4-line sanity check you can run immediately after setup:
 
 ```ts
 await cache.set("hello", "world", "1m");
-console.log(await cache.get("hello"));   // "world"
+console.log(await cache.get("hello")); // "world"
 await cache.remove("hello");
-console.log(await cache.get("hello"));   // null
+console.log(await cache.get("hello")); // null
 ```
 
 If you see `"world"` then `null`, your cache is working.
@@ -71,18 +70,18 @@ hot data instantly while it refreshes in the background. Paste this after `init(
 ```ts
 // 1. Cache a value, read it back.
 await cache.set("greeting", "hello", "5m");
-await cache.get("greeting");                       // "hello"
+await cache.get("greeting"); // "hello"
 
 // 2. Memoize a function — declare the strategy once, call it anywhere.
 const getUser = cached((id: number) => db.users.find(id), "user", "1h");
-await getUser(42);                                 // miss → runs the query
-await getUser(42);                                 // hit → no query
-await getUser.invalidate(42);                      // drop "user.42"
+await getUser(42); // miss → runs the query
+await getUser(42); // hit → no query
+await getUser.invalidate(42); // drop "user.42"
 
 // 3. Serve stale-but-instant while a refresh runs in the background.
 const product = await cache.swr(
   "product.42",
-  { freshTtl: "1m", staleTtl: "1h" },              // fresh 1m, stale up to 1h
+  { freshTtl: "1m", staleTtl: "1h" }, // fresh 1m, stale up to 1h
   () => db.products.find(42),
 );
 ```
@@ -105,9 +104,9 @@ async function getUser(id: number) {
 // After: the first call hits the database, the next thousand don't (~1ms each)
 async function getUser(id: number) {
   return cache.remember(
-    `user.${id}`,       // cache key — one per user
-    "1h",               // how long to cache (see "Duration strings" below)
-    () => db.users.findById(id),   // only runs on cache miss
+    `user.${id}`, // cache key — one per user
+    "1h", // how long to cache (see "Duration strings" below)
+    () => db.users.findById(id), // only runs on cache miss
   );
 }
 ```
@@ -157,14 +156,14 @@ Once you're comfortable with the basics, `set()` accepts a rich options object. 
 // "create" = succeed only if the key is missing
 const lock = await cache.set("lock.import", 1, {
   onConflict: "create",
-  ttl: "5m",          // auto-release after 5 min if we crash
+  ttl: "5m", // auto-release after 5 min if we crash
 });
 
 if (lock.wasSet) {
   try {
     await runImport();
   } finally {
-    await cache.remove("lock.import");   // release the lock
+    await cache.remove("lock.import"); // release the lock
   }
 }
 ```
@@ -175,16 +174,16 @@ Full reference in [Set Options](/v/latest/cache/set-options/). Skip this section
 
 TTL values accept a number of seconds or a human-readable duration string:
 
-| Form | Meaning |
-|------|---------|
-| `600` | 600 seconds (10 minutes) |
-| `"1s"`, `"30s"` | Seconds |
-| `"30m"` | Minutes |
-| `"1h"`, `"12h"` | Hours |
-| `"7d"`, `"30d"` | Days |
-| `"1w"`, `"2 weeks"` | Weeks |
-| `"1y"`, `"1 year"` | Years |
-| `Infinity` | Never expires |
+| Form                | Meaning                  |
+| ------------------- | ------------------------ |
+| `600`               | 600 seconds (10 minutes) |
+| `"1s"`, `"30s"`     | Seconds                  |
+| `"30m"`             | Minutes                  |
+| `"1h"`, `"12h"`     | Hours                    |
+| `"7d"`, `"30d"`     | Days                     |
+| `"1w"`, `"2 weeks"` | Weeks                    |
+| `"1y"`, `"1 year"`  | Years                    |
+| `Infinity`          | Never expires            |
 
 Compound forms like `"1h30m"` are not supported — use `"90m"` or the numeric equivalent. Duration strings work everywhere a TTL is accepted: `set()`, `remember()`, driver options, and inside [`CacheSetOptions`](/v/latest/cache/set-options/).
 
@@ -201,4 +200,3 @@ Compound forms like `"1h30m"` are not supported — use `"90m"` or the numeric e
 - [Set Options](/v/latest/cache/set-options/) — `ttl`, `expiresAt`, `tags`, `onConflict`, per-call `driver` override
 - [Stampede Prevention](/v/latest/cache/stampede-prevention/) — why `remember()` is special
 - [Cache Tags](/v/latest/cache/tags/), [Events](/v/latest/cache/events/), and more advanced features
-

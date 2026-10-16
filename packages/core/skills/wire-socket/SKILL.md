@@ -7,7 +7,7 @@ description: 'Configure Socket.IO via `src/config/socket.ts`, reach the live ser
 
 Warlock wraps `socket.io`'s `Server` in a connector. That connector is in the **late** lifecycle phase — it boots **after** your app code (every module's `main.ts`, `routes.ts`, `events.ts`) has already been imported. The order is: early-phase connectors (logger, mailer, database, cache, storage) → app code is imported → late-phase connectors (http, then socket) boot. The socket server lives in the framework's DI container once it boots — reach it through `app.socket` or `getSocketServer()`.
 
-The practical consequence: **`app.socket` is not yet populated while a module's `main.ts` is being evaluated at import time.** Register connection handlers from code that runs *after* bootstrap completes — a controller, a service, a job — or guard with `getSocketServer()`. (Unlike the router, which collects routes into a standalone registry that the http connector scans on boot, the socket connector does not harvest listeners registered at import time — it just constructs the `Server`.)
+The practical consequence: **`app.socket` is not yet populated while a module's `main.ts` is being evaluated at import time.** Register connection handlers from code that runs _after_ bootstrap completes — a controller, a service, a job — or guard with `getSocketServer()`. (Unlike the router, which collects routes into a standalone registry that the http connector scans on boot, the socket connector does not harvest listeners registered at import time — it just constructs the `Server`.)
 
 ## The shape
 
@@ -46,8 +46,8 @@ The framework auto-loads each module's `main.ts` once at boot, but **before** th
 
 ```ts
 export type SocketOptions = {
-  port?: number;     // standalone port (only if HTTP is disabled)
-  options?: ServerOptions;  // forwarded as the 2nd arg to socket.io's `new Server(httpServer, options)`
+  port?: number; // standalone port (only if HTTP is disabled)
+  options?: ServerOptions; // forwarded as the 2nd arg to socket.io's `new Server(httpServer, options)`
 };
 ```
 
@@ -78,19 +78,19 @@ Two ways to get the `socket.io` `Server` instance:
 // 1. Via the app runtime accessor — reads container.tryGet("socket")
 import { app } from "@warlock.js/core";
 
-const io = app.socket;            // → Server, or undefined before the socket connector boots
+const io = app.socket; // → Server, or undefined before the socket connector boots
 
 // 2. Via the safe getter — explicit null when the connector hasn't started
 import { getSocketServer } from "@warlock.js/core";
 
-const io = getSocketServer();     // → Server | null
+const io = getSocketServer(); // → Server | null
 ```
 
-Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
+Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that _might_ run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
 
 ## Wiring `connection` handlers
 
-The socket connector boots *after* app code is imported, and it does not collect listeners registered at `main.ts` import time. So register handlers from a function that runs once the server is live — call it from post-bootstrap code, or guard it:
+The socket connector boots _after_ app code is imported, and it does not collect listeners registered at `main.ts` import time. So register handlers from a function that runs once the server is live — call it from post-bootstrap code, or guard it:
 
 ```ts title="src/app/chat/setup-chat-socket.ts"
 import { getSocketServer } from "@warlock.js/core";
@@ -273,7 +273,7 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 
 ## Gotchas
 
-- **`app.socket` is `undefined` before the connector starts — it does not throw.** Because socket is a *late*-phase connector, this includes the top level of `main.ts` (imported before late connectors boot). Reading `app.socket.on(...)` there throws a `TypeError` on `undefined`, not a helpful framework error. Safe in controllers, services, jobs, and any post-bootstrap code; use `getSocketServer()` + a null-guard everywhere else.
+- **`app.socket` is `undefined` before the connector starts — it does not throw.** Because socket is a _late_-phase connector, this includes the top level of `main.ts` (imported before late connectors boot). Reading `app.socket.on(...)` there throws a `TypeError` on `undefined`, not a helpful framework error. Safe in controllers, services, jobs, and any post-bootstrap code; use `getSocketServer()` + a null-guard everywhere else.
 - **Register handlers from post-bootstrap code, not at `main.ts` import time.** The socket connector constructs the `Server` but doesn't harvest listeners you registered at import time (unlike routes, which the http connector scans on boot). Wire handlers from a setup function invoked after bootstrap, or guard the registration with `getSocketServer()`.
 - **Re-registration can double-bind.** If a setup function runs more than once (HMR, repeated calls), `io.on("connection", ...)` stacks handlers — guard with an idempotency flag if you observe duplicates.
 - **CORS matters.** Browsers fail Socket.IO connections silently if CORS rejects the upgrade request. Set `options.cors.origin` to the deployed frontend's origin in production.

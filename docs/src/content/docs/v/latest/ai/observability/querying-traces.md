@@ -5,14 +5,14 @@ sidebar:
   order: 7
 ---
 
-Exporters ship a trace *out* to a backend. A **trace store** does the opposite: it keeps each completed trace in memory so you can answer observability questions after the fact — pull one run by id, list every run for a session, slice failed runs in a time window, or roll usage and cost across any of those slices.
+Exporters ship a trace _out_ to a backend. A **trace store** does the opposite: it keeps each completed trace in memory so you can answer observability questions after the fact — pull one run by id, list every run for a session, slice failed runs in a time window, or roll usage and cost across any of those slices.
 
 `createInMemoryTraceStore()` is the shipped store. It returns one object that satisfies **both** contracts at once:
 
 - an `ExporterContract` — so you register it on the collector like any other sink and it fills as traces complete;
 - a `TraceStoreContract` — so the same handle is what you `query()` and `aggregate()` later.
 
-There is no separate "register" and "read" object — the store you wire in *is* the store you query.
+There is no separate "register" and "read" object — the store you wire in _is_ the store you query.
 
 ## Register it, then query it
 
@@ -51,12 +51,12 @@ const observe = panoptic({ collector: createCollector().use(store) });
 
 ```ts
 interface TraceStoreContract {
-  add(trace: Trace): void;                        // ingest; overwrites same traceId
-  get(traceId: string): Trace | undefined;        // one run by id
-  query(filter?: TraceQuery): Trace[];            // matching traces, newest-started first
+  add(trace: Trace): void; // ingest; overwrites same traceId
+  get(traceId: string): Trace | undefined; // one run by id
+  query(filter?: TraceQuery): Trace[]; // matching traces, newest-started first
   aggregate(filter?: TraceQuery): TraceAggregate; // usage + cost + status rollup
-  readonly size: number;                          // retained count
-  clear(): void;                                  // drop everything
+  readonly size: number; // retained count
+  clear(): void; // drop everything
 }
 ```
 
@@ -70,11 +70,11 @@ Every field is optional and **ANDed** together — an absent field means "don't 
 
 ```ts
 type TraceQuery = {
-  traceId?: string;                       // exact one run
-  sessionId?: string;                     // every run for a session
+  traceId?: string; // exact one run
+  sessionId?: string; // every run for a session
   status?: ReportStatus | ReportStatus[]; // single status or membership set
-  startedAfter?: string | Date;           // inclusive lower bound on root startedAt
-  startedBefore?: string | Date;          // inclusive upper bound on root startedAt
+  startedAfter?: string | Date; // inclusive lower bound on root startedAt
+  startedBefore?: string | Date; // inclusive upper bound on root startedAt
 };
 ```
 
@@ -103,12 +103,12 @@ Time bounds compare against each trace's root `startedAt`, **inclusive on both e
 
 ```ts
 type TraceAggregate = {
-  traces: number;        // matched count
-  completed: number;     // root status === "completed"
-  failed: number;        // root status === "failed"
-  cancelled: number;     // root status === "cancelled"
-  usage: Usage;          // summed token usage (input / output / total always present)
-  cost?: ModelPricing;   // merged per-channel USD, or undefined if no trace was priced
+  traces: number; // matched count
+  completed: number; // root status === "completed"
+  failed: number; // root status === "failed"
+  cancelled: number; // root status === "cancelled"
+  usage: Usage; // summed token usage (input / output / total always present)
+  cost?: ModelPricing; // merged per-channel USD, or undefined if no trace was priced
   totalDuration: number; // summed wall-clock ms
 };
 ```
@@ -127,7 +127,7 @@ const totalUsd =
 
 Things that matter when you read the numbers:
 
-- **`usage`** sums each trace's *root* `Usage` (already a rollup of its own cost plus its children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
+- **`usage`** sums each trace's _root_ `Usage` (already a rollup of its own cost plus its children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
 - **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number), merged with the framework's own cost-rollup logic, so an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
 - **`completed` + `failed` + `cancelled` need not equal `traces`** — non-terminal statuses (`awaiting-input`, `max-iterations`) count toward `traces` but none of the three headline counters.
 - An empty match returns a zeroed aggregate (`usage` all `0`, `cost` `undefined`, `totalDuration` `0`).
@@ -151,10 +151,7 @@ function sessionSpendUsd(sessionId: string): number {
   }
 
   return (
-    (cost.input ?? 0) +
-    (cost.output ?? 0) +
-    (cost.cachedInput ?? 0) +
-    (cost.cachedOutput ?? 0)
+    (cost.input ?? 0) + (cost.output ?? 0) + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0)
   );
 }
 
@@ -206,7 +203,7 @@ const store = createCacheTraceStore(async () => {
   return driver;
 });
 
-await store.ready();                // re-hydrate the mirror from a prior run
+await store.ready(); // re-hydrate the mirror from a prior run
 const observe = panoptic({ exporters: [store] });
 
 // ...same query surface as the in-memory store:
@@ -223,7 +220,7 @@ How it reconciles a **synchronous** store contract with an **async** cache drive
 
 ```ts
 type CacheTraceStoreOptions = {
-  prefix?: string;   // key namespace — keys are `${prefix}:trace:${id}` / `${prefix}:index`; default "panoptic"
+  prefix?: string; // key namespace — keys are `${prefix}:trace:${id}` / `${prefix}:index`; default "panoptic"
   capacity?: number; // FIFO cap across both cache + mirror; absent / 0 = unbounded
 };
 ```
@@ -236,11 +233,16 @@ The dashboard's search / filter / group-by / cost-heatmap rules are exported as 
 
 ```ts
 import {
-  filterTraces, matchesFilter,     // free-text + chip filtering
-  groupBySession, groupByPrompt,   // collapsible grouping
-  tracePromptKey,                  // a trace's resolved name@version key
-  rollupCost, maxNodeCost, heatIntensity, // cost-heatmap inputs
-  NO_SESSION_KEY, NO_PROMPT_KEY,
+  filterTraces,
+  matchesFilter, // free-text + chip filtering
+  groupBySession,
+  groupByPrompt, // collapsible grouping
+  tracePromptKey, // a trace's resolved name@version key
+  rollupCost,
+  maxNodeCost,
+  heatIntensity, // cost-heatmap inputs
+  NO_SESSION_KEY,
+  NO_PROMPT_KEY,
 } from "@warlock.js/ai-panoptic";
 import type { TraceFilter, SessionGroup, PromptGroup } from "@warlock.js/ai-panoptic";
 
@@ -302,7 +304,7 @@ When you already hold a finished `result.report` and just want the vendor-neutra
 import { reportToTrace, reportToSpan } from "@warlock.js/ai-panoptic";
 
 const trace = reportToTrace(result.report); // full Trace: root span + trace-wide rollups
-const root = reportToSpan(result.report);   // just the root TraceSpan (recurses into children)
+const root = reportToSpan(result.report); // just the root TraceSpan (recurses into children)
 
 console.log(trace.traceId, trace.usage.total, trace.duration);
 ```

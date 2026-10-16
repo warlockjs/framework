@@ -27,13 +27,15 @@ export class SyncFanoutQueue {
   public constructor(options: SyncFanoutQueueOptions = {}) {
     this.maxAttempts = options.maxAttempts ?? 3;
     this.retryDelay = options.retryDelay ?? ((attempt) => attempt * 50);
-    this.reportFailure = options.reportFailure ?? ((job, error) => {
-      log.error(
-        "database",
-        "sync.failed",
-        `[cascade] ${job.operation} sync failed for ${job.sourceModel} after ${this.maxAttempts} attempts: ${error}`,
-      );
-    });
+    this.reportFailure =
+      options.reportFailure ??
+      ((job, error) => {
+        log.error(
+          "database",
+          "sync.failed",
+          `[cascade] ${job.operation} sync failed for ${job.sourceModel} after ${this.maxAttempts} attempts: ${error}`,
+        );
+      });
   }
 
   /** Add a committed lifecycle fan-out job without awaiting its execution. */

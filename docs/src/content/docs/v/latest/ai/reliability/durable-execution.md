@@ -23,7 +23,7 @@ const writer = ai.agent({
   tools: [searchTool, draftTool],
   durable: {
     store: ai.snapshot.pg({ client: pgPool }), // reuses the ai.snapshot.* stores
-    deleteOnComplete: false,                    // default — keep for the completed-run short-circuit + audit
+    deleteOnComplete: false, // default — keep for the completed-run short-circuit + audit
   },
 });
 ```
@@ -68,10 +68,10 @@ const done = await research.resume("plan-7");
 
 ## Checkpoint granularity
 
-| Primitive | Written | Contains | Resume continues at |
-| --- | --- | --- | --- |
-| **agent** | after every settled **trip** | `messages`, `trips`, `toolCalls`, `usage`, resolved `systemPrompt` / `responseSchema`, `signature`, `status` | `trips.length` (the next trip index) |
-| **planner** | after every settled **plan node** | the frozen `plan`, `executedSteps` ledger, `usage`, child reports, `replanCount`, `signature`, `status` | the unfinished frontier (from `executedSteps`) |
+| Primitive   | Written                           | Contains                                                                                                     | Resume continues at                            |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| **agent**   | after every settled **trip**      | `messages`, `trips`, `toolCalls`, `usage`, resolved `systemPrompt` / `responseSchema`, `signature`, `status` | `trips.length` (the next trip index)           |
+| **planner** | after every settled **plan node** | the frozen `plan`, `executedSteps` ledger, `usage`, child reports, `replanCount`, `signature`, `status`      | the unfinished frontier (from `executedSteps`) |
 
 The write happens only where the persisted arrays are mutually consistent — for the agent, after every tool a trip requested has been dispatched and its result appended. A crash **mid-trip** loses only that in-flight trip (never checkpointed), which the resume re-issues cleanly. The planner **never re-calls the planning LLM** on resume — the plan is frozen on the first run; re-asking would burn tokens and risk a plan that no longer matches the ledger. Every field on both snapshots is JSON-serializable, so they round-trip through any `ai.snapshot.{memory,pg,redis}` backend verbatim.
 

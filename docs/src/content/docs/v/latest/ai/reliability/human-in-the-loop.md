@@ -18,11 +18,11 @@ It is **middleware on the agent**, so it composes with everything else — guard
 
 ## The three pieces
 
-| Surface | Role |
-| --- | --- |
-| `ai.human.approval(options)` | The `tool.before` gate. Evaluates a policy; gated calls go to a handler; the decision is applied. |
+| Surface                                  | Role                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `ai.human.approval(options)`             | The `tool.before` gate. Evaluates a policy; gated calls go to a handler; the decision is applied.                  |
 | `ai.human.resume(id, decision, options)` | Out-of-process, idempotent resume. Loads the persisted interrupt, applies the ruling, optionally re-runs the turn. |
-| `ai.human.interrupt.{memory,pg,redis}()` | `InterruptStore` factories — where a suspended request is persisted for durable resume. |
+| `ai.human.interrupt.{memory,pg,redis}()` | `InterruptStore` factories — where a suspended request is persisted for durable resume.                            |
 
 ## `ai.human.approval(options)`
 
@@ -47,10 +47,10 @@ const support = ai.agent({
 
 ```ts
 interface HumanApprovalOptions {
-  name?: string;          // middleware name — must be unique per agent (default "human-approval")
+  name?: string; // middleware name — must be unique per agent (default "human-approval")
   policy: InterruptPolicy; // which tool calls require a human
   handler: ApprovalHandler; // how a gated call reaches a human and yields a decision
-  store?: InterruptStore;  // durable persistence (only used in suspend-and-resume mode)
+  store?: InterruptStore; // durable persistence (only used in suspend-and-resume mode)
 }
 ```
 
@@ -92,8 +92,8 @@ The `handler` returns (sync or as a promise) an `ApprovalDecision`, a union keye
 
 ```ts
 type ApprovalDecision =
-  | { type: "approve" }                              // run the real tool, args unchanged
-  | { type: "reject"; reason: string }               // short-circuit; model sees a typed error
+  | { type: "approve" } // run the real tool, args unchanged
+  | { type: "reject"; reason: string } // short-circuit; model sees a typed error
   | { type: "edit"; args: unknown; reason?: string }; // run the tool with replaced args
 ```
 
@@ -105,18 +105,18 @@ type ApprovalDecision =
 
 ```ts
 interface ApprovalRequest {
-  interruptId: string;        // stable id; durable mode keys the store on it
+  interruptId: string; // stable id; durable mode keys the store on it
   toolName: string;
   toolDescription?: string;
-  args: unknown;              // the exact args the model produced
+  args: unknown; // the exact args the model produced
   context: {
     agentName: string;
-    tripIndex: number;        // which model round-trip produced the call
+    tripIndex: number; // which model round-trip produced the call
     sessionId?: string;
-    originalInput?: string;   // the run's original prompt — re-used on resume
-    tags?: string[];          // from the policy match
+    originalInput?: string; // the run's original prompt — re-used on resume
+    tags?: string[]; // from the policy match
   };
-  requestedAt: string;        // ISO-8601
+  requestedAt: string; // ISO-8601
 }
 ```
 
@@ -132,7 +132,7 @@ if (result.error instanceof ApprovalRejectedError) {
 }
 ```
 
-Only a *handler bug* (a non-sentinel throw) propagates, and even then it lands on `result.error`.
+Only a _handler bug_ (a non-sentinel throw) propagates, and even then it lands on `result.error`.
 
 ## Durable mode — pause, persist, resume
 
@@ -209,14 +209,19 @@ if (outcome.type === "applied" && outcome.result) {
 
 ```ts
 interface ResumeOptions<TOutput = unknown> {
-  store: InterruptStore;                       // required — where the interrupt lives
-  agent?: AgentContract<TOutput>;              // omit for apply-only (no re-run)
-  input?: string;                              // override the re-run prompt
+  store: InterruptStore; // required — where the interrupt lives
+  agent?: AgentContract<TOutput>; // omit for apply-only (no re-run)
+  input?: string; // override the re-run prompt
   executeOptions?: AgentExecuteOptions<TOutput>; // forwarded to agent.execute on re-run
 }
 
 type ResumeResult<TOutput = unknown> =
-  | { type: "applied"; interruptId: string; decision: ApprovalDecision; result?: AgentResult<TOutput> }
+  | {
+      type: "applied";
+      interruptId: string;
+      decision: ApprovalDecision;
+      result?: AgentResult<TOutput>;
+    }
   | { type: "already-resolved"; interruptId: string };
 ```
 
@@ -225,7 +230,7 @@ type ResumeResult<TOutput = unknown> =
 - **apply-only** — omit `agent`. `resume` loads, validates, deletes, and returns `{ type: "applied", decision }` for a caller-owned re-drive (e.g. a custom transport). No turn is re-run.
 - **re-run** — pass `agent`. `resume` additionally re-executes the turn; the `AgentResult` rides `outcome.result`.
 
-**Idempotent.** A second resume of an already-resolved (deleted) or never-raised interrupt is a no-op — it returns `{ type: "already-resolved" }` without re-applying the decision or re-running the turn. The record is deleted *before* the re-run, so even a re-run that itself raises a fresh interrupt cannot collide with the one being resolved. Webhook retries are safe.
+**Idempotent.** A second resume of an already-resolved (deleted) or never-raised interrupt is a no-op — it returns `{ type: "already-resolved" }` without re-applying the decision or re-running the turn. The record is deleted _before_ the re-run, so even a re-run that itself raises a fresh interrupt cannot collide with the one being resolved. Webhook retries are safe.
 
 `resume` also validates the decision payload (a webhook can hand it anything): a `reject` without a string `reason`, an `edit` without `args`, or an unknown `type` throws a `TypeError` loudly rather than mis-driving the re-run.
 

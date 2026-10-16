@@ -19,12 +19,7 @@
  *
  *   export default config;
  */
-import type {
-  Channel,
-  PreferenceProvider,
-  QueueDispatcher,
-  RateLimiter,
-} from "./contracts";
+import type { Channel, PreferenceProvider, QueueDispatcher, RateLimiter } from "./contracts";
 import { NotificationsNotConfiguredError } from "./errors";
 import type { ChannelName, NotificationChannels } from "./types";
 

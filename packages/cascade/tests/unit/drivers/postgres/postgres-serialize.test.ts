@@ -194,9 +194,7 @@ describe("PostgresDriver serialize() — native-array detection via schema intro
     const querySpy = vi.spyOn(driver, "query").mockRejectedValue(new Error("permission denied"));
 
     await expect(
-      (
-        driver as unknown as { loadNativeArrayColumns(): Promise<void> }
-      ).loadNativeArrayColumns(),
+      (driver as unknown as { loadNativeArrayColumns(): Promise<void> }).loadNativeArrayColumns(),
     ).resolves.toBeUndefined();
 
     querySpy.mockRestore();

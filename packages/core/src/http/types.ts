@@ -14,7 +14,10 @@ import type { Response } from "./response";
 import type { HttpTracingConfig } from "./tracing/tracing.type";
 
 export type RequestEvent =
-  "executingMiddleware" | "executedMiddleware" | "executingAction" | "executedAction";
+  | "executingMiddleware"
+  | "executedMiddleware"
+  | "executingAction"
+  | "executedAction";
 
 /**
  * Private, server-only, per-request data bag — `request.locals`.

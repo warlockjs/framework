@@ -37,11 +37,11 @@ This is the only path with an `unknown`-typed `payload` — prefer the literal `
 
 ## Opting into gating
 
-Preference/rate-limit gates need a notification *type*. Ad-hoc sends provide it explicitly, or it's auto-detected from a database payload's `type`:
+Preference/rate-limit gates need a notification _type_. Ad-hoc sends provide it explicitly, or it's auto-detected from a database payload's `type`:
 
 ```ts
 await notify.mail(user, payload, { type: "marketing.weekly" }); // explicit
-await notify.database(user, { type: "welcome", title: "Hi" });   // auto-detected
+await notify.database(user, { type: "welcome", title: "Hi" }); // auto-detected
 ```
 
 Without a type, ad-hoc sends skip the preference gate (there's nothing to gate on). `force: true` bypasses preferences; rate limits always apply when a type is known.

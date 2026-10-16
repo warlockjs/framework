@@ -299,10 +299,10 @@ describe("OpenAIResponsesModel request shape", () => {
 
   it("sends temperature for a non-reasoning model and omits it for a reasoning one", async () => {
     const plain = makeFakeClient({ response: makeResponse() });
-    await new OpenAIResponsesModel(plain.client, { name: "gpt-4o-mini", temperature: 0.4 }).complete(
-      userHi,
-      { temperature: 0.9 },
-    );
+    await new OpenAIResponsesModel(plain.client, {
+      name: "gpt-4o-mini",
+      temperature: 0.4,
+    }).complete(userHi, { temperature: 0.9 });
     expect(firstParams(plain.calls).temperature).toBe(0.9);
 
     const reasoning = makeFakeClient({ response: makeResponse() });
@@ -350,7 +350,10 @@ describe("OpenAIResponsesModel tools and toolChoice", () => {
     ["auto", "auto"],
     ["required", "required"],
     [{ name: "getWeather" }, { type: "function", name: "getWeather" }],
-    [{ type: "function", name: "getWeather" }, { type: "function", name: "getWeather" }],
+    [
+      { type: "function", name: "getWeather" },
+      { type: "function", name: "getWeather" },
+    ],
     [
       { type: "function", function: { name: "getWeather" } },
       { type: "function", name: "getWeather" },
@@ -801,7 +804,9 @@ describe("OpenAIResponsesModel errors", () => {
   });
 
   it("maps a failed response with no error object to ProviderError", async () => {
-    const { client } = makeFakeClient({ response: makeResponse({ status: "failed", error: null }) });
+    const { client } = makeFakeClient({
+      response: makeResponse({ status: "failed", error: null }),
+    });
 
     await expect(
       new OpenAIResponsesModel(client, { name: "gpt-5.6" }).complete(userHi),
@@ -838,7 +843,12 @@ describe("OpenAIResponsesModel errors", () => {
 
   it("maps a 429 to ProviderRateLimitError with the retry-after delay", async () => {
     const { client } = makeFakeClient({
-      error: { status: 429, code: "rate_limit_exceeded", message: "slow", headers: { "retry-after": "2" } },
+      error: {
+        status: 429,
+        code: "rate_limit_exceeded",
+        message: "slow",
+        headers: { "retry-after": "2" },
+      },
     });
 
     const error = await new OpenAIResponsesModel(client, { name: "gpt-5.6" })
@@ -849,7 +859,6 @@ describe("OpenAIResponsesModel errors", () => {
     expect(error).toMatchObject({ retryAfter: 2000 });
   });
 });
-
 
 // ---------------------------------------------------------------------------
 // Encrypted reasoning replay (card 3)
@@ -1271,7 +1280,9 @@ describe("OpenAIResponsesModel.stream()", () => {
       ],
     });
 
-    const chunks = await collect(new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi));
+    const chunks = await collect(
+      new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi),
+    );
 
     expect(chunks.map((chunk) => chunk.type)).toEqual(["delta", "tool-call", "tool-call", "done"]);
     expect(chunks[1]).toMatchObject({ id: "c1", providerMetadata: { openaiResponses: {} } });
@@ -1283,12 +1294,17 @@ describe("OpenAIResponsesModel.stream()", () => {
       events: [
         itemDone(functionCall({ call_id: "c1", arguments: '{"ci', status: "incomplete" })),
         incompleteEvent(
-          makeResponse({ status: "incomplete", incomplete_details: { reason: "max_output_tokens" } }),
+          makeResponse({
+            status: "incomplete",
+            incomplete_details: { reason: "max_output_tokens" },
+          }),
         ),
       ],
     });
 
-    const chunks = await collect(new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi));
+    const chunks = await collect(
+      new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi),
+    );
 
     expect(chunks).toEqual([
       { type: "done", finishReason: "length", usage: { input: 10, output: 4, total: 14 } },
@@ -1300,12 +1316,17 @@ describe("OpenAIResponsesModel.stream()", () => {
       events: [
         textDelta("Partial"),
         incompleteEvent(
-          makeResponse({ status: "incomplete", incomplete_details: { reason: "max_output_tokens" } }),
+          makeResponse({
+            status: "incomplete",
+            incomplete_details: { reason: "max_output_tokens" },
+          }),
         ),
       ],
     });
 
-    const chunks = await collect(new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi));
+    const chunks = await collect(
+      new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi),
+    );
 
     expect(chunks).toEqual([
       { type: "delta", content: "Partial" },
@@ -1322,7 +1343,9 @@ describe("OpenAIResponsesModel.stream()", () => {
       ],
     });
 
-    const chunks = await collect(new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi));
+    const chunks = await collect(
+      new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi),
+    );
 
     expect(chunks.at(-1)).toMatchObject({ type: "done", finishReason: "error" });
   });
@@ -1341,7 +1364,9 @@ describe("OpenAIResponsesModel.stream()", () => {
       ],
     });
 
-    const chunks = await collect(new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi));
+    const chunks = await collect(
+      new OpenAIResponsesModel(client, { name: "gpt-5.6" }).stream(userHi),
+    );
 
     expect(chunks[0]).toEqual({ type: "delta", content: "I cannot help." });
     expect(chunks.at(-1)).toMatchObject({ type: "done", finishReason: "stop" });

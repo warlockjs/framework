@@ -51,12 +51,12 @@ GroqModelConfig {
 
 A curated (not exhaustive, not an allow-list) set of current production ids is exported as `GROQ_KNOWN_MODELS`:
 
-| Model id | Notes |
-| --- | --- |
-| `llama-3.3-70b-versatile` | Flagship general-purpose text |
-| `llama-3.1-8b-instant` | Fastest / cheapest small text |
+| Model id                                     | Notes                                                  |
+| -------------------------------------------- | ------------------------------------------------------ |
+| `llama-3.3-70b-versatile`                    | Flagship general-purpose text                          |
+| `llama-3.1-8b-instant`                       | Fastest / cheapest small text                          |
 | `openai/gpt-oss-120b` / `openai/gpt-oss-20b` | OpenAI open-weight family — vision + reasoning capable |
-| `deepseek-r1-distill-llama-70b` | DeepSeek-R1-style reasoning |
+| `deepseek-r1-distill-llama-70b`              | DeepSeek-R1-style reasoning                            |
 
 `name` is the upstream open-weight id (e.g. `openai/gpt-oss-120b`), NOT an OpenAI id. `groq.model()` accepts any string, so a newly launched Groq id works the moment Groq ships it.
 
@@ -64,23 +64,23 @@ A curated (not exhaustive, not an allow-list) set of current production ids is e
 
 The whole reason this wrapper exists: Groq's ids aren't OpenAI's, so the OpenAI adapter's prefix inference would never fire. `GroqSDK` carries its **own** name lists and injects the result as explicit capability config, which wins over the inner adapter's inference. An explicit caller value always wins.
 
-| Capability | Default |
-| --- | --- |
-| `vision` | Inferred from the Groq id — `true` for `gpt-oss`, `llama-4`, `llama-3.2-*-vision`; `false` otherwise (e.g. `llama-3.3-70b-versatile`). |
-| `reasoning` | Inferred from the Groq id — `true` for `gpt-oss`, `deepseek-r1` / `deepseek-r1-distill`, `qwq`, `qwen3`; `false` otherwise. Drives whether `reasoning.effort` maps to `reasoning_effort` on the wire. |
-| `structuredOutput` | `true` — Groq accepts OpenAI-style `response_format`. |
+| Capability         | Default                                                                                                                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vision`           | Inferred from the Groq id — `true` for `gpt-oss`, `llama-4`, `llama-3.2-*-vision`; `false` otherwise (e.g. `llama-3.3-70b-versatile`).                                                                |
+| `reasoning`        | Inferred from the Groq id — `true` for `gpt-oss`, `deepseek-r1` / `deepseek-r1-distill`, `qwq`, `qwen3`; `false` otherwise. Drives whether `reasoning.effort` maps to `reasoning_effort` on the wire. |
+| `structuredOutput` | `true` — Groq accepts OpenAI-style `response_format`.                                                                                                                                                 |
 
 ```ts
-groq.model({ name: "openai/gpt-oss-120b" });                 // vision + reasoning auto-true
-groq.model({ name: "deepseek-r1-distill-llama-70b" });       // reasoning auto-true
-groq.model({ name: "some-custom-llama", vision: true });     // explicit override
+groq.model({ name: "openai/gpt-oss-120b" }); // vision + reasoning auto-true
+groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
+groq.model({ name: "some-custom-llama", vision: true }); // explicit override
 ```
 
 Reasoning models accept a discrete effort knob forwarded by the inner adapter as OpenAI's `reasoning_effort`:
 
 ```ts
 const model = groq.model({ name: "deepseek-r1-distill-llama-70b" });
-await model.complete(messages, { reasoning: { effort: "high" } });   // → reasoning_effort: "high"
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 ## Embeddings — not available on Groq

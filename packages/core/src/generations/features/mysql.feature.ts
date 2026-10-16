@@ -8,8 +8,6 @@ import type { FeatureDefinition } from "./types";
 export const mysqlFeature: FeatureDefinition = {
   description: "MySQL (not supported by @warlock.js/cascade yet)",
   onExecuting: async () => {
-    throw new Error(
-      "MySQL is not supported by @warlock.js/cascade yet; use postgres or mongodb",
-    );
+    throw new Error("MySQL is not supported by @warlock.js/cascade yet; use postgres or mongodb");
   },
 };

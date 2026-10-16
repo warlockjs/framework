@@ -20,16 +20,14 @@ const research = ai.planner({
   name: "research-assistant",
   model: openai.model({ name: "gpt-4o" }),
   capabilities: [
-    { name: "search",    description: "Search the web for sources",   executable: searchAgent },
-    { name: "summarize", description: "Summarize text into bullets",  executable: summarizer },
-    { name: "write",     description: "Draft a final report",         executable: writerAgent },
+    { name: "search", description: "Search the web for sources", executable: searchAgent },
+    { name: "summarize", description: "Summarize text into bullets", executable: summarizer },
+    { name: "write", description: "Draft a final report", executable: writerAgent },
   ],
   maxSteps: 6,
 });
 
-const { data, report, usage, error } = await research.execute(
-  "Compare React vs Vue in 2026",
-);
+const { data, report, usage, error } = await research.execute("Compare React vs Vue in 2026");
 
 console.log(report.plan?.summary);
 for (const executed of report.executedSteps) {
@@ -51,7 +49,7 @@ A `capability` adapts any executable — an agent, workflow, supervisor, tool, o
 }
 ```
 
-The `name` + `description` pair is what the LLM reads to decide *when* to use each capability — write descriptions like you'd write tool descriptions. Each capability's `usage` and `report` roll up into the planner's unified result.
+The `name` + `description` pair is what the LLM reads to decide _when_ to use each capability — write descriptions like you'd write tool descriptions. Each capability's `usage` and `report` roll up into the planner's unified result.
 
 ## Two planning brains — `model` XOR `planner`
 
@@ -72,10 +70,10 @@ With `model`, the planner constructs the planning agent itself and supplies the 
 ```ts
 type PlannerStep = {
   id?: string;
-  capability: string;       // names a registered capability
-  input: string;            // the concrete input the LLM resolved
+  capability: string; // names a registered capability
+  input: string; // the concrete input the LLM resolved
   reason?: string;
-  dependsOn?: string[];     // step ids this one waits on
+  dependsOn?: string[]; // step ids this one waits on
 };
 ```
 
@@ -86,7 +84,7 @@ By default (`dag` off) the planner runs the classic loop:
 - Earlier steps' outputs are threaded into later steps' prompt context, so a downstream capability builds on what ran before it.
 - `maxSteps` (default 10, must be ≥ 1) caps execution; a longer generated plan is truncated and the dropped tail recorded as `skipped`.
 
-**`maxSteps` also gates parsing, not just execution (4.15.0).** The strict-mode JSON Schema handed to the planning model can't express `maxItems`, so nothing on the wire stopped a provider or proxy that ignores the requested step budget from returning an arbitrarily long `steps[]` array — the truncate-to-`skipped` behavior above only ran *after* that whole array was already parsed. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** a plan past it with `PlannerPlanInvalidError`, rather than parsing it and truncating. The 4× slack keeps the everyday case — a model overshooting "at most N steps" by a little — truncating to `skipped` exactly as before; only a plan several times over budget is treated as a malfunction worth surfacing.
+**`maxSteps` also gates parsing, not just execution (4.15.0).** The strict-mode JSON Schema handed to the planning model can't express `maxItems`, so nothing on the wire stopped a provider or proxy that ignores the requested step budget from returning an arbitrarily long `steps[]` array — the truncate-to-`skipped` behavior above only ran _after_ that whole array was already parsed. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** a plan past it with `PlannerPlanInvalidError`, rather than parsing it and truncating. The 4× slack keeps the everyday case — a model overshooting "at most N steps" by a little — truncating to `skipped` exactly as before; only a plan several times over budget is treated as a malfunction worth surfacing.
 
 The three sections below — DAG execution, adaptive re-planning, and the plan-only/approval gate — are all **additive and off by default**. Leave them unset and the planner behaves exactly as the sequential loop above, byte-for-byte.
 
@@ -101,7 +99,7 @@ const research = ai.planner({
   capabilities: [
     { name: "search-a", description: "Search source A", executable: searchA },
     { name: "search-b", description: "Search source B", executable: searchB },
-    { name: "merge",    description: "Merge findings",  executable: merger },
+    { name: "merge", description: "Merge findings", executable: merger },
   ],
   dag: true,
   maxConcurrency: 4, // max steps running at once. default 4
@@ -160,16 +158,16 @@ For human-in-the-loop or audited pipelines, generate the plan, get sign-off, the
 // 1) Generate + validate the plan, execute NOTHING.
 const draft = await research.execute("Compare React vs Vue in 2026", { mode: "plan-only" });
 
-draft.report.status;      // "awaiting-approval"
+draft.report.status; // "awaiting-approval"
 draft.report.executedSteps; // [] — nothing ran
-draft.plan;               // the generated PlannerPlan, surfaced for review
+draft.plan; // the generated PlannerPlan, surfaced for review
 
 // 2) After a human approves it, run that exact plan — generation is skipped.
 const final = await research.execute("Compare React vs Vue in 2026", {
   approvedPlan: draft.plan!,
 });
 
-final.report.status;      // "completed"
+final.report.status; // "completed"
 ```
 
 - `mode: "plan-only"` generates and validates the plan, then returns **without executing**: `report.status === "awaiting-approval"`, `result.plan` carries the plan, and `report.executedSteps` is empty.
@@ -188,7 +186,7 @@ Set `output` and the planner validates the **last completed step's** output agai
 
 ## Delegating a step with `ai.spawnSubAgent()`
 
-When a plan step wants to hand a bounded subtask to a fresh, single-use agent with a hard spend cap, reach for [`ai.spawnSubAgent()`](/v/latest/ai/agents/spawn-sub-agent/). It is **not** a planner feature — it's a general one-shot-agent helper (a fresh `ai.agent()` + an optional per-task `budget`, run once) that works just as well inside a tool, a workflow step, or hand-rolled orchestration. The planner engine itself does not call it; it's simply a handy primitive a capability *you* write can use. See [Spawn sub-agent](/v/latest/ai/agents/spawn-sub-agent/) for the full surface.
+When a plan step wants to hand a bounded subtask to a fresh, single-use agent with a hard spend cap, reach for [`ai.spawnSubAgent()`](/v/latest/ai/agents/spawn-sub-agent/). It is **not** a planner feature — it's a general one-shot-agent helper (a fresh `ai.agent()` + an optional per-task `budget`, run once) that works just as well inside a tool, a workflow step, or hand-rolled orchestration. The planner engine itself does not call it; it's simply a handy primitive a capability _you_ write can use. See [Spawn sub-agent](/v/latest/ai/agents/spawn-sub-agent/) for the full surface.
 
 ## Related
 

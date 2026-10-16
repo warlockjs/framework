@@ -17,8 +17,8 @@ import "@warlock.js/ai-panoptic"; // side-effect: subscribes panoptic to the con
 
 ai.config({
   panoptic: {
-    dashboard: true,    // serve on http://127.0.0.1:4319/
-    observeAll: true,   // route every workflow/supervisor/team run to the collector
+    dashboard: true, // serve on http://127.0.0.1:4319/
+    observeAll: true, // route every workflow/supervisor/team run to the collector
   },
 });
 ```
@@ -49,7 +49,7 @@ So `dashboard: true` with no exporters Just Works — you get a store for free. 
 The page is one self-contained, dependency-free vanilla-JS file (no bundler, no framework, works offline). It polls the JSON API every 2s and renders:
 
 - **Header** — the Warlock logo + your `title`, the `TraceAggregate` headline counts (traces / completed / failed / cancelled), tokens as **`↓input · ↑output · total`**, total cost, an **errors-only** toggle, a **search** box, and a **light / dark / system** theme switch (persisted to `localStorage`, so the choice survives a reload; `system` follows the OS `prefers-color-scheme`).
-- **Trace list** — newest-first clickable master rows, each led by a **colour-coded Title-case type label** (`Supervisor` / `Team` / `Workflow` / `Agent` / `Tool` / …; `ai.team` reports its own `team` type rather than `supervisor`, so it groups, filters, and labels separately). An optional **group-by-session** view collapses runs under collapsible session headers; a **group-by-prompt** view does the same over the `name@version` prompt key (see *Prompt-version linkage* below); a **group-by-type** view buckets the list by root type under collapsible `Type (N)` headers (`Agent (12)`, `Team (3)`, …). The three groupings are mutually exclusive.
+- **Trace list** — newest-first clickable master rows, each led by a **colour-coded Title-case type label** (`Supervisor` / `Team` / `Workflow` / `Agent` / `Tool` / …; `ai.team` reports its own `team` type rather than `supervisor`, so it groups, filters, and labels separately). An optional **group-by-session** view collapses runs under collapsible session headers; a **group-by-prompt** view does the same over the `name@version` prompt key (see _Prompt-version linkage_ below); a **group-by-type** view buckets the list by root type under collapsible `Type (N)` headers (`Agent (12)`, `Team (3)`, …). The three groupings are mutually exclusive.
 - **Two-pane drawer** (click a row) — a collapsible **nested call tree** on the left and the **selected node's detail** on the right: rich structured input/output (chat bubbles / key-value / Markdown), a per-node **token breakdown** (`↓in · ↑out · total`), the node's **rollup cost** (its own cost, else the sum of its children — so wrapper nodes that carry tokens but no cost don't double-count), and a **metadata panel** with humanized keys (`Supervisor Terminated By`, `Span ID` — not raw `supervisor.terminatedBy`), and **started** / **ended** wall-clock timestamps (`28 Jun 2026 03:16 PM` — named month, 12-hour, minute precision) alongside the elapsed duration. Zero-valued token/cost rows are hidden so the panel stays readable.
 - **Cost heatmap** — every tree node and trace row carries a left accent tinted by its rollup cost relative to the trace's most expensive node, with a small legend, so the spend hot-spots jump out at a glance.
 - **Timeline view** — the drawer's left pane toggles between the nested call **Tree** and a Gantt **Timeline** (each span drawn at its offset from the root start, width = duration, critical path highlighted).
@@ -71,8 +71,14 @@ The pure matching/grouping rules are unit-tested in `trace-filter.ts` and mirror
 
 ```ts
 import {
-  filterTraces, matchesFilter, groupBySession, rollupCost, maxNodeCost, heatIntensity,
-  type TraceFilter, type SessionGroup,
+  filterTraces,
+  matchesFilter,
+  groupBySession,
+  rollupCost,
+  maxNodeCost,
+  heatIntensity,
+  type TraceFilter,
+  type SessionGroup,
 } from "@warlock.js/ai-panoptic"; // dashboard helpers, re-exported
 
 const failed = filterTraces(traces, { errorsOnly: true });
@@ -87,7 +93,7 @@ The open trace + span are reflected in the URL hash (`#trace=<id>&span=<id>`) an
 
 ### Prompt-version linkage
 
-When an agent ran against a *named* `ai.prompts` builder, the collector stamps `agent.promptName` / `agent.promptVersion` onto the root span. The dashboard derives a `name@version` key from them (`tracePromptKey(trace)`) and offers **filter-by-prompt** and **group-by-prompt** beside session — so a reviewer sees every run of `support@2` together and compares its cost / failure rate against `support@3`. Runs with no named prompt bucket under `"(no prompt)"`.
+When an agent ran against a _named_ `ai.prompts` builder, the collector stamps `agent.promptName` / `agent.promptVersion` onto the root span. The dashboard derives a `name@version` key from them (`tracePromptKey(trace)`) and offers **filter-by-prompt** and **group-by-prompt** beside session — so a reviewer sees every run of `support@2` together and compares its cost / failure rate against `support@3`. Runs with no named prompt bucket under `"(no prompt)"`.
 
 ```ts
 import { tracePromptKey, groupByPrompt, type PromptGroup } from "@warlock.js/ai-panoptic";
@@ -131,7 +137,7 @@ import { dashboard, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
 const store = createInMemoryTraceStore();
 const handle = await dashboard(store, { port: 4319, open: true });
 
-console.log(handle.url);  // http://127.0.0.1:4319/
+console.log(handle.url); // http://127.0.0.1:4319/
 console.log(handle.port); // 4319 (the REAL OS port when port: 0 was passed)
 
 // ...on teardown:
@@ -144,23 +150,23 @@ The store is the same object the collector writes to — wire the collector to i
 
 Every field optional, every default safe:
 
-| Option | Default | Notes |
-|---|---|---|
-| `port` | `4319` | Pass `0` for an ephemeral port — the resolved port comes back on `handle.port`. A busy port rejects with a clear `Error` (`port N in use; pass { port: 0 }`), not raw `EADDRINUSE`. |
-| `host` | `"127.0.0.1"` | **Loopback only** by default, so prompt content is never exposed to the LAN. Binding a non-loopback interface is gated — it requires `authToken` (see below) or `dashboard()` rejects. |
-| `basePath` | `"/"` | Mount-path prefix for both the page and every `/api/...` route, e.g. `"/panoptic"`. Normalized to leading + trailing slash. |
-| `open` | `false` | Open the default browser at the resolved URL once listening. Best-effort and fully swallowed — failing to open a browser never rejects the start. |
-| `title` | `"Panoptic"` | Header title baked into the served page. |
-| `authToken` | _unset_ | Bearer token required on every request. Compared with `crypto.timingSafeEqual` (constant-time, length-checked first) against both the header and query-string forms — never a plain `===` — so a network-reachable dashboard doesn't leak the token to a byte-at-a-time timing attack. `Authorization: Bearer <token>` is accepted on every route; `?token=` is accepted **only on the HTML page route** (the JSON API routes are header-only), since the page load is the one request that structurally can't carry a header — this narrows the token's footprint in access/proxy logs and browser history. Missing/wrong → `401`. **Required** when `host` is non-loopback. |
-| `allowedHosts` | loopback names | `Host`-header allowlist (DNS-rebind guard); an unlisted `Host` → `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind. |
+| Option         | Default        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `port`         | `4319`         | Pass `0` for an ephemeral port — the resolved port comes back on `handle.port`. A busy port rejects with a clear `Error` (`port N in use; pass { port: 0 }`), not raw `EADDRINUSE`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `host`         | `"127.0.0.1"`  | **Loopback only** by default, so prompt content is never exposed to the LAN. Binding a non-loopback interface is gated — it requires `authToken` (see below) or `dashboard()` rejects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `basePath`     | `"/"`          | Mount-path prefix for both the page and every `/api/...` route, e.g. `"/panoptic"`. Normalized to leading + trailing slash.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `open`         | `false`        | Open the default browser at the resolved URL once listening. Best-effort and fully swallowed — failing to open a browser never rejects the start.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `title`        | `"Panoptic"`   | Header title baked into the served page.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `authToken`    | _unset_        | Bearer token required on every request. Compared with `crypto.timingSafeEqual` (constant-time, length-checked first) against both the header and query-string forms — never a plain `===` — so a network-reachable dashboard doesn't leak the token to a byte-at-a-time timing attack. `Authorization: Bearer <token>` is accepted on every route; `?token=` is accepted **only on the HTML page route** (the JSON API routes are header-only), since the page load is the one request that structurally can't carry a header — this narrows the token's footprint in access/proxy logs and browser history. Missing/wrong → `401`. **Required** when `host` is non-loopback. |
+| `allowedHosts` | loopback names | `Host`-header allowlist (DNS-rebind guard); an unlisted `Host` → `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### `DashboardHandle`
 
 ```ts
 type DashboardHandle = {
-  readonly url: string;            // http://host:port{basePath}
-  readonly port: number;           // real OS port (when port: 0 was requested)
-  close(): Promise<void>;          // stop the server, release the port
+  readonly url: string; // http://host:port{basePath}
+  readonly port: number; // real OS port (when port: 0 was requested)
+  close(): Promise<void>; // stop the server, release the port
 };
 ```
 
@@ -168,13 +174,13 @@ type DashboardHandle = {
 
 Every route is **`GET`-only and read-only** (non-`GET` → `405`), mounted under `basePath` — EXCEPT the one opt-in `POST .../spans/:spanId/evaluate` route `DashboardOptions.evaluate` enables (see the `evaluate-system-prompt` topic); absent that config, it 405s like everything else. The page polls the `GET` routes; you can curl them too. Store shapes are already JSON-safe, so responses are a plain `JSON.stringify`.
 
-| Route | Returns |
-|---|---|
-| `GET /api/traces` | `store.query(...)` — the trace list, filtered by the query string (`id` / `sessionId` / `status` / time window, parsed by `parseQuery`). |
-| `GET /api/traces/:id` | `store.get(id)` — one full trace, or `404 { error: "trace_not_found" }`. |
-| `GET /api/aggregate` | `store.aggregate(...)` — the usage + cost + status rollup over the same query filter. |
-| `GET /` (basePath) | the self-contained HTML page. |
-| `POST /api/traces/:traceId/spans/:spanId/evaluate` | grades the span's last captured system prompt — only when `evaluate` is configured. |
+| Route                                              | Returns                                                                                                                                  |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/traces`                                  | `store.query(...)` — the trace list, filtered by the query string (`id` / `sessionId` / `status` / time window, parsed by `parseQuery`). |
+| `GET /api/traces/:id`                              | `store.get(id)` — one full trace, or `404 { error: "trace_not_found" }`.                                                                 |
+| `GET /api/aggregate`                               | `store.aggregate(...)` — the usage + cost + status rollup over the same query filter.                                                    |
+| `GET /` (basePath)                                 | the self-contained HTML page.                                                                                                            |
+| `POST /api/traces/:traceId/spans/:spanId/evaluate` | grades the span's last captured system prompt — only when `evaluate` is configured.                                                      |
 
 Query-string filters map 1:1 onto `TraceQuery`:
 
@@ -208,6 +214,7 @@ createServer(handler).listen(4319, "127.0.0.1");
 The dashboard surfaces whatever the store holds — including captured prompt/response content when content capture is on (`captureContent`). It binds **loopback-only** by default precisely so that content never leaves the machine. Binding a non-loopback host is gated — it requires an `authToken` (and checks a `Host` allowlist, sending `nosniff` / CSP / `X-Frame-Options: DENY` on every response) — but still prefer loopback for dev, and for production ship to a real backend via an exporter rather than exposing the dashboard. The dashboard has exactly one write-capable route (`evaluate`, off by default) — everything else stays read-only regardless of configuration.
 
 **Trace content is untrusted input to the dashboard's own UI, and is treated that way:**
+
 - **Markdown links in captured content are sanitized.** `span.input`/`span.output` can contain model output or attacker-controlled tool results — i.e. prompt-injected content — and the drawer renders it as Markdown. Link URLs go through `sanitizeHref` (a scheme allowlist: `http:`, `https:`, `mailto:`, plus relative/anchor URLs) after normalizing the way a browser will — attribute-entity decode, strip of ignored control chars/whitespace, lowercase — so `javascript:`/`data:`/`vbscript:` payloads (including case/whitespace/entity-obfuscated variants, and scheme-relative `//host` links) never become a live `href`; a rejected link renders its label as plain text instead. This closes a stored-XSS path that could otherwise reach the in-page bearer token.
 - **The bearer token is no longer a page-global.** The client script's `TOKEN` is sealed inside its own inner IIFE that exposes only the `fetchAuthed` helper, so other code in the page's closure can't read the raw token by name.
 

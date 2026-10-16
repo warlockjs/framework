@@ -30,7 +30,7 @@ const { data, error } = await ai.transcribe({
 });
 
 if (error) console.warn(error.code); // typed AIError
-else console.log(data.text);         // the transcript
+else console.log(data.text); // the transcript
 ```
 
 `TranscriptionModelContract` mirrors `SpeechModelContract` — a peer primitive produced by the adapter's optional `transcribe?()` factory. The model id is **not validated locally** — a non-STT id (`openai.transcribe({ name: "gpt-4o" })`) constructs fine and is forwarded to the provider as given, so it fails as a typed provider error on `result.error`, never as a local throw at construction.
@@ -39,14 +39,14 @@ else console.log(data.text);         // the transcript
 
 ```ts
 type AudioInput = {
-  base64: string;    // base64-encoded audio bytes
+  base64: string; // base64-encoded audio bytes
   mediaType: string; // IANA type, e.g. "audio/ogg", "audio/mpeg"
   filename?: string; // helps providers infer the codec from the extension
 };
 
 // From a file on disk — reads + infers media type (override for extensionless files).
 const fromDisk = await ai.audioFromFile("./meeting.m4a");
-const forced   = await ai.audioFromFile("./blob", { mediaType: "audio/ogg" });
+const forced = await ai.audioFromFile("./blob", { mediaType: "audio/ogg" });
 
 // From bytes you already hold (an upload buffer, a downloaded blob) — no I/O, no AI.
 const fromBytes = ai.audioFromBuffer(uploadBuffer, "audio/ogg", "note.ogg");
@@ -60,12 +60,12 @@ Keeping `AudioInput` as inlined base64 + explicit media type makes the verb prov
 type TranscriptionResult = {
   type: "transcription";
   data?: {
-    text: string;                    // full transcript
+    text: string; // full transcript
     segments?: TranscriptionSegment[]; // timestamped, in verbose mode
-  };                                 // undefined on failure
-  error?: AIError;                   // undefined on success — NEVER thrown
-  usage: Usage;                      // tokens (gpt-4o-transcribe) + cost when priced
-  report: TranscriptionReport;       // type:"transcription", model, durationSeconds, lineage
+  }; // undefined on failure
+  error?: AIError; // undefined on success — NEVER thrown
+  usage: Usage; // tokens (gpt-4o-transcribe) + cost when priced
+  report: TranscriptionReport; // type:"transcription", model, durationSeconds, lineage
 };
 
 type TranscriptionSegment = { text: string; start?: number; end?: number };
@@ -79,13 +79,13 @@ type TranscriptionSegment = { text: string; start?: number; end?: number };
 await ai.transcribe({
   model,
   audio,
-  language: "en",              // BCP-47 hint
-  prompt: "Names: Acme, Zoë",  // priming — spelling / style hints
-  format: "verbose_json",      // response-format override (segments + duration)
-  signal,                      // AbortSignal
-  observe: collector,          // route the report to an Observer (panoptic)
-  sessionId: "ticket-88",      // group into a session for flat cost/trace queries
-  options: { /* provider passthrough */ },
+  language: "en", // BCP-47 hint
+  prompt: "Names: Acme, Zoë", // priming — spelling / style hints
+  format: "verbose_json", // response-format override (segments + duration)
+  signal, // AbortSignal
+  observe: collector, // route the report to an Observer (panoptic)
+  sessionId: "ticket-88", // group into a session for flat cost/trace queries
+  options: {/* provider passthrough */},
 });
 ```
 
@@ -140,7 +140,9 @@ import { MockTranscriptionModel, transcribe } from "@warlock.js/ai";
 
 const AUDIO = { base64: "QUJD", mediaType: "audio/mpeg", filename: "clip.mp3" };
 
-const model = new MockTranscriptionModel("whisper-1", [{ durationSeconds: 120 }], { perMinute: 0.006 });
+const model = new MockTranscriptionModel("whisper-1", [{ durationSeconds: 120 }], {
+  perMinute: 0.006,
+});
 const { data, usage, report } = await transcribe({ model, audio: AUDIO });
 // data.text → "mock transcript"
 // usage.cost.input → (120 / 60) * 0.006   report.durationSeconds → 120

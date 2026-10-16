@@ -16,6 +16,7 @@ captureAnyUnhandledRejection();
 ```
 
 Registers:
+
 - `process.on("unhandledRejection", reason => log.error("app", "unhandledRejection", reason))` — logged; the process is kept alive.
 - `process.on("uncaughtException", error => log.fatal("app", "uncaughtException", error))` — logged, then `process.exit(1)` (by default).
 
@@ -23,7 +24,7 @@ The split is intentional: an `uncaughtException` leaves the process in an undefi
 
 ## Why it exits (and why that matters)
 
-Registering *any* `uncaughtException` listener **suppresses** Node's default "print the stack + exit non-zero." A listener that only logs therefore turns an unrecoverable crash into a silent `exit 0` — which is exactly how a config file that throws at boot can look like "the server started, then just stopped," with no error printed. So the handler restores the contract:
+Registering _any_ `uncaughtException` listener **suppresses** Node's default "print the stack + exit non-zero." A listener that only logs therefore turns an unrecoverable crash into a silent `exit 0` — which is exactly how a config file that throws at boot can look like "the server started, then just stopped," with no error printed. So the handler restores the contract:
 
 - **Exits non-zero** after logging (`process.exit(1)`), following a best-effort, time-bounded `log.flush()` so buffered `FileLog` / `SentryLog` entries drain first. Opt out with `captureAnyUnhandledRejection({ exitOnUncaughtException: false })` where the process is expected to recover on its own (a dev server reloading via HMR).
 - **Falls back to `console.error`** when no terminal channel is configured yet — the early-boot window, before `log.configure(...)`, where `log.fatal` has nowhere visible to go. When a `ConsoleLog` is present it already prints the entry, so the fallback is skipped (no double output).
@@ -35,16 +36,11 @@ Registering *any* `uncaughtException` listener **suppresses** Node's default "pr
 **Once**, at startup, **after** channels are registered. Typical place: immediately after your `log.configure({...})` call.
 
 ```ts title="src/index.ts"
-import {
-  log,
-  ConsoleLog,
-  FileLog,
-  captureAnyUnhandledRejection,
-} from "@warlock.js/logger";
+import { log, ConsoleLog, FileLog, captureAnyUnhandledRejection } from "@warlock.js/logger";
 
 log.configure({
   channels: [new ConsoleLog(), new FileLog({ levels: ["error"] })],
-  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],   // ← important; see below
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"], // ← important; see below
 });
 
 captureAnyUnhandledRejection();
@@ -54,7 +50,7 @@ captureAnyUnhandledRejection();
 
 The `uncaughtException` handler runs a best-effort, time-bounded `log.flush()` **before** its own `process.exit(1)`, so buffered `FileLog` / `SentryLog` entries drain even though `process.exit()` skips `beforeExit`. You don't need `autoFlushOn: ["beforeExit"]` for the fatal entry to survive — the handler already drains.
 
-`"beforeExit"` in `autoFlushOn` is still worth setting for the *other* exit routes (a natural drain when the event loop empties on its own). For signal-driven shutdown (`SIGINT` / `SIGTERM`), include those signals in `autoFlushOn`. See the `flush-logs-on-shutdown` topic.
+`"beforeExit"` in `autoFlushOn` is still worth setting for the _other_ exit routes (a natural drain when the event loop empties on its own). For signal-driven shutdown (`SIGINT` / `SIGTERM`), include those signals in `autoFlushOn`. See the `flush-logs-on-shutdown` topic.
 
 ## Idempotency — don't call it twice
 
@@ -79,7 +75,9 @@ import type { LoggingData } from "@warlock.js/logger";
 class Capture extends LogChannel {
   public name = "capture";
   public received: LoggingData[] = [];
-  public log(data: LoggingData) { this.received.push({ ...data }); }
+  public log(data: LoggingData) {
+    this.received.push({ ...data });
+  }
 }
 
 it("routes unhandled rejections to the logger", async () => {
@@ -104,6 +102,7 @@ Testing the **`uncaughtException`** path additionally trips `process.exit(1)`, s
 ## Module + action the capture uses
 
 Both listeners log with:
+
 - `module: "app"`
 - `action: "unhandledRejection"` (at `error`) or `action: "uncaughtException"` (at `fatal`)
 - `message`: the rejection reason / exception (keep it as the raw `Error` object — file channels capture the stack).

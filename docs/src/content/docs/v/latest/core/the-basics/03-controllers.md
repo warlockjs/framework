@@ -55,18 +55,18 @@ pnpm warlock generate.controller products/create-product --with-validation
 
 The `Request` object exposes everything you need to pull data off the wire. The everyday helpers:
 
-| Method                             | Returns                                         | Use when                                                     |
-| ---------------------------------- | ----------------------------------------------- | ------------------------------------------------------------ |
-| `request.input("key", default?)`   | one field from query, params, or body           | reading a single param/body field                            |
-| `request.all()`                    | full merged input map (query + body + params)   | passing the whole thing to a service                         |
-| `request.validated()`              | schema-typed object (only when schema attached) | controllers with validation — always preferred over `.all()` |
-| `request.locals.user`                     | authenticated user (after `authMiddleware`)     | guarded routes                                               |
-| `request.file("key")`              | `UploadedFile` instance                         | multipart uploads (single file)                              |
-| `request.files("key")`             | `UploadedFile[]`                                | multipart uploads (many files)                               |
-| `request.header("X-Foo")`          | header value                                    | reading request metadata                                     |
-| `request.ip`, `request.realIp`     | client IP (proxy-aware via `realIp`)            | logging, rate limiting, geolocation                          |
-| `request.userAgent`                | user-agent string                               | device-info capture                                          |
-| `request.locale`, `t(...)`         | locale code + translator (`t` from core)        | localized responses                                          |
+| Method                           | Returns                                         | Use when                                                     |
+| -------------------------------- | ----------------------------------------------- | ------------------------------------------------------------ |
+| `request.input("key", default?)` | one field from query, params, or body           | reading a single param/body field                            |
+| `request.all()`                  | full merged input map (query + body + params)   | passing the whole thing to a service                         |
+| `request.validated()`            | schema-typed object (only when schema attached) | controllers with validation — always preferred over `.all()` |
+| `request.locals.user`            | authenticated user (after `authMiddleware`)     | guarded routes                                               |
+| `request.file("key")`            | `UploadedFile` instance                         | multipart uploads (single file)                              |
+| `request.files("key")`           | `UploadedFile[]`                                | multipart uploads (many files)                               |
+| `request.header("X-Foo")`        | header value                                    | reading request metadata                                     |
+| `request.ip`, `request.realIp`   | client IP (proxy-aware via `realIp`)            | logging, rate limiting, geolocation                          |
+| `request.userAgent`              | user-agent string                               | device-info capture                                          |
+| `request.locale`, `t(...)`       | locale code + translator (`t` from core)        | localized responses                                          |
 
 There are also typed shortcuts: `request.int("id")`, `request.bool("active")`, `request.float("price")`, `request.string("name")`, `request.email()`. Use them when you want a coerced value without writing the conversion yourself.
 
@@ -277,12 +277,12 @@ createProductController.responseSchema = {
 
 `responseSchema` is keyed by HTTP status code; each entry has a `body` object. The values of a body are one of:
 
-| Value                                     | Meaning                                                                                   |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Value                                     | Meaning                                                                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"`. `?` means the key is always present and the value may be `null`. |
-| a resource                                | One object shaped like the resource's output.                                            |
-| `[Resource]`                              | An array of that resource.                                                                |
-| a nested plain object                     | Recursed, with any of the values above.                                                   |
+| a resource                                | One object shaped like the resource's output.                                                                        |
+| `[Resource]`                              | An array of that resource.                                                                                           |
+| a nested plain object                     | Recursed, with any of the values above.                                                                              |
 
 ```ts title="src/app/auth/controllers/login.controller.ts"
 import { UserResource } from "app/users/resources/user.resource";

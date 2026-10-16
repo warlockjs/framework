@@ -30,8 +30,7 @@ const runPackageManagerCommand = vi.fn((command: string) => `yarn ${command}`);
 
 vi.mock("../src/helpers/package-manager", () => ({
   getPackageManager: (...args: unknown[]) => getPackageManager(...args),
-  runPackageManagerCommand: (...args: unknown[]) =>
-    runPackageManagerCommand(...args),
+  runPackageManagerCommand: (...args: unknown[]) => runPackageManagerCommand(...args),
 }));
 
 const showSuccessScreen = vi.fn();
@@ -113,9 +112,7 @@ function run(fake: ReturnType<typeof makeFakeApp>) {
 beforeEach(() => {
   vi.clearAllMocks();
   getPackageManager.mockReturnValue("yarn");
-  runPackageManagerCommand.mockImplementation(
-    (command: string) => `yarn ${command}`,
-  );
+  runPackageManagerCommand.mockImplementation((command: string) => `yarn ${command}`);
 });
 
 describe("createWarlockApp — template + base install", () => {
@@ -146,10 +143,7 @@ describe("createWarlockApp — template + base install", () => {
 
     await run(fake);
 
-    expect(fake.configureAgentKitTargets).toHaveBeenCalledWith([
-      "claude",
-      "cursor",
-    ]);
+    expect(fake.configureAgentKitTargets).toHaveBeenCalledWith(["claude", "cursor"]);
   });
 
   it("prints the decisions summary after a successful scaffold", async () => {
@@ -158,7 +152,7 @@ describe("createWarlockApp — template + base install", () => {
 
     await run(fake);
 
-    const printed = logSpy.mock.calls.map(call => String(call[0])).join("\n");
+    const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
     expect(printed).toContain("Using yarn");
     expect(printed).toContain("agent-kit targets: claude");
 
@@ -185,12 +179,7 @@ describe("createWarlockApp — feature batch", () => {
     await run(fake);
 
     expect(fake.installFeatures).toHaveBeenCalledTimes(1);
-    expect(fake.installFeatures).toHaveBeenCalledWith([
-      "postgres",
-      "test",
-      "redis",
-      "openai",
-    ]);
+    expect(fake.installFeatures).toHaveBeenCalledWith(["postgres", "test", "redis", "openai"]);
   });
 
   it("pins Vite and records selected native build approvals before the batched install", async () => {
@@ -238,10 +227,7 @@ describe("createWarlockApp — feature batch", () => {
   });
 
   it("runs a second install when the feature add succeeds", async () => {
-    const fake = makeFakeApp(
-      { features: ["test"] },
-      { installFeaturesResult: true },
-    );
+    const fake = makeFakeApp({ features: ["test"] }, { installFeaturesResult: true });
 
     await run(fake);
 
@@ -250,10 +236,7 @@ describe("createWarlockApp — feature batch", () => {
   });
 
   it("skips the second install when the feature add fails", async () => {
-    const fake = makeFakeApp(
-      { features: ["test"] },
-      { installFeaturesResult: false },
-    );
+    const fake = makeFakeApp({ features: ["test"] }, { installFeaturesResult: false });
 
     await run(fake);
 
@@ -352,11 +335,7 @@ describe("createWarlockApp — full happy path ordering", () => {
     await run(fake);
 
     expect(fake.use).toHaveBeenCalledWith("warlock");
-    expect(fake.installFeatures).toHaveBeenCalledWith([
-      "postgres",
-      "test",
-      "openai",
-    ]);
+    expect(fake.installFeatures).toHaveBeenCalledWith(["postgres", "test", "openai"]);
     expect(fake.install).toHaveBeenCalledTimes(2);
     expect(fake.git).toHaveBeenCalledTimes(1);
     expect(fake.exec).toHaveBeenCalledWith("yarn jwt");

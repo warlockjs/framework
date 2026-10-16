@@ -172,7 +172,10 @@ describe("OpenAISDK api gate (Responses adapter)", () => {
   it("keeps SDK-level pricing resolution on the Responses model", () => {
     const sdk = new OpenAISDK({ apiKey: "k", pricing: { "gpt-5.6": { input: 1, output: 2 } } });
 
-    expect(sdk.model({ name: "gpt-5.6", api: "responses" }).pricing).toEqual({ input: 1, output: 2 });
+    expect(sdk.model({ name: "gpt-5.6", api: "responses" }).pricing).toEqual({
+      input: 1,
+      output: 2,
+    });
   });
 
   it.each(["deepseek", "groq", "xai", "mistral", "openrouter"])(
@@ -180,7 +183,9 @@ describe("OpenAISDK api gate (Responses adapter)", () => {
     (provider) => {
       const sdk = new OpenAISDK({ apiKey: "k", baseURL: "https://example.test/v1", provider });
 
-      expect(() => sdk.model({ name: "some-model", api: "responses" })).toThrow(InvalidRequestError);
+      expect(() => sdk.model({ name: "some-model", api: "responses" })).toThrow(
+        InvalidRequestError,
+      );
       expect(() => sdk.model({ name: "some-model", api: "responses" })).toThrow(
         /only on the direct "openai" provider/,
       );
@@ -201,7 +206,11 @@ describe("OpenAISDK api gate (Responses adapter)", () => {
               chatCalls.push(params);
               return {
                 choices: [
-                  { index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" },
+                  {
+                    index: 0,
+                    message: { role: "assistant", content: "ok" },
+                    finish_reason: "stop",
+                  },
                 ],
               };
             },
@@ -238,9 +247,9 @@ describe("OpenAISDK api gate (Responses adapter)", () => {
     expect(() => new OpenAIModel(client, { name: "gpt-5.6", api: "responses" })).toThrow(
       InvalidRequestError,
     );
-    expect(() => new OpenAIModel(client, { name: "gpt-5.6", api: "responses" }, "deepseek")).toThrow(
-      /cannot serve api: "responses"/,
-    );
+    expect(
+      () => new OpenAIModel(client, { name: "gpt-5.6", api: "responses" }, "deepseek"),
+    ).toThrow(/cannot serve api: "responses"/);
   });
 
   it("OpenAIResponsesModel refuses a wrapper provider label even if constructed directly", () => {

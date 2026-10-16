@@ -115,11 +115,7 @@ export class MongoQueryOperations {
    * });
    * ```
    */
-  public addProjectOperation(
-    type: string,
-    data: Record<string, unknown>,
-    mergeable = true,
-  ): void {
+  public addProjectOperation(type: string, data: Record<string, unknown>, mergeable = true): void {
     this.operations.push({
       stage: "$project",
       mergeable,
@@ -187,11 +183,7 @@ export class MongoQueryOperations {
    * helper.addGroupOperation("distinct", { fields: ["email"] });
    * ```
    */
-  public addGroupOperation(
-    type: string,
-    data: Record<string, unknown>,
-    mergeable = false,
-  ): void {
+  public addGroupOperation(type: string, data: Record<string, unknown>, mergeable = false): void {
     this.operations.push({
       stage: "$group",
       mergeable,

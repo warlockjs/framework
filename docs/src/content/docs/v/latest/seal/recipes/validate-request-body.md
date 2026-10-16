@@ -5,7 +5,7 @@ sidebar:
   label: "Validate a request body"
 ---
 
-This is the bread-and-butter job: a request lands, you need to know the body is shaped the way you expect *before* you touch the database. Seal makes this a three-line move — define the schema once, run `validate`, and branch on the result. No exceptions to catch, no manual field-poking.
+This is the bread-and-butter job: a request lands, you need to know the body is shaped the way you expect _before_ you touch the database. Seal makes this a three-line move — define the schema once, run `validate`, and branch on the result. No exceptions to catch, no manual field-poking.
 
 ## The whole flow
 
@@ -42,7 +42,7 @@ That's the entire pattern. Everything below is detail you can reach for when you
 
 ## Why `Infer.Output` and not bare `Infer`
 
-The body the *caller sends* and the body you *act on after validation* are subtly different types:
+The body the _caller sends_ and the body you _act on after validation_ are subtly different types:
 
 - **Before validation** (`Infer.Input`, the bare `Infer<>` default) — `role` is optional, because the caller is allowed to omit it.
 - **After validation** (`Infer.Output`) — `role` is guaranteed present, because `.default("member")` filled it in.
@@ -60,8 +60,8 @@ if (!result.isValid) {
     body: {
       message: "Validation failed",
       fields: result.errors.map((failure) => ({
-        field: failure.input,   // "email", or a nested path like "address.city"
-        rule: failure.type,     // "email", "required", "min" — the stable identifier
+        field: failure.input, // "email", or a nested path like "address.city"
+        rule: failure.type, // "email", "required", "min" — the stable identifier
         message: failure.error, // human-facing, already translated if you wired i18n
       })),
     },
@@ -73,7 +73,7 @@ Branch on `failure.type` — never on the message string. The message is for hum
 
 ## Collecting every error, not just the first
 
-By default seal stops at the first failing rule per field (`firstErrorOnly: true`). For a form where you want to surface *all* problems at once, flip it globally at boot:
+By default seal stops at the first failing rule per field (`firstErrorOnly: true`). For a form where you want to surface _all_ problems at once, flip it globally at boot:
 
 ```ts
 import { configureSeal } from "@warlock.js/seal";
@@ -87,13 +87,15 @@ Now a single `validate()` returns every failing rule across every field — idea
 
 By default extra keys are silently dropped from `result.data` — the output only ever contains keys you declared. If you want to actively reject a body that carries unknown keys (strict API contracts), that behaviour is already the safe default: unknown keys never reach your handler.
 
-If instead you want to *forward* unknown keys untouched (a passthrough envelope), opt in with `.allowUnknown()`:
+If instead you want to _forward_ unknown keys untouched (a passthrough envelope), opt in with `.allowUnknown()`:
 
 ```ts
-const envelope = v.object({
-  type: v.literal("user.created", "user.updated"),
-  payload: v.object({}).allowUnknown(),  // forward whatever the producer sent
-}).allowUnknown();
+const envelope = v
+  .object({
+    type: v.literal("user.created", "user.updated"),
+    payload: v.object({}).allowUnknown(), // forward whatever the producer sent
+  })
+  .allowUnknown();
 ```
 
 ## Don't reuse one schema for create and update

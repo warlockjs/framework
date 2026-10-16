@@ -15,12 +15,12 @@ The whole point: keep prompts versioned, forkable, and free of brittle string co
 ```ts
 import { ai } from "@warlock.js/ai";
 
-ai.systemPrompt();                   // empty — chain blocks onto it
-ai.systemPrompt("literal text");     // one-shot string form
-ai.systemPrompt([block1, block2]);   // array form — blocks render in declaration order
+ai.systemPrompt(); // empty — chain blocks onto it
+ai.systemPrompt("literal text"); // one-shot string form
+ai.systemPrompt([block1, block2]); // array form — blocks render in declaration order
 
-ai.persona("You are Alex.");         // PersonaContract block
-ai.instruction("Reply in Arabic.");  // InstructionContract block
+ai.persona("You are Alex."); // PersonaContract block
+ai.instruction("Reply in Arabic."); // InstructionContract block
 ```
 
 ## Three usage shapes
@@ -39,7 +39,8 @@ Fine for prototypes. Doesn't scale to multiple agents that share a persona.
 ### Builder form — composable
 
 ```ts
-const prompt = ai.systemPrompt()
+const prompt = ai
+  .systemPrompt()
   .persona("You are Alex, a senior TypeScript engineer.")
   .instruction("Explain things assuming the reader is a Go developer.")
   .instruction("Always cite the relevant TypeScript handbook section.");
@@ -94,8 +95,8 @@ const support = ai.systemPrompt("You are senior support for {{product}}.", {
 // Or update an existing builder — returns a NEW builder, original untouched.
 const renamed = base.meta({ name: "support", version: "2" });
 
-renamed.meta();        // { name: "support", version: "2", composedFrom?: [...] }
-base.meta();           // unchanged
+renamed.meta(); // { name: "support", version: "2", composedFrom?: [...] }
+base.meta(); // unchanged
 ```
 
 **Naming a prompt auto-registers it in [`ai.prompts`](/v/latest/ai/prompts/prompt-registry/)** under `name@version` (version defaults to the next integer). An anonymous prompt — no name — is never registered and exists only for inline composition. Read the snapshot with the no-argument `prompt.meta()`; it's `undefined` for a bare anonymous prompt.
@@ -125,15 +126,15 @@ Merging by name resolves through `ai.prompts`; an unknown name (or requested ver
 
 ```ts
 const report = await support.validate({ placeholders: { product: "Warlock" } });
-report.ok;       // true when no required {{key}} is missing (deterministic)
-report.missing;  // []
+report.ok; // true when no required {{key}} is missing (deterministic)
+report.missing; // []
 
 // Add an optional judge for a quality score — it never flips `ok`.
 const graded = await support.validate({
   placeholders: { product: "Warlock" },
   judge: openai.model({ name: "gpt-4o-mini" }),
 });
-graded.score;    // 0..1, or undefined if the judge degraded
+graded.score; // 0..1, or undefined if the judge degraded
 ```
 
 ## How blocks order
@@ -162,7 +163,8 @@ const arabic = base.instruction("Prefer Arabic comments");
 `{{key}}` and `{{key|defaultValue}}` substitute at render time:
 
 ```ts
-const prompt = ai.systemPrompt()
+const prompt = ai
+  .systemPrompt()
   .persona("You are Alex, a TypeScript expert.")
   .instruction("Respond in {{language|English}}.");
 
@@ -196,7 +198,8 @@ Useful for A/B testing, request-scoped personalization, turn-by-turn prompt vari
 ## Forking a base prompt
 
 ```ts
-const base = ai.systemPrompt()
+const base = ai
+  .systemPrompt()
   .persona("You are a support agent for Acme Corp.")
   .instruction("Cite policy §{{policy}} when denying a refund.");
 

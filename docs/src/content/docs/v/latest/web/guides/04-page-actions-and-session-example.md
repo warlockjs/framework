@@ -113,9 +113,13 @@ export default function AccountPage({ data }: PageProps<typeof loader>) {
         />
         <FieldError name="name" />
         {result?.formErrors.map((message) => (
-          <p key={message} role="alert">{message}</p>
+          <p key={message} role="alert">
+            {message}
+          </p>
         ))}
-        <button type="submit" disabled={saving}>Save</button>
+        <button type="submit" disabled={saving}>
+          Save
+        </button>
       </Form>
     </main>
   );

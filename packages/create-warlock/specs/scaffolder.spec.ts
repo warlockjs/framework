@@ -84,11 +84,7 @@ describe("parseFlags", () => {
   });
 
   it("splits comma lists for --features and --ai, trimming blanks", () => {
-    const flags = parseFlags([
-      "app",
-      "--features=test, herald ,",
-      "--ai=openai,anthropic",
-    ]);
+    const flags = parseFlags(["app", "--features=test, herald ,", "--ai=openai,anthropic"]);
 
     expect(flags.features).toEqual(["test", "herald"]);
     expect(flags.ai).toEqual(["openai", "anthropic"]);
@@ -178,15 +174,15 @@ describe("database drivers", () => {
 
   it("exposes select options that carry the disabled flag for coming-soon drivers", () => {
     const options = getDatabaseDriverOptions();
-    const mysql = options.find(option => option.value === "mysql");
+    const mysql = options.find((option) => option.value === "mysql");
 
     expect(mysql?.disabled).toBe(true);
   });
 
   it("leaves the shippable drivers enabled (no disabled flag)", () => {
     const options = getDatabaseDriverOptions();
-    const mongodb = options.find(option => option.value === "mongodb");
-    const postgres = options.find(option => option.value === "postgres");
+    const mongodb = options.find((option) => option.value === "mongodb");
+    const postgres = options.find((option) => option.value === "postgres");
 
     expect(mongodb?.disabled).toBeUndefined();
     expect(postgres?.disabled).toBeUndefined();
@@ -272,13 +268,11 @@ describe("resolveNonInteractiveOptions", () => {
   });
 
   it("throws on an unknown feature or ai key", () => {
-    expect(() =>
-      resolveNonInteractiveOptions({ features: ["test", "bogus"] }),
-    ).toThrow(/Unknown feature\(s\): bogus/);
+    expect(() => resolveNonInteractiveOptions({ features: ["test", "bogus"] })).toThrow(
+      /Unknown feature\(s\): bogus/,
+    );
 
-    expect(() =>
-      resolveNonInteractiveOptions({ ai: ["ai-openai", "nope"] }),
-    ).toThrow(/nope/);
+    expect(() => resolveNonInteractiveOptions({ ai: ["ai-openai", "nope"] })).toThrow(/nope/);
   });
 
   it("passes through valid features, ai providers, and the git/jwt toggles", () => {
@@ -306,7 +300,7 @@ describe("features map", () => {
   });
 
   it("never lists ai or a database driver as a standalone feature", () => {
-    const options = getFeatureOptions().map(option => option.value);
+    const options = getFeatureOptions().map((option) => option.value);
 
     expect(options).not.toContain("ai");
     expect(options).not.toContain("mongodb");
@@ -323,21 +317,17 @@ describe("features map", () => {
   });
 
   it("merges feature keys and ai provider/package keys with no duplicates", () => {
-    const featureValues = getFeatureOptions().map(option => option.value);
-    const aiValues = getAiProviderOptions().map(option => option.value);
-    const aiPackageValues = getAiPackageOptions().map(option => option.value);
+    const featureValues = getFeatureOptions().map((option) => option.value);
+    const aiValues = getAiProviderOptions().map((option) => option.value);
+    const aiPackageValues = getAiPackageOptions().map((option) => option.value);
     const allKeys = getAllFeatureKeys();
 
-    expect(allKeys).toEqual([
-      ...featureValues,
-      ...aiValues,
-      ...aiPackageValues,
-    ]);
+    expect(allKeys).toEqual([...featureValues, ...aiValues, ...aiPackageValues]);
     expect(new Set(allKeys).size).toBe(allKeys.length);
   });
 
   it("surfaces the group name inside each feature option hint", () => {
-    const react = getFeatureOptions().find(option => option.value === "react");
+    const react = getFeatureOptions().find((option) => option.value === "react");
 
     // getFeatureOptions folds the group into the hint as `${group} — ${hint}`.
     expect(react?.hint).toContain("Rendering & Mail");
@@ -346,15 +336,9 @@ describe("features map", () => {
 
   it("lists every shipped ai provider with a label and hint", () => {
     const options = getAiProviderOptions();
-    const values = options.map(option => option.value);
+    const values = options.map((option) => option.value);
 
-    expect(values).toEqual([
-      "ai-openai",
-      "ai-google",
-      "ai-anthropic",
-      "ai-bedrock",
-      "ai-ollama",
-    ]);
+    expect(values).toEqual(["ai-openai", "ai-google", "ai-anthropic", "ai-bedrock", "ai-ollama"]);
 
     for (const option of options) {
       expect(option.label).toBeTruthy();
@@ -364,7 +348,7 @@ describe("features map", () => {
 
   it("lists the ai capability packages with a label and hint", () => {
     const options = getAiPackageOptions();
-    const values = options.map(option => option.value);
+    const values = options.map((option) => option.value);
 
     expect(values).toEqual(["ai-tools", "ai-panoptic", "ai-workspace"]);
 
@@ -375,7 +359,7 @@ describe("features map", () => {
   });
 
   it("never marks ai providers as default-selected (only the general step pre-checks)", () => {
-    const aiValues = getAiProviderOptions().map(option => option.value);
+    const aiValues = getAiProviderOptions().map((option) => option.value);
     const defaults = getDefaultFeatureKeys();
 
     for (const aiValue of aiValues) {
@@ -412,9 +396,7 @@ describe("App template emission", () => {
 
     expect(existsSync(path.join(appPath, "package.json"))).toBe(true);
     expect(existsSync(path.join(appPath, "warlock.config.ts"))).toBe(true);
-    expect(
-      existsSync(path.join(appPath, "src/app/users/models/user/user.model.ts")),
-    ).toBe(true);
+    expect(existsSync(path.join(appPath, "src/app/users/models/user/user.model.ts"))).toBe(true);
     expect(existsSync(path.join(appPath, ".gitignore"))).toBe(true);
     expect(existsSync(path.join(appPath, "_.gitignore"))).toBe(false);
   });
@@ -433,21 +415,15 @@ describe("App template emission", () => {
     app.use("warlock").configureWebStarter(false);
 
     expect(existsSync(path.join(appPath, "src/app/home/routes.ts"))).toBe(true);
-    expect(
-      existsSync(
-        path.join(appPath, "src/app/home/controllers/home-page.controller.ts"),
-      ),
-    ).toBe(true);
+    expect(existsSync(path.join(appPath, "src/app/home/controllers/home-page.controller.ts"))).toBe(
+      true,
+    );
     expect(existsSync(path.join(appPath, "src/web"))).toBe(false);
-    expect(
-      existsSync(path.join(appPath, "skills/web-code-standards/SKILL.md")),
-    ).toBe(false);
+    expect(existsSync(path.join(appPath, "skills/web-code-standards/SKILL.md"))).toBe(false);
     expect(readFileSync(path.join(appPath, "AGENTS.md"), "utf8")).not.toContain(
       "web-code-standards",
     );
-    expect(existsSync(path.join(appPath, "src/app/shared/routes.ts"))).toBe(
-      false,
-    );
+    expect(existsSync(path.join(appPath, "src/app/shared/routes.ts"))).toBe(false);
     expect(existsSync(path.join(appPath, "public/home.css"))).toBe(false);
   });
 
@@ -458,56 +434,31 @@ describe("App template emission", () => {
 
     expect(existsSync(path.join(appPath, "src/web/root.tsx"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/web/root.setup.ts"))).toBe(true);
-    expect(
-      existsSync(path.join(appPath, "skills/web-code-standards/SKILL.md")),
-    ).toBe(true);
-    expect(readFileSync(path.join(appPath, "AGENTS.md"), "utf8")).toContain(
-      "web-code-standards",
-    );
-    expect(existsSync(path.join(appPath, "src/web/home/index.page.tsx"))).toBe(
-      true,
-    );
+    expect(existsSync(path.join(appPath, "skills/web-code-standards/SKILL.md"))).toBe(true);
+    expect(readFileSync(path.join(appPath, "AGENTS.md"), "utf8")).toContain("web-code-standards");
+    expect(existsSync(path.join(appPath, "src/web/home/index.page.tsx"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/web/home/index.setup.ts"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/web/404.setup.ts"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/web/home/register.ts"))).toBe(false);
-    expect(existsSync(path.join(appPath, "src/web/home/styles/home.css"))).toBe(
-      true,
-    );
-    expect(existsSync(path.join(appPath, "src/app/contact/routes.ts"))).toBe(
-      true,
-    );
-    expect(existsSync(path.join(appPath, "src/app/locale/routes.ts"))).toBe(
-      true,
-    );
+    expect(existsSync(path.join(appPath, "src/web/home/styles/home.css"))).toBe(true);
+    expect(existsSync(path.join(appPath, "src/app/contact/routes.ts"))).toBe(true);
+    expect(existsSync(path.join(appPath, "src/app/locale/routes.ts"))).toBe(true);
     expect(existsSync(path.join(appPath, "postcss.config.mjs"))).toBe(true);
-    expect(existsSync(path.join(appPath, "src/app/home/routes.ts"))).toBe(
-      false,
-    );
+    expect(existsSync(path.join(appPath, "src/app/home/routes.ts"))).toBe(false);
 
     const root = readFileSync(path.join(appPath, "src/web/root.tsx"), "utf8");
     const rootSetup = readFileSync(path.join(appPath, "src/web/root.setup.ts"), "utf8");
-    const page = readFileSync(
-      path.join(appPath, "src/web/home/index.page.tsx"),
-      "utf8",
-    );
-    const pageSetup = readFileSync(
-      path.join(appPath, "src/web/home/index.setup.ts"),
-      "utf8",
-    );
+    const page = readFileSync(path.join(appPath, "src/web/home/index.page.tsx"), "utf8");
+    const pageSetup = readFileSync(path.join(appPath, "src/web/home/index.setup.ts"), "utf8");
     const notFoundSetup = readFileSync(path.join(appPath, "src/web/404.setup.ts"), "utf8");
     const contact = readFileSync(
       path.join(appPath, "src/web/home/components/contact-section.tsx"),
       "utf8",
     );
-    const config = readFileSync(
-      path.join(appPath, "warlock.config.ts"),
-      "utf8",
-    );
+    const config = readFileSync(path.join(appPath, "warlock.config.ts"), "utf8");
     const tsconfig = readFileSync(path.join(appPath, "tsconfig.json"), "utf8");
     const appCss = readFileSync(path.join(appPath, "src/web/app.css"), "utf8");
-    const packageJson = JSON.parse(
-      readFileSync(path.join(appPath, "package.json"), "utf8"),
-    );
+    const packageJson = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
 
     expect(root).toContain('import "./app.css"');
     expect(root).not.toContain("setLocalizationConfigurations");
@@ -529,12 +480,8 @@ describe("App template emission", () => {
     expect(packageJson.dependencies).toMatchObject({
       "@mongez/react-form": "^4.0.0",
     });
-    expect(packageJson.dependencies).not.toHaveProperty(
-      "@mongez/react-localization",
-    );
-    expect(packageJson.dependencies).not.toHaveProperty(
-      "class-variance-authority",
-    );
+    expect(packageJson.dependencies).not.toHaveProperty("@mongez/react-localization");
+    expect(packageJson.dependencies).not.toHaveProperty("class-variance-authority");
     expect(packageJson.dependencies).not.toHaveProperty("tailwind-merge");
   });
 
@@ -543,9 +490,7 @@ describe("App template emission", () => {
 
     app.use("warlock").updatePackageJson().updateDotEnv();
 
-    const packageJson = JSON.parse(
-      readFileSync(path.join(appPath, "package.json"), "utf8"),
-    );
+    const packageJson = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
     const env = readFileSync(path.join(appPath, ".env"), "utf8");
 
     expect(packageJson.name).toBe("my-warlock-app");
@@ -555,9 +500,7 @@ describe("App template emission", () => {
   });
 
   it("wires the selected database driver port and value into .env", () => {
-    const app = new App(
-      makeApplication(appPath, { databaseDriver: "postgres" }),
-    );
+    const app = new App(makeApplication(appPath, { databaseDriver: "postgres" }));
 
     app.use("warlock").updateDotEnv().configureDatabaseEnv("postgres");
 
@@ -585,9 +528,7 @@ describe("App template emission", () => {
 
     app.use("warlock").updatePackageJson();
 
-    const packageJson = JSON.parse(
-      readFileSync(path.join(appPath, "package.json"), "utf8"),
-    );
+    const packageJson = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
 
     expect(packageJson.name).toBe("@acme-store");
   });
@@ -620,9 +561,7 @@ describe("App template emission", () => {
   });
 
   it("removeDatabaseConfig deletes src/config/database.ts but keeps its siblings", () => {
-    const app = new App(
-      makeApplication(appPath, { databaseDriver: NO_DATABASE }),
-    );
+    const app = new App(makeApplication(appPath, { databaseDriver: NO_DATABASE }));
 
     app.use("warlock");
 
@@ -631,27 +570,21 @@ describe("App template emission", () => {
 
     app.removeDatabaseConfig();
 
-    expect(existsSync(path.join(appPath, "src/config/database.ts"))).toBe(
-      false,
-    );
+    expect(existsSync(path.join(appPath, "src/config/database.ts"))).toBe(false);
     // Sibling config files are untouched.
     expect(existsSync(path.join(appPath, "src/config/app.ts"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/config/cache.ts"))).toBe(true);
   });
 
   it("removeDatabaseConfig is chainable and a no-op when the file is already gone", () => {
-    const app = new App(
-      makeApplication(appPath, { databaseDriver: NO_DATABASE }),
-    );
+    const app = new App(makeApplication(appPath, { databaseDriver: NO_DATABASE }));
 
     app.use("warlock");
 
     expect(app.removeDatabaseConfig()).toBe(app);
     // Second call: the file is already gone — it must not throw.
     expect(() => app.removeDatabaseConfig()).not.toThrow();
-    expect(existsSync(path.join(appPath, "src/config/database.ts"))).toBe(
-      false,
-    );
+    expect(existsSync(path.join(appPath, "src/config/database.ts"))).toBe(false);
   });
 
   it("preserves dotfiles and nested hidden directories from the template", () => {
@@ -685,9 +618,7 @@ describe("App template emission", () => {
 
     app.use("warlock").updatePackageJson();
 
-    const packageJson = JSON.parse(
-      readFileSync(path.join(appPath, "package.json"), "utf8"),
-    );
+    const packageJson = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
 
     // Scripts run through whichever manager invokes them (`pnpm dev`,
     // `npm run dev`), so none may shell out to one by name.
@@ -702,9 +633,7 @@ describe("App template emission", () => {
 
     app.use("warlock").updatePackageJson();
 
-    const packageJson = JSON.parse(
-      readFileSync(path.join(appPath, "package.json"), "utf8"),
-    );
+    const packageJson = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
 
     expect(packageJson.private).toBe(true);
     expect(packageJson.type).toBe("module");
@@ -737,14 +666,9 @@ describe("App template emission", () => {
   });
 
   it("is idempotent: re-running configureDatabaseEnv keeps a single correct driver", () => {
-    const app = new App(
-      makeApplication(appPath, { databaseDriver: "postgres" }),
-    );
+    const app = new App(makeApplication(appPath, { databaseDriver: "postgres" }));
 
-    app
-      .use("warlock")
-      .configureDatabaseEnv("postgres")
-      .configureDatabaseEnv("postgres");
+    app.use("warlock").configureDatabaseEnv("postgres").configureDatabaseEnv("postgres");
 
     const env = readFileSync(path.join(appPath, ".env"), "utf8");
     const driverLines = env.match(/DB_DRIVER=/g) ?? [];
@@ -758,10 +682,7 @@ describe("App template emission", () => {
     const app = new App(makeApplication(appPath));
 
     // First wire mongodb (inserts the line), then switch to postgres (rewrites it).
-    app
-      .use("warlock")
-      .configureDatabaseEnv("mongodb")
-      .configureDatabaseEnv("postgres");
+    app.use("warlock").configureDatabaseEnv("mongodb").configureDatabaseEnv("postgres");
 
     const env = readFileSync(path.join(appPath, ".env"), "utf8");
 
@@ -784,9 +705,7 @@ describe("App template emission", () => {
   });
 
   it("produces an internally consistent .env <-> database config pair", () => {
-    const app = new App(
-      makeApplication(appPath, { databaseDriver: "postgres" }),
-    );
+    const app = new App(makeApplication(appPath, { databaseDriver: "postgres" }));
 
     // The real flow always pairs the env and config steps: the env step drops
     // the Mongo-only DB_AUTH, the config step swaps in the postgres config.
@@ -797,15 +716,10 @@ describe("App template emission", () => {
       .configureDatabaseConfig("postgres");
 
     const env = readFileSync(path.join(appPath, ".env"), "utf8");
-    const dbConfig = readFileSync(
-      path.join(appPath, "src/config/database.ts"),
-      "utf8",
-    );
+    const dbConfig = readFileSync(path.join(appPath, "src/config/database.ts"), "utf8");
 
     // Every env key the database config reads must exist in the generated .env.
-    const referencedKeys = [...dbConfig.matchAll(/env\(\s*"([^"]+)"/g)].map(
-      match => match[1],
-    );
+    const referencedKeys = [...dbConfig.matchAll(/env\(\s*"([^"]+)"/g)].map((match) => match[1]);
 
     // Guard against a vacuous pass if the config ever stops using env().
     expect(referencedKeys.length).toBeGreaterThan(3);
@@ -861,9 +775,7 @@ describe("per-driver database config emission", () => {
   });
 
   it("emits a Postgres-shaped database.ts for --db=postgres", () => {
-    const app = new App(
-      makeApplication(appPath, { databaseDriver: "postgres" }),
-    );
+    const app = new App(makeApplication(appPath, { databaseDriver: "postgres" }));
 
     app
       .use("warlock")
@@ -903,22 +815,16 @@ describe("per-driver database config emission", () => {
   });
 
   it("leaves exactly one database.ts and no per-driver variant in the scaffold", () => {
-    const postgresApp = new App(
-      makeApplication(appPath, { databaseDriver: "postgres" }),
-    );
+    const postgresApp = new App(makeApplication(appPath, { databaseDriver: "postgres" }));
 
     postgresApp.use("warlock").configureDatabaseConfig("postgres");
 
     expect(existsSync(dbConfigPath())).toBe(true);
-    expect(
-      existsSync(path.join(appPath, "src/config/database.postgres.ts")),
-    ).toBe(false);
+    expect(existsSync(path.join(appPath, "src/config/database.postgres.ts"))).toBe(false);
   });
 
   it("fixes the working .env DB defaults for postgres (no DB_AUTH=admin, DB_PORT=5432)", () => {
-    const app = new App(
-      makeApplication(appPath, { databaseDriver: "postgres" }),
-    );
+    const app = new App(makeApplication(appPath, { databaseDriver: "postgres" }));
 
     app
       .use("warlock")

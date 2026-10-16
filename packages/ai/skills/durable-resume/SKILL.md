@@ -79,9 +79,9 @@ The re-run uses the interrupted request's `sessionId` by default, because it is 
 
 ### Two resume shapes
 
-| Shape | Pass | Behavior |
-|---|---|---|
-| **re-run** | `{ store, agent }` | Loads, deletes, re-executes the turn; `ResultResult.result` carries the `AgentResult`. |
+| Shape          | Pass                     | Behavior                                                                                                                           |
+| -------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **re-run**     | `{ store, agent }`       | Loads, deletes, re-executes the turn; `ResultResult.result` carries the `AgentResult`.                                             |
 | **apply-only** | `{ store }` (no `agent`) | Loads, validates, deletes; returns `{ type: "applied", decision }` for a caller-owned re-drive (custom transport). No turn re-run. |
 
 ### Idempotent by construction
@@ -98,11 +98,11 @@ A second resume of an already-resolved (deleted) or never-raised interrupt retur
 
 `ai.human.interrupt.{memory,pg,redis}()` build the store. The contract mirrors `@warlock.js/ai`'s `CheckpointStore` / `SnapshotStore` — `save` / `load` / `delete` / optional `list(prefix?)` / `schema()` — so a consumer already running an orchestrator can reuse the **same** pool for the interrupt table.
 
-| Factory | Backing | Deps |
-|---|---|---|
-| `ai.human.interrupt.memory()` | process-local `Map` | none — zero runtime deps |
-| `ai.human.interrupt.pg(options)` | one Postgres row per interrupt, keyed by `interrupt_id` | lazily imports the optional `pg` peer |
-| `ai.human.interrupt.redis(options)` | one namespaced JSON value + a self-maintained id index | lazily imports the optional `redis` peer |
+| Factory                             | Backing                                                 | Deps                                     |
+| ----------------------------------- | ------------------------------------------------------- | ---------------------------------------- |
+| `ai.human.interrupt.memory()`       | process-local `Map`                                     | none — zero runtime deps                 |
+| `ai.human.interrupt.pg(options)`    | one Postgres row per interrupt, keyed by `interrupt_id` | lazily imports the optional `pg` peer    |
+| `ai.human.interrupt.redis(options)` | one namespaced JSON value + a self-maintained id index  | lazily imports the optional `redis` peer |
 
 ```ts
 // Memory — dev / tests / single-process:

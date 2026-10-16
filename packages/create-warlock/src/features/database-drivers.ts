@@ -54,7 +54,7 @@ export const databaseDrivers: DatabaseDriver[] = [
  */
 export function getDatabaseDriverOptions() {
   return [
-    ...databaseDrivers.map(driver => ({
+    ...databaseDrivers.map((driver) => ({
       value: driver.value,
       label: driver.label,
       hint: driver.hint,
@@ -73,7 +73,7 @@ export function getDatabaseDriverOptions() {
  * Get database driver config by value
  */
 export function getDatabaseDriver(value: string): DatabaseDriver | undefined {
-  return databaseDrivers.find(driver => driver.value === value);
+  return databaseDrivers.find((driver) => driver.value === value);
 }
 
 /**
@@ -97,9 +97,7 @@ export function getDatabaseLabel(value: string): string {
 /**
  * Get database driver dependency
  */
-export function getDatabaseDependency(
-  driverValue: string,
-): Record<string, string> {
+export function getDatabaseDependency(driverValue: string): Record<string, string> {
   const driver = getDatabaseDriver(driverValue);
   if (!driver) return {};
 

@@ -19,7 +19,7 @@ describe("createMany bulk path leaves the shared driver alone", () => {
     const insertBefore = driver.insert;
 
     let release!: () => void;
-    const gate = new Promise<void>(resolve => {
+    const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
     let received: Record<string, unknown>[] = [];
@@ -27,14 +27,12 @@ describe("createMany bulk path leaves the shared driver alone", () => {
     vi.mocked(driver.insertMany).mockImplementation(async (_table, rows) => {
       received = rows;
       await gate;
-      return rows.map(document => ({ document }));
+      return rows.map((document) => ({ document }));
     });
 
-    const bulk = createManyRecords(
-      Note as any,
-      [{ title: "a" }, { title: "b" }, { title: "c" }],
-      { bulk: true },
-    );
+    const bulk = createManyRecords(Note as any, [{ title: "a" }, { title: "b" }, { title: "c" }], {
+      bulk: true,
+    });
 
     // Let the bulk run reach the pending insertMany.
     await vi.waitFor(() => expect(driver.insertMany).toHaveBeenCalledTimes(1));
@@ -53,6 +51,6 @@ describe("createMany bulk path leaves the shared driver alone", () => {
 
     expect(driver.insert).toBe(insertBefore);
     expect(driver.insert).toHaveBeenCalledTimes(1);
-    expect(received.map(row => row.title)).toEqual(["a", "b", "c"]);
+    expect(received.map((row) => row.title)).toEqual(["a", "b", "c"]);
   });
 });

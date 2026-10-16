@@ -47,7 +47,8 @@ describe("insertConnectorEntry", () => {
   });
 
   it("is idempotent — a connector already present is left unchanged", () => {
-    const source = "export default defineConfig({ connectors: [queueConnector(), webConnector()] });";
+    const source =
+      "export default defineConfig({ connectors: [queueConnector(), webConnector()] });";
 
     const result = insertConnectorEntry(source, "queueConnector()");
 

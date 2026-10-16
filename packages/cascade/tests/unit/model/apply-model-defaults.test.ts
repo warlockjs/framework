@@ -12,7 +12,11 @@ class Explicit extends Model {
 
 describe("B3: data-source defaults apply over base Model initialisers", () => {
   it("applies defaults when the subclass set nothing", () => {
-    Plain.applyModelDefaults({ strictMode: "fail", deletedAtColumn: "deleted_at", autoGenerateId: false });
+    Plain.applyModelDefaults({
+      strictMode: "fail",
+      deletedAtColumn: "deleted_at",
+      autoGenerateId: false,
+    });
 
     expect(Plain.strictMode).toBe("fail");
     expect(Plain.deletedAtColumn).toBe("deleted_at");

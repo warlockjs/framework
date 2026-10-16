@@ -7,7 +7,7 @@ sidebar:
 
 The [Configuration page in getting-started](../getting-started/03-configuration.md) covers the fast-kickoff: minimum config + `connectToDatabase`. This page picks up where that ends. It covers every option `ConnectionOptions` accepts, the model-defaults hierarchy, multi-data-source registration, and the migration-level knobs.
 
-If you've gotten this far through the docs, you've already configured a database. This page is for when you need to *tune* — performance pools, custom column conventions, multi-tenant routing, migration table naming, the works.
+If you've gotten this far through the docs, you've already configured a database. This page is for when you need to _tune_ — performance pools, custom column conventions, multi-tenant routing, migration table naming, the works.
 
 ## The shape of `connectToDatabase`
 
@@ -25,12 +25,12 @@ const dataSource = await connectToDatabase({
 
 The full option surface organizes into four buckets, each with its own concern:
 
-| Bucket | What it configures | Lives on |
-| ------ | ------------------ | -------- |
-| **Shared** | driver, connection details, logging | top-level fields |
-| **`driverOptions`** | Cascade-side driver knobs (id generation, sessions, ...) | `driverOptions: {...}` |
-| **`clientOptions`** | The native database client (mongodb / pg packages) | `clientOptions: {...}` |
-| **`modelOptions`** | Default model behaviour for every model on this data source | `modelOptions: {...}` |
+| Bucket              | What it configures                                          | Lives on               |
+| ------------------- | ----------------------------------------------------------- | ---------------------- |
+| **Shared**          | driver, connection details, logging                         | top-level fields       |
+| **`driverOptions`** | Cascade-side driver knobs (id generation, sessions, ...)    | `driverOptions: {...}` |
+| **`clientOptions`** | The native database client (mongodb / pg packages)          | `clientOptions: {...}` |
+| **`modelOptions`**  | Default model behaviour for every model on this data source | `modelOptions: {...}`  |
 
 The split is intentional: shared config is portable across drivers, `clientOptions` punches through to the native library when you need its specific knob, and `modelOptions` is where you set cross-cutting model behaviour without touching each model.
 
@@ -66,7 +66,7 @@ A few of these earn their own callouts:
 The registry can hold multiple data sources, keyed by `name`. Without a name, you get `"default"`. The first call to `connectToDatabase` becomes the default; subsequent calls override unless you pass `isDefault: false`:
 
 ```ts
-await connectToDatabase({ name: "primary",  database: "main",      isDefault: true });
+await connectToDatabase({ name: "primary", database: "main", isDefault: true });
 await connectToDatabase({ name: "analytics", database: "warehouse", isDefault: false });
 ```
 
@@ -114,9 +114,10 @@ await connectToDatabase<MongoDriverOptions>({
   driver: "mongodb",
   database: "myapp",
   driverOptions: {
-    autoGenerateId: true,                     // assign numeric ids via counters
-    counterCollection: "counters",            // where the counters live
-    transactionOptions: {                     // defaults for transactions
+    autoGenerateId: true, // assign numeric ids via counters
+    counterCollection: "counters", // where the counters live
+    transactionOptions: {
+      // defaults for transactions
       readPreference: "primary",
       readConcern: { level: "majority" },
       writeConcern: { w: "majority" },
@@ -173,9 +174,9 @@ await connectToDatabase({
   driver: "postgres",
   database: "myapp",
   clientOptions: {
-    max: 20,                    // max connections in the pool
+    max: 20, // max connections in the pool
     idleTimeoutMillis: 30_000,
-    statement_timeout: 10_000,  // SQL-level statement timeout (ms)
+    statement_timeout: 10_000, // SQL-level statement timeout (ms)
     ssl: { rejectUnauthorized: true },
   },
 });
@@ -263,7 +264,7 @@ await connectToDatabase({
   driver: "postgres",
   database: "myapp",
   migrations: {
-    transactional: true,    // wrap each migration in a transaction
+    transactional: true, // wrap each migration in a transaction
     table: "_migrations", // tracking table name
   },
 });

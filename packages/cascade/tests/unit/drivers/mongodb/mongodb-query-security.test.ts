@@ -90,9 +90,11 @@ describe("MongoQueryBuilder — filter security", () => {
     });
 
     it("rejects operator keys via orWhere()", () => {
-      expect(() => builder().where("a", 1).orWhere({ token: { $ne: null } })).toThrow(
-        UnsafeFilterError,
-      );
+      expect(() =>
+        builder()
+          .where("a", 1)
+          .orWhere({ token: { $ne: null } }),
+      ).toThrow(UnsafeFilterError);
     });
 
     it("reports the offending field and operator key", () => {
@@ -250,7 +252,9 @@ describe("MongoQueryBuilder — filter security", () => {
     });
 
     it("still honors an explicit RegExp as a pattern", () => {
-      const pipeline = builder().whereLike("name", /^ali.e$/i).parse().pipeline;
+      const pipeline = builder()
+        .whereLike("name", /^ali.e$/i)
+        .parse().pipeline;
 
       expect(regexSourceOf(pipeline)).toBe("^ali.e$");
     });
@@ -330,7 +334,9 @@ describe("MongoQueryBuilder — filter security", () => {
       const remove = vi.fn().mockResolvedValue(2);
       const where = vi.fn().mockReturnThis();
 
-      await expect(deleteRecords(fakeModelClass(where, remove), { role: "member" })).resolves.toBe(2);
+      await expect(deleteRecords(fakeModelClass(where, remove), { role: "member" })).resolves.toBe(
+        2,
+      );
       expect(where).toHaveBeenCalledWith({ role: "member" });
       expect(remove).toHaveBeenCalled();
     });
@@ -490,9 +496,7 @@ describe("QueryBuilder (base) — filter security", () => {
 
 describe("escapeRegex / likePatternToRegexSource", () => {
   it("escapes every regex metacharacter", () => {
-    expect(escapeRegex(".*+?^${}()|[]\\")).toBe(
-      "\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\",
-    );
+    expect(escapeRegex(".*+?^${}()|[]\\")).toBe("\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\");
   });
 
   it("leaves ordinary text alone", () => {

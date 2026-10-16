@@ -51,7 +51,7 @@ import { listPublishedProductSitemapRows } from "web/product-sitemap-data.server
 
 async function productSitemap() {
   const products = await listPublishedProductSitemapRows();
-  return products.map(product => ({
+  return products.map((product) => ({
     path: `/products/${encodeURIComponent(product.slug)}`,
     lastmod: product.updatedAt,
     images: [{ loc: product.imageUrl }],
@@ -185,6 +185,8 @@ export class Product extends Model {
 
 ```ts title="src/web/product-sitemap-data.server.ts"
 export async function listPublishedProductSitemapRows() {
-  return [{ slug: "anvil", updatedAt: new Date("2026-01-01"), imageUrl: "https://example.com/anvil.jpg" }];
+  return [
+    { slug: "anvil", updatedAt: new Date("2026-01-01"), imageUrl: "https://example.com/anvil.jpg" },
+  ];
 }
 ```

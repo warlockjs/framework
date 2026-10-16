@@ -27,9 +27,9 @@ describe("Router.getNamedApiRoutes", () => {
     expect(router.getNamedApiRoutes().filter((route) => route.path.startsWith("/api/"))).toEqual([
       { name: "users.update", path: "/api/users/:id", method: "POST" },
     ]);
-    expect(Object.keys(router.getNamedApiRoutes().find((route) => route.name === "users.update")!)).toEqual([
-      "name", "path", "method",
-    ]);
+    expect(
+      Object.keys(router.getNamedApiRoutes().find((route) => route.name === "users.update")!),
+    ).toEqual(["name", "path", "method"]);
   });
 
   it("preserves the registered suffix for same-name routes with different methods and keeps all", async () => {

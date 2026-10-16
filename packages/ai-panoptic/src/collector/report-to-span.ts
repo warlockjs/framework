@@ -115,11 +115,7 @@ type ContentReport = {
  * a redactor returning `undefined` drops the field. Under `fullHistory`
  * the redactor receives the full array as a single value.
  */
-function captureContent(
-  span: TraceSpan,
-  report: BaseReport,
-  options: ContentCaptureOptions,
-): void {
+function captureContent(span: TraceSpan, report: BaseReport, options: ContentCaptureOptions): void {
   const node = report as BaseReport & ContentReport;
   const redact = options.redactContent;
 
@@ -129,11 +125,7 @@ function captureContent(
   if (report.type === "tool") {
     input = node.input;
     output = node.output;
-  } else if (
-    options.fullHistory &&
-    Array.isArray(node.messages) &&
-    node.messages.length > 0
-  ) {
+  } else if (options.fullHistory && Array.isArray(node.messages) && node.messages.length > 0) {
     // Full-history capture: the entire assembled conversation as a single
     // input value. Output remains the agent's final response text.
     input = node.messages;
@@ -154,14 +146,18 @@ function captureContent(
   }
 
   if (input !== undefined) {
-    const value = redact ? redact(input, { name: span.name, type: span.type, field: "input" }) : input;
+    const value = redact
+      ? redact(input, { name: span.name, type: span.type, field: "input" })
+      : input;
     if (value !== undefined) {
       span.input = value;
     }
   }
 
   if (output !== undefined) {
-    const value = redact ? redact(output, { name: span.name, type: span.type, field: "output" }) : output;
+    const value = redact
+      ? redact(output, { name: span.name, type: span.type, field: "output" })
+      : output;
     if (value !== undefined) {
       span.output = value;
     }

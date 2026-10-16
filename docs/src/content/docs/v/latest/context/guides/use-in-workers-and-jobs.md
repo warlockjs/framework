@@ -83,13 +83,10 @@ import { parentPort, workerData } from "node:worker_threads";
 import { userContext } from "../contexts/user-context";
 
 async function main() {
-  await userContext.run(
-    { userId: workerData.userId, role: workerData.role },
-    async () => {
-      const result = await doHeavyWork(workerData.input);
-      parentPort?.postMessage(result);
-    },
-  );
+  await userContext.run({ userId: workerData.userId, role: workerData.role }, async () => {
+    const result = await doHeavyWork(workerData.input);
+    parentPort?.postMessage(result);
+  });
 }
 
 main();

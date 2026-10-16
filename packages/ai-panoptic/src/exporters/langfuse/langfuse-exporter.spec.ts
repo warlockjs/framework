@@ -97,7 +97,12 @@ describe("langfuseExporter", () => {
       name: "router",
       children: [
         makeSpan({ spanId: "gen", name: "llm-call", usage: { input: 5, output: 7, total: 12 } }),
-        makeSpan({ spanId: "tool", name: "search", type: "tool", usage: { input: 0, output: 0, total: 0 } }),
+        makeSpan({
+          spanId: "tool",
+          name: "search",
+          type: "tool",
+          usage: { input: 0, output: 0, total: 0 },
+        }),
       ],
     });
 

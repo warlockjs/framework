@@ -81,7 +81,7 @@ export const orderShipped = defineNotification<{ order: Order }>({
 ## 4. Send it
 
 ```ts
-await orderShipped.send(user, { order });           // mail + an in-app row
+await orderShipped.send(user, { order }); // mail + an in-app row
 await orderShipped.send([buyer, seller], { order }); // fan-out to a list
 await orderShipped.only("database").send(user, { order }); // just the in-app row
 ```
@@ -91,10 +91,10 @@ await orderShipped.only("database").send(user, { order }); // just the in-app ro
 ```ts
 import { inApp } from "@warlock.js/notifications";
 
-const badge  = await inApp.countUnread(user);          // for the bell badge
-const unread = await inApp.listUnread(user);           // the dropdown list
-await inApp.markAsRead(user, "ntf_123");               // user clicked one
-await inApp.markAsRead(user);                          // "mark all read"
+const badge = await inApp.countUnread(user); // for the bell badge
+const unread = await inApp.listUnread(user); // the dropdown list
+await inApp.markAsRead(user, "ntf_123"); // user clicked one
+await inApp.markAsRead(user); // "mark all read"
 ```
 
 Every read and write is scoped to the recipient — passing a notification id that belongs to a different user simply matches nothing.

@@ -25,7 +25,9 @@ export class UnsupportedQueryOperationError extends Error {
    * @param hint - Optional guidance appended to the message
    */
   public constructor(operation: string, driver: string, hint?: string) {
-    super(`The ${driver} driver does not support ${operation}() in queries.` + (hint ? ` ${hint}` : ""));
+    super(
+      `The ${driver} driver does not support ${operation}() in queries.` + (hint ? ` ${hint}` : ""),
+    );
     this.name = "UnsupportedQueryOperationError";
     this.operation = operation;
     this.driver = driver;

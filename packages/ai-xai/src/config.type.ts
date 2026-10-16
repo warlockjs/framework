@@ -1,9 +1,4 @@
-import type {
-  EmbedderConfig,
-  ImageModelConfig,
-  ModelConfig,
-  ModelPricing,
-} from "@warlock.js/ai";
+import type { EmbedderConfig, ImageModelConfig, ModelConfig, ModelPricing } from "@warlock.js/ai";
 import type { OpenAISDKConfig } from "@warlock.js/ai-openai";
 
 /**

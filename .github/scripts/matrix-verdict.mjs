@@ -40,9 +40,7 @@ export function computeVerdict({ expected, results, needsResults }) {
     }
   }
 
-  const unexpected = results.filter(
-    (result) => !expectedKeys.has(rowKey(result.row, result.os)),
-  );
+  const unexpected = results.filter((result) => !expectedKeys.has(rowKey(result.row, result.os)));
   for (const result of unexpected) {
     table.push({ row: result.row, os: result.os, status: `UNEXPECTED (${result.conclusion})` });
   }

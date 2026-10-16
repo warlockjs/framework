@@ -15,7 +15,7 @@ type AccessTokenOutput = { token: string; expiresAt: string };
 
 type TokenPair = {
   accessToken: AccessTokenOutput;
-  refreshToken?: AccessTokenOutput;   // omitted when config.auth.jwt.refresh.enabled is false
+  refreshToken?: AccessTokenOutput; // omitted when config.auth.jwt.refresh.enabled is false
 };
 ```
 
@@ -108,23 +108,23 @@ Schedule it via `@warlock.js/scheduler` or run the bundled CLI on cron — see [
 
 ## Issuance entry points
 
-| Method | What it does |
-| --- | --- |
-| `authService.generateAccessToken(user, payload?)` | Just access. Writes one `access_tokens` row. |
+| Method                                              | What it does                                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `authService.generateAccessToken(user, payload?)`   | Just access. Writes one `access_tokens` row.                                               |
 | `authService.createRefreshToken(user, deviceInfo?)` | Just refresh. Writes one `refresh_tokens` row. Returns `undefined` if refresh is disabled. |
-| `authService.createTokenPair(user, deviceInfo?)` | Both. Emits `token.created` + `session.created`. The everyday path. |
-| `user.createTokenPair(deviceInfo?)` | Instance-method form. Same as the line above. |
+| `authService.createTokenPair(user, deviceInfo?)`    | Both. Emits `token.created` + `session.created`. The everyday path.                        |
+| `user.createTokenPair(deviceInfo?)`                 | Instance-method form. Same as the line above.                                              |
 
 ## Revocation entry points
 
-| Method | What it does |
-| --- | --- |
-| `authService.removeAccessToken(user, token)` | Deletes one `access_tokens` row. |
-| `RefreshToken#revoke()` | Stamps `revoked_at = now()` on this row. |
-| `authService.removeRefreshToken(user, token)` | Deletes one `refresh_tokens` row outright (hard delete; rare — use `revoke()` for the audit trail). |
-| `authService.removeAllAccessTokens(user)` | Deletes every `access_tokens` row for this user. |
-| `authService.revokeAllTokens(user)` | Revokes every active refresh token + deletes every access token. Emits `token.revoked` per row, `logout.all` once. |
-| `authService.revokeTokenFamily(familyId)` | Atomically marks the durable family revoked, revokes its refresh rows, and removes associated access rows (plus conservative same-user/type legacy access rows). Emits `token.familyRevoked`. |
+| Method                                        | What it does                                                                                                                                                                                  |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authService.removeAccessToken(user, token)`  | Deletes one `access_tokens` row.                                                                                                                                                              |
+| `RefreshToken#revoke()`                       | Stamps `revoked_at = now()` on this row.                                                                                                                                                      |
+| `authService.removeRefreshToken(user, token)` | Deletes one `refresh_tokens` row outright (hard delete; rare — use `revoke()` for the audit trail).                                                                                           |
+| `authService.removeAllAccessTokens(user)`     | Deletes every `access_tokens` row for this user.                                                                                                                                              |
+| `authService.revokeAllTokens(user)`           | Revokes every active refresh token + deletes every access token. Emits `token.revoked` per row, `logout.all` once.                                                                            |
+| `authService.revokeTokenFamily(familyId)`     | Atomically marks the durable family revoked, revokes its refresh rows, and removes associated access rows (plus conservative same-user/type legacy access rows). Emits `token.familyRevoked`. |
 
 ## Related
 

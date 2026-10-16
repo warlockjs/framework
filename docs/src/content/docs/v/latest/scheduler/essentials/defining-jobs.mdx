@@ -23,15 +23,15 @@ These convenience methods cover the most common schedules:
 ```ts
 import { job } from "@warlock.js/scheduler";
 
-job("every-second",    task).everySecond();
-job("every-minute",    task).everyMinute();
-job("hourly",          task).everyHour();
-job("daily",           task).daily();         // alias for everyDay()
-job("weekly",          task).weekly();        // alias for everyWeek()
-job("monthly",         task).monthly();       // alias for everyMonth()
-job("yearly",          task).yearly();        // alias for everyYear()
-job("twice-a-day",     task).twiceDaily();    // every 12 hours
-job("always-running",  task).always();        // alias for everyMinute()
+job("every-second", task).everySecond();
+job("every-minute", task).everyMinute();
+job("hourly", task).everyHour();
+job("daily", task).daily(); // alias for everyDay()
+job("weekly", task).weekly(); // alias for everyWeek()
+job("monthly", task).monthly(); // alias for everyMonth()
+job("yearly", task).yearly(); // alias for everyYear()
+job("twice-a-day", task).twiceDaily(); // every 12 hours
+job("always-running", task).always(); // alias for everyMinute()
 ```
 
 ## Custom Intervals
@@ -41,9 +41,9 @@ Use `every(value, unit)` when the presets don't fit:
 ```ts
 import { job } from "@warlock.js/scheduler";
 
-job("every-5-min",   task).every(5, "minute");
+job("every-5-min", task).every(5, "minute");
 job("every-2-hours", task).every(2, "hour");
-job("every-3-days",  task).every(3, "day");
+job("every-3-days", task).every(3, "day");
 ```
 
 Plural shortcuts are also available:
@@ -89,12 +89,12 @@ Pass a day-of-week string or a day-of-month number:
 import { job } from "@warlock.js/scheduler";
 
 // Day of week (string)
-job("monday-standup",   task).weekly().on("monday");
-job("friday-report",    task).weekly().on("friday");
+job("monday-standup", task).weekly().on("monday");
+job("friday-report", task).weekly().on("friday");
 
 // Day of month (number 1–31)
-job("mid-month-sync",   task).monthly().on(15);
-job("end-of-month",     task).monthly().on(31);
+job("mid-month-sync", task).monthly().on(15);
+job("end-of-month", task).monthly().on(31);
 ```
 
 Valid day-of-week strings: `"sunday"`, `"monday"`, `"tuesday"`, `"wednesday"`, `"thursday"`, `"friday"`, `"saturday"`.
@@ -111,22 +111,22 @@ Run a job at the very start or end of a time period:
 import { job } from "@warlock.js/scheduler";
 
 // Start of every day (00:00)
-job("day-open",    task).daily().beginOf("day");
+job("day-open", task).daily().beginOf("day");
 
 // End of every day (23:59)
-job("day-close",   task).daily().endOf("day");
+job("day-close", task).daily().endOf("day");
 
 // Start of every month (1st at 00:00)
-job("month-open",  task).monthly().beginOf("month");
+job("month-open", task).monthly().beginOf("month");
 
 // End of every month (last day at 23:59)
 job("month-close", task).monthly().endOf("month");
 
 // Start of every year (Jan 1 at 00:00)
-job("year-open",   task).yearly().beginOf("year");
+job("year-open", task).yearly().beginOf("year");
 
 // End of every year (Dec 31 at 23:59)
-job("year-close",  task).yearly().endOf("year");
+job("year-close", task).yearly().endOf("year");
 ```
 
 `beginOf` and `endOf` support `"day"`, `"month"`, and `"year"`.
@@ -205,8 +205,8 @@ import { scheduler, job } from "@warlock.js/scheduler";
 
 // Fluent chaining on the scheduler
 scheduler
-  .addJob(job("cleanup",  cleanupFn).daily().at("03:00"))
-  .addJob(job("report",   reportFn).weekly().on("monday").at("09:00"))
+  .addJob(job("cleanup", cleanupFn).daily().at("03:00"))
+  .addJob(job("report", reportFn).weekly().on("monday").at("09:00"))
   .addJob(job("heartbeat", pingFn).everyMinutes(5));
 
 scheduler.start();
@@ -217,10 +217,7 @@ Or create a job directly from the scheduler instance using `newJob()`:
 ```ts
 import { scheduler } from "@warlock.js/scheduler";
 
-scheduler
-  .newJob("cleanup", cleanupFn)
-  .daily()
-  .at("03:00");
+scheduler.newJob("cleanup", cleanupFn).daily().at("03:00");
 
 scheduler.start();
 ```

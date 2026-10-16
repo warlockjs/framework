@@ -5,11 +5,7 @@ import type {
   SDKAdapterContract,
 } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
-import type {
-  GroqEmbedderConfig,
-  GroqModelConfig,
-  GroqSDKConfig,
-} from "./config.type";
+import type { GroqEmbedderConfig, GroqModelConfig, GroqSDKConfig } from "./config.type";
 import {
   GROQ_BASE_URL,
   GROQ_PROVIDER,

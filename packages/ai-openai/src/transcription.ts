@@ -113,7 +113,8 @@ export class OpenAITranscriptionModel implements TranscriptionModelContract {
     }));
 
     const durationSeconds =
-      response.duration ?? (response.usage?.type === "duration" ? response.usage.seconds : undefined);
+      response.duration ??
+      (response.usage?.type === "duration" ? response.usage.seconds : undefined);
 
     const usage =
       response.usage?.type === "tokens"

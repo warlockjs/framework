@@ -42,16 +42,18 @@ A quick taste of each:
 
 ```ts
 await fs.files.editJson("package.json", (p) => ({ ...p, version: "4.7.0" }));
-await fs.dirs.empty("cache");                    // clear it, keep the dir
-const readme = fs.file("docs/README.md");         // lazy — no IO yet
-for await (const e of fs.dirs.walk("src")) { /* { path, name, type } */ }
+await fs.dirs.empty("cache"); // clear it, keep the dir
+const readme = fs.file("docs/README.md"); // lazy — no IO yet
+for await (const e of fs.dirs.walk("src")) {
+  /* { path, name, type } */
+}
 ```
 
 ## Everything with sane defaults
 
 The point of `fs` isn't fewer characters — it's that the defaults are the ones you
 actually want. `node:fs` gives you power and no opinions; `fs` gives you power
-*and* the obvious behaviour:
+_and_ the obvious behaviour:
 
 - **Writes create parent dirs** — no `mkdir({ recursive: true })` first.
 - **Deletes are ENOENT-safe** — removing something that's already gone is a

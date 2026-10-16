@@ -36,7 +36,7 @@ import { cache } from "@warlock.js/cache";
 
 // Batch load multiple products
 const productIds = [1, 2, 3, 4, 5];
-const keys = productIds.map(id => `products.${id}`);
+const keys = productIds.map((id) => `products.${id}`);
 const products = await cache.many(keys);
 
 // Returns: [productData1, productData2, productData3, null, productData5]
@@ -49,13 +49,13 @@ const products = await cache.many(keys);
 
 ```ts
 const productIds = [1, 2, 3, 4, 5];
-const keys = productIds.map(id => `products.${id}`);
+const keys = productIds.map((id) => `products.${id}`);
 const cachedProducts = await cache.many(keys);
 
 // Find which products were cached
 const found = cachedProducts
-  .map((product, index) => product ? { id: productIds[index], data: product } : null)
-  .filter(item => item !== null);
+  .map((product, index) => (product ? { id: productIds[index], data: product } : null))
+  .filter((item) => item !== null);
 
 // Identify missing products (need to fetch from database)
 const missingIds = productIds.filter((id, index) => cachedProducts[index] === null);
@@ -74,11 +74,11 @@ import { cache, CACHE_FOR } from "@warlock.js/cache";
 const products = [
   { id: 1, name: "Laptop", price: 999 },
   { id: 2, name: "Phone", price: 599 },
-  { id: 3, name: "Tablet", price: 399 }
+  { id: 3, name: "Tablet", price: 399 },
 ];
 
 const cacheData = {};
-products.forEach(product => {
+products.forEach((product) => {
   cacheData[`products.${product.id}`] = product;
 });
 
@@ -92,7 +92,7 @@ await cache.setMany(cacheData, CACHE_FOR.ONE_HOUR);
 await cache.setMany({
   "config.tax.rate": 0.08,
   "config.shipping.free.threshold": 50,
-  "config.return.days": 30
+  "config.return.days": 30,
 });
 ```
 
@@ -105,7 +105,7 @@ import { cache } from "@warlock.js/cache";
 
 async function getProductsByIds(productIds: number[]) {
   // Try cache first
-  const keys = productIds.map(id => `products.${id}`);
+  const keys = productIds.map((id) => `products.${id}`);
   const cached = await cache.many(keys);
 
   // Find missing products
@@ -119,18 +119,18 @@ async function getProductsByIds(productIds: number[]) {
   // Fetch missing from database
   if (missing.length > 0) {
     const dbProducts = await db.products.findByIds(missing);
-    
+
     // Cache the fetched products
     const toCache: Record<string, any> = {};
-    dbProducts.forEach(product => {
+    dbProducts.forEach((product) => {
       toCache[`products.${product.id}`] = product;
     });
-    
+
     await cache.setMany(toCache, CACHE_FOR.ONE_HOUR);
   }
 
   // Return merged results
-  return productIds.map((id, index) => cached[index] || dbProducts.find(p => p.id === id));
+  return productIds.map((id, index) => cached[index] || dbProducts.find((p) => p.id === id));
 }
 ```
 
@@ -142,18 +142,18 @@ import { cache, CACHE_FOR } from "@warlock.js/cache";
 async function warmCache() {
   const [featuredProducts, categories] = await Promise.all([
     db.products.findFeatured(20),
-    db.categories.findAll()
+    db.categories.findAll(),
   ]);
 
   const toCache: Record<string, any> = {};
-  
+
   // Cache featured products
-  featuredProducts.forEach(product => {
+  featuredProducts.forEach((product) => {
     toCache[`products.${product.id}`] = product;
   });
-  
+
   // Cache categories
-  categories.forEach(category => {
+  categories.forEach((category) => {
     toCache[`categories.${category.id}`] = category;
   });
 
@@ -189,13 +189,13 @@ import { cache } from "@warlock.js/cache";
 
 async function getUsersSafely(userIds: number[]) {
   try {
-    const keys = userIds.map(id => `user.${id}`);
+    const keys = userIds.map((id) => `user.${id}`);
     const values = await cache.many(keys);
-    
+
     return values.map((value, index) => ({
       id: userIds[index],
       data: value,
-      cached: value !== null
+      cached: value !== null,
     }));
   } catch (error) {
     console.error("Failed to get users from cache:", error);
@@ -213,7 +213,7 @@ import { cache, CACHE_FOR } from "@warlock.js/cache";
 class ProductService {
   async getDetailedProducts(productIds: number[]) {
     // Step 1: Try cache
-    const keys = productIds.map(id => `products.${id}`);
+    const keys = productIds.map((id) => `products.${id}`);
     const cached = await cache.many(keys);
 
     // Step 2: Identify missing products
@@ -231,10 +231,10 @@ class ProductService {
     // Step 3: Fetch missing from database
     if (missing.length > 0) {
       const dbProducts = await db.products.findByIds(missing);
-      
+
       // Step 4: Cache fetched products
       const toCache: Record<string, any> = {};
-      dbProducts.forEach(product => {
+      dbProducts.forEach((product) => {
         toCache[`products.${product.id}`] = product;
         results[productIds.indexOf(product.id)] = product;
       });
@@ -247,7 +247,7 @@ class ProductService {
 
   async updateProductsCache(products: any[]) {
     const toCache: Record<string, any> = {};
-    products.forEach(product => {
+    products.forEach((product) => {
       toCache[`products.${product.id}`] = product;
     });
     await cache.setMany(toCache, CACHE_FOR.ONE_HOUR);
@@ -259,10 +259,10 @@ class ProductService {
 
 Bulk operations are significantly more efficient than individual calls:
 
-| Operation | Individual Calls | Bulk Operation | Improvement |
-|-----------|------------------|----------------|-------------|
-| Get 10 keys (Redis) | 10 network round-trips | 1 network round-trip | 10x faster |
-| Set 10 keys (Redis) | 10 network round-trips | 1 network round-trip | 10x faster |
+| Operation            | Individual Calls        | Bulk Operation       | Improvement |
+| -------------------- | ----------------------- | -------------------- | ----------- |
+| Get 10 keys (Redis)  | 10 network round-trips  | 1 network round-trip | 10x faster  |
+| Set 10 keys (Redis)  | 10 network round-trips  | 1 network round-trip | 10x faster  |
 | Get 100 keys (Redis) | 100 network round-trips | 1 network round-trip | 100x faster |
 
 ## Best Practices
@@ -280,4 +280,3 @@ Bulk operations are significantly more efficient than individual calls:
 - **Errors in batch?** Handle errors gracefully — some operations may succeed while others fail
 
 See [Best Practices](/v/latest/cache/best-practices/) for more bulk operation patterns.
-

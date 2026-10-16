@@ -252,44 +252,54 @@ describe("Sitemap — saveTo", () => {
 
   // The failure is injected with Windows sharing semantics; a POSIX rename replaces an
   // open file happily, so the POSIX twin below injects it with a read-only directory.
-  it.runIf(process.platform === "win32")("leaves a pre-existing sitemap byte-for-byte untouched, and no temp file behind, when the publish fails mid-write", async () => {
-    dir = await mkdtemp(join(tmpdir(), "warlock-sitemap-"));
+  it.runIf(process.platform === "win32")(
+    "leaves a pre-existing sitemap byte-for-byte untouched, and no temp file behind, when the publish fails mid-write",
+    async () => {
+      dir = await mkdtemp(join(tmpdir(), "warlock-sitemap-"));
 
-    const filePath = join(dir, "sitemap.xml");
-    const original = "<urlset><untouched/></urlset>";
+      const filePath = join(dir, "sitemap.xml");
+      const original = "<urlset><untouched/></urlset>";
 
-    await writeFile(filePath, original, "utf8");
+      await writeFile(filePath, original, "utf8");
 
-    // Holding an open read handle on the target denies the delete-sharing rename needs
-    // on Windows, so the publish's rename-over-target fails for real, every retry.
-    const handle = await open(filePath, "r");
+      // Holding an open read handle on the target denies the delete-sharing rename needs
+      // on Windows, so the publish's rename-over-target fails for real, every retry.
+      const handle = await open(filePath, "r");
 
-    try {
-      await expect(new Sitemap({ baseUrl }).add({ path: "/a" }).saveTo(filePath)).rejects.toThrow();
-    } finally {
-      await handle.close();
-    }
+      try {
+        await expect(
+          new Sitemap({ baseUrl }).add({ path: "/a" }).saveTo(filePath),
+        ).rejects.toThrow();
+      } finally {
+        await handle.close();
+      }
 
-    expect(await readFile(filePath, "utf8")).toBe(original);
-    expect(await readdir(dir)).toEqual(["sitemap.xml"]);
-  });
+      expect(await readFile(filePath, "utf8")).toBe(original);
+      expect(await readdir(dir)).toEqual(["sitemap.xml"]);
+    },
+  );
 
-  it.runIf(process.platform !== "win32" && process.getuid?.() !== 0)("leaves a pre-existing sitemap byte-for-byte untouched, and no temp file behind, when the directory refuses the write", async () => {
-    dir = await mkdtemp(join(tmpdir(), "warlock-sitemap-"));
+  it.runIf(process.platform !== "win32" && process.getuid?.() !== 0)(
+    "leaves a pre-existing sitemap byte-for-byte untouched, and no temp file behind, when the directory refuses the write",
+    async () => {
+      dir = await mkdtemp(join(tmpdir(), "warlock-sitemap-"));
 
-    const filePath = join(dir, "sitemap.xml");
-    const original = "<urlset><untouched/></urlset>";
+      const filePath = join(dir, "sitemap.xml");
+      const original = "<urlset><untouched/></urlset>";
 
-    await writeFile(filePath, original, "utf8");
-    await chmod(dir, 0o555);
+      await writeFile(filePath, original, "utf8");
+      await chmod(dir, 0o555);
 
-    try {
-      await expect(new Sitemap({ baseUrl }).add({ path: "/a" }).saveTo(filePath)).rejects.toThrow();
-    } finally {
-      await chmod(dir, 0o755);
-    }
+      try {
+        await expect(
+          new Sitemap({ baseUrl }).add({ path: "/a" }).saveTo(filePath),
+        ).rejects.toThrow();
+      } finally {
+        await chmod(dir, 0o755);
+      }
 
-    expect(await readFile(filePath, "utf8")).toBe(original);
-    expect(await readdir(dir)).toEqual(["sitemap.xml"]);
-  });
+      expect(await readFile(filePath, "utf8")).toBe(original);
+      expect(await readdir(dir)).toEqual(["sitemap.xml"]);
+    },
+  );
 });

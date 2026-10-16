@@ -20,21 +20,9 @@ default pricing.
 ## Install
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm install @warlock.js/ai @warlock.js/ai-mistral
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-mistral
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-mistral
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm install @warlock.js/ai @warlock.js/ai-mistral ```</TabItem>
+  <TabItem label="yarn">```bash pnpm add @warlock.js/ai @warlock.js/ai-mistral ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm add @warlock.js/ai @warlock.js/ai-mistral ```</TabItem>
 </Tabs>
 
 ## Construct
@@ -67,9 +55,9 @@ The headline `-latest` aliases are exported as `MISTRAL_MODELS`
 also accepts any version-pinned id (`mistral-large-2512`, `magistral-medium-2509`):
 
 ```ts
-mistral.model({ name: "mistral-large-latest" });    // multimodal flagship
+mistral.model({ name: "mistral-large-latest" }); // multimodal flagship
 mistral.model({ name: "magistral-medium-latest" }); // reasoning
-mistral.model({ name: "pixtral-large-latest" });    // vision
+mistral.model({ name: "pixtral-large-latest" }); // vision
 ```
 
 ## Use as an embedder

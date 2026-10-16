@@ -28,10 +28,7 @@ const require = createRequire(import.meta.url);
 
 const CREATE_WARLOCK_DIR = path.resolve(__dirname, "../../../../create-warlock");
 
-const TEMPLATE_PRETTIERRC = path.resolve(
-  CREATE_WARLOCK_DIR,
-  "templates/warlock/.prettierrc.json",
-);
+const TEMPLATE_PRETTIERRC = path.resolve(CREATE_WARLOCK_DIR, "templates/warlock/.prettierrc.json");
 
 const scaffoldPrettierConfig = JSON.parse(readFileSync(TEMPLATE_PRETTIERRC, "utf8")) as {
   plugins?: string[];

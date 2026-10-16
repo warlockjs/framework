@@ -45,9 +45,7 @@ describe("remedyLines — port-collision advice follows provenance (8782b840)", 
   });
 
   it("names HTTP_PORT and says to unset it — NOT to edit config — when an ambient HTTP_PORT is the colliding port", () => {
-    recordEnvironmentOverrides([
-      { key: "HTTP_PORT", effectiveValue: "41900", fileValue: "2030" },
-    ]);
+    recordEnvironmentOverrides([{ key: "HTTP_PORT", effectiveValue: "41900", fileValue: "2030" }]);
 
     const message = remedyLines(41900).join("\n");
 
@@ -71,9 +69,7 @@ describe("remedyLines — port-collision advice follows provenance (8782b840)", 
     // Ambient HTTP_PORT=41900 beat .env, but the collision is on 3000 (config).
     // Blaming HTTP_PORT here would send the reader to unset a variable that is
     // not the cause of THIS collision.
-    recordEnvironmentOverrides([
-      { key: "HTTP_PORT", effectiveValue: "41900", fileValue: "2030" },
-    ]);
+    recordEnvironmentOverrides([{ key: "HTTP_PORT", effectiveValue: "41900", fileValue: "2030" }]);
 
     const message = remedyLines(3000).join("\n");
 

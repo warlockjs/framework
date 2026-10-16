@@ -48,10 +48,7 @@ class McpClientImpl implements McpClient {
   /** Flipped once the handshake completes so we only do it once. */
   private initialized = false;
 
-  public constructor(
-    source: McpTransport | McpTransportClient,
-    options: McpClientOptions = {},
-  ) {
+  public constructor(source: McpTransport | McpTransportClient, options: McpClientOptions = {}) {
     this.rpc = createJsonRpcClient(source);
     this.options = options;
   }
@@ -145,8 +142,7 @@ class McpClientImpl implements McpClient {
 
     return tool<unknown, unknown>({
       name: prefixedName,
-      description:
-        descriptor.description ?? `Invoke the remote MCP tool "${remoteName}".`,
+      description: descriptor.description ?? `Invoke the remote MCP tool "${remoteName}".`,
       input,
       execute: async (args, ctx) => {
         const result = await this.rpc.call<McpToolCallResult>(

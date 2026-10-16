@@ -8,7 +8,7 @@ sidebar:
 
 `ai.vcr(model, options)` wraps any `ModelContract` in a record/replay decorator backed by a JSON **cassette** on disk. The first run records every model call; later runs replay them — so a test that exercises real prompt/tool wiring runs **deterministically, offline, and for free**, and a call that was never recorded fails loud instead of silently hitting the provider.
 
-It intercepts only `complete()` / `stream()` — the single seam every agent trip funnels through — and delegates `name`, `provider`, `capabilities`, and `pricing` to the inner model untouched, so cost accounting is unchanged. Because it depends only on `ModelContract`, it works with any adapter and composes *below* [`ai.fallbackModel`](/v/latest/ai/best-practices/resilience/).
+It intercepts only `complete()` / `stream()` — the single seam every agent trip funnels through — and delegates `name`, `provider`, `capabilities`, and `pricing` to the inner model untouched, so cost accounting is unchanged. Because it depends only on `ModelContract`, it works with any adapter and composes _below_ [`ai.fallbackModel`](/v/latest/ai/best-practices/resilience/).
 
 ## The shape
 
@@ -17,7 +17,7 @@ import { ai } from "@warlock.js/ai";
 
 const model = ai.vcr(liveModel, {
   path: "./cassettes/support.json", // cassette file (JSON)
-  mode: "auto",                     // "record" | "replay" | "auto". default "auto"
+  mode: "auto", // "record" | "replay" | "auto". default "auto"
 });
 
 const agent = ai.agent({ model, tools, systemPrompt });
@@ -30,11 +30,11 @@ await model.save(); // flush newly recorded entries to `path`
 
 ## Modes
 
-| `mode` | behaviour |
-| --- | --- |
-| `"record"` | **Always** calls the inner model and appends a cassette entry. Never replays. Use to (re)capture a fresh cassette. The in-memory cassette starts empty so a record run never accidentally replays a stale entry. |
-| `"replay"` | **Never** calls the inner model. A cassette hit returns the stored response / chunks / error; a miss throws `VcrCassetteMissError` — never a silent live call. Use in CI. |
-| `"auto"` (default) | Replay on a hit, record on a miss. The friendliest mode for local dev: records once, replays thereafter. |
+| `mode`             | behaviour                                                                                                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"record"`         | **Always** calls the inner model and appends a cassette entry. Never replays. Use to (re)capture a fresh cassette. The in-memory cassette starts empty so a record run never accidentally replays a stale entry. |
+| `"replay"`         | **Never** calls the inner model. A cassette hit returns the stored response / chunks / error; a miss throws `VcrCassetteMissError` — never a silent live call. Use in CI.                                        |
+| `"auto"` (default) | Replay on a hit, record on a miss. The friendliest mode for local dev: records once, replays thereafter.                                                                                                         |
 
 ### The typical workflow
 
@@ -73,9 +73,9 @@ A cassette is plain JSON — readable in a diff. It stores the **verbatim** requ
     {
       "requestHash": "a1b2c3…",
       "request": { "messages": [/* … sent verbatim … */], "options": { "temperature": 0 } },
-      "response": { /* a non-streaming reply */ }
-    }
-  ]
+      "response": {/* a non-streaming reply */},
+    },
+  ],
 }
 ```
 

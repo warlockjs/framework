@@ -38,28 +38,28 @@ Real output:
 
 **Prefix by level** — each line is prefixed with the level's icon and name. The name is padded to a fixed width so the timestamp, module, and action columns line up vertically across a stream of logs:
 
-| Level | Prefix |
-| --- | --- |
-| `debug` | ⚙ debug |
-| `info` | ℹ info |
-| `warn` | ⚠ warn |
-| `error` | ✗ error |
-| `success` | ✓ success |
-| `fatal` | ☠ fatal — white on a bright-red **background badge** (deliberately louder than `error` so a fatal entry can't be missed) |
+| Level     | Prefix                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `debug`   | ⚙ debug                                                                                                                  |
+| `info`    | ℹ info                                                                                                                   |
+| `warn`    | ⚠ warn                                                                                                                   |
+| `error`   | ✗ error                                                                                                                  |
+| `success` | ✓ success                                                                                                                |
+| `fatal`   | ☠ fatal — white on a bright-red **background badge** (deliberately louder than `error` so a fatal entry can't be missed) |
 
 **Colors by part**
 
-| Part | Color |
-| --- | --- |
-| Timestamp `(…)` | Gray (dimmed, so the message stands out) |
-| Module `[…]` | Cyan |
-| Action `[…]` | Magenta |
-| Message — `debug` | Magenta bright |
-| Message — `info` | Blue bright |
-| Message — `warn` | Yellow bright |
-| Message — `error` | Red bright |
-| Message — `success` | Green bright |
-| Message — `fatal` | Red bright + bold |
+| Part                | Color                                    |
+| ------------------- | ---------------------------------------- |
+| Timestamp `(…)`     | Gray (dimmed, so the message stands out) |
+| Module `[…]`        | Cyan                                     |
+| Action `[…]`        | Magenta                                  |
+| Message — `debug`   | Magenta bright                           |
+| Message — `info`    | Blue bright                              |
+| Message — `warn`    | Yellow bright                            |
+| Message — `error`   | Red bright                               |
+| Message — `success` | Green bright                             |
+| Message — `fatal`   | Red bright + bold                        |
 
 :::tip[Object messages]
 If `message` is an object, `ConsoleLog` issues a second `console.log` call with the raw object on its own line, so the Node.js inspector (or browser DevTools) can expand it interactively.

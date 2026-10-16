@@ -3,7 +3,9 @@ import { notificationColumns } from "../../../src/migration/notification-columns
 
 describe("notificationColumns", () => {
   it("uses bigint for recipient and tenant columns when requested", () => {
-    expect(notificationColumns({ idType: "bigint" }).user_id.getDefinition().type).toBe("bigInteger");
+    expect(notificationColumns({ idType: "bigint" }).user_id.getDefinition().type).toBe(
+      "bigInteger",
+    );
 
     const cols = notificationColumns(
       { columnMap: { recipient: "account_id", tenant: "organization_id" } },

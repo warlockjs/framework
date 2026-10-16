@@ -208,7 +208,7 @@ describe("QueryBuilderContract - Shared Behavior Tests", () => {
           queryBuilder.when(
             false,
             (q) => q.where("active", true),
-            (q) => q.where("inactive", true)
+            (q) => q.where("inactive", true),
           );
 
           const ops = (queryBuilder as any).operations;
@@ -217,9 +217,12 @@ describe("QueryBuilderContract - Shared Behavior Tests", () => {
         });
 
         it("should handle callback returning value", () => {
-          queryBuilder.when(() => true, (q) => {
-            q.where("evaluated", true);
-          });
+          queryBuilder.when(
+            () => true,
+            (q) => {
+              q.where("evaluated", true);
+            },
+          );
 
           expect((queryBuilder as any).operations).toHaveLength(1);
         });

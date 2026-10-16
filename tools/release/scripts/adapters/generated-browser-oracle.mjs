@@ -141,7 +141,9 @@ export async function discoverPages(appRoot) {
  *   the page has no (recognisable, literal) `route` export.
  */
 export function extractDeclaredRoutePath(source) {
-  const match = source.match(/export\s+const\s+route\s*=\s*(\{[\s\S]*?\}|["'`][^"'`]*["'`])\s*(?:as\s+const\s*)?;/);
+  const match = source.match(
+    /export\s+const\s+route\s*=\s*(\{[\s\S]*?\}|["'`][^"'`]*["'`])\s*(?:as\s+const\s*)?;/,
+  );
   if (!match) return undefined;
 
   const declaration = match[1];
@@ -165,13 +167,13 @@ export function extractDeclaredRoutePath(source) {
  */
 export function deriveFilesystemRoutePath(relativeToWebRoot) {
   const withoutExtension = relativeToWebRoot.slice(0, -PAGE_EXTENSION.length);
-  const segments = withoutExtension.split("/").filter(segment => segment.length > 0);
+  const segments = withoutExtension.split("/").filter((segment) => segment.length > 0);
 
   if (segments.at(-1) === "index") segments.pop();
 
   const routeSegments = segments
-    .filter(segment => !(segment.startsWith("(") && segment.endsWith(")")))
-    .map(segment => (/^\[[^[\]]+\]$/.test(segment) ? `:${segment.slice(1, -1)}` : segment));
+    .filter((segment) => !(segment.startsWith("(") && segment.endsWith(")")))
+    .map((segment) => (/^\[[^[\]]+\]$/.test(segment) ? `:${segment.slice(1, -1)}` : segment));
 
   return routeSegments.length === 0 ? "/" : `/${routeSegments.join("/")}`;
 }
@@ -196,7 +198,7 @@ export async function resolvePageRoutePath(page) {
  * @returns {{ absolutePath: string, relativeToWebRoot: string, routePath: string } | undefined}
  */
 export function findHomePage(pagesWithRoutes) {
-  return pagesWithRoutes.find(page => page.routePath === "/");
+  return pagesWithRoutes.find((page) => page.routePath === "/");
 }
 
 /**
@@ -218,9 +220,9 @@ export function findHomePage(pagesWithRoutes) {
  * @returns {{ find: string, replacement: string, buttonIndex: number } | undefined}
  */
 export function findIncrementMutationCandidate(source) {
-  const setters = [...source.matchAll(/const\s*\[\s*\w+\s*,\s*(set[A-Z]\w*)\s*\]\s*=\s*useState\b/g)].map(
-    match => match[1],
-  );
+  const setters = [
+    ...source.matchAll(/const\s*\[\s*\w+\s*,\s*(set[A-Z]\w*)\s*\]\s*=\s*useState\b/g),
+  ].map((match) => match[1]);
 
   for (const setter of setters) {
     // The parameter may or may not be parenthesised. The scaffold's own
@@ -276,9 +278,9 @@ function countPrecedingButtons(source, offset) {
  *          elements, or undefined when no `useState` setter is invoked at all.
  */
 export function findCounterButtonIndex(source) {
-  const setters = [...source.matchAll(/const\s*\[\s*\w+\s*,\s*(set[A-Z]\w*)\s*\]\s*=\s*useState\b/g)].map(
-    match => match[1],
-  );
+  const setters = [
+    ...source.matchAll(/const\s*\[\s*\w+\s*,\s*(set[A-Z]\w*)\s*\]\s*=\s*useState\b/g),
+  ].map((match) => match[1]);
 
   for (const setter of setters) {
     const invocation = new RegExp(`${setter}\\(`).exec(source);
@@ -331,7 +333,9 @@ export function extractCounterValue(containerTextWithoutButtonLabel) {
  * @returns {boolean}
  */
 export function counterAdvancedByOne(beforeCount, afterCount) {
-  return Number.isInteger(beforeCount) && Number.isInteger(afterCount) && afterCount === beforeCount + 1;
+  return (
+    Number.isInteger(beforeCount) && Number.isInteger(afterCount) && afterCount === beforeCount + 1
+  );
 }
 
 /**
@@ -352,17 +356,24 @@ export function buildCertificate({ appRoot, development, production, mutation })
     throw new Error("buildCertificate requires an absolute appRoot.");
   }
   for (const key of ["clickPassed", "linkSpaNavigationPassed", "hmrStatePreserved"]) {
-    if (typeof development?.[key] !== "boolean") throw new Error(`development.${key} must be a boolean.`);
+    if (typeof development?.[key] !== "boolean")
+      throw new Error(`development.${key} must be a boolean.`);
   }
   for (const key of ["clickPassed", "linkSpaNavigationPassed"]) {
-    if (typeof production?.[key] !== "boolean") throw new Error(`production.${key} must be a boolean.`);
+    if (typeof production?.[key] !== "boolean")
+      throw new Error(`production.${key} must be a boolean.`);
   }
   for (const phase of [development, production]) {
     if (!Array.isArray(phase?.consoleErrors) || !Array.isArray(phase?.pageErrors)) {
       throw new Error("Both phases require consoleErrors and pageErrors arrays.");
     }
   }
-  if (!mutation?.relativePath || !mutation.find || !mutation.replacement || mutation.find === mutation.replacement) {
+  if (
+    !mutation?.relativePath ||
+    !mutation.find ||
+    !mutation.replacement ||
+    mutation.find === mutation.replacement
+  ) {
     throw new Error("mutation requires a relativePath, a find token, and a distinct replacement.");
   }
   if (path.isAbsolute(mutation.relativePath)) {
@@ -486,7 +497,10 @@ export function decideOutcome({ mutationControl, development, production, mutati
  * @returns {string} Absolute path to a browser executable.
  */
 export function resolveBrowserExecutable() {
-  const override = process.env.WARLOCK_ORACLE_CHROME_PATH ?? process.env.CHROME_PATH ?? process.env.PUPPETEER_EXECUTABLE_PATH;
+  const override =
+    process.env.WARLOCK_ORACLE_CHROME_PATH ??
+    process.env.CHROME_PATH ??
+    process.env.PUPPETEER_EXECUTABLE_PATH;
   if (override && existsSync(override)) return override;
 
   const candidates =
@@ -511,7 +525,7 @@ export function resolveBrowserExecutable() {
             "/usr/bin/microsoft-edge",
           ];
 
-  const found = candidates.find(candidate => existsSync(candidate));
+  const found = candidates.find((candidate) => existsSync(candidate));
   if (!found) {
     throw new Error(
       "No installed Chrome/Chromium/Edge executable found. Set WARLOCK_ORACLE_CHROME_PATH to an explicit browser binary.",
@@ -527,14 +541,16 @@ class Cdp {
     this.nextId = 1;
     this.pending = new Map();
     this.listeners = [];
-    socket.addEventListener("message", event => this.receive(event.data));
+    socket.addEventListener("message", (event) => this.receive(event.data));
   }
 
   static async connect(url) {
     const socket = new WebSocket(url);
     await new Promise((resolve, reject) => {
       socket.addEventListener("open", resolve, { once: true });
-      socket.addEventListener("error", () => reject(new Error("CHROME_CDP_CONNECT_FAILED")), { once: true });
+      socket.addEventListener("error", () => reject(new Error("CHROME_CDP_CONNECT_FAILED")), {
+        once: true,
+      });
     });
     return new Cdp(socket);
   }
@@ -562,7 +578,10 @@ class Cdp {
       return;
     }
     for (const item of this.listeners) {
-      if (item.method === message.method && (!item.sessionId || item.sessionId === message.sessionId)) {
+      if (
+        item.method === message.method &&
+        (!item.sessionId || item.sessionId === message.sessionId)
+      ) {
         item.listener(message.params);
       }
     }
@@ -576,8 +595,13 @@ class Cdp {
 }
 
 async function evaluate(cdp, sessionId, expression) {
-  const result = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }, sessionId);
-  if (result.exceptionDetails) throw new Error(`BROWSER_EVALUATION_FAILED: ${result.exceptionDetails.text}`);
+  const result = await cdp.send(
+    "Runtime.evaluate",
+    { expression, awaitPromise: true, returnByValue: true },
+    sessionId,
+  );
+  if (result.exceptionDetails)
+    throw new Error(`BROWSER_EVALUATION_FAILED: ${result.exceptionDetails.text}`);
   return result.result.value;
 }
 
@@ -592,7 +616,9 @@ async function waitForExpression(cdp, sessionId, expression, timeoutMs) {
     }
     await delay(200);
   }
-  throw new Error(`BROWSER_WAIT_TIMEOUT: ${expression}; ${formatError(lastError ?? "condition stayed false")}`);
+  throw new Error(
+    `BROWSER_WAIT_TIMEOUT: ${expression}; ${formatError(lastError ?? "condition stayed false")}`,
+  );
 }
 
 async function reservePort() {
@@ -603,7 +629,7 @@ async function reservePort() {
     probe.listen({ host: "127.0.0.1", port: 0, exclusive: true }, () => {
       const address = probe.address();
       const port = typeof address === "object" && address ? address.port : 0;
-      probe.close(error => (error ? reject(error) : resolve(port)));
+      probe.close((error) => (error ? reject(error) : resolve(port)));
     });
   });
 }
@@ -629,7 +655,8 @@ async function waitForServer(baseUrl, server, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
-    if (server.exitCode !== null) throw new Error(`Server exited early with code ${server.exitCode}.`);
+    if (server.exitCode !== null)
+      throw new Error(`Server exited early with code ${server.exitCode}.`);
     try {
       const response = await fetch(baseUrl);
       if (response.ok || response.status < 500) return;
@@ -683,29 +710,38 @@ async function driveBrowserPhase({ baseUrl, chromeExecutable, homePage, includeH
   let cdp;
 
   try {
-    const versionInfo = await waitForJson(`http://127.0.0.1:${cdpPort}/json/version`, chrome, 30_000);
+    const versionInfo = await waitForJson(
+      `http://127.0.0.1:${cdpPort}/json/version`,
+      chrome,
+      30_000,
+    );
     cdp = await Cdp.connect(versionInfo.webSocketDebuggerUrl);
     const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
 
     cdp.on(
       "Runtime.consoleAPICalled",
-      event => {
-        if (event.type === "error") consoleErrors.push(event.args.map(argument => argument.value ?? argument.description).join(" "));
+      (event) => {
+        if (event.type === "error")
+          consoleErrors.push(
+            event.args.map((argument) => argument.value ?? argument.description).join(" "),
+          );
       },
       sessionId,
     );
     cdp.on(
       "Runtime.exceptionThrown",
-      event =>
+      (event) =>
         pageErrors.push(
-          event.exceptionDetails?.exception?.description ?? event.exceptionDetails?.text ?? "browser exception",
+          event.exceptionDetails?.exception?.description ??
+            event.exceptionDetails?.text ??
+            "browser exception",
         ),
       sessionId,
     );
     cdp.on(
       "Network.requestWillBeSent",
-      event => {
+      (event) => {
         if (event.type === "Document") documentRequests.push(event.request.url);
       },
       sessionId,
@@ -750,8 +786,15 @@ async function driveBrowserPhase({ baseUrl, chromeExecutable, homePage, includeH
     // `setCount(c => c + 1)` into `setCount(c => c)`, and that corruption
     // must be caught here even on a page where clicking happens to move
     // unrelated text around.
-    const hasButton = await evaluate(cdp, sessionId, `document.querySelectorAll("button")[${homePage.buttonIndex}] !== undefined`);
-    if (!hasButton) throw new Error(`NO_INCREMENT_BUTTON_FOUND: button index ${homePage.buttonIndex} is not present in the rendered DOM.`);
+    const hasButton = await evaluate(
+      cdp,
+      sessionId,
+      `document.querySelectorAll("button")[${homePage.buttonIndex}] !== undefined`,
+    );
+    if (!hasButton)
+      throw new Error(
+        `NO_INCREMENT_BUTTON_FOUND: button index ${homePage.buttonIndex} is not present in the rendered DOM.`,
+      );
 
     const readCounterContainerText = `(() => {
       const button = document.querySelectorAll("button")[${homePage.buttonIndex}];
@@ -779,7 +822,9 @@ async function driveBrowserPhase({ baseUrl, chromeExecutable, homePage, includeH
       `[...document.querySelectorAll("a")].filter(a => a.getAttribute("href")?.startsWith("/") && !a.target).length`,
     );
     if (internalLinkCount === 0) {
-      throw new Error("NO_INTERNAL_LINK_FOUND: no same-origin anchor without a target attribute is present in the rendered DOM.");
+      throw new Error(
+        "NO_INTERNAL_LINK_FOUND: no same-origin anchor without a target attribute is present in the rendered DOM.",
+      );
     }
     await evaluate(cdp, sessionId, `window.__WARLOCK_ORACLE_LINK_REALM__ = "alive"; true`);
     const documentsBeforeLink = documentRequests.length;
@@ -789,8 +834,13 @@ async function driveBrowserPhase({ baseUrl, chromeExecutable, homePage, includeH
       `(() => { [...document.querySelectorAll("a")].find(a => a.getAttribute("href")?.startsWith("/") && !a.target).click(); return true; })()`,
     );
     await delay(500);
-    const realmSurvived = await evaluate(cdp, sessionId, `window.__WARLOCK_ORACLE_LINK_REALM__ === "alive"`);
-    const linkSpaNavigationPassed = documentRequests.length === documentsBeforeLink && realmSurvived === true;
+    const realmSurvived = await evaluate(
+      cdp,
+      sessionId,
+      `window.__WARLOCK_ORACLE_LINK_REALM__ === "alive"`,
+    );
+    const linkSpaNavigationPassed =
+      documentRequests.length === documentsBeforeLink && realmSurvived === true;
 
     const result = { clickPassed, linkSpaNavigationPassed, consoleErrors, pageErrors };
 
@@ -804,19 +854,31 @@ async function driveBrowserPhase({ baseUrl, chromeExecutable, homePage, includeH
       // Append a plain, visible text marker just before the closing tag of
       // the FIRST button block found — a minimal, reversible source edit.
       const match = original.match(buttonBlockPattern);
-      if (!match) throw new Error("NO_HMR_PROBE_TARGET: could not find a <button ...>...</button> block to hot-edit.");
+      if (!match)
+        throw new Error(
+          "NO_HMR_PROBE_TARGET: could not find a <button ...>...</button> block to hot-edit.",
+        );
       const mutated = original.replace(buttonBlockPattern, `$1${probeMarker}$2`);
 
       await evaluate(cdp, sessionId, `window.__WARLOCK_ORACLE_HMR_REALM__ = "alive"; true`);
       const documentsBeforeHmr = documentRequests.length;
       try {
         await writeFile(homePage.absolutePath, mutated, "utf8");
-        await waitForExpression(cdp, sessionId, `document.body.innerText.includes(${JSON.stringify(probeMarker)})`, 20_000);
+        await waitForExpression(
+          cdp,
+          sessionId,
+          `document.body.innerText.includes(${JSON.stringify(probeMarker)})`,
+          20_000,
+        );
       } finally {
         await writeFile(homePage.absolutePath, original, "utf8");
       }
       const hmrDocumentRequests = documentRequests.length - documentsBeforeHmr;
-      const hmrRealmSurvived = await evaluate(cdp, sessionId, `window.__WARLOCK_ORACLE_HMR_REALM__ === "alive"`);
+      const hmrRealmSurvived = await evaluate(
+        cdp,
+        sessionId,
+        `window.__WARLOCK_ORACLE_HMR_REALM__ === "alive"`,
+      );
       result.hmrStatePreserved = hmrDocumentRequests === 0 && hmrRealmSurvived === true;
     }
 
@@ -835,8 +897,11 @@ async function reserveHttpPort() {
 async function terminate(child) {
   if (!child || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    await new Promise(resolve => {
-      const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
+    await new Promise((resolve) => {
+      const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
       killer.once("error", resolve);
       killer.once("close", resolve);
     });
@@ -858,23 +923,31 @@ function ownedEnv(port) {
 
 async function runCommand(command, args, { cwd, env, timeoutMs, label }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const child = spawn(command, args, {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
       reject(new Error(`${label} timed out after ${timeoutMs}ms.`));
     }, timeoutMs);
-    child.stdout.setEncoding("utf8").on("data", chunk => (stdout += chunk));
-    child.stderr.setEncoding("utf8").on("data", chunk => (stderr += chunk));
-    child.once("error", error => {
+    child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
+    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    child.once("error", (error) => {
       clearTimeout(timer);
       reject(new Error(`${label} could not start: ${formatError(error)}`));
     });
-    child.once("exit", code => {
+    child.once("exit", (code) => {
       clearTimeout(timer);
       if (code === 0) resolve({ stdout, stderr });
-      else reject(new Error(`${label} exited ${code}.\nSTDOUT:\n${tail(stdout)}\nSTDERR:\n${tail(stderr)}`));
+      else
+        reject(
+          new Error(`${label} exited ${code}.\nSTDOUT:\n${tail(stdout)}\nSTDERR:\n${tail(stderr)}`),
+        );
     });
   });
 }
@@ -891,7 +964,12 @@ function findWarlockBin(appRoot) {
 async function runDevelopmentPhase({ appRoot, homePage, chromeExecutable }) {
   const port = await reserveHttpPort();
   const warlockBin = findWarlockBin(appRoot);
-  const server = spawn(process.execPath, [warlockBin, "dev"], { cwd: appRoot, env: ownedEnv(port), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const server = spawn(process.execPath, [warlockBin, "dev"], {
+    cwd: appRoot,
+    env: ownedEnv(port),
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
   const baseUrl = `http://127.0.0.1:${port}`;
   try {
     await waitForServer(baseUrl, server, 90_000);
@@ -904,9 +982,19 @@ async function runDevelopmentPhase({ appRoot, homePage, chromeExecutable }) {
 /** Run the complete production phase: `warlock build` then `warlock start`, driven the same way but without the HMR probe. */
 async function runProductionPhase({ appRoot, homePage, chromeExecutable }) {
   const warlockBin = findWarlockBin(appRoot);
-  await runCommand(process.execPath, [warlockBin, "build"], { cwd: appRoot, env: ownedEnv(0), timeoutMs: 5 * 60_000, label: "warlock build" });
+  await runCommand(process.execPath, [warlockBin, "build"], {
+    cwd: appRoot,
+    env: ownedEnv(0),
+    timeoutMs: 5 * 60_000,
+    label: "warlock build",
+  });
   const port = await reserveHttpPort();
-  const server = spawn(process.execPath, [warlockBin, "start"], { cwd: appRoot, env: ownedEnv(port), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const server = spawn(process.execPath, [warlockBin, "start"], {
+    cwd: appRoot,
+    env: ownedEnv(port),
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
   const baseUrl = `http://127.0.0.1:${port}`;
   try {
     await waitForServer(baseUrl, server, 90_000);
@@ -925,7 +1013,7 @@ function formatError(error) {
 }
 
 function delay(milliseconds) {
-  return new Promise(resolve => setTimeout(resolve, milliseconds));
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 /**
@@ -942,11 +1030,13 @@ export async function main(argv) {
 
   const pages = await discoverPages(appRoot);
   const pagesWithRoutes = await Promise.all(
-    pages.map(async page => ({ ...page, routePath: await resolvePageRoutePath(page) })),
+    pages.map(async (page) => ({ ...page, routePath: await resolvePageRoutePath(page) })),
   );
   const homePage = findHomePage(pagesWithRoutes);
   if (!homePage) {
-    throw new Error(`NO_HOME_PAGE_FOUND: no *.page.tsx beneath ${path.join(appRoot, "src", "web")} resolves to route "/".`);
+    throw new Error(
+      `NO_HOME_PAGE_FOUND: no *.page.tsx beneath ${path.join(appRoot, "src", "web")} resolves to route "/".`,
+    );
   }
 
   const source = await readFile(homePage.absolutePath, "utf8");
@@ -976,8 +1066,16 @@ export async function main(argv) {
   const chromeExecutable = resolveBrowserExecutable();
   const homePageForDriving = { absolutePath: homePage.absolutePath, buttonIndex };
 
-  const development = await runDevelopmentPhase({ appRoot, homePage: homePageForDriving, chromeExecutable });
-  const production = await runProductionPhase({ appRoot, homePage: homePageForDriving, chromeExecutable });
+  const development = await runDevelopmentPhase({
+    appRoot,
+    homePage: homePageForDriving,
+    chromeExecutable,
+  });
+  const production = await runProductionPhase({
+    appRoot,
+    homePage: homePageForDriving,
+    chromeExecutable,
+  });
 
   // In control mode the candidate is absent by design (the gate already applied
   // it); these values only reach the diagnostic message there, never a
@@ -988,7 +1086,12 @@ export async function main(argv) {
     replacement: mutationCandidate?.replacement ?? "<already applied by the gate>",
   };
 
-  const outcome = decideOutcome({ mutationControl: options.mutationControl, development, production, mutation });
+  const outcome = decideOutcome({
+    mutationControl: options.mutationControl,
+    development,
+    production,
+    mutation,
+  });
 
   if (outcome.ok) {
     const certificate = buildCertificate({ appRoot, development, production, mutation });
@@ -1004,14 +1107,15 @@ export async function main(argv) {
   return outcome.exitCode;
 }
 
-const isEntryPoint = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+const isEntryPoint =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 
 if (isEntryPoint) {
   main(process.argv.slice(2))
-    .then(code => {
+    .then((code) => {
       process.exitCode = code;
     })
-    .catch(error => {
+    .catch((error) => {
       process.stderr.write(`${error && error.stack ? error.stack : String(error)}\n`);
       process.exitCode = 1;
     });

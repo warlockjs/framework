@@ -15,4 +15,3 @@ export type {
   RollbackOptions,
   RunMigrationsOptions,
 } from "./types";
-

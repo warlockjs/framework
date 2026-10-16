@@ -24,6 +24,8 @@ describe("pageSetupOwnerFileFor", () => {
     ["layout.setup.ts", "layout.tsx"],
     ["root.setup.ts", "root.tsx"],
   ])("maps %s back to %s", (file, expected) => {
-    expect(pageSetupOwnerFileFor(path.resolve("src/web", file))).toBe(path.resolve("src/web", expected));
+    expect(pageSetupOwnerFileFor(path.resolve("src/web", file))).toBe(
+      path.resolve("src/web", expected),
+    );
   });
 });

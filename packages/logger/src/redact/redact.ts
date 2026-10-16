@@ -1,8 +1,5 @@
 import type { LoggingData, RedactCensor, RedactConfig } from "../types";
-import {
-  DEFAULT_REDACT_KEY_SET,
-  normalizeRedactKey,
-} from "./default-keys";
+import { DEFAULT_REDACT_KEY_SET, normalizeRedactKey } from "./default-keys";
 
 const DEFAULT_CENSOR = "[REDACTED]";
 
@@ -387,10 +384,7 @@ export function resolveRedactKeys(
  *   client that exposes request config behind a getter still slips through.
  *   Enumerable ones (axios's `.config`, `.response`) *are* covered.
  */
-export function applyRedact(
-  data: LoggingData,
-  config: RedactConfig | undefined,
-): LoggingData {
+export function applyRedact(data: LoggingData, config: RedactConfig | undefined): LoggingData {
   const paths = config?.paths ?? [];
   const keys = resolveRedactKeys(config);
 
@@ -448,9 +442,7 @@ export function mergeRedact(
     // An absent logger-wide config still means "built-in denylist on" — it is
     // the floor, not the absence of one. A channel may not switch it off, so
     // its `defaultKeys: false` is overridden here rather than inherited.
-    return extra!.defaultKeys === false
-      ? { ...extra!, defaultKeys: true }
-      : extra;
+    return extra!.defaultKeys === false ? { ...extra!, defaultKeys: true } : extra;
   }
 
   if (!extra) return base;

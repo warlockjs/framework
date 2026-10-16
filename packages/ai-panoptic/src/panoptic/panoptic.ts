@@ -51,8 +51,7 @@ class PanopticSubscriber implements Panoptic {
       this.collector.use(exporter);
     }
 
-    this.completedEvents =
-      options.completedEvents ?? [...DEFAULT_COMPLETED_EVENTS];
+    this.completedEvents = options.completedEvents ?? [...DEFAULT_COMPLETED_EVENTS];
     this.middlewareName = options.middlewareName ?? "panoptic";
   }
 

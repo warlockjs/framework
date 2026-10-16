@@ -31,14 +31,10 @@ function read(relativePath: string): string {
  * so it counts as required for a seed, which never passes an id).
  */
 function requiredModelFields(modelSource: string): string[] {
-  const schemaBody = modelSource.match(
-    /userSchema\s*=\s*v\.object\(\{([\s\S]*?)\n\}\);/,
-  );
+  const schemaBody = modelSource.match(/userSchema\s*=\s*v\.object\(\{([\s\S]*?)\n\}\);/);
 
   if (!schemaBody) {
-    throw new Error(
-      "Could not locate `userSchema = v.object({...})` in the template user model.",
-    );
+    throw new Error("Could not locate `userSchema = v.object({...})` in the template user model.");
   }
 
   const fields: string[] = [];
@@ -63,36 +59,25 @@ function seededFields(seedSource: string): string[] {
   const createBody = seedSource.match(/User\.create\(\{([\s\S]*?)\}\)/);
 
   if (!createBody) {
-    throw new Error(
-      "Could not locate `User.create({...})` in the template users seed.",
-    );
+    throw new Error("Could not locate `User.create({...})` in the template users seed.");
   }
 
-  return [...createBody[1].matchAll(/^\s*(\w+):/gm)].map(match => match[1]);
+  return [...createBody[1].matchAll(/^\s*(\w+):/gm)].map((match) => match[1]);
 }
 
 describe("template users seed satisfies the template user model", () => {
   it("parses the model's fields, so an empty result can never pass vacuously", () => {
-    const required = requiredModelFields(
-      read("src/app/users/models/user/user.model.ts"),
-    );
+    const required = requiredModelFields(read("src/app/users/models/user/user.model.ts"));
 
-    expect(required).toEqual(
-      expect.arrayContaining(["name", "email", "password"]),
-    );
+    expect(required).toEqual(expect.arrayContaining(["name", "email", "password"]));
   });
 
   it("writes every field the model requires", () => {
-    const required = requiredModelFields(
-      read("src/app/users/models/user/user.model.ts"),
-    );
+    const required = requiredModelFields(read("src/app/users/models/user/user.model.ts"));
     const seeded = seededFields(read("src/app/users/seeds/users.seed.ts"));
 
-    const missing = required.filter(field => !seeded.includes(field));
+    const missing = required.filter((field) => !seeded.includes(field));
 
-    expect(
-      missing,
-      `users.seed.ts omits required model fields: ${missing.join(", ")}`,
-    ).toEqual([]);
+    expect(missing, `users.seed.ts omits required model fields: ${missing.join(", ")}`).toEqual([]);
   });
 });

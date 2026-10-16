@@ -72,9 +72,9 @@ describe("cache.metrics — counters", () => {
 
   it("counts sets, hits, and misses across reads", async () => {
     await cache.set("a", 1);
-    await cache.get("a");      // hit
-    await cache.get("a");      // hit
-    await cache.get("ghost");  // miss
+    await cache.get("a"); // hit
+    await cache.get("a"); // hit
+    await cache.get("ghost"); // miss
 
     const snapshot = cache.metrics();
     expect(snapshot.sets).toBe(1);
@@ -116,10 +116,10 @@ describe("cache.metrics — per-driver breakdown", () => {
   });
 
   it("isolates events under the driver that emitted them", async () => {
-    await cache.set("a", 1);   // memory
-    await cache.get("a");      // memory hit
+    await cache.set("a", 1); // memory
+    await cache.get("a"); // memory hit
 
-    await cache.set("b", 2, { driver: "memoryExtended" });   // routed to memoryExtended
+    await cache.set("b", 2, { driver: "memoryExtended" }); // routed to memoryExtended
 
     const snapshot = cache.metrics();
     expect(snapshot.byDriver.memory!.hits).toBe(1);

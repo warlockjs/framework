@@ -298,10 +298,7 @@ describe("FilterApplicator — multi-column 'like' (D1 regression)", () => {
   });
 
   it("builds a like-OR group across columns instead of equality", () => {
-    const query = apply(
-      { search: ["like", ["name", "description"]] },
-      { search: "%coffee%" },
-    );
+    const query = apply({ search: ["like", ["name", "description"]] }, { search: "%coffee%" });
 
     // Regression (D1): previously `orWhere({ name, description })`, i.e. equality.
     // Tenant regression: the group must be ANDed (`where`), never a top-level orWhere.
@@ -313,12 +310,10 @@ describe("FilterApplicator — multi-column 'like' (D1 regression)", () => {
   });
 
   it("throws naming the rule and the operator for a genuinely unsupported multi-column operator", () => {
-    expect(() =>
-      apply({ range: [">", ["startDate", "endDate"]] }, { range: 5 }),
-    ).toThrowError(/range/);
+    expect(() => apply({ range: [">", ["startDate", "endDate"]] }, { range: 5 })).toThrowError(
+      /range/,
+    );
 
-    expect(() =>
-      apply({ range: [">", ["startDate", "endDate"]] }, { range: 5 }),
-    ).toThrowError(/>/);
+    expect(() => apply({ range: [">", ["startDate", "endDate"]] }, { range: 5 })).toThrowError(/>/);
   });
 });

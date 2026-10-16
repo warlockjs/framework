@@ -20,11 +20,11 @@ It is agent middleware, so it composes with everything else (budget, semantic ca
 
 ## The three phases
 
-| Phase | Hook | Inspects | Supported verdicts |
-| --- | --- | --- | --- |
-| `input` | `trip.before` | the outbound user prompt | `allow` / `block` / `flag` (**`redact` → `block`**) |
-| `output` | `trip.after` | `response.content` | `allow` / `redact` / `block` / `flag` (full) |
-| `tool` | `tool.before` | `JSON.stringify(toolArgs)` | `allow` / `block` / `flag` (**`redact` → `block`**) |
+| Phase    | Hook          | Inspects                   | Supported verdicts                                  |
+| -------- | ------------- | -------------------------- | --------------------------------------------------- |
+| `input`  | `trip.before` | the outbound user prompt   | `allow` / `block` / `flag` (**`redact` → `block`**) |
+| `output` | `trip.after`  | `response.content`         | `allow` / `redact` / `block` / `flag` (full)        |
+| `tool`   | `tool.before` | `JSON.stringify(toolArgs)` | `allow` / `block` / `flag` (**`redact` → `block`**) |
 
 Each phase is an **array of detectors run in registration order**; the first non-`allow`/non-`flag` verdict short-circuits that phase.
 
@@ -34,13 +34,15 @@ Each phase is an **array of detectors run in registration order**; the first non
 import { ai } from "@warlock.js/ai";
 
 const policy = ai.guardrail({
-  name: "compliance",                                       // default "guardrail"
+  name: "compliance", // default "guardrail"
   input: [ai.guardrail.injection({ onMatch: "block" })],
   output: [ai.guardrail.pii({ onMatch: "redact", mask: "[REDACTED:{label}]" })],
   tool: [ai.guardrail.pii({ onMatch: "block" })],
-  toolNames: ["send_email"],                                // scope the tool detectors
+  toolNames: ["send_email"], // scope the tool detectors
   escalation: {
-    async onBlock(event) { await reviewQueue.enqueue(event); },
+    async onBlock(event) {
+      await reviewQueue.enqueue(event);
+    },
   },
 });
 
@@ -51,12 +53,12 @@ const agent = ai.agent({ model, tools: [sendEmail], middleware: [policy] });
 
 ```ts
 interface GuardOptions {
-  name?: string;                            // surfaces on the error + the ctx.state namespace
-  input?: readonly GuardrailDetector[];     // run at trip.before over the prompt
-  output?: readonly GuardrailDetector[];    // run at trip.after over response.content
-  tool?: readonly GuardrailDetector[];      // run at tool.before over JSON.stringify(args)
-  toolNames?: string | readonly string[];   // restrict the tool detectors to these tools
-  escalation?: GuardrailEscalation;         // onBlock hook for escalate:true verdicts
+  name?: string; // surfaces on the error + the ctx.state namespace
+  input?: readonly GuardrailDetector[]; // run at trip.before over the prompt
+  output?: readonly GuardrailDetector[]; // run at trip.after over response.content
+  tool?: readonly GuardrailDetector[]; // run at tool.before over JSON.stringify(args)
+  toolNames?: string | readonly string[]; // restrict the tool detectors to these tools
+  escalation?: GuardrailEscalation; // onBlock hook for escalate:true verdicts
 }
 ```
 
@@ -87,7 +89,7 @@ Practically: use `redact` for output PII; use `block` / `flag` for input and too
 
 ### Fail-open on detector fault
 
-A detector's `check()` *throwing* is an infrastructure fault (e.g. a moderation API outage), not a content violation. The guard records it as a `flag` (`<detector>.error`) and continues — one detector's outage never aborts every agent run.
+A detector's `check()` _throwing_ is an infrastructure fault (e.g. a moderation API outage), not a content violation. The guard records it as a `flag` (`<detector>.error`) and continues — one detector's outage never aborts every agent run.
 
 ## Built-in detectors
 
@@ -99,10 +101,10 @@ Scans for personally identifiable information via curated linear regexes (safe a
 
 ```ts
 ai.guardrail.pii({
-  detect: ["ssn", "credit-card"],   // default: all categories
-  onMatch: "redact",                 // default "redact"
-  mask: "[PII:{label}]",             // {label} → the matched category; default "[REDACTED]"
-  dictionary: ["Project Aurora"],    // extra exact terms, matched case-insensitively
+  detect: ["ssn", "credit-card"], // default: all categories
+  onMatch: "redact", // default "redact"
+  mask: "[PII:{label}]", // {label} → the matched category; default "[REDACTED]"
+  dictionary: ["Project Aurora"], // extra exact terms, matched case-insensitively
 });
 ```
 
@@ -129,7 +131,7 @@ Matches a curated set of jailbreak / prompt-injection marker phrases — overrid
 ```ts
 const guard = ai.guardrail({
   input: [ai.guardrail.injection({ onMatch: "block" })], // reject on the inbound prompt
-  output: [ai.guardrail.injection()],                    // flag-only on the model's reply
+  output: [ai.guardrail.injection()], // flag-only on the model's reply
 });
 
 // Extend the built-in set with a house rule:
@@ -145,8 +147,8 @@ Sends the inspected text to OpenAI's moderation endpoint and maps flagged catego
 ```ts
 ai.guardrail.moderation({
   blockOn: ["violence", "sexual/minors"], // omit to flag on any category
-  model: "omni-moderation-latest",        // default
-  apiKey: process.env.OPENAI_API_KEY,     // reads OPENAI_API_KEY when omitted
+  model: "omni-moderation-latest", // default
+  apiKey: process.env.OPENAI_API_KEY, // reads OPENAI_API_KEY when omitted
 });
 
 // Bring your own client (or a test double) — the SDK is then never imported:
@@ -192,7 +194,7 @@ if (result.error instanceof GuardrailViolationError) {
 
 ### `escalation.onBlock` — hand a block to a human
 
-A detector can return `{ type: "block", escalate: true }`. When it does, the guard **awaits** `escalation.onBlock(event)` *before* throwing — the seam for routing a hard block to a human-review surface:
+A detector can return `{ type: "block", escalate: true }`. When it does, the guard **awaits** `escalation.onBlock(event)` _before_ throwing — the seam for routing a hard block to a human-review surface:
 
 ```ts
 ai.guardrail({
@@ -214,8 +216,8 @@ ai.guardrail({
 
 ```ts
 interface FlagRecord {
-  detector: string;       // which detector flagged
-  phase: GuardrailPhase;  // "input" | "output" | "tool"
+  detector: string; // which detector flagged
+  phase: GuardrailPhase; // "input" | "output" | "tool"
   reason: string;
   matches: readonly GuardrailMatch[];
 }

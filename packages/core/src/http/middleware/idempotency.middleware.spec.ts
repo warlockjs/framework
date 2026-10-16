@@ -50,7 +50,8 @@ async function run(handler: () => Promise<number>) {
 
   const short = await middleware({ request: createRequest(), response } as any);
   const shortCircuited =
-    (response.replay as any).mock.calls.length > 0 || (response.conflict as any).mock.calls.length > 0;
+    (response.replay as any).mock.calls.length > 0 ||
+    (response.conflict as any).mock.calls.length > 0;
 
   if (short === undefined && !shortCircuited) {
     handled = true;

@@ -21,7 +21,7 @@ const openai = new OpenAISDK({
     "gpt-4o-mini": {
       input: 0.15,
       output: 0.6,
-      cachedInput: 0.075,        // when the provider reports cached input
+      cachedInput: 0.075, // when the provider reports cached input
     },
     "gpt-4o": {
       input: 5.0,
@@ -48,14 +48,14 @@ const customModel = openai.model({
 
 ```ts
 type CostBreakdown = {
-  input: number;          // USD
+  input: number; // USD
   output: number;
   cachedInput?: number;
   cachedOutput?: number;
 };
 
 type Usage = {
-  input: number;          // tokens
+  input: number; // tokens
   output: number;
   total: number;
   cost?: CostBreakdown;
@@ -127,10 +127,10 @@ ai.agent({
   model,
   middleware: [
     ai.middleware.budget({
-      maxCostUSD: 0.5,         // per-execute hard cap
-      onExceeded: "abort",     // throws BudgetExceededError
+      maxCostUSD: 0.5, // per-execute hard cap
+      onExceeded: "abort", // throws BudgetExceededError
     }),
-    costTracker,                // records what was spent
+    costTracker, // records what was spent
   ],
 });
 ```
@@ -162,7 +162,9 @@ console.log("Total cost:", usage.cost);
 // { input: 0.0042, output: 0.0181 }
 
 for (const step of Object.values(report.steps)) {
-  console.log(`  step ${step.name}: ${step.usage?.cost?.input ?? 0} + ${step.usage?.cost?.output ?? 0}`);
+  console.log(
+    `  step ${step.name}: ${step.usage?.cost?.input ?? 0} + ${step.usage?.cost?.output ?? 0}`,
+  );
 }
 ```
 

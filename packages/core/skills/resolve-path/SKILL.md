@@ -12,30 +12,30 @@ Twelve helpers, all anchored at `process.cwd()`, all in `@warlock.js/core`. They
 ```ts
 import { appPath, configPath, uploadsPath, storagePath } from "@warlock.js/core";
 
-appPath("orders/routes.ts");           // → <cwd>/src/app/orders/routes.ts
-configPath("http.ts");                  // → <cwd>/src/config/http.ts
-uploadsPath("avatars/42.png");          // → <cwd>/storage/uploads/avatars/42.png
-storagePath("backups/2026-01.tar.gz");  // → <cwd>/storage/backups/2026-01.tar.gz
+appPath("orders/routes.ts"); // → <cwd>/src/app/orders/routes.ts
+configPath("http.ts"); // → <cwd>/src/config/http.ts
+uploadsPath("avatars/42.png"); // → <cwd>/storage/uploads/avatars/42.png
+storagePath("backups/2026-01.tar.gz"); // → <cwd>/storage/backups/2026-01.tar.gz
 ```
 
 Every helper takes any number of path segments and joins them. No-argument calls return the base directory itself.
 
 ## Full inventory
 
-| Helper             | Resolves to                              | Notes                                                              |
-| ------------------ | ---------------------------------------- | ------------------------------------------------------------------ |
-| `rootPath(...p)`   | `<cwd>/<...p>`                           | Also `Application.rootPath`. Base of every other helper.           |
-| `srcPath(...p)`    | `<cwd>/src/<...p>`                       | Also `Application.srcPath`.                                        |
-| `appPath(p?)`      | `<cwd>/src/app/<p>`                      | Also `Application.appPath`. Module roots live here.                |
-| `configPath(...p)` | `<cwd>/src/config/<...p>`                | `src/config/*.ts` subsystem configs.                               |
-| `publicPath(p?)`   | `<cwd>/public/<p>`                       | Also `Application.publicPath`. Static assets served as-is.         |
-| `storagePath(p?)`  | `<cwd>/storage/<p>`                      | Also `Application.storagePath`. Root for framework-managed files.  |
-| `uploadsPath(p?)`  | `<cwd>/storage/uploads/<p>` *(default)*  | Also `Application.uploadsPath`. Honors `config.uploads.root` override (string or function). |
-| `cachePath(p?)`    | `<cwd>/storage/cache/<p>`                | Persistent cache files.                                            |
-| `logsPath(p?)`     | `<cwd>/storage/logs/<p>`                 | Application logs.                                                  |
-| `tempPath(p?)`     | `<cwd>/storage/tmp/<p>`                  | Throw-away scratch.                                                |
+| Helper              | Resolves to                             | Notes                                                                                                                               |
+| ------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `rootPath(...p)`    | `<cwd>/<...p>`                          | Also `Application.rootPath`. Base of every other helper.                                                                            |
+| `srcPath(...p)`     | `<cwd>/src/<...p>`                      | Also `Application.srcPath`.                                                                                                         |
+| `appPath(p?)`       | `<cwd>/src/app/<p>`                     | Also `Application.appPath`. Module roots live here.                                                                                 |
+| `configPath(...p)`  | `<cwd>/src/config/<...p>`               | `src/config/*.ts` subsystem configs.                                                                                                |
+| `publicPath(p?)`    | `<cwd>/public/<p>`                      | Also `Application.publicPath`. Static assets served as-is.                                                                          |
+| `storagePath(p?)`   | `<cwd>/storage/<p>`                     | Also `Application.storagePath`. Root for framework-managed files.                                                                   |
+| `uploadsPath(p?)`   | `<cwd>/storage/uploads/<p>` _(default)_ | Also `Application.uploadsPath`. Honors `config.uploads.root` override (string or function).                                         |
+| `cachePath(p?)`     | `<cwd>/storage/cache/<p>`               | Persistent cache files.                                                                                                             |
+| `logsPath(p?)`      | `<cwd>/storage/logs/<p>`                | Application logs.                                                                                                                   |
+| `tempPath(p?)`      | `<cwd>/storage/tmp/<p>`                 | Throw-away scratch.                                                                                                                 |
 | `warlockPath(...p)` | `<cwd>/.warlock/<...p>`                 | Framework internals (manifest, transpile cache, typings). **Never write app files here** — the framework deletes the folder freely. |
-| `sanitizePath(p)`  | Strips `<>:"/\|?*` from `p`              | Cleans user-supplied filename fragments before joining.            |
+| `sanitizePath(p)`   | Strips `<>:"/\|?*` from `p`             | Cleans user-supplied filename fragments before joining.                                                                             |
 
 ## The aggregate — `paths`
 
@@ -44,15 +44,15 @@ For builders or maintenance scripts that shuttle several locations in close prox
 ```ts
 import { paths } from "@warlock.js/core";
 
-paths.root("dist", "app.js");        // → <cwd>/dist/app.js
-paths.app("orders/routes.ts");        // → <cwd>/src/app/orders/routes.ts
-paths.uploads("avatars/42.png");      // → <cwd>/storage/uploads/avatars/42.png
-paths.config("mail.ts");              // → <cwd>/src/config/mail.ts
-paths.cache("queries.bin");           // → <cwd>/storage/cache/queries.bin
-paths.logs("errors.log");             // → <cwd>/storage/logs/errors.log
-paths.temp("tmp-export.csv");         // → <cwd>/storage/tmp/tmp-export.csv
-paths.warlock("manifest.json");       // → <cwd>/.warlock/manifest.json
-paths.sanitize("../etc/passwd");      // → "..etcpasswd"
+paths.root("dist", "app.js"); // → <cwd>/dist/app.js
+paths.app("orders/routes.ts"); // → <cwd>/src/app/orders/routes.ts
+paths.uploads("avatars/42.png"); // → <cwd>/storage/uploads/avatars/42.png
+paths.config("mail.ts"); // → <cwd>/src/config/mail.ts
+paths.cache("queries.bin"); // → <cwd>/storage/cache/queries.bin
+paths.logs("errors.log"); // → <cwd>/storage/logs/errors.log
+paths.temp("tmp-export.csv"); // → <cwd>/storage/tmp/tmp-export.csv
+paths.warlock("manifest.json"); // → <cwd>/.warlock/manifest.json
+paths.sanitize("../etc/passwd"); // → "..etcpasswd"
 ```
 
 Use the named import (`appPath`, `uploadsPath`, ...) when one helper dominates the file; reach for `paths.*` when you're shuttling multiple paths together.
@@ -65,10 +65,7 @@ Use the named import (`appPath`, `uploadsPath`, ...) when one helper dominates t
 import { appPath } from "@warlock.js/core";
 import { readFile } from "node:fs/promises";
 
-const template = await readFile(
-  appPath("mailers/templates/welcome.html"),
-  "utf-8",
-);
+const template = await readFile(appPath("mailers/templates/welcome.html"), "utf-8");
 ```
 
 ### Locate a config file
@@ -115,7 +112,7 @@ const manifest = warlockPath("manifest.json");
 ```ts title="src/config/uploads.ts"
 export default {
   uploads: {
-    root: "/mnt/uploads",                   // static
+    root: "/mnt/uploads", // static
     // root: (rel) => `/mnt/uploads/${rel}`, // dynamic
   },
 };
@@ -137,18 +134,18 @@ The override is applied **inside** `uploadsPath()`. So `Application.uploadsPath`
 
 ## When to use which
 
-| Goal                                       | Helper            |
-| ------------------------------------------ | ----------------- |
-| File inside a module (controllers/services) | `appPath`        |
-| Top-level subsystem config                 | `configPath`      |
-| Static asset served as-is over HTTP        | `publicPath`      |
-| User-uploaded file (avatar, document)      | `uploadsPath`     |
-| Persistent cache for an expensive op       | `cachePath`       |
-| Application log line                       | `logsPath`        |
-| Short-lived scratch (cleaned aggressively) | `tempPath`        |
-| Bundled artifact (build outputs)           | `rootPath("dist", ...)` |
-| Reading a TS source from disk              | `srcPath` / `appPath` |
-| Framework internals (manifest, transpile)  | `warlockPath` *(read-only)* |
+| Goal                                        | Helper                      |
+| ------------------------------------------- | --------------------------- |
+| File inside a module (controllers/services) | `appPath`                   |
+| Top-level subsystem config                  | `configPath`                |
+| Static asset served as-is over HTTP         | `publicPath`                |
+| User-uploaded file (avatar, document)       | `uploadsPath`               |
+| Persistent cache for an expensive op        | `cachePath`                 |
+| Application log line                        | `logsPath`                  |
+| Short-lived scratch (cleaned aggressively)  | `tempPath`                  |
+| Bundled artifact (build outputs)            | `rootPath("dist", ...)`     |
+| Reading a TS source from disk               | `srcPath` / `appPath`       |
+| Framework internals (manifest, transpile)   | `warlockPath` _(read-only)_ |
 
 If you find yourself reaching for `path.join(process.cwd(), ...)` — that's a sign you want one of these helpers instead.
 

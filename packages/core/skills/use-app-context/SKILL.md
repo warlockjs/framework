@@ -17,8 +17,8 @@ if (Application.isProduction) {
 }
 
 const uploadsDir = Application.uploadsPath;
-const uptimeMs   = Application.uptime;
-const version    = Application.version;
+const uptimeMs = Application.uptime;
+const version = Application.version;
 ```
 
 Every member is a getter — values are computed on access, not snapshotted at boot. That's deliberate: tests flip the environment, the dev server flips the runtime strategy, and the framework caches its own version. You always read the current value.
@@ -26,10 +26,10 @@ Every member is a getter — values are computed on access, not snapshotted at b
 ## Environment
 
 ```ts
-Application.environment      // "development" | "production" | "test"
-Application.isProduction     // === "production"
-Application.isDevelopment    // === "development"
-Application.isTest           // === "test"
+Application.environment; // "development" | "production" | "test"
+Application.isProduction; // === "production"
+Application.isDevelopment; // === "development"
+Application.isTest; // === "test"
 ```
 
 Backed by `process.env.NODE_ENV`. `setEnvironment` mutates it:
@@ -50,7 +50,7 @@ const httpConfigurations: HttpConfigurations = {
     secret: env("COOKIE_SECRET", "super-secret-key-change-me"),
     options: {
       httpOnly: true,
-      secure: Application.isProduction,   // true on prod (HTTPS only), false in dev
+      secure: Application.isProduction, // true on prod (HTTPS only), false in dev
       path: "/",
     },
   },
@@ -61,13 +61,13 @@ export default httpConfigurations;
 
 ## Runtime strategy
 
-`runtimeStrategy` is a separate axis from `environment`. It marks how the *framework itself* is running:
+`runtimeStrategy` is a separate axis from `environment`. It marks how the _framework itself_ is running:
 
 - `"development"` — dev server (file watcher, HMR, transpile cache on disk).
 - `"production"` — built bundle running from `dist/`.
 
 ```ts
-Application.runtimeStrategy           // "production" | "development"
+Application.runtimeStrategy; // "production" | "development"
 Application.setRuntimeStrategy("production");
 ```
 
@@ -77,7 +77,7 @@ Most app code shouldn't care about `runtimeStrategy` — branch on `environment`
 
 ## Lifecycle: boot & shutdown
 
-`Application.onceBooted(callback)` runs a callback the moment the app is fully booted — every connector in **both** phases is active and all app files (locales, events, main, routes) are loaded. It's the only hook that fires *after* the late phase (http, socket) is up.
+`Application.onceBooted(callback)` runs a callback the moment the app is fully booted — every connector in **both** phases is active and all app files (locales, events, main, routes) are loaded. It's the only hook that fires _after_ the late phase (http, socket) is up.
 
 ```ts
 import { Application } from "@warlock.js/core";
@@ -87,18 +87,18 @@ Application.onceBooted(({ environment, runtimeStrategy, bootDurationMs }) => {
 });
 ```
 
-Why a dedicated hook instead of code at the bottom of `main.ts`? **App files load before the late phase.** `main.ts`, `events.ts`, `routes.ts`, and locales are all imported *between* the early and late connector phases — so when `main.ts` runs, http/socket are not listening yet. `onceBooted` defers your callback until the whole sequence finishes, which makes it the safe place to touch `app.http` / `app.socket` from `main.ts`-level code.
+Why a dedicated hook instead of code at the bottom of `main.ts`? **App files load before the late phase.** `main.ts`, `events.ts`, `routes.ts`, and locales are all imported _between_ the early and late connector phases — so when `main.ts` runs, http/socket are not listening yet. `onceBooted` defers your callback until the whole sequence finishes, which makes it the safe place to touch `app.http` / `app.socket` from `main.ts`-level code.
 
-It's a **latch**, not a plain event listener: register before boot and it queues; register *after* boot and it fires on the next microtask. A late subscriber never silently misses the signal.
+It's a **latch**, not a plain event listener: register before boot and it queues; register _after_ boot and it fires on the next microtask. A late subscriber never silently misses the signal.
 
 ```ts
-Application.isBooted;           // boolean — has boot finished?
+Application.isBooted; // boolean — has boot finished?
 await Application.whenBooted(); // Promise<BootContext> — await instead of a callback
 ```
 
 `whenBooted()` is the promise form, resolving with the same `BootContext` (`{ environment, runtimeStrategy, bootDurationMs? }`). `bootDurationMs` is set by the dev server (which times boot) and omitted by the production entry.
 
-The framework fires the latch for you — the dev server and the production bundle each call it once, right after the late phase. App code only ever *reads* it via `onceBooted` / `whenBooted` / `isBooted`; the internal `markBooted` is a framework entry point, not for application use.
+The framework fires the latch for you — the dev server and the production bundle each call it once, right after the late phase. App code only ever _reads_ it via `onceBooted` / `whenBooted` / `isBooted`; the internal `markBooted` is a framework entry point, not for application use.
 
 ### Run something once everything is listening
 
@@ -140,12 +140,12 @@ For path helpers (`appPath`, `configPath`, `uploadsPath`, …) anchored at `proc
 The most-used helpers are also surfaced as no-argument getters on `Application`:
 
 ```ts
-Application.rootPath        // <cwd>
-Application.srcPath         // <cwd>/src
-Application.appPath         // <cwd>/src/app
-Application.publicPath      // <cwd>/public
-Application.storagePath     // <cwd>/storage
-Application.uploadsPath     // <cwd>/storage/uploads (or override)
+Application.rootPath; // <cwd>
+Application.srcPath; // <cwd>/src
+Application.appPath; // <cwd>/src/app
+Application.publicPath; // <cwd>/public
+Application.storagePath; // <cwd>/storage
+Application.uploadsPath; // <cwd>/storage/uploads (or override)
 ```
 
 Reach for those when you want the directory itself; reach for the helpers (e.g. `appPath("orders/routes.ts")`) when you need a file inside.
@@ -153,9 +153,9 @@ Reach for those when you want the directory itself; reach for the helpers (e.g. 
 ## Version and uptime
 
 ```ts
-Application.version        // "1.0.0" (semver, cached after first read)
-Application.uptime         // ms since process start
-Application.startedAt      // Date object — wall time when the process booted
+Application.version; // "1.0.0" (semver, cached after first read)
+Application.uptime; // ms since process start
+Application.startedAt; // Date object — wall time when the process booted
 ```
 
 `version` is the `@warlock.js/core` package version, lazily loaded once. `uptime` is `process.uptime() * 1000` — the Node-process uptime, not "the framework's uptime." If you spawn workers, each worker has its own.
@@ -175,13 +175,13 @@ The project's home page surfaces the version in a footer:
 ```ts
 import { app } from "@warlock.js/core";
 
-app.http        // Fastify instance (after http connector starts)
-app.socket      // socket.io Server (after socket connector starts)
-app.router      // the Router singleton
-app.database    // Cascade's DataSource
+app.http; // Fastify instance (after http connector starts)
+app.socket; // socket.io Server (after socket connector starts)
+app.router; // the Router singleton
+app.database; // Cascade's DataSource
 ```
 
-Each property is a getter backed by the framework's DI container (`container.tryGet("http.server")` etc. — `router` uses `container.get(...)`, which throws instead, since it is never legitimately absent). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. `http`, `socket`, and `database` are thin `container.tryGet(...)` reads, so before the connector boots they return `undefined` (they do **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
+Each property is a getter backed by the framework's DI container (`container.tryGet("http.server")` etc. — `router` uses `container.get(...)`, which throws instead, since it is never legitimately absent). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. `http`, `socket`, and `database` are thin `container.tryGet(...)` reads, so before the connector boots they return `undefined` (they do **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are _late_-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
 
 Typical uses (note: from runtime code, after bootstrap — not at module-import time):
 
@@ -289,7 +289,7 @@ cors: {
 - **`version` is `null` until the first `await`.** The version loader is async (it reads `package.json`). On a cold start before any framework code has run `getWarlockVersion()`, `Application.version` returns `null`. The framework does load it during bootstrap, so anywhere downstream of bootstrap is fine — controllers, services, connectors after `start()`. CLI commands without `preload.bootstrap` may see `null`.
 - **`Application` is static, not a DI registration.** Don't try to inject it. There's nothing to inject — it's a class with only static members.
 - **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.tryGet(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`. `app.router` is the exception: it reads via `container.get(...)`, which throws a named `ContainerKeyMissingError` instead of handing back `undefined`, because the router is never a legitimate absence.
-- **`onceBooted` is a latch, not `events.on`.** A callback registered *after* boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
+- **`onceBooted` is a latch, not `events.on`.** A callback registered _after_ boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
 - **`onShutdown` runs before connectors close, not after.** That ordering is deliberate so cleanup can still use db/cache/http — but it means a hook that hangs delays connector teardown (bounded only by your process manager's kill timeout). Keep teardown fast; for HTTP draining the framework already bounds it via `http.gracefulShutdown.timeout`.
 
 ## See also

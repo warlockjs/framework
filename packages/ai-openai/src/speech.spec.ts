@@ -57,7 +57,11 @@ describe("OpenAISpeechModel", () => {
 
     await model.generate("x", { speed: 1.5, instructions: "calm and slow" });
 
-    expect(calls[0].body).toMatchObject({ voice: "verse", speed: 1.5, instructions: "calm and slow" });
+    expect(calls[0].body).toMatchObject({
+      voice: "verse",
+      speed: 1.5,
+      instructions: "calm and slow",
+    });
   });
 
   it("wraps provider errors into the typed AIError hierarchy", async () => {

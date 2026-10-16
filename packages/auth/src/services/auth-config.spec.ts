@@ -97,14 +97,14 @@ describe("authConfig expiresInMs", () => {
 
   it.each(["30dayz", "thirty days", "0d", "-1h", "", 2_592_000, true])(
     "throws naming auth.accessToken.expiresIn for %o",
-    value => {
+    (value) => {
       withConfig("auth.accessToken.expiresIn", value);
 
       expect(() => authConfig.accessToken.expiresInMs()).toThrow(/auth\.accessToken\.expiresIn/);
     },
   );
 
-  it.each(["30dayz", "0d", ""])("throws naming auth.refreshToken.expiresIn for %o", value => {
+  it.each(["30dayz", "0d", ""])("throws naming auth.refreshToken.expiresIn for %o", (value) => {
     withConfig("auth.refreshToken.expiresIn", value);
 
     expect(() => authConfig.refreshToken.expiresInMs()).toThrow(/auth\.refreshToken\.expiresIn/);

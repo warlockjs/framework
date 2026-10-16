@@ -21,10 +21,7 @@ import { describe, expect, it } from "vitest";
  * while still guarding against a genuine hang.
  */
 
-const packageRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-);
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("templates/warlock/ typechecks against this checkout's framework source", () => {
   it("tsc --noEmit exits clean", () => {

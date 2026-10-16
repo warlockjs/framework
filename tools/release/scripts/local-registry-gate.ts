@@ -207,9 +207,7 @@ function assertCandidate(input: LocalRegistryGateInput): void {
   if (
     input.expectedFamilyNames.length !== WARLOCK_FAMILY_PACKAGE_NAMES.length ||
     new Set(input.expectedFamilyNames).size !== WARLOCK_FAMILY_PACKAGE_NAMES.length ||
-    WARLOCK_FAMILY_PACKAGE_NAMES.some(
-      (name) => !input.expectedFamilyNames.includes(name),
-    )
+    WARLOCK_FAMILY_PACKAGE_NAMES.some((name) => !input.expectedFamilyNames.includes(name))
   ) {
     throw new Error(
       `expectedFamilyNames must contain exactly the ${WARLOCK_FAMILY_PACKAGE_NAMES.length}-package Warlock family`,
@@ -315,9 +313,7 @@ async function defaultSha256File(path: string): Promise<string> {
   return digest.digest("hex");
 }
 
-async function defaultStartRegistry(
-  request: RegistryStartRequest,
-): Promise<OwnedRegistryServer> {
+async function defaultStartRegistry(request: RegistryStartRequest): Promise<OwnedRegistryServer> {
   const require = createRequire(import.meta.url);
   const verdaccio = require("verdaccio") as {
     runServer?: (configPath: string) => Promise<{
@@ -400,9 +396,7 @@ function verdaccioPing(port: number): Promise<boolean> {
   });
 }
 
-async function defaultWaitForRegistryReady(
-  registry: OwnedRegistryServer,
-): Promise<void> {
+async function defaultWaitForRegistryReady(registry: OwnedRegistryServer): Promise<void> {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const address = registry.server.address();
@@ -614,7 +608,8 @@ export function defaultResolveNpmCliPath(): string {
   );
 
   const resolved = candidates.find(
-    (candidate) => isAbsolute(candidate) && candidate.endsWith("npm-cli.js") && existsSync(candidate),
+    (candidate) =>
+      isAbsolute(candidate) && candidate.endsWith("npm-cli.js") && existsSync(candidate),
   );
   if (!resolved) {
     throw new Error(
@@ -685,18 +680,17 @@ export async function runLocalRegistryPreGate(
   const makeTemporaryDirectory =
     dependencies.makeTemporaryDirectory ?? ((prefix) => mkdtemp(join(tmpdir(), prefix)));
   const makeDirectory =
-    dependencies.makeDirectory ?? ((path) => mkdir(path, { recursive: true }).then(() => undefined));
+    dependencies.makeDirectory ??
+    ((path) => mkdir(path, { recursive: true }).then(() => undefined));
   const writeTextFile =
     dependencies.writeTextFile ?? ((path, contents) => writeFile(path, contents, "utf8"));
   const removeDirectory =
     dependencies.removeDirectory ?? ((path) => rm(path, { recursive: true, force: true }));
   const sha256File = dependencies.sha256File ?? defaultSha256File;
   const startRegistry = dependencies.startRegistry ?? defaultStartRegistry;
-  const waitForRegistryReady =
-    dependencies.waitForRegistryReady ?? defaultWaitForRegistryReady;
+  const waitForRegistryReady = dependencies.waitForRegistryReady ?? defaultWaitForRegistryReady;
   const stopRegistry = dependencies.stopRegistry ?? defaultStopRegistry;
-  const proveRegistryClosed =
-    dependencies.proveRegistryClosed ?? defaultProveRegistryClosed;
+  const proveRegistryClosed = dependencies.proveRegistryClosed ?? defaultProveRegistryClosed;
   const provePortDead = dependencies.provePortDead ?? defaultProvePortDead;
   const runCommand = dependencies.runCommand ?? defaultRunCommand;
   const resolveNpmCliPath = dependencies.resolveNpmCliPath ?? defaultResolveNpmCliPath;
@@ -749,12 +743,7 @@ export async function runLocalRegistryPreGate(
     if (!isAbsolute(npmCliPath) || !npmCliPath.endsWith("npm-cli.js")) {
       throw new Error("resolveNpmCliPath must return an absolute npm-cli.js path");
     }
-    const env = npmEnvironment(
-      registryUrl,
-      cacheDirectory,
-      npmrcPath,
-      globalNpmrcPath,
-    );
+    const env = npmEnvironment(registryUrl, cacheDirectory, npmrcPath, globalNpmrcPath);
     event("environment-asserted");
 
     const runNpm = async (args: readonly string[]): Promise<CommandResult> => {
@@ -788,35 +777,35 @@ export async function runLocalRegistryPreGate(
       event("artifact-verified", artifact.name);
 
       await runNpm([
-          "publish",
-          artifact.tarballPath,
-          "--registry",
-          registryUrl,
-          "--cache",
-          cacheDirectory,
-          "--userconfig",
-          npmrcPath,
-          "--globalconfig",
-          globalNpmrcPath,
-          "--ignore-scripts",
-        ]);
+        "publish",
+        artifact.tarballPath,
+        "--registry",
+        registryUrl,
+        "--cache",
+        cacheDirectory,
+        "--userconfig",
+        npmrcPath,
+        "--globalconfig",
+        globalNpmrcPath,
+        "--ignore-scripts",
+      ]);
       event("artifact-published-locally", artifact.name);
 
       const observed = await runNpm([
-          "view",
-          `${artifact.name}@${candidate.candidateVersion}`,
-          "version",
-          "--json",
-          "--registry",
-          registryUrl,
-          "--cache",
-          cacheDirectory,
-          "--userconfig",
-          npmrcPath,
-          "--globalconfig",
-          globalNpmrcPath,
-          "--prefer-online",
-        ]);
+        "view",
+        `${artifact.name}@${candidate.candidateVersion}`,
+        "version",
+        "--json",
+        "--registry",
+        registryUrl,
+        "--cache",
+        cacheDirectory,
+        "--userconfig",
+        npmrcPath,
+        "--globalconfig",
+        globalNpmrcPath,
+        "--prefer-online",
+      ]);
       let observedVersion: unknown;
       try {
         observedVersion = JSON.parse(observed.stdout.trim());
@@ -917,9 +906,7 @@ export async function runLocalRegistryPreGate(
     ),
     verifiedAt: (dependencies.now?.() ?? new Date()).toISOString(),
     matrixScope: candidate.matrixScope,
-    ...(candidate.onlyFeatures
-      ? { matrixRows: Object.freeze([...candidate.onlyFeatures]) }
-      : {}),
+    ...(candidate.onlyFeatures ? { matrixRows: Object.freeze([...candidate.onlyFeatures]) } : {}),
   });
 
   await dependencies.emitHandoff?.(handoff);

@@ -55,7 +55,8 @@ The system prompt is what shapes the agent's behavior. It can be a plain string,
 ```ts
 const myAgent = ai.agent({
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are Alex, a senior TypeScript engineer.")
     .instruction("Always cite the relevant TypeScript handbook section.")
     .instruction("Reply in plain prose — no markdown headings."),

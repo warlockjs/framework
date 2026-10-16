@@ -9,8 +9,6 @@ describe("locale preference cookie contract", () => {
       "utf8",
     );
 
-    expect(source).toContain(
-      `LOCALE_PREFERENCE_COOKIE_NAME = "${LOCALE_PREFERENCE_COOKIE_NAME}"`,
-    );
+    expect(source).toContain(`LOCALE_PREFERENCE_COOKIE_NAME = "${LOCALE_PREFERENCE_COOKIE_NAME}"`);
   });
 });

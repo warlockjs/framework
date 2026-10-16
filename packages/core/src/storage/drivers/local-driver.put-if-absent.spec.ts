@@ -39,9 +39,7 @@ describe("LocalDriver.putIfAbsent()", () => {
   });
 
   it("leaves no temp files behind", async () => {
-    await Promise.all(
-      Array.from({ length: 5 }, () => driver.putIfAbsent("x", "tmp/file.txt")),
-    );
+    await Promise.all(Array.from({ length: 5 }, () => driver.putIfAbsent("x", "tmp/file.txt")));
 
     expect(fs.readdirSync(path.join(root, "tmp"))).toEqual(["file.txt"]);
   });

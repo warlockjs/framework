@@ -20,7 +20,7 @@ await herald()
       await sendWelcomeEmail(message.payload.email);
       await ctx.ack();
     } catch (error) {
-      await ctx.nack(true);   // requeue, broker redelivers
+      await ctx.nack(true); // requeue, broker redelivers
     }
   });
 ```
@@ -34,23 +34,23 @@ The handler can be sync or async. Returning resolves the message; throwing fails
 
 ## Flow control via `ctx`
 
-| Method | What it does |
-| --- | --- |
-| `ctx.ack()` | Success — message removed from the queue. |
-| `ctx.nack(requeue?)` | Failure — `requeue: true` (default) puts it back; `false` drops it (or sends to DLQ if configured at the channel level). |
-| `ctx.reject()` | Shorthand for `nack(false)` — permanent failure. |
-| `ctx.retry(delayMs?)` | Republishes with a retry counter; goes to DLQ when `maxRetries` is exceeded. |
-| `ctx.reply(payload)` | Sends `payload` to the requester — only meaningful for [request-and-respond](./request-and-respond.md). |
+| Method                | What it does                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `ctx.ack()`           | Success — message removed from the queue.                                                                                |
+| `ctx.nack(requeue?)`  | Failure — `requeue: true` (default) puts it back; `false` drops it (or sends to DLQ if configured at the channel level). |
+| `ctx.reject()`        | Shorthand for `nack(false)` — permanent failure.                                                                         |
+| `ctx.retry(delayMs?)` | Republishes with a retry counter; goes to DLQ when `maxRetries` is exceeded.                                             |
+| `ctx.reply(payload)`  | Sends `payload` to the requester — only meaningful for [request-and-respond](./request-and-respond.md).                  |
 
 Pick by intent:
 
-| Intent | Use |
-| --- | --- |
-| Processed cleanly | `ctx.ack()` |
-| Transient failure, try again now | `ctx.nack(true)` |
-| Transient failure, back off first | `ctx.retry(5000)` |
-| Permanent failure, send to DLQ | `ctx.reject()` |
-| Validation failure (bad message) | `ctx.reject()` — don't requeue, it'll loop |
+| Intent                            | Use                                        |
+| --------------------------------- | ------------------------------------------ |
+| Processed cleanly                 | `ctx.ack()`                                |
+| Transient failure, try again now  | `ctx.nack(true)`                           |
+| Transient failure, back off first | `ctx.retry(5000)`                          |
+| Permanent failure, send to DLQ    | `ctx.reject()`                             |
+| Validation failure (bad message)  | `ctx.reject()` — don't requeue, it'll loop |
 
 ## Smart auto-behavior
 
@@ -66,10 +66,10 @@ The explicit-call version is usually clearer, but the auto-behavior is a safety 
 
 ```ts
 await channel.subscribe(handler, {
-  group: "email-workers",      // consumer tag — multiple consumers in same group split work
-  prefetch: 10,                 // how many in-flight messages this consumer holds
-  autoAck: false,               // default; keep false in production
-  exclusive: false,             // single consumer only on this channel?
+  group: "email-workers", // consumer tag — multiple consumers in same group split work
+  prefetch: 10, // how many in-flight messages this consumer holds
+  autoAck: false, // default; keep false in production
+  exclusive: false, // single consumer only on this channel?
   retry: {
     maxRetries: 3,
     delay: 1000,
@@ -83,15 +83,15 @@ await channel.subscribe(handler, {
 
 All `SubscribeOptions`:
 
-| Field | Type | Default | What it does |
-| --- | --- | --- | --- |
-| `consumerId` | `string` | random UUID | Stable ID for the subscription — pass when you want to `unsubscribeById` later from elsewhere. |
-| `group` | `string` | unset | AMQP `consumerTag`. Workers sharing the same `group` split messages round-robin. |
-| `prefetch` | `number` | broker default | Per-consumer in-flight cap. Higher = more throughput; lower = even spread across workers. |
-| `autoAck` | `boolean` | `false` | If `true`, broker acks on delivery (`noAck` in AMQP terms). Loses messages on crash. |
-| `exclusive` | `boolean` | `false` | If `true`, only this consumer can read from the queue. Use sparingly. |
-| `retry` | `RetryOptions` | unset | See [Retry policy](#retry-policy). |
-| `deadLetter` | `DeadLetterOptions` | unset | See [Dead-letter queues](#dead-letter-queues). |
+| Field        | Type                | Default        | What it does                                                                                   |
+| ------------ | ------------------- | -------------- | ---------------------------------------------------------------------------------------------- |
+| `consumerId` | `string`            | random UUID    | Stable ID for the subscription — pass when you want to `unsubscribeById` later from elsewhere. |
+| `group`      | `string`            | unset          | AMQP `consumerTag`. Workers sharing the same `group` split messages round-robin.               |
+| `prefetch`   | `number`            | broker default | Per-consumer in-flight cap. Higher = more throughput; lower = even spread across workers.      |
+| `autoAck`    | `boolean`           | `false`        | If `true`, broker acks on delivery (`noAck` in AMQP terms). Loses messages on crash.           |
+| `exclusive`  | `boolean`           | `false`        | If `true`, only this consumer can read from the queue. Use sparingly.                          |
+| `retry`      | `RetryOptions`      | unset          | See [Retry policy](#retry-policy).                                                             |
+| `deadLetter` | `DeadLetterOptions` | unset          | See [Dead-letter queues](#dead-letter-queues).                                                 |
 
 ## Prefetch
 
@@ -145,9 +145,7 @@ When `maxRetries` is exceeded (or you explicitly `ctx.reject()` on a channel wit
 herald()
   .channel("user.created.failed")
   .subscribe(async (message, ctx) => {
-    await alerts.notify(
-      `Permanently failed: ${JSON.stringify(message.payload)}`,
-    );
+    await alerts.notify(`Permanently failed: ${JSON.stringify(message.payload)}`);
     await ctx.ack();
   });
 ```
@@ -230,8 +228,8 @@ The companion on the publish side is `EventMessage` + `defineEvent` + `publishEv
 ```ts
 const subscription = await channel.subscribe(handler);
 
-await subscription.unsubscribe();   // cancel consumer, drain in-flight
-await subscription.pause();          // also cancels (no native pause in RabbitMQ)
+await subscription.unsubscribe(); // cancel consumer, drain in-flight
+await subscription.pause(); // also cancels (no native pause in RabbitMQ)
 // subscription.resume()             // throws — re-subscribe instead
 ```
 

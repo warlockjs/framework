@@ -14,11 +14,11 @@ This page covers the whole single-chain aggregation family: simple aggregates (`
 Each of these runs one query and returns a single `Promise<number>`:
 
 ```ts
-const total     = await Order.query().count();
-const revenue   = await Order.query().sum("amount");
+const total = await Order.query().count();
+const revenue = await Order.query().sum("amount");
 const avgAmount = await Order.query().avg("amount");
-const cheapest  = await Order.query().min("amount");
-const priciest  = await Order.query().max("amount");
+const cheapest = await Order.query().min("amount");
+const priciest = await Order.query().max("amount");
 ```
 
 They compose with `.where(...)` upstream — the filter applies before the aggregate:
@@ -31,7 +31,7 @@ const completedRevenue = await Order.where("status", "completed").sum("amount");
 
 ```ts
 const uniqueCustomers = await Order.query().countDistinct("customerId"); // number
-const categories = await Product.query().distinct<string>("category");   // string[]
+const categories = await Product.query().distinct<string>("category"); // string[]
 ```
 
 `countDistinct` returns the count of distinct values; `distinct` returns the distinct values themselves as an array. On MongoDB, `countDistinct` ignores nulls by default; on Postgres it's a plain `COUNT(DISTINCT column)`.
@@ -85,7 +85,7 @@ Order.query().groupBy("category", { models: $agg.distinct("sku") });
 //  DISTINCT / FLOOR) if you need it here."
 ```
 
-The reasons are semantic, not laziness: Mongo's `$distinct` returns the *array* of distinct values while SQL `DISTINCT` is a set quantifier (not a scalar aggregate); `$floor` is a scalar function, not an aggregate; `$first`/`$last` need an ordering context SQL window functions require and `$agg` doesn't carry. Rather than silently emit a different-meaning query, Postgres throws and points you at the escape hatch.
+The reasons are semantic, not laziness: Mongo's `$distinct` returns the _array_ of distinct values while SQL `DISTINCT` is a set quantifier (not a scalar aggregate); `$floor` is a scalar function, not an aggregate; `$first`/`$last` need an ordering context SQL window functions require and `$agg` doesn't carry. Rather than silently emit a different-meaning query, Postgres throws and points you at the escape hatch.
 
 ### Driver-specific aggregates — the raw escape hatch
 
@@ -107,9 +107,7 @@ On MongoDB it's an operator object (`{ total: { $sum: "$amount" } }`). The raw f
 To group by an expression rather than a plain column (`DATE(created_at)`, a JSON path), use `groupByRaw`:
 
 ```ts
-await Order.query()
-  .groupByRaw("DATE(created_at)")
-  .get();
+await Order.query().groupByRaw("DATE(created_at)").get();
 ```
 
 Driver-specific; use sparingly. The structured `groupBy` form carries across drivers, `groupByRaw` doesn't.
@@ -171,15 +169,15 @@ The expression builders are grouped under a single `$expr` object (mirroring `$a
 import { $expr } from "@warlock.js/cascade";
 ```
 
-| Builder                  | Meaning                                       |
-| ------------------------ | --------------------------------------------- |
-| `$expr.col("price")`     | a column reference (driver-quoted/escaped)    |
-| `$expr.lit(1.2)`         | a numeric/boolean literal                     |
-| `$expr.mul(a, b, …)`     | multiply (variadic)                           |
-| `$expr.add(a, b, …)`     | add (variadic)                                |
-| `$expr.sub(left, right)` | subtract                                      |
-| `$expr.div(left, right)` | divide                                        |
-| `$expr.raw("…")`         | raw SQL fragment escape hatch                 |
+| Builder                  | Meaning                                    |
+| ------------------------ | ------------------------------------------ |
+| `$expr.col("price")`     | a column reference (driver-quoted/escaped) |
+| `$expr.lit(1.2)`         | a numeric/boolean literal                  |
+| `$expr.mul(a, b, …)`     | multiply (variadic)                        |
+| `$expr.add(a, b, …)`     | add (variadic)                             |
+| `$expr.sub(left, right)` | subtract                                   |
+| `$expr.div(left, right)` | divide                                     |
+| `$expr.raw("…")`         | raw SQL fragment escape hatch              |
 
 The nodes nest, and a bare string anywhere a node is expected is treated as a column reference (`"price"` === `$expr.col("price")`). So `$expr.mul("price", $expr.lit(1.2))` is "price × 1.2", and `$expr.mul($expr.col("price"), $expr.col("quantity"))` is "price × quantity". Each compiles portably:
 
@@ -211,7 +209,7 @@ The fragment is emitted verbatim into the generated query — **never build it f
 
 ## Filtering grouped results — `having`
 
-`where` filters records *before* grouping. `having` filters groups *after* aggregation. The field you filter on is the alias you gave the aggregate:
+`where` filters records _before_ grouping. `having` filters groups _after_ aggregation. The field you filter on is the alias you gave the aggregate:
 
 ```ts
 const bigCategories = await Order.query()
@@ -224,7 +222,7 @@ const bigCategories = await Order.query()
 
 :::note — Postgres aliases in HAVING just work
 
-SQL doesn't allow a SELECT alias in a raw `HAVING` clause — `HAVING "total" > 1000` would fail with *"column total does not exist."* Cascade rewrites `.having("total", ...)` into the underlying expression (`HAVING SUM("amount") > $1`) automatically, so you write the alias and it works on both drivers. You don't need to know this — it's called out only so the SQL in your logs doesn't surprise you.
+SQL doesn't allow a SELECT alias in a raw `HAVING` clause — `HAVING "total" > 1000` would fail with _"column total does not exist."_ Cascade rewrites `.having("total", ...)` into the underlying expression (`HAVING SUM("amount") > $1`) automatically, so you write the alias and it works on both drivers. You don't need to know this — it's called out only so the SQL in your logs doesn't surprise you.
 
 :::
 
@@ -237,7 +235,7 @@ Same shape vocabulary as `.where()`:
 .having("total", ">", 1000)       // operator
 ```
 
-A `having` on a grouped *column* (not an aggregate alias) works too and is left as a plain column filter:
+A `having` on a grouped _column_ (not an aggregate alias) works too and is left as a plain column filter:
 
 ```ts
 await Order.query()
@@ -265,12 +263,12 @@ The whole family in one chain — "top 10 categories by completed-order revenue,
 
 ```ts
 const topCategories = await Order.query()
-  .where("status", "completed")          // filter rows BEFORE grouping
+  .where("status", "completed") // filter rows BEFORE grouping
   .groupBy("category", {
     total: $agg.sum("amount"),
     count: $agg.count(),
   })
-  .having("total", ">", 5000)            // filter groups AFTER aggregation
+  .having("total", ">", 5000) // filter groups AFTER aggregation
   .orderBy("total", "desc")
   .limit(10)
   .get();
@@ -283,7 +281,7 @@ One query, both drivers. The chain reads in execution order: filter rows, group,
 
 ### `.where()` vs `.having()` — put the filter in the right place
 
-`.where()` filters *records before grouping* — it's cheaper and can use indexes. `.having()` filters *groups after aggregation* — it can only reference aggregate results. Filter as early as possible:
+`.where()` filters _records before grouping_ — it's cheaper and can use indexes. `.having()` filters _groups after aggregation_ — it can only reference aggregate results. Filter as early as possible:
 
 ```ts
 // ✅ status filter before grouping (indexed, fewer rows to aggregate)

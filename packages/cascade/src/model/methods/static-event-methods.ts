@@ -13,9 +13,7 @@ import type { ChildModel, Model } from "../model";
  */
 const modelEventsRegistry = new WeakMap<any, any>();
 
-export function getModelEvents<TModel extends Model>(
-  ModelClass: any,
-): ModelEvents<TModel> {
+export function getModelEvents<TModel extends Model>(ModelClass: any): ModelEvents<TModel> {
   let events = modelEventsRegistry.get(ModelClass);
   if (!events) {
     events = new ModelEvents<TModel>();

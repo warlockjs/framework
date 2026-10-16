@@ -1,6 +1,11 @@
 import type { OpenApiParameter, OpenApiSchema } from "../types";
 import { isRecord, resolveSchema, type SchemaComponents } from "./schema-refs";
-import type { PostmanHeader, PostmanQueryParam, PostmanUrl, PostmanVariable } from "./postman-types";
+import type {
+  PostmanHeader,
+  PostmanQueryParam,
+  PostmanUrl,
+  PostmanVariable,
+} from "./postman-types";
 
 /** The Postman variable every request URL starts with. */
 export const BASE_URL_HOST = "{{baseUrl}}";
@@ -35,7 +40,10 @@ function parameterValue(schema: OpenApiSchema, components: SchemaComponents): st
   return "";
 }
 
-function withDescription<T extends object>(row: T, parameter: OpenApiParameter): T & { description?: string } {
+function withDescription<T extends object>(
+  row: T,
+  parameter: OpenApiParameter,
+): T & { description?: string } {
   return parameter.description ? { ...row, description: parameter.description } : row;
 }
 
@@ -103,8 +111,9 @@ export function buildRequestUrl(
       return [];
     }
 
-    const description = parameters.find((parameter) => parameter.in === "path" && parameter.name === name)
-      ?.description;
+    const description = parameters.find(
+      (parameter) => parameter.in === "path" && parameter.name === name,
+    )?.description;
 
     return [{ key: name, value: "", ...(description ? { description } : {}) }];
   });

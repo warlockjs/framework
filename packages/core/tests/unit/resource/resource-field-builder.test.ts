@@ -67,9 +67,7 @@ describe("primitive casts", () => {
 
 describe("url casts", () => {
   it("builds an absolute url", () => {
-    expect(new ResourceFieldBuilder("url").transform("page")).toBe(
-      "https://store.test/page",
-    );
+    expect(new ResourceFieldBuilder("url").transform("page")).toBe("https://store.test/page");
   });
 
   it("builds an uploads url", () => {
@@ -97,9 +95,7 @@ describe("nullable and default handling", () => {
   });
 
   it("returns null for a non-array value on a nullable array field", () => {
-    expect(
-      new ResourceFieldBuilder("string").array().nullable().transform(null),
-    ).toBeNull();
+    expect(new ResourceFieldBuilder("string").array().nullable().transform(null)).toBeNull();
   });
 });
 
@@ -145,9 +141,7 @@ describe("date cast", () => {
   const when = new Date("2024-03-15T10:30:00.000Z");
 
   it("returns a formatted string when dateOptions is 'format'", () => {
-    const builder = new ResourceFieldBuilder("date")
-      .dateOptions("format")
-      .format("YYYY-MM-DD");
+    const builder = new ResourceFieldBuilder("date").dateOptions("format").format("YYYY-MM-DD");
 
     expect(builder.transform(when)).toBe("2024-03-15");
   });

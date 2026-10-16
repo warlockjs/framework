@@ -27,11 +27,11 @@ The helpers in this guide earn their place by doing JSON-specific operations —
 
 Dot-notation paths walk the structure:
 
-| Path                    | MongoDB                       | Postgres JSONB                  |
-| ----------------------- | ----------------------------- | ------------------------------- |
-| `profile.address.city`  | `profile.address.city`        | `profile -> 'address' ->> 'city'` |
-| `tags`                  | array field                   | `jsonb` array column            |
-| `tags.0`                | element `0` of the array      | `tags -> 0`                     |
+| Path                   | MongoDB                  | Postgres JSONB                    |
+| ---------------------- | ------------------------ | --------------------------------- |
+| `profile.address.city` | `profile.address.city`   | `profile -> 'address' ->> 'city'` |
+| `tags`                 | array field              | `jsonb` array column              |
+| `tags.0`               | element `0` of the array | `tags -> 0`                       |
 
 You don't write the right-hand column. You write the dot-path. Cascade emits the right thing per driver.
 
@@ -40,13 +40,9 @@ You don't write the right-hand column. You write the dot-path. Cascade emits the
 ### `whereJsonContains` — value present in array or object
 
 ```ts
-const taggedJS = await Post.query()
-  .whereJsonContains("tags", "javascript")
-  .get();
+const taggedJS = await Post.query().whereJsonContains("tags", "javascript").get();
 
-const admins = await User.query()
-  .whereJsonContains("profile.roles", "admin")
-  .get();
+const admins = await User.query().whereJsonContains("profile.roles", "admin").get();
 ```
 
 Tests whether the JSON value at the path contains the given value. Works on array fields (`tags`) and on object subtrees alike.
@@ -54,9 +50,7 @@ Tests whether the JSON value at the path contains the given value. Works on arra
 ### `whereJsonDoesntContain` — inverse
 
 ```ts
-const notDeprecated = await Post.query()
-  .whereJsonDoesntContain("tags", "deprecated")
-  .get();
+const notDeprecated = await Post.query().whereJsonDoesntContain("tags", "deprecated").get();
 ```
 
 The negation. Same shape, opposite outcome.
@@ -64,19 +58,15 @@ The negation. Same shape, opposite outcome.
 ### `whereJsonContainsKey` — the key is present
 
 ```ts
-const withAvatar = await User.query()
-  .whereJsonContainsKey("profile.avatar")
-  .get();
+const withAvatar = await User.query().whereJsonContainsKey("profile.avatar").get();
 ```
 
-Tests whether the path *exists* (the key is present), regardless of its value. Useful for "users who have configured an avatar" versus "users whose avatar happens to be null" — those are different questions.
+Tests whether the path _exists_ (the key is present), regardless of its value. Useful for "users who have configured an avatar" versus "users whose avatar happens to be null" — those are different questions.
 
 ### `whereJsonLength` — array or object size
 
 ```ts
-const verbose = await Post.query()
-  .whereJsonLength("tags", ">", 5)
-  .get();
+const verbose = await Post.query().whereJsonLength("tags", ">", 5).get();
 ```
 
 An operator-style filter on the length of an array (or count of keys in an object) at the path. Operators are the same vocabulary as `.where()`: `=`, `!=`, `>`, `>=`, `<`, `<=`.
@@ -114,7 +104,7 @@ await Post.query().whereArrayLength("tags", ">=", 2).get();
 
 :::tip — `whereArray*` vs `whereJson*`
 
-They overlap on plain arrays. Use the `whereArray*` family when the column **is** an array — the names read better and the third `key` argument lets you match inside arrays of objects. Use `whereJson*` when you're navigating a JSON structure that *contains* an array somewhere inside it.
+They overlap on plain arrays. Use the `whereArray*` family when the column **is** an array — the names read better and the third `key` argument lets you match inside arrays of objects. Use `whereJson*` when you're navigating a JSON structure that _contains_ an array somewhere inside it.
 
 :::
 
@@ -123,9 +113,7 @@ They overlap on plain arrays. Use the `whereArray*` family when the column **is*
 ### `selectJson(path, alias?)`
 
 ```ts
-const compact = await User.query()
-  .selectJson("profile.address.city", "city")
-  .get();
+const compact = await User.query().selectJson("profile.address.city", "city").get();
 // each row: { city: "..." }
 ```
 
@@ -134,11 +122,7 @@ Projects a nested JSON path into a top-level alias on each result row. Saves tra
 ### `selectJsonRaw(path, expression, alias)`
 
 ```ts
-query.selectJsonRaw(
-  "stats.views",
-  { $ifNull: ["$stats.views", 0] },
-  "views",
-);
+query.selectJsonRaw("stats.views", { $ifNull: ["$stats.views", 0] }, "views");
 ```
 
 Apply a driver-native expression to a JSON path under an alias. Useful for coalescing, defaults, or any computation that needs more than a plain projection — `$ifNull` on Mongo, `COALESCE(...)` on Postgres.
@@ -165,25 +149,25 @@ const writers = await User.query()
 // each row: { id, name, city }
 ```
 
-In English: *find users tagged as "writer" who have at least one notification preference, and return just their id, name, and city.* One query. Both drivers. No driver-specific syntax in the call site.
+In English: _find users tagged as "writer" who have at least one notification preference, and return just their id, name, and city._ One query. Both drivers. No driver-specific syntax in the call site.
 
 ## Driver translation reference
 
 If you're reading existing raw SQL or Mongo queries and translating to Cascade (or the other way around), here's the Rosetta:
 
-| Cascade helper                          | MongoDB                          | Postgres JSONB                |
-| --------------------------------------- | -------------------------------- | ----------------------------- |
-| `whereJsonContains("tags", v)`          | `{ tags: v }` / `$in`            | `tags @> v::jsonb`            |
-| `whereJsonContainsKey("a.b")`           | `{ "a.b": { $exists: true } }`   | `jsonb_path_exists`           |
-| `whereJsonLength("tags", ">", 5)`       | `$expr` + `$size`                | `jsonb_array_length`          |
-| `whereJsonIsArray("tags")`              | `{ tags: { $type: "array" } }`   | `jsonb_typeof(tags) = 'array'` |
-| `selectJson("a.b", "alias")`            | `$project: { alias: "$a.b" }`    | `a -> 'b' AS alias`           |
+| Cascade helper                    | MongoDB                        | Postgres JSONB                 |
+| --------------------------------- | ------------------------------ | ------------------------------ |
+| `whereJsonContains("tags", v)`    | `{ tags: v }` / `$in`          | `tags @> v::jsonb`             |
+| `whereJsonContainsKey("a.b")`     | `{ "a.b": { $exists: true } }` | `jsonb_path_exists`            |
+| `whereJsonLength("tags", ">", 5)` | `$expr` + `$size`              | `jsonb_array_length`           |
+| `whereJsonIsArray("tags")`        | `{ tags: { $type: "array" } }` | `jsonb_typeof(tags) = 'array'` |
+| `selectJson("a.b", "alias")`      | `$project: { alias: "$a.b" }`  | `a -> 'b' AS alias`            |
 
 The takeaway: Cascade is the abstraction; the driver emits whatever its engine speaks.
 
 ## A note on indexes
 
-Filtering on JSON paths gets *enormously* cheaper when the path is indexed. On MongoDB, a regular field index on a dot-path works (`db.users.createIndex({ "profile.roles": 1 })`). On Postgres, JSONB columns want a **GIN index** for containment queries (`@>`). Without an index, the database has to scan and decode every row.
+Filtering on JSON paths gets _enormously_ cheaper when the path is indexed. On MongoDB, a regular field index on a dot-path works (`db.users.createIndex({ "profile.roles": 1 })`). On Postgres, JSONB columns want a **GIN index** for containment queries (`@>`). Without an index, the database has to scan and decode every row.
 
 If you've got a JSON path that's hot in queries, declare an index for it. The migrations layer covers index creation; see the migrations guide once Cascade ships full index docs.
 

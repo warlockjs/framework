@@ -17,7 +17,7 @@ scheduler.addJob(
   })
     .daily()
     .at("08:00")
-    .retry(3)           // retry up to 3 times, 1 s between attempts (default delay)
+    .retry(3), // retry up to 3 times, 1 s between attempts (default delay)
 );
 ```
 
@@ -35,7 +35,7 @@ scheduler.addJob(
     await externalApi.syncInventory();
   })
     .everyHour()
-    .retry(5, 2000)     // retry up to 5 times, wait 2 s between each attempt
+    .retry(5, 2000), // retry up to 5 times, wait 2 s between each attempt
 );
 ```
 
@@ -51,20 +51,20 @@ scheduler.addJob(
     await queue.processNext();
   })
     .everyMinutes(10)
-    .retry(5, 1000, 2)  // 1s → 2s → 4s → 8s → 16s
+    .retry(5, 1000, 2), // 1s → 2s → 4s → 8s → 16s
 );
 ```
 
 **Delay schedule with `retry(5, 1000, 2)`:**
 
-| Attempt | Wait before attempt |
-|---------|-------------------|
-| 1 (initial) | — |
-| 2 | 1 000 ms |
-| 3 | 2 000 ms |
-| 4 | 4 000 ms |
-| 5 | 8 000 ms |
-| 6 | 16 000 ms |
+| Attempt     | Wait before attempt |
+| ----------- | ------------------- |
+| 1 (initial) | —                   |
+| 2           | 1 000 ms            |
+| 3           | 2 000 ms            |
+| 4           | 4 000 ms            |
+| 5           | 8 000 ms            |
+| 6           | 16 000 ms           |
 
 The formula is: `delay × backoffMultiplier ^ (attempt - 1)`
 
@@ -111,20 +111,18 @@ The job will fire again at its next scheduled slot. It does **not** re-fire on e
 ```ts
 // Fires every 10 minutes regardless of whether each attempt succeeds.
 // If the 10:00 run exhausts all retries, the next run is at 10:10.
-job("process-queue", queue.processNext)
-  .everyMinutes(10)
-  .retry(3, 1000);
+job("process-queue", queue.processNext).everyMinutes(10).retry(3, 1000);
 ```
 
 If you need a permanently-failing job to stop firing, listen for repeated `job:error` events and call `scheduler.removeJob(name)` after N failures — see [Events](./events) for the listener shape.
 
 ## When to Use Backoff
 
-| Scenario | Recommended config |
-|---|---|
-| Transient network errors | `retry(3, 1000)` |
-| Rate-limited external API | `retry(5, 2000, 2)` |
-| Database deadlocks | `retry(3, 500)` |
+| Scenario                     | Recommended config    |
+| ---------------------------- | --------------------- |
+| Transient network errors     | `retry(3, 1000)`      |
+| Rate-limited external API    | `retry(5, 2000, 2)`   |
+| Database deadlocks           | `retry(3, 500)`       |
 | Long-running payment gateway | `retry(4, 5000, 1.5)` |
 
 :::tip

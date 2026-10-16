@@ -29,19 +29,19 @@ userSchema.toJsonSchema("draft-2020-12");
 
 ```ts
 type JsonSchemaTarget =
-  | "draft-2020-12"  // default — modern JSON Schema
-  | "draft-07"       // older tooling, Swagger 2.0
-  | "openapi-3.0"    // uses { nullable: true } instead of type unions
-  | "openai-strict"  // OpenAI Structured Outputs strict mode
+  | "draft-2020-12" // default — modern JSON Schema
+  | "draft-07" // older tooling, Swagger 2.0
+  | "openapi-3.0" // uses { nullable: true } instead of type unions
+  | "openai-strict"; // OpenAI Structured Outputs strict mode
 ```
 
 Pick by consumer:
 
-| Consumer | Target |
-| --- | --- |
-| Modern tooling, no specific reason otherwise | `"draft-2020-12"` |
-| Swagger 2.0 / older OpenAPI / older form builders | `"draft-07"` |
-| OpenAPI 3.0 spec (uses `nullable: true`) | `"openapi-3.0"` |
+| Consumer                                                        | Target            |
+| --------------------------------------------------------------- | ----------------- |
+| Modern tooling, no specific reason otherwise                    | `"draft-2020-12"` |
+| Swagger 2.0 / older OpenAPI / older form builders               | `"draft-07"`      |
+| OpenAPI 3.0 spec (uses `nullable: true`)                        | `"openapi-3.0"`   |
 | OpenAI `response_format: { type: "json_schema", strict: true }` | `"openai-strict"` |
 
 ## OpenAI structured outputs (`openai-strict`)
@@ -122,8 +122,8 @@ Cleanly mapped:
 
 Some seal constructs have no JSON Schema representation:
 
-- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`, etc.) — runtime-only. The generated schema describes the *shape*, not the inter-field invariants.
-- **Transformers and mutators** — output reshaping doesn't appear in the schema; the schema reflects *post-mutator, pre-transformer* shape (since that's what rules see and what the LLM is asked to produce for `openai-strict`).
+- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`, etc.) — runtime-only. The generated schema describes the _shape_, not the inter-field invariants.
+- **Transformers and mutators** — output reshaping doesn't appear in the schema; the schema reflects _post-mutator, pre-transformer_ shape (since that's what rules see and what the LLM is asked to produce for `openai-strict`).
 - **`v.computed` / `v.managed`** — **skipped** entirely by the parent `v.object`; they never appear in `properties`. They aren't part of the data contract. (Calling `.toJsonSchema()` directly on one throws — the parent object is responsible for skipping them.)
 - **`v.instanceof(Ctor)`** — produces `{}`. Class identity isn't expressible. For `File`, attach `{ type: "string", format: "binary" }` manually after generation if needed for OpenAPI.
 - **`v.any()`** — produces `{}` deliberately (any value is valid).
@@ -132,10 +132,10 @@ Boolean rules `accepted` / `declined` and similar coercion-style rules are also 
 
 ## When the generated schema rejects valid data
 
-If the schema validator itself accepts data but the *generated* JSON Schema rejects the same data downstream, the cause is usually one of:
+If the schema validator itself accepts data but the _generated_ JSON Schema rejects the same data downstream, the cause is usually one of:
 
 - **Cross-field rule.** The generated schema doesn't enforce it, but a separate consumer might. (Or the runtime check fired at a different stage.)
-- **Transformer running on the wrong side.** The schema describes the input shape (or strict-mode normalized form). If your transformer reshapes `Date` to ISO string for `data`, the *input* still needs to be a Date-parseable thing.
+- **Transformer running on the wrong side.** The schema describes the input shape (or strict-mode normalized form). If your transformer reshapes `Date` to ISO string for `data`, the _input_ still needs to be a Date-parseable thing.
 - **`openai-strict` quirk.** Optional fields show as `["T", "null"]` rather than omitted — if the model omits them entirely (without sending `null`), strict mode fails. The fix is on the prompt side: tell the model to send `null` for unused fields.
 
 ## Cost note

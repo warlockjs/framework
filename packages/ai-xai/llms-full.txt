@@ -32,11 +32,11 @@ const xai = new XaiSDK({ apiKey: process.env.XAI_API_KEY! });
 ## Producing a model
 
 ```ts
-xai.model({ name: "grok-4" })                       // vision + reasoning auto-true
-xai.model({ name: "grok-3-mini" })                  // reasoning auto-true, vision false
-xai.model({ name: "grok-2-vision" })                // vision auto-true
-xai.model({ name: "grok-4", temperature: 0.2 })     // sampling controls
-xai.model({ name: "grok-3", vision: true })         // explicit capability override
+xai.model({ name: "grok-4" }); // vision + reasoning auto-true
+xai.model({ name: "grok-3-mini" }); // reasoning auto-true, vision false
+xai.model({ name: "grok-2-vision" }); // vision auto-true
+xai.model({ name: "grok-4", temperature: 0.2 }); // sampling controls
+xai.model({ name: "grok-3", vision: true }); // explicit capability override
 ```
 
 Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
@@ -45,13 +45,13 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 This adapter ships xAI's OWN name lists (Grok ids don't match OpenAI's `gpt-*` / `o*` prefixes). Capabilities are injected per model before delegating; an explicit value always wins over inference.
 
-| Model | `vision` | `reasoning` |
-| --- | --- | --- |
-| `grok-4` | true | true (reasoning-first) |
-| `grok-3` | false | false |
-| `grok-3-mini` | false | true (the "think" variant) |
-| `grok-2-vision` | true | false |
-| `grok-2` | false | false |
+| Model           | `vision` | `reasoning`                |
+| --------------- | -------- | -------------------------- |
+| `grok-4`        | true     | true (reasoning-first)     |
+| `grok-3`        | false    | false                      |
+| `grok-3-mini`   | false    | true (the "think" variant) |
+| `grok-2-vision` | true     | false                      |
+| `grok-2`        | false    | false                      |
 
 - `vision` — inferred `true` for the `grok-4` and `grok-2-vision` prefixes; `false` otherwise.
 - `reasoning` — inferred `true` for `grok-4` and `grok-3-mini`; drives whether `reasoning.effort` is forwarded as `reasoning_effort` on the wire.
@@ -64,8 +64,8 @@ This adapter ships xAI's OWN name lists (Grok ids don't match OpenAI's `gpt-*` /
 ## Reasoning (grok-4 / grok-3-mini)
 
 ```ts
-const model = xai.model({ name: "grok-4" });   // reasoning auto-true
-await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+const model = xai.model({ name: "grok-4" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 `reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim to the OpenAI-compatible `reasoning_effort` param. When `capabilities.reasoning` is `false` (e.g. `grok-3`), the option is dropped — the adapter never forwards it. Pin `reasoning: true` to force it for a custom/gateway id.
@@ -98,7 +98,7 @@ xAI does **not** currently expose a public embeddings endpoint. `embedder()` is 
 const xai = new XaiSDK({
   apiKey,
   pricing: {
-    "grok-4":      { input: 3, output: 15 },
+    "grok-4": { input: 3, output: 15 },
     "grok-3-mini": { input: 0.3, output: 0.5 },
   },
 });
@@ -123,6 +123,7 @@ Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError
 - The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output / multipart surface
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
+
 ```
 
 ## Provider body options and token estimates
@@ -138,5 +139,6 @@ OpenAI-only bodies across a mixed-provider fallback chain.
 Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
+```
 
 

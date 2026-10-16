@@ -90,17 +90,17 @@ export type Infer<T> =
   T extends ObjectValidator<infer S>
     ? {
         // Optional fields: marked .optional() AND no default
-        [K in keyof S as
-          S[K] extends { isOptional: true }
+        [
+          K in keyof S as S[K] extends { isOptional: true }
             ? ExtractHasDefault<S[K]> extends true
-              ? never  // has default → required at runtime
+              ? never // has default → required at runtime
               : K
             : never
         ]?: Infer<S[K]> | ExtractNullable<S[K]>;
       } & {
         // Required fields: not optional, OR optional-with-default
-        [K in keyof S as
-          S[K] extends { isOptional: true }
+        [
+          K in keyof S as S[K] extends { isOptional: true }
             ? ExtractHasDefault<S[K]> extends true
               ? K
               : never
@@ -133,7 +133,7 @@ BaseValidator.prototype.nullish = function () {
 - [ ] Update `BaseValidator.prototype.nullable` and `.notNullable` return types in [base-validator.ts:106-119](../../../@warlock.js/seal/src/validators/base-validator.ts:106) (or via `declare module`)
 - [ ] Update `BaseValidator.prototype.default` return type in [base-validator.ts:567](../../../@warlock.js/seal/src/validators/base-validator.ts:567)
 - [ ] Rewrite `Infer<T>` in [inference-types.ts](../../../@warlock.js/seal/src/types/inference-types.ts) to handle the three new cases
-- [ ] Audit factory casts in [factory/validators.ts](../../../@warlock.js/seal/src/factory/validators.ts): every `as XValidator & StandardSchemaV1<Y>` needs to *not* strip the new brands. May need to drop the `as` and use a different declaration style
+- [ ] Audit factory casts in [factory/validators.ts](../../../@warlock.js/seal/src/factory/validators.ts): every `as XValidator & StandardSchemaV1<Y>` needs to _not_ strip the new brands. May need to drop the `as` and use a different declaration style
 - [ ] Audit downstream consumers (`cascade` model schemas, `ai` Standard Schema usage) for places where the old `Infer<>` was implicitly relied upon for narrower types — TS errors will surface these
 - [ ] Run `tsc --noEmit` across the monorepo
 - [ ] Hand-test the four cases below
@@ -168,17 +168,17 @@ type F = Infer<typeof v.object({ tags: v.array(v.string()).nullable() })>;
 
 ## Decisions to lock with Hasan
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Brand via TS-only intersection (no runtime cost) or runtime flag too? | **TS-only intersection.** Runtime `isNullable` boolean already exists; that's the runtime state. The brand is purely for `Infer<>` consumption. Avoids double-bookkeeping. |
-| 2 | `.default(v => fn)` (lazy callback) — does it brand `{ hasDefault: true }` too? | **Yes.** Runtime behaviour is identical; the brand reflects "this field will always be present in validData", which is true for both eager and lazy defaults. |
-| 3 | When `.notNullable()` is called after `.nullable()`, does the brand revert? | **Yes — type-level too.** Method signature returns `{ isNullable: false }` which TS treats as removing the brand. Cleanly cancels. |
-| 4 | Should `.default(undefined)` strip the `{ hasDefault: true }` brand? | **No.** Defaulting to `undefined` is a no-op (`data ?? undefined` is `data`), but the brand reflects intent, not runtime equivalence. If users do this, they get a slightly weird type — it's their tell to remove the call. |
-| 5 | Major version bump? | **No (point release).** This widens types in ways that surface previously-hidden bugs in user code; consumers will get new TS errors, but those errors are *uncovering* real issues. Document in changelog as "type-narrowing improvements". |
+| #   | Question                                                                        | Recommendation                                                                                                                                                                                                                               |
+| --- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Brand via TS-only intersection (no runtime cost) or runtime flag too?           | **TS-only intersection.** Runtime `isNullable` boolean already exists; that's the runtime state. The brand is purely for `Infer<>` consumption. Avoids double-bookkeeping.                                                                   |
+| 2   | `.default(v => fn)` (lazy callback) — does it brand `{ hasDefault: true }` too? | **Yes.** Runtime behaviour is identical; the brand reflects "this field will always be present in validData", which is true for both eager and lazy defaults.                                                                                |
+| 3   | When `.notNullable()` is called after `.nullable()`, does the brand revert?     | **Yes — type-level too.** Method signature returns `{ isNullable: false }` which TS treats as removing the brand. Cleanly cancels.                                                                                                           |
+| 4   | Should `.default(undefined)` strip the `{ hasDefault: true }` brand?            | **No.** Defaulting to `undefined` is a no-op (`data ?? undefined` is `data`), but the brand reflects intent, not runtime equivalence. If users do this, they get a slightly weird type — it's their tell to remove the call.                 |
+| 5   | Major version bump?                                                             | **No (point release).** This widens types in ways that surface previously-hidden bugs in user code; consumers will get new TS errors, but those errors are _uncovering_ real issues. Document in changelog as "type-narrowing improvements". |
 
 ## Risks
 
-- **Type breakage in consumers.** Cascade/AI code that implicitly assumed `Infer<v.string().nullable()> === string` will now error. Each will need a one-line fix (`as string` cast, or — better — accept the new shape and handle `null`). These errors are *signal*, not regression: they reveal places where the old types were lying.
+- **Type breakage in consumers.** Cascade/AI code that implicitly assumed `Infer<v.string().nullable()> === string` will now error. Each will need a one-line fix (`as string` cast, or — better — accept the new shape and handle `null`). These errors are _signal_, not regression: they reveal places where the old types were lying.
 - **`as X & StandardSchemaV1<Y>` casts in `factory/validators.ts`.** If the cast is too narrow, it strips the new brands and Infer reverts to the old broken output. The audit task above catches this; mitigation is to widen the casts or drop them where possible.
 - **`Infer<>` conditional-type complexity.** TS conditional-mapped types are finicky; one wrong distribution and the inference goes broad. Hand-test matrix catches the regressions.
 

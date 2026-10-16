@@ -1,15 +1,5 @@
-import {
-  guardedFetch,
-  OutboundPolicyError,
-  tool,
-  type ToolContract,
-} from "@warlock.js/ai";
-import type {
-  FetchUrlExtract,
-  FetchUrlInput,
-  FetchUrlOptions,
-  FetchUrlResult,
-} from "../contracts";
+import { guardedFetch, OutboundPolicyError, tool, type ToolContract } from "@warlock.js/ai";
+import type { FetchUrlExtract, FetchUrlInput, FetchUrlOptions, FetchUrlResult } from "../contracts";
 import { WebToolError } from "../errors";
 import { objectSchema, stringField } from "./schema";
 
@@ -126,10 +116,9 @@ function parseUrl(raw: string): URL {
   }
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new WebToolError(
-      `fetch_url only supports http(s) URLs; got "${url.protocol}".`,
-      { type: "invalid-url" },
-    );
+    throw new WebToolError(`fetch_url only supports http(s) URLs; got "${url.protocol}".`, {
+      type: "invalid-url",
+    });
   }
 
   return url;
@@ -223,11 +212,7 @@ async function readBody(
  * {@link WebToolError} when those optional peers are absent. `"markdown"`
  * applies a light heading/paragraph conversion over the extracted text.
  */
-async function render(
-  html: string,
-  url: string,
-  extract: FetchUrlExtract,
-): Promise<string> {
+async function render(html: string, url: string, extract: FetchUrlExtract): Promise<string> {
   if (extract === "html") {
     return html;
   }

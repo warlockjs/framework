@@ -50,15 +50,15 @@ Listeners attached via `cache.on(...)` survive driver switches the same way the 
 
 ## Which one to reach for
 
-| Goal | Use |
-|---|---|
-| Show hit rate / latency in a dashboard | `cache.metrics()` |
-| Page on cache errors | `cache.on("error", ...)` |
-| Periodic export to Prometheus / StatsD | `cache.metrics()` + `setInterval` + `resetMetrics()` |
-| Audit log of every removal | `cache.on("removed", ...)` |
+| Goal                                                                      | Use                                                                                                  |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Show hit rate / latency in a dashboard                                    | `cache.metrics()`                                                                                    |
+| Page on cache errors                                                      | `cache.on("error", ...)`                                                                             |
+| Periodic export to Prometheus / StatsD                                    | `cache.metrics()` + `setInterval` + `resetMetrics()`                                                 |
+| Audit log of every removal                                                | `cache.on("removed", ...)`                                                                           |
 | See which tag invalidations ran, what they removed and how long they took | `cache.on("invalidated", ({ tags, keys, durationMs }) => ...)` — once per `tags([...]).invalidate()` |
-| Detect a specific anti-pattern (e.g. always-miss key) | `cache.on("miss", ...)` |
-| Debug "is the cache being hit at all?" in dev | `cache.metrics()` once at the end of a flow |
+| Detect a specific anti-pattern (e.g. always-miss key)                     | `cache.on("miss", ...)`                                                                              |
+| Debug "is the cache being hit at all?" in dev                             | `cache.metrics()` once at the end of a flow                                                          |
 
 Both layers can coexist — events fire whether the metrics collector is attached or not.
 

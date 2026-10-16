@@ -1,7 +1,3 @@
 {
-  "privateAppNames": [
-    "Bureau",
-    "teamsup",
-    "FORMAI"
-  ]
+  "privateAppNames": ["Bureau", "teamsup", "FORMAI"]
 }

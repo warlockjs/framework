@@ -58,11 +58,11 @@ Postgres returns `COUNT(*)` as `bigint` which node-postgres surfaces as JS strin
 
 ## Open questions
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Should belongsTo `withCount` be allowed at all, given count ∈ {0,1}? | **Allow** — consistency over arbitrary restriction. Trivial guard against `null` is `IS NOT NULL` not `withCount`. |
-| 2 | If user passes constraint to belongsToMany, qualify column refs by `<pivot>` or `<related>`? | **Related table** — constraint targets the model being counted, not the pivot. Pivot conditions stay implicit. If user needs pivot conditions, they'd need a separate API (out of scope). |
-| 3 | When `constraintOps` contains things other than `where*` (e.g. `orderBy`, `limit`), silently drop them? | **Silently drop with a console.warn** in dev. ORDER/LIMIT have no meaning in COUNT subquery — warning is enough; throwing would surprise users mid-feature. |
+| #   | Question                                                                                                | Recommendation                                                                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Should belongsTo `withCount` be allowed at all, given count ∈ {0,1}?                                    | **Allow** — consistency over arbitrary restriction. Trivial guard against `null` is `IS NOT NULL` not `withCount`.                                                                        |
+| 2   | If user passes constraint to belongsToMany, qualify column refs by `<pivot>` or `<related>`?            | **Related table** — constraint targets the model being counted, not the pivot. Pivot conditions stay implicit. If user needs pivot conditions, they'd need a separate API (out of scope). |
+| 3   | When `constraintOps` contains things other than `where*` (e.g. `orderBy`, `limit`), silently drop them? | **Silently drop with a console.warn** in dev. ORDER/LIMIT have no meaning in COUNT subquery — warning is enough; throwing would surprise users mid-feature.                               |
 
 ## Summary
 

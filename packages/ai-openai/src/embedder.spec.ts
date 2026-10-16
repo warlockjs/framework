@@ -186,7 +186,12 @@ describe("OpenAIEmbedder.embedMany() — batch input", () => {
   });
 
   it("forwards configured dimensions in the batch request payload", async () => {
-    const { client, calls } = makeFakeClient({ response: makeResponse([[0.1, 0.2], [0.3, 0.4]]) });
+    const { client, calls } = makeFakeClient({
+      response: makeResponse([
+        [0.1, 0.2],
+        [0.3, 0.4],
+      ]),
+    });
     const embedder = new OpenAIEmbedder(client, {
       name: "text-embedding-3-large",
       dimensions: 2,
@@ -199,7 +204,10 @@ describe("OpenAIEmbedder.embedMany() — batch input", () => {
 
   it("resolves dimensions from the first vector's length on a batch call", async () => {
     const { client } = makeFakeClient({
-      response: makeResponse([[1, 2, 3], [4, 5, 6]]),
+      response: makeResponse([
+        [1, 2, 3],
+        [4, 5, 6],
+      ]),
     });
     const embedder = new OpenAIEmbedder(client, { name: "text-embedding-3-small" });
 

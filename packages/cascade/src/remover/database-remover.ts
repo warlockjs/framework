@@ -1,7 +1,4 @@
-import type {
-  DriverContract,
-  UpdateOperations,
-} from "../contracts/database-driver.contract";
+import type { DriverContract, UpdateOperations } from "../contracts/database-driver.contract";
 import type {
   RemoverContract,
   RemoverOptions,
@@ -173,11 +170,7 @@ export class DatabaseRemover implements RemoverContract {
         };
         // Guard: an already soft-deleted row must keep its original timestamp
         const softFilter = { ...filter, [deletedAtColumn]: null };
-        const updateResult = await this.driver.update(
-          this.table,
-          softFilter,
-          updateOperations,
-        );
+        const updateResult = await this.driver.update(this.table, softFilter, updateOperations);
         deletedCount = updateResult.modifiedCount > 0 ? 1 : 0;
 
         // The row stays (unlike trash/permanent), so reflect the persisted
@@ -191,9 +184,7 @@ export class DatabaseRemover implements RemoverContract {
           // edits to other columns keep their dirty state.
           const dirty = this.model.dirtyTracker.getDirtyColumns();
           if (dirty.length === 1 && dirty[0] === deletedAtColumn) {
-            this.model.dirtyTracker.reset(
-              this.model.data as Record<string, unknown>,
-            );
+            this.model.dirtyTracker.reset(this.model.data as Record<string, unknown>);
           }
         }
         break;
@@ -201,9 +192,7 @@ export class DatabaseRemover implements RemoverContract {
     }
 
     if (deletedCount === 0) {
-      throw new Error(
-        `Failed to destroy ${this.ctor.name} instance: record not found.`,
-      );
+      throw new Error(`Failed to destroy ${this.ctor.name} instance: record not found.`);
     }
 
     context.deletedCount = deletedCount;
@@ -253,16 +242,13 @@ export class DatabaseRemover implements RemoverContract {
    * @returns Prepared trash record data with all original fields + deletedAt + originalTable
    * @private
    */
-  private prepareTrashRecord(
-    documentData: Record<string, unknown>,
-  ): Record<string, unknown> {
+  private prepareTrashRecord(documentData: Record<string, unknown>): Record<string, unknown> {
     // Preserve all original fields and add deletion metadata
     const deletedAtColumn = this.ctor.deletedAtColumn;
 
     return {
       ...documentData,
-      [typeof deletedAtColumn === "string" ? deletedAtColumn : "deletedAt"]:
-        new Date(),
+      [typeof deletedAtColumn === "string" ? deletedAtColumn : "deletedAt"]: new Date(),
       originalTable: this.table,
     };
   }

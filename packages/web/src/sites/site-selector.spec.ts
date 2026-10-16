@@ -88,12 +88,24 @@ describe("createSiteSelector", () => {
     });
 
     it("null goes to unknownHost site", async () => {
-      const { select } = createSiteSelector({ sites, resolveHost: () => null, unknownHost: "landing" });
-      expect(await select(at("x.com"))).toMatchObject({ kind: "site", site: "landing", host: "x.com" });
+      const { select } = createSiteSelector({
+        sites,
+        resolveHost: () => null,
+        unknownHost: "landing",
+      });
+      expect(await select(at("x.com"))).toMatchObject({
+        kind: "site",
+        site: "landing",
+        host: "x.com",
+      });
     });
 
     it("unknownHost not-found stays not-found", async () => {
-      const { select } = createSiteSelector({ sites, resolveHost: () => null, unknownHost: "not-found" });
+      const { select } = createSiteSelector({
+        sites,
+        resolveHost: () => null,
+        unknownHost: "not-found",
+      });
       expect((await select(at("x.com"))).kind).toBe("not-found");
     });
 
@@ -109,7 +121,10 @@ describe("createSiteSelector", () => {
     });
 
     it("throws for an invalid resolved site", async () => {
-      const { select } = createSiteSelector({ sites, resolveHost: () => ({ site: "landing", key: "k" }) });
+      const { select } = createSiteSelector({
+        sites,
+        resolveHost: () => ({ site: "landing", key: "k" }),
+      });
       await expect(select(at("x.com"))).rejects.toThrow(/not a dynamic site/);
     });
 
@@ -228,7 +243,9 @@ describe("validateSitesAtBoot", () => {
       a: { dynamic: true },
       b: { hosts: ["b.com"], basePath: "/" },
     };
-    expect(() => validateSitesAtBoot({ sites })).toThrow(/SITE_BASEPATH_INVALID[\s\S]*DYNAMIC_SITE_WITHOUT_RESOLVER/);
+    expect(() => validateSitesAtBoot({ sites })).toThrow(
+      /SITE_BASEPATH_INVALID[\s\S]*DYNAMIC_SITE_WITHOUT_RESOLVER/,
+    );
     expect(() => validateSitesAtBoot({ sites: fixed, resolveHost: () => null })).toThrow(
       /RESOLVER_WITHOUT_DYNAMIC_SITE/,
     );

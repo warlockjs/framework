@@ -41,12 +41,12 @@ await sitemap.saveTo("public/sitemap.xml");
 
 ## `new Sitemap(options)`
 
-| Option | Meaning |
-| --- | --- |
-| `baseUrl` | **Required.** An absolute origin, such as `https://example.com` or `https://example.com/docs`. |
-| `changefreq` | The default for any entry that doesn't set its own. |
-| `priority` | The same. |
-| `lastmod` | The same. |
+| Option       | Meaning                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `baseUrl`    | **Required.** An absolute origin, such as `https://example.com` or `https://example.com/docs`. |
+| `changefreq` | The default for any entry that doesn't set its own.                                            |
+| `priority`   | The same.                                                                                      |
+| `lastmod`    | The same.                                                                                      |
 
 The constructor validates `baseUrl`. A value that isn't an absolute `http(s)`
 URL throws `InvalidBaseUrlError`. That includes a missing value, a relative
@@ -58,15 +58,15 @@ so you don't find out at the first request.
 Only `path` is required. It must be a **concrete path**, such as `/posts/123`.
 A pattern like `/posts/:id` is not a URL.
 
-| Field | Meaning |
-| --- | --- |
-| `path` | **Required.** Resolved against `baseUrl`. An absolute URL is used as given. |
-| `name` | An optional label for the route, for your own diagnostics. It is never written to the XML. |
-| `route` | The optional pattern this URL came from, such as `/posts/:id`. `routes()` and `duplicates()` use it. |
-| `lastmod` | A `Date`, written as a W3C datetime (`toISOString()`), or a string, written exactly as given. |
-| `changefreq` | `always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, or `never`. |
-| `priority` | `0.0`–`1.0`. |
-| `alternates` | Language versions of this page. See [Alternates](#language-alternates) below. |
+| Field        | Meaning                                                                                              |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| `path`       | **Required.** Resolved against `baseUrl`. An absolute URL is used as given.                          |
+| `name`       | An optional label for the route, for your own diagnostics. It is never written to the XML.           |
+| `route`      | The optional pattern this URL came from, such as `/posts/:id`. `routes()` and `duplicates()` use it. |
+| `lastmod`    | A `Date`, written as a W3C datetime (`toISOString()`), or a string, written exactly as given.        |
+| `changefreq` | `always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, or `never`.                              |
+| `priority`   | `0.0`–`1.0`.                                                                                         |
+| `alternates` | Language versions of this page. See [Alternates](#language-alternates) below.                        |
 
 ## Images
 
@@ -150,9 +150,9 @@ sitemap.add({ path: "/ar/about-us", alternates });
 ```
 
 <Aside type="caution" title="Every language version is its own <url>">
-Add each language version as its own entry, and give each one the complete
-alternate set, including itself. Sitemaps often ship broken because the
-alternates are listed on only one version.
+  Add each language version as its own entry, and give each one the complete alternate set,
+  including itself. Sitemaps often ship broken because the alternates are listed on only one
+  version.
 </Aside>
 
 The package has no concept of a locale. `hreflang` accepts any string (`en`,

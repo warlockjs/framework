@@ -64,21 +64,23 @@ the model is registered before queries run.
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Add deferred-resolution mode? | **Yes, opt-in.** Useful escape hatch for genuine circular cases. |
-| 2 | Add startup verification pass? | **Yes.** O(M×R) once at boot; catches every typo / missing import. |
-| 3 | Where does verification fire — in `Model.bootstrap()` or first `query()` call? | **App bootstrap.** Earlier failure = better signal. |
-| 4 | Throw or warn on verification failure? | **Throw.** Continuing with broken relations silently is worse than failing fast. |
+| #   | Question                                                                       | Recommendation                                                                   |
+| --- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| 1   | Add deferred-resolution mode?                                                  | **Yes, opt-in.** Useful escape hatch for genuine circular cases.                 |
+| 2   | Add startup verification pass?                                                 | **Yes.** O(M×R) once at boot; catches every typo / missing import.               |
+| 3   | Where does verification fire — in `Model.bootstrap()` or first `query()` call? | **App bootstrap.** Earlier failure = better signal.                              |
+| 4   | Throw or warn on verification failure?                                         | **Throw.** Continuing with broken relations silently is worse than failing fast. |
 
 ## Summary (partial — 2026-05-12)
 
 **Landed:**
+
 - `RelationLoader.resolveModelClass` now throws with caller context (which model + which relation triggered the resolution) and lists common causes (missing `@RegisterModel`, missing import, circular import) with a concrete fix suggestion.
 - New exported `verifyRegisteredRelations()` function in `register-model.ts`. Walks every registered model, checks every relation's string `model` target resolves in the registry, throws a single error listing all failures with the `caller.relation → target` format. Designed to be called once at app bootstrap after all model modules have loaded.
 - `verifyRegisteredRelations` is auto-exported via the existing `index.ts` barrel.
 
 **Deferred:**
+
 - `getModelFromRegistry(name, { defer: true })` overload returning a lazy thunk/Proxy. Useful escape hatch for genuine circular cases but adds API surface; consumers haven't requested it. Revisit if a real case appears.
 
 **Recommended usage:**

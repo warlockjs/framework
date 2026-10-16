@@ -45,11 +45,11 @@ Prefer `request.validated()` once a schema is attached — it's typed.
 
 `request.input()` / `.all()` / `.validated()` read the same way regardless of how the body arrived — every content type below feeds the same parsed bag:
 
-| Content type                         | Parsed by                       | Notes                                                                |
-| ------------------------------------ | -------------------------------- | --------------------------------------------------------------------- |
-| `application/json`                   | Fastify (built-in)               | objects/arrays parsed as-is                                           |
-| `multipart/form-data`                | `@fastify/multipart`             | fields + files; see the `upload-file` topic          |
-| `application/x-www-form-urlencoded`  | Warlock's own content-type parser (`http/parse-urlencoded-body.ts`) | plain HTML forms, OAuth `form_post` callbacks (e.g. Apple Sign in)    |
+| Content type                        | Parsed by                                                           | Notes                                                              |
+| ----------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `application/json`                  | Fastify (built-in)                                                  | objects/arrays parsed as-is                                        |
+| `multipart/form-data`               | `@fastify/multipart`                                                | fields + files; see the `upload-file` topic                        |
+| `application/x-www-form-urlencoded` | Warlock's own content-type parser (`http/parse-urlencoded-body.ts`) | plain HTML forms, OAuth `form_post` callbacks (e.g. Apple Sign in) |
 
 For urlencoded bodies: fields decode via `URLSearchParams`. A key sent more than once (`tag=a&tag=b`) becomes an array (`request.input("tag")` → `["a", "b"]`); every other key is a plain string. Bracket-notation keys (`a[b]=1`) are **not** expanded by the urlencoded parser itself — nesting only happens through the same shared bracket-key logic every body type already goes through, so it behaves exactly like a JSON or query-string key of that shape, no differently than today.
 
@@ -163,12 +163,12 @@ loginController.responseSchema = {
 
 A body is an object whose values are one of:
 
-| Value                                           | Meaning                                     |
-| ----------------------------------------------- | ------------------------------------------- |
-| a cast string, with the resource suffixes       | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
-| a resource                                      | one `ResourceOutput` object                 |
-| `[Resource]`                                    | an array of that resource                   |
-| a nested plain object of any of the above       | recursed                                    |
+| Value                                     | Meaning                                                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
+| a resource                                | one `ResourceOutput` object                                                                 |
+| `[Resource]`                              | an array of that resource                                                                   |
+| a nested plain object of any of the above | recursed                                                                                    |
 
 The output types follow the same rules as `defineResource` (`ResponseBodyOutput<B>` and `ResponseSchemaOutput<S>` are exported if you need the type of a body or of the whole schema).
 

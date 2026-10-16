@@ -228,7 +228,11 @@ export async function buildWarlockHydrationClient(
     logRoot: options.appRoot,
     sites: options.sites === undefined ? undefined : Object.keys(options.sites),
     plugins: [
-      ...warlockClientBoundary({ appRoot: options.appRoot, srcDir: options.srcDir, sites: options.sites }),
+      ...warlockClientBoundary({
+        appRoot: options.appRoot,
+        srcDir: options.srcDir,
+        sites: options.sites,
+      }),
       ...(options.plugins ?? []),
     ],
   });

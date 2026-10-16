@@ -15,6 +15,8 @@ describe("mergeEsbuildPatches plugins", () => {
   it("keeps plugins from a patch that has none after it", () => {
     const first: Plugin = { name: "first", setup() {} };
 
-    expect(mergeEsbuildPatches({ plugins: [first] }, { jsx: "automatic" }).plugins).toEqual([first]);
+    expect(mergeEsbuildPatches({ plugins: [first] }, { jsx: "automatic" }).plugins).toEqual([
+      first,
+    ]);
   });
 });

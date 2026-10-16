@@ -281,12 +281,20 @@ describe("attachLogSource", () => {
     const socket = new Socket();
     socket.parser.socket = socket;
 
-    await log.info("devtools-test", "live", "request seen", { method: "GET", socket, nested: { socket } });
+    await log.info("devtools-test", "live", "request seen", {
+      method: "GET",
+      socket,
+      nested: { socket },
+    });
     dispose();
 
     const context = logs[0]?.entry.context;
 
     expect(() => JSON.stringify(context)).not.toThrow();
-    expect(context).toMatchObject({ method: "GET", socket: "[Socket]", nested: { socket: "[Socket]" } });
+    expect(context).toMatchObject({
+      method: "GET",
+      socket: "[Socket]",
+      nested: { socket: "[Socket]" },
+    });
   });
 });

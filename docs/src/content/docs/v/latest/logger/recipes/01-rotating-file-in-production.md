@@ -66,7 +66,7 @@ log.setChannels([
 The `levels` whitelist is per channel — the first file still records everything. See [Channels Overview](../channels/01-overview/) for the filtering model.
 
 :::caution[`chunk: "daily"` ignores `name`]
-With `chunk: "daily"` (or `"hourly"`) the file is named by the date, **not** by the `name` option — so two daily channels in the same `storagePath` would write to the *same* file. Give each channel its own `storagePath` directory (as above) to keep them separate. `name` only takes effect with `chunk: "single"`.
+With `chunk: "daily"` (or `"hourly"`) the file is named by the date, **not** by the `name` option — so two daily channels in the same `storagePath` would write to the _same_ file. Give each channel its own `storagePath` directory (as above) to keep them separate. `name` only takes effect with `chunk: "single"`.
 :::
 
 :::caution[Rotation renames, it doesn't delete]

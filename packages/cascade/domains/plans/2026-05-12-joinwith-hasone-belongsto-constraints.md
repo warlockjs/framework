@@ -76,11 +76,11 @@ Reuse `absorbSubParserParams` exactly as it's used in the hasMany branch.
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | ON-clause append vs subquery wrap? | **ON-clause append.** Less SQL, planner-friendly, simpler. |
-| 2 | Constraint orderBy/limit — drop or error? | **Drop with dev-warn.** Same precedent as withCount. |
-| 3 | Threading constraintOps through leftJoin op or stuffing in selectRelatedColumns? | **Through leftJoin.** The constraint is JOIN-level, not SELECT-level; route it where it ends up. |
+| #   | Question                                                                         | Recommendation                                                                                   |
+| --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1   | ON-clause append vs subquery wrap?                                               | **ON-clause append.** Less SQL, planner-friendly, simpler.                                       |
+| 2   | Constraint orderBy/limit — drop or error?                                        | **Drop with dev-warn.** Same precedent as withCount.                                             |
+| 3   | Threading constraintOps through leftJoin op or stuffing in selectRelatedColumns? | **Through leftJoin.** The constraint is JOIN-level, not SELECT-level; route it where it ends up. |
 
 ## Verification
 
@@ -93,6 +93,7 @@ Reuse `absorbSubParserParams` exactly as it's used in the hasMany branch.
 Constraint where-clauses on `joinWith` hasOne/belongsTo are now honoured by appending them to the LEFT JOIN's ON clause — preserves LEFT JOIN semantics (main rows stay even when no related row passes the constraint).
 
 **Implementation:**
+
 - `applyJoinRelations` now threads `config.constraintOps` through the `leftJoin` op's data (previously only passed via `selectRelatedColumns`).
 - `processJoin` reads `constraintOps`, filters for where-ops only, runs a sub-parser, absorbs its params via `absorbSubParserParams`, and appends the renumbered where-fragment to the ON clause as `AND <fragment>`.
 - orderBy/limit on the constraint are silently dropped — no meaning on a single-row LEFT JOIN.

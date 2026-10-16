@@ -390,13 +390,19 @@ describe("installPageRoutesFromManifest — per-site locale routing", () => {
     };
     const landingPage = {
       ...postsPage,
-      module: { config: { route: { path: "/pricing", name: "landing.pricing" } }, default: () => null },
+      module: {
+        config: { route: { path: "/pricing", name: "landing.pricing" } },
+        default: () => null,
+      },
       site: "landing",
       sourceFile: "src/web/$sites/landing/pricing.page.tsx",
     };
     const platformPage = {
       ...postsPage,
-      module: { config: { route: { path: "/pricing", name: "platform.pricing" } }, default: () => null },
+      module: {
+        config: { route: { path: "/pricing", name: "platform.pricing" } },
+        default: () => null,
+      },
       site: "platform",
       sourceFile: "src/web/$sites/platform/pricing.page.tsx",
     };

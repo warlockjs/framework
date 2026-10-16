@@ -226,7 +226,9 @@ export function looksLikePositionalHandler(handler: unknown): boolean {
   if (parameters) {
     const firstParameter = parameters[0];
 
-    return parameters.length >= 2 && firstParameter !== undefined && !isDestructured(firstParameter);
+    return (
+      parameters.length >= 2 && firstParameter !== undefined && !isDestructured(firstParameter)
+    );
   }
 
   return handler.length >= 2;

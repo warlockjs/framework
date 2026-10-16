@@ -64,21 +64,21 @@ Features: none
 
 ## Flags
 
-| Flag                       | Takes value | Default        | Purpose                                                              |
-| --------------------------- | ----------- | -------------- | ------------------------------------------------------------------- |
-| `<positional>` / `--name`  | yes         | — (required)   | Project name + target directory.                                    |
-| `--stack`                  | yes         | `api`          | `api` or `web` — the structural choice; `web` seeds the `web` feature by default. |
-| `--db`                     | yes         | `mongodb`      | Database driver key (`mongodb`, `postgres`, or `none`).             |
-| `--no-db`                  | no          | —              | Opt out of a database — shorthand for `--db=none`.                  |
-| `--pm`                     | yes         | inferred (`npm_config_user_agent` / system) | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
-| `--features`                | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
-| `--lint` | yes | `eslint` | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier); unknown or missing values fail before writes. |
-| `--ai`                      | yes (CSV)   | none           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).     |
-| `--agents`                  | yes (CSV)   | `claude`       | Comma-separated `agent-kit` targets — see below.                    |
-| `--git` / `--no-git`        | no          | off            | Initialize a Git repo (`git init` + `main` branch + initial commit).|
-| `--jwt` / `--no-jwt`        | no          | off            | Generate JWT secrets via the project's `jwt` script.               |
-| `--yes` / `-y`              | no          | off            | Fully headless mode.                                                 |
-| `--interactive`, `--customize` | no       | off            | Restore the full long-form wizard.                                   |
+| Flag                           | Takes value | Default                                                             | Purpose                                                                                                                |
+| ------------------------------ | ----------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory.                                                                                       |
+| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default.                                      |
+| `--db`                         | yes         | `mongodb`                                                           | Database driver key (`mongodb`, `postgres`, or `none`).                                                                |
+| `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                                     |
+| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
+| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default.                |
+| `--lint`                       | yes         | `eslint`                                                            | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier); unknown or missing values fail before writes.                      |
+| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                                        |
+| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                                       |
+| `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                                   |
+| `--jwt` / `--no-jwt`           | no          | off                                                                 | Generate JWT secrets via the project's `jwt` script.                                                                   |
+| `--yes` / `-y`                 | no          | off                                                                 | Fully headless mode.                                                                                                   |
+| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form wizard.                                                                                     |
 
 With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script
 approvals (esbuild, and Sharp when the `image` feature is selected) where that
@@ -104,18 +104,18 @@ fallback that always works — even fully offline. Any other target
 `goose`, …) is validated against the list published at
 https://mongez.js.org/agent-kit/llms.txt, fetched once and cached locally. If
 that fetch fails for an explicitly requested non-default target, the run fails
-visibly and names every target it *could* determine — it never silently
+visibly and names every target it _could_ determine — it never silently
 guesses.
 
 ## Valid keys
 
 **Database drivers** (`--db`):
 
-| Key        | Default port | Status      |
-| ---------- | ------------ | ----------- |
-| `mongodb`  | 27017        | available   |
-| `postgres` | 5432         | available   |
-| `mysql`    | 3306         | coming soon (disabled in the wizard) |
+| Key        | Default port | Status                                                                   |
+| ---------- | ------------ | ------------------------------------------------------------------------ |
+| `mongodb`  | 27017        | available                                                                |
+| `postgres` | 5432         | available                                                                |
+| `mysql`    | 3306         | coming soon (disabled in the wizard)                                     |
 | `none`     | —            | opt out — no driver, no driver package, `src/config/database.ts` removed |
 
 **Features** (`--features`): `react`, `react-email`, `mail`, `ses`, `image`, `s3`, `redis`, `scheduler`, `herald`, `socket`, `test`, `access`, `web`, `tailwind`, `shadcn`, `notifications`.

@@ -8,7 +8,7 @@ sidebar:
 
 Some agent surfaces fetch remote content on the user's behalf — a remote-text attachment, a URL skill source, a future RAG document loader. Those URLs are frequently user-controlled, so an unguarded `fetch()` is an [SSRF](https://owasp.org/www-community/attacks/Server_Side_Request_Forgery) hole (point it at `http://169.254.169.254/` and read cloud metadata) and a resource-exhaustion hole (point it at a multi-gigabyte body).
 
-`OutboundPolicy` is the one audited guard those surfaces share, instead of six ad-hoc `fetch()` call sites. It is `https`-only, denies any host that *resolves to* a private / reserved address, caps the response body, enforces a timeout, and — critically — re-validates every redirect hop instead of letting the platform follow one blindly. A policy violation throws an `OutboundPolicyError`.
+`OutboundPolicy` is the one audited guard those surfaces share, instead of six ad-hoc `fetch()` call sites. It is `https`-only, denies any host that _resolves to_ a private / reserved address, caps the response body, enforces a timeout, and — critically — re-validates every redirect hop instead of letting the platform follow one blindly. A policy violation throws an `OutboundPolicyError`.
 
 ## When you touch it
 
@@ -28,23 +28,23 @@ Reach for the standalone helpers (`resolveOutboundPolicy`, `guardedFetch`, `fetc
 import type { OutboundPolicy } from "@warlock.js/ai";
 
 const policy: OutboundPolicy = {
-  allowedSchemes: ["https"],          // default ["https"] — http must be opted in
+  allowedSchemes: ["https"], // default ["https"] — http must be opted in
   hostAllowlist: ["cdn.example.com"], // when set, host must equal or be a subdomain
-  maxBytes: 1_000_000,                // default 5 MiB
-  timeoutMs: 5_000,                   // default 10s
+  maxBytes: 1_000_000, // default 5 MiB
+  timeoutMs: 5_000, // default 10s
 };
 ```
 
-| Field | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `allowedSchemes` | `string[]` | `["https"]` | URL schemes permitted, compared case-insensitively against the protocol (no trailing colon). `http` must be opted in explicitly. |
-| `hostAllowlist` | `string[]` | _(none)_ | When set, the request host must equal an entry **or be a subdomain** of one (`cdn.example.com` allows `a.cdn.example.com`). When omitted, any host passes the allowlist check — the private-IP guard still applies. |
-| `denyPrivateIPsAfterDNS` | `boolean` | `true` | Resolve the host through DNS and reject when it maps to a private / loopback / link-local / unique-local / cloud-metadata (`169.254.169.254`) address. The core SSRF guard — catches a public hostname that resolves inward. |
-| `maxBytes` | `number` | `5_242_880` (5 MiB) | Max response body in bytes. A declared `content-length` over this fails fast; otherwise the body is read with a running cap and aborted on overflow. |
-| `timeoutMs` | `number` | `10_000` | Per-request timeout in milliseconds. |
-| `maxRedirects` | `number` | `5` | Maximum redirect hops `guardedFetch` will follow. Every hop's `Location` is re-run through the same scheme / host-allowlist / private-IP checks before being followed — see [Redirects are revalidated per hop](#redirects-are-revalidated-per-hop-not-delegated-to-fetch) below. |
-| `signal` | `AbortSignal` | _(none)_ | Caller signal, merged with the internal timeout — whichever fires first aborts the request. |
-| `fetch` | `typeof fetch` | `globalThis.fetch` | Injected `fetch` implementation (for tests, proxies, or a wrapper that already enforces app-level rules). |
+| Field                    | Type           | Default             | Meaning                                                                                                                                                                                                                                                                           |
+| ------------------------ | -------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowedSchemes`         | `string[]`     | `["https"]`         | URL schemes permitted, compared case-insensitively against the protocol (no trailing colon). `http` must be opted in explicitly.                                                                                                                                                  |
+| `hostAllowlist`          | `string[]`     | _(none)_            | When set, the request host must equal an entry **or be a subdomain** of one (`cdn.example.com` allows `a.cdn.example.com`). When omitted, any host passes the allowlist check — the private-IP guard still applies.                                                               |
+| `denyPrivateIPsAfterDNS` | `boolean`      | `true`              | Resolve the host through DNS and reject when it maps to a private / loopback / link-local / unique-local / cloud-metadata (`169.254.169.254`) address. The core SSRF guard — catches a public hostname that resolves inward.                                                      |
+| `maxBytes`               | `number`       | `5_242_880` (5 MiB) | Max response body in bytes. A declared `content-length` over this fails fast; otherwise the body is read with a running cap and aborted on overflow.                                                                                                                              |
+| `timeoutMs`              | `number`       | `10_000`            | Per-request timeout in milliseconds.                                                                                                                                                                                                                                              |
+| `maxRedirects`           | `number`       | `5`                 | Maximum redirect hops `guardedFetch` will follow. Every hop's `Location` is re-run through the same scheme / host-allowlist / private-IP checks before being followed — see [Redirects are revalidated per hop](#redirects-are-revalidated-per-hop-not-delegated-to-fetch) below. |
+| `signal`                 | `AbortSignal`  | _(none)_            | Caller signal, merged with the internal timeout — whichever fires first aborts the request.                                                                                                                                                                                       |
+| `fetch`                  | `typeof fetch` | `globalThis.fetch`  | Injected `fetch` implementation (for tests, proxies, or a wrapper that already enforces app-level rules).                                                                                                                                                                         |
 
 ## `resolveOutboundPolicy(policy?)`
 
@@ -78,10 +78,10 @@ The one-shot helper: validate the URL, fetch with the timeout, then read the (ca
 ```ts
 import { fetchTextWithPolicy } from "@warlock.js/ai";
 
-const { ok, status, statusText, text } = await fetchTextWithPolicy(
-  userSuppliedUrl,
-  { hostAllowlist: ["cdn.example.com"], maxBytes: 1_000_000 },
-);
+const { ok, status, statusText, text } = await fetchTextWithPolicy(userSuppliedUrl, {
+  hostAllowlist: ["cdn.example.com"],
+  maxBytes: 1_000_000,
+});
 
 if (!ok) {
   throw new Error(`fetch failed: ${status} ${statusText}`);
@@ -115,7 +115,7 @@ const body = await readTextCapped(response, policy.maxBytes);
 
 ### Redirects are revalidated per hop, not delegated to `fetch`
 
-Validating only the *initial* URL and then letting the platform's `fetch` follow redirects automatically leaves a gap: a URL that passes every check can still `3xx` into `http://169.254.169.254/` or an internal host, and the platform would follow it with no re-check. `guardedFetch` closes that gap — it never sets `redirect: "follow"` on the underlying request. Every hop is issued with `redirect: "manual"`, and when the response is a redirect, its `Location` header is resolved and re-run through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) **before** it is followed:
+Validating only the _initial_ URL and then letting the platform's `fetch` follow redirects automatically leaves a gap: a URL that passes every check can still `3xx` into `http://169.254.169.254/` or an internal host, and the platform would follow it with no re-check. `guardedFetch` closes that gap — it never sets `redirect: "follow"` on the underlying request. Every hop is issued with `redirect: "manual"`, and when the response is a redirect, its `Location` header is resolved and re-run through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) **before** it is followed:
 
 - Capped at `policy.maxRedirects` (default `5`) — one hop past the cap throws `OutboundPolicyError`.
 - **Credential headers are stripped on a cross-origin hop.** `authorization`, `cookie`, and `proxy-authorization` are dropped the moment a redirect's target origin differs from the current one, so a redirect can't carry credentials meant for the original host to somewhere else.
@@ -164,10 +164,10 @@ It takes a **resolved** policy — call `resolveOutboundPolicy` first.
 ```ts
 import { isPrivateOrReservedIp } from "@warlock.js/ai";
 
-isPrivateOrReservedIp("10.0.0.1");          // true
-isPrivateOrReservedIp("169.254.169.254");   // true (cloud metadata)
-isPrivateOrReservedIp("::1");               // true (IPv6 loopback)
-isPrivateOrReservedIp("93.184.216.34");     // false
+isPrivateOrReservedIp("10.0.0.1"); // true
+isPrivateOrReservedIp("169.254.169.254"); // true (cloud metadata)
+isPrivateOrReservedIp("::1"); // true (IPv6 loopback)
+isPrivateOrReservedIp("93.184.216.34"); // false
 ```
 
 ## Errors
@@ -186,7 +186,7 @@ try {
 }
 ```
 
-When the policy is enforced *inside* a managed surface (an agent attachment, a skill source), the `OutboundPolicyError` lands on that surface's result envelope rather than throwing past `execute()` — see [Handle errors](/v/latest/ai/reliability/handle-errors/).
+When the policy is enforced _inside_ a managed surface (an agent attachment, a skill source), the `OutboundPolicyError` lands on that surface's result envelope rather than throwing past `execute()` — see [Handle errors](/v/latest/ai/reliability/handle-errors/).
 
 ## Related
 

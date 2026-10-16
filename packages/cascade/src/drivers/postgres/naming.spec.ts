@@ -31,7 +31,12 @@ describe("Postgres snake_case naming", () => {
 
   it("converts insert columns and returned rows", async () => {
     const driver = new PostgresDriver({ database: "test", naming: "snake_case" });
-    const query = vi.fn().mockResolvedValue({ rows: [{ first_name: "a" }], rowCount: 1, fields: [], command: "INSERT" });
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ first_name: "a" }],
+      rowCount: 1,
+      fields: [],
+      command: "INSERT",
+    });
     driver.query = query;
 
     await driver.insert("userProfiles", { firstName: "a" });
@@ -50,6 +55,8 @@ describe("Postgres snake_case naming", () => {
       operations: [{ type: "where", data: { field: "createdAt", operator: "=", value: 1 } }],
     });
 
-    expect(parser.parse().query).toBe('SELECT * FROM "userProfiles" WHERE "userProfiles"."createdAt" = $1');
+    expect(parser.parse().query).toBe(
+      'SELECT * FROM "userProfiles" WHERE "userProfiles"."createdAt" = $1',
+    );
   });
 });

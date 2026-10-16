@@ -26,7 +26,11 @@ describe("groupBy clears the model hydrator (K4 B9)", () => {
   });
 
   it("mongo: groupBy and groupByDate drop hydrateCallback", () => {
-    const dataSource = new DataSource({ name: "t", driver: createMockDriver("mongodb"), isDefault: true });
+    const dataSource = new DataSource({
+      name: "t",
+      driver: createMockDriver("mongodb"),
+      isDefault: true,
+    });
 
     const qb = new MongoQueryBuilder("orders", dataSource);
     qb.hydrate(() => "MODEL");
@@ -46,7 +50,9 @@ describe("pg scalar aggregates (K4 B10)", () => {
   function build(row: Record<string, unknown> | undefined) {
     const driver = createMockDriver("postgres");
     (driver as any).dialect = new PostgresDialect();
-    (driver as any).query = vi.fn().mockResolvedValue({ rows: row ? [row] : [], rowCount: row ? 1 : 0 });
+    (driver as any).query = vi
+      .fn()
+      .mockResolvedValue({ rows: row ? [row] : [], rowCount: row ? 1 : 0 });
     const dataSource = new DataSource({ name: "t", driver, isDefault: true });
     return { driver: driver as any, qb: new PostgresQueryBuilder("users", dataSource) };
   }
@@ -62,7 +68,7 @@ describe("pg scalar aggregates (K4 B10)", () => {
   it("countDistinct quotes the field", async () => {
     const { driver, qb } = build({ count: "2" });
     await qb.countDistinct('a" ,1');
-    expect(driver.query.mock.calls[0][0]).toContain("COUNT(DISTINCT \"a\"\" ,1\")");
+    expect(driver.query.mock.calls[0][0]).toContain('COUNT(DISTINCT "a"" ,1")');
   });
 
   it("avg/min/max return null on an empty set", async () => {
@@ -74,7 +80,9 @@ describe("pg scalar aggregates (K4 B10)", () => {
   it("min/max keep dates and text intact, and parse numeric strings", async () => {
     const date = new Date("2024-03-01T00:00:00Z");
     expect(await build({ min: date }).qb.min<Date>("createdAt")).toBe(date);
-    expect(await build({ max: "2024-03-01 10:00:00" }).qb.max<string>("createdAt")).toBe("2024-03-01 10:00:00");
+    expect(await build({ max: "2024-03-01 10:00:00" }).qb.max<string>("createdAt")).toBe(
+      "2024-03-01 10:00:00",
+    );
     expect(await build({ max: "12.5" }).qb.max("price")).toBe(12.5);
   });
 });

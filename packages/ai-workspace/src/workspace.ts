@@ -46,11 +46,7 @@ const ALL_TOOL_NAMES: readonly WorkspaceToolName[] = [
  * `runTests` are deliberately omitted so a reviewer agent has no path to
  * change the tree.
  */
-const READONLY_TOOL_NAMES: readonly WorkspaceToolName[] = [
-  "readFile",
-  "grep",
-  "glob",
-];
+const READONLY_TOOL_NAMES: readonly WorkspaceToolName[] = ["readFile", "grep", "glob"];
 
 /**
  * Choose the dumb IO executor for a policy. `"mock"` selects the
@@ -118,9 +114,8 @@ class WorkspaceImpl implements Workspace {
     // a specific contract is not assignable to the erased one — so erase it
     // once, here, through `unknown`. The runtime object is identical; only
     // the static input type is widened for the shared surface.
-    const erase = <TInput, TOutput>(
-      contract: ToolContract<TInput, TOutput>,
-    ): ToolContract => contract as unknown as ToolContract;
+    const erase = <TInput, TOutput>(contract: ToolContract<TInput, TOutput>): ToolContract =>
+      contract as unknown as ToolContract;
 
     const factories: Record<
       WorkspaceToolName,
@@ -140,9 +135,7 @@ class WorkspaceImpl implements Workspace {
 
     return {
       all: () =>
-        ALL_TOOL_NAMES.filter((name) => this.allowedTools.has(name)).map((name) =>
-          build(name),
-        ),
+        ALL_TOOL_NAMES.filter((name) => this.allowedTools.has(name)).map((name) => build(name)),
       pick: (...names: WorkspaceToolName[]) =>
         names.filter((name) => this.allowedTools.has(name)).map((name) => build(name)),
       readFile: (opts) => build("readFile", opts),
@@ -243,10 +236,9 @@ class WorkspaceImpl implements Workspace {
    * same allow/deny/shell/read sub-policies, but a tighter jail root.
    */
   public scope(subdir: string): Workspace {
-    return new WorkspaceImpl(
-      { ...this.policy, cwd: path.join(this.policy.cwd, subdir) },
-      [...this.allowedTools],
-    );
+    return new WorkspaceImpl({ ...this.policy, cwd: path.join(this.policy.cwd, subdir) }, [
+      ...this.allowedTools,
+    ]);
   }
 }
 

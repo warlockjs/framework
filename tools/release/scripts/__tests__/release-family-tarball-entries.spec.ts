@@ -92,11 +92,7 @@ describe("assertTarballContainsItsEntryPoints (pure function)", () => {
       assertTarballContainsItsEntryPoints(
         "@warlock.js/hollow-example",
         GUILTY_MANIFEST,
-        new Set([
-          "package/package.json",
-          "package/esm/index.js",
-          "package/esm/index.d.ts",
-        ]),
+        new Set(["package/package.json", "package/esm/index.js", "package/esm/index.d.ts"]),
       ),
     );
   });

@@ -139,9 +139,7 @@ describe("TranspileCache labeled entries", () => {
   it("writes the label into the filename, keyed by hash", () => {
     const cache = new TranspileCache(dir);
     cache.put("ab34cd", { code: "x;", map: "" }, "vectors-utils-locales");
-    expect(readdirSync(path.join(dir, "ab"))).toContain(
-      "vectors-utils-locales.ab34cd.js",
-    );
+    expect(readdirSync(path.join(dir, "ab"))).toContain("vectors-utils-locales.ab34cd.js");
   });
 
   it("label is part of the on-disk name: wrong/absent label misses", () => {

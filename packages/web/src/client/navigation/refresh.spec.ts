@@ -465,7 +465,11 @@ describe("refresh — and previousRoute()", () => {
 
     await expect(createRefresher(scenario.runtime)()).resolves.toBe(true);
 
-    expect(browser.replaceState).toHaveBeenCalledWith(undefined, "", "https://app.test/products?page=1");
+    expect(browser.replaceState).toHaveBeenCalledWith(
+      undefined,
+      "",
+      "https://app.test/products?page=1",
+    );
     expect(browser.pushState).not.toHaveBeenCalled();
     expect(scenario.writes[0].routeSource).toBe(onScreenBefore.routeSource);
   });

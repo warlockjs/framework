@@ -45,7 +45,8 @@ const weatherTool = ai.tool({
 
 const myAgent = ai.agent({
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a concise weather assistant.")
     .instruction("Always respond in {{language|English}}."),
   tools: [weatherTool],

@@ -74,7 +74,7 @@ export const config: PageConfig = {
     entries: async function productEntries() {
       const products = await listPublishedSitemapProducts();
 
-      return products.map(product => ({
+      return products.map((product) => ({
         path: "/products/" + encodeURIComponent(product.slug),
         lastmod: product.updatedAt,
         images: [{ loc: product.imageUrl }],

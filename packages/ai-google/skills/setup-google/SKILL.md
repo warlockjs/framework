@@ -29,21 +29,21 @@ const vertex = new GoogleSDK({
 ## Producing a model
 
 ```ts
-google.model({ name: "gemini-2.5-flash" })
-google.model({ name: "gemini-2.5-pro", temperature: 0.2 })
-google.model({ name: "gemini-1.5-flash", maxTokens: 2048 })
+google.model({ name: "gemini-2.5-flash" });
+google.model({ name: "gemini-2.5-pro", temperature: 0.2 });
+google.model({ name: "gemini-1.5-flash", maxTokens: 2048 });
 ```
 
 ## Capabilities — what's auto-set
 
-| Flag | Default |
-| --- | --- |
-| `structuredOutput` | `true` (via `responseMimeType` + `responseJsonSchema`) |
-| `vision` | Inferred from model id substring. `true` when the id contains `gemini-1.5`, `gemini-2` (covers 2.x / 2.5), `gemini-exp`, `gemini-flash`, or `gemini-pro-vision`; `false` for bare `gemini-pro` / `gemini-1.0-pro` and any unknown id. Case-insensitive, tolerates date/preview/vendor-prefix suffixes (`models/gemini-1.5-flash-001`). |
-| `reasoning` | `true` — every Gemini 2.5 model thinks; older families harmlessly ignore an empty budget. Set `reasoning: false` to stop forwarding `thinkingConfig` to a model that rejects it. |
-| `promptCaching` | Always `true` — Gemini reports cache-read hits (`cachedContentTokenCount`) via implicit caching and accepts explicit context caching. |
-| `audio` | Mirrors the `vision` inference (the multimodal Gemini families accept audio parts). Override with `audio: true \| false`. |
-| `pdf` | Mirrors the `vision` inference (the multimodal Gemini families accept PDF / document parts). Override with `pdf: true \| false`. |
+| Flag               | Default                                                                                                                                                                                                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `structuredOutput` | `true` (via `responseMimeType` + `responseJsonSchema`)                                                                                                                                                                                                                                                                                 |
+| `vision`           | Inferred from model id substring. `true` when the id contains `gemini-1.5`, `gemini-2` (covers 2.x / 2.5), `gemini-exp`, `gemini-flash`, or `gemini-pro-vision`; `false` for bare `gemini-pro` / `gemini-1.0-pro` and any unknown id. Case-insensitive, tolerates date/preview/vendor-prefix suffixes (`models/gemini-1.5-flash-001`). |
+| `reasoning`        | `true` — every Gemini 2.5 model thinks; older families harmlessly ignore an empty budget. Set `reasoning: false` to stop forwarding `thinkingConfig` to a model that rejects it.                                                                                                                                                       |
+| `promptCaching`    | Always `true` — Gemini reports cache-read hits (`cachedContentTokenCount`) via implicit caching and accepts explicit context caching.                                                                                                                                                                                                  |
+| `audio`            | Mirrors the `vision` inference (the multimodal Gemini families accept audio parts). Override with `audio: true \| false`.                                                                                                                                                                                                              |
+| `pdf`              | Mirrors the `vision` inference (the multimodal Gemini families accept PDF / document parts). Override with `pdf: true \| false`.                                                                                                                                                                                                       |
 
 Explicit config always wins (`google.model({ name, reasoning: false, audio: false, pdf: true })`).
 
@@ -83,12 +83,12 @@ PDF and audio reach the wire only when the model declares the matching capabilit
 
 `google.image({ name })` returns an `ImageModelContract` for the `ai.image()` verb. **The model id picks the transport:**
 
-| Model id | Transport | Usage it can report |
-| --- | --- | --- |
+| Model id                                        | Transport                                                                 | Usage it can report                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `gemini-*` (e.g. `gemini-3.1-flash-lite-image`) | `ai.models.generateContent` with `responseModalities` including `"IMAGE"` | whatever `usageMetadata` Google attaches — price with `{ input, output }` |
-| anything else (`imagen-*`, unknown ids) | `ai.models.generateImages` (Imagen) | none, always zero — price with `{ perImage }` |
+| anything else (`imagen-*`, unknown ids)         | `ai.models.generateImages` (Imagen)                                       | none, always zero — price with `{ perImage }`                             |
 
-A `gemini-` id sent to `generateImages` comes back `404 … is not supported for predict` (observed verbatim from Google) — `generateImages` routes to `{model}:predict`. `generateContent` is the SDK's own named replacement: its runtime deprecation notice for `generateImages` says *"Please use the generateContent method with image models instead"*. Routing on the id is what lets both families go through one factory. A leading `models/` resource prefix is tolerated.
+A `gemini-` id sent to `generateImages` comes back `404 … is not supported for predict` (observed verbatim from Google) — `generateImages` routes to `{model}:predict`. `generateContent` is the SDK's own named replacement: its runtime deprecation notice for `generateImages` says _"Please use the generateContent method with image models instead"_. Routing on the id is what lets both families go through one factory. A leading `models/` resource prefix is tolerated.
 
 This is **routing, not validation** — no id is refused locally. An id matching neither family takes the `generateImages` route (the pre-existing one) and fails at Google as a typed provider error, not with a local throw.
 
@@ -99,13 +99,13 @@ This is **routing, not validation** — no id is refused locally. An id matching
 ```ts
 const gemini = google.image({
   name: "gemini-3.1-flash-lite-image",
-  pricing: { input: 0.3, output: 30 },     // token-metered
+  pricing: { input: 0.3, output: 30 }, // token-metered
 });
 
 const { data, error, usage } = await ai.image({
   model: gemini,
   prompt: "a red bicycle on a white background",
-  aspectRatio: "16:9",                     // → config.imageConfig.aspectRatio
+  aspectRatio: "16:9", // → config.imageConfig.aspectRatio
   options: { imageSize: "2K", personGeneration: "ALLOW_ADULT" }, // → imageConfig passthroughs
 });
 ```
@@ -127,7 +127,7 @@ const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perIma
 const { data, error } = await ai.image({
   model: imagen,
   prompt: "a watercolor lighthouse at dawn",
-  aspectRatio: "3:4",          // Imagen ratio (vs OpenAI's WxH `size`)
+  aspectRatio: "3:4", // Imagen ratio (vs OpenAI's WxH `size`)
   negativePrompt: "text, watermark",
   options: { imageSize: "2K", personGeneration: "allow_adult" }, // Imagen passthroughs
 });
@@ -135,7 +135,7 @@ const { data, error } = await ai.image({
 
 - Imagen is **per-image-metered** (price with `{ perImage }`) and returns base64 bytes — no hosted URL, and `usage` is an honest `{ input: 0, output: 0, total: 0 }`.
 - When every candidate is safety-filtered (`raiFilteredReason`), the run surfaces a typed `ContentFilterError` on `result.error`.
-- ⏳ **This path is on a clock.** `@google/genai` warns at runtime: *"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead."* This package depends on `@google/genai` `^2.17.1`, which does emit that warning. Nothing breaks today, but new work should prefer a `gemini-*` id.
+- ⏳ **This path is on a clock.** `@google/genai` warns at runtime: _"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead."_ This package depends on `@google/genai` `^2.17.1`, which does emit that warning. Nothing breaks today, but new work should prefer a `gemini-*` id.
 
 ### Not implemented: the `interactions` API
 
@@ -156,7 +156,7 @@ The verb surface lives in the `generate-images` topic of the `warlock-js-ai` ski
 ```ts
 const embedder = google.embedder({ name: "gemini-embedding-001" });
 const { vector } = await embedder.embed("Hello world");
-const { vectors } = await embedder.embedMany(["a", "b"]);   // single batched call
+const { vectors } = await embedder.embedMany(["a", "b"]); // single batched call
 ```
 
 `embedContent` accepts an array natively, so `embedMany` is **one request** (unlike Bedrock/Titan). Pass `dimensions` to forward Gemini's `outputDimensionality` truncation hint.
@@ -179,7 +179,7 @@ Timeout is checked first, so an aborted/`AbortError` request always classifies a
 ## Token counting
 
 ```ts
-await google.count("some text")  // approximate heuristic, offline
+await google.count("some text"); // approximate heuristic, offline
 ```
 
 `count(text, model?)` accepts an optional model arg for signature parity but **ignores it** — the estimate is `approximateTokenCount` (≈ `ceil(chars / 4)`) from `@warlock.js/ai`, never a `countTokens` network call.
@@ -255,7 +255,6 @@ if (model.countTokens) {
   const inputTokens = await model.countTokens(messages, options);
 }
 ```
-
 
 ## When NOT to use this skill
 

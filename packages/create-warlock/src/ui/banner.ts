@@ -1,10 +1,5 @@
 import { colors } from "@mongez/copper";
-import {
-  visibleWidth,
-  wrapStyledText,
-  wrapText,
-  type StyledSegment,
-} from "./wrap-text";
+import { visibleWidth, wrapStyledText, wrapText, type StyledSegment } from "./wrap-text";
 
 export const warlockTextAnsi = `
 \x1b[49m
@@ -99,17 +94,14 @@ export function getSuccessScreen(
     wrapText(value, Math.max(2, contentWidth - 10)).map(
       (line, index) =>
         colors.dim((index === 0 ? label : "").padEnd(10)) +
-        (label === "Features:" && !features.length
-          ? colors.dim(line)
-          : colors.white(line)),
+        (label === "Features:" && !features.length ? colors.dim(line) : colors.white(line)),
     ),
   );
   let summary: string[];
   if (narrow) {
     summary = [...wrapText(heading, contentWidth), "", ...rows];
   } else {
-    const innerWidth =
-      Math.max(visibleWidth(heading), ...rows.map(visibleWidth)) + 6;
+    const innerWidth = Math.max(visibleWidth(heading), ...rows.map(visibleWidth)) + 6;
     const border = (left: string, right: string) =>
       indent + colors.magentaBright(left + "─".repeat(innerWidth) + right);
     const row = (text: string, center = false) => {
@@ -129,20 +121,19 @@ export function getSuccessScreen(
       row(""),
       row(colors.bold(colors.green(heading)), true),
       row(""),
-      ...rows.map(text => row(text)),
+      ...rows.map((text) => row(text)),
       row(""),
       border("╰", "╯"),
     ];
   }
-  const devCommand =
-    packageManager === "npm" ? "npm run dev" : `${packageManager} dev`;
+  const devCommand = packageManager === "npm" ? "npm run dev" : `${packageManager} dev`;
   const nextSteps: { indent: string; segments: StyledSegment[] }[] = [
     {
       indent,
       segments: [
         {
           text: "🚀 Next steps:",
-          style: text => colors.bold(colors.cyan(text)),
+          style: (text) => colors.bold(colors.cyan(text)),
         },
       ],
     },
@@ -189,10 +180,9 @@ export function getSuccessScreen(
     "",
     ...nextSteps.flatMap(({ indent: lineIndent, segments }, index) => [
       ...(index === 1 || index === 3 || index === 4 ? [""] : []),
-      ...wrapStyledText(
-        segments,
-        Math.max(2, terminalWidth - lineIndent.length),
-      ).map(line => lineIndent + line),
+      ...wrapStyledText(segments, Math.max(2, terminalWidth - lineIndent.length)).map(
+        (line) => lineIndent + line,
+      ),
     ]),
     "",
   ].join("\n");

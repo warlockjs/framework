@@ -17,9 +17,9 @@ Until 2026-05-12, seal expected you to validate these with `.pattern(/regex/)`. 
 ## UUID
 
 ```ts
-v.string().uuid()        // any RFC 4122 UUID — versions 1, 3, 4, 5, 6, 7
-v.string().uuid(4)       // restrict to v4 (random) only
-v.string().uuid(7)       // restrict to v7 (timestamp-ordered)
+v.string().uuid(); // any RFC 4122 UUID — versions 1, 3, 4, 5, 6, 7
+v.string().uuid(4); // restrict to v4 (random) only
+v.string().uuid(7); // restrict to v7 (timestamp-ordered)
 ```
 
 Strict by RFC 4122 — the variant nibble (8/9/a/b at position 17) is checked, so "looks-like-UUID-but-not-valid" inputs are rejected.
@@ -27,6 +27,7 @@ Strict by RFC 4122 — the variant nibble (8/9/a/b at position 17) is checked, s
 **JSON Schema:** `{ type: "string", format: "uuid" }` — widely recognised by OpenAPI tooling and AJV.
 
 **Common version choices:**
+
 - `.uuid(4)` — random, no information leakage, the default for most apps
 - `.uuid(7)` — timestamp-ordered, plays nicely with B-tree DB indexes (sorted-friendly inserts)
 - No-argument `.uuid()` — accepts any version; useful when ingesting IDs you didn't generate
@@ -34,8 +35,8 @@ Strict by RFC 4122 — the variant nibble (8/9/a/b at position 17) is checked, s
 ## CUID
 
 ```ts
-v.string().cuid()                  // CUID2 (current spec — 24 chars, lowercase, starts with letter)
-v.string().cuid({ version: 1 })    // legacy CUID1 (starts with "c", ≥25 chars)
+v.string().cuid(); // CUID2 (current spec — 24 chars, lowercase, starts with letter)
+v.string().cuid({ version: 1 }); // legacy CUID1 (starts with "c", ≥25 chars)
 ```
 
 Default is **CUID2** because CUID1 is officially deprecated by its original author ([github.com/paralleldrive/cuid2](https://github.com/paralleldrive/cuid2)). Only pass `{ version: 1 }` for legacy data — new apps should use CUID2 or one of the alternatives below.
@@ -45,7 +46,7 @@ Default is **CUID2** because CUID1 is officially deprecated by its original auth
 ## ULID
 
 ```ts
-v.string().ulid()  // 26 chars, Crockford base32
+v.string().ulid(); // 26 chars, Crockford base32
 ```
 
 Crockford base32 excludes the letters I, L, O, U to avoid ambiguity with 1/0. The regex enforces the full 26-char form including the time component (10 chars) and randomness component (16 chars).
@@ -57,9 +58,9 @@ Crockford base32 excludes the letters I, L, O, U to avoid ambiguity with 1/0. Th
 ## nanoid
 
 ```ts
-v.string().nanoid()         // standard 21-char nanoid
-v.string().nanoid(10)       // custom length (10 chars)
-v.string().nanoid(64)       // longer for higher collision resistance
+v.string().nanoid(); // standard 21-char nanoid
+v.string().nanoid(10); // custom length (10 chars)
+v.string().nanoid(64); // longer for higher collision resistance
 ```
 
 URL-safe alphabet: `A-Za-z0-9_-`. Default length 21 gives ~2^126 possibilities — comparable collision resistance to UUID v4. Length is configurable per the nanoid library's convention.
@@ -73,10 +74,10 @@ URL-safe alphabet: `A-Za-z0-9_-`. Default length 21 gives ~2^126 possibilities �
 ID validators compose like any other rule:
 
 ```ts
-v.string().uuid(4)                    // required UUID v4
-v.string().ulid().optional()                     // optional ULID
-v.string().nanoid().describe("Public share id")  // with description
-v.string().uuid().sameAs("parent_id")            // cross-field equality check
+v.string().uuid(4); // required UUID v4
+v.string().ulid().optional(); // optional ULID
+v.string().nanoid().describe("Public share id"); // with description
+v.string().uuid().sameAs("parent_id"); // cross-field equality check
 
 // In a schema
 const userSchema = v.object({
@@ -101,28 +102,28 @@ const userSchema = v.object({
 
 // CUID2 for public-facing IDs (collision-resistant, sortable)
 const orderSchema = v.object({
-  id: v.string().uuid(7),               // internal UUID v7 (timestamp-ordered)
-  publicId: v.string().cuid(),          // outward-facing CUID2
+  id: v.string().uuid(7), // internal UUID v7 (timestamp-ordered)
+  publicId: v.string().cuid(), // outward-facing CUID2
   // ...
 });
 
 // nanoid for short share-links
 const shareSchema = v.object({
-  token: v.string().nanoid(10),         // short URL token
+  token: v.string().nanoid(10), // short URL token
   // ...
 });
 ```
 
 ## Choosing between formats
 
-| Need | Reach for |
-| --- | --- |
-| Maximum ecosystem compatibility | `v.string().uuid(4)` — every tool understands UUID |
-| Timestamp-ordered, B-tree friendly | `v.string().uuid(7)` — UUID v7 (RFC 9562) |
-| Shorter than UUID, sortable | `v.string().ulid()` |
-| Short URL tokens, share links | `v.string().nanoid(10)` |
-| Modern alternative, no Postgres bloat | `v.string().cuid()` — CUID2 |
-| Internal-only opaque IDs | `v.string().nanoid()` |
+| Need                                  | Reach for                                          |
+| ------------------------------------- | -------------------------------------------------- |
+| Maximum ecosystem compatibility       | `v.string().uuid(4)` — every tool understands UUID |
+| Timestamp-ordered, B-tree friendly    | `v.string().uuid(7)` — UUID v7 (RFC 9562)          |
+| Shorter than UUID, sortable           | `v.string().ulid()`                                |
+| Short URL tokens, share links         | `v.string().nanoid(10)`                            |
+| Modern alternative, no Postgres bloat | `v.string().cuid()` — CUID2                        |
+| Internal-only opaque IDs              | `v.string().nanoid()`                              |
 
 UUID v4 remains the safest default for cross-system compatibility. Reach for the others when you have a specific reason (ordering, brevity, URL-safety).
 

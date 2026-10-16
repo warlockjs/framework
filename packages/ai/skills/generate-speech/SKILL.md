@@ -19,7 +19,7 @@ const model = openai.speech({ name: "tts-1", voice: "alloy" }); // SpeechModelCo
 const { data, error, usage, report } = await ai.speech({ model, text: "Your order has shipped." });
 
 if (error) {
-  console.warn(error.code);          // typed AIError (auth / rate-limit / content-filter / …)
+  console.warn(error.code); // typed AIError (auth / rate-limit / content-filter / …)
 } else {
   const { base64, mediaType } = data.audio; // GeneratedAudio (always base64 today)
   await fs.writeFile("ship.mp3", Buffer.from(base64, "base64"));
@@ -34,14 +34,14 @@ if (error) {
 type SpeechResult = {
   type: "speech";
   data?: { audio: GeneratedAudio }; // undefined on failure
-  error?: AIError;                  // undefined on success — NEVER thrown
-  usage: Usage;                     // tokens (gpt-4o-mini-tts) + cost when priced
-  report: SpeechReport;             // type:"speech", model, characters, lineage
+  error?: AIError; // undefined on success — NEVER thrown
+  usage: Usage; // tokens (gpt-4o-mini-tts) + cost when priced
+  report: SpeechReport; // type:"speech", model, characters, lineage
 };
 
 type GeneratedAudio = {
   type: "base64";
-  base64: string;    // base64-encoded audio bytes
+  base64: string; // base64-encoded audio bytes
   mediaType: string; // IANA type, e.g. "audio/mpeg", "audio/wav"
 };
 ```
@@ -54,14 +54,14 @@ type GeneratedAudio = {
 await ai.speech({
   model,
   text: "Welcome aboard. Let's get you set up.",
-  voice: "verse",                 // voice id/name; overrides the model's default
-  format: "wav",                  // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
-  speed: 1.25,                    // playback multiplier (OpenAI 0.25–4.0)
-  instructions: "calm, warm",     // tone/delivery steering (gpt-4o-mini-tts only)
-  signal,                         // AbortSignal
-  observe: collector,             // route the report to an Observer (panoptic), like agents
-  sessionId: "onboarding-42",     // group into a session for flat cost/trace queries
-  options: { /* provider passthrough */ },
+  voice: "verse", // voice id/name; overrides the model's default
+  format: "wav", // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
+  speed: 1.25, // playback multiplier (OpenAI 0.25–4.0)
+  instructions: "calm, warm", // tone/delivery steering (gpt-4o-mini-tts only)
+  signal, // AbortSignal
+  observe: collector, // route the report to an Observer (panoptic), like agents
+  sessionId: "onboarding-42", // group into a session for flat cost/trace queries
+  options: {/* provider passthrough */},
 });
 ```
 
@@ -76,12 +76,20 @@ import { OpenAISDK } from "@warlock.js/ai-openai";
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 // tts-1 / tts-1-hd — billed per INPUT CHARACTER.
-const classic = openai.speech({ name: "tts-1", voice: "alloy", pricing: { perMillionCharacters: 15 } });
+const classic = openai.speech({
+  name: "tts-1",
+  voice: "alloy",
+  pricing: { perMillionCharacters: 15 },
+});
 
 // gpt-4o-mini-tts — billed per TOKEN like a chat model; supports `instructions`.
 const steered = openai.speech({ name: "gpt-4o-mini-tts", pricing: { input: 0.6, output: 12 } });
 
-const { data } = await ai.speech({ model: steered, text: "Read this warmly.", instructions: "gentle" });
+const { data } = await ai.speech({
+  model: steered,
+  text: "Read this warmly.",
+  instructions: "gentle",
+});
 ```
 
 ## Cost-truth — one rollup, two metering models

@@ -18,18 +18,10 @@ const at = (iso: string) => dayjs(iso).utc();
 describe("CronParser — field parsing", () => {
   it("parses wildcard '*' as full range", () => {
     const parser = new CronParser("* * * * *");
-    expect(parser.fields.minutes).toEqual(
-      Array.from({ length: 60 }, (_, i) => i),
-    );
-    expect(parser.fields.hours).toEqual(
-      Array.from({ length: 24 }, (_, i) => i),
-    );
-    expect(parser.fields.daysOfMonth).toEqual(
-      Array.from({ length: 31 }, (_, i) => i + 1),
-    );
-    expect(parser.fields.months).toEqual(
-      Array.from({ length: 12 }, (_, i) => i + 1),
-    );
+    expect(parser.fields.minutes).toEqual(Array.from({ length: 60 }, (_, i) => i));
+    expect(parser.fields.hours).toEqual(Array.from({ length: 24 }, (_, i) => i));
+    expect(parser.fields.daysOfMonth).toEqual(Array.from({ length: 31 }, (_, i) => i + 1));
+    expect(parser.fields.months).toEqual(Array.from({ length: 12 }, (_, i) => i + 1));
     expect(parser.fields.daysOfWeek).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
@@ -59,17 +51,13 @@ describe("CronParser — field parsing", () => {
   });
 
   it("parses range with step", () => {
-    expect(new CronParser("0 1-10/2 * * *").fields.hours).toEqual([
-      1, 3, 5, 7, 9,
-    ]);
+    expect(new CronParser("0 1-10/2 * * *").fields.hours).toEqual([1, 3, 5, 7, 9]);
   });
 
   it("parses combined business-hours weekday expression", () => {
     const parser = new CronParser("0,30 9-17 * * 1-5");
     expect(parser.fields.minutes).toEqual([0, 30]);
-    expect(parser.fields.hours).toEqual([
-      9, 10, 11, 12, 13, 14, 15, 16, 17,
-    ]);
+    expect(parser.fields.hours).toEqual([9, 10, 11, 12, 13, 14, 15, 16, 17]);
     expect(parser.fields.daysOfWeek).toEqual([1, 2, 3, 4, 5]);
   });
 
@@ -102,22 +90,16 @@ describe("CronParser — field parsing", () => {
 
   it("merges multiple comma groups, one stepped, one plain", () => {
     // "1-4/2" → [1, 3]; "10-12" → [10, 11, 12]; union sorted.
-    expect(new CronParser("1-4/2,10-12 * * * *").fields.minutes).toEqual([
-      1, 3, 10, 11, 12,
-    ]);
+    expect(new CronParser("1-4/2,10-12 * * * *").fields.minutes).toEqual([1, 3, 10, 11, 12]);
   });
 
   it("merges singletons with a stepped range in one field", () => {
     // "0", "15", "30-40/5" → [0, 15, 30, 35, 40].
-    expect(new CronParser("0,15,30-40/5 * * * *").fields.minutes).toEqual([
-      0, 15, 30, 35, 40,
-    ]);
+    expect(new CronParser("0,15,30-40/5 * * * *").fields.minutes).toEqual([0, 15, 30, 35, 40]);
   });
 
   it("keeps the result sorted ascending regardless of source order", () => {
-    expect(new CronParser("50,5,30 * * * *").fields.minutes).toEqual([
-      5, 30, 50,
-    ]);
+    expect(new CronParser("50,5,30 * * * *").fields.minutes).toEqual([5, 30, 50]);
   });
 
   it("parses the boundary values 0 and 59 for minutes", () => {
@@ -235,82 +217,62 @@ describe("CronParser — nextRun", () => {
 
   it("returns next hour boundary for '0 * * * *'", () => {
     const parser = new CronParser("0 * * * *");
-    expect(
-      parser.nextRun(at("2026-05-11T10:30:00Z")).format("HH:mm"),
-    ).toBe("11:00");
+    expect(parser.nextRun(at("2026-05-11T10:30:00Z")).format("HH:mm")).toBe("11:00");
   });
 
   it("fires today at 09:00 when called before 09:00", () => {
     const parser = new CronParser("0 9 * * *");
-    expect(
-      parser
-        .nextRun(at("2026-05-11T07:00:00Z"))
-        .format("YYYY-MM-DD HH:mm"),
-    ).toBe("2026-05-11 09:00");
+    expect(parser.nextRun(at("2026-05-11T07:00:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2026-05-11 09:00",
+    );
   });
 
   it("rolls to next day when called after 09:00", () => {
     const parser = new CronParser("0 9 * * *");
-    expect(
-      parser
-        .nextRun(at("2026-05-11T10:00:00Z"))
-        .format("YYYY-MM-DD HH:mm"),
-    ).toBe("2026-05-12 09:00");
+    expect(parser.nextRun(at("2026-05-11T10:00:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2026-05-12 09:00",
+    );
   });
 
   it("skips weekends for weekday-only schedules", () => {
     // Sat 2026-05-09 → first weekday is Mon 2026-05-11
     const parser = new CronParser("0 9 * * 1-5");
-    expect(
-      parser
-        .nextRun(at("2026-05-09T10:00:00Z"))
-        .format("YYYY-MM-DD HH:mm"),
-    ).toBe("2026-05-11 09:00");
+    expect(parser.nextRun(at("2026-05-09T10:00:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2026-05-11 09:00",
+    );
   });
 
   it("monthly 1st rolls to next month when past", () => {
     const parser = new CronParser("0 0 1 * *");
-    expect(
-      parser
-        .nextRun(at("2026-05-15T10:00:00Z"))
-        .format("YYYY-MM-DD HH:mm"),
-    ).toBe("2026-06-01 00:00");
+    expect(parser.nextRun(at("2026-05-15T10:00:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2026-06-01 00:00",
+    );
   });
 
   it("yearly Jan 1 rolls over year", () => {
     const parser = new CronParser("0 0 1 1 *");
-    expect(
-      parser
-        .nextRun(at("2026-05-15T10:00:00Z"))
-        .format("YYYY-MM-DD HH:mm"),
-    ).toBe("2027-01-01 00:00");
+    expect(parser.nextRun(at("2026-05-15T10:00:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2027-01-01 00:00",
+    );
   });
 
   it("rolls midnight across year-end boundary", () => {
     const parser = new CronParser("0 0 * * *");
-    expect(
-      parser
-        .nextRun(at("2026-12-31T23:30:00Z"))
-        .format("YYYY-MM-DD HH:mm"),
-    ).toBe("2027-01-01 00:00");
+    expect(parser.nextRun(at("2026-12-31T23:30:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2027-01-01 00:00",
+    );
   });
 
   it("respects Feb 29 in leap years", () => {
     // 2028 is a leap year.
     const parser = new CronParser("0 0 * * *");
-    expect(
-      parser
-        .nextRun(at("2028-02-28T01:00:00Z"))
-        .format("YYYY-MM-DD"),
-    ).toBe("2028-02-29");
+    expect(parser.nextRun(at("2028-02-28T01:00:00Z")).format("YYYY-MM-DD")).toBe("2028-02-29");
   });
 
   it("skips months with fewer days for day-31 schedules", () => {
     const parser = new CronParser("0 0 31 * *");
     // April has 30 days — next 31st is May 31.
-    expect(
-      parser.nextRun(at("2026-04-15T00:00:00Z")).format("YYYY-MM-DD"),
-    ).toBe("2026-05-31");
+    expect(parser.nextRun(at("2026-04-15T00:00:00Z")).format("YYYY-MM-DD")).toBe("2026-05-31");
   });
 
   it("defaults `from` to now when omitted", () => {
@@ -331,9 +293,7 @@ describe("CronParser — nextRun", () => {
     const parser = new CronParser("0 9 * * *");
     const from = at("2026-05-11T09:00:00Z");
     expect(parser.nextRun(from).isAfter(from)).toBe(true);
-    expect(parser.nextRun(from).format("YYYY-MM-DD HH:mm")).toBe(
-      "2026-05-12 09:00",
-    );
+    expect(parser.nextRun(from).format("YYYY-MM-DD HH:mm")).toBe("2026-05-12 09:00");
   });
 
   it("evaluates fields in the timezone of the `from` instant", () => {
@@ -360,9 +320,7 @@ describe("CronParser — nextRun", () => {
   // forward scan that used to burn ~5.7s of synchronous CPU. The throw is fast
   // and happens at `new CronParser(...)`, not at `nextRun()`.
   it("rejects an impossible day-of-month / month combination eagerly (Feb 30)", () => {
-    expect(() => new CronParser("0 0 30 2 *")).toThrow(
-      /Impossible cron expression/,
-    );
+    expect(() => new CronParser("0 0 30 2 *")).toThrow(/Impossible cron expression/);
   });
 
   it("rejects the impossible combo fast — no giant forward scan", () => {
@@ -387,19 +345,13 @@ describe("CronParser — stepped schedules", () => {
   it("every-2-hours fires on even hours only", () => {
     const parser = new CronParser("0 */2 * * *");
     // From 09:30 → next even hour at :00 is 10:00.
-    expect(
-      parser.nextRun(at("2026-05-11T09:30:00Z")).format("HH:mm"),
-    ).toBe("10:00");
+    expect(parser.nextRun(at("2026-05-11T09:30:00Z")).format("HH:mm")).toBe("10:00");
   });
 
   it("every-15-minutes lands on the quarter-hour grid", () => {
     const parser = new CronParser("*/15 * * * *");
-    expect(
-      parser.nextRun(at("2026-05-11T10:07:00Z")).format("HH:mm"),
-    ).toBe("10:15");
-    expect(
-      parser.nextRun(at("2026-05-11T10:46:00Z")).format("HH:mm"),
-    ).toBe("11:00");
+    expect(parser.nextRun(at("2026-05-11T10:07:00Z")).format("HH:mm")).toBe("10:15");
+    expect(parser.nextRun(at("2026-05-11T10:46:00Z")).format("HH:mm")).toBe("11:00");
   });
 
   it("range-with-step weekday business window honors both bounds", () => {
@@ -407,9 +359,9 @@ describe("CronParser — stepped schedules", () => {
     const parser = new CronParser("0 9-17/4 * * 1-5");
     expect(parser.fields.hours).toEqual([9, 13, 17]);
     // From Mon 10:00 → next slot is 13:00 same day.
-    expect(
-      parser.nextRun(at("2026-05-11T10:00:00Z")).format("YYYY-MM-DD HH:mm"),
-    ).toBe("2026-05-11 13:00");
+    expect(parser.nextRun(at("2026-05-11T10:00:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2026-05-11 13:00",
+    );
   });
 });
 
@@ -421,41 +373,31 @@ describe("CronParser — DOM/DOW OR semantics", () => {
   it("'1 OR Monday': fires on Monday even when not the 1st", () => {
     // From Wed 2026-05-13 → next Mon is 2026-05-18 (NOT June 1)
     const parser = new CronParser("0 0 1 * 1");
-    expect(
-      parser.nextRun(at("2026-05-13T00:00:00Z")).format("YYYY-MM-DD"),
-    ).toBe("2026-05-18");
+    expect(parser.nextRun(at("2026-05-13T00:00:00Z")).format("YYYY-MM-DD")).toBe("2026-05-18");
   });
 
   it("'1 OR Monday': fires on the 1st even when not Monday", () => {
     // From Tue 2026-06-30 → next 1st is Wed 2026-07-01, next Mon is 2026-07-06
     const parser = new CronParser("0 0 1 * 1");
-    expect(
-      parser.nextRun(at("2026-06-30T00:01:00Z")).format("YYYY-MM-DD"),
-    ).toBe("2026-07-01");
+    expect(parser.nextRun(at("2026-06-30T00:01:00Z")).format("YYYY-MM-DD")).toBe("2026-07-01");
   });
 
   it("only DOM restricted: AND degenerates to DOM-only", () => {
     const parser = new CronParser("0 0 15 * *");
-    expect(
-      parser.nextRun(at("2026-05-20T00:00:00Z")).format("YYYY-MM-DD"),
-    ).toBe("2026-06-15");
+    expect(parser.nextRun(at("2026-05-20T00:00:00Z")).format("YYYY-MM-DD")).toBe("2026-06-15");
   });
 
   it("only DOW restricted: AND degenerates to DOW-only", () => {
     // Wed 2026-05-13 → next Mon = 2026-05-18
     const parser = new CronParser("0 0 * * 1");
-    expect(
-      parser.nextRun(at("2026-05-13T00:00:00Z")).format("YYYY-MM-DD"),
-    ).toBe("2026-05-18");
+    expect(parser.nextRun(at("2026-05-13T00:00:00Z")).format("YYYY-MM-DD")).toBe("2026-05-18");
   });
 
   it("both * (no day restriction): every day", () => {
     const parser = new CronParser("0 12 * * *");
-    expect(
-      parser
-        .nextRun(at("2026-05-11T13:00:00Z"))
-        .format("YYYY-MM-DD HH:mm"),
-    ).toBe("2026-05-12 12:00");
+    expect(parser.nextRun(at("2026-05-11T13:00:00Z")).format("YYYY-MM-DD HH:mm")).toBe(
+      "2026-05-12 12:00",
+    );
   });
 });
 
@@ -465,15 +407,11 @@ describe("CronParser — DOM/DOW OR semantics", () => {
 
 describe("CronParser — matches", () => {
   it("matches at the exact slot", () => {
-    expect(
-      new CronParser("30 14 * * *").matches(at("2026-05-11T14:30:00Z")),
-    ).toBe(true);
+    expect(new CronParser("30 14 * * *").matches(at("2026-05-11T14:30:00Z"))).toBe(true);
   });
 
   it("rejects neighbouring minute", () => {
-    expect(
-      new CronParser("30 14 * * *").matches(at("2026-05-11T14:31:00Z")),
-    ).toBe(false);
+    expect(new CronParser("30 14 * * *").matches(at("2026-05-11T14:31:00Z"))).toBe(false);
   });
 
   it("uses OR semantics for DOM/DOW", () => {

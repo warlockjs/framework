@@ -159,10 +159,7 @@ function add(...operands: ColumnExpressionInput[]): ArithmeticExpression {
  * @param right - The subtrahend
  * @returns A subtract expression node
  */
-function sub(
-  left: ColumnExpressionInput,
-  right: ColumnExpressionInput,
-): ArithmeticExpression {
+function sub(left: ColumnExpressionInput, right: ColumnExpressionInput): ArithmeticExpression {
   return {
     __expr: "subtract",
     operands: [toColumnExpression(left), toColumnExpression(right)],
@@ -176,10 +173,7 @@ function sub(
  * @param right - The divisor
  * @returns A divide expression node
  */
-function div(
-  left: ColumnExpressionInput,
-  right: ColumnExpressionInput,
-): ArithmeticExpression {
+function div(left: ColumnExpressionInput, right: ColumnExpressionInput): ArithmeticExpression {
   return {
     __expr: "divide",
     operands: [toColumnExpression(left), toColumnExpression(right)],

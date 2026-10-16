@@ -30,7 +30,7 @@ function press(stream: FakeTTY, sequence: string): void {
 }
 
 /** Let the keypress event and the (async) handler settle. */
-const flush = () => new Promise(resolve => setImmediate(resolve));
+const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("DevServerShortcuts", () => {
   let input: FakeTTY;
@@ -94,7 +94,7 @@ describe("DevServerShortcuts", () => {
 
   it("does not re-enter a handler that is still running", async () => {
     let release: () => void = () => {};
-    const handler = vi.fn(() => new Promise<void>(resolve => (release = resolve)));
+    const handler = vi.fn(() => new Promise<void>((resolve) => (release = resolve)));
     const shortcuts = new DevServerShortcuts(input);
 
     shortcuts.register({ key: "u", description: "update", handler });

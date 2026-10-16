@@ -47,11 +47,11 @@ warlock dev --skip-typings           # skip background type generation
 warlock dev --skip-health            # skip health checkers
 ```
 
-| Flag                  | Type      | Description                                                                    |
-| --------------------- | --------- | ------------------------------------------------------------------------------ |
-| `--fresh, -f`         | boolean   | Delete `.warlock/manifest.json` before starting (force full re-parse from disk). |
-| `--skip-typings, -st` | boolean   | Skip background type generation for this run.                                  |
-| `--skip-health, -sh`  | boolean   | Skip file health checkers for this run.                                        |
+| Flag                  | Type    | Description                                                                      |
+| --------------------- | ------- | -------------------------------------------------------------------------------- |
+| `--fresh, -f`         | boolean | Delete `.warlock/manifest.json` before starting (force full re-parse from disk). |
+| `--skip-typings, -st` | boolean | Skip background type generation for this run.                                    |
+| `--skip-health, -sh`  | boolean | Skip file health checkers for this run.                                          |
 
 Persistent — the process stays alive until you Ctrl+C it. Boots the full app: env, all configs, every connector, then your modules. See [How it works](../architecture-concepts/how-it-works.md) for what's happening behind the scenes.
 
@@ -59,14 +59,14 @@ Persistent — the process stays alive until you Ctrl+C it. Boots the full app: 
 
 Once the server is ready it listens for single keypresses — press `h` at any time to list the ones that are armed.
 
-| Key      | Does                                                                                          |
-| -------- | --------------------------------------------------------------------------------------------- |
-| `r`      | Restart the server on a fresh process.                                                        |
-| `c`      | Clear the console.                                                                            |
-| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                       |
-| `h`      | Print the shortcuts armed right now.                                                          |
-| `u`      | Only while an update notice is showing — update every `@warlock.js/*` package and restart.     |
-| `Ctrl+C` | Graceful shutdown, unchanged.                                                                 |
+| Key      | Does                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------ |
+| `r`      | Restart the server on a fresh process.                                                     |
+| `c`      | Clear the console.                                                                         |
+| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                   |
+| `h`      | Print the shortcuts armed right now.                                                       |
+| `u`      | Only while an update notice is showing — update every `@warlock.js/*` package and restart. |
+| `Ctrl+C` | Graceful shutdown, unchanged.                                                              |
 
 #### The supervisor
 
@@ -82,7 +82,7 @@ A restart never re-launches the supervisor: the worker shuts down — freeing th
 
 `Ctrl+C` reaches the worker directly, so shutdown is unchanged. `SIGTERM` and `SIGHUP` are forwarded explicitly, since they don't propagate to the process group on Windows.
 
-The supervisor also **recovers from crashes**. A worker that dies after running healthily for at least 5 seconds — out of memory, a native crash, a dead loader thread — is replaced automatically. One that dies sooner failed to *boot* and has already printed why, so it is left alone rather than having its error buried under a reprint. More than 3 crashes in a minute and the supervisor stops instead of restarting behind your back.
+The supervisor also **recovers from crashes**. A worker that dies after running healthily for at least 5 seconds — out of memory, a native crash, a dead loader thread — is replaced automatically. One that dies sooner failed to _boot_ and has already printed why, so it is left alone rather than having its error buried under a reprint. More than 3 crashes in a minute and the supervisor stops instead of restarting behind your back.
 
 #### Restart on config change
 
@@ -141,9 +141,9 @@ warlock generate.typings
 warlock generate.typings --files src/config/database.ts,src/config/storage.ts
 ```
 
-| Flag           | Type    | Description                                                                                  |
-| -------------- | ------- | -------------------------------------------------------------------------------------------- |
-| `--files, -f`  | string  | Comma-separated list of files to generate typings for. Omit to regenerate everything.        |
+| Flag          | Type   | Description                                                                           |
+| ------------- | ------ | ------------------------------------------------------------------------------------- |
+| `--files, -f` | string | Comma-separated list of files to generate typings for. Omit to regenerate everything. |
 
 The dev server runs this automatically on every boot (unless `--skip-typings`). You'd run it manually after editing a config file in a fresh checkout or when the IDE's autocomplete is lying to you.
 
@@ -161,12 +161,12 @@ warlock generate.openapi --out docs/openapi.json --title "Shop API" --server htt
 warlock generate.openapi --include-pages
 ```
 
-| Flag              | Type    | Description                                                                                          |
-| ----------------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `--out, -o`       | string  | Output file, relative to the project root. Default `storage/openapi/openapi.json`.                   |
-| `--title`         | string  | `info.title`. Default: the `name` in `package.json`.                                                 |
-| `--server`        | string  | `servers[0].url`. Default: built from the `http` config.                                             |
-| `--include-pages` | boolean | Also document page (SSR) routes.                                                                     |
+| Flag              | Type    | Description                                                                        |
+| ----------------- | ------- | ---------------------------------------------------------------------------------- |
+| `--out, -o`       | string  | Output file, relative to the project root. Default `storage/openapi/openapi.json`. |
+| `--title`         | string  | `info.title`. Default: the `name` in `package.json`.                               |
+| `--server`        | string  | `servers[0].url`. Default: built from the `http` config.                           |
+| `--include-pages` | boolean | Also document page (SSR) routes.                                                   |
 
 Routes are read in the same isolated child process `warlock build` uses, so no connector starts. Per-route gaps are printed as warnings; the command fails only when the app cannot be loaded. What is documented, the security schemes, and the live API docs page in devtools are in the [`warlock generate.openapi` guide](./openapi.md).
 
@@ -259,23 +259,23 @@ warlock migrate --sql --compact          # ...minus comments and blank lines
 warlock migrate --path src/app/orders/models/order/migrations
 ```
 
-| Flag                | Type    | Description                                                                                              |
-| ------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
-| `--fresh, -f`       | boolean | Drop all tables and re-run migrations from scratch.                                                      |
-| `--rollback, -r`    | boolean | Roll back migrations, dropping all tables.                                                               |
-| `--path, -p`        | string  | Path to a specific migration file or folder. Defaults to running all.                                    |
-| `--list, -l`        | boolean | Migration state: executed migrations, then what will run next.                                           |
-| `--pending`         | boolean | Only what will run next, in execution order. Sets an exit code — see below.                              |
-| `--all, -a`         | boolean | List *every* migration file in the app, executed or not.                                                 |
-| `--sql, -s`         | boolean | Export migrations as phase-ordered SQL files instead of executing them.                                  |
-| `--pending-only`    | boolean | With `--sql`, export only pending migrations. Otherwise exports all.                                     |
-| `--compact, -c`     | boolean | With `--sql`, strips generated comments and blank lines.                                                 |
+| Flag             | Type    | Description                                                                 |
+| ---------------- | ------- | --------------------------------------------------------------------------- |
+| `--fresh, -f`    | boolean | Drop all tables and re-run migrations from scratch.                         |
+| `--rollback, -r` | boolean | Roll back migrations, dropping all tables.                                  |
+| `--path, -p`     | string  | Path to a specific migration file or folder. Defaults to running all.       |
+| `--list, -l`     | boolean | Migration state: executed migrations, then what will run next.              |
+| `--pending`      | boolean | Only what will run next, in execution order. Sets an exit code — see below. |
+| `--all, -a`      | boolean | List _every_ migration file in the app, executed or not.                    |
+| `--sql, -s`      | boolean | Export migrations as phase-ordered SQL files instead of executing them.     |
+| `--pending-only` | boolean | With `--sql`, export only pending migrations. Otherwise exports all.        |
+| `--compact, -c`  | boolean | With `--sql`, strips generated comments and blank lines.                    |
 
 The minimal preload — only `database` and `logger` connectors — keeps migrations fast.
 
 #### Checking what will run next
 
-Before applying a schema change to a database other people are using, the question is *what is about to run* — not what already has.
+Before applying a schema change to a database other people are using, the question is _what is about to run_ — not what already has.
 
 ```bash
 warlock migrate --list
@@ -296,7 +296,7 @@ Total Pending Migrations: 1
 The pending block is printed **in execution order**, so it reads as a dry run rather than a set.
 
 :::caution[Don't derive the pending set by hand]
-Differencing `--all` against `--list` gives the wrong answer, and it errs towards *"safe to proceed"*.
+Differencing `--all` against `--list` gives the wrong answer, and it errs towards _"safe to proceed"_.
 
 `--all` lists files under `src/app`. `--list` reads the migrations table, which **also** contains migrations registered by packages through `database.migrations` — `@warlock.js/auth` contributes two. The two outputs are drawn from different populations, so the difference under-counts what is pending. Use `--list` or `--pending`; neither has that problem.
 :::
@@ -305,11 +305,11 @@ Differencing `--all` against `--list` gives the wrong answer, and it errs toward
 
 `--list` is a report and always exits `0`. `--pending` is a gate:
 
-| Exit code | Meaning                                     |
-| --------- | ------------------------------------------- |
-| `0`       | Computed, and **nothing** is pending.       |
+| Exit code | Meaning                                          |
+| --------- | ------------------------------------------------ |
+| `0`       | Computed, and **nothing** is pending.            |
 | `1`       | Computed, and at least one migration is pending. |
-| `2`       | **Could not be computed.**                  |
+| `2`       | **Could not be computed.**                       |
 
 ```bash
 warlock migrate --pending && ./deploy.sh   # deploys only when nothing is outstanding
@@ -324,7 +324,7 @@ Pending: unavailable — src/app/media/migrations/broken.ts must have a default 
   The executed list above is still accurate.
 ```
 
-It never reports `0` pending in that case. An empty pending list means *nothing is pending*, and nothing else.
+It never reports `0` pending in that case. An empty pending list means _nothing is pending_, and nothing else.
 
 ### `seed`
 
@@ -337,11 +337,11 @@ warlock seed --list              # show the order without running
 warlock seed --transaction       # run inside a transaction (default: true)
 ```
 
-| Flag                  | Type      | Default | Description                                                          |
-| --------------------- | --------- | ------- | -------------------------------------------------------------------- |
-| `--fresh, -f`         | boolean   |         | Drop all rows from all tables before seeding.                        |
-| `--list, -l`          | boolean   |         | Print the seed execution order without running.                      |
-| `--transaction, -t`   | boolean   | `true`  | Run all seeds inside a single transaction.                           |
+| Flag                | Type    | Default | Description                                     |
+| ------------------- | ------- | ------- | ----------------------------------------------- |
+| `--fresh, -f`       | boolean |         | Drop all rows from all tables before seeding.   |
+| `--list, -l`        | boolean |         | Print the seed execution order without running. |
+| `--transaction, -t` | boolean | `true`  | Run all seeds inside a single transaction.      |
 
 Full `bootstrap: true` — seeds touch app models, so the whole app initializes. Slower than `migrate`; that's the price for being able to use model classes in your seed files.
 
@@ -357,13 +357,13 @@ warlock create-database my_app --connection secondary
 warlock cdb my_app                          # alias
 ```
 
-| Positional | Description                              |
-| ---------- | ---------------------------------------- |
-| `<name>`   | The database name to create. Required.   |
+| Positional | Description                            |
+| ---------- | -------------------------------------- |
+| `<name>`   | The database name to create. Required. |
 
-| Flag                | Default      | Description                                                       |
-| ------------------- | ------------ | ----------------------------------------------------------------- |
-| `--connection, -c`  | `"default"`  | Database connection name as defined in `src/config/database.ts`.  |
+| Flag               | Default     | Description                                                      |
+| ------------------ | ----------- | ---------------------------------------------------------------- |
+| `--connection, -c` | `"default"` | Database connection name as defined in `src/config/database.ts`. |
 
 The connector layer takes care of MongoDB vs Postgres — your config decides; the command runs against whichever you've wired.
 
@@ -376,9 +376,9 @@ warlock drop.tables
 warlock drop.tables --force            # skip confirmation
 ```
 
-| Flag           | Description                            |
-| -------------- | -------------------------------------- |
-| `--force, -f`  | Skip the confirmation prompt.          |
+| Flag          | Description                   |
+| ------------- | ----------------------------- |
+| `--force, -f` | Skip the confirmation prompt. |
 
 Without `--force`, the command prompts before deleting anything. Pairs naturally with `migrate --fresh` if you want a complete reset.
 
@@ -398,15 +398,15 @@ warlock add auth --package-manager yarn
 warlock add auth --no-install                # record deps, run setup, skip the install
 ```
 
-| Positional      | Description                                                       |
-| --------------- | ----------------------------------------------------------------- |
-| `<features...>` | One or more feature names. Required unless using `--list`.        |
+| Positional      | Description                                                |
+| --------------- | ---------------------------------------------------------- |
+| `<features...>` | One or more feature names. Required unless using `--list`. |
 
-| Flag                       | Description                                                              |
-| -------------------------- | ------------------------------------------------------------------------ |
-| `--package-manager`        | Package manager to use (auto-detected if omitted).                       |
-| `--list, -l`               | List every available feature.                                            |
-| `--no-install`             | Record the dependencies in `package.json` and run the setup (eject configs, add scripts, run setup hooks) without invoking the package manager install. Pass it last, after the feature list. Used by scaffolders that run a single install afterwards. |
+| Flag                | Description                                                                                                                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--package-manager` | Package manager to use (auto-detected if omitted).                                                                                                                                                                                                      |
+| `--list, -l`        | List every available feature.                                                                                                                                                                                                                           |
+| `--no-install`      | Record the dependencies in `package.json` and run the setup (eject configs, add scripts, run setup hooks) without invoking the package manager install. Pass it last, after the feature list. Used by scaffolders that run a single install afterwards. |
 
 The command installs the npm package(s), runs their post-install hooks (configuration files, migrations, etc.), and updates your `warlock.config.ts` where needed.
 
@@ -414,9 +414,9 @@ The command installs the npm package(s), runs their post-install hooks (configur
 
 `auth-google` and `auth-passkeys` each `requires: ["auth"]` and install a login method's optional peer on top of `@warlock.js/auth`:
 
-| Feature | Installs | Adds |
-| ------- | -------- | ---- |
-| `auth-google` | `jose` | Google OAuth login (`startProviderLogin`, `completeProviderLogin`). |
+| Feature         | Installs                 | Adds                                                                                               |
+| --------------- | ------------------------ | -------------------------------------------------------------------------------------------------- |
+| `auth-google`   | `jose`                   | Google OAuth login (`startProviderLogin`, `completeProviderLogin`).                                |
 | `auth-passkeys` | `@simplewebauthn/server` | WebAuthn passkey registration/login. Add `@simplewebauthn/browser` to your client bundle yourself. |
 
 ```bash
@@ -434,17 +434,17 @@ See [Login with Google, passkeys, or a phone code](/v/latest/auth/guides/login-w
 
 The AI toolkit is split across a core package, provider packages, and capability satellites — each a separate `add` feature:
 
-| Feature | Installs | Notes |
-| ------- | -------- | ----- |
-| `ai` | `@warlock.js/ai` | Core toolkit (agents, tools, workflows). **Ejects `src/config/ai.ts`** — see below. Required by every other AI feature. |
-| `ai-openai` | `@warlock.js/ai-openai` | OpenAI provider. |
-| `ai-google` | `@warlock.js/ai-google` | Google (Gemini) provider. |
-| `ai-anthropic` | `@warlock.js/ai-anthropic` | Anthropic (Claude) provider. |
-| `ai-bedrock` | `@warlock.js/ai-bedrock` | AWS Bedrock provider. |
-| `ai-ollama` | `@warlock.js/ai-ollama` | Ollama provider. |
-| `ai-tools` | `@warlock.js/ai-tools` | Ready-made agent tools + MCP client/server (`ai.tools.*`, `ai.mcp`). |
-| `ai-panoptic` | `@warlock.js/ai-panoptic` | Observability — collector, exporters, local dashboard, via `ai.config({ panoptic })`. |
-| `ai-workspace` | `@warlock.js/ai-workspace` | Policy-jailed filesystem + shell workspace (`ai.workspace`). |
+| Feature        | Installs                   | Notes                                                                                                                   |
+| -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `ai`           | `@warlock.js/ai`           | Core toolkit (agents, tools, workflows). **Ejects `src/config/ai.ts`** — see below. Required by every other AI feature. |
+| `ai-openai`    | `@warlock.js/ai-openai`    | OpenAI provider.                                                                                                        |
+| `ai-google`    | `@warlock.js/ai-google`    | Google (Gemini) provider.                                                                                               |
+| `ai-anthropic` | `@warlock.js/ai-anthropic` | Anthropic (Claude) provider.                                                                                            |
+| `ai-bedrock`   | `@warlock.js/ai-bedrock`   | AWS Bedrock provider.                                                                                                   |
+| `ai-ollama`    | `@warlock.js/ai-ollama`    | Ollama provider.                                                                                                        |
+| `ai-tools`     | `@warlock.js/ai-tools`     | Ready-made agent tools + MCP client/server (`ai.tools.*`, `ai.mcp`).                                                    |
+| `ai-panoptic`  | `@warlock.js/ai-panoptic`  | Observability — collector, exporters, local dashboard, via `ai.config({ panoptic })`.                                   |
+| `ai-workspace` | `@warlock.js/ai-workspace` | Policy-jailed filesystem + shell workspace (`ai.workspace`).                                                            |
 
 Every AI feature `requires: ["ai"]`, so adding any one pulls in the core package automatically:
 
@@ -487,7 +487,7 @@ warlock update --check          # same, but exit 1 when behind — a CI gate
 | -------------- | ------- | ------------------------------------------------------------------------------------ |
 | `--no-install` | boolean | Rewrite the versions in `package.json` without running the package manager install.  |
 | `--dry-run`    | boolean | Report which packages would be updated without writing `package.json` or installing. |
-| `--check`      | boolean | Like `--dry-run`, but exits `1` when any package is behind.                           |
+| `--check`      | boolean | Like `--dry-run`, but exits `1` when any package is behind.                          |
 
 `--check` is the CI form: exit `0` means every `@warlock.js/*` package is current, exit `1` means at least one is behind (or the registry couldn't be reached). Both flags imply a dry run, so neither ever writes to `package.json`.
 
@@ -514,15 +514,15 @@ warlock storage.put ./uploads backups/2026 --driver r2 -c 10    # under a prefix
 warlock sput ./public/logo.png assets/logo.png                  # alias
 ```
 
-| Positional       | Description                                                                                  |
-| ---------------- | -------------------------------------------------------------------------------------------- |
-| `<localPath>`    | The local file or directory to upload. Required.                                             |
-| `[destination]`  | Destination path/prefix. Optional — defaults to the file's basename for files.               |
+| Positional      | Description                                                                    |
+| --------------- | ------------------------------------------------------------------------------ |
+| `<localPath>`   | The local file or directory to upload. Required.                               |
+| `[destination]` | Destination path/prefix. Optional — defaults to the file's basename for files. |
 
-| Flag                  | Type    | Default                              | Description                                                                          |
-| --------------------- | ------- | ------------------------------------ | ------------------------------------------------------------------------------------ |
-| `--driver, -d`        | string  | configured default                   | Storage driver name as defined in `src/config/storage.ts`.                           |
-| `--concurrency, -c`   | number  | `5`                                  | Number of concurrent uploads when uploading a directory.                             |
+| Flag                | Type   | Default            | Description                                                |
+| ------------------- | ------ | ------------------ | ---------------------------------------------------------- |
+| `--driver, -d`      | string | configured default | Storage driver name as defined in `src/config/storage.ts`. |
+| `--concurrency, -c` | number | `5`                | Number of concurrent uploads when uploading a directory.   |
 
 Auto-detects file vs. directory. Files are streamed (no full-buffer-in-memory), so you can upload large assets without blowing the heap. Built for the "migrate from local storage to S3/R2" workflow.
 
@@ -573,16 +573,16 @@ Requires a prior `warlock build`. See the [`routes:diff` section](./routes.md#wa
 
 The whole `generate.*` family lives in [Generators](./generators.md) — that page covers what each one produces, naming transformations, and best practices. The quick reference:
 
-| Command                                          | Alias        | What it generates                                                  |
-| ------------------------------------------------ | ------------ | ------------------------------------------------------------------ |
-| `generate <generator> [args...]`                 | `g`          | Master dispatch — `warlock g module products`.                     |
-| `generate.module <name>`                         | `gen.m`      | A new module folder with the standard subfolders.                  |
-| `generate.controller <module>/<name>`            | `gen.c`      | A controller, optionally with a validation schema (`--with-validation`). |
-| `generate.service <module>/<name>`               | `gen.s`      | A service.                                                         |
-| `generate.model <module>/<name>`                 | `gen.md`     | A Cascade model with its migration file.                           |
-| `generate.repository <module>/<name>`            | `gen.r`      | A `RepositoryManager` subclass.                                    |
-| `generate.resource <module>/<name>`              | `gen.rs`     | A `Resource` subclass.                                             |
-| `generate.migration <model-path>`                | `gen.mig`    | A migration file with add/drop/rename DSL support.                 |
+| Command                               | Alias     | What it generates                                                        |
+| ------------------------------------- | --------- | ------------------------------------------------------------------------ |
+| `generate <generator> [args...]`      | `g`       | Master dispatch — `warlock g module products`.                           |
+| `generate.module <name>`              | `gen.m`   | A new module folder with the standard subfolders.                        |
+| `generate.controller <module>/<name>` | `gen.c`   | A controller, optionally with a validation schema (`--with-validation`). |
+| `generate.service <module>/<name>`    | `gen.s`   | A service.                                                               |
+| `generate.model <module>/<name>`      | `gen.md`  | A Cascade model with its migration file.                                 |
+| `generate.repository <module>/<name>` | `gen.r`   | A `RepositoryManager` subclass.                                          |
+| `generate.resource <module>/<name>`   | `gen.rs`  | A `Resource` subclass.                                                   |
+| `generate.migration <model-path>`     | `gen.mig` | A migration file with add/drop/rename DSL support.                       |
 
 See [Generators](./generators.md) for the full surface.
 
@@ -633,16 +633,16 @@ Two rules for project-local commands:
 
 ### `CLICommandOptions`
 
-| Field         | Type                            | Required | Notes                                                                                          |
-| ------------- | ------------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `name`        | `string`                        | yes      | Dot notation OK (`db.seed`, `jwt.generate`). May include positional placeholders (`name <arg>`). |
-| `description` | `string`                        |          | Shown in help output.                                                                          |
-| `alias`       | `string`                        |          | Short name (`m` for `migrate`).                                                                |
-| `preload`     | `CLICommandPreload`             |          | What subsystems to load before `action`. See below.                                            |
-| `persistent`  | `boolean`                       |          | `true` for long-running commands. Skips the auto-exit.                                         |
-| `preAction`   | `(data) => void \| Promise`     |          | Runs **before** preloaders — banner, input validation.                                         |
-| `action`      | `(data) => void \| Promise`     | yes      | Runs after preloaders. `data` is `{ args, options }`.                                          |
-| `options`     | `CLICommandOption[]`            |          | Flag definitions.                                                                              |
+| Field         | Type                        | Required | Notes                                                                                            |
+| ------------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `name`        | `string`                    | yes      | Dot notation OK (`db.seed`, `jwt.generate`). May include positional placeholders (`name <arg>`). |
+| `description` | `string`                    |          | Shown in help output.                                                                            |
+| `alias`       | `string`                    |          | Short name (`m` for `migrate`).                                                                  |
+| `preload`     | `CLICommandPreload`         |          | What subsystems to load before `action`. See below.                                              |
+| `persistent`  | `boolean`                   |          | `true` for long-running commands. Skips the auto-exit.                                           |
+| `preAction`   | `(data) => void \| Promise` |          | Runs **before** preloaders — banner, input validation.                                           |
+| `action`      | `(data) => void \| Promise` | yes      | Runs after preloaders. `data` is `{ args, options }`.                                            |
+| `options`     | `CLICommandOption[]`        |          | Flag definitions.                                                                                |
 
 ### Options — the flag shape
 
@@ -710,18 +710,12 @@ export function registerJWTSecretGeneratorCommand() {
 Wire it in the project's `warlock.config.ts`:
 
 ```ts title="warlock.config.ts"
-import {
-  registerAuthCleanupCommand,
-  registerJWTSecretGeneratorCommand,
-} from "@warlock.js/auth";
+import { registerAuthCleanupCommand, registerJWTSecretGeneratorCommand } from "@warlock.js/auth";
 import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   cli: {
-    commands: [
-      registerJWTSecretGeneratorCommand(),
-      registerAuthCleanupCommand(),
-    ],
+    commands: [registerJWTSecretGeneratorCommand(), registerAuthCleanupCommand()],
   },
 });
 ```
@@ -738,7 +732,7 @@ For colored output, use the `colors` helper re-exported from `@warlock.js/core`:
 import { colors } from "@warlock.js/core";
 
 console.log(colors.green("[OK]") + " user promoted");
-console.log(colors.red("[!]")  + " something went wrong");
+console.log(colors.red("[!]") + " something went wrong");
 ```
 
 ### Gotchas

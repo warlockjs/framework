@@ -123,18 +123,16 @@ await cache.remove("app.config");
 `remember()` gets a value from cache, or if it doesn't exist, executes a callback to generate it, caches the result, and returns it. **It also prevents cache stampedes** within a single process — concurrent callers for the same key share the in-flight promise.
 
 ```ts
-const products = await cache.remember(
-  `products.category.${categoryId}`,
-  "30m",
-  async () => db.products.findByCategory(categoryId),
+const products = await cache.remember(`products.category.${categoryId}`, "30m", async () =>
+  db.products.findByCategory(categoryId),
 );
 ```
 
 #### `set()` vs `remember()`
 
-| Method | When to use | Behavior |
-|--------|-------------|----------|
-| `set()` | You already have the value | Stores it directly |
+| Method       | When to use                              | Behavior                                                   |
+| ------------ | ---------------------------------------- | ---------------------------------------------------------- |
+| `set()`      | You already have the value               | Stores it directly                                         |
 | `remember()` | Value needs to be computed on cache miss | Gets from cache OR runs the callback and caches the result |
 
 ```ts
@@ -234,10 +232,10 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 cache.setCacheConfigurations({
   default: "pg",
   drivers: { pg: PgCacheDriver },
-  options: { pg: { table: "cache" } },           // static defaults
+  options: { pg: { table: "cache" } }, // static defaults
 });
 
-await cache.use("pg", { client: pool });          // runtime injection
+await cache.use("pg", { client: pool }); // runtime injection
 ```
 
 Runtime options merge **over** the config defaults per-key — runtime wins on collision:
@@ -371,10 +369,11 @@ await cache.disconnect();
 ## Troubleshooting
 
 :::info
+
 - **Always call `init()` before using cache operations** — operations throw [`CacheDriverNotInitializedError`](/v/latest/cache/errors/#cachedrivernotinitializederror) otherwise.
 - **Use `await cache.driver('name')` to access a specific driver without changing the default** — useful when you need to read from one driver and write to another in the same flow (e.g. rate-limit in memory, results in Redis).
 - **Use `{ driver: "name" }` in `set` options** when the override is per-call — cleaner than switching and switching back.
-:::
+  :::
 
 ## Related Documentation
 

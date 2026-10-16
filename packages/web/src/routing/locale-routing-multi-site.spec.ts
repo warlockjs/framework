@@ -5,7 +5,10 @@ import config from "@mongez/config";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { requestContext as coreRequestContext, type Router } from "@warlock.js/core";
 import * as createPageRouteHandlerModule from "../server/create-page-route-handler";
-import type { PageRouteHandler, PageRouteHandlerOptions } from "../server/create-page-route-handler";
+import type {
+  PageRouteHandler,
+  PageRouteHandlerOptions,
+} from "../server/create-page-route-handler";
 import { installPageRoutes, type InstallPageRoutesOptions } from "../server/install-page-routes";
 import { installPageRoutesFromManifest } from "../server/install-page-routes-from-manifest";
 import type { PageManifest, PageManifestPageEntry } from "../server/page-manifest";
@@ -127,7 +130,10 @@ function recordingRouter() {
 }
 
 /** `handler` renders the site's home page and captures what a real render would read/embed. */
-function captureHandlerOptions(options: PageRouteHandlerOptions, captured: Captured[]): PageRouteHandler {
+function captureHandlerOptions(
+  options: PageRouteHandlerOptions,
+  captured: Captured[],
+): PageRouteHandler {
   const match = /\$sites[\\/]([a-z]+)[\\/]/.exec(options.pageFile.replaceAll("\\", "/"));
   const site = match?.[1] ?? "";
 

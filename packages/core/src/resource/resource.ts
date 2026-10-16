@@ -160,7 +160,9 @@ export class Resource implements ResourceContract {
    * Converts string cast types (including suffixes) and tuples into pre-built builders.
    * Other entry types (ResourceConstructor, resolver functions, ResourceArraySchema) are kept as-is.
    */
-  public static normalizeSchema(schema: Record<string, ResourceFieldConfig | string>): Record<string, ResourceFieldConfig> {
+  public static normalizeSchema(
+    schema: Record<string, ResourceFieldConfig | string>,
+  ): Record<string, ResourceFieldConfig> {
     const parsed: Record<string, ResourceFieldConfig> = {};
 
     for (const [key, value] of Object.entries(schema)) {
@@ -240,9 +242,8 @@ export class Resource implements ResourceContract {
     const source = this.originalData instanceof Model ? this.originalData : this.resource;
 
     for (const [outputKey, outputSettings] of Object.entries(parsedSchema)) {
-      const inputKey = outputSettings instanceof ResourceFieldBuilder
-        ? outputSettings.getInputKey()
-        : undefined;
+      const inputKey =
+        outputSettings instanceof ResourceFieldBuilder ? outputSettings.getInputKey() : undefined;
       const inputValue = this.resolveSourceValue(source, outputKey, inputKey);
       const outputValue = this.transformValue(inputValue, outputSettings, localeCode);
 
@@ -265,7 +266,9 @@ export class Resource implements ResourceContract {
       return ctor.parsedSchema;
     }
 
-    const instanceSchema = (this as unknown as { schema?: Record<string, ResourceFieldConfig | string> }).schema;
+    const instanceSchema = (
+      this as unknown as { schema?: Record<string, ResourceFieldConfig | string> }
+    ).schema;
     const schema = instanceSchema ?? ctor.schema;
 
     if (!schema || Object.keys(schema).length === 0) {
@@ -429,9 +432,10 @@ export class Resource implements ResourceContract {
         valueTransformType = outputSettings[1] as ResourceFieldConfig;
       }
 
-      const inputKey = valueTransformType instanceof ResourceFieldBuilder
-        ? valueTransformType.getInputKey()
-        : undefined;
+      const inputKey =
+        valueTransformType instanceof ResourceFieldBuilder
+          ? valueTransformType.getInputKey()
+          : undefined;
       const inputValue = this.resolveSourceValue(item, outputKey, inputKey ?? fieldKey);
       const outputValue = this.transformValue(inputValue, valueTransformType, locale);
 
@@ -447,9 +451,14 @@ export class Resource implements ResourceContract {
    * Resolve one schema field from a model or plain object. Mongo records use `_id`
    * internally, while resources expose `id` by convention.
    */
-  protected resolveSourceValue(source: GenericObject | Resource | Model, outputKey: string, inputKey?: string) {
+  protected resolveSourceValue(
+    source: GenericObject | Resource | Model,
+    outputKey: string,
+    inputKey?: string,
+  ) {
     const key = inputKey ?? outputKey;
-    const read = (field: string) => source instanceof Model ? source.get(field) : get(source, field);
+    const read = (field: string) =>
+      source instanceof Model ? source.get(field) : get(source, field);
     const value = read(key);
 
     return outputKey === "id" && key === "id" && value === undefined ? read("_id") : value;

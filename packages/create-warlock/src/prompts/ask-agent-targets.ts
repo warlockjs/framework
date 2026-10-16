@@ -21,9 +21,7 @@ import { multiselectMaxItems } from "./fit-to-terminal";
  * targets and SAYS SO, rather than either crashing or silently pretending
  * that is the whole list.
  */
-export async function askAgentTargets(
-  requested: string[] | undefined,
-): Promise<string[]> {
+export async function askAgentTargets(requested: string[] | undefined): Promise<string[]> {
   const { targets: known, complete } = await availableTargets();
   const targets = reconcileRequested(requested, known, complete);
 
@@ -31,7 +29,7 @@ export async function askAgentTargets(
     message: complete
       ? "Which coding agents should this project be set up for?"
       : "Which coding agents should this project be set up for? (offline — showing built-in targets only)",
-    options: targets.map(target => ({ value: target, label: target })),
+    options: targets.map((target) => ({ value: target, label: target })),
     initialValues: initialSelection(requested, targets),
     required: false,
     maxItems: multiselectMaxItems(targets.length),
@@ -80,7 +78,7 @@ function reconcileRequested(
 ): string[] {
   if (!requested || requested.length === 0) return known;
 
-  const unknown = requested.filter(target => !known.includes(target));
+  const unknown = requested.filter((target) => !known.includes(target));
 
   if (unknown.length === 0) return known;
 
@@ -101,12 +99,8 @@ function reconcileRequested(
  * Pre-tick what `--agents` asked for. Everything it names is among the
  * options by now, so nothing is filtered away here.
  */
-function initialSelection(
-  requested: string[] | undefined,
-  targets: string[],
-): string[] {
-  const wanted =
-    requested && requested.length > 0 ? requested : [DEFAULT_AGENT_KIT_TARGET];
+function initialSelection(requested: string[] | undefined, targets: string[]): string[] {
+  const wanted = requested && requested.length > 0 ? requested : [DEFAULT_AGENT_KIT_TARGET];
 
-  return wanted.filter(target => targets.includes(target));
+  return wanted.filter((target) => targets.includes(target));
 }

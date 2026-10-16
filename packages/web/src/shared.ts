@@ -128,7 +128,8 @@ export function connectSharedStore(
  */
 export function currentRequestLocale(): string | undefined {
   const store = resolveSharedStore?.() as
-    (SharedStore & { request?: { locale?: unknown } }) | undefined;
+    | (SharedStore & { request?: { locale?: unknown } })
+    | undefined;
   const locale = store?.request?.locale;
 
   return typeof locale === "string" && locale.length > 0 ? locale : undefined;

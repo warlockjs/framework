@@ -3,7 +3,10 @@ import { SyncFanoutQueue } from "./sync-fanout";
 
 describe("SyncFanoutQueue", () => {
   it("retries a failed fan-out and keeps later jobs moving", async () => {
-    const executeFirst = vi.fn().mockRejectedValueOnce(new Error("transient")).mockResolvedValueOnce(undefined);
+    const executeFirst = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce(undefined);
     const executeSecond = vi.fn().mockResolvedValue(undefined);
     const reportFailure = vi.fn();
     const queue = new SyncFanoutQueue({ retryDelay: () => 0, reportFailure });

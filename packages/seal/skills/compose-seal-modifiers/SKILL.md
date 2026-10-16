@@ -25,16 +25,19 @@ When `validate()` runs against a value, the order is:
 If a rule fails, transformers don't run for that field.
 
 **Mutator vs transformer mental model:**
+
 - **Mutator** = pre-validation reshape. `v.date()` ships one that parses strings. Use when you want rules to see the reshaped value.
 - **Transformer** = post-validation reshape. Lands in `data`. Use when you only care about the output form.
 
 ```ts
 // trim BEFORE length check — use a mutator
-v.string().addMutator(s => s.trim()).min(3)
+v.string()
+  .addMutator((s) => s.trim())
+  .min(3);
 // "  Hi  " → mutator trims → "Hi" → fails min(3)
 
 // trim only the OUTPUT — use a transformer (.trim() on string is a transformer)
-v.string().min(3).trim()
+v.string().min(3).trim();
 // "  Hi  " → rules see "  Hi  " (length 6, passes min(3)) → trim → data = "Hi"
 ```
 
@@ -66,9 +69,9 @@ Output transformers do not yet change declared output types: a
 ## `.required()` / `.optional()` / `.present()`
 
 ```ts
-v.string()             // already required inside v.object
-v.string().optional()  // type: string | undefined — { isOptional: true } brand
-v.string().present()   // must exist, may be "" / null
+v.string(); // already required inside v.object
+v.string().optional(); // type: string | undefined — { isOptional: true } brand
+v.string().present(); // must exist, may be "" / null
 ```
 
 **Required is the default inside `v.object`.** Most schemas read cleaner without `.required()` — `Infer<>` already shows what's required (no `?`) vs optional (`?`). Calling `.required()` explicitly is harmless and accepted, but the canonical seal style is to skip it. Keep `.optional()` explicit (it changes behavior); skip `.required()` (it doesn't).
@@ -76,9 +79,11 @@ v.string().present()   // must exist, may be "" / null
 The `{ isOptional: true }` brand survives chaining (`.optional().min(3)` is still optional) and `Infer<>` reads it to make the key optional.
 
 **When `.required()` is still useful:**
-- It's not needed for conditional rules — `.requiredIf(field, value)` and friends *replace* the default required-condition slot, so they work standalone.
+
+- It's not needed for conditional rules — `.requiredIf(field, value)` and friends _replace_ the default required-condition slot, so they work standalone.
 
 Conditional variants (run inside `v.object` only):
+
 - `.requiredIf(field, value)` / `.requiredIfSibling(field, value)`
 - `.requiredWith(field)` / `.requiredWithSibling(field)`
 - `.requiredWithout(field)` / `.requiredWithoutSibling(field)`
@@ -90,22 +95,22 @@ Conditional variants (run inside `v.object` only):
 ## `.nullable()` / `.notNullable()` / `.nullish()`
 
 ```ts
-v.string().nullable()  // type: string | null
-v.string().nullish()   // sugar for .optional().nullable()
+v.string().nullable(); // type: string | null
+v.string().nullish(); // sugar for .optional().nullable()
 ```
 
-Independent of optional — a field can be required *and* nullable. Defaults to non-nullable. The `{ isNullable: true }` brand widens both `Infer.Input` and `Infer.Output` with `| null`.
+Independent of optional — a field can be required _and_ nullable. Defaults to non-nullable. The `{ isNullable: true }` brand widens both `Infer.Input` and `Infer.Output` with `| null`.
 
 ## `.default(value | callback)`
 
 ```ts
-v.string().default("guest")
-v.int().default(0)
-v.date().default(() => new Date())   // lazy — fresh each validation
-v.array(v.string()).default([])
+v.string().default("guest");
+v.int().default(0);
+v.date().default(() => new Date()); // lazy — fresh each validation
+v.array(v.string()).default([]);
 ```
 
-If input is `undefined` (or missing), the default is used and rules run against it. Pass a callback for fresh-per-run values. The default fires *before* rules — so `v.string().min(3).default("a")` fails because `"a"` is shorter than 3.
+If input is `undefined` (or missing), the default is used and rules run against it. Pass a callback for fresh-per-run values. The default fires _before_ rules — so `v.string().min(3).default("a")` fails because `"a"` is shorter than 3.
 
 Date sugar: `v.date().defaultNow()` ≡ `.default(() => new Date())`.
 
@@ -113,7 +118,7 @@ The `{ hasDefault: true }` brand makes the key optional in `Infer.Input` (caller
 
 ## `.catch(fallback)`
 
-Rescues *failed* validation by substituting a fallback. Complement to `.default()`:
+Rescues _failed_ validation by substituting a fallback. Complement to `.default()`:
 
 - `.default(x)` fires when input is **absent**
 - `.catch(y)` fires when input is **present but invalid**
@@ -148,7 +153,7 @@ const schema = v.object({
   retries: v.int().catch(3),
 });
 
-type In  = Infer.Input<typeof schema>;
+type In = Infer.Input<typeof schema>;
 // {
 //   bio?:     string;
 //   status?:  Status;      ← default makes caller optional
@@ -162,10 +167,11 @@ type Out = Infer.Output<typeof schema>;
 //   retries: number;       ← catch guarantees a value
 // }
 
-type Default = Infer<typeof schema>;   // alias for Infer.Input
+type Default = Infer<typeof schema>; // alias for Infer.Input
 ```
 
 **When to reach for which:**
+
 - `Infer.Input<T>` (or bare `Infer<T>`) — for HTTP request bodies, form payloads, DTOs, anything pre-validation. **The common case in HTTP-shaped code.**
 - `Infer.Output<T>` — for Cascade `Model<>` params, validated state, anywhere downstream of `validate()`.
 
@@ -175,26 +181,26 @@ Both widen with `| null` when `.nullable()` is set.
 
 Three failure modes, three different rescue mechanisms:
 
-| Input state | Rescued by | What appears in `data` |
-| --- | --- | --- |
-| Field absent | `.default(x)` | `x` |
-| Field absent (no default) | `.optional()` | Key omitted entirely |
-| Field present and invalid | `.catch(y)` | `y` |
-| Field is `null` | `.nullable()` | `null` |
-| Field present, empty (`""`, `[]`, `{}`) | (none needed — empty is a valid value) | Preserved as-is |
+| Input state                             | Rescued by                             | What appears in `data` |
+| --------------------------------------- | -------------------------------------- | ---------------------- |
+| Field absent                            | `.default(x)`                          | `x`                    |
+| Field absent (no default)               | `.optional()`                          | Key omitted entirely   |
+| Field present and invalid               | `.catch(y)`                            | `y`                    |
+| Field is `null`                         | `.nullable()`                          | `null`                 |
+| Field present, empty (`""`, `[]`, `{}`) | (none needed — empty is a valid value) | Preserved as-is        |
 
 Full truth table for an `.optional()` field inside `v.object(…)`:
 
-| Input | What appears in `data` |
-| --- | --- |
-| Field absent | Key **omitted entirely** (not `undefined`-valued) |
-| Field is explicit `undefined` | Key omitted (treated identically to absent) |
-| Field is `null` (no `.nullable()`) | Key omitted — for an **optional** field, `null` coalesces to empty and the (cleared) required rule doesn't fire. On a **required** field the same `null` triggers a validation error. |
-| Field is `null` with `.nullable()` | Key is `null` |
-| Field present and empty (`""`, `[]`, `{}`) | Preserved as-is — empty ≠ absent |
-| Field is `.default(x)` and absent | Key is `x` (default fires, then rules run on `x`) |
-| Field is `.default(x)` and present | Caller value wins; default is unused |
-| Field is `.catch(y)` and validation fails | Key is `y` (catch rescues) |
+| Input                                      | What appears in `data`                                                                                                                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field absent                               | Key **omitted entirely** (not `undefined`-valued)                                                                                                                                     |
+| Field is explicit `undefined`              | Key omitted (treated identically to absent)                                                                                                                                           |
+| Field is `null` (no `.nullable()`)         | Key omitted — for an **optional** field, `null` coalesces to empty and the (cleared) required rule doesn't fire. On a **required** field the same `null` triggers a validation error. |
+| Field is `null` with `.nullable()`         | Key is `null`                                                                                                                                                                         |
+| Field present and empty (`""`, `[]`, `{}`) | Preserved as-is — empty ≠ absent                                                                                                                                                      |
+| Field is `.default(x)` and absent          | Key is `x` (default fires, then rules run on `x`)                                                                                                                                     |
+| Field is `.default(x)` and present         | Caller value wins; default is unused                                                                                                                                                  |
+| Field is `.catch(y)` and validation fails  | Key is `y` (catch rescues)                                                                                                                                                            |
 
 ```ts
 const schema = v.object({
@@ -202,11 +208,12 @@ const schema = v.object({
   embedding: v.array(v.number()).optional(),
 });
 
-(await validate(schema, {})).data
-// → {} — neither key appears
-// (NOT { metadata: {}, embedding: [] })
+(await validate(schema, {}))
+  .data
+  // → {} — neither key appears
+  // (NOT { metadata: {}, embedding: [] })
 
-(await validate(schema, { metadata: {}, embedding: [] })).data
+  (await validate(schema, { metadata: {}, embedding: [] })).data;
 // → { metadata: {}, embedding: [] } — present-empty is preserved
 ```
 
@@ -219,12 +226,12 @@ Collection validators (`v.record`, `v.array`, `v.tuple`) explicitly honor this �
 Available on `v.string()`, `v.number()`, `v.int()`, `v.float()`, `v.boolean()`, `v.scalar()`:
 
 ```ts
-v.string().in(["admin", "user", "guest"])   // value must match one
-v.string().oneOf(["a", "b"])                // alias for .in
-v.string().notIn(["banned", "blocked"])     // value must NOT match
-v.string().forbids(["banned"])              // alias for .notIn
-v.number().allowsOnly([1, 2, 3])            // stricter — explicit allowlist
-v.string().enum(MyTSEnum)                   // accepts a TS enum object via Object.values
+v.string().in(["admin", "user", "guest"]); // value must match one
+v.string().oneOf(["a", "b"]); // alias for .in
+v.string().notIn(["banned", "blocked"]); // value must NOT match
+v.string().forbids(["banned"]); // alias for .notIn
+v.number().allowsOnly([1, 2, 3]); // stricter — explicit allowlist
+v.string().enum(MyTSEnum); // accepts a TS enum object via Object.values
 ```
 
 For literal-typed narrowing (`"admin" | "user" | "guest"` instead of `string`), use `v.literal(...)` instead — `oneOf` keeps the broader primitive type.
@@ -236,10 +243,10 @@ v.object({
   email: v.string(),
   password: v.string(),
   passwordConfirm: v.string().sameAs("password").omit(),
-})
+});
 ```
 
-`.omit()` keeps the field in *validation* but drops it from `data` and from `Infer<>`. Use for confirmation/checksum fields that exist only for cross-field rules. `.exclude()` is the same idea, used internally for managed/computed plumbing.
+`.omit()` keeps the field in _validation_ but drops it from `data` and from `Infer<>`. Use for confirmation/checksum fields that exist only for cross-field rules. `.exclude()` is the same idea, used internally for managed/computed plumbing.
 
 ## `.label("Display Name")` — field display name
 
@@ -248,7 +255,7 @@ To control the `:input` placeholder in a field's own messages, call `.label()` o
 ```ts
 v.object({
   email_address: v.string().label("Email Address"),
-})
+});
 // Error message: "The Email Address is required" (instead of "The email_address is required")
 ```
 
@@ -256,12 +263,14 @@ v.object({
 
 ### `.attributes({ ... })` is a different tool
 
-`.attributes()` does NOT relabel a field's own `:input`. It supplies named substitution values consumed by the translation layer and by rules that reference *other* fields (e.g. `matches`):
+`.attributes()` does NOT relabel a field's own `:input`. It supplies named substitution values consumed by the translation layer and by rules that reference _other_ fields (e.g. `matches`):
 
 ```ts
-v.string().sameAs("confirmPassword").attributes({
-  matches: { confirmPassword: "Confirm Password" },
-})
+v.string()
+  .sameAs("confirmPassword")
+  .attributes({
+    matches: { confirmPassword: "Confirm Password" },
+  });
 ```
 
 For per-field display names use `.label()`; for translated messages wire the `translateRule` / `translateAttribute` hooks via `configureSeal()`.
@@ -289,7 +298,7 @@ Switch back with `.immutable`. Default is fine 99% of the time. Reach for `.muta
 
 ## Things NOT to do
 
-- Don't put a transformer where a mutator belongs — `.trim()` is a transformer; if you need trimming *before* `.min()`, use `.addMutator(s => s.trim())`.
+- Don't put a transformer where a mutator belongs — `.trim()` is a transformer; if you need trimming _before_ `.min()`, use `.addMutator(s => s.trim())`.
 - Don't combine `.required()` and `.optional()` on the same chain — last wins, but the intent is unclear; pick one.
 - Don't chain `.default("a")` with `.min(3)` and expect `"a"` to pass — the default goes through rules.
 - Don't expect `.requiredIf()` to work on a standalone validator outside `v.object` — sibling resolution silently passes.

@@ -121,7 +121,10 @@ export async function startMongodbHarness(
 
   const dropCollections = async (...collections: string[]) => {
     for (const collection of collections) {
-      await db.collection(collection).drop().catch(() => undefined);
+      await db
+        .collection(collection)
+        .drop()
+        .catch(() => undefined);
     }
   };
 

@@ -111,7 +111,7 @@ Each metric is one entry in the aggregates object. The result rows carry exactly
 
 ## Empty results
 
-Per the [Aggregates guide](../digging-deeper/aggregates.md#empty-results-return-0-not-null): the simple terminators (`sum`/`count`/`avg`/`min`/`max`) return `0`, never `null`, when nothing matches. For *grouped* reports there's a different edge — a group with no rows simply doesn't appear in the result array. A report over a date range with no orders returns `[]`, not a row of zeros. Render the empty state from `rows.length === 0`, don't expect placeholder rows.
+Per the [Aggregates guide](../digging-deeper/aggregates.md#empty-results-return-0-not-null): the simple terminators (`sum`/`count`/`avg`/`min`/`max`) return `0`, never `null`, when nothing matches. For _grouped_ reports there's a different edge — a group with no rows simply doesn't appear in the result array. A report over a date range with no orders returns `[]`, not a row of zeros. Render the empty state from `rows.length === 0`, don't expect placeholder rows.
 
 ## Where this stops being a single query
 

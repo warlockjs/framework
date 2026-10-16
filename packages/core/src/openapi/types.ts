@@ -95,9 +95,7 @@ export type OpenApiBuildResult = {
 
 /** The slice of a route the builder reads. A full `Route` satisfies it. */
 export type OpenApiRouteInput = Pick<Route, "method" | "path" | "handler"> &
-  Partial<
-    Pick<Route, "name" | "label" | "description" | "middleware" | "isPage" | "sourceFile">
-  >;
+  Partial<Pick<Route, "name" | "label" | "description" | "middleware" | "isPage" | "sourceFile">>;
 
 /**
  * The descriptor `authMiddleware()` attaches under `Symbol.for("warlock.auth")`.

@@ -13,9 +13,9 @@ import {
 describe("pnpm feature build approvals", () => {
   it("approves sharp for a fresh selected image feature alongside the template's esbuild policy", () => {
     expect(requiredPnpmBuildApprovals(["image"])).toEqual(["sharp"]);
-    expect(
-      mergePnpmBuildApprovals("allowBuilds:\n  esbuild: true\n", ["sharp"]),
-    ).toBe("allowBuilds:\n  sharp: true\n  esbuild: true\n");
+    expect(mergePnpmBuildApprovals("allowBuilds:\n  esbuild: true\n", ["sharp"])).toBe(
+      "allowBuilds:\n  sharp: true\n  esbuild: true\n",
+    );
   });
 
   it("preserves an explicit sharp denial and unrelated workspace YAML", () => {
@@ -28,9 +28,7 @@ describe("pnpm feature build approvals", () => {
     const yaml =
       "allowBuilds:\n  sharp: set this to true or false # generated placeholder\n  esbuild: true\n";
     const approved = mergePnpmBuildApprovals(yaml, ["sharp"]);
-    expect(approved).toBe(
-      "allowBuilds:\n  sharp: true # generated placeholder\n  esbuild: true\n",
-    );
+    expect(approved).toBe("allowBuilds:\n  sharp: true # generated placeholder\n  esbuild: true\n");
     expect(mergePnpmBuildApprovals(approved, ["sharp"])).toBe(approved);
   });
 
@@ -88,7 +86,9 @@ describe("mergeOnlyBuiltDependencies", () => {
     const yaml = "onlyBuiltDependencies:\n    - esbuild\nminimumReleaseAge: 60\n";
     const merged = mergeOnlyBuiltDependencies(yaml, ["esbuild", "sharp"]);
 
-    expect(merged).toBe("onlyBuiltDependencies:\n    - sharp\n    - esbuild\nminimumReleaseAge: 60\n");
+    expect(merged).toBe(
+      "onlyBuiltDependencies:\n    - sharp\n    - esbuild\nminimumReleaseAge: 60\n",
+    );
     expect(mergeOnlyBuiltDependencies(merged, ["esbuild", "sharp"])).toBe(merged);
   });
 

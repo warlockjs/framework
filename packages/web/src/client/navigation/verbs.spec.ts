@@ -106,7 +106,12 @@ describe("navigateTo", () => {
     const assign = vi.fn();
 
     vi.stubGlobal("window", {
-      location: { href: "https://shop.test/", origin: "https://shop.test", assign, replace: vi.fn() },
+      location: {
+        href: "https://shop.test/",
+        origin: "https://shop.test",
+        assign,
+        replace: vi.fn(),
+      },
     });
     publishRouteTable([{ name: "products.show", path: "/products/:id" }]);
 

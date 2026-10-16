@@ -211,7 +211,8 @@ describe("publishRouteTable — reachable across module graphs", () => {
     publishRouteTable([{ name: "main.home", path: "/" }]);
 
     const slot = (globalThis as Record<symbol, unknown>)[Symbol.for("warlock.web.routeTable")] as
-      { table: Map<string, { path: string }> } | undefined;
+      | { table: Map<string, { path: string }> }
+      | undefined;
 
     expect(slot?.table.get("main.home")?.path).toBe("/");
   });

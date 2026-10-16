@@ -69,7 +69,7 @@ function run(command, args, cwd) {
 
     let output = "";
 
-    const capture = chunk => {
+    const capture = (chunk) => {
       const text = chunk.toString();
       output += text;
       process.stdout.write(text);
@@ -79,7 +79,7 @@ function run(command, args, cwd) {
     child.stderr.on("data", capture);
 
     child.on("error", reject);
-    child.on("close", code => resolve({ code: code ?? 1, output }));
+    child.on("close", (code) => resolve({ code: code ?? 1, output }));
   });
 }
 
@@ -128,11 +128,7 @@ async function main() {
 
     heading(`Typechecking (tsc --noEmit) in ${appPath}`);
 
-    const tsc = await run(
-      path.join(appPath, "node_modules", ".bin", "tsc"),
-      ["--noEmit"],
-      appPath,
-    );
+    const tsc = await run(path.join(appPath, "node_modules", ".bin", "tsc"), ["--noEmit"], appPath);
 
     if (tsc.code !== 0) {
       failure = `a freshly scaffolded project does not typecheck (tsc exited ${tsc.code})`;

@@ -33,7 +33,8 @@ function snapshot(value: unknown, depth: number, seen: WeakSet<object>): unknown
   const object = value as object;
 
   if (seen.has(object)) return "[Circular]";
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "Invalid Date" : value.toISOString();
+  if (value instanceof Date)
+    return Number.isNaN(value.getTime()) ? "Invalid Date" : value.toISOString();
   if (value instanceof Error) return { name: value.name, message: value.message };
 
   if (depth >= MAX_DEPTH) return Array.isArray(value) ? "[Array]" : "[Object]";

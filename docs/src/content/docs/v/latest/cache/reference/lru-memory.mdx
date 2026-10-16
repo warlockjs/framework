@@ -6,14 +6,17 @@ slug: v/latest/cache/lru-memory
 In-memory cache with automatic eviction of the least recently used items when the capacity limit is reached.
 
 ## When to Use
+
 - You want fast, in-memory caching with automatic eviction
 - You have limited memory and want to avoid unbounded growth
 
 ## Best For
+
 - Caching computed values, API responses, or temporary data
 - Scenarios where memory usage must be controlled
 
 ## Limitations
+
 - Data is lost on restart
 - Not shared between processes or servers
 - No persistence
@@ -31,19 +34,20 @@ const cacheConfigurations = {
   options: {
     lru: {
       capacity: 500,
-      ttl: "1h",                 // optional default TTL for new entries
-      globalPrefix: "myapp",     // optional
+      ttl: "1h", // optional default TTL for new entries
+      globalPrefix: "myapp", // optional
     },
   },
 };
 ```
 
 ## Options
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `capacity` | number | `1000` | Maximum number of items in the cache |
-| `ttl` | number \| string | `Infinity` | Default TTL for new entries — seconds or a duration string like `"1h"` |
-| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+
+| Option         | Type               | Default     | Description                                                            |
+| -------------- | ------------------ | ----------- | ---------------------------------------------------------------------- |
+| `capacity`     | number             | `1000`      | Maximum number of items in the cache                                   |
+| `ttl`          | number \| string   | `Infinity`  | Default TTL for new entries — seconds or a duration string like `"1h"` |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys                                       |
 
 ### Capacity Configuration
 
@@ -89,6 +93,7 @@ Same semantics as other drivers — useful for multi-tenant scoping. When set, `
 ## Example Usage
 
 ## Storing and Retrieving Data
+
 ```ts
 import { cache } from "@warlock.js/cache";
 
@@ -108,12 +113,12 @@ The LRU (Least Recently Used) algorithm works as follows:
 
 ```ts
 // Cache with capacity: 3
-await cache.set("a", 1);  // Cache: {a: 1}
-await cache.set("b", 2);  // Cache: {a: 1, b: 2}
-await cache.set("c", 3);  // Cache: {a: 1, b: 2, c: 3}
-await cache.set("d", 4);  // Cache: {b: 2, c: 3, d: 4} - 'a' was evicted
-await cache.get("b");     // Cache: {c: 3, d: 4, b: 2} - 'b' moved to end
-await cache.set("e", 5);  // Cache: {d: 4, b: 2, e: 5} - 'c' was evicted
+await cache.set("a", 1); // Cache: {a: 1}
+await cache.set("b", 2); // Cache: {a: 1, b: 2}
+await cache.set("c", 3); // Cache: {a: 1, b: 2, c: 3}
+await cache.set("d", 4); // Cache: {b: 2, c: 3, d: 4} - 'a' was evicted
+await cache.get("b"); // Cache: {c: 3, d: 4, b: 2} - 'b' moved to end
+await cache.set("e", 5); // Cache: {d: 4, b: 2, e: 5} - 'c' was evicted
 ```
 
 ## Performance Characteristics
@@ -140,8 +145,9 @@ await cache.removeNamespace("user.1");
 Prefix matching is dot-boundary-aware — `removeNamespace("user")` does **not** affect `"users.1"`.
 
 ## Troubleshooting
+
 - **Data disappears after restart**: Expected. Use [File](/v/latest/cache/file/) or [Redis](/v/latest/cache/redis/) for persistence.
 - **Cache not shared between processes**: Use [Redis](/v/latest/cache/redis/) for distributed cache.
 - **Items being evicted too quickly**: Increase the `capacity` option.
-- **Default TTL not applying**: Check that `options.lru.ttl` is set — positional TTLs on `set()` override the default. 
-✅ **Supported (brute force).** `set({ vector })` indexes the entry; `similar()` does an O(N) cosine scan over live nodes. LRU eviction also drops the vector. Dev-only at scale — see [Similarity Retrieval](/v/latest/cache/similarity/).
+- **Default TTL not applying**: Check that `options.lru.ttl` is set — positional TTLs on `set()` override the default.
+  ✅ **Supported (brute force).** `set({ vector })` indexes the entry; `similar()` does an O(N) cosine scan over live nodes. LRU eviction also drops the vector. Dev-only at scale — see [Similarity Retrieval](/v/latest/cache/similarity/).

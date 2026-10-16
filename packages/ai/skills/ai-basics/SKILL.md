@@ -58,25 +58,25 @@ console.log(text, usage.total, report.duration);
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| `ai.agent({...})` — single-LLM-turn primitive, structured output, streaming, attachments, `spawnSubAgent` | the `run-ai-agent` topic |
-| `ai.tool({...})` — typed validated functions the model can call | the `define-ai-tool` topic |
-| `ai.systemPrompt()` / `ai.persona()` / `ai.instruction()` — composable prompts with placeholders | the `write-system-prompt` topic |
-| `ai.workflow({...})` — durable resumable pipelines with steps, routing, retry | the `run-ai-workflow` topic |
-| `ai.supervisor({...})` — multi-intent routing, fan-out, evaluate loops | the `run-supervisor` topic |
-| `ai.orchestrator({...})` — durable stateful sessions, drift, compaction, resume | the `run-orchestrator` topic |
-| `ai.planner({...})` — LLM-generated plans over registered capabilities | the `run-planner` topic |
-| `ai.memory({...})` — working + semantic recall for agents / sessions | the `use-ai-memory` topic |
-| `ai.checkpoint.*` / `ai.snapshot.*` — orchestrator session + run stores | the `manage-ai-stores` topic |
-| DX helpers — `batch` / `fallbackModel` / `eval` + matchers / SLO contracts / `fromFile` | the `ai-dx-helpers` topic |
-| `sdk.embedder({...})` — text-to-vector for RAG tools, vector ingest | the `embed-text` topic |
-| Agent + supervisor middleware — `budget` / `guardrail` / `semanticCache` + custom hooks | the `attach-ai-middleware` topic |
-| Snapshot resume + semantic cache via `@warlock.js/cache` | the `persist-ai-data` topic |
-| Configuring framework logging | the `log-ai-calls` topic |
-| `AIError` hierarchy, `error.code` / `error.category`, retry patterns (incl. `ORCHESTRATOR_*` / `PLANNER_*` families) | the `handle-ai-errors` topic |
-| Provider adapters + cost truth (pricing / cache + reasoning tokens / capabilities) | the `pick-ai-provider` topic |
-| Observability — `panoptic()` subscriber, queryable trace store, OTEL / Langfuse / console / file exporters | the `observe-with-panoptic` topic of the `warlock-js-ai-panoptic` skill |
+| If the task is about…                                                                                                | Load                                                                    |
+| -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `ai.agent({...})` — single-LLM-turn primitive, structured output, streaming, attachments, `spawnSubAgent`            | the `run-ai-agent` topic                                                |
+| `ai.tool({...})` — typed validated functions the model can call                                                      | the `define-ai-tool` topic                                              |
+| `ai.systemPrompt()` / `ai.persona()` / `ai.instruction()` — composable prompts with placeholders                     | the `write-system-prompt` topic                                         |
+| `ai.workflow({...})` — durable resumable pipelines with steps, routing, retry                                        | the `run-ai-workflow` topic                                             |
+| `ai.supervisor({...})` — multi-intent routing, fan-out, evaluate loops                                               | the `run-supervisor` topic                                              |
+| `ai.orchestrator({...})` — durable stateful sessions, drift, compaction, resume                                      | the `run-orchestrator` topic                                            |
+| `ai.planner({...})` — LLM-generated plans over registered capabilities                                               | the `run-planner` topic                                                 |
+| `ai.memory({...})` — working + semantic recall for agents / sessions                                                 | the `use-ai-memory` topic                                               |
+| `ai.checkpoint.*` / `ai.snapshot.*` — orchestrator session + run stores                                              | the `manage-ai-stores` topic                                            |
+| DX helpers — `batch` / `fallbackModel` / `eval` + matchers / SLO contracts / `fromFile`                              | the `ai-dx-helpers` topic                                               |
+| `sdk.embedder({...})` — text-to-vector for RAG tools, vector ingest                                                  | the `embed-text` topic                                                  |
+| Agent + supervisor middleware — `budget` / `guardrail` / `semanticCache` + custom hooks                              | the `attach-ai-middleware` topic                                        |
+| Snapshot resume + semantic cache via `@warlock.js/cache`                                                             | the `persist-ai-data` topic                                             |
+| Configuring framework logging                                                                                        | the `log-ai-calls` topic                                                |
+| `AIError` hierarchy, `error.code` / `error.category`, retry patterns (incl. `ORCHESTRATOR_*` / `PLANNER_*` families) | the `handle-ai-errors` topic                                            |
+| Provider adapters + cost truth (pricing / cache + reasoning tokens / capabilities)                                   | the `pick-ai-provider` topic                                            |
+| Observability — `panoptic()` subscriber, queryable trace store, OTEL / Langfuse / console / file exporters           | the `observe-with-panoptic` topic of the `warlock-js-ai-panoptic` skill |
 
 ## Package layout
 

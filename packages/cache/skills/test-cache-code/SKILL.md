@@ -63,7 +63,7 @@ When you want the real read/write semantics (eviction, TTL expiry, similarity sc
 
 `MockCacheDriver` does NOT implement `similar()` — vector writes are recorded into the call log but nearest-neighbor scoring is not available. Tests that call `cache.similar(...)` should use the memory driver.
 
-## Strategy 3 — `NullCacheDriver` when you need cache *off*
+## Strategy 3 — `NullCacheDriver` when you need cache _off_
 
 Use `NullCacheDriver` to disable caching entirely for code paths that should still work without a cache (graceful-degradation tests):
 
@@ -88,7 +88,9 @@ import { vi } from "vitest";
 class FakeRedisClient {
   public store = new Map<string, string>();
   private expires = new Map<string, number>();
-  public on() { return this; }
+  public on() {
+    return this;
+  }
   public async connect() {}
   public async quit() {}
   public async set(key: string, value: string, opts?: { EX?: number; NX?: boolean; XX?: boolean }) {
@@ -116,13 +118,18 @@ class FakeRedisClient {
     const regex = new RegExp("^" + pattern.replace(/\*/g, ".*") + "$");
     return [...this.store.keys()].filter((k) => regex.test(k));
   }
-  public async flushAll() { this.store.clear(); this.expires.clear(); }
+  public async flushAll() {
+    this.store.clear();
+    this.expires.clear();
+  }
   public async incrBy(key: string, n: number) {
     const next = Number(this.store.get(key) ?? 0) + n;
     this.store.set(key, String(next));
     return next;
   }
-  public async decrBy(key: string, n: number) { return this.incrBy(key, -n); }
+  public async decrBy(key: string, n: number) {
+    return this.incrBy(key, -n);
+  }
 }
 
 const fakeClient = new FakeRedisClient();
@@ -146,7 +153,7 @@ The in-package vitest config runs `silent: true`, but if you're outside the pack
 ```ts
 cache.setCacheConfigurations({
   default: "memory",
-  logging: false,             // <-- here
+  logging: false, // <-- here
   drivers: { memory: MemoryCacheDriver },
   options: { memory: {} },
 });
@@ -165,7 +172,7 @@ cache.on("hit", hits);
 await service.getProfile("1");
 await service.getProfile("1");
 
-expect(hits).toHaveBeenCalledTimes(1);   // second call was a hit
+expect(hits).toHaveBeenCalledTimes(1); // second call was a hit
 ```
 
 Listeners registered via `cache.on(...)` automatically attach to any driver loaded later, so order of `on()` vs `init()` doesn't matter.
@@ -178,9 +185,7 @@ The chain-serialization guarantee is worth testing when your code fans out concu
 await cache.set("counter", 0);
 
 await Promise.all(
-  Array.from({ length: 10 }, () =>
-    cache.update<number>("counter", (c) => (c ?? 0) + 1),
-  ),
+  Array.from({ length: 10 }, () => cache.update<number>("counter", (c) => (c ?? 0) + 1)),
 );
 
 await expect(cache.get("counter")).resolves.toBe(10);
@@ -205,7 +210,7 @@ beforeEach(async () => {
 
 it("returns the most similar doc above threshold", async () => {
   await cache.set("a", { text: "alpha" }, { vector: [1, 0, 0] });
-  await cache.set("b", { text: "beta" },  { vector: [0, 1, 0] });
+  await cache.set("b", { text: "beta" }, { vector: [0, 1, 0] });
 
   const hits = await cache.similar([1, 0, 0], { topK: 1, threshold: 0.5 });
 

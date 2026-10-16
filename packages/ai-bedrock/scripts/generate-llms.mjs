@@ -39,7 +39,9 @@ const projectName =
   "Warlock " +
   shortName
     .split("-")
-    .map((part) => (part.length <= 2 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)))
+    .map((part) =>
+      part.length <= 2 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1),
+    )
     .join(" ");
 
 /**
@@ -65,7 +67,10 @@ function parseFrontmatter(text) {
     const key = line.slice(0, colon).trim();
     let value = line.slice(colon + 1).trim();
 
-    if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
+    if (
+      (value.startsWith("'") && value.endsWith("'")) ||
+      (value.startsWith('"') && value.endsWith('"'))
+    ) {
       value = value.slice(1, -1).replace(/''/g, "'").replace(/\\"/g, '"');
     }
 
@@ -155,7 +160,12 @@ const fullLines = [
 ];
 
 for (const skill of skills) {
-  fullLines.push(`## ${skill.folder}  \`${packageName}/${skill.folder}/SKILL.md\``, ``, readFileSync(skill.path, "utf8"), ``);
+  fullLines.push(
+    `## ${skill.folder}  \`${packageName}/${skill.folder}/SKILL.md\``,
+    ``,
+    readFileSync(skill.path, "utf8"),
+    ``,
+  );
 
   for (const ref of collectReferenceFiles(skill.folderPath)) {
     fullLines.push(

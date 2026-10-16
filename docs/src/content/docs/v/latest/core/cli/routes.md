@@ -28,7 +28,7 @@ The `METHOD` column is colored by verb (GET green, POST blue, PUT/PATCH yellow, 
 
 | Column   | What it shows                                                                                   |
 | -------- | ----------------------------------------------------------------------------------------------- |
-| `METHOD` | The HTTP verb. A wildcard `all`-verb route lists as `ALL`.                                       |
+| `METHOD` | The HTTP verb. A wildcard `all`-verb route lists as `ALL`.                                      |
 | `PATH`   | The full request path, with any group prefix already folded in.                                 |
 | `NAME`   | The route name (`—` if the route was registered without one).                                   |
 | `ACTION` | The handler/controller-action — the handler function name (`anonymous` for an unnamed handler). |
@@ -79,7 +79,7 @@ Because the route-module loader is **fail-loud**, a route file that throws on im
 
 ## Gotchas
 
-- **No connectors are started.** The route list reflects what's *registered*, independent of whether the database or cache would connect.
+- **No connectors are started.** The route list reflects what's _registered_, independent of whether the database or cache would connect.
 - **`MW` counts middleware, it doesn't name them.** It's a quick "is this route guarded?" signal; for the actual middleware chain, read the route definition.
 - **`ACTION` is the handler function name.** A controller method shows its method name; an inline arrow handler with no name shows `anonymous`.
 
@@ -119,8 +119,8 @@ cannot see the API routes a page name could collide with — and when a name is
 already claimed by another method, the router appends a `.<method>` suffix at
 registration time, which the comparison accepts rather than reporting.
 
-`Page routes match` therefore means *the page surface has not moved since the
-build*. It does **not** mean *no page route name collided*. Run plain
+`Page routes match` therefore means _the page surface has not moved since the
+build_. It does **not** mean _no page route name collided_. Run plain
 `warlock routes` (the table at the top of this page) to see the names as they
 were actually registered.
 :::

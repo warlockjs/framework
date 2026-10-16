@@ -186,11 +186,7 @@ export class BaseNotificationsRepository<
    * the existing row instead of inserting a duplicate. A unique index on the
    * key is the backstop for the rare insert race (we re-fetch on conflict).
    */
-  public async createFor(
-    recipientId: Id,
-    input: DatabasePayload,
-    tenantId?: Id,
-  ): Promise<TModel> {
+  public async createFor(recipientId: Id, input: DatabasePayload, tenantId?: Id): Promise<TModel> {
     const { idempotencyKey } = input;
 
     if (idempotencyKey) {

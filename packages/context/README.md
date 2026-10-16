@@ -69,16 +69,13 @@ contextManager.register("user", userContext);
 #### With `run()` - Scoped execution
 
 ```typescript
-await userContext.run(
-  { userId: "123", role: "admin", tenantId: "acme" },
-  async () => {
-    // Context is available throughout this async scope
-    const userId = userContext.get("userId"); // '123'
-    const role = userContext.get("role"); // 'admin'
+await userContext.run({ userId: "123", role: "admin", tenantId: "acme" }, async () => {
+  // Context is available throughout this async scope
+  const userId = userContext.get("userId"); // '123'
+  const role = userContext.get("role"); // 'admin'
 
-    await someAsyncOperation(); // Context propagates through async calls
-  }
-);
+  await someAsyncOperation(); // Context propagates through async calls
+});
 ```
 
 #### With `enter()` - Middleware-style
@@ -291,9 +288,7 @@ app.use((req, res, next) => {
   traceContext.run(stores.trace, async () => {
     traceContext.log(`Request started: ${req.path}`);
     await next();
-    traceContext.log(
-      `Request completed in ${Date.now() - stores.trace.startTime}ms`
-    );
+    traceContext.log(`Request completed in ${Date.now() - stores.trace.startTime}ms`);
   });
 });
 ```

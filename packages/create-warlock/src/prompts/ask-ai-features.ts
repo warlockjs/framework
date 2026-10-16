@@ -1,8 +1,5 @@
 import { isCancel, log, multiselect } from "@clack/prompts";
-import {
-  getAiPackageOptions,
-  getAiProviderOptions,
-} from "../features/features-map";
+import { getAiPackageOptions, getAiProviderOptions } from "../features/features-map";
 import { fitOptionsToWidth, multiselectMaxItems } from "./fit-to-terminal";
 
 const NO_AI = "none";
@@ -18,10 +15,8 @@ const aiOptions = [
 ];
 
 /** Ask for optional AI packages without leaking the UI-only None sentinel. */
-export async function askAiFeatures(
-  initialValues: string[] = [],
-): Promise<string[] | symbol> {
-  let selectedValues = initialValues.filter(value => value !== NO_AI);
+export async function askAiFeatures(initialValues: string[] = []): Promise<string[] | symbol> {
+  let selectedValues = initialValues.filter((value) => value !== NO_AI);
 
   while (true) {
     const answer = await multiselect({
@@ -43,6 +38,6 @@ export async function askAiFeatures(
 
     log.warn("Choose None by itself, or select one or more AI packages.");
 
-    selectedValues = selected.filter(value => value !== NO_AI);
+    selectedValues = selected.filter((value) => value !== NO_AI);
   }
 }

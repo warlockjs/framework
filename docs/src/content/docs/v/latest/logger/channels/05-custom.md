@@ -87,18 +87,18 @@ export class DatabaseLog extends LogChannel<DbConfig> {
 
 ## `LogChannel` members
 
-| Member | Type | Description |
-| --- | --- | --- |
-| `name` | `string` | Unique identifier for this channel |
-| `description` | `string?` | Optional human-readable description |
-| `terminal` | `boolean` | `true` preserves ANSI codes; `false` (default) strips them via `clearMessage()` |
-| `log(data)` | abstract method | Your write/send logic |
-| `shouldBeLogged(data)` | protected method | `false` if `data.type` is not in `levels`, or if `filter` returns `false` |
-| `config(key)` | protected method | Type-safe accessor merging provided options with channel defaults |
-| `getDateAndTimeFormat()` | protected method | Returns `{ date, time }` Day.js format strings resolved from config |
-| `init()` | protected hook | Optional async setup called once after construction |
-| `defaultConfigurations` | protected field | Override in subclasses to provide option defaults |
-| `getRedactConfig()` | method | Returns the channel's `redact` config (additive on top of the logger floor) |
+| Member                   | Type             | Description                                                                     |
+| ------------------------ | ---------------- | ------------------------------------------------------------------------------- |
+| `name`                   | `string`         | Unique identifier for this channel                                              |
+| `description`            | `string?`        | Optional human-readable description                                             |
+| `terminal`               | `boolean`        | `true` preserves ANSI codes; `false` (default) strips them via `clearMessage()` |
+| `log(data)`              | abstract method  | Your write/send logic                                                           |
+| `shouldBeLogged(data)`   | protected method | `false` if `data.type` is not in `levels`, or if `filter` returns `false`       |
+| `config(key)`            | protected method | Type-safe accessor merging provided options with channel defaults               |
+| `getDateAndTimeFormat()` | protected method | Returns `{ date, time }` Day.js format strings resolved from config             |
+| `init()`                 | protected hook   | Optional async setup called once after construction                             |
+| `defaultConfigurations`  | protected field  | Override in subclasses to provide option defaults                               |
+| `getRedactConfig()`      | method           | Returns the channel's `redact` config (additive on top of the logger floor)     |
 
 ## `LogContract` vs `LogChannel`
 

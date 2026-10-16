@@ -13,11 +13,11 @@ sidebar:
 ```ts
 type ValidationResult = {
   isValid: boolean;
-  data: any;          // validated + reshaped data; matches Infer.Output<>
+  data: any; // validated + reshaped data; matches Infer.Output<>
   errors: {
-    type: string;     // rule name — "required", "email", "min", ...
-    error: string;    // human-facing message (translated if configured)
-    input: string;    // dot-notation field path — "email", "address.city"
+    type: string; // rule name — "required", "email", "min", ...
+    error: string; // human-facing message (translated if configured)
+    input: string; // dot-notation field path — "email", "address.city"
   }[];
 };
 ```
@@ -94,17 +94,17 @@ Branch on `error.type` (the stable rule name), never on `error.error` (the human
 
 Common values for `error.type`:
 
-| Rule | Source |
-| --- | --- |
-| `required`, `present`, `optional` | `.required()`, `.present()`, `.optional()` |
-| `requiredIf`, `requiredWith`, `requiredWithout`, `requiredUnless` | conditional required methods |
-| `string`, `number`, `int`, `float`, `boolean`, `scalar`, `object`, `array`, `date` | type guards |
-| `min`, `max`, `between`, `length` | range / length rules |
-| `email`, `url`, `uuid`, `regex` | string format rules |
-| `literal`, `enum`, `in`, `oneOf`, `notIn`, `forbids`, `allowsOnly` | membership rules |
-| `instanceof` | `v.instanceof(Ctor)` |
-| `sameAs`, `notSameAs` | cross-field equality |
-| `before`, `after`, `today`, `weekDay`, `weekend`, `businessDay` | date rules |
+| Rule                                                                               | Source                                     |
+| ---------------------------------------------------------------------------------- | ------------------------------------------ |
+| `required`, `present`, `optional`                                                  | `.required()`, `.present()`, `.optional()` |
+| `requiredIf`, `requiredWith`, `requiredWithout`, `requiredUnless`                  | conditional required methods               |
+| `string`, `number`, `int`, `float`, `boolean`, `scalar`, `object`, `array`, `date` | type guards                                |
+| `min`, `max`, `between`, `length`                                                  | range / length rules                       |
+| `email`, `url`, `uuid`, `regex`                                                    | string format rules                        |
+| `literal`, `enum`, `in`, `oneOf`, `notIn`, `forbids`, `allowsOnly`                 | membership rules                           |
+| `instanceof`                                                                       | `v.instanceof(Ctor)`                       |
+| `sameAs`, `notSameAs`                                                              | cross-field equality                       |
+| `before`, `after`, `today`, `weekDay`, `weekend`, `businessDay`                    | date rules                                 |
 
 Custom rules use whatever `name` you set on the rule object — pick stable, kebab-or-camel-case names since they become a public API.
 
@@ -130,15 +130,12 @@ Each chain method takes an optional `errorMessage`:
 
 ```ts
 v.object({
-  email: v.string()
-    .email("Please enter a valid email address")
-    .required("Email is required"),
-  password: v.string()
-    .min(8, "Password must be at least 8 characters"),
+  email: v.string().email("Please enter a valid email address").required("Email is required"),
+  password: v.string().min(8, "Password must be at least 8 characters"),
 });
 ```
 
-Reach for this when *one rule in one schema* needs a tailored message. For project-wide message customization, use the translation hook.
+Reach for this when _one rule in one schema_ needs a tailored message. For project-wide message customization, use the translation hook.
 
 ## Pattern 5 — i18n via `translateRule`
 
@@ -149,14 +146,10 @@ import { configureSeal } from "@warlock.js/seal";
 import { trans } from "@mongez/localization";
 
 configureSeal({
-  translateRule: ({ rule, attributes }) =>
-    trans(`validation.${rule.name}`, attributes),
+  translateRule: ({ rule, attributes }) => trans(`validation.${rule.name}`, attributes),
 
   translateAttribute: ({ rule, attribute, context }) =>
-    trans(
-      `validation.attributes.${rule.name}.${attribute}`,
-      context.allValues,
-    ),
+    trans(`validation.attributes.${rule.name}.${attribute}`, context.allValues),
 });
 ```
 
@@ -194,10 +187,12 @@ await validate(config, badInput);
 For observability:
 
 ```ts
-v.string().uuid().catch((errors, originalInput) => {
-  log.warn(`bad uuid: ${JSON.stringify(originalInput)}`, { errors });
-  return ANONYMOUS_USER_ID;
-});
+v.string()
+  .uuid()
+  .catch((errors, originalInput) => {
+    log.warn(`bad uuid: ${JSON.stringify(originalInput)}`, { errors });
+    return ANONYMOUS_USER_ID;
+  });
 ```
 
 `.catch()` is leaf-only in v1 — container validators (`v.object`, `v.array`, …) don't run the catch hook on their own outcome. To rescue a whole-container failure, wrap the call in try/catch.
@@ -223,7 +218,7 @@ if (!result.isValid) {
 
 `@warlock.js/logger`'s redaction layer is the right place to enforce field-level redaction policies project-wide.
 
-## When seal *does* throw
+## When seal _does_ throw
 
 Seal never throws on bad input. It throws on programming bugs:
 

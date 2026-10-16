@@ -12,13 +12,13 @@ Three factories — `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()` — 
 ```ts
 import { ai } from "@warlock.js/ai";
 
-ai.systemPrompt();                  // empty — chain .persona(), .instruction() onto it
-ai.systemPrompt("literal text");    // one-shot string form
-ai.systemPrompt([block1, block2]);  // array form — blocks render in declaration order
-ai.systemPrompt.fromFile(path);     // seed from a file read once at construction
+ai.systemPrompt(); // empty — chain .persona(), .instruction() onto it
+ai.systemPrompt("literal text"); // one-shot string form
+ai.systemPrompt([block1, block2]); // array form — blocks render in declaration order
+ai.systemPrompt.fromFile(path); // seed from a file read once at construction
 
-ai.persona(text);                   // PersonaContract block
-ai.instruction(text);               // InstructionContract block
+ai.persona(text); // PersonaContract block
+ai.instruction(text); // InstructionContract block
 ```
 
 ## Two shapes, same result
@@ -35,7 +35,8 @@ ai.agent({
 ### Builder form — composable
 
 ```ts
-const prompt = ai.systemPrompt()
+const prompt = ai
+  .systemPrompt()
   .persona("You are Alex, a senior TypeScript engineer.")
   .instruction("Explain things assuming the reader is a Go developer.")
   .instruction("Always cite the relevant TypeScript handbook section.");
@@ -90,7 +91,8 @@ const arabic = base.instruction("Prefer Arabic comments");
 `{{key}}` and `{{key|defaultValue}}` substitute at render time:
 
 ```ts
-const prompt = ai.systemPrompt()
+const prompt = ai
+  .systemPrompt()
   .persona("You are Alex, a TypeScript expert.")
   .instruction("Respond in {{language|English}}.");
 
@@ -113,7 +115,7 @@ A prompt carries optional `SystemPromptMeta` — `{ name?, version?, description
 
 ```ts
 const base = ai.systemPrompt("You are support.", { name: "support", version: "1" });
-base.meta();                       // → { name: "support", version: "1" }
+base.meta(); // → { name: "support", version: "1" }
 const v2 = base.meta({ version: "2" }); // new builder; original untouched; re-registers under support@2
 ```
 
@@ -125,7 +127,7 @@ const p = ai.systemPrompt().merge(ai.persona("You are Alex."), ai.instruction("B
 
 // (b) another prompt contract — its blocks fold in; meta.composedFrom records provenance
 const merged = ai.systemPrompt("Be terse.").merge(otherPrompt);
-merged.meta()?.composedFrom;       // deterministic source labels, e.g. ["base@2"]
+merged.meta()?.composedFrom; // deterministic source labels, e.g. ["base@2"]
 
 // (c) a registered prompt resolved from ai.prompts by name (latest, or a pinned fromVersion)
 const composed = ai.systemPrompt("You are support.").merge("global", { fromVersion: "1" });
@@ -154,7 +156,8 @@ Why: `instanceof` breaks across duplicate package copies (different `node_module
 ## Pattern — forking a base prompt
 
 ```ts
-const base = ai.systemPrompt()
+const base = ai
+  .systemPrompt()
   .persona("You are a support agent for Acme Corp.")
   .instruction("Cite policy §{{policy}} when denying a refund.");
 

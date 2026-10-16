@@ -110,13 +110,14 @@ describe("dropSeedRecords", () => {
     // roles data + refs + log gone…
     expect(memory.rowsOf("roles")).toHaveLength(0);
     // …but the users seeder is untouched.
-    expect(memory.rowsOf("users").map((row) => row.id).sort()).toEqual([1, 99]);
     expect(
-      memory.rowsOf(seedRecordsTableName).map((row) => row.seeder),
-    ).toEqual(["users"]);
-    expect(memory.rowsOf(seedsTableName).map((row) => row.name)).toEqual([
-      "users",
-    ]);
+      memory
+        .rowsOf("users")
+        .map((row) => row.id)
+        .sort(),
+    ).toEqual([1, 99]);
+    expect(memory.rowsOf(seedRecordsTableName).map((row) => row.seeder)).toEqual(["users"]);
+    expect(memory.rowsOf(seedsTableName).map((row) => row.name)).toEqual(["users"]);
   });
 
   it("deletes in reverse insertion (descending id) order", async () => {

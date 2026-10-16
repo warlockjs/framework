@@ -24,10 +24,10 @@ warlock update --check          # same, but exit 1 when behind — a CI gate
 
 `--check` is the CI form — its exit code carries the answer:
 
-| Exit | Meaning                                                              |
-| ---- | -------------------------------------------------------------------- |
-| `0`  | Every `@warlock.js/*` package is current.                            |
-| `1`  | At least one is behind (or the registry could not be reached).       |
+| Exit | Meaning                                                        |
+| ---- | -------------------------------------------------------------- |
+| `0`  | Every `@warlock.js/*` package is current.                      |
+| `1`  | At least one is behind (or the registry could not be reached). |
 
 Both flags imply a dry run, so neither ever writes to `package.json`.
 
@@ -39,19 +39,19 @@ What it does, in order:
 4. Rewrites each matching spec, **preserving the range operator**: `^4.2.0` → `^4.3.0`, `~4.2.0` → `~4.3.0`, an exact `4.2.0` → `4.3.0`. Specs that are not a plain semver — `workspace:*`, `*`, `latest`, git/file URLs — are left exactly as written, and any package already at or ahead of latest is skipped.
 5. Runs the project's install to reconcile `node_modules`, chosen by the lockfile present. Skipped with `--no-install`.
 
-| Lockfile                        | Install         | Add (`warlock add`) |
-| ------------------------------- | --------------- | ------------------- |
-| `bun.lock` / `bun.lockb`        | `bun install`   | `bun add`           |
-| `package-lock.json`             | `npm install`   | `npm install`       |
-| `yarn.lock`                     | `yarn install`  | `yarn add`          |
-| `pnpm-lock.yaml`                | `pnpm install`  | `pnpm add`          |
-| *none*                          | `npm install`   | `npm install`       |
+| Lockfile                 | Install        | Add (`warlock add`) |
+| ------------------------ | -------------- | ------------------- |
+| `bun.lock` / `bun.lockb` | `bun install`  | `bun add`           |
+| `package-lock.json`      | `npm install`  | `npm install`       |
+| `yarn.lock`              | `yarn install` | `yarn add`          |
+| `pnpm-lock.yaml`         | `pnpm install` | `pnpm add`          |
+| _none_                   | `npm install`  | `npm install`       |
 
 Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
 
 Re-running on an already-current project is a no-op: nothing resolves as newer, so it prints "All @warlock.js packages are already up to date" and exits without writing or installing.
 
-**Offline is not "up to date".** If *every* registry lookup fails, the command says so and changes nothing:
+**Offline is not "up to date".** If _every_ registry lookup fails, the command says so and changes nothing:
 
 ```
 ⚠ Could not reach the npm registry — no versions were changed. Check your connection and try again.
@@ -71,7 +71,7 @@ On start, `warlock dev` checks npm for a newer `@warlock.js/core` and prints a o
 
 Core's version stands in for the whole family (lockstep), so a single lookup is enough. The check is **best-effort and non-blocking** — it runs fire-and-forget after the server is ready, never delays or breaks startup, and stays silent on any failure (offline, registry down, timeout). Its abort budget is 5s, much shorter than the `warlock update` command's, so a hanging network leaves nothing behind.
 
-**The answer is cached for 24 hours** in `.warlock/update-check.json`, so a normal day of dev-server restarts costs one registry lookup rather than one per boot. Three deliberate details: a **failed** lookup is never cached (one flaky moment must not silence the notice for a day), an entry stamped in the *future* is ignored (a clock that moves backwards would otherwise pin the cache as fresh forever), and the entry is **dropped** once `u` actually applies an update, so the next boot compares against the version you just installed.
+**The answer is cached for 24 hours** in `.warlock/update-check.json`, so a normal day of dev-server restarts costs one registry lookup rather than one per boot. Three deliberate details: a **failed** lookup is never cached (one flaky moment must not silence the notice for a day), an entry stamped in the _future_ is ignored (a clock that moves backwards would otherwise pin the cache as fresh forever), and the entry is **dropped** once `u` actually applies an update, so the next boot compares against the version you just installed.
 
 ### The `u` shortcut
 
@@ -83,11 +83,11 @@ Pressing `u` on that notice runs the whole upgrade without leaving the dev serve
 
 What happens when it doesn't go to plan:
 
-| Situation                     | Result                                                                       |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| Registry unreachable          | Nothing changes, the server keeps serving, and `u` is re-armed for a retry.   |
+| Situation                     | Result                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Registry unreachable          | Nothing changes, the server keeps serving, and `u` is re-armed for a retry.                              |
 | Install failed                | `package.json` keeps the new versions; `u` is **not** re-armed — finish the install and restart by hand. |
-| Restart could not be launched | The notice tells you to restart manually.                                     |
+| Restart could not be launched | The notice tells you to restart manually.                                                                |
 
 The shortcut is only offered when stdin is an interactive TTY. When it isn't (CI, piped stdin, a process supervisor), the notice falls back to the `Run npx warlock update` line instead — it never silently does nothing.
 
@@ -124,7 +124,7 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 - **Non-semver specs are intentionally skipped.** A `workspace:*` or `*` dependency stays as written; `update` will not pin it to a concrete version.
 - **The notice never blocks dev.** If npm is unreachable, `warlock dev` behaves exactly as before — no delay, no error, no notice, and no `u` shortcut.
 - **`u` is not offered without a TTY.** Don't expect it in CI logs or piped output; the notice prints the command instead.
-- **`warlock update` is not `warlock add`.** `add` installs a *new* feature package and runs its setup hooks; `update` only bumps the versions of packages you already depend on.
+- **`warlock update` is not `warlock add`.** `add` installs a _new_ feature package and runs its setup hooks; `update` only bumps the versions of packages you already depend on.
 
 ## See also
 

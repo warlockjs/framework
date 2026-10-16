@@ -26,10 +26,4 @@ export {
 
 export type { DashboardHandle, DashboardOptions } from "./dashboard.type";
 export type { ServeConfig } from "./serve";
-export type {
-  PromptGroup,
-  SessionGroup,
-  TraceFilter,
-  TypeGroup,
-  TypeStat,
-} from "./trace-filter";
+export type { PromptGroup, SessionGroup, TraceFilter, TypeGroup, TypeStat } from "./trace-filter";

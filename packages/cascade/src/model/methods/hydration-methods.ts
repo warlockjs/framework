@@ -1,6 +1,10 @@
 import { clone } from "@mongez/reinforcements";
 import { DateValidator } from "@warlock.js/seal";
-import { RelationHydrator, type ModelSnapshot, type SerializedRelation } from "../../relations/relation-hydrator";
+import {
+  RelationHydrator,
+  type ModelSnapshot,
+  type SerializedRelation,
+} from "../../relations/relation-hydrator";
 import type { ChildModel, Model } from "../model";
 
 /**
@@ -56,7 +60,9 @@ export function modelToSnapshot(model: Model): ModelSnapshot {
     if (related === null) {
       relations[name] = null;
     } else if (Array.isArray(related)) {
-      relations[name] = related.map((m) => (m instanceof Object && typeof m.toSnapshot === "function" ? m.toSnapshot() : m));
+      relations[name] = related.map((m) =>
+        m instanceof Object && typeof m.toSnapshot === "function" ? m.toSnapshot() : m,
+      );
     } else if (related instanceof Object && typeof related.toSnapshot === "function") {
       relations[name] = related.toSnapshot();
     }

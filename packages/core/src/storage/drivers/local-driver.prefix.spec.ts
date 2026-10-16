@@ -28,9 +28,9 @@ describe("LocalDriver prefix and streaming", () => {
 
     expect((await driver.put("one", "one.txt")).path).toBe("t1/one.txt");
     expect((await driver.putIfAbsent("two", "two.txt"))?.path).toBe("t1/two.txt");
-    expect(
-      (await driver.putStream(Readable.from([Buffer.from("three")]), "three.txt")).path,
-    ).toBe("t1/three.txt");
+    expect((await driver.putStream(Readable.from([Buffer.from("three")]), "three.txt")).path).toBe(
+      "t1/three.txt",
+    );
     expect((await driver.copy("one.txt", "copy.txt")).path).toBe("t1/copy.txt");
     expect((await driver.move("copy.txt", "moved.txt")).path).toBe("t1/moved.txt");
   });

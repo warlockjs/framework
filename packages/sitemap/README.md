@@ -48,12 +48,12 @@ in five minutes.
 
 ### `new Sitemap(options)`
 
-| Option | Meaning |
-| --- | --- |
-| `baseUrl` | **Required.** Absolute origin, e.g. `https://example.com` or `https://example.com/docs`. |
-| `changefreq` | Applied to any entry that does not set its own. |
-| `priority` | Same. |
-| `lastmod` | Same. |
+| Option       | Meaning                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `baseUrl`    | **Required.** Absolute origin, e.g. `https://example.com` or `https://example.com/docs`. |
+| `changefreq` | Applied to any entry that does not set its own.                                          |
+| `priority`   | Same.                                                                                    |
+| `lastmod`    | Same.                                                                                    |
 
 `baseUrl` is validated **in the constructor**. A `Sitemap` that cannot produce
 a valid URL should not exist, and you should learn about a typo at the line
@@ -65,15 +65,15 @@ absolute `http(s)` URL throws `InvalidBaseUrlError`.
 Only `path` is required, and it must be a **concrete path** — `/posts/123`, not
 `/posts/:id`. A pattern is not a URL.
 
-| Field | Meaning |
-| --- | --- |
-| `path` | **Required.** Resolved against `baseUrl`. An absolute URL is used as given. |
-| `name` | Optional label for the route, for your own diagnostics. |
-| `route` | Optional pattern this URL came from, e.g. `/posts/:id`. |
-| `lastmod` | `Date` (serialised as W3C datetime) or a string (passed through untouched). |
-| `changefreq` | One of the seven protocol values. |
-| `priority` | `0.0`–`1.0`. Anything else throws. |
-| `alternates` | Language versions of this page — see below. |
+| Field        | Meaning                                                                     |
+| ------------ | --------------------------------------------------------------------------- |
+| `path`       | **Required.** Resolved against `baseUrl`. An absolute URL is used as given. |
+| `name`       | Optional label for the route, for your own diagnostics.                     |
+| `route`      | Optional pattern this URL came from, e.g. `/posts/:id`.                     |
+| `lastmod`    | `Date` (serialised as W3C datetime) or a string (passed through untouched). |
+| `changefreq` | One of the seven protocol values.                                           |
+| `priority`   | `0.0`–`1.0`. Anything else throws.                                          |
+| `alternates` | Language versions of this page — see below.                                 |
 
 Both return `this`, so they chain.
 
@@ -214,10 +214,10 @@ writes to. `Sitemap.publishTo(outDir)` follows the same rule.
 
 ## Errors
 
-| Error | When |
-| --- | --- |
-| `InvalidBaseUrlError` | `baseUrl` is missing, relative, or not `http(s)`. Thrown from the constructor. |
-| `InvalidSitemapEntryError` | An entry the protocol cannot represent: no path, a priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, an alternate with no `hreflang`. |
+| Error                         | When                                                                                                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `InvalidBaseUrlError`         | `baseUrl` is missing, relative, or not `http(s)`. Thrown from the constructor.                                                                                                                               |
+| `InvalidSitemapEntryError`    | An entry the protocol cannot represent: no path, a priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, an alternate with no `hreflang`.                                                |
 | `UnownedOutputDirectoryError` | `SitemapIndex.saveTo(outDir)` or `Sitemap.publishTo(outDir)`: `outDir` is a non-empty directory with no `.sitemap-set.json` marker from a previous publish, so it is refused rather than swapped or deleted. |
 
 ## Also exported

@@ -19,7 +19,7 @@ const searchTool = ai.tool({
   description: "Search the product catalog. Returns matching products with SKU, name, price.",
   version: "v2",
   action: ({ query }) => `Searching the catalog for "${query}"`,
-  mode: "feedback",                                    // default — or "silent"
+  mode: "feedback", // default — or "silent"
   input: v.object({ query: v.string(), limit: v.number().optional() }),
   execute: async ({ query, limit }, ctx) => {
     return await searchProducts(query, limit ?? 10);
@@ -45,7 +45,7 @@ ai.tool({
 });
 ```
 
-`action` accepts a string or a function. The function receives the model's **raw, pre-validation** input — it resolves at the dispatch boundary, *before* `execute`'s schema validation runs — and throws inside it are swallowed, since a UI string isn't worth aborting LLM dispatch over.
+`action` accepts a string or a function. The function receives the model's **raw, pre-validation** input — it resolves at the dispatch boundary, _before_ `execute`'s schema validation runs — and throws inside it are swallowed, since a UI string isn't worth aborting LLM dispatch over.
 
 ## Schemas via Standard Schema V1
 
@@ -73,7 +73,7 @@ Whatever `execute` resolves with is `JSON.stringify`'d and sent back as the next
 execute: async ({ query }) => {
   if (!query) throw new Error("query is required");
   return { items: await search(query) };
-}
+};
 ```
 
 ## Parallel tool calls
@@ -110,7 +110,7 @@ ai.tool({
   input: v.object({ preferences: v.array(v.string()).optional() }),
   execute: async (patch, ctx) => {
     ctx.artifacts.stateUpdate = patch;
-    return { ok: true };   // model never sees this
+    return { ok: true }; // model never sees this
   },
 });
 ```
@@ -131,9 +131,9 @@ ai.tool({
     const items = await searchItems(input.query);
 
     ctx.artifacts.blocks ??= [];
-    ctx.artifacts.blocks.push({ type: "items", itemIds: items.map(i => i.id) });
+    ctx.artifacts.blocks.push({ type: "items", itemIds: items.map((i) => i.id) });
 
-    return { total: items.length };   // LLM-visible — what the agent reasons over
+    return { total: items.length }; // LLM-visible — what the agent reasons over
   },
 });
 ```

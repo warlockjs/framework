@@ -48,10 +48,10 @@ export class User extends Model<UserSchema> {
 ## Read state — `.id`, `.uuid`, and `.get(field)`
 
 ```ts
-user.id;                   // direct property — ID is so common cascade exposes it directly
-user.uuid;                 // the same id, narrowed to `string` (see below)
-user.get("status");        // canonical reader for every other column
-user.get<number>("age");   // TypeScript generic for typed reads
+user.id; // direct property — ID is so common cascade exposes it directly
+user.uuid; // the same id, narrowed to `string` (see below)
+user.get("status"); // canonical reader for every other column
+user.get<number>("age"); // TypeScript generic for typed reads
 ```
 
 Use the direct `.id` property; use `.get("field")` for everything else. Add a typed getter on the model class when the same field is read in many places — turns N typed-cast call sites into one named accessor.
@@ -60,18 +60,20 @@ Use the direct `.id` property; use `.get("field")` for everything else. Add a ty
 
 Both getters return the model's primary id (`this.get("id")`); the only difference is the **static type**:
 
-| Accessor | Return type | Use when |
-|---|---|---|
-| `model.id` | `string \| number` | You want the real id type — SQL auto-increment is `number`, MongoDB's ObjectId is `string`. |
-| `model.uuid` | `string` | You want to pass the id to code typed for a single `string` id, without leaking the engine's `string \| number` union everywhere. |
+| Accessor     | Return type        | Use when                                                                                                                          |
+| ------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `model.id`   | `string \| number` | You want the real id type — SQL auto-increment is `number`, MongoDB's ObjectId is `string`.                                       |
+| `model.uuid` | `string`           | You want to pass the id to code typed for a single `string` id, without leaking the engine's `string \| number` union everywhere. |
 
 `uuid` does **not** validate or coerce the value to a UUID — the name is historical. It simply returns the same id, typed as `string`, so a helper typed for a string id accepts it on either engine:
 
 ```ts
-function shareLink(modelId: string) { /* ... */ }
+function shareLink(modelId: string) {
+  /* ... */
+}
 
-shareLink(user.uuid);  // ✓ typechecks on both Postgres and MongoDB
-shareLink(user.id);    // ✗ TS error on SQL: `number` is not assignable to `string`
+shareLink(user.uuid); // ✓ typechecks on both Postgres and MongoDB
+shareLink(user.id); // ✗ TS error on SQL: `number` is not assignable to `string`
 ```
 
 ## Write — three update idioms
@@ -94,7 +96,7 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 
 The everyday case. Service takes `Partial<UserSchema>` from a request body, merges it into the instance, saves. Existing fields not in the object are untouched.
 
-**Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an *existing* record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
+**Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an _existing_ record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
 
 ### `.save()` after manual mutation — when changes are spread
 
@@ -110,11 +112,11 @@ await user.save();
 
 Quick reference:
 
-| Situation | Pattern |
-| --- | --- |
-| 1–2 specific fields | `user.set(k, v).save()` |
-| Bulk from an object | `user.merge(data).save()` |
-| After spread mutations | `user.save()` |
+| Situation              | Pattern                   |
+| ---------------------- | ------------------------- |
+| 1–2 specific fields    | `user.set(k, v).save()`   |
+| Bulk from an object    | `user.merge(data).save()` |
+| After spread mutations | `user.save()`             |
 
 ## Remove a field — `.unset(field)`
 

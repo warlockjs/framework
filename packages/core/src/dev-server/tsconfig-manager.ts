@@ -87,7 +87,9 @@ export class TSConfigManager {
    * Get the alias key that matches the given import path
    */
   public getMatchingAlias(path: string): string | null {
-    const aliasKey = Object.keys(this.aliases).find((alias) => this.matchesAliasPattern(alias, path));
+    const aliasKey = Object.keys(this.aliases).find((alias) =>
+      this.matchesAliasPattern(alias, path),
+    );
 
     return aliasKey || null;
   }

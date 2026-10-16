@@ -15,7 +15,7 @@ type RefreshTokenOutput = { token: string; expiresAt: string };
 
 type TokenPair = {
   accessToken: AccessTokenOutput;
-  refreshToken?: RefreshTokenOutput;   // omitted if config.auth.refreshToken.enabled = false
+  refreshToken?: RefreshTokenOutput; // omitted if config.auth.refreshToken.enabled = false
 };
 ```
 
@@ -90,7 +90,7 @@ The family ties together "successive rotations of one session." In 5.19 it is al
 const sessions = await authService.getActiveSessions(user);
 
 for (const session of sessions) {
-  session.get("device_info");     // { userAgent, ip, deviceId? } if provided at login
+  session.get("device_info"); // { userAgent, ip, deviceId? } if provided at login
   session.get("created_at");
   session.get("expires_at");
 }

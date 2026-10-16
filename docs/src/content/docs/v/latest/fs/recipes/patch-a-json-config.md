@@ -28,7 +28,7 @@ Existing top-level keys you didn't mention survive untouched.
 
 ## Deep merge
 
-By default the spread is shallow, so a nested object *replaces* rather than
+By default the spread is shallow, so a nested object _replaces_ rather than
 merges. When you want the patch to recurse into nested objects, pass
 `{ deep: true }`:
 
@@ -36,16 +36,12 @@ merges. When you want the patch to recurse into nested objects, pass
 import { fs } from "@warlock.js/fs";
 
 // Only touches features.flags.queues — other flags under features stay put.
-await fs.files.mergeJson(
-  "config.json",
-  { features: { flags: { queues: true } } },
-  { deep: true },
-);
+await fs.files.mergeJson("config.json", { features: { flags: { queues: true } } }, { deep: true });
 ```
 
 :::caution[Shallow vs deep]
 Without `deep`, `mergeJson("config.json", { features: { flags: { queues: true } } })`
-would overwrite the *entire* `features` object with just
+would overwrite the _entire_ `features` object with just
 `{ flags: { queues: true } }`, dropping every other feature. Reach for
 `{ deep: true }` whenever your patch is more than one level down.
 :::

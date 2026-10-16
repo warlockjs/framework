@@ -11,11 +11,11 @@ description: 'Pick the delete behavior — `permanent` (hard delete), `soft` (se
 
 `DeleteStrategy` is `"permanent" | "soft" | "trash"`.
 
-| Strategy | Behavior | Reversible? |
-| --- | --- | --- |
-| `permanent` | DELETE the row / document (the default fallback) | No |
-| `soft` | Set the `deletedAt` column; the row stays in the table | Yes — via `Model.restore(id)` |
-| `trash` | Move the record to a separate table / collection, then delete the original | Yes — via `Model.restore(id)` |
+| Strategy    | Behavior                                                                   | Reversible?                   |
+| ----------- | -------------------------------------------------------------------------- | ----------------------------- |
+| `permanent` | DELETE the row / document (the default fallback)                           | No                            |
+| `soft`      | Set the `deletedAt` column; the row stays in the table                     | Yes — via `Model.restore(id)` |
+| `trash`     | Move the record to a separate table / collection, then delete the original | Yes — via `Model.restore(id)` |
 
 ## Set the default per-model
 
@@ -36,9 +36,9 @@ When the strategy resolves to `"soft"`, `Migration.create(Model, { … })` adds 
 ## Override per-call
 
 ```ts
-await user.destroy();                            // uses the model's strategy
-await user.destroy({ strategy: "permanent" });   // GDPR-compliant hard delete
-await user.destroy({ strategy: "trash" });       // move to the trash table
+await user.destroy(); // uses the model's strategy
+await user.destroy({ strategy: "permanent" }); // GDPR-compliant hard delete
+await user.destroy({ strategy: "trash" }); // move to the trash table
 ```
 
 Resolution order: `destroy({ strategy })` → `static deleteStrategy` → data source `defaultDeleteStrategy` → `"permanent"`.
@@ -50,10 +50,10 @@ After a `"soft"` destroy the in-memory instance reflects the change — `model.g
 Restore is a **static** operation keyed by the record's id. It auto-detects whether the record was soft-deleted or trashed:
 
 ```ts
-const user = await User.restore(123);            // clears deletedAt or pulls from trash; fires "restored"
+const user = await User.restore(123); // clears deletedAt or pulls from trash; fires "restored"
 const user2 = await User.restore(123, { onIdConflict: "fail" });
 
-await User.restoreAll();                          // restore every deleted record for this model
+await User.restoreAll(); // restore every deleted record for this model
 ```
 
 There is no instance `user.restore()` — call `User.restore(id)`. `restoreAll(options?)` restores all soft-deleted (or all trashed) records for the model's table.
@@ -91,7 +91,7 @@ export class User extends Model<UserSchema> {
 With that scope in place:
 
 ```ts
-await User.all();                                          // active only (scope applied)
+await User.all(); // active only (scope applied)
 await User.query().withoutGlobalScope("notDeleted").get(); // active + soft-deleted
 await User.query().withoutGlobalScope("notDeleted").whereNotNull("deletedAt").get(); // only deleted
 ```

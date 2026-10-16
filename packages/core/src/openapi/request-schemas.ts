@@ -1,11 +1,6 @@
 import type { RequestHandlerValidation } from "../router/types";
 import { extractPathParamNames, isBodylessMethod, type OpenApiMethod } from "./paths";
-import type {
-  OpenApiParameter,
-  OpenApiRequestBody,
-  OpenApiSchema,
-  WarningSink,
-} from "./types";
+import type { OpenApiParameter, OpenApiRequestBody, OpenApiSchema, WarningSink } from "./types";
 
 type ValidatingLocation = "body" | "query" | "params" | "headers";
 
@@ -79,7 +74,9 @@ function readObjectSchema(
   return {
     schema: schema as OpenApiSchema,
     properties: properties as Record<string, OpenApiSchema>,
-    required: new Set(Array.isArray(required) ? required.filter((key) => typeof key === "string") : []),
+    required: new Set(
+      Array.isArray(required) ? required.filter((key) => typeof key === "string") : [],
+    ),
   };
 }
 
@@ -162,8 +159,8 @@ function resolvePrimaryLocation(
  */
 export function buildRequestParts(input: BuildRequestPartsInput): RequestParts {
   const { method, path, validation, warn } = input;
-  const validating = (validation?.validating ?? []).filter((location): location is ValidatingLocation =>
-    VALIDATING_LOCATIONS.includes(location),
+  const validating = (validation?.validating ?? []).filter(
+    (location): location is ValidatingLocation => VALIDATING_LOCATIONS.includes(location),
   );
   const pathNames = extractPathParamNames(path);
 
@@ -236,7 +233,9 @@ export function buildRequestParts(input: BuildRequestPartsInput): RequestParts {
     properties[key] = schema;
   }
 
-  const required = located.body.filter(({ key }) => mainSchema.required.has(key)).map(({ key }) => key);
+  const required = located.body
+    .filter(({ key }) => mainSchema.required.has(key))
+    .map(({ key }) => key);
   const bodySchema: OpenApiSchema = { ...mainSchema.schema, properties };
 
   if (required.length > 0) {

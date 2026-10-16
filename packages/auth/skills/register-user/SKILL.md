@@ -52,7 +52,7 @@ export const registerController: RequestHandler = async ({ request, response }) 
 
   // 4. Respond
   return response.successCreate({
-    user,         // shape via static toJsonColumns / static resource
+    user, // shape via static toJsonColumns / static resource
     tokens,
   });
 };
@@ -67,7 +67,7 @@ Always pass `hashPassword(plain)` — never store the plain password. The `hashP
 ```ts
 import { hashPassword, verifyPassword } from "@warlock.js/core";
 
-const hash = await hashPassword("plaintext");      // store this
+const hash = await hashPassword("plaintext"); // store this
 const ok = await verifyPassword("plaintext", hash); // compare on login
 ```
 
@@ -81,7 +81,7 @@ Define the password as `v.string().strongPassword(12)` (or similar) in your User
 const userSchema = v.object({
   email: v.string().email(),
   name: v.string().min(2).max(120),
-  password: v.string().strongPassword(12),   // 12+ chars, upper/lower/digit/symbol
+  password: v.string().strongPassword(12), // 12+ chars, upper/lower/digit/symbol
   // status, role, etc.
 });
 ```
@@ -93,7 +93,7 @@ But **don't return the password in the public output**:
 export class User extends Model<UserSchema> {
   public static table = "users";
   public static schema = userSchema;
-  public static toJsonColumns = ["id", "email", "name", "created_at"];   // omit password
+  public static toJsonColumns = ["id", "email", "name", "created_at"]; // omit password
 }
 ```
 

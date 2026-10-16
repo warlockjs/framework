@@ -9,14 +9,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { Model } from "../../../src/model/model";
-import {
-  cleanupModelsRegistery,
-  registerModelInRegistry,
-} from "../../../src/model/register-model";
-import {
-  createPivotOperations,
-  PivotOperations,
-} from "../../../src/relations/pivot-operations";
+import { cleanupModelsRegistery, registerModelInRegistry } from "../../../src/model/register-model";
+import { createPivotOperations, PivotOperations } from "../../../src/relations/pivot-operations";
 import type { RelationDefinition } from "../../../src/relations/types";
 import { createMockDriver } from "../../utils/test-helpers";
 
@@ -80,12 +74,7 @@ describe("relations/pivot-operations", () => {
       const post = new Post({ id: 1 });
       expect(
         () =>
-          new PivotOperations(
-            post,
-            "author",
-            { type: "belongsTo", model: "Tag" },
-            Post as never,
-          ),
+          new PivotOperations(post, "author", { type: "belongsTo", model: "Tag" }, Post as never),
       ).toThrow(/only available for belongsToMany/);
     });
 

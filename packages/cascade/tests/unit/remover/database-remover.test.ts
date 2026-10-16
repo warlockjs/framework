@@ -3,10 +3,7 @@ import type { DriverContract } from "../../../src/contracts/database-driver.cont
 import type { DataSource } from "../../../src/data-source/data-source";
 import { Model } from "../../../src/model/model";
 import { DatabaseRemover } from "../../../src/remover/database-remover";
-import {
-  createMockDataSource,
-  createMockDriver,
-} from "../../utils/test-helpers";
+import { createMockDataSource, createMockDriver } from "../../utils/test-helpers";
 
 // Mock model class for testing
 class TestModel extends Model {
@@ -63,9 +60,7 @@ describe("DatabaseRemover", () => {
 
       const remover = new DatabaseRemover(model);
 
-      await expect(remover.destroy()).rejects.toThrow(
-        "primary key (id) is missing",
-      );
+      await expect(remover.destroy()).rejects.toThrow("primary key (id) is missing");
     });
   });
 
@@ -156,8 +151,7 @@ describe("DatabaseRemover", () => {
       expect(inMemory).toBeInstanceOf(Date);
 
       // The in-memory value is exactly the timestamp written to the database.
-      const persisted = (mockDriver.update as any).mock.calls[0][2].$set
-        .deletedAt;
+      const persisted = (mockDriver.update as any).mock.calls[0][2].$set.deletedAt;
       expect(inMemory).toEqual(persisted);
     });
 
@@ -169,9 +163,7 @@ describe("DatabaseRemover", () => {
 
       const remover = new DatabaseRemover(model);
 
-      await expect(remover.destroy({ strategy: "soft" })).rejects.toThrow(
-        "record not found",
-      );
+      await expect(remover.destroy({ strategy: "soft" })).rejects.toThrow("record not found");
       expect(model.get("deletedAt")).toBeUndefined();
     });
 
@@ -181,9 +173,7 @@ describe("DatabaseRemover", () => {
         static primaryKey = "id";
         static deletedAtColumn = "removed_at";
       }
-      vi.spyOn(CustomDeletedAtModel, "getDataSource").mockReturnValue(
-        mockDataSource,
-      );
+      vi.spyOn(CustomDeletedAtModel, "getDataSource").mockReturnValue(mockDataSource);
 
       const model = new CustomDeletedAtModel({ id: 1 });
       model.isNew = false;
@@ -242,10 +232,7 @@ describe("DatabaseRemover", () => {
       const remover = new DatabaseRemover(model);
       await remover.destroy({ strategy: "trash" });
 
-      expect(mockDriver.insert).toHaveBeenCalledWith(
-        "RecycleBin",
-        expect.any(Object),
-      );
+      expect(mockDriver.insert).toHaveBeenCalledWith("RecycleBin", expect.any(Object));
     });
 
     it("should use defaultTrashTable from data source if set", async () => {
@@ -257,10 +244,7 @@ describe("DatabaseRemover", () => {
       const remover = new DatabaseRemover(model);
       await remover.destroy({ strategy: "trash" });
 
-      expect(mockDriver.insert).toHaveBeenCalledWith(
-        "GlobalTrash",
-        expect.any(Object),
-      );
+      expect(mockDriver.insert).toHaveBeenCalledWith("GlobalTrash", expect.any(Object));
     });
 
     it("should mark model as new after trash deletion", async () => {

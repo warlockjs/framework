@@ -276,7 +276,7 @@ export const aiPackages: AiProviderOption[] = [
  * surfaced in the hint (keeps a flat list scannable without group widgets).
  */
 export function getFeatureOptions() {
-  return features.map(feature => ({
+  return features.map((feature) => ({
     value: feature.key,
     label: feature.label,
     hint: `${feature.group} — ${feature.hint}`,
@@ -287,16 +287,14 @@ export function getFeatureOptions() {
  * Keys pre-checked in the feature multiselect.
  */
 export function getDefaultFeatureKeys(): string[] {
-  return features
-    .filter(feature => feature.defaultSelected)
-    .map(feature => feature.key);
+  return features.filter((feature) => feature.defaultSelected).map((feature) => feature.key);
 }
 
 /**
  * AI provider options for the dedicated AI multiselect step.
  */
 export function getAiProviderOptions() {
-  return aiProviders.map(provider => ({
+  return aiProviders.map((provider) => ({
     value: provider.key,
     label: provider.label,
     hint: provider.hint,
@@ -308,7 +306,7 @@ export function getAiProviderOptions() {
  * together with the providers (see `getAiProviderOptions`).
  */
 export function getAiPackageOptions() {
-  return aiPackages.map(pkg => ({
+  return aiPackages.map((pkg) => ({
     value: pkg.key,
     label: pkg.label,
     hint: pkg.hint,
@@ -322,20 +320,20 @@ export function getAiPackageOptions() {
  */
 export function getAllFeatureKeys(): string[] {
   return [
-    ...features.map(feature => feature.key),
-    ...aiProviders.map(provider => provider.key),
-    ...aiPackages.map(pkg => pkg.key),
+    ...features.map((feature) => feature.key),
+    ...aiProviders.map((provider) => provider.key),
+    ...aiPackages.map((pkg) => pkg.key),
   ];
 }
 
 /** Feature sections in manifest order, with short lists for the grouped picker. */
 export function getFeatureGroups() {
-  const labels = [...new Set(features.map(feature => feature.group))];
-  return labels.map(label => ({
+  const labels = [...new Set(features.map((feature) => feature.group))];
+  return labels.map((label) => ({
     label,
     options: features
-      .filter(feature => feature.group === label)
-      .map(feature => ({
+      .filter((feature) => feature.group === label)
+      .map((feature) => ({
         value: feature.key,
         label: feature.label,
         hint: feature.hint,

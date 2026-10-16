@@ -28,10 +28,10 @@ const mistral = new MistralSDK({ apiKey: process.env.MISTRAL_API_KEY! });
 ## Producing a model
 
 ```ts
-mistral.model({ name: "mistral-large-latest" })             // multimodal flagship
-mistral.model({ name: "magistral-medium-latest" })          // reasoning
-mistral.model({ name: "pixtral-large-latest" })             // vision
-mistral.model({ name: "some-fine-tune", vision: true })     // explicit capability override
+mistral.model({ name: "mistral-large-latest" }); // multimodal flagship
+mistral.model({ name: "magistral-medium-latest" }); // reasoning
+mistral.model({ name: "pixtral-large-latest" }); // vision
+mistral.model({ name: "some-fine-tune", vision: true }); // explicit capability override
 ```
 
 Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
@@ -40,13 +40,13 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 The wrapper injects **Mistral-aware** inference before delegating to the OpenAI adapter (the OpenAI prefix lists never match Mistral names):
 
-| Flag | Default |
-| --- | --- |
-| `vision` | Inferred from the model name. `true` for the `pixtral` family and the recent multimodal generations (`mistral-large`, `mistral-medium`, `ministral-3`); `false` otherwise. |
-| `reasoning` | Inferred from the model name. `true` for the `magistral` family and the hybrid `mistral-small` generation; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
-| `structuredOutput` | `true`, unless `responseFormat` is forced to `"json_object"` / `"text"` (loose modes). |
-| `promptCaching` | `true` (inherited from the OpenAI adapter — read-side `cachedTokens` accounting). |
-| `pdf` / `audio` | `false` by default (opt-in `.model({ pdf: true })` / `{ audio: true }`). |
+| Flag               | Default                                                                                                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vision`           | Inferred from the model name. `true` for the `pixtral` family and the recent multimodal generations (`mistral-large`, `mistral-medium`, `ministral-3`); `false` otherwise.    |
+| `reasoning`        | Inferred from the model name. `true` for the `magistral` family and the hybrid `mistral-small` generation; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
+| `structuredOutput` | `true`, unless `responseFormat` is forced to `"json_object"` / `"text"` (loose modes).                                                                                        |
+| `promptCaching`    | `true` (inherited from the OpenAI adapter — read-side `cachedTokens` accounting).                                                                                             |
+| `pdf` / `audio`    | `false` by default (opt-in `.model({ pdf: true })` / `{ audio: true }`).                                                                                                      |
 
 **Override any flag explicitly** via `.model({ name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio? })` — an explicit value always wins over inference. The known-family fragments live in `known-models.ts` (`inferVisionCapability`, `inferReasoningCapability`).
 
@@ -78,8 +78,8 @@ const mistral = new MistralSDK({
   apiKey,
   pricing: {
     // USD per 1M tokens — billing-grade overrides.
-    "mistral-large-latest":    { input: 2,   output: 6 },
-    "magistral-medium-latest": { input: 2,   output: 5 },
+    "mistral-large-latest": { input: 2, output: 6 },
+    "magistral-medium-latest": { input: 2, output: 5 },
   },
 });
 ```
@@ -101,3 +101,17 @@ Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by th
 - The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; identical wire behavior.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`.
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison.
+
+## Provider body options and token estimates
+
+This adapter delegates Chat Completions to the OpenAI adapter, so
+`providerOptions.openai.body` adds native Chat request fields. Other provider
+keys are ignored. Plain-object fields merge one level deep with neutral options;
+caller-provided keys win, while arrays, scalars and `null` replace the field.
+The OpenAI adapter's protected conversation, tool and transport fields remain
+protected here too. Send only fields supported by this provider; do not reuse
+OpenAI-only bodies across a mixed-provider fallback chain.
+
+Models from this adapter have no native `countTokens` method. Check
+`model.countTokens` before using an optional native counting capability;
+`sdk.count(text)` is a separate offline estimate.

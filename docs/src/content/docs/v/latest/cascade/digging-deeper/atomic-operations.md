@@ -22,30 +22,30 @@ await User.whereId(user.id).increment("loginCount");
 
 They look almost identical. They behave very differently under concurrency:
 
-| Aspect | Instance form | Query-builder form |
-| ------ | ------------- | ------------------ |
-| **Mechanics** | reads current value into memory, adds, calls `.save()` | single `UPDATE ... SET col = col + 1` statement |
-| **Round-trips** | 2 (read + write) | 1 (write only) |
-| **Race-safe** | ❌ Lost-update window if another writer modifies the row between read and save | ✅ Atomic at the database level |
-| **Fires lifecycle events** | ✅ `saving`/`updating`/`saved` etc. | ❌ Bypasses model events |
-| **Best for** | Single-writer flows where the model is already loaded | Multi-writer counters, rate limits, view counts |
+| Aspect                     | Instance form                                                                  | Query-builder form                              |
+| -------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
+| **Mechanics**              | reads current value into memory, adds, calls `.save()`                         | single `UPDATE ... SET col = col + 1` statement |
+| **Round-trips**            | 2 (read + write)                                                               | 1 (write only)                                  |
+| **Race-safe**              | ❌ Lost-update window if another writer modifies the row between read and save | ✅ Atomic at the database level                 |
+| **Fires lifecycle events** | ✅ `saving`/`updating`/`saved` etc.                                            | ❌ Bypasses model events                        |
+| **Best for**               | Single-writer flows where the model is already loaded                          | Multi-writer counters, rate limits, view counts |
 
 ## The lost-update problem (instance form)
 
 ```ts
 // Process A
-const user = await User.find(123);     // loginCount = 5
-user.increment("loginCount");          // user.data.loginCount becomes 6 in memory
-                                        // (Process B does the same thing here)
-await user.save();                     // writes 6
+const user = await User.find(123); // loginCount = 5
+user.increment("loginCount"); // user.data.loginCount becomes 6 in memory
+// (Process B does the same thing here)
+await user.save(); // writes 6
 
 // Process B
-const user = await User.find(123);     // loginCount = 5 (still!)
-user.increment("loginCount");          // user.data.loginCount becomes 6 in memory
-await user.save();                     // writes 6 — A's increment is lost
+const user = await User.find(123); // loginCount = 5 (still!)
+user.increment("loginCount"); // user.data.loginCount becomes 6 in memory
+await user.save(); // writes 6 — A's increment is lost
 ```
 
-Two increments, one survived. Classic concurrency bug, expensive to detect (the counter just *runs a bit slow*), expensive to reproduce. The instance form is fine when only one process ever writes to the row in a given window — validated user profile edits, single-writer flows — but **wrong for counters under load**.
+Two increments, one survived. Classic concurrency bug, expensive to detect (the counter just _runs a bit slow_), expensive to reproduce. The instance form is fine when only one process ever writes to the row in a given window — validated user profile edits, single-writer flows — but **wrong for counters under load**.
 
 ## The atomic form (query builder)
 
@@ -98,9 +98,7 @@ Single statement. No race. Don't reach for transactions or instance loads for th
 
 ```ts
 async function tryConsume(userId: string, limit: number): Promise<boolean> {
-  const newCount = await RateLimit
-    .where({ userId, window: currentMinute() })
-    .increment("requests");
+  const newCount = await RateLimit.where({ userId, window: currentMinute() }).increment("requests");
   return newCount <= limit;
 }
 ```
@@ -111,8 +109,7 @@ The increment is atomic; the check happens on the returned value. If the row did
 
 ```ts
 async function reserveStock(productId: string, qty: number): Promise<boolean> {
-  const rows = await Product
-    .where("id", productId)
+  const rows = await Product.where("id", productId)
     .where("stock", ">=", qty)
     .decrementMany("stock", qty);
   return rows > 0; // true = reserved; false = insufficient stock
@@ -154,7 +151,7 @@ await user.save();
 // fires saving/updating/saved with all dirty fields visible to listeners
 ```
 
-For *just* the counter under load, prefer the query-builder form.
+For _just_ the counter under load, prefer the query-builder form.
 
 ## Atomic upsert with `atomic()` / `findOneAndUpdate()` / `findAndUpdate()`
 
@@ -215,4 +212,4 @@ Atomicity composes: a transaction wrapping several query-builder increments is *
 - **Lifecycle events** that fire (or don't) per API: [Events and hooks guide](../architecture-concepts/events-and-hooks.md)
 - **Transactions** for multi-step atomicity: [Transactions guide](./transactions.md)
 - **Race-free upserts** and conditional updates: [Querying essentials](../the-basics/02-querying.md) + [Query Builder API reference](../reference/query-builder-api.md)
-- **Inventory / rate-limit recipes** *(planned)* — the productionised patterns for these
+- **Inventory / rate-limit recipes** _(planned)_ — the productionised patterns for these

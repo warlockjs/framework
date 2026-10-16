@@ -58,7 +58,11 @@ export class PostgresSQLSerializer extends SQLSerializer {
         return this.dropIndex(table, operation.payload as string | string[]);
       case "createUniqueIndex": {
         const payload = operation.payload as { columns: string[]; name?: string };
-        return this.createIndex(table, { columns: payload.columns, name: payload.name, unique: true });
+        return this.createIndex(table, {
+          columns: payload.columns,
+          name: payload.name,
+          unique: true,
+        });
       }
       case "dropUniqueIndex":
         return this.dropIndex(table, operation.payload as string[]);
@@ -247,7 +251,9 @@ export class PostgresSQLSerializer extends SQLSerializer {
 
   private dropColumns(table: string, columns: string[]): string {
     const quotedTable = this.dialect.quoteIdentifier(table);
-    const drops = columns.map((col) => `DROP COLUMN ${this.dialect.quoteIdentifier(col)}`).join(", ");
+    const drops = columns
+      .map((col) => `DROP COLUMN ${this.dialect.quoteIdentifier(col)}`)
+      .join(", ");
     return `ALTER TABLE ${quotedTable} ${drops}`;
   }
 
@@ -347,7 +353,9 @@ export class PostgresSQLSerializer extends SQLSerializer {
       const conditions = Object.entries(index.where)
         .map(([key, value]) => {
           const quotedKey = this.dialect.quoteIdentifier(key);
-          return typeof value === "string" ? `${quotedKey} = '${value}'` : `${quotedKey} = ${value}`;
+          return typeof value === "string"
+            ? `${quotedKey} = '${value}'`
+            : `${quotedKey} = ${value}`;
         })
         .join(" AND ");
       sql += ` WHERE ${conditions}`;
@@ -367,7 +375,11 @@ export class PostgresSQLSerializer extends SQLSerializer {
     return `DROP INDEX IF EXISTS ${quotedIndexName}`;
   }
 
-  private createFullTextIndex(table: string, columns: string[], options?: FullTextIndexOptions): string {
+  private createFullTextIndex(
+    table: string,
+    columns: string[],
+    options?: FullTextIndexOptions,
+  ): string {
     const quotedTable = this.dialect.quoteIdentifier(table);
     const indexName = options?.name ?? `idx_${table}_fulltext_${columns.join("_")}`;
     const quotedIndexName = this.dialect.quoteIdentifier(indexName);
@@ -479,15 +491,18 @@ export class PostgresSQLSerializer extends SQLSerializer {
     return `ALTER TABLE ${quotedTable} DROP CONSTRAINT ${quotedName}`;
   }
 
-  private mapForeignKeyAction(
-    action: "cascade" | "restrict" | "setNull" | "noAction",
-  ): string {
+  private mapForeignKeyAction(action: "cascade" | "restrict" | "setNull" | "noAction"): string {
     switch (action) {
-      case "cascade": return "CASCADE";
-      case "restrict": return "RESTRICT";
-      case "setNull": return "SET NULL";
-      case "noAction": return "NO ACTION";
-      default: return "NO ACTION";
+      case "cascade":
+        return "CASCADE";
+      case "restrict":
+        return "RESTRICT";
+      case "setNull":
+        return "SET NULL";
+      case "noAction":
+        return "NO ACTION";
+      default:
+        return "NO ACTION";
     }
   }
 }

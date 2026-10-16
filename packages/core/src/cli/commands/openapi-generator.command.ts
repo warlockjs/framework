@@ -19,7 +19,8 @@ export const openApiGeneratorCommand = command({
   options: [
     {
       text: "--out, -o",
-      description: "Output file, relative to the project root (default storage/openapi/openapi.json)",
+      description:
+        "Output file, relative to the project root (default storage/openapi/openapi.json)",
       type: "string",
     },
     {

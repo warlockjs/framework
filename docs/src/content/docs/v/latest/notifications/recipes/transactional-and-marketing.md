@@ -26,7 +26,10 @@ export const orderShipped = defineNotification<{ order: Order }>({
   type: "order.shipped",
   via: (_d, to) => (to.get("telegram_chat_id") ? ["database", "telegram"] : ["database", "mail"]),
   database: ({ order }) => ({ title: `Order #${order.number} shipped`, payload: { id: order.id } }),
-  mail: ({ order }, to) => ({ subject: `Order #${order.number} shipped`, html: `<p>Hi ${to.get("name")}…</p>` }),
+  mail: ({ order }, to) => ({
+    subject: `Order #${order.number} shipped`,
+    html: `<p>Hi ${to.get("name")}…</p>`,
+  }),
 });
 
 await orderShipped.send(user, { order });
@@ -44,7 +47,11 @@ export const passwordChanged = defineNotification<{ ip: string }>({
   mail: ({ ip }) => ({ subject: "Your password was changed", html: `<p>IP: ${ip}</p>` }),
 });
 
-await passwordChanged.send(user, { ip }, { force: true, idempotencyKey: `pwd:${user.id}:${changeId}` });
+await passwordChanged.send(
+  user,
+  { ip },
+  { force: true, idempotencyKey: `pwd:${user.id}:${changeId}` },
+);
 ```
 
 ## 4. Marketing blast — rate-limited, localized, queued
@@ -72,7 +79,11 @@ for (const chunk of subscribers.chunk(500)) {
 export const handoff = defineNotification<{ conversationId: string; reason: string }>({
   type: "support.handoff",
   via: ["database", "slack"], // slack = a custom defineChannel
-  database: ({ conversationId, reason }) => ({ title: "Needs attention", body: reason, payload: { conversationId } }),
+  database: ({ conversationId, reason }) => ({
+    title: "Needs attention",
+    body: reason,
+    payload: { conversationId },
+  }),
   slack: ({ conversationId, reason }) => ({ text: `🆘 #${conversationId}: ${reason}` }),
 });
 
@@ -82,10 +93,10 @@ await handoff.send(onCallStaff, { conversationId, reason }); // one call, N staf
 ## Reading the in-app side
 
 ```ts
-const badge  = await inApp.countUnread(user);
+const badge = await inApp.countUnread(user);
 const unread = await inApp.listUnread(user, { type: "order.shipped" });
-await inApp.markAsRead(user);          // mark all read
-await inApp.dismiss(user, "ntf_123");  // delete one
+await inApp.markAsRead(user); // mark all read
+await inApp.dismiss(user, "ntf_123"); // delete one
 ```
 
 ## See also

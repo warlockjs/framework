@@ -49,8 +49,12 @@ export function requestLogger(base: Record<string, unknown>) {
       log.warn(module, action, message as string, withBase(context)),
     error: (module: string, action: string, message: unknown, context?: Record<string, unknown>) =>
       log.error(module, action, message as string, withBase(context)),
-    success: (module: string, action: string, message: unknown, context?: Record<string, unknown>) =>
-      log.success(module, action, message as string, withBase(context)),
+    success: (
+      module: string,
+      action: string,
+      message: unknown,
+      context?: Record<string, unknown>,
+    ) => log.success(module, action, message as string, withBase(context)),
   };
 }
 ```

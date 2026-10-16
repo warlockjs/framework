@@ -51,7 +51,9 @@ export function parseQuery(params: URLSearchParams): TraceQuery {
 
   const statuses = params
     .getAll("status")
-    .filter((value): value is ReportStatus => (KNOWN_STATUSES as readonly string[]).includes(value));
+    .filter((value): value is ReportStatus =>
+      (KNOWN_STATUSES as readonly string[]).includes(value),
+    );
   if (statuses.length === 1) {
     query.status = statuses[0];
   } else if (statuses.length > 1) {

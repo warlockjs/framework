@@ -69,9 +69,7 @@ describe("wrapAnthropicError", () => {
   });
 
   it("maps billing_error to QuotaExceededError (still an AIError/ProviderError-free quota)", () => {
-    const wrapped = wrapAnthropicError(
-      fakeAnthropicError({ status: 400, type: "billing_error" }),
-    );
+    const wrapped = wrapAnthropicError(fakeAnthropicError({ status: 400, type: "billing_error" }));
 
     expect(wrapped).toBeInstanceOf(QuotaExceededError);
   });
@@ -149,9 +147,7 @@ describe("wrapAnthropicError", () => {
   });
 
   it("maps 500 / overloaded to plain ProviderError", () => {
-    const wrapped = wrapAnthropicError(
-      fakeAnthropicError({ status: 500, message: "server err" }),
-    );
+    const wrapped = wrapAnthropicError(fakeAnthropicError({ status: 500, message: "server err" }));
 
     expect(wrapped).toBeInstanceOf(ProviderError);
     expect(wrapped).not.toBeInstanceOf(InvalidRequestError);

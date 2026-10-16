@@ -23,22 +23,26 @@ export interface Observer {
 `observe?: boolean | Observer` (`FlowObserveOption`) is accepted on **`ai.agent`, `ai.workflow`, `ai.supervisor`, and `ai.team`** (a team forwards it verbatim to the supervisor it desugars into):
 
 ```ts
-const collector: Observer = { collect(report) { exporter.send(report); } };
+const collector: Observer = {
+  collect(report) {
+    exporter.send(report);
+  },
+};
 
-ai.agent({ model, observe: true });       // → the globally registered observers, even if observe-all is off
-ai.agent({ model, observe: false });      // → opt out entirely, even when observe-all is on
-ai.agent({ model, observe: collector });  // → a flow-LOCAL collector; only this flow's report, only to it
-ai.agent({ model });                      // → undefined: follow the global observe-all flag
+ai.agent({ model, observe: true }); // → the globally registered observers, even if observe-all is off
+ai.agent({ model, observe: false }); // → opt out entirely, even when observe-all is on
+ai.agent({ model, observe: collector }); // → a flow-LOCAL collector; only this flow's report, only to it
+ai.agent({ model }); // → undefined: follow the global observe-all flag
 ```
 
 Resolution (`resolveObservers(observe)`):
 
-| value | observers notified |
-| --- | --- |
-| `false` | `[]` — opted out |
-| `true` | the globally registered observers |
-| an `Observer` object | just that one (flow-local; globals skipped) |
-| `undefined` | the global observers when observe-all is on **and this is a root (non-nested) run**, otherwise `[]` |
+| value                | observers notified                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------- |
+| `false`              | `[]` — opted out                                                                                    |
+| `true`               | the globally registered observers                                                                   |
+| an `Observer` object | just that one (flow-local; globals skipped)                                                         |
+| `undefined`          | the global observers when observe-all is on **and this is a root (non-nested) run**, otherwise `[]` |
 
 The object form is typed as the structural `Observer` — **not** a panoptic-specific options type — so a panoptic flow-local collector (which implements `Observer`) can be passed straight in, and core stays panoptic-agnostic.
 
@@ -46,16 +50,20 @@ The object form is typed as the structural `Observer` — **not** a panoptic-spe
 
 ```ts
 import {
-  registerObserver, getObservers, setObserveAll, isObserveAll, clearObservers,
+  registerObserver,
+  getObservers,
+  setObserveAll,
+  isObserveAll,
+  clearObservers,
 } from "@warlock.js/ai";
 
-registerObserver(collector);  // an observability tool registers ONE collector when its config is applied
-getObservers();               // read-only snapshot of the registered observers (do not mutate)
+registerObserver(collector); // an observability tool registers ONE collector when its config is applied
+getObservers(); // read-only snapshot of the registered observers (do not mutate)
 
-setObserveAll(true);          // "observe every flow by default" — flows without their own `observe` get observed
-isObserveAll();               // read the flag (default false — opt-in observability)
+setObserveAll(true); // "observe every flow by default" — flows without their own `observe` get observed
+isObserveAll(); // read the flag (default false — opt-in observability)
 
-clearObservers();             // test-only: reset observers + the observe-all flag for spec isolation
+clearObservers(); // test-only: reset observers + the observe-all flag for spec isolation
 ```
 
 `observeAll` defaults to `false` (opt-in). A flow that never sets `observe` is observed **only** when observe-all is on; individual flows still opt out with `observe: false`. At completion a flow calls `notifyObservers(observe, report)`, which routes the report to each resolved observer, awaiting each `collect` (so async exporters finish before the flow returns) and **isolating** any throw — a failing observer never breaks the run, and the framework surfaces it with a warn-once log per observer rather than swallowing it silently.
@@ -65,7 +73,7 @@ clearObservers();             // test-only: reset observers + the observe-all fl
 registerObserver(myCollector);
 setObserveAll(true);
 
-await ai.agent({ model }).execute("Go");          // observed (observe-all on, no per-flow opt-out)
+await ai.agent({ model }).execute("Go"); // observed (observe-all on, no per-flow opt-out)
 await ai.agent({ model, observe: false }).execute("…"); // skipped, even with observe-all on
 ```
 
@@ -84,9 +92,9 @@ A `CapturedMessage` is a JSON-safe projection:
 ```ts
 type CapturedMessage = {
   role: "system" | "user" | "assistant" | "tool";
-  content: string;                  // always a string — tool results stringified
+  content: string; // always a string — tool results stringified
   toolCalls?: ModelToolCallRequest[]; // only on assistant turns that triggered tools
-  toolCallId?: string;              // only on tool-result turns
+  toolCallId?: string; // only on tool-result turns
 };
 ```
 
@@ -101,12 +109,15 @@ import { ai, registerObserver, type Observer } from "@warlock.js/ai";
 
 const jsonlSink: Observer = {
   async collect(report) {
-    await appendFile("./runs.jsonl", JSON.stringify({
-      type: report.type,
-      status: report.status,
-      duration: report.duration,
-      usage: report.usage,
-    }) + "\n");
+    await appendFile(
+      "./runs.jsonl",
+      JSON.stringify({
+        type: report.type,
+        status: report.status,
+        duration: report.duration,
+        usage: report.usage,
+      }) + "\n",
+    );
   },
 };
 

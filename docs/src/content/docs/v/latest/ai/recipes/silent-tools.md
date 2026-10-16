@@ -147,12 +147,12 @@ Middleware (logging, cost tracking, telemetry) still sees silent tools. `Middlew
 
 Captured from the smoke test at `scripts/smoke/silent-tools.ts` and the side-by-side example at `src/app/examples/silent-tools.ts` (run 2026-05-07 via OpenRouter):
 
-| Provider | Model | Single-trip terminates? | Prose alongside silent tool_use? |
-| --- | --- | --- | --- |
-| Anthropic | claude-sonnet-4.6 | ✓ Yes | ✓ Yes — emits prose deltas alongside the tool call |
-| OpenAI | gpt-5 | ✓ Yes | ✗ No — emits the tool call alone |
-| OpenAI | gpt-4o | ✓ Yes | ✗ No — emits the tool call alone |
-| OpenAI | gpt-4o-mini | ✓ Yes | ✗ No — emits the tool call alone |
+| Provider  | Model             | Single-trip terminates? | Prose alongside silent tool_use?                   |
+| --------- | ----------------- | ----------------------- | -------------------------------------------------- |
+| Anthropic | claude-sonnet-4.6 | ✓ Yes                   | ✓ Yes — emits prose deltas alongside the tool call |
+| OpenAI    | gpt-5             | ✓ Yes                   | ✗ No — emits the tool call alone                   |
+| OpenAI    | gpt-4o            | ✓ Yes                   | ✗ No — emits the tool call alone                   |
+| OpenAI    | gpt-4o-mini       | ✓ Yes                   | ✗ No — emits the tool call alone                   |
 
 **Framework invariant.** Silent mode terminates the loop after dispatch regardless of provider. That part is solid across all four models tested.
 

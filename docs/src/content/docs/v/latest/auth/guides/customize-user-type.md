@@ -87,7 +87,9 @@ import { router } from "@warlock.js/core";
 
 router.get("/account", userAccountController, { middleware: [authMiddleware("user")] });
 router.get("/admin/users", listUsersController, { middleware: [authMiddleware("admin")] });
-router.get("/back-office", backOfficeController, { middleware: [authMiddleware(["admin", "staff"])] });
+router.get("/back-office", backOfficeController, {
+  middleware: [authMiddleware(["admin", "staff"])],
+});
 router.get("/dashboard", dashboardController, { middleware: [authMiddleware([])] }); // any logged-in
 ```
 
@@ -122,7 +124,7 @@ abstract class Auth<TSchema> extends Model<TSchema> implements Authenticable {
   // all Model<> methods, plus:
   abstract get userType(): string;
 
-  public accessTokenPayload(): { id, userType, created_at };
+  public accessTokenPayload(): { id; userType; created_at };
 
   public createTokenPair(deviceInfo?): Promise<TokenPair>;
   public generateAccessToken(payload?): Promise<AccessTokenOutput>;

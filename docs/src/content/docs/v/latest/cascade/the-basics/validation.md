@@ -72,7 +72,7 @@ try {
 - **`hasFieldError(path)`** — quick boolean check.
 - **`toString()`** — a coloured, formatted dump suitable for `console.log` during development.
 
-The error is *thrown*, not returned. If you want the validation result without committing to a save, call `userSchema.validate(data)` directly — that gives you the seal-native `ValidationResult` shape without the throw.
+The error is _thrown_, not returned. If you want the validation result without committing to a save, call `userSchema.validate(data)` directly — that gives you the seal-native `ValidationResult` shape without the throw.
 
 ## Catching validation in HTTP controllers
 
@@ -86,7 +86,7 @@ try {
   if (err instanceof DatabaseWriterValidationError) {
     return res.status(422).json({
       message: "Validation failed",
-      errors: err.errors.map(e => ({
+      errors: err.errors.map((e) => ({
         field: e.input,
         message: e.error,
         rule: e.rule,
@@ -104,7 +104,7 @@ Standardise the error shape once at the framework level (middleware, exception f
 ### `onValidating` — transform input before validation
 
 ```ts
-User.events().onValidating(async user => {
+User.events().onValidating(async (user) => {
   // Normalise email before the .email() validator sees it
   const email = user.get("email");
   if (typeof email === "string") {
@@ -118,7 +118,7 @@ The listener runs before `userSchema.validate(...)`, so any normalisation you do
 ### `onValidated` — post-validation hook
 
 ```ts
-User.events().onValidated(async user => {
+User.events().onValidated(async (user) => {
   // Schema passed; do anything that depends on a clean payload
 });
 ```
@@ -128,7 +128,7 @@ Less commonly used than `onValidating`. Reach for it when you need a guarantee t
 ### Vetoing a save with custom logic
 
 ```ts
-User.events().onValidating(async user => {
+User.events().onValidating(async (user) => {
   if (user.isDirty("email")) {
     const existing = await User.where("email", user.get("email")).first();
     if (existing && existing.id !== user.id) {
@@ -142,7 +142,7 @@ Throwing inside `onValidating` aborts the save with whatever error you threw. Fo
 
 ## Database-aware rules — `unique` and `exists`
 
-For checks that need the database — *"is this email already in use?"*, *"does this `category_id` actually exist?"* — Cascade ships two database-aware seal validators you chain like any other:
+For checks that need the database — _"is this email already in use?"_, _"does this `category_id` actually exist?"_ — Cascade ships two database-aware seal validators you chain like any other:
 
 ```ts
 export const userSchema = v.object({
@@ -155,7 +155,7 @@ export const userSchema = v.object({
 What each does:
 
 - **`.unique(Model | "ModelName", options?)`** — fails validation if a record on `Model` already has the value you're trying to save. By default it checks the column with the same name as the field being validated; override with `{ column: "..." }`.
-- **`.exists(Model | "ModelName", options?)`** — fails validation if no record on `Model` has the value. The mirror of `unique` — useful for foreign-key-style checks at the validation layer (catch the bad reference before the insert blows up). Defaults to looking up by the related model's primary key; override with `{ column: "slug" }` to point at a different unique column. *(Changed in 5.21: the default is the related model's primary key, which may not be `id`.)*
+- **`.exists(Model | "ModelName", options?)`** — fails validation if no record on `Model` has the value. The mirror of `unique` — useful for foreign-key-style checks at the validation layer (catch the bad reference before the insert blows up). Defaults to looking up by the related model's primary key; override with `{ column: "slug" }` to point at a different unique column. _(Changed in 5.21: the default is the related model's primary key, which may not be `id`.)_
 
 Both rules accept the **registered model name** (`"User"`, `"Organization"`) or the **model class directly** (`User`, `Organization`). Use the string form when you'd hit a circular import otherwise; use the class form when the import is clean.
 
@@ -183,7 +183,7 @@ slug: v.string().unique("Post", {
 }),
 ```
 
-Slug only needs to be unique among *published* posts — drafts can share. The callback receives the in-progress query builder, the value being validated, and the rest of the input object, so you can branch on whatever context you need.
+Slug only needs to be unique among _published_ posts — drafts can share. The callback receives the in-progress query builder, the value being validated, and the rest of the input object, so you can branch on whatever context you need.
 
 ## Writing your own custom rules
 
@@ -219,8 +219,8 @@ import { v } from "@warlock.js/seal";
 import "@warlock.js/cascade"; // registers the embed plugin
 
 export const orderSchema = v.object({
-  user: v.embed().model("User"),         // single embedded user document
-  items: v.embed().models("OrderItem"),   // array of embedded order-item docs
+  user: v.embed().model("User"), // single embedded user document
+  items: v.embed().models("OrderItem"), // array of embedded order-item docs
 });
 ```
 
@@ -229,7 +229,7 @@ What it does:
 - **At write time** — accepts a `User` instance or a primary-key value; resolves to the full embedded model representation. Useful for snapshotting "the user as they were at order time" so later edits to the live user don't rewrite history.
 - **At read time** — the field comes back as a hydrated `User` model instance (or array of `OrderItem` instances).
 
-When to reach for it: **document-style** denormalisation where you specifically want to *embed* (not reference) another model. Most apps use foreign keys + relations (covered in the [Relationships essentials](../the-basics/03-relationships.md)) and never need `embed`; reach for it when you've decided a column should hold a snapshot.
+When to reach for it: **document-style** denormalisation where you specifically want to _embed_ (not reference) another model. Most apps use foreign keys + relations (covered in the [Relationships essentials](../the-basics/03-relationships.md)) and never need `embed`; reach for it when you've decided a column should hold a snapshot.
 
 ## Where to put schema declarations
 

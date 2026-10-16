@@ -68,7 +68,7 @@ MAIL_FROM_NAME="Acme Support"
 MAIL_FROM_ADDRESS=support@acme.com
 ```
 
-*(Changed in 5.21: when `secure` is omitted it now defaults from the port — 465 → `true`, everything else `false`.)* `secure: true` is for port 465 (implicit TLS). For 587 you want `secure: false` plus `tls: true` (STARTTLS upgrade). Sticking the wrong combination on a port that doesn't speak it is the most common "why am I getting `wrong version number`" cause.
+_(Changed in 5.21: when `secure` is omitted it now defaults from the port — 465 → `true`, everything else `false`.)_ `secure: true` is for port 465 (implicit TLS). For 587 you want `secure: false` plus `tls: true` (STARTTLS upgrade). Sticking the wrong combination on a port that doesn't speak it is the most common "why am I getting `wrong version number`" cause.
 
 The framework's mail connector picks this up in startup, calls `setMailConfigurations(...)` under the hood, and gracefully shuts down the SMTP pool on process exit. You don't import or call any of that yourself.
 
@@ -76,11 +76,11 @@ The framework's mail connector picks this up in startup, calls `setMailConfigura
 
 Three modes, set once per process:
 
-| Mode            | What it does                                          | Use for          |
-| --------------- | ----------------------------------------------------- | ---------------- |
-| `"production"`  | Actually opens an SMTP connection and sends           | live deployments |
-| `"development"` | Logs subject + recipient to console, never connects   | local dev        |
-| `"test"`        | Captures every send into an in-memory mailbox         | automated tests  |
+| Mode            | What it does                                        | Use for          |
+| --------------- | --------------------------------------------------- | ---------------- |
+| `"production"`  | Actually opens an SMTP connection and sends         | live deployments |
+| `"development"` | Logs subject + recipient to console, never connects | local dev        |
+| `"test"`        | Captures every send into an in-memory mailbox       | automated tests  |
 
 Set the mode at boot:
 
@@ -101,16 +101,7 @@ Tests set their own mode in setup — covered below.
 Email templates live in `emails/` at the project root. Drop in `@react-email/components` (already in the reference project's dependencies) and write standard React — the framework hands the element to `@react-email/render` which knows how to produce email-safe HTML.
 
 ```tsx title="emails/verification-email.tsx"
-import {
-  Body,
-  Button,
-  Container,
-  Head,
-  Heading,
-  Hr,
-  Html,
-  Text,
-} from "@react-email/components";
+import { Body, Button, Container, Head, Heading, Hr, Html, Text } from "@react-email/components";
 
 type VerificationEmailProps = {
   userName: string;
@@ -146,8 +137,8 @@ export default function VerificationEmail({
           </Heading>
 
           <Text style={{ color: "#4b5563", lineHeight: "24px" }}>
-            Thanks for signing up. Click the button below to confirm your address —
-            this link expires in {expiresInMinutes} minutes.
+            Thanks for signing up. Click the button below to confirm your address — this link
+            expires in {expiresInMinutes} minutes.
           </Text>
 
           <Button
@@ -248,22 +239,22 @@ export async function sendVerificationEmailService(options: SendVerificationOpti
 
 What the builder does, line by line:
 
-| Call                       | Effect                                                       |
-| -------------------------- | ------------------------------------------------------------ |
-| `Mail.to(email)`           | Start a new builder, set the recipient                       |
-| `.subject(...)`            | Set the subject line                                         |
-| `.component(<X />)`        | React element — rendered through `@react-email/render`       |
-| `.tag("verification")`     | A free-form label for analytics / debugging                  |
-| `.send()`                  | Resolve config, build payload, dispatch through the pipeline |
+| Call                   | Effect                                                       |
+| ---------------------- | ------------------------------------------------------------ |
+| `Mail.to(email)`       | Start a new builder, set the recipient                       |
+| `.subject(...)`        | Set the subject line                                         |
+| `.component(<X />)`    | React element — rendered through `@react-email/render`       |
+| `.tag("verification")` | A free-form label for analytics / debugging                  |
+| `.send()`              | Resolve config, build payload, dispatch through the pipeline |
 
 `Mail` is a fluent builder. Every method returns `this`. The `.send()` call validates (you need at least a `to`, a `subject`, and one of `html` / `text` / `component`) and then hands off to the framework's `sendMail()` under the hood. You get back a `MailResult`:
 
 ```ts
 type MailResult = {
-  success: boolean;          // false if every recipient was rejected
-  messageId?: string;        // transport-assigned id (when sent)
-  accepted: string[];        // who got it
-  rejected: string[];        // who didn't (partial-rejection case)
+  success: boolean; // false if every recipient was rejected
+  messageId?: string; // transport-assigned id (when sent)
+  accepted: string[]; // who got it
+  rejected: string[]; // who didn't (partial-rejection case)
   response?: string;
   envelope?: { from: string; to: string[] };
 };
@@ -273,7 +264,7 @@ type MailResult = {
 
 SMTP is famously flaky in the bottom 0.1% of connections — DNS hiccup, a transient TLS handshake failure, a 421 from the provider asking you to slow down. `retry(fn, { count, delay, shouldRetry })` from `@warlock.js/core` wraps the call: try once, on failure check `shouldRetry`, sleep `delay` ms, try again, up to `count` extra times.
 
-The `shouldRetry` callback receives the thrown error and the attempt number. We only retry the codes that mean "transport-level transient failure" — `CONNECTION_ERROR`, `TIMEOUT`, `RATE_LIMIT`. We do *not* retry `AUTH_ERROR` (your credentials are bad, retrying makes it worse), `INVALID_ADDRESS` (the email is malformed, will fail forever), or `REJECTED` (the recipient bounced — retrying just lights the same fire).
+The `shouldRetry` callback receives the thrown error and the attempt number. We only retry the codes that mean "transport-level transient failure" — `CONNECTION_ERROR`, `TIMEOUT`, `RATE_LIMIT`. We do _not_ retry `AUTH_ERROR` (your credentials are bad, retrying makes it worse), `INVALID_ADDRESS` (the email is malformed, will fail forever), or `REJECTED` (the recipient bounced — retrying just lights the same fire).
 
 Four attempts (`count: 3` = initial + 3 retries) at 500ms each is the right neighborhood for a transactional email. More than that and the user is already staring at a spinner; less and you don't outlast typical hiccups.
 
@@ -391,21 +382,21 @@ describe("sendVerificationEmailService", () => {
 
 The helpers, at a glance:
 
-| Helper                              | Purpose                                                                  |
-| ----------------------------------- | ------------------------------------------------------------------------ |
-| `setMailMode("test")`               | Flip the process into capture mode — no SMTP connections                 |
-| `clearTestMailbox()`                | Empty the mailbox between tests so each one starts clean                 |
-| `getTestMailbox()`                  | All captured mails for inspection                                        |
-| `findMailsTo(email)`                | Filter by recipient                                                      |
-| `findMailsBySubject(substring)`     | Filter by subject substring                                              |
-| `assertMailSent(predicate)`         | Find the first match, throw if nothing matches                           |
-| `assertMailCount(n)`                | Throw if mailbox doesn't have exactly `n` mails                          |
-| `wasMailSentTo(email)`              | Boolean — did anyone email this address?                                 |
-| `wasMailSentWithSubject(subject)`   | Boolean — did we send a mail with this exact subject?                    |
+| Helper                            | Purpose                                                  |
+| --------------------------------- | -------------------------------------------------------- |
+| `setMailMode("test")`             | Flip the process into capture mode — no SMTP connections |
+| `clearTestMailbox()`              | Empty the mailbox between tests so each one starts clean |
+| `getTestMailbox()`                | All captured mails for inspection                        |
+| `findMailsTo(email)`              | Filter by recipient                                      |
+| `findMailsBySubject(substring)`   | Filter by subject substring                              |
+| `assertMailSent(predicate)`       | Find the first match, throw if nothing matches           |
+| `assertMailCount(n)`              | Throw if mailbox doesn't have exactly `n` mails          |
+| `wasMailSentTo(email)`            | Boolean — did anyone email this address?                 |
+| `wasMailSentWithSubject(subject)` | Boolean — did we send a mail with this exact subject?    |
 
 Each captured entry exposes the original `options` (everything you passed to the builder), a `normalized` view (recipients as arrays, the rendered HTML if you used a component), and a `timestamp`. `normalized.html` is the right field for assertions about rendered content — `options.component` is the React element, which is not what your user sees.
 
-### What test mode does *not* do
+### What test mode does _not_ do
 
 It doesn't verify that your SMTP server would accept the mail, that the recipient exists, or that the HTML renders correctly in Outlook 2007. Test mode is for asserting "we tried to send the right thing." For end-to-end SMTP testing, use `mailtrap` or `mailpit` in a staging environment with `setMailMode("production")` pointed at the catch-all inbox.
 

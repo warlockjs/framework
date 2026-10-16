@@ -52,7 +52,8 @@ export type ExecutableTool<TInput = unknown, TOutput = unknown> = {
  * behalf.
  */
 export type AgentToolEntry<TInput = unknown, TOutput = unknown> =
-  ToolContract<TInput, TOutput> | ExecutableTool<TInput, TOutput>;
+  | ToolContract<TInput, TOutput>
+  | ExecutableTool<TInput, TOutput>;
 
 /**
  * Identity passthrough schema used when an executable is registered as

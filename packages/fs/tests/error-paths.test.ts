@@ -37,9 +37,7 @@ describe("error paths — missing sources throw", () => {
   });
 
   it("copyFile (sync) throws when the source is missing", () => {
-    expect(() =>
-      copyFile(path.join(dir, "nope.txt"), path.join(dir, "out.txt")),
-    ).toThrow();
+    expect(() => copyFile(path.join(dir, "nope.txt"), path.join(dir, "out.txt"))).toThrow();
   });
 
   it("copyDirectoryAsync rejects when the source directory is missing", async () => {
@@ -55,9 +53,7 @@ describe("error paths — missing sources throw", () => {
   });
 
   it("renameFile (sync) throws when the source is missing", () => {
-    expect(() =>
-      renameFile(path.join(dir, "nope.txt"), path.join(dir, "to.txt")),
-    ).toThrow();
+    expect(() => renameFile(path.join(dir, "nope.txt"), path.join(dir, "to.txt"))).toThrow();
   });
 
   it("hashFileAsync rejects when the file is missing", async () => {
@@ -69,9 +65,7 @@ describe("error paths — missing sources throw", () => {
   });
 
   it("hashFileSmallAsync rejects when the file is missing", async () => {
-    await expect(
-      hashFileSmallAsync(path.join(dir, "nope.txt")),
-    ).rejects.toThrow();
+    await expect(hashFileSmallAsync(path.join(dir, "nope.txt"))).rejects.toThrow();
   });
 
   it("listAsync rejects when the directory is missing", async () => {
@@ -116,9 +110,9 @@ describe("error paths — ENOENT code is surfaced", () => {
   });
 
   it("hashFileAsync surfaces an ENOENT error for a missing file", async () => {
-    await expect(hashFileAsync(path.join(dir, "nope.txt"))).rejects.toMatchObject(
-      { code: "ENOENT" },
-    );
+    await expect(hashFileAsync(path.join(dir, "nope.txt"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("statsAsync surfaces an ENOENT error for a missing path", async () => {
@@ -148,9 +142,7 @@ describe("interplay — copy then verify source preserved across helpers", () =>
 
     await copyDirectoryAsync(source, destination);
 
-    const names = (await listAsync(destination))
-      .map((entry) => path.basename(entry))
-      .sort();
+    const names = (await listAsync(destination)).map((entry) => path.basename(entry)).sort();
     expect(names).toEqual(["from-source.txt", "pre-existing.txt"]);
   });
 });

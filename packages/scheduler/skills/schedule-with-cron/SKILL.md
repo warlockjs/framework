@@ -23,14 +23,14 @@ The escape hatch when the fluent API can't express a schedule. Activating `.cron
 
 ## Operators
 
-| Syntax    | Meaning                       | Example          |
-| --------- | ----------------------------- | ---------------- |
-| `*`       | Any value (full range)        | `* * * * *`      |
-| `5`       | Single value                  | `30 14 * * *`    |
-| `1,3,5`   | List                          | `0,30 * * * *`   |
-| `1-5`     | Inclusive range               | `0 9-17 * * *`   |
-| `*/N`     | Step over the wildcard        | `*/5 * * * *`    |
-| `A-B/N`   | Step over a range             | `0 1-10/2 * * *` |
+| Syntax  | Meaning                | Example          |
+| ------- | ---------------------- | ---------------- |
+| `*`     | Any value (full range) | `* * * * *`      |
+| `5`     | Single value           | `30 14 * * *`    |
+| `1,3,5` | List                   | `0,30 * * * *`   |
+| `1-5`   | Inclusive range        | `0 9-17 * * *`   |
+| `*/N`   | Step over the wildcard | `*/5 * * * *`    |
+| `A-B/N` | Step over a range      | `0 1-10/2 * * *` |
 
 **Not supported (yet):** named tokens (`MON-FRI`, `JAN-DEC`), special strings (`@daily`, `@hourly`, `@reboot`), seconds field (6-field), Quartz modifiers (`L`, `W`, `#`).
 
@@ -102,13 +102,13 @@ import dayjs from "dayjs";
 
 const parser = parseCron("0 9 * * 1-5");
 
-parser.nextRun().toISOString();              // next weekday at 9 AM
+parser.nextRun().toISOString(); // next weekday at 9 AM
 parser.nextRun(dayjs("2026-12-31")).format(); // from a specific anchor
 
-parser.matches(dayjs());                     // is "now" a fire moment?
+parser.matches(dayjs()); // is "now" a fire moment?
 
-parser.fields;                                // parsed numeric arrays
-parser.expression;                            // original string
+parser.fields; // parsed numeric arrays
+parser.expression; // original string
 ```
 
 Impossible expressions are rejected eagerly at construction (see Validation), so `nextRun(from?)` always resolves a satisfiable expression within a year — its one-year scan bound is just a defensive backstop, never the path that catches a bad expression.

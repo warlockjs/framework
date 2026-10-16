@@ -98,18 +98,31 @@ describe("resolvePageRouteIdentity", () => {
     ["/welcome", "index", "landing.index"],
     [{ path: "/welcome" }, "index", "landing.index"],
     [{ path: "/welcome", name: "welcome" }, "welcome", "welcome"],
-  ] as const)("keeps generated names site-scoped for %o routes", (route, singleSiteName, siteName) => {
-    expect(resolvePageRouteIdentity(route, "index.page.tsx", "index.page.tsx").name).toBe(
-      singleSiteName,
-    );
-    expect(resolvePageRouteIdentity(route, "index.page.tsx", "index.page.tsx", "landing").name).toBe(
-      siteName,
-    );
-  });
+  ] as const)(
+    "keeps generated names site-scoped for %o routes",
+    (route, singleSiteName, siteName) => {
+      expect(resolvePageRouteIdentity(route, "index.page.tsx", "index.page.tsx").name).toBe(
+        singleSiteName,
+      );
+      expect(
+        resolvePageRouteIdentity(route, "index.page.tsx", "index.page.tsx", "landing").name,
+      ).toBe(siteName);
+    },
+  );
 
   it("keeps the $sites/<site> folder out of paths and names, whichever installer passes it", () => {
-    const fromSiteRoot = resolvePageRouteIdentity(undefined, "listings/[id].page.tsx", "x", "tenant");
-    const fromWebRoot = resolvePageRouteIdentity(undefined, "$sites/tenant/listings/[id].page.tsx", "x", "tenant");
+    const fromSiteRoot = resolvePageRouteIdentity(
+      undefined,
+      "listings/[id].page.tsx",
+      "x",
+      "tenant",
+    );
+    const fromWebRoot = resolvePageRouteIdentity(
+      undefined,
+      "$sites/tenant/listings/[id].page.tsx",
+      "x",
+      "tenant",
+    );
 
     expect(fromWebRoot).toEqual(fromSiteRoot);
     expect(fromWebRoot.path).toBe("/listings/:id");

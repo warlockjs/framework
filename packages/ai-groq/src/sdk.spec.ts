@@ -78,9 +78,9 @@ describe("GroqSDK capability inference (Groq model names, not OpenAI's)", () => 
   });
 
   it("declares structuredOutput=true by default", () => {
-    expect(
-      sdk.model({ name: "llama-3.3-70b-versatile" }).capabilities?.structuredOutput,
-    ).toBe(true);
+    expect(sdk.model({ name: "llama-3.3-70b-versatile" }).capabilities?.structuredOutput).toBe(
+      true,
+    );
   });
 
   it("lets an explicit capability override win over inference", () => {
@@ -119,7 +119,9 @@ describe("GroqSDK pricing resolution", () => {
       pricing: { "llama-3.3-70b-versatile": { input: 1, output: 2 } },
     });
     const override = { input: 99, output: 99 };
-    expect(sdk.model({ name: "llama-3.3-70b-versatile", pricing: override }).pricing).toBe(override);
+    expect(sdk.model({ name: "llama-3.3-70b-versatile", pricing: override }).pricing).toBe(
+      override,
+    );
   });
 
   it("leaves pricing undefined for an unknown model with no registry entry", () => {

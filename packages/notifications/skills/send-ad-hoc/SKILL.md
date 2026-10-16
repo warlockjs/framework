@@ -32,7 +32,7 @@ Pass a string instead of a model to use the string as the route directly:
 
 ```ts
 await notify.mail("guest@example.com", { subject: "Receipt", html: "<p>…</p>" });
-await notify.whatsapp("+201234567890", { body: "Promo: 20% off!" });  // Phase 2
+await notify.whatsapp("+201234567890", { body: "Promo: 20% off!" }); // Phase 2
 ```
 
 When the recipient isn't a model, `PreferenceProvider` and `RateLimiter` are skipped — there's no `Notifiable` to consult.
@@ -74,14 +74,14 @@ await notify.slack(staff, { text: "Deploy starting" });
 
 ## SendOptions (3rd arg)
 
-| Field | Effect |
-|---|---|
-| `delay` | Reserved for `.queue` paths; not used by `notify.<channel>` (sync). |
-| `locale` | Forwarded to the channel's `send({ options })`. |
-| `meta` | Forwarded to the channel + included in every observability event. |
-| `idempotencyKey` | Injected into the database payload (dedupe). |
-| `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
-| `type` | Notification type for gating (ad-hoc only). |
+| Field            | Effect                                                              |
+| ---------------- | ------------------------------------------------------------------- |
+| `delay`          | Reserved for `.queue` paths; not used by `notify.<channel>` (sync). |
+| `locale`         | Forwarded to the channel's `send({ options })`.                     |
+| `meta`           | Forwarded to the channel + included in every observability event.   |
+| `idempotencyKey` | Injected into the database payload (dedupe).                        |
+| `force`          | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`.         |
+| `type`           | Notification type for gating (ad-hoc only).                         |
 
 ## Failure surfaces
 

@@ -31,11 +31,7 @@
  */
 import { log } from "@warlock.js/logger";
 import { getNotificationConfig } from "../config";
-import {
-  ChannelNotFoundError,
-  MissingRendererError,
-  NoQueueDispatcherError,
-} from "../errors";
+import { ChannelNotFoundError, MissingRendererError, NoQueueDispatcherError } from "../errors";
 import type {
   ChannelName,
   Notifiable,

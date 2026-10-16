@@ -58,9 +58,7 @@ describe("toOllamaMessages", () => {
   });
 
   it("omits images when there are none", () => {
-    const messages: Message[] = [
-      { role: "user", content: [{ type: "text", text: "plain" }] },
-    ];
+    const messages: Message[] = [{ role: "user", content: [{ type: "text", text: "plain" }] }];
 
     expect(toOllamaMessages(messages)).toEqual([{ role: "user", content: "plain" }]);
   });

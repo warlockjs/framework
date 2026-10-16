@@ -11,10 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * missing binary (mirroring the real "command not found" failure).
  */
 
-type ExecCallback = (
-  error: Error | null,
-  result?: { stdout: string; stderr: string },
-) => void;
+type ExecCallback = (error: Error | null, result?: { stdout: string; stderr: string }) => void;
 
 const execMock = vi.fn((command: string, callback: ExecCallback) => {
   void command;
@@ -26,13 +23,10 @@ const execSyncMock = vi.fn((command: string) => {
   return Buffer.from("");
 });
 
-const whichPmMock = vi.fn<[], { name: string; version: string } | undefined>(
-  () => undefined,
-);
+const whichPmMock = vi.fn<[], { name: string; version: string } | undefined>(() => undefined);
 
 vi.mock("child_process", () => ({
-  exec: (command: string, callback: ExecCallback) =>
-    execMock(command, callback),
+  exec: (command: string, callback: ExecCallback) => execMock(command, callback),
   execSync: (command: string) => execSyncMock(command),
 }));
 
@@ -283,12 +277,7 @@ describe("bun is probed like every other allow-listed manager", () => {
     setInstalled(["npm", "yarn", "pnpm", "bun"]);
     const pm = await loadModule();
 
-    expect(pm.getSystemPackageManagers()).toEqual([
-      "npm",
-      "yarn",
-      "pnpm",
-      "bun",
-    ]);
+    expect(pm.getSystemPackageManagers()).toEqual(["npm", "yarn", "pnpm", "bun"]);
   });
 
   it("offers bun from the ASYNC detector, which is the one that fills the cache", async () => {
@@ -306,12 +295,8 @@ describe("bun is probed like every other allow-listed manager", () => {
 
     await pm.detectPackageManagers();
 
-    const probed = new Set(
-      execMock.mock.calls.map(call => String(call[0]).split(" ")[0]),
-    );
+    const probed = new Set(execMock.mock.calls.map((call) => String(call[0]).split(" ")[0]));
 
-    expect(probed).toEqual(
-      new Set(pm.ALLOWED_PACKAGE_MANAGERS.filter(name => name !== "npm")),
-    );
+    expect(probed).toEqual(new Set(pm.ALLOWED_PACKAGE_MANAGERS.filter((name) => name !== "npm")));
   });
 });

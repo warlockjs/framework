@@ -178,7 +178,8 @@ function loadSource(
     if (page.appSetupFile !== undefined) {
       bindings.push("AppSetupModule");
       specifiers.push(`${toImportSpecifier(page.appSetupFile)}?warlock-setup-register`);
-      appModule = '{ ...AppModule, ...(AppSetupModule.register === undefined ? {} : { register: AppSetupModule.register }) }';
+      appModule =
+        "{ ...AppModule, ...(AppSetupModule.register === undefined ? {} : { register: AppSetupModule.register }) }";
     } else {
       appModule = "AppModule";
     }
@@ -191,7 +192,8 @@ function loadSource(
     if (errorSetupFile !== undefined) {
       bindings.push("ErrorPageSetupModule");
       specifiers.push(`${toImportSpecifier(errorSetupFile)}?warlock-setup-register`);
-      errorModule = '{ ...ErrorPageModule, ...(ErrorPageSetupModule.register === undefined ? {} : { register: ErrorPageSetupModule.register }) }';
+      errorModule =
+        "{ ...ErrorPageModule, ...(ErrorPageSetupModule.register === undefined ? {} : { register: ErrorPageSetupModule.register }) }";
     } else {
       errorModule = "ErrorPageModule";
     }
@@ -205,7 +207,7 @@ function loadSource(
   const pageModule =
     page.setupFile === undefined
       ? "PageModule"
-      : '{ ...PageModule, ...(PageSetupModule.register === undefined ? {} : { register: PageSetupModule.register }) }';
+      : "{ ...PageModule, ...(PageSetupModule.register === undefined ? {} : { register: PageSetupModule.register }) }";
 
   return [
     "    load: async () => {",
@@ -267,14 +269,19 @@ export function generateClientRegistry(options: GenerateClientRegistryOptions): 
     `export const ${CLIENT_ROUTE_TABLE_EXPORT_NAME} = ${JSON.stringify({ entries: tableEntries, sites })};`,
     `globalThis[Symbol.for(${quote(CLIENT_ROUTE_TABLE_SLOT)})] = ${CLIENT_ROUTE_TABLE_EXPORT_NAME};`,
   ].join("\n");
-  const registry = routablePages.length === 0
-    ? [`${declaration} [];`]
-    : [
-    ...HEADER,
-    `${declaration} [`,
-    ...routablePages.flatMap((page) => entrySource(page, errorPageFile, errorSetupFile, toImportSpecifier)),
-    "];",
-  ];
+  const registry =
+    routablePages.length === 0
+      ? [`${declaration} [];`]
+      : [
+          ...HEADER,
+          `${declaration} [`,
+          ...routablePages.flatMap((page) =>
+            entrySource(page, errorPageFile, errorSetupFile, toImportSpecifier),
+          ),
+          "];",
+        ];
 
-  return [...(routablePages.length === 0 ? [...HEADER, ""] : []), ...registry, routeTable, ""].join("\n");
+  return [...(routablePages.length === 0 ? [...HEADER, ""] : []), ...registry, routeTable, ""].join(
+    "\n",
+  );
 }

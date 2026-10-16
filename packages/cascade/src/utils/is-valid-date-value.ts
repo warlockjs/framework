@@ -33,5 +33,7 @@ export function isValidDateValue(value: unknown): boolean {
 
   const written = new Date(Date.UTC(y, m - 1, d));
 
-  return written.getUTCFullYear() === y && written.getUTCMonth() + 1 === m && written.getUTCDate() === d;
+  return (
+    written.getUTCFullYear() === y && written.getUTCMonth() + 1 === m && written.getUTCDate() === d
+  );
 }

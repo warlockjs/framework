@@ -122,7 +122,9 @@ export function queueConnector(options: QueueConnectorOptions = {}): Connector {
       return changedFiles.some((file) => {
         const normalized = file.replace(/\\/g, "/");
 
-        return WATCHED_FILES.some((watched) => normalized === watched || normalized.endsWith(`/${watched}`));
+        return WATCHED_FILES.some(
+          (watched) => normalized === watched || normalized.endsWith(`/${watched}`),
+        );
       });
     },
   };

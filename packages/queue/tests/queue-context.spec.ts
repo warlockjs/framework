@@ -57,7 +57,10 @@ afterEach(() => {
 describe("queue context", () => {
   it("round-trips the payload through the envelope; old jobs pass through", async () => {
     let seen: unknown;
-    const job = defineJob({ name: "ctx.roundtrip", handle: async (p: { a: number }) => (seen = p) });
+    const job = defineJob({
+      name: "ctx.roundtrip",
+      handle: async (p: { a: number }) => (seen = p),
+    });
 
     await withTenant("t1", () => job.dispatch({ a: 1 }));
     expect(lastData()).toEqual({ __warlock: { v: 1, context: "t1" }, payload: { a: 1 } });
@@ -96,7 +99,10 @@ describe("queue context", () => {
 
   it("nested dispatch inside a restored handler captures the same tenant", async () => {
     const child = defineJob({ name: "ctx.child", handle: async (_p: {}) => {} });
-    const parent = defineJob({ name: "ctx.parent", handle: async (_p: {}) => void (await child.dispatch({})) });
+    const parent = defineJob({
+      name: "ctx.parent",
+      handle: async (_p: {}) => void (await child.dispatch({})),
+    });
 
     await withTenant("t3", () => parent.dispatch({}));
     await processJob(fakeJob("ctx.parent", lastData()));

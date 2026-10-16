@@ -51,10 +51,7 @@ import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   cli: {
-    commands: [
-      registerJWTSecretGeneratorCommand(),
-      registerAuthCleanupCommand(),
-    ],
+    commands: [registerJWTSecretGeneratorCommand(), registerAuthCleanupCommand()],
   },
   database: {
     migrations: authMigrations,
@@ -98,19 +95,19 @@ That is deliberate. `ms` answers `undefined` for a string it can't parse (`"30da
 
 Two values that look right and are not:
 
-- `expiresIn: 2592000` — a bare number. `ms` *formats* numbers instead of parsing them, so this is rejected; write `"30d"`.
+- `expiresIn: 2592000` — a bare number. `ms` _formats_ numbers instead of parsing them, so this is rejected; write `"30d"`.
 - `expiresIn: env("JWT_TTL")` where the variable is unset — resolves to `""` and is rejected. Give the env read a default: `env("JWT_TTL") || "1h"`.
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Gating routes with `authMiddleware(allowedUserType)`, any-authenticated vs typed access | The `protect-routes` topic |
-| `authService.login(...)`, `attemptLogin`, full credentials-to-tokens flow + logout | The `handle-login-and-logout` topic |
-| Token lifecycle — `generateAccessToken`, `createRefreshToken`, rotation, family revocation, max-per-user | The `manage-tokens` topic |
-| Register a new user + issue tokens in one flow | The `register-user` topic |
-| Multi-user-type apps (`user`, `admin`, `client`), `config.auth.userType.<name>` mapping | The `customize-user-type` topic |
-| `warlock jwt.generate` + `warlock auth.cleanup` CLI commands | The `run-auth-commands` topic |
+| If the task is about…                                                                                    | Load                                |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Gating routes with `authMiddleware(allowedUserType)`, any-authenticated vs typed access                  | The `protect-routes` topic          |
+| `authService.login(...)`, `attemptLogin`, full credentials-to-tokens flow + logout                       | The `handle-login-and-logout` topic |
+| Token lifecycle — `generateAccessToken`, `createRefreshToken`, rotation, family revocation, max-per-user | The `manage-tokens` topic           |
+| Register a new user + issue tokens in one flow                                                           | The `register-user` topic           |
+| Multi-user-type apps (`user`, `admin`, `client`), `config.auth.userType.<name>` mapping                  | The `customize-user-type` topic     |
+| `warlock jwt.generate` + `warlock auth.cleanup` CLI commands                                             | The `run-auth-commands` topic       |
 
 ## Things NOT to do
 

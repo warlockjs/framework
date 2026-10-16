@@ -23,14 +23,14 @@ const TEMPLATE_APP_DIR = path.resolve(
 );
 
 describe("scanning src/app/**/routes.{ts,tsx} for a home-route collision", () => {
-  it("proves the premise: the real template claims GET \"/\" in app/home/routes.ts, not app/shared/routes.ts", () => {
+  it('proves the premise: the real template claims GET "/" in app/home/routes.ts, not app/shared/routes.ts', () => {
     const homeRoutes = readFileSync(path.join(TEMPLATE_APP_DIR, "home/routes.ts"), "utf8");
 
     expect(homeRoutes).toMatch(/^router\s*\.\s*get\(\s*["'`]\/["'`]/m);
     expect(existsSync(path.join(TEMPLATE_APP_DIR, "shared/routes.ts"))).toBe(false);
   });
 
-  it("relocates the real template's home route to /welcome and drops the top-level GET \"/\"", () => {
+  it('relocates the real template\'s home route to /welcome and drops the top-level GET "/"', () => {
     const files = [
       {
         relativePath: "app/home/routes.ts",
@@ -62,7 +62,7 @@ describe("scanning src/app/**/routes.{ts,tsx} for a home-route collision", () =>
     expect(rewrites).toHaveLength(0);
   });
 
-  it("reports a conflict, and rewrites nothing, when two files each declare a top-level GET \"/\"", () => {
+  it('reports a conflict, and rewrites nothing, when two files each declare a top-level GET "/"', () => {
     const files = [
       { relativePath: "app/home/routes.ts", source: 'router.get("/", homePageController);\n' },
       { relativePath: "app/shared/routes.ts", source: 'router.get("/", sharedController);\n' },
@@ -89,9 +89,12 @@ describe("scanning src/app/**/routes.{ts,tsx} for a home-route collision", () =>
     expect(rewrites).toHaveLength(0);
   });
 
-  it("reports absent when nothing under src/app declares a top-level GET \"/\"", () => {
+  it('reports absent when nothing under src/app declares a top-level GET "/"', () => {
     const files = [
-      { relativePath: "app/users/routes.ts", source: 'router.get("/list", listUsersController);\n' },
+      {
+        relativePath: "app/users/routes.ts",
+        source: 'router.get("/list", listUsersController);\n',
+      },
     ];
 
     const { collision, rewrites } = resolveHomeRouteCollision(files);

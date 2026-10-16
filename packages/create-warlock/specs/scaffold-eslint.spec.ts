@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -13,17 +7,8 @@ import type { Application } from "../src/commands/create-new-app/types";
 import { App } from "../src/helpers/app";
 import { setPackageManager } from "../src/helpers/package-manager";
 
-const packageRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-);
-const eslintEntry = path.join(
-  packageRoot,
-  "node_modules",
-  "eslint",
-  "bin",
-  "eslint.js",
-);
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const eslintEntry = path.join(packageRoot, "node_modules", "eslint", "bin", "eslint.js");
 const generatedRoots: string[] = [];
 
 function generateApp(): string {
@@ -55,11 +40,10 @@ function generateApp(): string {
 }
 
 function lint(appPath: string) {
-  return spawnSync(
-    process.execPath,
-    [eslintEntry, "--fix", "./src", "--max-warnings=0"],
-    { cwd: appPath, encoding: "utf8" },
-  );
+  return spawnSync(process.execPath, [eslintEntry, "--fix", "./src", "--max-warnings=0"], {
+    cwd: appPath,
+    encoding: "utf8",
+  });
 }
 
 afterEach(() => {
@@ -76,9 +60,7 @@ describe("the ESLint config emitted by a real no-web scaffold", () => {
       withFileTypes: true,
     });
 
-    expect(
-      sourceFiles.some(entry => entry.isFile() && entry.name.endsWith(".css")),
-    ).toBe(false);
+    expect(sourceFiles.some((entry) => entry.isFile() && entry.name.endsWith(".css"))).toBe(false);
 
     const result = lint(appPath);
 
@@ -113,9 +95,7 @@ describe("the ESLint config emitted by a real no-web scaffold", () => {
     const output = `${broken.stdout}\n${broken.stderr}`;
 
     expect(broken.status).not.toBe(0);
-    expect(output).toContain(
-      "Parsing error: Declaration or statement expected",
-    );
+    expect(output).toContain("Parsing error: Declaration or statement expected");
     // Observed at 64.01s alone; 120s leaves room for ordinary machine load.
   }, 120_000);
 

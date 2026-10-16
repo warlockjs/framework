@@ -9,12 +9,12 @@ Four built-in channels (`SentryLog` needs the optional `@sentry/node` peer). A c
 
 ## The decision
 
-| Need | Pick |
-|---|---|
-| Local dev, colored output in the terminal | `ConsoleLog` |
-| Plain text `.log` files on disk — humans read them | `FileLog` |
+| Need                                                                              | Pick          |
+| --------------------------------------------------------------------------------- | ------------- |
+| Local dev, colored output in the terminal                                         | `ConsoleLog`  |
+| Plain text `.log` files on disk — humans read them                                | `FileLog`     |
 | Structured `.json` files — a log aggregator (Loki / Datadog / Elastic) reads them | `JSONFileLog` |
-| Errors & warnings into Sentry (events + breadcrumbs) | `SentryLog` |
+| Errors & warnings into Sentry (events + breadcrumbs)                              | `SentryLog`   |
 
 Most production setups use **two** channels: `ConsoleLog` + one file channel. Dev uses `ConsoleLog` only.
 
@@ -32,6 +32,7 @@ new ConsoleLog();
 ```
 
 Properties:
+
 - `name = "console"`, `terminal = true`
 - Accepts `ConsoleLogConfig` — `levels`, `filter`, `dateFormat`, `showContext`, `contextDepth`
 - If `message` is an object, a second `console.log(message)` is issued so Node's inspector can expand it
@@ -58,14 +59,14 @@ Plain text. Buffers in memory, flushes to disk periodically.
 import { FileLog } from "@warlock.js/logger";
 
 new FileLog({
-  storagePath: "./storage/logs",  // default: process.cwd() + "/storage/logs"
-  name: "app",                    // default: "app"
-  extension: "log",               // default: "log"
-  chunk: "daily",                 // "single" (default) | "daily" | "hourly"
-  rotate: true,                   // default: true
-  maxFileSize: 10 * 1024 * 1024,  // default: 10MB — triggers rotation
-  maxMessagesToWrite: 100,        // default: 100 — flush threshold
-  groupBy: ["level", "module"],   // optional subdirectory nesting
+  storagePath: "./storage/logs", // default: process.cwd() + "/storage/logs"
+  name: "app", // default: "app"
+  extension: "log", // default: "log"
+  chunk: "daily", // "single" (default) | "daily" | "hourly"
+  rotate: true, // default: true
+  maxFileSize: 10 * 1024 * 1024, // default: 10MB — triggers rotation
+  maxMessagesToWrite: 100, // default: 100 — flush threshold
+  groupBy: ["level", "module"], // optional subdirectory nesting
 });
 ```
 
@@ -91,16 +92,14 @@ Subclass of `FileLog` — same buffering, chunking, rotation, grouping. Output i
       "date": "15-03-2024 10:22:03",
       "module": "payments",
       "action": "charge",
-      "stack": [
-        "Error: Card declined",
-        "    at chargeCard (/app/src/payments.ts:42:11)"
-      ]
+      "stack": ["Error: Card declined", "    at chargeCard (/app/src/payments.ts:42:11)"]
     }
   ]
 }
 ```
 
 Differences from `FileLog`:
+
 - `name = "fileJson"` (**not** `"json"` — use this exact string for `log.channel("fileJson")`)
 - `extension` is always `"json"` — the option is silently ignored
 - Error `stack` is stored as `string[]` (split on newlines) — easy to query in aggregators
@@ -127,8 +126,8 @@ Every channel constructor accepts at minimum:
 
 ```ts
 type BasicLogConfigurations = {
-  levels?: LogLevel[];                       // whitelist — omit or [] to allow all
-  filter?: (data: LoggingData) => boolean;   // custom predicate
+  levels?: LogLevel[]; // whitelist — omit or [] to allow all
+  filter?: (data: LoggingData) => boolean; // custom predicate
   dateFormat?: { date?: string; time?: string }; // Day.js format strings
   context?: (data) => Promise<Record<string, any>>; // reserved — not yet read
 };
@@ -139,10 +138,10 @@ Concrete file channels extend this with their storage/chunk/rotate/groupBy optio
 ## Picking a channel by name at runtime
 
 ```ts
-log.channel("console");   // → ConsoleLog | undefined
-log.channel("file");      // → FileLog | undefined
-log.channel("fileJson");  // ← note the name — NOT "json"
-log.channel("sentry");    // → SentryLog | undefined
+log.channel("console"); // → ConsoleLog | undefined
+log.channel("file"); // → FileLog | undefined
+log.channel("fileJson"); // ← note the name — NOT "json"
+log.channel("sentry"); // → SentryLog | undefined
 ```
 
 If two channels share a `name`, only one is reachable this way — the search returns the first match.

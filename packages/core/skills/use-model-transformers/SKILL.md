@@ -7,11 +7,11 @@ description: 'Three schema-side helpers — `useHashedPassword()` (bcrypt on sav
 
 Three helpers in `@warlock.js/core` plug into Seal schemas to compute or mutate a field at write time. They sit between "controllers + services" (the mutable-input layer) and "the database row" (the stored state) — so the value the DB sees is always derived, even if the caller didn't think about it.
 
-| Helper | Job | Attaches via | Behavior |
-| --- | --- | --- | --- |
-| `useHashedPassword()` | bcrypt-hash a password field on save | `.addTransformer(useHashedPassword())` on the field | Hash on new row; hash on change; pass through on no-change |
-| `useComputedSlug(field?, scope?)` | Derive a slug from another field | `v.computed(useComputedSlug("title"))` | Compute on every save where the source field is set |
-| `useComputedModel(callback)` | Any custom derived value | `v.computed(useComputedModel(...))` | Runs your callback with `(data, model, context)` |
+| Helper                            | Job                                  | Attaches via                                        | Behavior                                                   |
+| --------------------------------- | ------------------------------------ | --------------------------------------------------- | ---------------------------------------------------------- |
+| `useHashedPassword()`             | bcrypt-hash a password field on save | `.addTransformer(useHashedPassword())` on the field | Hash on new row; hash on change; pass through on no-change |
+| `useComputedSlug(field?, scope?)` | Derive a slug from another field     | `v.computed(useComputedSlug("title"))`              | Compute on every save where the source field is set        |
+| `useComputedModel(callback)`      | Any custom derived value             | `v.computed(useComputedModel(...))`                 | Runs your callback with `(data, model, context)`           |
 
 All three are imported from `@warlock.js/core` (despite living in `src/database/utils.ts` under the hood).
 
@@ -53,12 +53,12 @@ password: v.string().addTransformer(useHashedPassword()),
 
 What it does at save time:
 
-| Situation                       | Behavior                                    |
-| ------------------------------- | ------------------------------------------- |
-| New row, password set           | Hash the value before insert.               |
-| Existing row, password changed  | Re-hash the new value.                      |
+| Situation                        | Behavior                                              |
+| -------------------------------- | ----------------------------------------------------- |
+| New row, password set            | Hash the value before insert.                         |
+| Existing row, password changed   | Re-hash the new value.                                |
 | Existing row, password unchanged | Pass through (no re-hashing — stored hash preserved). |
-| Empty / undefined value         | Pass through untouched.                     |
+| Empty / undefined value          | Pass through untouched.                               |
 
 Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See the `hash-password` topic for full bcrypt setup (salt rounds, `npm install bcryptjs`).
 
@@ -69,7 +69,7 @@ Without the transformer, every code path that writes a password has to remember:
 ```ts
 await User.create({
   email: input.email,
-  password: await hashPassword(input.password),  // easy to forget
+  password: await hashPassword(input.password), // easy to forget
 });
 ```
 
@@ -83,17 +83,17 @@ Pass plaintext to `User.create({ password: input.password })` and the transforme
 slug: v.computed(useComputedSlug("title")),
 ```
 
-- **`field`** *(default `"title"`)* — the source field name to slugify.
-- **`scope`** — `"sibling"` *(default)* or `"global"`. `"sibling"` reads `data[field]` from the same object being saved; `"global"` reads `get(context.allValues, field)` (the root context — useful in nested schemas where the source field lives on a parent).
+- **`field`** _(default `"title"`)_ — the source field name to slugify.
+- **`scope`** — `"sibling"` _(default)_ or `"global"`. `"sibling"` reads `data[field]` from the same object being saved; `"global"` reads `get(context.allValues, field)` (the root context — useful in nested schemas where the source field lives on a parent).
 
 What it does:
 
-| Situation                          | Behavior                                   |
-| ---------------------------------- | ------------------------------------------ |
-| Source field has a value           | Return `slugify(value)` — overwrite the slug. |
-| Source field is empty / undefined  | Return `model.get(field)` — i.e. the model's existing value for the **source** field (e.g. the stored `title`), not the existing slug. |
+| Situation                         | Behavior                                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Source field has a value          | Return `slugify(value)` — overwrite the slug.                                                                                          |
+| Source field is empty / undefined | Return `model.get(field)` — i.e. the model's existing value for the **source** field (e.g. the stored `title`), not the existing slug. |
 
-So if a caller sets `title: "Hello World"` without touching `slug`, the saved row has `slug: "hello-world"`. If they explicitly set `slug: "custom-handle"` AND leave `title` populated, the computed field **still overwrites** with the slugified title — because the source value is set. (Note the empty-source fallback returns `model.get(field)` keyed by the *source* field name, not the slug — a quirk of the implementation; if `title` is also empty on the model you get whatever the source field holds, which may be `undefined`.)
+So if a caller sets `title: "Hello World"` without touching `slug`, the saved row has `slug: "hello-world"`. If they explicitly set `slug: "custom-handle"` AND leave `title` populated, the computed field **still overwrites** with the slugified title — because the source value is set. (Note the empty-source fallback returns `model.get(field)` keyed by the _source_ field name, not the slug — a quirk of the implementation; if `title` is also empty on the model you get whatever the source field holds, which may be `undefined`.)
 
 To allow explicit slug overrides, branch in your service before calling save, or skip the transformer for that one save (model-level mutation).
 
@@ -137,8 +137,8 @@ slug: v.computed(useComputedModel((data, model, context) => {
 
 ```ts
 type ComputedCallbackModel = (
-  data: any,         // the schema input being saved
-  model: Model,      // the Cascade model instance
+  data: any, // the schema input being saved
+  model: Model, // the Cascade model instance
   context: SchemaContext,
 ) => any | Promise<any>;
 ```

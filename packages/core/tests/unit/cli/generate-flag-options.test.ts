@@ -88,13 +88,23 @@ describe("generate.module — the two faces of #21 (#23)", () => {
   it("hands the generator force=false, not the truthy string 'false'", async () => {
     // `module.generator.ts:41` reads `data.options.force || data.options.f` and
     // `:48` gates the overwrite on it. A string "false" here overwrites files.
-    const { options } = await drive(generateModuleCommand, "generate.module", "users", "--force=false");
+    const { options } = await drive(
+      generateModuleCommand,
+      "generate.module",
+      "users",
+      "--force=false",
+    );
 
     expect(options.force).toBe(false);
   });
 
   it("keeps the module name as a positional when --force comes first", async () => {
-    const { options, args } = await drive(generateModuleCommand, "generate.module", "--force", "users");
+    const { options, args } = await drive(
+      generateModuleCommand,
+      "generate.module",
+      "--force",
+      "users",
+    );
 
     expect(options.force).toBe(true);
     expect(args).toEqual(["users"]);
@@ -157,12 +167,15 @@ describe("every generate command that declares --force / --dry-run (#23)", () =>
     expect(options.dryRun).toBe(false);
   });
 
-  it.each(forceCommands)("%s keeps the target after a bare --force", async (_label, command, name) => {
-    const { options, args } = await drive(command, name, "--force", "target");
+  it.each(forceCommands)(
+    "%s keeps the target after a bare --force",
+    async (_label, command, name) => {
+      const { options, args } = await drive(command, name, "--force", "target");
 
-    expect(options.force).toBe(true);
-    expect(args).toEqual(["target"]);
-  });
+      expect(options.force).toBe(true);
+      expect(args).toEqual(["target"]);
+    },
+  );
 });
 
 describe("generate.controller / generate.model — the remaining flags (#23)", () => {

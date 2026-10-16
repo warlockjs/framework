@@ -24,9 +24,8 @@ vi.mock("node:child_process", () => ({
   execSync: (...args: unknown[]) => execSync(...args),
 }));
 
-const { isRegistryUnreachable, updateWarlockPackages } = await import(
-  "../../../src/updater/update-warlock-packages"
-);
+const { isRegistryUnreachable, updateWarlockPackages } =
+  await import("../../../src/updater/update-warlock-packages");
 
 /** A minimal project that depends on two framework packages. */
 const packageJson = () => ({
@@ -104,7 +103,7 @@ describe("updateWarlockPackages", () => {
     const result = await updateWarlockPackages();
 
     expect(result.outcome).toBe("updated");
-    expect(result.updates.map(update => update.to)).toEqual(["^4.9.0", "^4.9.0"]);
+    expect(result.updates.map((update) => update.to)).toEqual(["^4.9.0", "^4.9.0"]);
     expect(putJsonFileAsync).toHaveBeenCalledOnce();
     expect(execSync).toHaveBeenCalledOnce();
   });

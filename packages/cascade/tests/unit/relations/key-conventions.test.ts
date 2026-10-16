@@ -95,19 +95,19 @@ describe("relations/key-conventions", () => {
     });
 
     it("uses owner-first ordering when configured", () => {
-      expect(
-        inferPivotTable("Post", "Tag", { pivotTableNamingOrder: "owner_first" }),
-      ).toBe("post_tag");
-      expect(
-        inferPivotTable("Tag", "Post", { pivotTableNamingOrder: "owner_first" }),
-      ).toBe("tag_post");
+      expect(inferPivotTable("Post", "Tag", { pivotTableNamingOrder: "owner_first" })).toBe(
+        "post_tag",
+      );
+      expect(inferPivotTable("Tag", "Post", { pivotTableNamingOrder: "owner_first" })).toBe(
+        "tag_post",
+      );
     });
 
     it("owner-first keeps the owner segment first even when it sorts later", () => {
       // "user" sorts after "group" alphabetically; owner_first must NOT sort.
-      expect(
-        inferPivotTable("User", "Group", { pivotTableNamingOrder: "owner_first" }),
-      ).toBe("user_group");
+      expect(inferPivotTable("User", "Group", { pivotTableNamingOrder: "owner_first" })).toBe(
+        "user_group",
+      );
     });
 
     it("defaults to alphabetical when ordering option is omitted", () => {

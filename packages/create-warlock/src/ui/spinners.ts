@@ -20,8 +20,7 @@ export const spinnerMessages = {
 
   warmingCache: "Charging magical circuits...",
   cacheWarmed: "Circuits charged!",
-  cacheWarmFailed:
-    "Cache could not be warmed (harmless — it builds on first run)",
+  cacheWarmFailed: "Cache could not be warmed (harmless — it builds on first run)",
 
   addingFeatures: "Weaving in your features...",
   featuresAdded: "Features woven in!",

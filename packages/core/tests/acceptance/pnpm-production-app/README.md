@@ -8,7 +8,7 @@ framework ships an artifact a real consumer cannot boot.
 `warlock build` bundles with esbuild's `packages: "external"`, so every bare
 specifier the builder writes survives verbatim into `dist/app.js` and resolves
 against the **consuming app's** `node_modules`. When the builder emitted
-`import config from "@mongez/config"` — one of *core's* dependencies, never the
+`import config from "@mongez/config"` — one of _core's_ dependencies, never the
 app's — npm and yarn resolved it by accident through flat hoisting. pnpm's
 strict layout does not, so the shipped bundle died with `ERR_MODULE_NOT_FOUND`
 for a package the app never imported and had no reason to declare.
@@ -20,7 +20,7 @@ never once run. That is the actual defect this app exists to prevent.
 
 1. **It declares `@warlock.js/core` and nothing else.** Adding any other
    dependency to satisfy a build failure defeats the entire test — the failure
-   *is* the finding. A consumer must never have to declare a package it does
+   _is_ the finding. A consumer must never have to declare a package it does
    not import in order to boot our artifact.
 2. **Core is installed from a packed tarball, not a directory.** A `file:` or
    `link:` dependency pointing at a sibling folder makes pnpm create a symlink

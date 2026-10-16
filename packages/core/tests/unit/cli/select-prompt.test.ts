@@ -8,7 +8,10 @@ it("rejects empty choices before opening terminal input", async () => {
   await expect(select("Choose", [])).rejects.toThrow("at least one choice");
   expect(create).not.toHaveBeenCalled();
 });
-it.each([["2", "second"], ["invalid", "first"]])("returns a definite choice for %s", async (answer, expected) => {
+it.each([
+  ["2", "second"],
+  ["invalid", "first"],
+])("returns a definite choice for %s", async (answer, expected) => {
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(readline, "createInterface").mockReturnValue({
     close: vi.fn(),

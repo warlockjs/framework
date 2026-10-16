@@ -1,13 +1,7 @@
-import {
-  getDatabaseLabel,
-  isNoDatabase,
-} from "../../features/database-drivers";
+import { getDatabaseLabel, isNoDatabase } from "../../features/database-drivers";
 import { App } from "../../helpers/app";
 import { CommandResult, takeLastCommandOutput } from "../../helpers/exec";
-import {
-  getPackageManager,
-  runPackageManagerCommand,
-} from "../../helpers/package-manager";
+import { getPackageManager, runPackageManagerCommand } from "../../helpers/package-manager";
 import { resolveWarlockVersions } from "../../helpers/warlock-versions";
 import { printDecisionsSummary } from "../../summary";
 import { showSuccessScreen } from "../../ui/banner";
@@ -42,7 +36,7 @@ function reasonFrom(result: CommandResult | undefined): string {
 
   const lastLine = `${result.stderr}\n${result.stdout}`
     .split(/\r?\n/)
-    .map(line => line.trim())
+    .map((line) => line.trim())
     .filter(Boolean)
     .pop();
 
@@ -54,9 +48,7 @@ function reasonFrom(result: CommandResult | undefined): string {
   return lastLine ? `${status} — ${lastLine}` : status;
 }
 
-export async function createWarlockApp(
-  application: App,
-): Promise<ScaffoldOutcome> {
+export async function createWarlockApp(application: App): Promise<ScaffoldOutcome> {
   const options = application.options;
   const { useGit, useJWT, features, aiProviders, databaseDriver } = options;
   const noDatabase = isNoDatabase(databaseDriver);
@@ -72,11 +64,7 @@ export async function createWarlockApp(
   templateSpinner.start(spinnerMessages.copyingTemplate);
 
   try {
-    application
-      .init()
-      .use("warlock")
-      .updatePackageJson(versions)
-      .updateDotEnv();
+    application.init().use("warlock").updatePackageJson(versions).updateDotEnv();
 
     // Wire the chosen database driver into .env — or, when the user opted out,
     // strip the database config entirely so the app boots with no database.
@@ -133,11 +121,7 @@ export async function createWarlockApp(
   // The DB driver, optional features, and AI providers all go through the single
   // source of truth (core's feature map) so versions never drift. When no
   // database was chosen, the driver is omitted (there is no `none` feature).
-  const selectedFeatures = [
-    ...(noDatabase ? [] : [databaseDriver]),
-    ...features,
-    ...aiProviders,
-  ];
+  const selectedFeatures = [...(noDatabase ? [] : [databaseDriver]), ...features, ...aiProviders];
 
   // Features the user asked for that are not in the project when we finish.
   const failedFeatures: { feature: string; reason: string }[] = [];
@@ -203,9 +187,7 @@ export async function createWarlockApp(
       featuresSpinner.stop(spinnerMessages.featuresAdded);
     } else {
       featuresSpinner.stop(
-        addedFeatures.length > 0
-          ? spinnerMessages.featuresPartial
-          : spinnerMessages.featuresFailed,
+        addedFeatures.length > 0 ? spinnerMessages.featuresPartial : spinnerMessages.featuresFailed,
       );
 
       problems.push({
@@ -230,9 +212,7 @@ export async function createWarlockApp(
 
     const initialized = await application.git();
 
-    gitSpinner.stop(
-      initialized ? spinnerMessages.gitInitialized : spinnerMessages.gitFailed,
-    );
+    gitSpinner.stop(initialized ? spinnerMessages.gitInitialized : spinnerMessages.gitFailed);
 
     if (!initialized) {
       const failure = takeLastCommandOutput();
@@ -252,8 +232,7 @@ export async function createWarlockApp(
   if (useJWT && featureDependencyInstallFailed) {
     problems.push({
       step: "JWT secrets",
-      detail:
-        "Skipped because the selected feature dependencies did not install.",
+      detail: "Skipped because the selected feature dependencies did not install.",
       hints: [
         `Install the failed feature dependencies, then run \`${runPackageManagerCommand("jwt")}\` inside the project.`,
       ],
@@ -265,9 +244,7 @@ export async function createWarlockApp(
     const command = runPackageManagerCommand("jwt");
     const generated = await application.exec(command);
 
-    jwtSpinner.stop(
-      generated ? spinnerMessages.jwtGenerated : spinnerMessages.jwtFailed,
-    );
+    jwtSpinner.stop(generated ? spinnerMessages.jwtGenerated : spinnerMessages.jwtFailed);
 
     if (!generated) {
       const failure = takeLastCommandOutput();
@@ -287,9 +264,7 @@ export async function createWarlockApp(
 
     const warmed = await application.exec("npx warlock --warm-cache");
 
-    warmSpinner.stop(
-      warmed ? spinnerMessages.cacheWarmed : spinnerMessages.cacheWarmFailed,
-    );
+    warmSpinner.stop(warmed ? spinnerMessages.cacheWarmed : spinnerMessages.cacheWarmFailed);
 
     if (!warmed) takeLastCommandOutput();
   }
@@ -299,9 +274,9 @@ export async function createWarlockApp(
   const requestedFeatures = [...features, ...aiProviders];
   const missingFeatures = failedFeatures
     .map(({ feature }) => feature)
-    .filter(feature => requestedFeatures.includes(feature));
+    .filter((feature) => requestedFeatures.includes(feature));
   const installedFeatures = requestedFeatures.filter(
-    feature => !missingFeatures.includes(feature),
+    (feature) => !missingFeatures.includes(feature),
   );
 
   if (problems.length > 0) {

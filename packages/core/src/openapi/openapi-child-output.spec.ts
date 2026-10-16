@@ -70,7 +70,10 @@ describe("buildOpenApiForChild", () => {
   });
 
   it("names resources by their export and only imports resource modules when a route declares a schema", async () => {
-    hoisted.resourceMap.set(UserResource, { file: "/app/user.resource.ts", exportName: "UserResource" });
+    hoisted.resourceMap.set(UserResource, {
+      file: "/app/user.resource.ts",
+      exportName: "UserResource",
+    });
     hoisted.routes = [{ method: "GET", path: "/plain", handler: handler() }];
 
     await buildOpenApiForChild({ cwd, files: [], request: { version: 1 } });
@@ -98,7 +101,9 @@ describe("buildOpenApiForChild", () => {
       {
         method: "POST",
         path: "/x",
-        handler: handler({ validation: { schema: { toJsonSchema: () => ({ type: "object", properties: {} }) } } }),
+        handler: handler({
+          validation: { schema: { toJsonSchema: () => ({ type: "object", properties: {} }) } },
+        }),
       },
     ];
 
@@ -111,7 +116,10 @@ describe("buildOpenApiForChild", () => {
 
     expect(Object.keys(without.document.paths)).toEqual(["/x"]);
     expect(Object.keys(withPages.document.paths)).toEqual(["/about", "/x"]);
-    expect(Object.keys(without.document.paths["/x"]?.post?.responses ?? {})).toEqual(["200", "400"]);
+    expect(Object.keys(without.document.paths["/x"]?.post?.responses ?? {})).toEqual([
+      "200",
+      "400",
+    ]);
   });
 });
 

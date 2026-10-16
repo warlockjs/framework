@@ -86,7 +86,11 @@ export function cssModulesServerPlugin(root: string): Plugin {
     name: "warlock-css-modules-ssr",
     setup(build) {
       build.onLoad({ filter: /\.module\.css$/ }, async (args) => ({
-        contents: cssModuleServerSource(await fs.promises.readFile(args.path, "utf-8"), args.path, root),
+        contents: cssModuleServerSource(
+          await fs.promises.readFile(args.path, "utf-8"),
+          args.path,
+          root,
+        ),
         loader: "js",
       }));
     },

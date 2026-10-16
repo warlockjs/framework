@@ -53,10 +53,13 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const invoiceReader = ai.agent({
   name: "invoice-reader",
   model: openai.model({ name: "gpt-4o" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You read fields out of scanned invoice images.")
     .instruction("Transcribe exactly what the image shows — do not compute or correct totals.")
-    .instruction("Use the currency symbol shown on the invoice to set the currency code (e.g. $ → USD, € → EUR)."),
+    .instruction(
+      "Use the currency symbol shown on the invoice to set the currency code (e.g. $ → USD, € → EUR).",
+    ),
 });
 ```
 
@@ -65,14 +68,11 @@ const invoiceReader = ai.agent({
 The simplest case: the scan is on disk. Pass the path as a tagged image attachment so intent is explicit.
 
 ```ts
-const { data, error } = await invoiceReader.execute(
-  "Extract the invoice fields from this scan.",
-  {
-    attachments: [{ type: "image", source: "./invoices/inv-4821.jpg" }],
-    output: invoiceSchema,
-    repair: { maxAttempts: 1 },
-  },
-);
+const { data, error } = await invoiceReader.execute("Extract the invoice fields from this scan.", {
+  attachments: [{ type: "image", source: "./invoices/inv-4821.jpg" }],
+  output: invoiceSchema,
+  repair: { maxAttempts: 1 },
+});
 
 if (error) {
   console.error(`could not read invoice: ${error.message}`);
@@ -94,18 +94,15 @@ import { readFile } from "node:fs/promises";
 // In a real handler this buffer comes straight from the upload stream.
 const bytes = await readFile("./invoices/inv-4821.jpg");
 
-const { data, error } = await invoiceReader.execute(
-  "Extract the invoice fields from this scan.",
-  {
-    attachments: [
-      {
-        type: "image",
-        source: { base64: bytes.toString("base64"), mediaType: "image/jpeg" },
-      },
-    ],
-    output: invoiceSchema,
-  },
-);
+const { data, error } = await invoiceReader.execute("Extract the invoice fields from this scan.", {
+  attachments: [
+    {
+      type: "image",
+      source: { base64: bytes.toString("base64"), mediaType: "image/jpeg" },
+    },
+  ],
+  output: invoiceSchema,
+});
 ```
 
 A remote URL works the same way — `source: "https://cdn.example.com/scans/inv-4821.jpg"` — and the agent auto-detects the URL form from the `https://` prefix.

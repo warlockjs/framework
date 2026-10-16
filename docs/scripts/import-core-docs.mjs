@@ -83,13 +83,10 @@ function transform(content) {
 
   // Neutralize cross-package skill links — they point outside Starlight's
   // content tree. Convert `[text](path-with-@warlock.js)` → `\`text\``.
-  body = body.replace(
-    /\[([^\]]+)\]\(([^)]*@warlock\.js\/[^)]+)\)/g,
-    (_match, text) => {
-      const clean = text.replace(/^`(.*)`$/, "$1");
-      return `\`${clean}\``;
-    },
-  );
+  body = body.replace(/\[([^\]]+)\]\(([^)]*@warlock\.js\/[^)]+)\)/g, (_match, text) => {
+    const clean = text.replace(/^`(.*)`$/, "$1");
+    return `\`${clean}\``;
+  });
 
   return `---\n${lines.join("\n")}\n---\n\n${body.trimStart()}`;
 }

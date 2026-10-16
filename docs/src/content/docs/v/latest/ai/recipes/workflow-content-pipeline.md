@@ -27,7 +27,8 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const outliner = ai.agent({
   name: "outliner",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a senior content strategist.")
     .instruction("Produce a tight, numbered outline. Headings only, no prose."),
 });
@@ -35,7 +36,8 @@ const outliner = ai.agent({
 const drafter = ai.agent({
   name: "drafter",
   model: openai.model({ name: "gpt-4o" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a long-form writer.")
     .instruction("Expand the supplied outline into a full first draft. Markdown."),
 });
@@ -43,9 +45,12 @@ const drafter = ai.agent({
 const copyEditor = ai.agent({
   name: "copy-editor",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a meticulous copy editor.")
-    .instruction("Fix grammar, tighten sentences, keep the author's voice. Return the edited Markdown only."),
+    .instruction(
+      "Fix grammar, tighten sentences, keep the author's voice. Return the edited Markdown only.",
+    ),
 });
 
 // The SEO agent has a baked-in output schema, so its result.data is typed.
@@ -59,7 +64,8 @@ const seoMeta = v.object({
 const seoAgent = ai.agent({
   name: "seo",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are an SEO specialist.")
     .instruction("Given the draft, produce title, meta description, URL slug, and 5-8 keywords."),
   output: seoMeta,
@@ -90,11 +96,11 @@ const pipeline = ai.workflow<Brief, FinalArticle>({
     ai.step({
       name: "outline",
       agent: outliner,
-      input: ctx => ({
+      input: (ctx) => ({
         prompt: `Topic: ${ctx.input.topic}\nAudience: ${ctx.input.audience}\nTone: ${ctx.input.tone}\n\nWrite the outline.`,
       }),
-      output: { extract: ctx => ctx.agentResult?.text ?? "" },
-      after: ctx => {
+      output: { extract: (ctx) => ctx.agentResult?.text ?? "" },
+      after: (ctx) => {
         ctx.state.outline = ctx.steps.outline?.output as string;
       },
     }),
@@ -102,11 +108,11 @@ const pipeline = ai.workflow<Brief, FinalArticle>({
     ai.step({
       name: "draft",
       agent: drafter,
-      input: ctx => ({
+      input: (ctx) => ({
         prompt: `Outline:\n${ctx.state.outline}\n\nWrite the full draft in a ${ctx.input.tone} tone.`,
       }),
-      output: { extract: ctx => ctx.agentResult?.text ?? "" },
-      after: ctx => {
+      output: { extract: (ctx) => ctx.agentResult?.text ?? "" },
+      after: (ctx) => {
         ctx.state.draft = ctx.steps.draft?.output as string;
       },
     }),
@@ -118,19 +124,21 @@ const pipeline = ai.workflow<Brief, FinalArticle>({
         ai.step({
           name: "edit",
           agent: copyEditor,
-          input: ctx => ({ prompt: `Edit this draft:\n\n${ctx.state.draft}` }),
-          output: { extract: ctx => ctx.agentResult?.text ?? "" },
-          after: ctx => {
+          input: (ctx) => ({ prompt: `Edit this draft:\n\n${ctx.state.draft}` }),
+          output: { extract: (ctx) => ctx.agentResult?.text ?? "" },
+          after: (ctx) => {
             ctx.state.edited = ctx.steps.edit?.output as string;
           },
         }),
         ai.step({
           name: "seo",
           agent: seoAgent,
-          input: ctx => ({ prompt: `Produce SEO metadata for this draft:\n\n${ctx.state.draft}` }),
+          input: (ctx) => ({
+            prompt: `Produce SEO metadata for this draft:\n\n${ctx.state.draft}`,
+          }),
           // The SEO agent has a baked output schema, so agentResult.data is typed.
-          output: { extract: ctx => ctx.agentResult?.data },
-          after: ctx => {
+          output: { extract: (ctx) => ctx.agentResult?.data },
+          after: (ctx) => {
             ctx.state.seo = ctx.steps.seo?.output;
           },
         }),
@@ -140,7 +148,7 @@ const pipeline = ai.workflow<Brief, FinalArticle>({
 
   // One typed object assembled from shared state at the end.
   output: {
-    extract: ctx => ({
+    extract: (ctx) => ({
       body: ctx.state.edited as string,
       seo: ctx.state.seo as FinalArticle["seo"],
     }),

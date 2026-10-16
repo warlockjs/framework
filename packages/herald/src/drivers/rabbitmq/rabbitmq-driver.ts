@@ -360,7 +360,7 @@ export class RabbitMQDriver implements BrokerDriverContract {
    * Gracefully cancels all active consumers.
    */
   public async stopConsuming(): Promise<void> {
-    const stops = Array.from(this.channels.values()).map(channel =>
+    const stops = Array.from(this.channels.values()).map((channel) =>
       (channel as RabbitMQChannel<any>).stopConsuming(),
     );
     await Promise.all(stops);

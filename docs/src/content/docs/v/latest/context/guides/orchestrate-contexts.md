@@ -192,10 +192,10 @@ Useful in shared utilities that should not depend on concrete context classes. P
 ## Introspection helpers
 
 ```ts
-contextManager.hasContext("tenant");        // is "tenant" registered?
-contextManager.getContext("trace");         // get the instance (or undefined)
-contextManager.unregister("debug");         // remove a registration
-contextManager.clearAll();                  // call clear() on every registered context
+contextManager.hasContext("tenant"); // is "tenant" registered?
+contextManager.getContext("trace"); // get the instance (or undefined)
+contextManager.unregister("debug"); // remove a registration
+contextManager.clearAll(); // call clear() on every registered context
 ```
 
 `hasContext` on the manager checks **registration**, not whether you are inside an active scope. The `Context` instance has its own `hasContext()` for that.

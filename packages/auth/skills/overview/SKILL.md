@@ -30,41 +30,50 @@ Nine task skills. Most apps need `auth-basics` + `protect-routes` + `handle-logi
 ### Foundations
 
 #### `auth-basics`
+
 Start here. The `Auth` base model, `authMiddleware` gate, `authService` (login/logout/refresh), AccessToken + RefreshToken persistence, multi-user-type support.
 
 ### The flows
 
 #### `handle-login-and-logout`
+
 `authService.login(Model, credentials, deviceInfo?)` — verify password, issue the token pair, fire events. `authService.logout(user, accessToken?, refreshToken?)` — revoke tokens. For your `POST /login` and `POST /logout` controllers.
 
 #### `register-user`
+
 Sign up a new user and issue the first token pair — `User.create({ ...password: await hashPassword(plain) })` then `authService.createTokenPair(user)`. For `POST /register`.
 
 #### `protect-routes`
+
 `authMiddleware` object and legacy overloads: typed/default hard gates, optional resolution, credential source, and page-local redirects. Sets `request.locals.user` + `request.decodedAccessToken` when a user resolves.
 
 ### Going deeper
 
 #### `manage-tokens`
+
 The token lifecycle — `generateAccessToken`, `createRefreshToken`, `createTokenPair`, `refreshTokens` (rotation + replay detection), `revokeAllTokens`, `revokeTokenFamily`, `cleanupExpiredTokens`, `getActiveSessions`. For custom login/registration, token revocation, "logout everywhere", and scheduled cleanup.
 
 #### `customize-user-type`
+
 Support multiple user types in one system — each `Auth` subclass overrides `userType`, `config.auth.userType.<slug>` maps the slug to a model class, `authMiddleware("admin")` / `authMiddleware(["admin", "staff"])` gates per type.
 
 #### `customize-token-storage`
+
 Override the persisted `AccessToken` / `RefreshToken` models to add columns (multi-tenant `organization_id`), rename, or change storage — extend the model + schema and register it under `config.auth.accessToken.model` / `config.auth.refreshToken.model`.
 
 #### `throttle-login-attempts`
+
 Brute-force / credential-stuffing protection — `loginThrottleMiddleware()` counts only failed logins, resets on success, locks per-account + per-IP after a threshold, and rejects pre-controller with 429. Cache-backed, fails open on a cache outage.
 
 #### `run-auth-commands`
+
 Two CLI commands — `warlock jwt.generate` (strong JWT secret → `.env`) and `warlock auth.cleanup` (remove expired refresh tokens). Register via `registerJWTSecretGeneratorCommand()` and `registerAuthCleanupCommand()`.
 
 ## What this package deliberately doesn't do
 
 - **Session-cookie auth.** It's JWT/token-based. If you need server-side sessions, this isn't it.
 - **OAuth / social login / SSO.** No provider adapters here — wire those at the controller layer and create the user through this package's models.
-- **Authorization / roles / permissions (RBAC).** It authenticates (who you are) and gates by user *type*, not fine-grained permissions. Build RBAC on top.
+- **Authorization / roles / permissions (RBAC).** It authenticates (who you are) and gates by user _type_, not fine-grained permissions. Build RBAC on top.
 - **Standalone use.** It depends on `@warlock.js/core` for routing, models (Cascade), and config.
 
 ## See also

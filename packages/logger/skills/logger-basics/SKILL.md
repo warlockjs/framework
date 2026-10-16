@@ -37,10 +37,7 @@ The 11 things that are true in every logger use:
 import { log, ConsoleLog, FileLog } from "@warlock.js/logger";
 
 log.configure({
-  channels: [
-    new ConsoleLog(),
-    new FileLog({ chunk: "daily", storagePath: "./storage/logs" }),
-  ],
+  channels: [new ConsoleLog(), new FileLog({ chunk: "daily", storagePath: "./storage/logs" })],
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
 });
 
@@ -51,12 +48,12 @@ log.error("payments", "charge", new Error("Card declined"));
 ## The six levels
 
 ```ts
-log.debug("module", "action", "verbose detail");      // dev-only diagnostics
-log.info("module", "action", "neutral event");        // user-visible event
-log.warn("module", "action", "something off");         // recoverable concern
-log.error("module", "action", error);                 // handled failure, app continues
-log.success("module", "action", "operation done");    // explicit success
-log.fatal("module", "action", error);                 // unrecoverable, app is going down
+log.debug("module", "action", "verbose detail"); // dev-only diagnostics
+log.info("module", "action", "neutral event"); // user-visible event
+log.warn("module", "action", "something off"); // recoverable concern
+log.error("module", "action", error); // handled failure, app continues
+log.success("module", "action", "operation done"); // explicit success
+log.fatal("module", "action", error); // unrecoverable, app is going down
 ```
 
 `fatal` is purely informational — it does NOT auto-flush or exit. The caller decides whether to `await log.flush()` and `process.exit(...)`. See the `capture-unhandled-errors` topic for the `uncaughtException` → `fatal` routing.
@@ -65,17 +62,17 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Picking a channel — what each built-in does, when to use which | the `pick-log-channel` topic |
-| Startup — registering channels, environment-based setup, the `configure` method | the `configure-logger` topic |
-| Filtering log output (`levels`, `filter`, per-channel routing, `minLevel`) | the `filter-log-entries` topic |
-| Graceful shutdown — `flushSync`, `autoFlushOn`, signal behavior | the `flush-logs-on-shutdown` topic |
-| Extending `LogChannel` to build a custom sink (Slack, database, HTTP) | the `write-custom-log-channel` topic |
-| Routing Node's `unhandledRejection` / `uncaughtException` through the logger | the `capture-unhandled-errors` topic |
-| `log.assert(...)` and `log.timer(...)` shorthand helpers | the `use-log-helpers` topic |
-| Redacting secrets — logger floor + additive channel paths | the `redact-sensitive-log-fields` topic |
-| Tests that assert on log output, or code under test that logs | the `test-logging-code` topic |
+| If the task is about…                                                           | Load                                    |
+| ------------------------------------------------------------------------------- | --------------------------------------- |
+| Picking a channel — what each built-in does, when to use which                  | the `pick-log-channel` topic            |
+| Startup — registering channels, environment-based setup, the `configure` method | the `configure-logger` topic            |
+| Filtering log output (`levels`, `filter`, per-channel routing, `minLevel`)      | the `filter-log-entries` topic          |
+| Graceful shutdown — `flushSync`, `autoFlushOn`, signal behavior                 | the `flush-logs-on-shutdown` topic      |
+| Extending `LogChannel` to build a custom sink (Slack, database, HTTP)           | the `write-custom-log-channel` topic    |
+| Routing Node's `unhandledRejection` / `uncaughtException` through the logger    | the `capture-unhandled-errors` topic    |
+| `log.assert(...)` and `log.timer(...)` shorthand helpers                        | the `use-log-helpers` topic             |
+| Redacting secrets — logger floor + additive channel paths                       | the `redact-sensitive-log-fields` topic |
+| Tests that assert on log output, or code under test that logs                   | the `test-logging-code` topic           |
 
 ## Things NOT to do
 

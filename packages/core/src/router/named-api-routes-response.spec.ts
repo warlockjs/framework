@@ -125,7 +125,12 @@ describe("router.getNamedApiRoutes responses", () => {
     });
 
     expect(Object.keys(at(routes, 0))).toEqual(["name", "path", "method"]);
-    expect(at(routes, 1)).toEqual({ name: "login", path: "/login", method: "POST", response: { "200": "{ }" } });
+    expect(at(routes, 1)).toEqual({
+      name: "login",
+      path: "/login",
+      method: "POST",
+      response: { "200": "{ }" },
+    });
     expect(Object.isFrozen(at(routes, 1).response)).toBe(true);
   });
 
@@ -158,7 +163,10 @@ describe("collectNamedApiRoutesWithResponses", () => {
 
   const files = [
     { absolutePath: userFile, relativePath: "src/app/users/resources/user.resource.ts" },
-    { absolutePath: resolve(appRoot, "src/app/users/models/user.model.ts"), relativePath: "src/app/users/models/user.model.ts" },
+    {
+      absolutePath: resolve(appRoot, "src/app/users/models/user.model.ts"),
+      relativePath: "src/app/users/models/user.model.ts",
+    },
   ];
 
   it("maps resources by identity and produces the documented strings", async () => {

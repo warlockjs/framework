@@ -53,9 +53,9 @@ export const config = {
   cache: { public: true, maxAge: 60 },
 } satisfies PageConfig;
 
-export async function loader(
-  { request }: PageLoaderContext<typeof config.validation, typeof config.route>,
-) {
+export async function loader({
+  request,
+}: PageLoaderContext<typeof config.validation, typeof config.route>) {
   const id = request.input("id");
 
   return {
@@ -351,15 +351,15 @@ export default function ProductPage({ data }: PageProps<typeof loader>) {
 }
 ```
 
-| The loader returns                                          | The page reads                                                               |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| a model registered in `ModelResourceRegistry`               | that resource's output, `ResourceOutput<typeof ProductResource>`             |
-| a model with no registry entry                              | its serialized `data` type                                                   |
-| a value with `toJSON()`                                     | the awaited result of `toJSON()`                                             |
-| `Date`, `Map`, `Set`, `RegExp`, `URL`                       | the same native type                                                         |
-| a class instance with private members and no `toJSON()`     | `never`, because devalue would throw at render                               |
-| a function-valued key                                       | dropped from the type; devalue still refuses a function at render, so do not return one |
-| a `defer()` key holding a promise                           | a `Promise` of the serialized settled value, for `use()`                     |
+| The loader returns                                      | The page reads                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| a model registered in `ModelResourceRegistry`           | that resource's output, `ResourceOutput<typeof ProductResource>`                        |
+| a model with no registry entry                          | its serialized `data` type                                                              |
+| a value with `toJSON()`                                 | the awaited result of `toJSON()`                                                        |
+| `Date`, `Map`, `Set`, `RegExp`, `URL`                   | the same native type                                                                    |
+| a class instance with private members and no `toJSON()` | `never`, because devalue would throw at render                                          |
+| a function-valued key                                   | dropped from the type; devalue still refuses a function at render, so do not return one |
+| a `defer()` key holding a promise                       | a `Promise` of the serialized settled value, for `use()`                                |
 
 A model reads as its resource automatically when it declares `static resource`:
 `warlock generate.typings` and `warlock dev` generate the `ModelResourceRegistry` entries. See

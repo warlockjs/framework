@@ -44,7 +44,11 @@ export async function startNotificationsWorker(options: WorkerOptions = {}): Pro
 
         if (!channel) {
           // Unknown channel — log and ack to avoid a poison-message loop.
-          log.error("notifications", "queue.worker", `Unknown channel "${job.channel}" — dropping job`);
+          log.error(
+            "notifications",
+            "queue.worker",
+            `Unknown channel "${job.channel}" — dropping job`,
+          );
           await ctx.ack();
           return;
         }

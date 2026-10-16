@@ -42,9 +42,12 @@ if (result.error instanceof ContextLengthExceededError) {
 
 // Or branch on stable code string (good for persisted logs / metrics)
 switch (result.error.code) {
-  case "PROVIDER_RATE_LIMIT": /* ... */ break;
-  case "CONTENT_FILTER":      /* ... */ break;
-  case "WORKFLOW_DRIFT":      /* ... */ break;
+  case "PROVIDER_RATE_LIMIT":
+    /* ... */ break;
+  case "CONTENT_FILTER":
+    /* ... */ break;
+  case "WORKFLOW_DRIFT":
+    /* ... */ break;
 }
 ```
 
@@ -56,17 +59,37 @@ Too granular to dashboard on `code` — every `AIError` carries a coarser `categ
 
 ```ts
 type ErrorCategory =
-  | "auth" | "rate-limit" | "timeout" | "validation" | "content-filter"
-  | "provider" | "tool" | "cancelled" | "max-trips" | "max-iterations"
-  | "max-steps" | "schema" | "drift" | "routing" | "guardrail"
-  | "budget" | "quota" | "context-length" | "unknown";
+  | "auth"
+  | "rate-limit"
+  | "timeout"
+  | "validation"
+  | "content-filter"
+  | "provider"
+  | "tool"
+  | "cancelled"
+  | "max-trips"
+  | "max-iterations"
+  | "max-steps"
+  | "schema"
+  | "drift"
+  | "routing"
+  | "guardrail"
+  | "budget"
+  | "quota"
+  | "context-length"
+  | "unknown";
 
 switch (result.error.category) {
-  case "rate-limit":     return retryWithBackoff();
-  case "timeout":        return retryOnce();
-  case "auth":           return escalate();              // not retryable
-  case "content-filter": return policyMessage();          // not retryable
-  case "schema":         return repair();                 // use agent `repair`
+  case "rate-limit":
+    return retryWithBackoff();
+  case "timeout":
+    return retryOnce();
+  case "auth":
+    return escalate(); // not retryable
+  case "content-filter":
+    return policyMessage(); // not retryable
+  case "schema":
+    return repair(); // use agent `repair`
 }
 
 metrics.increment("ai.error", { category: result.error.category });
@@ -129,31 +152,31 @@ Typed fields (`retryAfter`, `toolName`, `issues`, `stepName`, …) are first-cla
 
 ## Retry strategy
 
-| Error family | Retryable? |
-| --- | --- |
-| `ProviderRateLimitError` | Yes — back off by `retryAfter` ms |
-| `ProviderTimeoutError` | Yes — short delay |
-| `ProviderError` (generic) | Maybe — depends on cause |
-| `QuotaExceededError` | **No** — needs human intervention |
-| `ProviderAuthError` | **No** — fix config / rotate key |
-| `ContextLengthExceededError` | Only after truncating input |
-| `ContentFilterError` | Usually **no** — the prompt itself is the issue |
-| `SchemaValidationError` | Use agent `repair: { maxAttempts }` instead |
-| `ToolExecutionError` | Depends on `cause` |
-| `WorkflowDriftError` / `SupervisorDriftError` / `OrchestratorDriftError` | **No** — manual migration or `force: true` |
-| `WorkflowCancelledError` / `SupervisorCancelledError` / `OrchestratorCancelledError` / `PlannerCancelledError` | **No** — caller-driven cancel |
-| `MaxStepsExceededError` / `RoutingError` / `SupervisorRoutingError` | **No** — programmer error |
-| `OrchestratorConfigError` | **No** — authoring-time config bug; thrown at construction |
-| `PlannerPlanInvalidError` | **No** — bad LLM plan / unregistered capability; re-prompt or fix the capability roster |
-| `BudgetExceededError` | **No** — raise the cap, split the workload |
-| `GuardrailViolationError` (`phase: "input"`) | **No** — block / sanitize at product layer |
-| `GuardrailViolationError` (`phase: "output"`) | Sometimes — re-prompt with adjusted system message |
+| Error family                                                                                                   | Retryable?                                                                              |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `ProviderRateLimitError`                                                                                       | Yes — back off by `retryAfter` ms                                                       |
+| `ProviderTimeoutError`                                                                                         | Yes — short delay                                                                       |
+| `ProviderError` (generic)                                                                                      | Maybe — depends on cause                                                                |
+| `QuotaExceededError`                                                                                           | **No** — needs human intervention                                                       |
+| `ProviderAuthError`                                                                                            | **No** — fix config / rotate key                                                        |
+| `ContextLengthExceededError`                                                                                   | Only after truncating input                                                             |
+| `ContentFilterError`                                                                                           | Usually **no** — the prompt itself is the issue                                         |
+| `SchemaValidationError`                                                                                        | Use agent `repair: { maxAttempts }` instead                                             |
+| `ToolExecutionError`                                                                                           | Depends on `cause`                                                                      |
+| `WorkflowDriftError` / `SupervisorDriftError` / `OrchestratorDriftError`                                       | **No** — manual migration or `force: true`                                              |
+| `WorkflowCancelledError` / `SupervisorCancelledError` / `OrchestratorCancelledError` / `PlannerCancelledError` | **No** — caller-driven cancel                                                           |
+| `MaxStepsExceededError` / `RoutingError` / `SupervisorRoutingError`                                            | **No** — programmer error                                                               |
+| `OrchestratorConfigError`                                                                                      | **No** — authoring-time config bug; thrown at construction                              |
+| `PlannerPlanInvalidError`                                                                                      | **No** — bad LLM plan / unregistered capability; re-prompt or fix the capability roster |
+| `BudgetExceededError`                                                                                          | **No** — raise the cap, split the workload                                              |
+| `GuardrailViolationError` (`phase: "input"`)                                                                   | **No** — block / sanitize at product layer                                              |
+| `GuardrailViolationError` (`phase: "output"`)                                                                  | Sometimes — re-prompt with adjusted system message                                      |
 
 ## Why extend `Error`, not `HttpError`
 
 - `@warlock.js/ai` is a standalone product — used from CLIs / workers / scripts as often as HTTP handlers.
 - Coupling to a web framework pulls HTTP into every consumer.
-- AI errors aren't HTTP errors anyway — "rate limit" is a 429 the *upstream provider* returned, not one the server returns.
+- AI errors aren't HTTP errors anyway — "rate limit" is a 429 the _upstream provider_ returned, not one the server returns.
 
 The **consumer app** layer (`src/app/ai/`) wraps framework errors with its own `AIError` subclass that extends `HttpError`. See `domains/ai/conventions/errors.md`.
 
@@ -186,10 +209,10 @@ async function runWithFallbacks(input: string) {
     }
 
     if (error instanceof QuotaExceededError || error instanceof ProviderAuthError) {
-      throw error;   // not retryable
+      throw error; // not retryable
     }
 
-    throw error;     // unknown — give up
+    throw error; // unknown — give up
   }
 
   throw new Error("exhausted retries");

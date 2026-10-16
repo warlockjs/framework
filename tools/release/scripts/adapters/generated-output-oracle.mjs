@@ -155,9 +155,10 @@ export function routeId(method, routePath) {
  * @returns The app-only rows, in app order.
  */
 export function diffRoutes(appRows, baselineRows) {
-  const baselineIds = new Set(baselineRows.map(row => routeId(row.method, row.path)));
+  const baselineIds = new Set(baselineRows.map((row) => routeId(row.method, row.path)));
   return appRows.filter(
-    row => !String(row.source ?? "").startsWith("\0") && !baselineIds.has(routeId(row.method, row.path)),
+    (row) =>
+      !String(row.source ?? "").startsWith("\0") && !baselineIds.has(routeId(row.method, row.path)),
   );
 }
 
@@ -201,7 +202,7 @@ export function diffProjectCommands(appCommandsJson, baselineCommandsJson) {
   const appCommands = appCommandsJson?.commands ?? {};
   const baselineCommands = baselineCommandsJson?.commands ?? {};
   return Object.keys(appCommands).filter(
-    name => appCommands[name]?.source === "project" && baselineCommands[name] === undefined,
+    (name) => appCommands[name]?.source === "project" && baselineCommands[name] === undefined,
   );
 }
 
@@ -313,7 +314,7 @@ async function main() {
     introducedRouteRows,
   });
 
-  const introducedRoutes = introducedRouteRows.map(row => ({
+  const introducedRoutes = introducedRouteRows.map((row) => ({
     id: routeId(row.method, row.path),
     developmentRequested: development.requested.get(routeId(row.method, row.path)) === true,
     productionRequested: production.requested.get(routeId(row.method, row.path)) === true,
@@ -442,7 +443,9 @@ async function routesJson(root) {
       maxBuffer: 64 * 1024 * 1024,
     }));
   } catch (error) {
-    throw new Error(`\`warlock routes --json\` failed in ${root}: ${error.stderr || String(error)}`);
+    throw new Error(
+      `\`warlock routes --json\` failed in ${root}: ${error.stderr || String(error)}`,
+    );
   }
   try {
     const rows = JSON.parse(stdout);
@@ -499,7 +502,7 @@ async function reserveEphemeralPort() {
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       const port = typeof address === "object" && address ? address.port : undefined;
-      server.close(error => (error ? reject(error) : resolve(port)));
+      server.close((error) => (error ? reject(error) : resolve(port)));
     });
   });
 }
@@ -509,7 +512,9 @@ async function bindAndReleasePort(port) {
     const probe = net.createServer();
     probe.unref();
     probe.once("error", reject);
-    probe.listen(port, "127.0.0.1", () => probe.close(error => (error ? reject(error) : resolve())));
+    probe.listen(port, "127.0.0.1", () =>
+      probe.close((error) => (error ? reject(error) : resolve())),
+    );
   });
 }
 
@@ -529,7 +534,7 @@ async function waitForPortRelease(port, timeoutMs) {
 }
 
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function processIsAlive(pid) {
@@ -585,7 +590,7 @@ async function fetchWithTimeout(url, init, timeoutMs) {
 /** Stop a spawned server and report whether it terminated cleanly (see header JSDoc). */
 async function stopServerCleanly(child) {
   if (!child || child.exitCode !== null) return true;
-  const exited = new Promise(resolve => child.once("exit", resolve));
+  const exited = new Promise((resolve) => child.once("exit", resolve));
   if (process.platform === "win32") {
     try {
       await execFileAsync("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], {
@@ -636,7 +641,7 @@ async function exercisePhase({ appRoot, introducedRouteRows }) {
   // logging go to stdout, so capturing stderr alone reported a failed boot with
   // the cause missing — the same silence this gate exists to remove.
   let stderrTail = "";
-  const captureOutput = chunk => {
+  const captureOutput = (chunk) => {
     stderrTail = (stderrTail + chunk.toString()).slice(-8000);
   };
   child.stdout?.on("data", captureOutput);
@@ -694,7 +699,7 @@ async function exerciseProductionPhase({ appRoot, introducedRouteRows }) {
   // logging go to stdout, so capturing stderr alone reported a failed boot with
   // the cause missing — the same silence this gate exists to remove.
   let stderrTail = "";
-  const captureOutput = chunk => {
+  const captureOutput = (chunk) => {
     stderrTail = (stderrTail + chunk.toString()).slice(-8000);
   };
   child.stdout?.on("data", captureOutput);
@@ -733,7 +738,7 @@ const isMainModule =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMainModule) {
-  main().catch(error => {
+  main().catch((error) => {
     process.stderr.write(`${error && error.stack ? error.stack : String(error)}\n`);
     process.exitCode = 1;
   });

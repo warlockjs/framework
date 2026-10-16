@@ -6,7 +6,7 @@ sidebar:
   label: "File & Directory handles"
 ---
 
-Sometimes you don't want to keep threading a string path through five calls. You want an **object** that *is* the file — one you can pass around, ask questions of, and act on. That's `fs.file(path)` and `fs.dir(path)`.
+Sometimes you don't want to keep threading a string path through five calls. You want an **object** that _is_ the file — one you can pass around, ask questions of, and act on. That's `fs.file(path)` and `fs.dir(path)`.
 
 ```ts
 import { fs } from "@warlock.js/fs";
@@ -23,7 +23,8 @@ Creating a handle touches the disk **not at all**. `fs.file()` and `fs.dir()` ju
 
 ```ts
 const report = fs.file("reports/2026-q3.json"); // no IO — the file need not exist
-if (await report.exists()) {                     // *now* it touches disk
+if (await report.exists()) {
+  // *now* it touches disk
   const data = await report.getJson();
 }
 ```
@@ -32,13 +33,13 @@ So you can build handles freely — in a loop, in a config, ahead of time — wi
 
 ## Immutable — copy / move / rename return a new handle
 
-A handle is a stable reference to *a path*, not a moving target. `copy`, `move`, `rename` (and their `copyTo` / `moveTo` cousins) **never mutate the handle they're called on** — they perform the operation and hand back a brand-new handle pointing at the destination.
+A handle is a stable reference to _a path_, not a moving target. `copy`, `move`, `rename` (and their `copyTo` / `moveTo` cousins) **never mutate the handle they're called on** — they perform the operation and hand back a brand-new handle pointing at the destination.
 
 ```ts
 const original = fs.file("draft.md");
 const published = await original.rename("final.md"); // File → "final.md"
 
-original.name;  // "draft.md"  ← unchanged
+original.name; // "draft.md"  ← unchanged
 published.name; // "final.md"  ← the new handle
 ```
 
@@ -54,10 +55,10 @@ The original still points where it always did. This makes handles safe to captur
 
 ```ts
 const f = fs.file("src/components/Button.tsx");
-f.name;       // "Button.tsx"
-f.basename;   // "Button"
-f.extension;  // ".tsx"
-f.parent();   // Directory handle for "src/components"
+f.name; // "Button.tsx"
+f.basename; // "Button"
+f.extension; // ".tsx"
+f.parent(); // Directory handle for "src/components"
 ```
 
 `Directory` mirrors this with `name` and `parent()`.
@@ -68,7 +69,7 @@ A `Directory` builds child handles for you with `file(...segments)` and `dir(...
 
 ```ts
 const app = fs.dir("app");
-const env = app.file("config", ".env");   // File  → "app/config/.env"
+const env = app.file("config", ".env"); // File  → "app/config/.env"
 const cache = app.dir("storage", "cache"); // Directory → "app/storage/cache"
 await cache.ensure();
 ```
@@ -109,7 +110,7 @@ If you only ever need the paths (not a `File[]`), reach for `fs.dirs.walk` inste
 :::tip[When to prefer a handle over `fs.files.*`]
 Both do the same work; pick by how the code reads.
 
-- **Use a handle** when you pass a path *around* (return it, store it, hand it to another function), or when you do **several operations on one path** — one `fs.file(p)` up front beats repeating `p` in every call.
+- **Use a handle** when you pass a path _around_ (return it, store it, hand it to another function), or when you do **several operations on one path** — one `fs.file(p)` up front beats repeating `p` in every call.
 - **Use `fs.files.*` / `fs.dirs.*`** for a **single** one-off operation on a path you already have — `await fs.files.remove(p)` is shorter than `await fs.file(p).remove()`.
 
 Handles are also the cleaner choice for `rename` / `move` chains, since each step returns the next handle to work with.
@@ -117,18 +118,18 @@ Handles are also the cleaner choice for `rename` / `move` chains, since each ste
 
 ## Handle method map
 
-Everything below is IO-free to *construct* and delegates to the same primitives under the hood.
+Everything below is IO-free to _construct_ and delegates to the same primitives under the hood.
 
-| `fs.file(path)` → `File` | `fs.dir(path)` → `Directory` |
-| --- | --- |
-| `name` / `basename` / `extension` / `parent()` | `name` / `parent()` / `file(...segs)` / `dir(...segs)` |
-| `get` / `getJson` / `put` / `putJson` | `ensure` / `remove` / `empty` |
-| `append` / `prepend` / `appendJsonLine` | `exists` / `isEmpty` / `count` |
-| `edit` / `editJson` / `mergeJson` | `list` / `listFiles` → `File[]` / `listDirs` → `Directory[]` |
-| `exists` / `isEmpty` / `ensure` / `touch` | `copy(to)` / `move(to)` → `Directory` |
-| `remove` / `copy(to)` / `move(to)` → `File` | `stats` / `size` / `walk` / `hash` |
-| `copyTo(dir)` / `moveTo(dir)` / `rename(name)` → `File` | |
-| `stats` / `size` / `lastModified` / `hash` / `readLines` | |
+| `fs.file(path)` → `File`                                 | `fs.dir(path)` → `Directory`                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------ |
+| `name` / `basename` / `extension` / `parent()`           | `name` / `parent()` / `file(...segs)` / `dir(...segs)`       |
+| `get` / `getJson` / `put` / `putJson`                    | `ensure` / `remove` / `empty`                                |
+| `append` / `prepend` / `appendJsonLine`                  | `exists` / `isEmpty` / `count`                               |
+| `edit` / `editJson` / `mergeJson`                        | `list` / `listFiles` → `File[]` / `listDirs` → `Directory[]` |
+| `exists` / `isEmpty` / `ensure` / `touch`                | `copy(to)` / `move(to)` → `Directory`                        |
+| `remove` / `copy(to)` / `move(to)` → `File`              | `stats` / `size` / `walk` / `hash`                           |
+| `copyTo(dir)` / `moveTo(dir)` / `rename(name)` → `File`  |                                                              |
+| `stats` / `size` / `lastModified` / `hash` / `readLines` |                                                              |
 
 ## Related
 

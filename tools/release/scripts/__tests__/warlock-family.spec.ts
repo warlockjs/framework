@@ -49,7 +49,7 @@ const temporaryRoots: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })),
+    temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
   );
 });
 
@@ -58,15 +58,15 @@ test("loads the authoritative family and keeps Web/Core late and create-warlock 
 
   assert.equal(family.members.length, WARLOCK_FAMILY_SIZE);
   assert.deepEqual(
-    family.members.slice(-3).map(member => member.name),
+    family.members.slice(-3).map((member) => member.name),
     ["@warlock.js/web", "@warlock.js/core", "create-warlock"],
   );
-  assert.ok(family.members.every(member => member.version === family.version));
+  assert.ok(family.members.every((member) => member.version === family.version));
 });
 
 test("reports a name-set mismatch before the count backstop", async () => {
   const fixture = await createFixture();
-  const packages = fixture.declaration.packages.map(member => ({ ...member }));
+  const packages = fixture.declaration.packages.map((member) => ({ ...member }));
   packages[0] = { name: "@warlock.js/not-a-real-member", root: packages[0].root };
 
   await assert.rejects(
@@ -74,7 +74,7 @@ test("reports a name-set mismatch before the count backstop", async () => {
       ...fixture,
       declaration: { name: "warlock", packages },
     }),
-    error => {
+    (error) => {
       assert.match(String(error), /name-set mismatch/);
       assert.doesNotMatch(String(error), /size invariant/);
       return true;
@@ -84,7 +84,7 @@ test("reports a name-set mismatch before the count backstop", async () => {
 
 test("reports configured-root drift", async () => {
   const fixture = await createFixture();
-  const packages = fixture.declaration.packages.map(member => ({ ...member }));
+  const packages = fixture.declaration.packages.map((member) => ({ ...member }));
   packages[0] = { ...packages[0], root: "../wrong-root" };
 
   await assert.rejects(
@@ -113,9 +113,7 @@ test("uses the declared family size only as a secondary invariant after matching
   );
 });
 
-async function createFixture(
-  names: readonly string[] = FAMILY_NAMES,
-): Promise<{
+async function createFixture(names: readonly string[] = FAMILY_NAMES): Promise<{
   workspaceRoot: string;
   configDir: string;
   declaration: WarlockFamilyDeclaration;

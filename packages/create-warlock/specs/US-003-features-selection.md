@@ -56,10 +56,7 @@ const featuresMap = {
 // Merge selected features into package.json before install
 for (const feature of selectedFeatures) {
   Object.assign(packageJson.dependencies, featuresMap[feature].dependencies);
-  Object.assign(
-    packageJson.devDependencies,
-    featuresMap[feature].devDependencies,
-  );
+  Object.assign(packageJson.devDependencies, featuresMap[feature].devDependencies);
 }
 ```
 

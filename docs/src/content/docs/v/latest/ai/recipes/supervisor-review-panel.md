@@ -50,11 +50,14 @@ const reviewer = ai.agent({
   // identical answers — independent samples are the entire point of a panel.
   modelOptions: { temperature: 0.7 },
   output: reviewerVerdict,
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a strict but fair content reviewer.")
     .instruction("Judge ONLY the submission you are given. Do not assume other reviewers exist.")
-    .instruction("Set `approved: false` and `severity: \"blocking\"` for policy violations, factual errors, or unsafe content.")
-    .instruction("Use `severity: \"minor\"` for style nits that don't block shipping."),
+    .instruction(
+      'Set `approved: false` and `severity: "blocking"` for policy violations, factual errors, or unsafe content.',
+    )
+    .instruction('Use `severity: "minor"` for style nits that don\'t block shipping.'),
 });
 ```
 
@@ -80,7 +83,10 @@ const aggregate = {
     const panel = ctx.iterations[0]?.result ?? {};
 
     const verdicts = Object.values(panel)
-      .map((branch) => branch.output as { approved: boolean; reason: string; severity: string } | undefined)
+      .map(
+        (branch) =>
+          branch.output as { approved: boolean; reason: string; severity: string } | undefined,
+      )
       .filter((verdict): verdict is NonNullable<typeof verdict> => verdict !== undefined);
 
     const total = verdicts.length;
@@ -191,5 +197,5 @@ Three reviewer trips (parallel, so latency is one trip's worth) plus a zero-toke
 - **Independence is the whole point — protect it.** Each fan-out branch must judge the submission cold. Raise `temperature` so the copies actually diverge, and keep the reviewer prompt from referencing "the other reviewers" (it can't see them anyway, but a prompt that implies a panel biases the sample). If every branch returns the same answer every time, you're paying 3× for one opinion.
 - **Aggregate in code, not in an LLM.** Counting votes is deterministic — a callback intent does it for free and is trivially testable. Reach for an LLM aggregator only when the merge is genuinely judgmental (e.g. synthesizing conflicting prose), and even then prefer a `run` callback that calls one agent via `ctx.run(...)` over adding another routed intent.
 - **Veto beats majority for safety.** A pure majority rule ships content two reviewers liked and one flagged as unsafe. The blocking-severity veto in this aggregator overrides the count — for moderation and code review, one credible blocker should outweigh a thin majority. Tune the rule to your risk tolerance.
-- **Fan-out branches share the underlying agent instance.** `ai.fanOut` clones the agent across distinct intent *keys*, not the agent object — every branch references the same `reviewer`. That's intended (they're independent dispatch slots, not independent configs); if you need genuinely different reviewers, list them as separate named intents instead of fanning one out.
+- **Fan-out branches share the underlying agent instance.** `ai.fanOut` clones the agent across distinct intent _keys_, not the agent object — every branch references the same `reviewer`. That's intended (they're independent dispatch slots, not independent configs); if you need genuinely different reviewers, list them as separate named intents instead of fanning one out.
 - **The panel's verdicts persist on the report.** Iteration 0's `snapshot.result` keeps every branch's `output`, `usage`, `duration`, and any per-branch `error` — a reviewer that errored doesn't abort its siblings, so always check `branch.error` before trusting a verdict when you tally.

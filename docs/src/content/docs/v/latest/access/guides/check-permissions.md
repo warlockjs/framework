@@ -29,7 +29,9 @@ Always stack these **after** `authMiddleware` — they read `request.locals.user
 ```ts
 import { can, cannot, canAll, canAny } from "@warlock.js/access";
 
-if (await can(user, "orders.update")) { /* … */ }
+if (await can(user, "orders.update")) {
+  /* … */
+}
 
 await canAll(user, ["orders.update", "orders.viewCost"]); // needs BOTH
 await canAny(user, ["orders.update", "orders.updateStatus"]); // needs EITHER

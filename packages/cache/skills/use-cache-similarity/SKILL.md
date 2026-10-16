@@ -24,21 +24,21 @@ const hits = await cache.similar<T>(queryVec, {
 
 ## Capability matrix
 
-| Driver | `similar()` |
-|---|---|
+| Driver                              | `similar()`                                        |
+| ----------------------------------- | -------------------------------------------------- |
 | `memory` / `memoryExtended` / `lru` | ✅ Brute force (O(N)) — dev only past ~10k entries |
-| `pg` *with* `options.pg.vector` | ✅ pgvector + HNSW/IVFFlat index |
-| `pg` *without* `options.pg.vector` | ❌ Throws `CacheUnsupportedError` |
-| `redis` | ❌ Throws (RediSearch on backlog) |
-| `file` | ❌ Throws |
-| `null` | Returns `[]` |
+| `pg` _with_ `options.pg.vector`     | ✅ pgvector + HNSW/IVFFlat index                   |
+| `pg` _without_ `options.pg.vector`  | ❌ Throws `CacheUnsupportedError`                  |
+| `redis`                             | ❌ Throws (RediSearch on backlog)                  |
+| `file`                              | ❌ Throws                                          |
+| `null`                              | Returns `[]`                                       |
 
 ## Always-true facts
 
 1. **Cache is embedding-agnostic.** Caller computes vectors. The cache stores and ranks; it doesn't call out to an embedder.
 2. **Only entries written with `set({ vector })` show up.** A plain `set` adds the entry as KV — invisible to `similar()`.
 3. **Score = cosine similarity** in `[0, 1]` for typical embedding spaces. The `pg` driver computes `1 - (embedding <=> $1::vector)` so the score matches the memory drivers.
-4. **Tag filter narrows the candidate pool *before* ranking** — union semantics (entry must carry at least one of the listed tags).
+4. **Tag filter narrows the candidate pool _before_ ranking** — union semantics (entry must carry at least one of the listed tags).
 5. **Dimension mismatch throws `CacheConfigurationError`** at both `set({ vector })` and `similar()` time. Don't switch embedders without re-indexing.
 6. **TTL + LRU eviction also drop the vector** — expired or evicted entries are invisible to `similar()`.
 
@@ -51,7 +51,7 @@ const queryVec = await embed(prompt);
 const hits = await cache.similar<Answer>(queryVec, { topK: 1, threshold: 0.92 });
 
 if (hits.length > 0) {
-  return hits[0].value;     // skip the LLM call
+  return hits[0].value; // skip the LLM call
 }
 
 const answer = await llm.complete(prompt);

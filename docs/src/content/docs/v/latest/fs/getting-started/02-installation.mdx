@@ -111,17 +111,16 @@ A one-liner to prove it's wired up:
 import { fs } from "@warlock.js/fs";
 
 await fs.files.put("./.fs-check", "ok");
-console.log(await fs.files.get("./.fs-check"));   // → "ok"
+console.log(await fs.files.get("./.fs-check")); // → "ok"
 ```
 
 If that prints `ok`, you're done.
 
 <Aside type="tip" title="Need synchronous, tree-shakeable functions?">
-The `fs` facade is async by design. Synchronous callers — CLI tools, code
-generators — and bundles that want to pull in a single operation can drop to
-the [low-level primitives](../reference/api#low-level-primitives-sync--async)
-(`putFile`, `getFile`, `hashString`, …), which are individually tree-shakeable.
-For app code, reach for `fs` first.
+  The `fs` facade is async by design. Synchronous callers — CLI tools, code generators — and bundles
+  that want to pull in a single operation can drop to the [low-level
+  primitives](../reference/api#low-level-primitives-sync--async) (`putFile`, `getFile`,
+  `hashString`, …), which are individually tree-shakeable. For app code, reach for `fs` first.
 </Aside>
 
 ## Next

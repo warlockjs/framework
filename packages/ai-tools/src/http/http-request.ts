@@ -1,9 +1,4 @@
-import {
-  guardedFetch,
-  OutboundPolicyError,
-  tool,
-  type ToolContract,
-} from "@warlock.js/ai";
+import { guardedFetch, OutboundPolicyError, tool, type ToolContract } from "@warlock.js/ai";
 import type {
   HttpMethod,
   HttpRequestInput,

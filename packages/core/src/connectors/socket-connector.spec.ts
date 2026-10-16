@@ -68,7 +68,11 @@ describe("SocketConnector shutdown (shared server)", () => {
   it("detaches the engine and never closes the shared http server", async () => {
     const disconnect = vi.fn();
     const engineClose = vi.fn();
-    const io = { of: () => ({ disconnectSockets: disconnect }), engine: { close: engineClose }, close: vi.fn() };
+    const io = {
+      of: () => ({ disconnectSockets: disconnect }),
+      engine: { close: engineClose },
+      close: vi.fn(),
+    };
     vi.spyOn(container, "tryGet").mockReturnValue(io as never);
 
     const connector = new SocketConnector() as any;

@@ -6,7 +6,7 @@ sidebar:
   label: "Orchestrator as a tool"
 ---
 
-You have a polished refund orchestrator — multi-turn, stateful, durable. Now product wants a single "concierge" agent the customer talks to for *everything*: order status, returns, account questions, and refunds. The concierge shouldn't reimplement refund logic; it should *delegate* to the orchestrator you already built.
+You have a polished refund orchestrator — multi-turn, stateful, durable. Now product wants a single "concierge" agent the customer talks to for _everything_: order status, returns, account questions, and refunds. The concierge shouldn't reimplement refund logic; it should _delegate_ to the orchestrator you already built.
 
 `orchestrator.asTool()` wraps an orchestrator as a `ToolContract` so an outer agent can invoke it from its tool-call loop. This recipe nests the refund orchestrator inside a concierge agent two ways: with a brand-new session per call (`sessionScope: "fresh"`), and with a session the concierge continues across turns (`sessionScope: "shared"`).
 
@@ -16,7 +16,7 @@ Before the code, the two rules that govern everything here: **the tool boundary 
 
 The parent agent's `signal`, request `context`, and events do **not** auto-forward across the tool boundary. Anything the wrapped orchestrator needs per call must ride on the tool's `inputSchema` payload — with one deliberate exception: under `sessionScope: "shared"`, the session id is bound by the developer through `OrchestratorAsToolOptions.session`, never through `inputSchema`.
 
-That exception exists because a `sessionId` is **bearer-equivalent** to full read/write access on that session's persisted state and history. `inputSchema` is filled in by the calling *model*, and anything able to influence that model's output — a summarized document, a poisoned tool result, a web page it fetched — can write text into the call. If the session id lived on the schema, that text could say "continue session `<victim-id>`" and the nested orchestrator would load, mutate, and echo back a **stranger's** conversation. So `session` reads from the invocation's `ToolContext` instead (`ctx.artifacts`, the same out-of-band bag `signal` travels on) or is fixed as a literal at `asTool()` construction — both channels the model cannot write to.
+That exception exists because a `sessionId` is **bearer-equivalent** to full read/write access on that session's persisted state and history. `inputSchema` is filled in by the calling _model_, and anything able to influence that model's output — a summarized document, a poisoned tool result, a web page it fetched — can write text into the call. If the session id lived on the schema, that text could say "continue session `<victim-id>`" and the nested orchestrator would load, mutate, and echo back a **stranger's** conversation. So `session` reads from the invocation's `ToolContext` instead (`ctx.artifacts`, the same out-of-band bag `signal` travels on) or is fixed as a literal at `asTool()` construction — both channels the model cannot write to.
 
 ### What crosses the boundary, and what doesn't
 
@@ -24,16 +24,16 @@ When the concierge fires `handle_refund`, the agent runtime invokes the wrapped 
 
 Inside the wrapper, the orchestrator is then called as `orchestrator.execute(executeInput, { sessionId, history })`. Note what is — and isn't — in that options object:
 
-| Parent-side input to `concierge.execute(...)` | Reaches the wrapped orchestrator? | How |
-| --- | --- | --- |
-| The `inputSchema` payload (model's tool-call args) | **Yes, minus session control fields** | Validated, then forwarded as the orchestrator's `execute(input)` argument. A `sessionId` / `history` field on the payload is stripped before forwarding under `"shared"` — even if the model writes one, it never reaches `session`. |
-| `sessionId` / `history` under `"shared"` | **From `options.session`, never the payload** | A literal id fixed at `asTool()` construction, or a `(ctx) => sessionId \| { sessionId, history }` resolver reading `ctx.artifacts` — the developer-controlled, model-invisible channel. |
-| `signal` (`AbortSignal`) | **No** | The wrapper never constructs an options `signal`; a parent timeout/cancel does not propagate. |
-| `context` (request-scoped bag) | **No** | Not forwarded. Pass any request data (user id, db handle, deadline) as fields on `inputSchema`, or via the `session` resolver's `ctx.artifacts`. |
-| `on` (event handlers) | **No** | The orchestrator's own definition/instance handlers fire; the parent's per-call `on` does not. |
-| Parent's observability `sessionId` | **No** | The orchestrator owns its session id — `"fresh"` generates one, `"shared"` resolves one from `options.session`. The wrapper never substitutes the parent agent's `sessionId`. |
+| Parent-side input to `concierge.execute(...)`      | Reaches the wrapped orchestrator?             | How                                                                                                                                                                                                                                  |
+| -------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The `inputSchema` payload (model's tool-call args) | **Yes, minus session control fields**         | Validated, then forwarded as the orchestrator's `execute(input)` argument. A `sessionId` / `history` field on the payload is stripped before forwarding under `"shared"` — even if the model writes one, it never reaches `session`. |
+| `sessionId` / `history` under `"shared"`           | **From `options.session`, never the payload** | A literal id fixed at `asTool()` construction, or a `(ctx) => sessionId \| { sessionId, history }` resolver reading `ctx.artifacts` — the developer-controlled, model-invisible channel.                                             |
+| `signal` (`AbortSignal`)                           | **No**                                        | The wrapper never constructs an options `signal`; a parent timeout/cancel does not propagate.                                                                                                                                        |
+| `context` (request-scoped bag)                     | **No**                                        | Not forwarded. Pass any request data (user id, db handle, deadline) as fields on `inputSchema`, or via the `session` resolver's `ctx.artifacts`.                                                                                     |
+| `on` (event handlers)                              | **No**                                        | The orchestrator's own definition/instance handlers fire; the parent's per-call `on` does not.                                                                                                                                       |
+| Parent's observability `sessionId`                 | **No**                                        | The orchestrator owns its session id — `"fresh"` generates one, `"shared"` resolves one from `options.session`. The wrapper never substitutes the parent agent's `sessionId`.                                                        |
 
-The practical rule: **design `inputSchema` as the orchestrator's complete per-call *business* API — and design `session` as its complete per-call identity binding.** The two are deliberately separate channels; nothing that decides *which session* runs should ever be a field a model fills in.
+The practical rule: **design `inputSchema` as the orchestrator's complete per-call _business_ API — and design `session` as its complete per-call identity binding.** The two are deliberately separate channels; nothing that decides _which session_ runs should ever be a field a model fills in.
 
 ## Setup
 
@@ -93,7 +93,9 @@ const concierge = ai.agent({
   systemPrompt: ai
     .systemPrompt()
     .persona("You are Acme's customer concierge. You answer order, account, and refund questions.")
-    .instruction("For any refund request, call `handle_refund` with the customer's full message. Do not reason about refund eligibility yourself."),
+    .instruction(
+      "For any refund request, call `handle_refund` with the customer's full message. Do not reason about refund eligibility yourself.",
+    ),
   tools: [refundTool],
 });
 
@@ -108,7 +110,7 @@ console.log(text);
 
 ## Shared sessions — `sessionScope: "shared"`
 
-When the concierge itself runs a multi-turn conversation and the refund flow must persist *across those turns*, switch to `"shared"`. The orchestrator now joins an **existing** session and checkpoints its state under that id — but the id itself is bound by your application code through `options.session`, not read from anything the model wrote. Building a `"shared"` tool without `session` throws `SupervisorFailedError` at construction, before any call can hit the missing-binding path.
+When the concierge itself runs a multi-turn conversation and the refund flow must persist _across those turns_, switch to `"shared"`. The orchestrator now joins an **existing** session and checkpoints its state under that id — but the id itself is bound by your application code through `options.session`, not read from anything the model wrote. Building a `"shared"` tool without `session` throws `SupervisorFailedError` at construction, before any call can hit the missing-binding path.
 
 ```ts
 const refundTool = refundBot.asTool({
@@ -121,7 +123,7 @@ const refundTool = refundBot.asTool({
 });
 ```
 
-`session` here is a resolver reading `ctx.artifacts` — the tool invocation's out-of-band context bag, the same channel `signal` travels on, which the model has no way to write to. Your application code is what puts `refundSessionId` there, before the concierge ever runs, tying it to something *you* authenticated (the logged-in customer's chat, not a string the model produced):
+`session` here is a resolver reading `ctx.artifacts` — the tool invocation's out-of-band context bag, the same channel `signal` travels on, which the model has no way to write to. Your application code is what puts `refundSessionId` there, before the concierge ever runs, tying it to something _you_ authenticated (the logged-in customer's chat, not a string the model produced):
 
 ```ts
 function makeConcierge(chatSessionId: string) {
@@ -156,7 +158,11 @@ function makeConcierge(chatSessionId: string) {
     session: chatSessionId, // fixed at construction — one tool instance per chat
   });
 
-  return ai.agent({ name: "concierge", model: openai.model({ name: "gpt-4o" }), tools: [refundTool] });
+  return ai.agent({
+    name: "concierge",
+    model: openai.model({ name: "gpt-4o" }),
+    tools: [refundTool],
+  });
 }
 ```
 
@@ -197,15 +203,15 @@ for (const call of failedTools) {
 
 ## Nest it, or keep it top-level?
 
-An orchestrator is already a complete, top-level executable: you call `refundBot.execute(message, { sessionId, history })`, `refundBot.stream(...)`, `refundBot.resume(sessionId)`, and `refundBot.command("compact", ...)` directly. Wrapping it `asTool()` is an *additional* surface, not the primary one — reach for it only when an outer agent genuinely needs to *choose* the refund flow against other options.
+An orchestrator is already a complete, top-level executable: you call `refundBot.execute(message, { sessionId, history })`, `refundBot.stream(...)`, `refundBot.resume(sessionId)`, and `refundBot.command("compact", ...)` directly. Wrapping it `asTool()` is an _additional_ surface, not the primary one — reach for it only when an outer agent genuinely needs to _choose_ the refund flow against other options.
 
 **Keep the orchestrator top-level when** the refund flow is the whole interaction. If a request that hits your refund endpoint is always a refund, there is no routing decision to delegate — you call `refundBot.execute(...)` and skip the wrapper entirely. Nesting it under an agent only to immediately call it adds a model round-trip, a tool-call hop, and the opaque boundary (lost `signal` / `context`) for no benefit. You also keep direct access to `resume()` and `command()`, which the `asTool` surface does not expose — once an orchestrator is a tool, the parent can only `execute` it.
 
-**Nest it inside an agent when** the agent must decide *whether* to use the orchestrator among other capabilities — order status, account questions, FAQ — and refunds are one branch. That decision is exactly what an LLM tool-call loop is for: the concierge reads each tool's `description`, picks `handle_refund` when (and only when) the customer wants a refund, and narrates the result. This is the concierge in this recipe.
+**Nest it inside an agent when** the agent must decide _whether_ to use the orchestrator among other capabilities — order status, account questions, FAQ — and refunds are one branch. That decision is exactly what an LLM tool-call loop is for: the concierge reads each tool's `description`, picks `handle_refund` when (and only when) the customer wants a refund, and narrates the result. This is the concierge in this recipe.
 
 A useful tie-breaker:
 
-- **One flow, deterministic entry → top-level.** A webhook, a job, or a route that is *defined* as "run the refund orchestrator" should call `execute()` directly.
+- **One flow, deterministic entry → top-level.** A webhook, a job, or a route that is _defined_ as "run the refund orchestrator" should call `execute()` directly.
 - **Many flows, model picks → nest under an agent.** A single conversational surface that fields mixed intents should expose each flow as a tool and let the agent route.
 
 When you do nest, pick `sessionScope` to match the parent's lifetime: a stateless one-shot agent turn pairs with `"fresh"`; a multi-turn chat agent that must carry refund context across turns pairs with `"shared"` (and a durable checkpoint store).

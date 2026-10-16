@@ -57,7 +57,7 @@ export async function updateEnvFile(appPath: string, appName: string) {
       "AppCodeName",
       appName
         .split(/-|_/g)
-        .map(word => word[0])
+        .map((word) => word[0])
         .join(""),
     );
 
@@ -70,32 +70,24 @@ export async function updateEnvFile(appPath: string, appName: string) {
     "AppCodeName",
     appName
       .split(/-|_/g)
-      .map(word => word[0])
+      .map((word) => word[0])
       .join(""),
   );
 
   putFile(path.resolve(appPath, ".env.shared"), dotEnvProduction);
 }
 
-export async function copyTemplateFiles(
-  templateName: Template,
-  appPath: string,
-  _appName: string,
-) {
+export async function copyTemplateFiles(templateName: Template, appPath: string, _appName: string) {
   // copy project files
   copyDirectory(template(templateName), appPath);
 
   // replace _.gitignore to
-  renameFile(
-    path.resolve(appPath, "_.gitignore"),
-    path.resolve(appPath, ".gitignore"),
-  );
+  renameFile(path.resolve(appPath, "_.gitignore"), path.resolve(appPath, ".gitignore"));
 }
 
 export async function allDone(appName: string) {
   outro(
-    "Awesome! Your project is ready to rock! " +
-      "Run the following command to start development:",
+    "Awesome! Your project is ready to rock! " + "Run the following command to start development:",
   );
 
   console.log(colors.cyan(`cd ${appName} && ${startCommand()}`));

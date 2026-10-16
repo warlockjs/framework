@@ -50,10 +50,7 @@ export interface RestorerContract {
    * await restorer.restore(123, { skipEvents: true });
    * ```
    */
-  restore(
-    id: string | number,
-    options?: RestorerOptions,
-  ): Promise<RestorerResult>;
+  restore(id: string | number, options?: RestorerOptions): Promise<RestorerResult>;
 
   /**
    * Restore all deleted records for the model's table.

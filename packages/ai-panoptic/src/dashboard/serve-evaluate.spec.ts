@@ -14,7 +14,12 @@ import { createRequestHandler, type ServeConfig } from "./serve";
  * handler kicks off `handleEvaluate` fire-and-forget and returns before any
  * awaited step runs).
  */
-function fakePostReq(opts: { url: string; host?: string; auth?: string; body?: string }): IncomingMessage {
+function fakePostReq(opts: {
+  url: string;
+  host?: string;
+  auth?: string;
+  body?: string;
+}): IncomingMessage {
   const emitter = new EventEmitter();
   const req = Object.assign(emitter, {
     url: opts.url,
@@ -64,7 +69,7 @@ function fakeRes(): ServerResponse & { captured: Captured } {
 
 /** Let the evaluate route's async chain (body read → judge call → response) settle. */
 function flush(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, 0));
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 const baseConfig: ServeConfig = {
@@ -115,7 +120,10 @@ describe("dashboard serve — evaluate route", () => {
     const handle = createRequestHandler(createInMemoryTraceStore(), config);
 
     const badHost = fakeRes();
-    handle(fakePostReq({ url: "/api/traces/t1/spans/t1/evaluate", host: "evil.example.com" }), badHost);
+    handle(
+      fakePostReq({ url: "/api/traces/t1/spans/t1/evaluate", host: "evil.example.com" }),
+      badHost,
+    );
     await flush();
     expect(badHost.captured.status).toBe(403);
 
@@ -197,12 +205,15 @@ describe("dashboard serve — evaluate route", () => {
     await flush();
 
     expect(res.captured.status).toBe(200);
-    expect(JSON.parse(res.captured.body)).toMatchObject({ score: 0.9, issues: ["clear and scoped"] });
+    expect(JSON.parse(res.captured.body)).toMatchObject({
+      score: 0.9,
+      issues: ["clear and scoped"],
+    });
 
     // The per-run instructions override actually reached the judge.
     const sent = model.callHistory
-      .flatMap(call => call.messages)
-      .map(message => JSON.stringify(message.content))
+      .flatMap((call) => call.messages)
+      .map((message) => JSON.stringify(message.content))
       .join("\n");
     expect(sent).toContain("Must be polite.");
   });

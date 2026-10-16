@@ -96,17 +96,17 @@ async function fetchJson(
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
 
-    throw new WebToolError(
-      `web_search request to the "${provider}" provider failed: ${message}`,
-      { type: "request-failed", cause },
-    );
+    throw new WebToolError(`web_search request to the "${provider}" provider failed: ${message}`, {
+      type: "request-failed",
+      cause,
+    });
   }
 
   if (!response.ok) {
-    throw new WebToolError(
-      `web_search "${provider}" provider returned HTTP ${response.status}.`,
-      { type: "request-failed", context: { status: response.status } },
-    );
+    throw new WebToolError(`web_search "${provider}" provider returned HTTP ${response.status}.`, {
+      type: "request-failed",
+      context: { status: response.status },
+    });
   }
 
   return response.json();

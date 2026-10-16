@@ -49,8 +49,8 @@ export const cacheConfigurations: CacheConfigurations = {
   options: {
     pg: {
       client: pool,
-      table: "warlock_cache",  // optional, this is the default
-      ttl: "1h",               // optional default for new entries
+      table: "warlock_cache", // optional, this is the default
+      ttl: "1h", // optional default for new entries
       globalPrefix: "prod-app",
     },
   },
@@ -74,7 +74,7 @@ options: {
 ```ts title="src/main.ts"
 const pool = await buildTenantPool(tenantId);
 cache.setCacheConfigurations(cacheConfigurations);
-await cache.use("pg", { client: pool });   // runtime options merge over static config
+await cache.use("pg", { client: pool }); // runtime options merge over static config
 ```
 
 Both patterns produce the same loaded driver. See [Cache Manager → Runtime driver options](/v/latest/cache/cache-manager/#runtime-driver-options) for merge precedence and reload semantics.
@@ -104,14 +104,14 @@ You can change it later, but you'll need to rebuild the index.
 
 ### Options reference
 
-| Option | Type | Required | Description |
-|---|---|---|---|
-| `client` | `pg.Pool \| pg.Client` | yes | Your already-built Postgres connection. The driver never closes it. |
-| `table` | `string` | no | Table name. Default: `"warlock_cache"`. Restricted to `[A-Za-z_][A-Za-z0-9_]*` (no SQL injection via DDL). |
-| `ttl` | `number \| string` | no | Default TTL for new entries. Seconds or a duration string (`"1h"`, `"7d"`). Default: `Infinity`. |
-| `globalPrefix` | `string \| () => string` | no | Prefix all keys for tenant separation. |
-| `vector.dimensions` | `number` | only with vector | Vector size. Must match your embedder. |
-| `vector.index` | `"hnsw" \| "ivfflat"` | no | pgvector index strategy. Default: `"hnsw"`. |
+| Option              | Type                     | Required         | Description                                                                                                |
+| ------------------- | ------------------------ | ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| `client`            | `pg.Pool \| pg.Client`   | yes              | Your already-built Postgres connection. The driver never closes it.                                        |
+| `table`             | `string`                 | no               | Table name. Default: `"warlock_cache"`. Restricted to `[A-Za-z_][A-Za-z0-9_]*` (no SQL injection via DDL). |
+| `ttl`               | `number \| string`       | no               | Default TTL for new entries. Seconds or a duration string (`"1h"`, `"7d"`). Default: `Infinity`.           |
+| `globalPrefix`      | `string \| () => string` | no               | Prefix all keys for tenant separation.                                                                     |
+| `vector.dimensions` | `number`                 | only with vector | Vector size. Must match your embedder.                                                                     |
+| `vector.index`      | `"hnsw" \| "ivfflat"`    | no               | pgvector index strategy. Default: `"hnsw"`.                                                                |
 
 ## One-time schema setup
 
@@ -175,10 +175,10 @@ await cache.set("doc.policy", policy, {
   tags: ["policies"],
 });
 
-const hits = await cache.similar<typeof policy>(
-  await embedder.embed(userQuestion),
-  { topK: 5, threshold: 0.75 },
-);
+const hits = await cache.similar<typeof policy>(await embedder.embed(userQuestion), {
+  topK: 5,
+  threshold: 0.75,
+});
 ```
 
 See [Similarity Retrieval](/v/latest/cache/similarity/) for the full `similar()` API.

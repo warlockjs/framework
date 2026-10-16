@@ -77,9 +77,7 @@ export async function scanTopLevelPublishableManifests(
     try {
       manifest = JSON.parse(source) as PackageManifest;
     } catch (error) {
-      throw new Error(
-        `Cannot parse top-level manifest ${manifestPath}: ${formatError(error)}`,
-      );
+      throw new Error(`Cannot parse top-level manifest ${manifestPath}: ${formatError(error)}`);
     }
 
     if (manifest.private === true || !isWarlockPackageName(manifest.name)) {
@@ -124,10 +122,10 @@ export async function deriveWarlockFamily({
   const semanticProblems: string[] = [];
 
   const missingFromConfig = [...discoveredByName.keys()]
-    .filter(name => !configuredByName.has(name))
+    .filter((name) => !configuredByName.has(name))
     .sort(compareText);
   const missingFromFilesystem = [...configuredByName.keys()]
-    .filter(name => !discoveredByName.has(name))
+    .filter((name) => !discoveredByName.has(name))
     .sort(compareText);
 
   if (missingFromConfig.length > 0 || missingFromFilesystem.length > 0) {
@@ -179,7 +177,7 @@ export async function deriveWarlockFamily({
   if (!version) throw new Error("Warlock family discovery returned no publishable manifests.");
 
   const members = discovered
-    .map(manifest => ({
+    .map((manifest) => ({
       ...manifest,
       configuredRoot: path.resolve(configDir, configuredByName.get(manifest.name)!.root),
     }))
@@ -193,9 +191,7 @@ export async function loadAuthoritativeWarlockFamily(
   packagesRoot: string = path.resolve(import.meta.dirname, "../../../packages"),
 ): Promise<WarlockFamily> {
   const configDir = path.resolve(import.meta.dirname, "..");
-  const declaration = pkgistConfig.families?.find(
-    family => family.name === WARLOCK_FAMILY_NAME,
-  );
+  const declaration = pkgistConfig.families?.find((family) => family.name === WARLOCK_FAMILY_NAME);
 
   if (!declaration) {
     throw new Error(`pkgist.config.ts has no ${JSON.stringify(WARLOCK_FAMILY_NAME)} family.`);
@@ -206,8 +202,7 @@ export async function loadAuthoritativeWarlockFamily(
 
 function isWarlockPackageName(name: unknown): name is string {
   return (
-    name === "create-warlock" ||
-    (typeof name === "string" && /^@warlock\.js\/[^/]+$/.test(name))
+    name === "create-warlock" || (typeof name === "string" && /^@warlock\.js\/[^/]+$/.test(name))
   );
 }
 

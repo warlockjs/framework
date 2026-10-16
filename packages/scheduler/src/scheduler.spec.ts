@@ -1,15 +1,7 @@
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone.js";
 import utc from "dayjs/plugin/utc.js";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Job, job } from "./job";
 import { Scheduler } from "./scheduler";
 
@@ -148,7 +140,7 @@ describe("Scheduler — addJob / addJobs / newJob", () => {
     const b = job("b", noop).everyMinute();
     const c = job("c", noop).everyMinute();
     scheduler.addJob(a).addJobs([b, c]);
-    expect(scheduler.list().map(j => j.name)).toEqual(["a", "b", "c"]);
+    expect(scheduler.list().map((j) => j.name)).toEqual(["a", "b", "c"]);
   });
 });
 
@@ -315,10 +307,7 @@ describe("Scheduler — tick behaviour", () => {
     await vi.advanceTimersByTimeAsync(1500);
 
     expect(startListener).toHaveBeenCalledWith("a");
-    expect(completeListener).toHaveBeenCalledWith(
-      "a",
-      expect.objectContaining({ success: true }),
-    );
+    expect(completeListener).toHaveBeenCalledWith("a", expect.objectContaining({ success: true }));
 
     scheduler.stop();
   });
@@ -349,7 +338,7 @@ describe("Scheduler — tick behaviour", () => {
     // externally before starting the scheduler.
     const scheduler = new Scheduler();
     const jobInstance = job("a", async () => {
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     })
       .everySecond()
       .preventOverlap();
@@ -397,12 +386,12 @@ describe("Scheduler — execution modes", () => {
     scheduler.addJobs([
       job("a", async () => {
         order.push("start-a");
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         order.push("end-a");
       }).everySecond(),
       job("b", async () => {
         order.push("start-b");
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         order.push("end-b");
       }).everySecond(),
     ]);
@@ -423,12 +412,12 @@ describe("Scheduler — execution modes", () => {
     scheduler.addJobs([
       job("a", async () => {
         order.push("start-a");
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         order.push("end-a");
       }).everySecond(),
       job("b", async () => {
         order.push("start-b");
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         order.push("end-b");
       }).everySecond(),
     ]);
@@ -455,7 +444,7 @@ describe("Scheduler — execution modes", () => {
     const makeCallback = () => async () => {
       liveCount.current++;
       liveCount.peak = Math.max(liveCount.peak, liveCount.current);
-      await new Promise<void>(resolve => callbacks.push(resolve));
+      await new Promise<void>((resolve) => callbacks.push(resolve));
       liveCount.current--;
     };
 
@@ -510,7 +499,7 @@ describe("Scheduler — execution modes", () => {
     ]);
 
     const errored: string[] = [];
-    scheduler.on("job:error", name => errored.push(name));
+    scheduler.on("job:error", (name) => errored.push(name));
 
     scheduler.runInParallel(true);
     scheduler.start();
@@ -531,12 +520,12 @@ describe("Scheduler — execution modes", () => {
     scheduler.addJobs([
       job("a", async () => {
         order.push("start-a");
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         order.push("end-a");
       }).everySecond(),
       job("b", async () => {
         order.push("start-b");
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         order.push("end-b");
       }).everySecond(),
     ]);
@@ -562,7 +551,7 @@ describe("Scheduler — shutdown", () => {
     let finished = false;
     scheduler.addJob(
       job("a", async () => {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
         finished = true;
       }).everySecond(),
     );
@@ -582,7 +571,7 @@ describe("Scheduler — shutdown", () => {
     const scheduler = new Scheduler();
     scheduler.addJob(
       job("a", async () => {
-        await new Promise(resolve => setTimeout(resolve, 10_000));
+        await new Promise((resolve) => setTimeout(resolve, 10_000));
       }).everySecond(),
     );
 
@@ -636,7 +625,7 @@ describe("Scheduler — drift compensation", () => {
     scheduler.runEvery(100);
     scheduler.addJob(
       job("slow", async () => {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }).everySecond(),
     );
 
@@ -701,7 +690,7 @@ describe("Scheduler — event emitter", () => {
     const scheduler = new Scheduler();
     scheduler.addJob(job("a", noop).everyMinute());
     let payload: unknown;
-    scheduler.on("scheduler:tick", ts => {
+    scheduler.on("scheduler:tick", (ts) => {
       payload = ts;
     });
 

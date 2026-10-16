@@ -119,11 +119,7 @@ The migration page is intentionally a kickoff. Once you need more:
 - **Programmatic execution** for CI scripts, test setup, container init, or any embedded use case — call the Operations API directly:
 
   ```ts
-  import {
-    connectToDatabase,
-    migrationRunner,
-    runMigrations,
-  } from "@warlock.js/cascade";
+  import { connectToDatabase, migrationRunner, runMigrations } from "@warlock.js/cascade";
   import databaseConfig from "./config/database";
   import UserMigration from "./src/app/users/models/user/migrations/05-11-2026_10-00-00-user.migration";
 

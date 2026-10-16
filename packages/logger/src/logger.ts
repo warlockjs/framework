@@ -452,10 +452,7 @@ export class Logger {
    * const user = await usersRepo.findById(id);
    * end({ id, found: !!user });
    */
-  public timer(
-    module: string,
-    action: string,
-  ): (extra?: Record<string, any>) => this {
+  public timer(module: string, action: string): (extra?: Record<string, any>) => this {
     const startedAt = Date.now();
     return (extra?: Record<string, any>) => {
       const durationMs = Date.now() - startedAt;
@@ -666,7 +663,9 @@ function reportChannelError(error: unknown, channel: LogContract) {
   const reason = error instanceof Error ? error.message : String(error);
 
   try {
-    process.stderr.write(`[@warlock.js/logger] channel "${channel.name}" failed to log: ${reason}\n`);
+    process.stderr.write(
+      `[@warlock.js/logger] channel "${channel.name}" failed to log: ${reason}\n`,
+    );
   } catch {
     // stderr itself is gone; nothing left to report to.
   }

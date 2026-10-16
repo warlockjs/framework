@@ -120,20 +120,20 @@ toOptions: ({ sessionId, history }) => ({ sessionId, history })
 
 ### Options
 
-| Option | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `authToken` | `string` | - | Require `Authorization: Bearer <token>`, else `401`. |
-| `toInput` | `(body) => TInput` | `body.input` | Map parsed JSON to executable input. |
-| `toOptions` | `(context: ServeRequestContext) => Record<string, unknown>` | `() => ({})` | Add trusted per-call stream options. |
-| `session` | `ServeSessionOptions` | Fresh UUID and no history | Own the request session ID and optional server-loaded history. |
-| `maxBodyBytes` | `number` | `1_048_576` (1 MiB) | Maximum JSON request size; oversized bodies get `413`. |
+| Option         | Type                                                        | Default                   | Purpose                                                        |
+| -------------- | ----------------------------------------------------------- | ------------------------- | -------------------------------------------------------------- |
+| `authToken`    | `string`                                                    | -                         | Require `Authorization: Bearer <token>`, else `401`.           |
+| `toInput`      | `(body) => TInput`                                          | `body.input`              | Map parsed JSON to executable input.                           |
+| `toOptions`    | `(context: ServeRequestContext) => Record<string, unknown>` | `() => ({})`              | Add trusted per-call stream options.                           |
+| `session`      | `ServeSessionOptions`                                       | Fresh UUID and no history | Own the request session ID and optional server-loaded history. |
+| `maxBodyBytes` | `number`                                                    | `1_048_576` (1 MiB)       | Maximum JSON request size; oversized bodies get `413`.         |
 
 ## Client disconnects cancel the run
 
 Each request gets an `AbortSignal` in `ServeRequestContext` and in the options passed to `stream()`. If the client aborts its request or closes the response before the stream finishes, `serve` aborts that signal and stops writing SSE frames. Forward it through work added in `toOptions` so downstream work can stop promptly:
 
 ```ts
-toOptions: ({ signal }) => ({ signal })
+toOptions: ({ signal }) => ({ signal });
 ```
 
 Cancellation is cooperative: the executable and its provider or dependencies must honor the signal to stop in-flight work.

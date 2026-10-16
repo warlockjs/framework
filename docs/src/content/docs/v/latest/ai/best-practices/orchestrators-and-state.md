@@ -13,7 +13,7 @@ Everything below assumes the shape from the [run-orchestrator skill](/v/latest/a
 
 ## One `sessionId` per conversation — and pass it every call
 
-There is no implicit "current session". Every `execute` / `stream` / `resume` / `command` call names the session it acts on via `sessionId`. The checkpoint row is keyed by `(orchestrator_name, session_id, turn_index)` — so the `sessionId` *is* the conversation's identity. Get it wrong and you either fork one conversation into two unrelated sessions or, worse, collapse two users into one.
+There is no implicit "current session". Every `execute` / `stream` / `resume` / `command` call names the session it acts on via `sessionId`. The checkpoint row is keyed by `(orchestrator_name, session_id, turn_index)` — so the `sessionId` _is_ the conversation's identity. Get it wrong and you either fork one conversation into two unrelated sessions or, worse, collapse two users into one.
 
 **Do this — derive `sessionId` from a stable conversation key.** Mint it once when the conversation starts and reuse it verbatim for every subsequent turn.
 
@@ -40,11 +40,11 @@ await supportBot.execute(message, { sessionId: crypto.randomUUID(), history });
 await supportBot.execute(message, { sessionId: "support-session", history });
 ```
 
-> Namespace the id the way you namespace anything multi-tenant: `support:${tenantId}:${threadId}`. The orchestrator `name` already partitions sessions across orchestrators (it's the first PK segment), so you only need the id to be unique *within* one orchestrator.
+> Namespace the id the way you namespace anything multi-tenant: `support:${tenantId}:${threadId}`. The orchestrator `name` already partitions sessions across orchestrators (it's the first PK segment), so you only need the id to be unique _within_ one orchestrator.
 
 ## Serialize turns per session — the checkpoint is last-writer-wins
 
-A checkpoint row is append-only per `turn_index`, but the orchestrator computes the next turn from *the checkpoint it loaded at the start of the turn*. If two `execute()` calls for the same `sessionId` run concurrently, they both load the same latest turn, both compute the same next `turn_index`, and the slower one's persist silently clobbers the faster one's — last writer wins, and a turn's worth of state vanishes. The framework does not lock the session for you (the only lock is the *compaction* lock, which is a different thing).
+A checkpoint row is append-only per `turn_index`, but the orchestrator computes the next turn from _the checkpoint it loaded at the start of the turn_. If two `execute()` calls for the same `sessionId` run concurrently, they both load the same latest turn, both compute the same next `turn_index`, and the slower one's persist silently clobbers the faster one's — last writer wins, and a turn's worth of state vanishes. The framework does not lock the session for you (the only lock is the _compaction_ lock, which is a different thing).
 
 **Do this — funnel a session's turns through a per-session queue.** Hold a turn until the previous turn for the same `sessionId` has settled.
 
@@ -81,11 +81,11 @@ await Promise.all([
 ]);
 ```
 
-> The `awaiting-input` status is your serialization signal in disguise: a turn that returns `status: "awaiting-input"` is telling you the session is paused, waiting for the *next* user turn. Don't send another turn until you've got it back.
+> The `awaiting-input` status is your serialization signal in disguise: a turn that returns `status: "awaiting-input"` is telling you the session is paused, waiting for the _next_ user turn. Don't send another turn until you've got it back.
 
 ## Bound history per dispatchable with `historyWindow`
 
-`history` is required on every `execute` call — the framework owns session *state*, never the raw message log, so you re-supply prior turns each call. Left unbounded, that array grows every turn and you pay for the whole transcript on every dispatch, forever. `historyWindow` slices it per role *before* the turn runs, so the router and the agents each see only what they need.
+`history` is required on every `execute` call — the framework owns session _state_, never the raw message log, so you re-supply prior turns each call. Left unbounded, that array grows every turn and you pay for the whole transcript on every dispatch, forever. `historyWindow` slices it per role _before_ the turn runs, so the router and the agents each see only what they need.
 
 **Do this — give the router a tight window and the agents a wider one.** The router only needs the recent gist to pick an intent; the working agents need more context to actually answer.
 
@@ -95,8 +95,8 @@ const supportBot = ai.orchestrator<SupportState>({
   intents,
   route,
   historyWindow: {
-    router: 5,   // last 5 messages are plenty to choose an intent
-    agents: 20,  // the agent doing the work gets more context
+    router: 5, // last 5 messages are plenty to choose an intent
+    agents: 20, // the agent doing the work gets more context
   },
   checkpointStore,
 });
@@ -127,11 +127,11 @@ const supportBot = ai.orchestrator<SupportState>({
 await supportBot.execute(message, { sessionId, history: everyMessageEverSent });
 ```
 
-> `historyWindow` trims what *this turn* sends to the model; it does not shrink the array you store. Pair it with compaction (next section) so the underlying history you re-supply also stays small.
+> `historyWindow` trims what _this turn_ sends to the model; it does not shrink the array you store. Pair it with compaction (next section) so the underlying history you re-supply also stays small.
 
 ## Schedule compaction so context stays small
 
-Windowing caps per-turn cost; it doesn't stop the history *you re-supply* from growing. Compaction does — `summarize` replaces a run of old turns with one summary message once the conversation gets long. The object form fires automatically after `afterTurns` and keeps the most recent `keep` verbatim.
+Windowing caps per-turn cost; it doesn't stop the history _you re-supply_ from growing. Compaction does — `summarize` replaces a run of old turns with one summary message once the conversation gets long. The object form fires automatically after `afterTurns` and keeps the most recent `keep` verbatim.
 
 **Do this — set a count-based policy and apply the result to your message store.** `onCompact` hands you the `CompactionResult` so you can collapse the range in the store you own.
 
@@ -141,8 +141,8 @@ const supportBot = ai.orchestrator<SupportState>({
   intents,
   route,
   summarize: {
-    afterTurns: 20,        // start compacting once the session passes 20 turns
-    keep: 6,               // keep the 6 most-recent messages verbatim
+    afterTurns: 20, // start compacting once the session passes 20 turns
+    keep: 6, // keep the 6 most-recent messages verbatim
     summarizer: cheapModel, // summarize with a cheap model, not the turn model
     onCompact: async (compaction, ctx) => {
       // compaction = { summary, replacesFromIndex, replacesToIndex }
@@ -170,11 +170,11 @@ if (result.compaction) {
 const supportBot = ai.orchestrator<SupportState>({ name, intents, route, checkpointStore });
 ```
 
-> The callback form of `summarize` (`(history) => CompactionResult`) **never auto-fires** — it runs only when you call `command("compact", { sessionId, history })`. Reach for it when you want full control of *what* gets summarized; reach for the object form when you just want "compact every N turns" on autopilot.
+> The callback form of `summarize` (`(history) => CompactionResult`) **never auto-fires** — it runs only when you call `command("compact", { sessionId, history })`. Reach for it when you want full control of _what_ gets summarized; reach for the object form when you just want "compact every N turns" on autopilot.
 
 ## Pick the store deliberately — memory for dev, pg or redis for prod
 
-`ai.orchestrator()` persists through two **distinct** stores, and confusing them is the most common wiring mistake. The **checkpoint** store (`ai.checkpoint.{memory,pg,redis}()`) holds cross-turn session state and is always required. The **snapshot** store (`ai.snapshot.{memory,pg,redis}()`) holds the in-flight internal-supervisor run and is required *only* when `iterate: true` — construction throws `OrchestratorConfigError` if you set `iterate: true` without one (or a `defaultSnapshotStore`).
+`ai.orchestrator()` persists through two **distinct** stores, and confusing them is the most common wiring mistake. The **checkpoint** store (`ai.checkpoint.{memory,pg,redis}()`) holds cross-turn session state and is always required. The **snapshot** store (`ai.snapshot.{memory,pg,redis}()`) holds the in-flight internal-supervisor run and is required _only_ when `iterate: true` — construction throws `OrchestratorConfigError` if you set `iterate: true` without one (or a `defaultSnapshotStore`).
 
 **Do this — `memory` in dev, a durable store in prod, chosen for what it can do.** Only the checkpoint store needs to enumerate sessions for the boot-drain loop, and the Redis snapshot store deliberately omits `list()` — so the common production split is a Postgres checkpoint store (queryable, `list()`-capable) with a Redis snapshot store (fast, high-churn).
 
@@ -182,16 +182,16 @@ const supportBot = ai.orchestrator<SupportState>({ name, intents, route, checkpo
 import { ai } from "@warlock.js/ai";
 import { pgPool, redisClient } from "./db"; // YOUR clients — @warlock.js/ai imports neither pg nor redis
 
-export const checkpointStore = ai.checkpoint.pg({ client: pgPool });   // list()-capable → drives boot-drain
+export const checkpointStore = ai.checkpoint.pg({ client: pgPool }); // list()-capable → drives boot-drain
 export const snapshotStore = ai.snapshot.redis({ client: redisClient }); // fast, high-churn
 
 export const supportBot = ai.orchestrator<SupportState>({
   name: "refund-support",
   intents,
   route,
-  iterate: true,        // each turn delegates to a real internal supervisor
+  iterate: true, // each turn delegates to a real internal supervisor
   checkpointStore,
-  snapshotStore,        // required because iterate: true
+  snapshotStore, // required because iterate: true
 });
 ```
 
@@ -201,7 +201,12 @@ Register them once with `ai.config({ defaultCheckpointStore, defaultSnapshotStor
 
 ```ts
 // Anti-pattern: in-memory checkpoint in prod — every session evaporates on deploy.
-const supportBot = ai.orchestrator({ name, intents, route, checkpointStore: ai.checkpoint.memory() });
+const supportBot = ai.orchestrator({
+  name,
+  intents,
+  route,
+  checkpointStore: ai.checkpoint.memory(),
+});
 
 // Anti-pattern: iterate without durability — throws OrchestratorConfigError at construction.
 const supportBot = ai.orchestrator({ name, intents, route, iterate: true /* no snapshotStore */ });
@@ -238,7 +243,7 @@ export async function drainInterruptedSessions() {
 }
 ```
 
-**Avoid this — assuming a restarted process picks up where it left off on its own.** Nothing resumes an interrupted turn implicitly. Skip the drain and a session that was mid-iteration when the pod rotated stays frozen until — if you're lucky — the user sends another turn, at which point `execute()` opens a *fresh* turn on top of a half-finished one.
+**Avoid this — assuming a restarted process picks up where it left off on its own.** Nothing resumes an interrupted turn implicitly. Skip the drain and a session that was mid-iteration when the pod rotated stays frozen until — if you're lucky — the user sends another turn, at which point `execute()` opens a _fresh_ turn on top of a half-finished one.
 
 > `resume()` re-supplies request-scoped `context` (never persisted) and rehydrates `state` from the checkpoint — there's no `history` argument, because it continues an in-flight turn rather than opening a new one. Anything the resumed turn needs from `context` (db handles, request ids) must be re-supplied here.
 
@@ -279,7 +284,7 @@ try {
 await supportBot.execute(message, { sessionId, history, force: true });
 ```
 
-> The orchestrator signature does **not** aggregate the internal supervisor's signature. Internal-supervisor drift surfaces separately, only on `iterate: true` *resume*, via the supervisor's own check — so a change to a router agent's prompt won't trip the orchestrator-level drift guard. Version both layers when you change both.
+> The orchestrator signature does **not** aggregate the internal supervisor's signature. Internal-supervisor drift surfaces separately, only on `iterate: true` _resume_, via the supervisor's own check — so a change to a router agent's prompt won't trip the orchestrator-level drift guard. Version both layers when you change both.
 
 ## Keep session state JSON-serializable and small
 
@@ -290,7 +295,7 @@ Whatever your intents merge into `state` gets checkpointed verbatim — it's the
 ```ts
 type SupportState = {
   category?: "refund" | "shipping" | "other";
-  orderId?: string;        // the id, not the hydrated order object
+  orderId?: string; // the id, not the hydrated order object
   refundEligible?: boolean;
   replyDraft?: string;
 };
@@ -301,9 +306,9 @@ type SupportState = {
 ```ts
 // Anti-pattern: live handles and fat payloads in session state.
 type SupportState = {
-  db: Pool;                 // a connection can't be checkpointed
-  fetchedAt: Date;          // round-trips to a string, breaks `instanceof Date`
-  fullOrder: Order;         // re-serialized and re-loaded on every single turn
+  db: Pool; // a connection can't be checkpointed
+  fetchedAt: Date; // round-trips to a string, breaks `instanceof Date`
+  fullOrder: Order; // re-serialized and re-loaded on every single turn
 };
 ```
 

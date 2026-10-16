@@ -1,7 +1,11 @@
 import type { Environment } from "../utils/environment";
 
 const IN_PROCESS_CACHE_NAMES = ["memory", "memoryextended", "lru"];
-const IN_PROCESS_CACHE_CLASSES = ["memorycachedriver", "memoryextendedcachedriver", "lrumemorycachedriver"];
+const IN_PROCESS_CACHE_CLASSES = [
+  "memorycachedriver",
+  "memoryextendedcachedriver",
+  "lrumemorycachedriver",
+];
 
 /**
  * Warning for a production app whose default cache driver keeps data in this

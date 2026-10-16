@@ -382,13 +382,13 @@ describe("when / whenSibling conditional schema", () => {
       }),
     });
 
-    expect(
-      (await validate(schema, { contactType: "email", contact: "a@b.com" })).isValid,
-    ).toBe(true);
+    expect((await validate(schema, { contactType: "email", contact: "a@b.com" })).isValid).toBe(
+      true,
+    );
     expect((await validate(schema, { contactType: "email", contact: "nope" })).isValid).toBe(false);
-    expect(
-      (await validate(schema, { contactType: "phone", contact: "1234567890" })).isValid,
-    ).toBe(true);
+    expect((await validate(schema, { contactType: "phone", contact: "1234567890" })).isValid).toBe(
+      true,
+    );
     expect((await validate(schema, { contactType: "phone", contact: "12" })).isValid).toBe(false);
   });
 
@@ -443,7 +443,10 @@ describe("when / whenSibling conditional schema", () => {
 describe("remaining date mutators", () => {
   it("addHours shifts the hour before a time check", async () => {
     // 08:00 + 7h = 15:00 → fromHour(15) passes
-    const result = await validate(v.date().addHours(7).fromHour(15), new Date(2023, 5, 15, 8, 0, 0));
+    const result = await validate(
+      v.date().addHours(7).fromHour(15),
+      new Date(2023, 5, 15, 8, 0, 0),
+    );
     expect(result.isValid).toBe(true);
   });
 

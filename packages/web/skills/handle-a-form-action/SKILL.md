@@ -35,7 +35,9 @@ export default function Contact() {
     <Form>
       <input name="email" defaultValue={result?.values?.email} />
       <FieldError name="email" />
-      {result?.formErrors.map(message => <p key={message}>{message}</p>)}
+      {result?.formErrors.map((message) => (
+        <p key={message}>{message}</p>
+      ))}
       <button disabled={pending}>Send</button>
     </Form>
   );
@@ -43,6 +45,7 @@ export default function Contact() {
 ```
 
 ## Rules
+
 - Export `action` OR `actions` (a record), never both; page modules only. Policy goes in `config.action` / `config.actions.<name>` (`validation`, `middleware`), and the key must match an export.
 - Several forms: `actions = { save, remove }`, `<Form action="remove">`. The name travels as the body field `_action`; names match `/^[a-z][a-zA-Z0-9]*$/`; `default` is reserved.
 - Validation runs on the body only (files included); use `request.validated()`. Failure is a 422 `ActionState`, the action does not run.
@@ -101,7 +104,9 @@ export default function LoginPage() {
       <FieldError name="email" />
       <input name="password" type="password" />
       <FieldError name="password" />
-      {result?.formErrors.map((message) => <p key={message}>{message}</p>)}
+      {result?.formErrors.map((message) => (
+        <p key={message}>{message}</p>
+      ))}
       <button disabled={pending}>Sign in</button>
     </Form>
   );
@@ -203,10 +208,12 @@ split the browser-safe constraints into a shared schema.
 ## Observe failures and cancellations
 
 ```tsx
-<Form onSettled={outcome => {
-  if (outcome.type === "failed") setMessage(outcome.reason);
-  if (outcome.type === "dropped") setMessage("Submission cancelled");
-}}>
+<Form
+  onSettled={(outcome) => {
+    if (outcome.type === "failed") setMessage(outcome.reason);
+    if (outcome.type === "dropped") setMessage("Submission cancelled");
+  }}
+>
   <button>Start</button>
   <button data-independent>Cancel</button>
 </Form>
@@ -253,9 +260,13 @@ export default function CancelPage() {
   const [message, setMessage] = useState("");
   return (
     <>
-      <Form independent query={{ source: "controls" }} onSettled={(outcome) => {
-        setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
-      }}>
+      <Form
+        independent
+        query={{ source: "controls" }}
+        onSettled={(outcome) => {
+          setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
+        }}
+      >
         <button>Cancel</button>
       </Form>
       <p>{message}</p>

@@ -270,12 +270,12 @@ Translation happens at the controller or response layer, never in repositories o
 A quick cheat-sheet of which properties are available where:
 
 | Step              | `request.locals.user` | `request.validated()` | `request.params` | `ctx` (use-case) |
-| ----------------- | -------------- | --------------------- | ---------------- | ---------------- |
-| Middleware        | maybe          | not yet               | yes              | n/a              |
-| Schema validation | yes (if auth)  | not yet               | yes              | n/a              |
-| Controller        | yes (if auth)  | yes (if schema)       | yes              | n/a              |
-| Use-case guard    | n/a            | data is `Readonly`    | n/a              | yes (empty)      |
-| Use-case handler  | n/a            | data is validated     | n/a              | yes (enriched)   |
+| ----------------- | --------------------- | --------------------- | ---------------- | ---------------- |
+| Middleware        | maybe                 | not yet               | yes              | n/a              |
+| Schema validation | yes (if auth)         | not yet               | yes              | n/a              |
+| Controller        | yes (if auth)         | yes (if schema)       | yes              | n/a              |
+| Use-case guard    | n/a                   | data is `Readonly`    | n/a              | yes (empty)      |
+| Use-case handler  | n/a                   | data is validated     | n/a              | yes (enriched)   |
 
 `request.locals.user` is populated by `authMiddleware` — without that middleware on the route, it's undefined.
 

@@ -40,13 +40,13 @@ const digest = await hashFileSmallAsync("./icon.svg");
 
 `hashFileSmallAsync` reads the file in a single `readFile` call before hashing. Slightly faster than streaming when the file is < ~1 MB; **don't** use it on large files (it'll load the whole thing into memory).
 
-| Use | Reach for |
-| --- | --- |
-| Streaming async (default for files) | `hashFileAsync` |
-| Small file, slightly faster async | `hashFileSmallAsync` |
-| Sync (CLI / config loader only) | `hashFile` |
-| In-memory string | `hashString` |
-| In-memory Buffer / Uint8Array | `hashBuffer` |
+| Use                                 | Reach for            |
+| ----------------------------------- | -------------------- |
+| Streaming async (default for files) | `hashFileAsync`      |
+| Small file, slightly faster async   | `hashFileSmallAsync` |
+| Sync (CLI / config loader only)     | `hashFile`           |
+| In-memory string                    | `hashString`         |
+| In-memory Buffer / Uint8Array       | `hashBuffer`         |
 
 ## Hash in-memory content
 
@@ -101,7 +101,7 @@ async function syncIfChanged() {
     : null;
 
   if (inputDigest === cachedDigest) {
-    return;   // input unchanged — skip the expensive pipeline
+    return; // input unchanged — skip the expensive pipeline
   }
 
   await runPipeline();

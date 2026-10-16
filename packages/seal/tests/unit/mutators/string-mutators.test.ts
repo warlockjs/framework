@@ -145,7 +145,7 @@ describe("String Mutators", () => {
 
     it.each([replaceMutator, replaceAllMutator])(
       "keeps the string value when replacement options are absent: %s",
-      async mutate => {
+      async (mutate) => {
         for (const context of [undefined, {}, { options: undefined }, { options: null }]) {
           expect(await mutate("hello world", context as any)).toBe("hello world");
           expect(await mutate(123, context as any)).toBe("123");

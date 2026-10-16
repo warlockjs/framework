@@ -27,11 +27,7 @@ includes handlers, middleware, schemas, or source paths. It is absent for a
 Core-only app.
 
 ```ts title="src/connectors/queue-worker-connector.ts"
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 
 export class QueueWorkerConnector extends BaseConnector {
   public readonly name: ConnectorName = "queueWorker";
@@ -62,14 +58,14 @@ That's the entire shape. Put the file under `src/connectors/<name>.ts` (a conven
 
 Every `BaseConnector` subclass declares five members. Two are required readonly properties; one is a watched-files array; two are lifecycle methods.
 
-| Member          | Type                          | Notes                                                                                |
-| --------------- | ----------------------------- | ------------------------------------------------------------------------------------ |
-| `name`          | `ConnectorName`               | Unique. Used in preload lists (`preload: { connectors: ["queueWorker"] }`).          |
-| `priority`      | `number`                      | Lower starts first. See the built-in `ConnectorPriority` enum for the existing ordering. |
-| `lifecyclePhase`| `ConnectorLifecyclePhase`     | `Early` (default) or `Late`. Semantics below.                                        |
-| `watchedFiles`  | `string[]` (protected)        | Relative paths; touching any triggers a restart in dev mode.                         |
-| `start()`       | `() => Promise<void>`         | The work that brings the subsystem online. Set `this.active = true` on success.      |
-| `shutdown()`    | `() => Promise<void>`         | Inverse — close connections, drain queues. Set `this.active = false`.                |
+| Member           | Type                      | Notes                                                                                    |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
+| `name`           | `ConnectorName`           | Unique. Used in preload lists (`preload: { connectors: ["queueWorker"] }`).              |
+| `priority`       | `number`                  | Lower starts first. See the built-in `ConnectorPriority` enum for the existing ordering. |
+| `lifecyclePhase` | `ConnectorLifecyclePhase` | `Early` (default) or `Late`. Semantics below.                                            |
+| `watchedFiles`   | `string[]` (protected)    | Relative paths; touching any triggers a restart in dev mode.                             |
+| `start()`        | `() => Promise<void>`     | The work that brings the subsystem online. Set `this.active = true` on success.          |
+| `shutdown()`     | `() => Promise<void>`     | Inverse — close connections, drain queues. Set `this.active = false`.                    |
 
 Optional overrides:
 
@@ -83,18 +79,18 @@ Optional overrides:
 
 Connectors start in ascending order of `priority` and shut down in reverse. The built-in ordering, from the `ConnectorPriority` enum:
 
-| Connector       | Priority | Phase   |
-| --------------- | -------- | ------- |
-| `logger`        | `0`      | Early   |
-| `mailer`        | `1`      | Early   |
-| `database`      | `2`      | Early   |
-| `herald`        | `3`      | Early   |
-| `cache`         | `4`      | Early   |
+| Connector       | Priority | Phase    |
+| --------------- | -------- | -------- |
+| `logger`        | `0`      | Early    |
+| `mailer`        | `1`      | Early    |
+| `database`      | `2`      | Early    |
+| `herald`        | `3`      | Early    |
+| `cache`         | `4`      | Early    |
 | `http`          | `5`      | **Late** |
-| `storage`       | `6`      | Early   |
+| `storage`       | `6`      | Early    |
 | `socket`        | `7`      | **Late** |
-| `notifications` | `8`      | Early   |
-| `access`        | `9`      | Early   |
+| `notifications` | `8`      | Early    |
+| `access`        | `9`      | Early    |
 
 (The priority **constant** for herald is `COMMUNICATOR`, but the connector's runtime name is `herald`.)
 
@@ -146,7 +142,9 @@ import { ExperimentalIndexerConnector } from "./src/connectors/experimental-inde
 
 export default defineConfig({
   connectors: [
-    ...(process.env.SEARCH_EXPERIMENTAL_ENABLED === "true" ? [new ExperimentalIndexerConnector()] : []),
+    ...(process.env.SEARCH_EXPERIMENTAL_ENABLED === "true"
+      ? [new ExperimentalIndexerConnector()]
+      : []),
   ],
 });
 ```
@@ -158,11 +156,7 @@ Keep the condition stable between build and boot — `warlock build` resolves th
 A worker pool that consumes jobs from a Redis-backed queue. Depends on the database (for state) and runs in `Early` phase.
 
 ```ts title="src/connectors/queue-worker-connector.ts"
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
 import { startWorkerPool, stopWorkerPool } from "app/queue/services/worker-pool.service";
 
@@ -200,11 +194,7 @@ The work lives in `worker-pool.service.ts` — the connector is just the lifecyc
 A cron-style scheduler that needs the application to be fully wired before it can read job definitions:
 
 ```ts title="src/connectors/scheduler-connector.ts"
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 
 export class SchedulerConnector extends BaseConnector {
   public readonly name: ConnectorName = "scheduler";

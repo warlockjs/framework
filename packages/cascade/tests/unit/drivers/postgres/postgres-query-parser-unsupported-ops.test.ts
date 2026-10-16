@@ -29,14 +29,18 @@ describe("PostgresQueryParser - ops that used to be silently dropped", () => {
         .query,
     ).toContain(`"createdAt"::date = $1::date`);
     expect(
-      parse([{ type: "whereDateAfter", data: { field: "createdAt", value: "2024-05-01" } }] as never)
-        .query,
+      parse([
+        { type: "whereDateAfter", data: { field: "createdAt", value: "2024-05-01" } },
+      ] as never).query,
     ).toContain(`"createdAt"::date > $1::date`);
   });
 
   it("whereDateBetween is an inclusive date range", () => {
     const { query, bindings } = parse([
-      { type: "whereDateBetween", data: { field: "createdAt", range: ["2024-01-01", "2024-02-01"] } },
+      {
+        type: "whereDateBetween",
+        data: { field: "createdAt", range: ["2024-01-01", "2024-02-01"] },
+      },
     ] as never);
 
     expect(query).toContain(`"createdAt"::date BETWEEN $1::date AND $2::date`);
@@ -48,7 +52,9 @@ describe("PostgresQueryParser - ops that used to be silently dropped", () => {
       [
         {
           type: "whereNot",
-          data: { nested: [{ type: "where", data: { field: "role", operator: "=", value: "admin" } }] },
+          data: {
+            nested: [{ type: "where", data: { field: "role", operator: "=", value: "admin" } }],
+          },
         },
       ] as never,
       "users",
@@ -141,7 +147,9 @@ describe("PostgresQueryBuilder - has / whereHas / doesntHave in write filters", 
       .delete();
 
     const [sql, params] = (driver as any).query.mock.calls[0];
-    expect(sql).toContain(`WHERE EXISTS (SELECT 1 FROM "orders" WHERE "orders"."user_id" = "users"."id" AND`);
+    expect(sql).toContain(
+      `WHERE EXISTS (SELECT 1 FROM "orders" WHERE "orders"."user_id" = "users"."id" AND`,
+    );
     expect(sql).toContain(`"status" = $1`);
     expect(params).toEqual(["paid"]);
   });

@@ -16,10 +16,8 @@ app.get("/product/:id", async (req, res) => {
 
 // After: the first request hits the database, the next 999 don't (~1ms each)
 app.get("/product/:id", async (req, res) => {
-  const product = await cache.remember(
-    `products.${req.params.id}`,
-    "1h",
-    () => db.products.findById(req.params.id),
+  const product = await cache.remember(`products.${req.params.id}`, "1h", () =>
+    db.products.findById(req.params.id),
   );
   res.json(product);
 });
@@ -74,37 +72,37 @@ pnpm add @warlock.js/cache
 
 ## Core Operations
 
-| Method | Description |
-|--------|-------------|
+| Method                           | Description                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------- |
 | `set(key, value, ttlOrOptions?)` | Store a value with optional TTL or [rich options](/v/latest/cache/set-options/) |
-| `get(key)` | Retrieve a cached value |
-| `remove(key)` | Delete a cache entry |
-| `has(key)` | Check if a key exists |
-| `pull(key)` | Get a value and delete it |
-| `forever(key, value)` | Store a value without expiration |
-| `remember(key, ttl, callback)` | Get cached value or compute and cache it (with stampede prevention) |
-| `flush()` | Clear all cache entries |
-| `increment(key, amount)` | Atomically increment a numeric value |
-| `decrement(key, amount)` | Atomically decrement a numeric value |
-| `update(key, fn)` | Atomic read-modify-write for objects |
-| `merge(key, partial)` | Shallow-merge a partial into a cached object |
-| `list<T>(key)` | Typed list accessor (push/shift/slice/trim) |
-| `many(keys)` | Retrieve multiple values at once |
-| `setMany(entries, ttl?)` | Store multiple values at once |
-| `removeNamespace(namespace)` | Delete all keys matching a namespace pattern |
+| `get(key)`                       | Retrieve a cached value                                                         |
+| `remove(key)`                    | Delete a cache entry                                                            |
+| `has(key)`                       | Check if a key exists                                                           |
+| `pull(key)`                      | Get a value and delete it                                                       |
+| `forever(key, value)`            | Store a value without expiration                                                |
+| `remember(key, ttl, callback)`   | Get cached value or compute and cache it (with stampede prevention)             |
+| `flush()`                        | Clear all cache entries                                                         |
+| `increment(key, amount)`         | Atomically increment a numeric value                                            |
+| `decrement(key, amount)`         | Atomically decrement a numeric value                                            |
+| `update(key, fn)`                | Atomic read-modify-write for objects                                            |
+| `merge(key, partial)`            | Shallow-merge a partial into a cached object                                    |
+| `list<T>(key)`                   | Typed list accessor (push/shift/slice/trim)                                     |
+| `many(keys)`                     | Retrieve multiple values at once                                                |
+| `setMany(entries, ttl?)`         | Store multiple values at once                                                   |
+| `removeNamespace(namespace)`     | Delete all keys matching a namespace pattern                                    |
 
 Conditional writes — "set only if missing" or "set only if present" — are expressed via `set(k, v, { onConflict: "create" \| "update" })` and work across every driver (Redis-native, others emulated).
 
 ## Drivers
 
-| Use Case | Recommended Driver |
-|----------|-------------------|
-| Production, multi-server, distributed | Redis |
-| Local development, simple persistence | File |
-| Fastest, ephemeral, single-process | Memory |
-| Need sliding expiration | Memory Extended |
-| Limited memory, want LRU eviction | LRU Memory |
-| Testing, disable cache | Null |
+| Use Case                              | Recommended Driver |
+| ------------------------------------- | ------------------ |
+| Production, multi-server, distributed | Redis              |
+| Local development, simple persistence | File               |
+| Fastest, ephemeral, single-process    | Memory             |
+| Need sliding expiration               | Memory Extended    |
+| Limited memory, want LRU eviction     | LRU Memory         |
+| Testing, disable cache                | Null               |
 
 ## Advanced Features
 
@@ -130,10 +128,8 @@ cache.setCacheConfigurations({
 await cache.init();
 
 // Cache a product for 1 hour (human-readable duration string)
-const product = await cache.remember(
-  `products.${productId}`,
-  "1h",
-  () => db.products.findById(productId),
+const product = await cache.remember(`products.${productId}`, "1h", () =>
+  db.products.findById(productId),
 );
 
 // Invalidate all cached orders for a user after checkout

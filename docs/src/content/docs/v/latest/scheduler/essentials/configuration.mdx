@@ -10,9 +10,7 @@ The `Scheduler` class is configurable through a set of chainable methods. All co
 
 The scheduler checks for due jobs on a recurring tick. The default tick interval is **1000 ms (1 second)**. Increase it to reduce CPU overhead when your shortest job interval is longer than a second:
 
-The tick interval is **drift-compensated** — if a tick's work takes 200 ms, the next tick fires 800 ms later (not 1000 ms), so the cadence between tick *starts* averages the configured interval rather than `interval + work-time`. Long-running jobs still block the next tick (the scheduler is sequential around its loop), but short ticks don't slowly drift behind the wall clock.
-
-
+The tick interval is **drift-compensated** — if a tick's work takes 200 ms, the next tick fires 800 ms later (not 1000 ms), so the cadence between tick _starts_ averages the configured interval rather than `interval + work-time`. Long-running jobs still block the next tick (the scheduler is sequential around its loop), but short ticks don't slowly drift behind the wall clock.
 
 ```ts
 import { Scheduler, job } from "@warlock.js/scheduler";
@@ -20,7 +18,7 @@ import { Scheduler, job } from "@warlock.js/scheduler";
 const myScheduler = new Scheduler();
 
 myScheduler
-  .runEvery(60_000)   // check for due jobs once per minute
+  .runEvery(60_000) // check for due jobs once per minute
   .addJob(job("report", generateReport).daily().at("09:00"))
   .addJob(job("cleanup", cleanupFn).weekly().on("sunday").at("02:00"))
   .start();
@@ -42,7 +40,7 @@ import { Scheduler, job } from "@warlock.js/scheduler";
 const myScheduler = new Scheduler();
 
 myScheduler
-  .runInParallel(true)            // enable parallel execution
+  .runInParallel(true) // enable parallel execution
   .addJob(job("job-a", taskA).everyHour())
   .addJob(job("job-b", taskB).everyHour())
   .addJob(job("job-c", taskC).everyHour())
@@ -81,9 +79,7 @@ scheduler.addJobs([
 ]);
 
 // Fluent chaining
-scheduler
-  .addJob(job("a", taskA).everyMinutes(5))
-  .addJob(job("b", taskB).everyMinutes(10));
+scheduler.addJob(job("a", taskA).everyMinutes(5)).addJob(job("b", taskB).everyMinutes(10));
 ```
 
 ### Creating Jobs Inline — `newJob()`
@@ -91,10 +87,7 @@ scheduler
 `newJob()` creates, registers, and returns a job in one call:
 
 ```ts
-scheduler
-  .newJob("cleanup", cleanupFn)
-  .daily()
-  .at("03:00");
+scheduler.newJob("cleanup", cleanupFn).daily().at("03:00");
 ```
 
 ### Removing Jobs
@@ -147,6 +140,7 @@ Calling `stop()` on a scheduler that was never started (or was already stopped) 
 ### `shutdown(timeout?)`
 
 Gracefully stops the scheduler. It:
+
 1. Stops scheduling new ticks
 2. Waits for all currently-running jobs to finish
 3. Times out after the specified duration (default **30 000 ms**)
@@ -156,7 +150,7 @@ Gracefully stops the scheduler. It:
 await scheduler.shutdown();
 
 // Custom timeout
-await scheduler.shutdown(60_000);  // wait up to 60 s
+await scheduler.shutdown(60_000); // wait up to 60 s
 ```
 
 Wire this to your process signal handlers:
@@ -180,8 +174,8 @@ process.on("SIGINT", async () => {
 ## Checking Scheduler State
 
 ```ts
-console.log(scheduler.isRunning);  // boolean
-console.log(scheduler.jobCount);   // number of registered jobs
+console.log(scheduler.isRunning); // boolean
+console.log(scheduler.jobCount); // number of registered jobs
 ```
 
 ## CronParser Utility
@@ -217,23 +211,21 @@ import { logger } from "./logger";
 const appScheduler = new Scheduler();
 
 // Observability
-appScheduler.on("job:start",    (name)         => logger.debug(`Job started: ${name}`));
-appScheduler.on("job:complete", (name, result) => logger.info({ name, duration: result.duration }, "Job complete"));
-appScheduler.on("job:error",    (name, error)  => logger.error({ name, error }, "Job failed"));
-appScheduler.on("job:skip",     (name, reason) => logger.warn({ name, reason }, "Job skipped"));
+appScheduler.on("job:start", (name) => logger.debug(`Job started: ${name}`));
+appScheduler.on("job:complete", (name, result) =>
+  logger.info({ name, duration: result.duration }, "Job complete"),
+);
+appScheduler.on("job:error", (name, error) => logger.error({ name, error }, "Job failed"));
+appScheduler.on("job:skip", (name, reason) => logger.warn({ name, reason }, "Job skipped"));
 
 // Configuration
 appScheduler
-  .runEvery(1_000)        // check every second
+  .runEvery(1_000) // check every second
   .runInParallel(true, 5) // up to 5 concurrent jobs
 
-// Jobs
+  // Jobs
   .addJob(
-    job("token-cleanup", deleteExpiredTokens)
-      .daily()
-      .at("03:00")
-      .preventOverlap()
-      .retry(3, 2000)
+    job("token-cleanup", deleteExpiredTokens).daily().at("03:00").preventOverlap().retry(3, 2000),
   )
   .addJob(
     job("weekly-report", generateWeeklyReport)
@@ -241,13 +233,9 @@ appScheduler
       .on("monday")
       .at("08:00")
       .inTimezone("America/New_York")
-      .preventOverlap()
+      .preventOverlap(),
   )
-  .addJob(
-    job("heartbeat", pingExternalService)
-      .everyMinutes(5)
-      .retry(2, 1000, 2)
-  );
+  .addJob(job("heartbeat", pingExternalService).everyMinutes(5).retry(2, 1000, 2));
 
 appScheduler.start();
 logger.info("Scheduler started with", appScheduler.jobCount, "jobs");

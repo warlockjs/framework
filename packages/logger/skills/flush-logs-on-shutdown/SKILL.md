@@ -20,14 +20,15 @@ log.configure({
 
 ### What each event does
 
-| Event | Behavior |
-|---|---|
+| Event                                                    | Behavior                                                                                                  |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `SIGINT` / `SIGTERM` / `SIGHUP` / `SIGBREAK` / `SIGUSR2` | Flush → remove this handler → re-raise the signal so Node's default exit code runs (e.g. 130 for SIGINT). |
-| `beforeExit` | Flush in place. Node continues its natural exit. |
+| `beforeExit`                                             | Flush in place. Node continues its natural exit.                                                          |
 
 ### Default recommendation
 
 `["SIGINT", "SIGTERM", "beforeExit"]` covers:
+
 - Local `Ctrl+C` (SIGINT)
 - Container orchestrators (`docker stop`, Kubernetes sending SIGTERM)
 - Natural exit (Node finished all work)
@@ -46,7 +47,7 @@ Use this when you need async work (close an HTTP server, drain a queue) **before
 async function gracefulShutdown() {
   await httpServer.close();
   await queue.drain();
-  log.flushSync();          // still sync — guarantees disk write before exit
+  log.flushSync(); // still sync — guarantees disk write before exit
   process.exit(0);
 }
 
@@ -72,13 +73,13 @@ process.once("SIGTERM", gracefulShutdown);
 
 `log.flush()` drains every channel concurrently: each waits for its own async deliveries still in flight (level methods are fire-and-forget and never return a promise; entries logged during the flush are awaited too), then runs its `flush()`. A hung network delivery can't hold up the file channel, and one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. It is bounded: `log.flush({ timeout })` resolves after `timeout` ms (default 5000) and reports each channel still draining to `onChannelError`.
 
-| | `flushSync()` | `flush()` |
-|---|---|---|
-| I/O | synchronous — blocks the loop | asynchronous — awaited |
-| Safe in a re-raising signal handler | yes | no — the signal exits before the promise settles |
-| Used by `autoFlushOn` | yes | no |
-| Reach for it when | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
-| `FileLog` / `JSONFileLog` | ✓ | ✓ (async write) |
+|                                     | `flushSync()`                         | `flush()`                                                    |
+| ----------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
+| I/O                                 | synchronous — blocks the loop         | asynchronous — awaited                                       |
+| Safe in a re-raising signal handler | yes                                   | no — the signal exits before the promise settles             |
+| Used by `autoFlushOn`               | yes                                   | no                                                           |
+| Reach for it when                   | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
+| `FileLog` / `JSONFileLog`           | ✓                                     | ✓ (async write)                                              |
 
 `autoFlushOn` always uses `flushSync()` — signal re-raising can't wait on a promise. If a channel needs async delivery on shutdown, drive `await log.flush()` from your own handler and leave that signal out of `autoFlushOn`.
 
@@ -99,7 +100,7 @@ log.flushSync();
 
 ## Unhandled errors
 
-The `uncaughtException` path in `captureAnyUnhandledRejection()` (the `capture-unhandled-errors` topic) already runs a best-effort, time-bounded `log.flush()` before its own `process.exit(1)`, so the fatal entry drains without extra wiring (and `process.exit()` skips `beforeExit`, so a `beforeExit` handler would not fire on that path anyway). Still set `autoFlushOn` for the *other* shutdown routes — `"SIGINT"` / `"SIGTERM"` and a natural `"beforeExit"` — so those don't lose the last buffered batch.
+The `uncaughtException` path in `captureAnyUnhandledRejection()` (the `capture-unhandled-errors` topic) already runs a best-effort, time-bounded `log.flush()` before its own `process.exit(1)`, so the fatal entry drains without extra wiring (and `process.exit()` skips `beforeExit`, so a `beforeExit` handler would not fire on that path anyway). Still set `autoFlushOn` for the _other_ shutdown routes — `"SIGINT"` / `"SIGTERM"` and a natural `"beforeExit"` — so those don't lose the last buffered batch.
 
 ```ts
 log.configure({

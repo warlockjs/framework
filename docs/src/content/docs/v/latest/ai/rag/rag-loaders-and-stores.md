@@ -16,7 +16,12 @@ Every loader returns `RagLoaderResult` — a plain array of documents:
 
 ```ts
 type RagLoaderResult = RagDocument[];
-type RagDocument = { id: string; text: string; metadata?: Record<string, unknown>; tags?: string[] };
+type RagDocument = {
+  id: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+  tags?: string[];
+};
 ```
 
 Every store satisfies the three-method `VectorStore` contract — a thin narrowing of the cache `similar()` surface, not a new engine:
@@ -24,19 +29,22 @@ Every store satisfies the three-method `VectorStore` contract — a thin narrowi
 ```ts
 interface VectorStore {
   upsert(key: string, value: unknown, vector: number[], tags?: string[]): Promise<void>;
-  query<T>(vector: number[], options: { topK: number; threshold?: number; tags?: string[] }): Promise<{ key: string; value: T; score: number }[]>;
+  query<T>(
+    vector: number[],
+    options: { topK: number; threshold?: number; tags?: string[] },
+  ): Promise<{ key: string; value: T; score: number }[]>;
   removeNamespace(namespace: string): Promise<void>;
 }
 ```
 
 ## Loaders
 
-| Loader | Input | Deps | Emits |
-| --- | --- | --- | --- |
-| `ai.rag.loadText(input, opts?)` | `string` \| `{ id, text }` \| array of either | none | one doc per non-empty item |
-| `ai.rag.loadHtml(html, opts?)` | raw HTML string | none (regex strip) | one doc, `metadata.title` from `<title>` |
-| `ai.rag.loadWeb(url, opts?)` | absolute URL | none (core `guardedFetch`) | one doc, SSRF-safe fetch |
-| `ai.rag.loadPdf(bytes, opts?)` | `Buffer` \| `ArrayBuffer` \| `Uint8Array` | lazy `pdf-parse` peer | one doc, or one per page with `perPage: true` |
+| Loader                          | Input                                         | Deps                       | Emits                                         |
+| ------------------------------- | --------------------------------------------- | -------------------------- | --------------------------------------------- |
+| `ai.rag.loadText(input, opts?)` | `string` \| `{ id, text }` \| array of either | none                       | one doc per non-empty item                    |
+| `ai.rag.loadHtml(html, opts?)`  | raw HTML string                               | none (regex strip)         | one doc, `metadata.title` from `<title>`      |
+| `ai.rag.loadWeb(url, opts?)`    | absolute URL                                  | none (core `guardedFetch`) | one doc, SSRF-safe fetch                      |
+| `ai.rag.loadPdf(bytes, opts?)`  | `Buffer` \| `ArrayBuffer` \| `Uint8Array`     | lazy `pdf-parse` peer      | one doc, or one per page with `perPage: true` |
 
 All four accept the shared `RagLoaderOptions`: `id` (source id — falls back to the URL for web, `"document"` otherwise), `metadata` (merged **over** the loader-derived keys, so an explicit `metadata.title` always wins), and `tags` (applied to every chunk for `retrieve({ tags })` filtering). Loader-derived keys include `source`, `loader` (`"text" | "html" | "web" | "pdf"`), plus `title` / `page` / `pageCount` / `contentType` where determinable.
 
@@ -44,10 +52,12 @@ All four accept the shared `RagLoaderOptions`: `id` (source id — falls back to
 import { ai } from "@warlock.js/ai";
 
 // A bare string, or many records → many distinctly-identified docs:
-await kb.index(ai.rag.loadText([
-  { id: "faq-billing", text: "…", metadata: { section: "billing" } },
-  { id: "faq-shipping", text: "…" },
-]));
+await kb.index(
+  ai.rag.loadText([
+    { id: "faq-billing", text: "…", metadata: { section: "billing" } },
+    { id: "faq-shipping", text: "…" },
+  ]),
+);
 
 // Raw HTML → readable text (scripts/styles dropped, entities decoded):
 await kb.index(ai.rag.loadHtml(rawHtml, { id: "landing", tags: ["marketing"] }));
@@ -62,10 +72,12 @@ Empty, whitespace-only, or all-markup input emits **no** document — never a no
 Every request goes through core's `guardedFetch` under an `OutboundPolicy`. The strict defaults — https-only, private-IP-deny on, 10s timeout, 5 MiB cap — apply even when you pass no `policy`, so an untuned call is already hardened. Tighten it per call:
 
 ```ts
-await kb.index(await ai.rag.loadWeb("https://docs.example.com/guide", {
-  policy: { hostAllowlist: ["docs.example.com"], maxBytes: 2_000_000, timeoutMs: 5_000 },
-  tags: ["docs"],
-}));
+await kb.index(
+  await ai.rag.loadWeb("https://docs.example.com/guide", {
+    policy: { hostAllowlist: ["docs.example.com"], maxBytes: 2_000_000, timeoutMs: 5_000 },
+    tags: ["docs"],
+  }),
+);
 ```
 
 HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL and `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
@@ -102,12 +114,12 @@ One durable row per chunk keyed by the pipeline's dotted key, the chunk payload 
 
 ```ts
 type PgVectorStoreOptions = {
-  client?: PgClientLike;               // a pg.Pool / pg.Client — only `query` is ever called
-  connectionString?: string;           // else the store builds its own Pool lazily
-  table?: string;                      // default "warlock_ai_rag_vectors"; must be a safe identifier
-  dimensions?: number;                 // vector(N) width in the DDL, default 1536
+  client?: PgClientLike; // a pg.Pool / pg.Client — only `query` is ever called
+  connectionString?: string; // else the store builds its own Pool lazily
+  table?: string; // default "warlock_ai_rag_vectors"; must be a safe identifier
+  dimensions?: number; // vector(N) width in the DDL, default 1536
   index?: "hnsw" | "ivfflat" | "none"; // ANN strategy, default "hnsw"
-  ivfflatLists?: number;               // ivfflat only, default 100
+  ivfflatLists?: number; // ivfflat only, default 100
 };
 ```
 
@@ -152,9 +164,13 @@ const kb = ai.rag({
 });
 
 for (const url of ["https://docs.example.com/intro", "https://docs.example.com/config"]) {
-  await kb.index(await ai.rag.loadWeb(url, { policy: { hostAllowlist: ["docs.example.com"] }, tags: ["docs"] }));
+  await kb.index(
+    await ai.rag.loadWeb(url, { policy: { hostAllowlist: ["docs.example.com"] }, tags: ["docs"] }),
+  );
 }
-await kb.index(await ai.rag.loadPdf(await readFile("spec.pdf"), { id: "spec", perPage: true, tags: ["spec"] }));
+await kb.index(
+  await ai.rag.loadPdf(await readFile("spec.pdf"), { id: "spec", perPage: true, tags: ["spec"] }),
+);
 
 // Every hit's citation traces back to its source URL / page:
 const { chunks } = await kb.retrieve("how do I configure caching?", { topK: 4, tags: ["docs"] });

@@ -86,11 +86,9 @@ describe("HTTP middleware — short-circuit", () => {
     harness = await bootHarness((router) => {
       const passThrough: Middleware = () => undefined;
 
-      router.get(
-        "/passes",
-        ({ response }) => response.success({ reached: true }),
-        { middleware: [passThrough] },
-      );
+      router.get("/passes", ({ response }) => response.success({ reached: true }), {
+        middleware: [passThrough],
+      });
     });
 
     const result = await harness.inject({ method: "GET", url: "/passes" });
@@ -109,11 +107,9 @@ describe("HTTP middleware — guarded route", () => {
     };
 
     harness = await bootHarness((router) => {
-      router.get(
-        "/guarded",
-        ({ response }) => response.success({ secret: "value" }),
-        { middleware: [guard] },
-      );
+      router.get("/guarded", ({ response }) => response.success({ secret: "value" }), {
+        middleware: [guard],
+      });
     });
 
     const result = await harness.inject({ method: "GET", url: "/guarded" });
@@ -130,11 +126,9 @@ describe("HTTP middleware — guarded route", () => {
     };
 
     harness = await bootHarness((router) => {
-      router.get(
-        "/guarded-ok",
-        ({ response }) => response.success({ secret: "value" }),
-        { middleware: [guard] },
-      );
+      router.get("/guarded-ok", ({ response }) => response.success({ secret: "value" }), {
+        middleware: [guard],
+      });
     });
 
     const result = await harness.inject({

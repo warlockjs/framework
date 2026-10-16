@@ -12,21 +12,22 @@ A supervisor takes one input, picks which intent(s) handle it, runs them, option
 - **`agent`** — one model + tools, single task. Doesn't fit when the right specialist depends on the input.
 - **`workflow`** — fixed step order. Doesn't fit when routing decisions need an LLM or vary per request.
 - **`supervisor`** — when the right specialist is decided per-call and you may iterate to a goal.
-- **`orchestrator`** — when the *session* matters: long-running conversations with durable cross-turn state, history windowing/compaction, and mid-turn resume. See the `run-orchestrator` topic.
+- **`orchestrator`** — when the _session_ matters: long-running conversations with durable cross-turn state, history windowing/compaction, and mid-turn resume. See the `run-orchestrator` topic.
 
 ## Three dispatch surfaces
 
-| | When it fires | Iterations |
-| --- | --- | --- |
-| `classifier` | iter-0 prelude — picks the FIRST intent | 1 |
-| `router` | iter 0+ (no classifier); iter 1+ (with classifier) | 1..maxIterations |
-| `route` | iter 0+ (no classifier); iter 1+ (with classifier) | 1..maxIterations |
+|              | When it fires                                      | Iterations       |
+| ------------ | -------------------------------------------------- | ---------------- |
+| `classifier` | iter-0 prelude — picks the FIRST intent            | 1                |
+| `router`     | iter 0+ (no classifier); iter 1+ (with classifier) | 1..maxIterations |
+| `route`      | iter 0+ (no classifier); iter 1+ (with classifier) | 1..maxIterations |
 
 `router` and `route` are mutually exclusive. `classifier` composes with either. Classifier alone (no router/route) → terminates after iter 0.
 
 `classifier` is mutually exclusive with `initialAgent`.
 
 Quick decision tree:
+
 - Pure classification → `classifier` alone.
 - Multi-step reasoning → `router` + `intents` with rich descriptions.
 - Deterministic routing → `route` callback.
@@ -63,9 +64,7 @@ const supportBot = ai.supervisor({
   router: routerAgent,
   intents: { billing, shipping, returns, escalate },
   evaluate: (ctx) =>
-    Object.values(ctx.result).some((b: any) => b.data?.resolved)
-      ? { satisfied: true }
-      : undefined,
+    Object.values(ctx.result).some((b: any) => b.data?.resolved) ? { satisfied: true } : undefined,
 });
 ```
 
@@ -99,7 +98,7 @@ The result is a plain `AgentContract` — usable standalone or as `router`. Hand
 ```ts
 ai.supervisor({
   intents: {
-    ...ai.fanOut(writer, 3),                                   // writer1, writer2, writer3
+    ...ai.fanOut(writer, 3), // writer1, writer2, writer3
     vote: { run: pickMajority, description: "Choose the majority answer." },
   },
   route: (ctx) => (ctx.iteration === 0 ? ["writer1", "writer2", "writer3"] : "vote"),
@@ -302,11 +301,11 @@ Same behavior across `ai.supervisor`, `ai.team` (member callbacks), and `ai.orch
 
 ```ts
 await supportBot.execute(message, {
-  context: { userId, db, traceId },   // request-scoped bag, never persisted
-  history: priorMessages,              // Message[] forwarded to router + agents
-  sessionId: "sess_user_42",           // stamps onto every report node
+  context: { userId, db, traceId }, // request-scoped bag, never persisted
+  history: priorMessages, // Message[] forwarded to router + agents
+  sessionId: "sess_user_42", // stamps onto every report node
   signal: AbortSignal.timeout(60_000),
-  runId: "support-2026-04-26-7",       // for snapshot resume
+  runId: "support-2026-04-26-7", // for snapshot resume
 });
 ```
 
@@ -355,8 +354,8 @@ import { cache } from "@warlock.js/cache";
 
 ai.config({ defaultStore: cache.driver("redis", { client }) });
 
-await supportBot.execute(message, { runId: "support-7" });   // fresh
-await supportBot.resume("support-7");                          // after crash
+await supportBot.execute(message, { runId: "support-7" }); // fresh
+await supportBot.resume("support-7"); // after crash
 ```
 
 Signature drift detection throws `SupervisorDriftError` on shape mismatch — `force: true` bypasses. See the `persist-ai-data` topic.

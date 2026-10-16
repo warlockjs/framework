@@ -6,10 +6,7 @@ import { validateAll } from "../../../src/validation/validateAll";
  * validateAll() only touches a small, well-defined slice of Request/Response,
  * so thin structural stubs stand in for the full HTTP objects.
  */
-const makeRequest = (
-  data: Record<string, unknown>,
-  params: Record<string, unknown> = {},
-) => {
+const makeRequest = (data: Record<string, unknown>, params: Record<string, unknown> = {}) => {
   return {
     body: data,
     query: {},

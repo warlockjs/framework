@@ -12,10 +12,7 @@ describe("LazyValidator", () => {
 
     const tree = {
       name: "root",
-      children: [
-        { name: "a", children: [{ name: "a1" }] },
-        { name: "b" },
-      ],
+      children: [{ name: "a", children: [{ name: "a1" }] }, { name: "b" }],
     };
 
     const result = await validate(category, tree);

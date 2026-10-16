@@ -34,13 +34,7 @@ import { askStack } from "../../prompts/ask-stack";
 import { showIntroBanner } from "../../ui/banner";
 import { createWarlockApp } from "../create-warlock-app";
 import getAppPath from "./get-app-path";
-import {
-  AppOptions,
-  App as AppType,
-  CliFlags,
-  SetupChoice,
-  Stack,
-} from "./types";
+import { AppOptions, App as AppType, CliFlags, SetupChoice, Stack } from "./types";
 
 export default async function createNewApp(cli: CliFlags = {}) {
   // Start detecting package managers in the background to avoid delay later
@@ -58,9 +52,7 @@ export default async function createNewApp(cli: CliFlags = {}) {
   // Validate Node.js version (minimum 22.15: the warlock CLI uses module.registerHooks)
   const [major = 0, minor = 0] = process.versions.node.split(".").map(Number);
   if (major < 22 || (major === 22 && minor < 15)) {
-    cancel(
-      `Node.js 22.15.0 or newer is required (found ${process.versions.node}).`,
-    );
+    cancel(`Node.js 22.15.0 or newer is required (found ${process.versions.node}).`);
     process.exit(0);
   }
 
@@ -106,10 +98,7 @@ export default async function createNewApp(cli: CliFlags = {}) {
  * only its trigger moved from "any TTY" to an explicit opt-in flag, per the
  * rule that a reversible choice never prompts by default.
  */
-async function createFullWizard(
-  cli: CliFlags,
-  pmDetectionPromise: Promise<void>,
-) {
+async function createFullWizard(cli: CliFlags, pmDetectionPromise: Promise<void>) {
   // Step 1: Project name — but only when it is not already known. It arrives
   // answered from `--name`/the positional arg, and from the default path when
   // the user picked "Customize" AFTER being asked for a name. Re-asking for an
@@ -142,7 +131,7 @@ async function createFullWizard(
 
   const packageManager = await select({
     message: "Which package manager do you want to use?",
-    options: getSystemPackageManagers().map(pm => ({
+    options: getSystemPackageManagers().map((pm) => ({
       value: pm,
       label: pm,
     })),
@@ -254,10 +243,7 @@ async function createFullWizard(
  * Every other choice is resolved exactly like `createNonInteractive` — flags,
  * with defaults, never a prompt.
  */
-async function createDefaultInteractive(
-  cli: CliFlags,
-  pmDetectionPromise: Promise<void>,
-) {
+async function createDefaultInteractive(cli: CliFlags, pmDetectionPromise: Promise<void>) {
   const appName = cli.name ?? (await askProjectName());
 
   const appPath = getAppPath(appName);
@@ -351,9 +337,7 @@ export type SyncAppOptions = Omit<AppOptions, "agents">;
 export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
   const lint = cli.lint ?? "eslint";
   if (lint !== "eslint" && lint !== "oxc") {
-    throw new Error(
-      `Unknown lint toolchain "${lint}". Use --lint=eslint or --lint=oxc.`,
-    );
+    throw new Error(`Unknown lint toolchain "${lint}". Use --lint=eslint or --lint=oxc.`);
   }
   const databaseDriver = cli.db ?? "mongodb";
   const noDatabase = isNoDatabase(databaseDriver);
@@ -368,18 +352,17 @@ export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
   const aiProviders = cli.ai ?? [];
 
   const allowedKeys = getAllFeatureKeys();
-  const invalidFeatureKeys = features.filter(key => !allowedKeys.includes(key));
+  const invalidFeatureKeys = features.filter((key) => !allowedKeys.includes(key));
   const errors: string[] = [];
 
   if (invalidFeatureKeys.length > 0) {
     errors.push(`Unknown feature(s): ${invalidFeatureKeys.join(",")}`);
   }
 
-  const aiFeatureKeys = [
-    ...getAiProviderOptions(),
-    ...getAiPackageOptions(),
-  ].map(option => option.value);
-  const invalidAiKeys = aiProviders.filter(key => !aiFeatureKeys.includes(key));
+  const aiFeatureKeys = [...getAiProviderOptions(), ...getAiPackageOptions()].map(
+    (option) => option.value,
+  );
+  const invalidAiKeys = aiProviders.filter((key) => !aiFeatureKeys.includes(key));
 
   if (invalidAiKeys.length > 0) {
     errors.push(

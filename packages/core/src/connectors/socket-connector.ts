@@ -232,7 +232,8 @@ export class SocketConnector extends BaseConnector {
       const now = after.get(event) ?? [];
 
       for (const listener of now) if (!listeners.includes(listener)) added.push([event, listener]);
-      for (const listener of listeners) if (!now.includes(listener)) removed.push([event, listener]);
+      for (const listener of listeners)
+        if (!now.includes(listener)) removed.push([event, listener]);
     }
 
     return { added, removed };

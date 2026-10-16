@@ -6,7 +6,7 @@ sidebar:
   label: "Run orchestrator"
 ---
 
-The [Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) concept page covers *why*. This page is the working surface: every config field, the per-turn result envelope, `iterate` + `resume`, drift recovery, and the production lifecycle.
+The [Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) concept page covers _why_. This page is the working surface: every config field, the per-turn result envelope, `iterate` + `resume`, drift recovery, and the production lifecycle.
 
 ## The full config
 
@@ -17,28 +17,28 @@ type SessionState = { category?: string; order?: { id: string }; reply?: string 
 
 const supportBot = ai.orchestrator<SessionState>({
   // identity
-  name: "refund-support",                     // required — logs, events, checkpoints, signature
-  version: "v3-2026-06",                      // metadata only, never parsed
+  name: "refund-support", // required — logs, events, checkpoints, signature
+  version: "v3-2026-06", // metadata only, never parsed
 
   // "what runs" — the supervisor surface, spread directly
   intents: { classify, lookup, process, compose },
-  route: (ctx) => (ctx.iteration === 0 ? "classify" : END),   // route XOR router
+  route: (ctx) => (ctx.iteration === 0 ? "classify" : END), // route XOR router
   evaluate: (ctx) => (ctx.state.reply ? { satisfied: true } : undefined),
-  state: {},                                  // initial session-state seed
-  output: outputSchema,                       // final-state schema → result.data
-  initialAgent: "classify",                   // dispatch this on turn 0, skip the first route call
-  maxIterations: 8,                           // in-turn cap (iterate: true only); default 10
+  state: {}, // initial session-state seed
+  output: outputSchema, // final-state schema → result.data
+  initialAgent: "classify", // dispatch this on turn 0, skip the first route call
+  maxIterations: 8, // in-turn cap (iterate: true only); default 10
 
   // session lifecycle — orchestrator-specific
-  iterate: true,                              // delegate each turn to a real internal supervisor
-  historyWindow: { router: 5, agents: 20 },   // per-role history slice before each turn
-  summarize: { afterTurns: 20, keep: 8 },     // automatic post-turn compaction
-  keepSnapshots: 100,                         // turn snapshots retained per session; or "all"
+  iterate: true, // delegate each turn to a real internal supervisor
+  historyWindow: { router: 5, agents: 20 }, // per-role history slice before each turn
+  summarize: { afterTurns: 20, keep: 8 }, // automatic post-turn compaction
+  keepSnapshots: 100, // turn snapshots retained per session; or "all"
   memory: ai.memory({ semantic: { embedder, store } }),
 
   // durable stores
   checkpointStore: ai.checkpoint.pg({ client: pg }),
-  snapshotStore: ai.snapshot.pg({ client: pg }),   // REQUIRED when iterate: true
+  snapshotStore: ai.snapshot.pg({ client: pg }), // REQUIRED when iterate: true
 
   // events
   on: { "orchestrator.turn.routed": (e) => log(e.source) },
@@ -47,7 +47,7 @@ const supportBot = ai.orchestrator<SessionState>({
 
 ### Author-time validation
 
-The factory throws an `OrchestratorConfigError` *at construction* (never on the first turn) when:
+The factory throws an `OrchestratorConfigError` _at construction_ (never on the first turn) when:
 
 - `name` is missing or not a string.
 - `intents` is missing.
@@ -61,26 +61,26 @@ The factory throws an `OrchestratorConfigError` *at construction* (never on the 
 
 ```ts
 const result = await supportBot.execute(message, {
-  sessionId: "user-42",        // required — names the session this turn acts on
-  history: priorTurns,         // required — you own the message history
-  state: { category: "refund" },   // partial seed/patch, shallow-merged into loaded state
-  context: { userId, db },     // request-scoped, frozen at intake, NEVER persisted
+  sessionId: "user-42", // required — names the session this turn acts on
+  history: priorTurns, // required — you own the message history
+  state: { category: "refund" }, // partial seed/patch, shallow-merged into loaded state
+  context: { userId, db }, // request-scoped, frozen at intake, NEVER persisted
   signal: AbortSignal.timeout(60_000),
-  on: { "orchestrator.turn.awaiting-input": (e) => done(e.turnIndex) },  // a clean turn ends here
-  force: false,                // bypass the drift check for this call
+  on: { "orchestrator.turn.awaiting-input": (e) => done(e.turnIndex) }, // a clean turn ends here
+  force: false, // bypass the drift check for this call
 });
 ```
 
-There is no implicit "current session" — `sessionId` is required and names the session explicitly. `history` is required too: the framework never persists raw messages (it persists *session state*), so you pass the prior turns each call.
+There is no implicit "current session" — `sessionId` is required and names the session explicitly. `history` is required too: the framework never persists raw messages (it persists _session state_), so you pass the prior turns each call.
 
 ## The per-turn result
 
 ```ts
 type OrchestratorResult<TOutput> = {
-  data?: TOutput;              // turn output when an `output` schema validated
+  data?: TOutput; // turn output when an `output` schema validated
   sessionId: string;
   turnIndex: number;
-  compaction?: CompactionResult;   // present when a compaction was suggested for YOU to apply
+  compaction?: CompactionResult; // present when a compaction was suggested for YOU to apply
   report: OrchestratorReport;
   usage: Usage;
   error?: AIError;
@@ -114,7 +114,7 @@ if (result.compaction) {
 
 ## `iterate` and `resume`
 
-By default each turn is a single dispatch. Set `iterate: true` and the orchestrator builds a real internal supervisor per turn, looping up to `maxIterations` — and persisting the supervisor's mid-turn run to the `snapshotStore` so a crash *mid-iteration* can resume:
+By default each turn is a single dispatch. Set `iterate: true` and the orchestrator builds a real internal supervisor per turn, looping up to `maxIterations` — and persisting the supervisor's mid-turn run to the `snapshotStore` so a crash _mid-iteration_ can resume:
 
 ```ts
 // turn crashed mid-iteration — pick up where it left off
@@ -139,7 +139,7 @@ await supportBot.execute(message, { sessionId, history, force: true });
 await supportBot.resume("user-42", { force: true });
 
 // 2. End the session — start clean (safest when the shape genuinely changed)
-await store.delete("refund-support", "user-42");   // CheckpointStore.delete
+await store.delete("refund-support", "user-42"); // CheckpointStore.delete
 await supportBot.execute(message, { sessionId: "user-42", history: [] });
 
 // 3. Migrate — load the checkpoint, translate it, re-stamp the signature, write it back

@@ -69,7 +69,9 @@ export function bullmqQueue(options: BullmqQueueOptions): QueueDispatcher {
 
       await notificationJob.dispatch(
         { channel: job.channel, route: job.route, payload: job.payload, options: job.options },
-        { delay: job.options.delay === undefined ? undefined : notificationDelay(job.options.delay) },
+        {
+          delay: job.options.delay === undefined ? undefined : notificationDelay(job.options.delay),
+        },
       );
     },
   };

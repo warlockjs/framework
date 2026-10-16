@@ -21,9 +21,9 @@ The pivot mutation surface is currently split and collides with an unrelated fea
 await post.pivot("tags").attach([1, 2, 3]);
 await post.pivot("tags").attach([4], { addedBy: currentUserId });
 await post.pivot("tags").detach([2]);
-await post.pivot("tags").detach();              // detach all
-await post.pivot("tags").sync([1, 3, 5]);       // replace whole set
-await post.pivot("tags").toggle([1, 7]);        // flip each
+await post.pivot("tags").detach(); // detach all
+await post.pivot("tags").sync([1, 3, 5]); // replace whole set
+await post.pivot("tags").toggle([1, 7]); // flip each
 ```
 
 - `model.pivot(relation).sync(...)` can never be confused with `Model.sync(Target, field)` — the `.pivot("tags")` qualifier makes the domain explicit at the call site.

@@ -70,10 +70,7 @@ async function canonicalize(target: string): Promise<string> {
 function isInside(child: string, root: string): boolean {
   const relative = path.relative(root, child);
 
-  return (
-    relative === "" ||
-    (!relative.startsWith("..") && !path.isAbsolute(relative))
-  );
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 /**
@@ -163,9 +160,7 @@ export async function resolveInJail(
   inputPath: string,
 ): Promise<ResolvedPath> {
   const jailRoot = await canonicalize(policy.cwd);
-  const requested = path.isAbsolute(inputPath)
-    ? inputPath
-    : path.join(policy.cwd, inputPath);
+  const requested = path.isAbsolute(inputPath) ? inputPath : path.join(policy.cwd, inputPath);
   const absolutePath = await canonicalize(requested);
 
   const insideCwd = isInside(absolutePath, jailRoot);
@@ -185,10 +180,10 @@ export async function resolveInJail(
   }
 
   if (!insideCwd && !insideAllow) {
-    throw new WorkspacePolicyError(
-      `Path "${inputPath}" resolves outside the workspace jail.`,
-      { type: "path-escape", path: inputPath },
-    );
+    throw new WorkspacePolicyError(`Path "${inputPath}" resolves outside the workspace jail.`, {
+      type: "path-escape",
+      path: inputPath,
+    });
   }
 
   // `denyPaths` is evaluated relative to the jail root and wins even
@@ -199,10 +194,10 @@ export async function resolveInJail(
 
   if (insideCwd && policy.denyPaths && policy.denyPaths.length > 0) {
     if (matchesDeny(relativeToJail, policy.denyPaths)) {
-      throw new WorkspacePolicyError(
-        `Path "${inputPath}" is blocked by the workspace deny list.`,
-        { type: "path-escape", path: inputPath },
-      );
+      throw new WorkspacePolicyError(`Path "${inputPath}" is blocked by the workspace deny list.`, {
+        type: "path-escape",
+        path: inputPath,
+      });
     }
   }
 
@@ -245,10 +240,7 @@ function executableBasename(firstToken: string): string {
  * isCommandAllowed({ cwd, shell: { allow: ["npm"] } }, "rm -rf /"); // false
  * isCommandAllowed({ cwd, shell: { allow: ["npm"] } }, "npm test; rm -rf /"); // false
  */
-export function isCommandAllowed(
-  policy: WorkspacePolicy,
-  command: string,
-): boolean {
+export function isCommandAllowed(policy: WorkspacePolicy, command: string): boolean {
   const shell = policy.shell;
 
   // No shell sub-policy ⇒ fail-closed: nothing may run.

@@ -49,10 +49,7 @@ export function createPanopticMiddleware(
   const onResult = (result: unknown): void => {
     // A run can complete with `result.error` populated (`after` still
     // fires); thread that envelope error onto the root span.
-    collectReport(
-      (result as { report?: unknown }).report,
-      (result as { error?: unknown }).error,
-    );
+    collectReport((result as { report?: unknown }).report, (result as { error?: unknown }).error);
   };
 
   const onError = (error: unknown): void => {

@@ -16,14 +16,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { Model } from "../../../src/model/model";
-import {
-  cleanupModelsRegistery,
-  registerModelInRegistry,
-} from "../../../src/model/register-model";
-import {
-  attachLoadedRelation,
-  RelationLoader,
-} from "../../../src/relations/relation-loader";
+import { cleanupModelsRegistery, registerModelInRegistry } from "../../../src/model/register-model";
+import { attachLoadedRelation, RelationLoader } from "../../../src/relations/relation-loader";
 import type { RelationDefinition } from "../../../src/relations/types";
 import { createMockDriver } from "../../utils/test-helpers";
 
@@ -203,9 +197,7 @@ describe("relations/relation-loader", () => {
     it("throws a descriptive error when the relation target is not registered", async () => {
       const broken = new Broken({ id: 1 });
       const loader = new RelationLoader([broken], Broken);
-      await expect(loader.load("ghost")).rejects.toThrow(
-        /model "DoesNotExist" is not registered/,
-      );
+      await expect(loader.load("ghost")).rejects.toThrow(/model "DoesNotExist" is not registered/);
     });
   });
 
@@ -229,10 +221,8 @@ describe("relations/relation-loader", () => {
 
       // Default FK inferred from owner model name "User" → "user_id".
       expect(fake.calls[0]).toEqual({ method: "whereIn", args: ["user_id", [1, 2]] });
-      expect((users[0].getRelation("posts") as Post[]).map((p) => p.get("id"))).toEqual([
-        10, 11,
-      ]);
-      expect((users[1].getRelation("posts") as Post[])).toHaveLength(1);
+      expect((users[0].getRelation("posts") as Post[]).map((p) => p.get("id"))).toEqual([10, 11]);
+      expect(users[1].getRelation("posts") as Post[]).toHaveLength(1);
     });
 
     it("assigns an empty array to a model with no matching children", async () => {
@@ -322,7 +312,10 @@ describe("relations/relation-loader", () => {
 
   describe("belongsTo", () => {
     it("collects the FK from this model and queries the owner key on the target", async () => {
-      const users = [new User({ id: 1, organization_id: 7 }), new User({ id: 2, organization_id: 8 })];
+      const users = [
+        new User({ id: 1, organization_id: 7 }),
+        new User({ id: 2, organization_id: 8 }),
+      ];
       const orgs = [new Organization({ id: 7 }), new Organization({ id: 8 })];
       const fake = createFakeQuery(orgs);
       vi.spyOn(Organization, "query").mockReturnValue(fake as never);

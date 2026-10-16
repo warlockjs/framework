@@ -37,7 +37,8 @@ export type SitemapModelLike = {
 };
 
 export type SitemapPageSupplier = () =>
-  Promise<Iterable<SitemapPageUrl>> | Iterable<SitemapPageUrl>;
+  | Promise<Iterable<SitemapPageUrl>>
+  | Iterable<SitemapPageUrl>;
 
 /** A page-owned URL supplier with optional model dependencies for later invalidation wiring. */
 export type SitemapPageEntriesDeclaration = SitemapPageOptions & {
@@ -53,4 +54,7 @@ export function isSitemapPageEntriesDeclaration(
 
 /** A page opts out, declares static options, or supplies its URLs in either supported form. */
 export type SitemapPageExport =
-  false | SitemapPageOptions | SitemapPageSupplier | SitemapPageEntriesDeclaration;
+  | false
+  | SitemapPageOptions
+  | SitemapPageSupplier
+  | SitemapPageEntriesDeclaration;

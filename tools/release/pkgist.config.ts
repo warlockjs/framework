@@ -44,8 +44,7 @@ export default defineConfig({
     sourcesDir: "./sources", // builder holds its own source snapshots
   },
 
-  standalone: [
-],
+  standalone: [],
 
   families: [
     {
@@ -56,196 +55,84 @@ export default defineConfig({
         {
           name: "@warlock.js/ai",
           root: "../../packages/ai",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-panoptic",
           root: "../../packages/ai-panoptic",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-anthropic",
           root: "../../packages/ai-anthropic",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-bedrock",
           root: "../../packages/ai-bedrock",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-google",
           root: "../../packages/ai-google",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-ollama",
           root: "../../packages/ai-ollama",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-openai",
           root: "../../packages/ai-openai",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-live",
           root: "../../packages/ai-live",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-mistral",
           root: "../../packages/ai-mistral",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-groq",
           root: "../../packages/ai-groq",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-deepseek",
           root: "../../packages/ai-deepseek",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-xai",
           root: "../../packages/ai-xai",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-tools",
           root: "../../packages/ai-tools",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/ai-workspace",
           root: "../../packages/ai-workspace",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/auth",
           root: "../../packages/auth",
           mainType: "esm",
           formats: ["esm"],
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/cache",
           root: "../../packages/cache",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/cascade",
@@ -263,14 +150,7 @@ export default defineConfig({
         {
           name: "@warlock.js/context",
           root: "../../packages/context",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/core",
@@ -330,75 +210,33 @@ export default defineConfig({
         {
           name: "@warlock.js/fs",
           root: "../../packages/fs",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/herald",
           root: "../../packages/herald",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/logger",
           root: "../../packages/logger",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/scheduler",
           root: "../../packages/scheduler",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/seal",
           root: "../../packages/seal",
           entries: ["index.ts", "object.ts", "string.ts"],
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/notifications",
           root: "../../packages/notifications",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           /**
@@ -500,26 +338,12 @@ export default defineConfig({
            * and left out of here exists in the repo and is absent from the
            * tarball — done everywhere except where it counts.
            */
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           name: "@warlock.js/access",
           root: "../../packages/access",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           /**
@@ -530,27 +354,13 @@ export default defineConfig({
           name: "@warlock.js/queue",
           root: "../../packages/queue",
           entries: ["index.ts"],
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           /** Runtime `sitemap.xml` generation, new in 5.15. No subpath exports. */
           name: "@warlock.js/sitemap",
           root: "../../packages/sitemap",
-          clone: [
-            "README.md",
-            "LICENSE",
-            "CHANGELOG.md",
-            "skills",
-            "llms.txt",
-            "llms-full.txt",
-          ],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
           /**

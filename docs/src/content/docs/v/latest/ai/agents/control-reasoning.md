@@ -60,13 +60,13 @@ The same flag lives on every adapter's per-model config: `OpenAIModelConfig`, `A
 
 ## How each adapter maps the option
 
-| Adapter | Wire field | `effort` → | `effort: "none"` → | `maxTokens` → | Reports `reasoningTokens`? |
-| --- | --- | --- | --- | --- | --- |
-| **OpenAI** | `reasoning_effort` | passed through (`"low"`/`"medium"`/`"high"`) | emits `reasoning_effort: "none"` (reasoning off; **required** for function tools on gpt-5 / o-series) | **ignored** — Chat Completions has no token budget | Yes — `completion_tokens_details.reasoning_tokens` |
-| **Anthropic** | `thinking: { type: "enabled", budget_tokens }` | bucketed to a token budget | no `thinking` block (thinking is opt-in) | used directly (floored at 1024) | No — thinking tokens billed inside `output` |
-| **Bedrock** | `additionalModelRequestFields.thinking` | bucketed to a token budget | no `thinking` field (thinking is opt-in) | used directly | No — Converse `TokenUsage` has no reasoning channel |
-| **Google** | `thinkingConfig.thinkingBudget` | bucketed to a token budget | `thinkingBudget: 0` (Gemini's native off switch) | used directly as the cap | Yes — `thoughtsTokenCount` |
-| **Ollama** | `think` request flag | passed through (`"low"`/`"medium"`/`"high"`); effort-less → `true` | `think: false` | **ignored** — the daemon takes no token cap | No — thinking surfaces as a string, not a count |
+| Adapter       | Wire field                                     | `effort` →                                                         | `effort: "none"` →                                                                                    | `maxTokens` →                                      | Reports `reasoningTokens`?                          |
+| ------------- | ---------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------- |
+| **OpenAI**    | `reasoning_effort`                             | passed through (`"low"`/`"medium"`/`"high"`)                       | emits `reasoning_effort: "none"` (reasoning off; **required** for function tools on gpt-5 / o-series) | **ignored** — Chat Completions has no token budget | Yes — `completion_tokens_details.reasoning_tokens`  |
+| **Anthropic** | `thinking: { type: "enabled", budget_tokens }` | bucketed to a token budget                                         | no `thinking` block (thinking is opt-in)                                                              | used directly (floored at 1024)                    | No — thinking tokens billed inside `output`         |
+| **Bedrock**   | `additionalModelRequestFields.thinking`        | bucketed to a token budget                                         | no `thinking` field (thinking is opt-in)                                                              | used directly                                      | No — Converse `TokenUsage` has no reasoning channel |
+| **Google**    | `thinkingConfig.thinkingBudget`                | bucketed to a token budget                                         | `thinkingBudget: 0` (Gemini's native off switch)                                                      | used directly as the cap                           | Yes — `thoughtsTokenCount`                          |
+| **Ollama**    | `think` request flag                           | passed through (`"low"`/`"medium"`/`"high"`); effort-less → `true` | `think: false`                                                                                        | **ignored** — the daemon takes no token cap        | No — thinking surfaces as a string, not a count     |
 
 Resolution rule for the budget-based adapters (Anthropic / Bedrock / Google): `effort: "none"` disables reasoning first; otherwise an explicit `reasoning.maxTokens` wins; otherwise `effort` is bucketed to a representative budget; if neither is set, no thinking field is emitted (provider default).
 
@@ -74,12 +74,12 @@ Resolution rule for the budget-based adapters (Anthropic / Bedrock / Google): `e
 
 When you give `effort` but no explicit `maxTokens`, the budget-based adapters translate the level to these token budgets:
 
-| `effort` | OpenAI | Anthropic | Bedrock | Google |
-| --- | --- | --- | --- | --- |
-| `"low"` | `reasoning_effort: "low"` | 1024 | 1024 | 1024 |
-| `"medium"` | `reasoning_effort: "medium"` | 4096 | 4096 | 8192 |
-| `"high"` | `reasoning_effort: "high"` | 12000 | 16384 | 24576 |
-| `"none"` | `reasoning_effort: "none"` | no thinking | no thinking | `thinkingBudget: 0` |
+| `effort`   | OpenAI                       | Anthropic   | Bedrock     | Google              |
+| ---------- | ---------------------------- | ----------- | ----------- | ------------------- |
+| `"low"`    | `reasoning_effort: "low"`    | 1024        | 1024        | 1024                |
+| `"medium"` | `reasoning_effort: "medium"` | 4096        | 4096        | 8192                |
+| `"high"`   | `reasoning_effort: "high"`   | 12000       | 16384       | 24576               |
+| `"none"`   | `reasoning_effort: "none"`   | no thinking | no thinking | `thinkingBudget: 0` |
 
 OpenAI and Ollama have no budget column — they forward the `effort` enum verbatim (`"none"` → `think: false` on Ollama).
 
@@ -100,13 +100,13 @@ reasoning_effort to 'none'.
 A tool-using agent on such a model returns **empty replies** every turn. Passing `effort: "none"` fixes it — the OpenAI adapter emits `reasoning_effort: "none"` on the wire, reasoning switches off, and function tools are accepted:
 
 ```ts
-const model = openai.model({ name: "gpt-5-mini" });      // reasoning auto-true
+const model = openai.model({ name: "gpt-5-mini" }); // reasoning auto-true
 await myAgent.execute(input, {
-  modelOptions: { reasoning: { effort: "none" } },        // → reasoning_effort: "none"
+  modelOptions: { reasoning: { effort: "none" } }, // → reasoning_effort: "none"
 });
 ```
 
-Note the subtlety: **omitting** `effort` is *not* the same as `"none"`. With the param absent, a gpt-5 model still reasons server-side by default, so tools stay rejected. `"none"` is the switch that actively turns reasoning off.
+Note the subtlety: **omitting** `effort` is _not_ the same as `"none"`. With the param absent, a gpt-5 model still reasons server-side by default, so tools stay rejected. `"none"` is the switch that actively turns reasoning off.
 
 The trade-off is you lose reasoning. For tool-heavy agent work (function calls plus solid replies, not deep analysis) that's usually the right call — it's the difference between empty replies and working ones. When you need reasoning **and** tools together, use OpenAI's Responses API (planned in `@warlock.js/ai-openai`).
 
@@ -124,7 +124,7 @@ const gpt4o = openai.model({ name: "gpt-4o" }); // capabilities.reasoning === fa
 await gpt4o.complete(messages, { reasoning: { effort: "high" } });
 ```
 
-This is the whole point of the neutral option: you write the agent once and let capability inference decide whether the hint is forwarded. The `reasoning` per-model flag only changes *which* models count as capable.
+This is the whole point of the neutral option: you write the agent once and let capability inference decide whether the hint is forwarded. The `reasoning` per-model flag only changes _which_ models count as capable.
 
 :::tip
 Reading `reasoningTokens` back matters for cost. OpenAI and Google bill (and report) the thinking phase as a distinct token channel, so `usage.reasoningTokens` is populated and `ModelPricing.reasoning` (USD per 1M) prices it separately. Anthropic and Bedrock fold thinking into `output` tokens, so there is no separate count — they price under the normal `output` rate.

@@ -111,9 +111,7 @@ describe("useCase — pipeline order", () => {
   it("before middleware can transform the data the handler receives", async () => {
     const run = useCase<{ seen: unknown }, { email: string }>({
       name: uniqueName("transform"),
-      before: [
-        async (data) => ({ ...data, email: data.email.toLowerCase() }),
-      ],
+      before: [async (data) => ({ ...data, email: data.email.toLowerCase() })],
       handler: async (data) => ({ seen: data }),
     });
 

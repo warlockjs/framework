@@ -451,7 +451,9 @@ describe("Context prototype-pollution guard", () => {
     const userContext = createContext();
 
     await userContext.run({ userId: "u-1", role: "user" }, async () => {
-      userContext.update(JSON.parse('{"__proto__":{"isAdmin":true},"userId":"u-9","role":"admin"}'));
+      userContext.update(
+        JSON.parse('{"__proto__":{"isAdmin":true},"userId":"u-9","role":"admin"}'),
+      );
 
       expect(userContext.get("userId")).toBe("u-9");
       expect(userContext.get("role")).toBe("admin");

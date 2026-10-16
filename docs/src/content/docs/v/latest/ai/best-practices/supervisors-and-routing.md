@@ -11,7 +11,7 @@ A supervisor has three dispatch surfaces — a deterministic `route` callback, a
 
 ## The running scenario
 
-A customer-support supervisor for a SaaS product. An inbound message — *"I was charged twice for Pro and the dashboard won't load"* — needs triaging to one or more specialists (`billing`, `tech`, `sales`), and a `resolver` composes the final customer-facing reply. Sometimes one specialist answers the whole thing; sometimes a message genuinely needs billing **and** tech before a resolver can reply. The job is to route each message through exactly as many specialists as it needs and no more.
+A customer-support supervisor for a SaaS product. An inbound message — _"I was charged twice for Pro and the dashboard won't load"_ — needs triaging to one or more specialists (`billing`, `tech`, `sales`), and a `resolver` composes the final customer-facing reply. Sometimes one specialist answers the whole thing; sometimes a message genuinely needs billing **and** tech before a resolver can reply. The job is to route each message through exactly as many specialists as it needs and no more.
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -21,12 +21,12 @@ import { v } from "@warlock.js/seal";
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 const cheap = openai.model({ name: "gpt-4o-mini" }); // routing + classification
-const strong = openai.model({ name: "gpt-4o" });     // the customer-facing reply
+const strong = openai.model({ name: "gpt-4o" }); // the customer-facing reply
 
 // The four specialists, declared once and reused as intents.
-const billing = ai.agent({ name: "billing", model: cheap, /* … */ });
-const tech = ai.agent({ name: "tech", model: cheap, /* … */ });
-const sales = ai.agent({ name: "sales", model: cheap, /* … */ });
+const billing = ai.agent({ name: "billing", model: cheap /* … */ });
+const tech = ai.agent({ name: "tech", model: cheap /* … */ });
+const sales = ai.agent({ name: "sales", model: cheap /* … */ });
 const resolver = ai.agent({
   name: "resolver",
   model: strong,
@@ -36,7 +36,7 @@ const resolver = ai.agent({
 
 ## Prefer a deterministic `route` or a `classifier` over a `router` agent
 
-This is the single biggest cost lever in a supervisor. A `router` agent re-decides the next intent on **every** iteration — that's roughly **two LLM calls per iteration** (the router decides, then a specialist runs). A deterministic `route` callback makes the same decision in **zero** model tokens, and a `classifier` makes it in **one** call on iteration zero and then terminates. You only earn the router's per-iteration tax when the routing decision genuinely needs an LLM's judgment *and* can change as state accumulates across turns.
+This is the single biggest cost lever in a supervisor. A `router` agent re-decides the next intent on **every** iteration — that's roughly **two LLM calls per iteration** (the router decides, then a specialist runs). A deterministic `route` callback makes the same decision in **zero** model tokens, and a `classifier` makes it in **one** call on iteration zero and then terminates. You only earn the router's per-iteration tax when the routing decision genuinely needs an LLM's judgment _and_ can change as state accumulates across turns.
 
 **Do this — a `route` callback when the decision is a rule.** If the intent is derivable from the input itself — a keyword, an enum field, a metadata flag — no model needs to pick it. `route` returns `string | string[] | END`, and the array form fans out.
 
@@ -47,12 +47,18 @@ const triage = ai.supervisor({
   name: "support-triage",
   intents: { billing, tech, sales, resolver },
   route: (ctx) => {
-    if (ctx.state.reply) { return END; }      // resolver already replied — stop
+    if (ctx.state.reply) {
+      return END;
+    } // resolver already replied — stop
 
     const text = typeof ctx.input === "string" ? ctx.input.toLowerCase() : "";
 
-    if (text.includes("charge") || text.includes("refund")) { return "billing"; }
-    if (text.includes("error") || text.includes("crash")) { return "tech"; }
+    if (text.includes("charge") || text.includes("refund")) {
+      return "billing";
+    }
+    if (text.includes("error") || text.includes("crash")) {
+      return "tech";
+    }
 
     return "resolver";
   },
@@ -66,7 +72,8 @@ const classifyAgent = ai.agent({
   name: "classify",
   model: cheap, // classification is easy-tier work — the strong model picks the same label
   output: v.object({ intent: v.enum(["billing", "tech", "sales"]) }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You triage inbound support messages.")
     .instruction("Pick the single specialist that should answer."),
 });
@@ -80,7 +87,7 @@ const fastTriage = ai.supervisor<{ reply: string }, { reply?: string }>({
 });
 ```
 
-**Avoid this — a `router` agent for a single-pass, rule-based decision.** *"What's your refund policy?"* is billing, full stop. A router loop spends a routing call to reach that conclusion, runs billing, then spends a second routing call to decide it's done — two trips a `route` callback skips entirely and a `classifier` halves.
+**Avoid this — a `router` agent for a single-pass, rule-based decision.** _"What's your refund policy?"_ is billing, full stop. A router loop spends a routing call to reach that conclusion, runs billing, then spends a second routing call to decide it's done — two trips a `route` callback skips entirely and a `classifier` halves.
 
 ```ts
 // Anti-pattern: the heaviest dispatch surface for the lightest decision.
@@ -93,13 +100,13 @@ const triage = ai.supervisor({
 });
 ```
 
-Reserve the `router` agent for what it's actually good at: a message that needs **several** specialists in sequence, where the *next* one depends on what the last one found — a path no static rule can express. The cost ladder is the [support-triage recipe's](/v/latest/ai/recipes/supervisor-support-triage/) opening table; the cheap rungs are the [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/). This ties directly back to the model-tiering rule on the [cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) page: routing is cheap-tier work, so even when you do use a `router`, give it the cheap model.
+Reserve the `router` agent for what it's actually good at: a message that needs **several** specialists in sequence, where the _next_ one depends on what the last one found — a path no static rule can express. The cost ladder is the [support-triage recipe's](/v/latest/ai/recipes/supervisor-support-triage/) opening table; the cheap rungs are the [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/). This ties directly back to the model-tiering rule on the [cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) page: routing is cheap-tier work, so even when you do use a `router`, give it the cheap model.
 
 ## Write intent descriptions like a one-line "when would you pick this?" answer
 
 When you use a `router` (or an LLM `classifier`), the **descriptions are the routing prompt**. The supervisor renders each intent into the router's per-turn message as `- <intent>: <description>` — that line, and almost nothing else, is what the model uses to choose. A vague description misroutes more reliably than a weak model does: the strongest frontier model still can't pick `billing` over `sales` if both descriptions say "handles customer questions." Sharpening the description is usually the highest-leverage fix for a misrouting supervisor — cheaper and more reliable than upgrading the router's model.
 
-**Do this — describe the *trigger condition*, not the agent.** Each description should read like the answer to "when would you route here, and not to a sibling?" — disjoint, concrete, decision-shaped.
+**Do this — describe the _trigger condition_, not the agent.** Each description should read like the answer to "when would you route here, and not to a sibling?" — disjoint, concrete, decision-shaped.
 
 ```ts
 const support = ai.supervisor({
@@ -108,11 +115,13 @@ const support = ai.supervisor({
   intents: {
     billing: {
       agent: billingAgent,
-      description: "Charges, refunds, invoices, plan changes, or anything about money owed or paid.",
+      description:
+        "Charges, refunds, invoices, plan changes, or anything about money owed or paid.",
     },
     tech: {
       agent: techAgent,
-      description: "The product is broken or erroring — crashes, failed loads, features not working.",
+      description:
+        "The product is broken or erroring — crashes, failed loads, features not working.",
     },
     sales: {
       agent: salesAgent,
@@ -126,7 +135,7 @@ const support = ai.supervisor({
 });
 ```
 
-**Avoid this — descriptions that restate the agent's name.** "Handles billing," "handles technical issues," "handles sales" give the router no signal a boundary case can split on. A message like *"my upgrade to Pro failed and I got charged anyway"* touches all three — without a clear trigger condition per intent, the router's pick is a coin-flip the description was supposed to settle.
+**Avoid this — descriptions that restate the agent's name.** "Handles billing," "handles technical issues," "handles sales" give the router no signal a boundary case can split on. A message like _"my upgrade to Pro failed and I got charged anyway"_ touches all three — without a clear trigger condition per intent, the router's pick is a coin-flip the description was supposed to settle.
 
 ```ts
 // Anti-pattern: name-shaped descriptions with overlapping, vague boundaries.
@@ -137,11 +146,11 @@ intents: {
 }
 ```
 
-> Under a `router`, a non-empty `description` is *mandatory* on every intent — the factory throws `SUPERVISOR_INTENT_DESCRIPTION_REQUIRED` if any router-routed intent lacks one. Bare-callback shorthand (`refund: async (ctx) => …`) carries no description, so under a router you must upgrade it to the object form `{ run, description }`. A deterministic `route` callback skips the check entirely — there's no LLM to read a description, so don't write prose your code doesn't use.
+> Under a `router`, a non-empty `description` is _mandatory_ on every intent — the factory throws `SUPERVISOR_INTENT_DESCRIPTION_REQUIRED` if any router-routed intent lacks one. Bare-callback shorthand (`refund: async (ctx) => …`) carries no description, so under a router you must upgrade it to the object form `{ run, description }`. A deterministic `route` callback skips the check entirely — there's no LLM to read a description, so don't write prose your code doesn't use.
 
 ## Use `evaluate` as the real stop condition — it outranks the router
 
-A router agent deciding to emit `END` is the *model's* opinion that the run is done. That's the weakest possible stop signal: it's a generation, it can be wrong, and it can loop. `evaluate` is the deterministic verdict you control, and the framework gives it the final word — the order of authority is **`evaluate` → `intent.next` → `router`/`route`**. So the robust pattern is to let the router pick *who runs next* but let `evaluate` decide *whether we're done*, keyed off accumulated state rather than the model's say-so.
+A router agent deciding to emit `END` is the _model's_ opinion that the run is done. That's the weakest possible stop signal: it's a generation, it can be wrong, and it can loop. `evaluate` is the deterministic verdict you control, and the framework gives it the final word — the order of authority is **`evaluate` → `intent.next` → `router`/`route`**. So the robust pattern is to let the router pick _who runs next_ but let `evaluate` decide _whether we're done_, keyed off accumulated state rather than the model's say-so.
 
 **Do this — terminate on a state fact, not on the router's `END`.** The run stops the moment a customer-ready `reply` exists in state, regardless of what the router would have chosen next.
 
@@ -184,11 +193,11 @@ ai.supervisor({
 });
 ```
 
-> A returned `{ satisfied: true }` is a *success* termination; hitting `maxIterations` is a *failure* termination that surfaces `MaxIterationsError` on `result.error`. Those are very different outcomes — design for the run to end via `evaluate`, and treat the cap as the safety net it is, not the expected exit. For state-driven termination in `route` mode, `evaluate` pairs with `route` too (not just `router`).
+> A returned `{ satisfied: true }` is a _success_ termination; hitting `maxIterations` is a _failure_ termination that surfaces `MaxIterationsError` on `result.error`. Those are very different outcomes — design for the run to end via `evaluate`, and treat the cap as the safety net it is, not the expected exit. For state-driven termination in `route` mode, `evaluate` pairs with `route` too (not just `router`).
 
 ## Keep `maxIterations` low — and alert when you hit the cap
 
-`maxIterations` defaults to `10`. That default is a backstop, not a target: a healthy support supervisor converges in two or three iterations. Setting the cap close to your real convergence count turns "the run is looping" from a slow, expensive, silent failure into a fast, cheap, *loud* one — every iteration past the answer is a wasted router call plus a wasted specialist call. And because hitting the cap is a genuine failure mode (`result.error` is a `MaxIterationsError`), it deserves an alert, not a swallow.
+`maxIterations` defaults to `10`. That default is a backstop, not a target: a healthy support supervisor converges in two or three iterations. Setting the cap close to your real convergence count turns "the run is looping" from a slow, expensive, silent failure into a fast, cheap, _loud_ one — every iteration past the answer is a wasted router call plus a wasted specialist call. And because hitting the cap is a genuine failure mode (`result.error` is a `MaxIterationsError`), it deserves an alert, not a swallow.
 
 **Do this — set the cap to a tight multiple of expected iterations, and treat the cap as an incident.** If the supervisor should finish in three turns, `maxIterations: 5` leaves slack for a retry without letting a loop run to ten.
 
@@ -242,7 +251,10 @@ type SupportState = {
 
 // Disjoint slices — each intent owns its own keys.
 const intents = {
-  billing: { agent: billingAgent, output: v.object({ refund: v.object({ eligible: v.boolean(), amount: v.number() }) }) },
+  billing: {
+    agent: billingAgent,
+    output: v.object({ refund: v.object({ eligible: v.boolean(), amount: v.number() }) }),
+  },
   tech: { agent: techAgent, output: v.object({ diagnosis: v.object({ rootCause: v.string() }) }) },
   resolver: { agent: resolverAgent, output: v.object({ reply: v.string() }) },
 };
@@ -277,7 +289,7 @@ route: (ctx) => (ctx.iteration === 0 ? ["billing", "tech"] : "resolver"), // bot
 The short version — the routing mistakes that quietly inflate a supervisor's cost or corrupt its output:
 
 - **Don't reach for a `router` agent when a rule decides the route.** A deterministic `route` callback costs zero routing tokens; a `classifier` costs one call for a single-pass message. Reserve the router loop for genuinely multi-specialist messages where the next pick depends on the last result.
-- **Don't write name-shaped intent descriptions.** Under a router, the descriptions *are* the routing prompt — write each as a disjoint "when would you pick this?" trigger condition. Vague descriptions misroute more than weak models do.
+- **Don't write name-shaped intent descriptions.** Under a router, the descriptions _are_ the routing prompt — write each as a disjoint "when would you pick this?" trigger condition. Vague descriptions misroute more than weak models do.
 - **Don't let the router decide when to stop.** Make `evaluate` the stop condition keyed off accumulated state — it outranks the router and turns a model opinion into a deterministic verdict you control.
 - **Don't leave `maxIterations` at the default and ignore the cap.** Set it to a tight multiple of expected iterations and alert on `SUPERVISOR_MAX_ITERATIONS` — hitting the cap is a failure that signals a routing or `evaluate` hole, not a normal finish.
 - **Don't let two intents write the same state key.** The cross-branch merge is shallow and last-write-wins — keep slices disjoint so a fan-out composes instead of clobbering. Use `finalizeArtifacts` when you truly need to accumulate same-keyed values.

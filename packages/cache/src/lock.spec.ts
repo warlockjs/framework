@@ -10,10 +10,7 @@ describe("cache.lock()", () => {
       logging: false,
       // `alt` is a custom driver name (not a built-in key); the literal needs a
       // permissive cast to register alongside `memory`.
-      drivers: { memory: MemoryCacheDriver, alt: MemoryCacheDriver } as Record<
-        string,
-        DriverClass
-      >,
+      drivers: { memory: MemoryCacheDriver, alt: MemoryCacheDriver } as Record<string, DriverClass>,
       options: { memory: {}, alt: {} } as Record<string, Record<string, never>>,
     });
     await cache.init();
@@ -32,7 +29,7 @@ describe("cache.lock()", () => {
 
       expect(outcome).toEqual({ acquired: true, value: 42 });
       expect(work).toHaveBeenCalledTimes(1);
-      await expect(cache.get("lock.x")).resolves.toBeNull();   // released
+      await expect(cache.get("lock.x")).resolves.toBeNull(); // released
     });
 
     it("returns acquired:false when the key already exists", async () => {
@@ -43,7 +40,7 @@ describe("cache.lock()", () => {
 
       expect(outcome).toEqual({ acquired: false });
       expect(work).not.toHaveBeenCalled();
-      await expect(cache.get("lock.x")).resolves.toBe("someone-else");  // untouched
+      await expect(cache.get("lock.x")).resolves.toBe("someone-else"); // untouched
     });
 
     it("preserves wrapped function's return value through the outcome", async () => {
@@ -177,13 +174,9 @@ describe("cache.lock()", () => {
 
   describe("driver override", () => {
     it("routes the whole lock op through a non-default driver", async () => {
-      await cache.lock(
-        "lock.audit",
-        { ttl: "1m", driver: "alt" },
-        async () => {
-          return "audit";
-        },
-      );
+      await cache.lock("lock.audit", { ttl: "1m", driver: "alt" }, async () => {
+        return "audit";
+      });
 
       const defaultDriver = cache.currentDriver!;
       const altDriver = await cache.load("alt");

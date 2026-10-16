@@ -38,7 +38,11 @@ import { collectOwnedDiagnostics, type WorkspacePackage } from "../strictness-ga
  * are inside its own rootDir there).
  */
 
-const FIXTURES_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "strictness-gate");
+const FIXTURES_ROOT = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "fixtures",
+  "strictness-gate",
+);
 
 function fixturePackage(dir: string): WorkspacePackage {
   return { dir, path: path.join(FIXTURES_ROOT, dir) };
@@ -66,7 +70,10 @@ describe("collectOwnedDiagnostics -- program-containment diagnostic ownership", 
       (diagnostic) => diagnostic.file.endsWith("pkg-a/src/shared.ts") && diagnostic.code === 2322,
     );
 
-    assert.ok(sharedTypeError, "expected shared.ts's own TS2322, raised while compiling pkg-b, to still be owned by pkg-a");
+    assert.ok(
+      sharedTypeError,
+      "expected shared.ts's own TS2322, raised while compiling pkg-b, to still be owned by pkg-a",
+    );
 
     const ownedByB = measurement.diagnostics.get("pkg-b") ?? [];
     assert.ok(
@@ -88,7 +95,10 @@ describe("collectOwnedDiagnostics -- program-containment diagnostic ownership", 
       (diagnostic) => diagnostic.file.endsWith("pkg-a/src/index.ts") && diagnostic.code === 6059,
     );
 
-    assert.ok(containment, "expected the TS6059 located in pkg-a/src/index.ts to be charged to pkg-b, the producing program");
+    assert.ok(
+      containment,
+      "expected the TS6059 located in pkg-a/src/index.ts to be charged to pkg-b, the producing program",
+    );
 
     const ownedByA = measurement.diagnostics.get("pkg-a") ?? [];
     assert.ok(

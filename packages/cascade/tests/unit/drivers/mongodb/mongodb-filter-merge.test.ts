@@ -30,7 +30,10 @@ describe("MongoQueryBuilder — filter building (K1 B6, B10, B11)", () => {
     it("keeps the global scope in the filter of an unfiltered query", () => {
       const q = builder();
       (q as any).pendingGlobalScopes = new Map([
-        ["tenant", { callback: (b: MongoQueryBuilder) => b.where("tenantId", 7), timing: "before" }],
+        [
+          "tenant",
+          { callback: (b: MongoQueryBuilder) => b.where("tenantId", 7), timing: "before" },
+        ],
       ]);
 
       expect(filterOf(q)).toEqual({ tenantId: 7 });
@@ -83,13 +86,17 @@ describe("MongoQueryBuilder — filter building (K1 B6, B10, B11)", () => {
     });
 
     it("keeps both bounds of a callback with age > 18 and age < 65", () => {
-      const filter = filterOf(builder().where((q: any) => q.where("age", ">", 18).where("age", "<", 65)));
+      const filter = filterOf(
+        builder().where((q: any) => q.where("age", ">", 18).where("age", "<", 65)),
+      );
 
       expect(filter).toEqual({ age: { $gt: 18, $lt: 65 } });
     });
 
     it("keeps both same-operator conditions inside a callback", () => {
-      const filter = filterOf(builder().where((q: any) => q.where("age", ">", 18).where("age", ">", 30)));
+      const filter = filterOf(
+        builder().where((q: any) => q.where("age", ">", 18).where("age", ">", 30)),
+      );
 
       expect(filter).toEqual({ age: { $gt: 18 }, $and: [{ age: { $gt: 30 } }] });
     });

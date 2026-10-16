@@ -11,7 +11,7 @@ Multi-channel notifications for Warlock.js. **Define once, fire anywhere.**
 
 You have an event (`order.shipped`, `comment.mentioned`, `password.changed`) and one or more recipients. You want to address them through any combination of channels (mail, in-app, push, ...) with one render. That's what this package is.
 
-It is NOT a queue, a template engine, a transport library, or an analytics pipeline — it orchestrates *over* the transports cascade / core / herald / bridges already provide.
+It is NOT a queue, a template engine, a transport library, or an analytics pipeline — it orchestrates _over_ the transports cascade / core / herald / bridges already provide.
 
 ## Server-only package
 
@@ -34,7 +34,7 @@ import { Notification } from "app/notifications/models/notification/notification
 
 const config: NotificationConfig = {
   channels: {
-    mail:     mailChannel({ from: "no-reply@store.com" }),
+    mail: mailChannel({ from: "no-reply@store.com" }),
     database: inApp.configure({ model: Notification }),
   },
 };
@@ -67,7 +67,7 @@ await orderShipped.send(user, { orderId: order.id, number: order.number });
 await notify.mail(user, { subject: "Welcome", html: "<p>Hi!</p>" });
 
 const unread = await inApp.listUnread(user);
-const badge  = await inApp.countUnread(user);
+const badge = await inApp.countUnread(user);
 await inApp.markAsRead(user, "ntf_123");
 ```
 
@@ -77,15 +77,15 @@ await inApp.markAsRead(user, "ntf_123");
 
 ## Phase 1 vs Phase 2
 
-| Channel | Phase | How |
-|---|---|---|
-| `mail` | 1 ✅ | core `sendMail` |
-| `database` | 1 ✅ | cascade repo (recipient-scoped reads) |
-| `whatsapp` | 2 | bridges `MessageProvider` |
-| `telegram` | 2 | bridges `MessageProvider` |
-| `slack` | 2 | bridges `MessageProvider` |
-| `push` | 2 | bridges `PushProvider` |
-| your own | 1 ✅ | `defineChannel` + 3-line `declare module` |
+| Channel    | Phase | How                                       |
+| ---------- | ----- | ----------------------------------------- |
+| `mail`     | 1 ✅  | core `sendMail`                           |
+| `database` | 1 ✅  | cascade repo (recipient-scoped reads)     |
+| `whatsapp` | 2     | bridges `MessageProvider`                 |
+| `telegram` | 2     | bridges `MessageProvider`                 |
+| `slack`    | 2     | bridges `MessageProvider`                 |
+| `push`     | 2     | bridges `PushProvider`                    |
+| your own   | 1 ✅  | `defineChannel` + 3-line `declare module` |
 
 ## See also
 

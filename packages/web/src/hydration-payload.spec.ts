@@ -221,15 +221,31 @@ describe("readHydrationPayload", () => {
     ],
     ["a status below 400", { error: serializedErrorPage.error, status: 399 }],
     ["a status above 599", { error: serializedErrorPage.error, status: 600 }],
-    ["a non-string errorCode", { error: { name: "Error", message: "boom", errorCode: 7 }, status: 500 }],
-    ["non-array validation errors", { error: { name: "E", message: "m", errors: "bad" }, status: 400 }],
+    [
+      "a non-string errorCode",
+      { error: { name: "Error", message: "boom", errorCode: 7 }, status: 500 },
+    ],
+    [
+      "non-array validation errors",
+      { error: { name: "E", message: "m", errors: "bad" }, status: 400 },
+    ],
     [
       "a validation issue with an extra field",
-      { error: { name: "E", message: "m", errors: [{ input: "a", type: "b", error: "c", value: "raw" }] }, status: 400 },
+      {
+        error: {
+          name: "E",
+          message: "m",
+          errors: [{ input: "a", type: "b", error: "c", value: "raw" }],
+        },
+        status: 400,
+      },
     ],
     [
       "a validation issue with a non-string field",
-      { error: { name: "E", message: "m", errors: [{ input: "a", type: "b", error: 1 }] }, status: 400 },
+      {
+        error: { name: "E", message: "m", errors: [{ input: "a", type: "b", error: 1 }] },
+        status: 400,
+      },
     ],
     ["a non-integer status", { error: serializedErrorPage.error, status: 500.5 }],
   ])("rejects errorPage with %s", (_caseName, errorPage) => {
@@ -444,7 +460,7 @@ describe("optional actionData and session keys", () => {
     }
   });
 
-  it("readHydrationPayload throws for session: \"x\" and session: []", () => {
+  it('readHydrationPayload throws for session: "x" and session: []', () => {
     for (const bad of ["x", []]) {
       expect(() =>
         readHydrationPayload(makeDocument(stringify({ ...fullPayload, session: bad }))),

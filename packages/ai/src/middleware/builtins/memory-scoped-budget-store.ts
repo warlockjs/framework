@@ -21,7 +21,10 @@ export function memoryScopedBudgetStore(): ScopedBudgetStore {
     const current = new Promise<void>((resolve) => {
       release = resolve;
     });
-    queues.set(key, previous.then(() => current));
+    queues.set(
+      key,
+      previous.then(() => current),
+    );
     await previous;
 
     try {

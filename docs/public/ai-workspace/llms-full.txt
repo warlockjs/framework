@@ -8,7 +8,7 @@
 
 ---
 name: build-loop-agent
-description: 'Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, ''agent that fixes a failing test'', ''make the suite green'', ''coding agent that edits a repo'', ''build-loop agent'', ''self-correcting agent'', ''read-only code reviewer'', ''scaffold then hand off to an agent'', ''share one workspace across a supervisor'', ''least-privilege agent tools'', ''errors as tool data''; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — the `use-a-workspace` topic; the agent loop / maxTrips / events themselves — the `run-ai-agent` topic of the `warlock-js-ai` skill.'
+description: "Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, 'agent that fixes a failing test', 'make the suite green', 'coding agent that edits a repo', 'build-loop agent', 'self-correcting agent', 'read-only code reviewer', 'scaffold then hand off to an agent', 'share one workspace across a supervisor', 'least-privilege agent tools', 'errors as tool data'; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — the `use-a-workspace` topic; the agent loop / maxTrips / events themselves — the `run-ai-agent` topic of the `warlock-js-ai` skill."
 ---
 
 # Build a build-loop agent — read → edit → run tests, until green
@@ -27,8 +27,8 @@ const ws = ai.workspace({
 
 const dev = ai.agent({
   model,
-  tools: ws.tools.all(),   // read_file, edit_file, write_file, run_shell, run_tests, grep, glob
-  maxTrips: 25,            // give the loop room to iterate
+  tools: ws.tools.all(), // read_file, edit_file, write_file, run_shell, run_tests, grep, glob
+  maxTrips: 25, // give the loop room to iterate
 });
 
 await dev.execute("`npm test` fails on the cart-total suite. Make it green.");
@@ -51,7 +51,7 @@ Override the base command per agent: `ws.tools.runTests({ command: "vitest run" 
 
 ### A read-only reviewer
 
-A reviewer should never write or run a shell. Pick exactly the read tools, or hand it a `readonly()` projection (which omits the mutating tools *and* rejects the mutating direct methods):
+A reviewer should never write or run a shell. Pick exactly the read tools, or hand it a `readonly()` projection (which omits the mutating tools _and_ rejects the mutating direct methods):
 
 ```ts
 const reviewer = ai.agent({
@@ -69,8 +69,8 @@ ai.agent({ model, tools: ws.readonly().tools.all() }); // read_file + grep + glo
 `scope(subdir)` narrows the jail so a per-package agent can't reach outside it — one sub-agent per package, isolated blast radius:
 
 ```ts
-const apiDev  = ai.agent({ model, tools: ws.scope("packages/api").tools.all() });
-const webDev  = ai.agent({ model, tools: ws.scope("packages/web").tools.all() });
+const apiDev = ai.agent({ model, tools: ws.scope("packages/api").tools.all() });
+const webDev = ai.agent({ model, tools: ws.scope("packages/web").tools.all() });
 ```
 
 ## Scaffold from code, then hand off
@@ -112,7 +112,7 @@ ai.supervisor({
 
 ---
 name: use-a-workspace
-description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `WorkspacePolicyError`, `WorkspaceEditError`, `denyPaths`, `inheritEnv`, `expectHash`, `tokenizeCommand`, `read_file`/`edit_file`/`write_file`/`run_shell`/`run_tests`/`grep`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — the `build-loop-agent` topic; defining a non-filesystem custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
+description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `WorkspacePolicyError`, `WorkspaceEditError`, `denyPaths`, `inheritEnv`, `expectHash`, `read.maxBytes`, `bytesCapped`, `cancelled`, `ExecOptions`, `tokenizeCommand`, `read_file`/`edit_file`/`write_file`/`run_shell`/`run_tests`/`grep`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent'', ''cap how many bytes a read returns'', ''cancel a running workspace command''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — the `build-loop-agent` topic; defining a non-filesystem custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
 ---
 
 # Use a workspace — a policy jail for an agent's filesystem + shell
@@ -134,21 +134,21 @@ const ws = ai.workspace({
 
 ## A policy jail, NOT OS isolation
 
-This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an *allowed* process does once it runs. Real isolation (container / microVM) is a later phase.
+This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an _allowed_ process does once it runs. Real isolation (container / microVM) is a later phase.
 
 ## The policy surface
 
-| Field | What it does |
-|---|---|
-| `cwd` | **Absolute** jail root. Every path resolves against it and must stay inside. |
-| `allowPaths` | Extra readable roots outside `cwd`. |
-| `denyPaths` | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents. |
-| `shell.allow` / `shell.deny` | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
-| `shell.inheritEnv` | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`. |
-| `shell.env` | Explicit env vars injected into every spawned process (override inherited on collision). |
-| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (SIGKILL on expiry) and stdout/stderr byte cap. |
-| `read.defaultLines` / `read.maxBytes` | Default read window + a byte ceiling. |
-| `backend` | `"local"` (default — real disk) or `"mock"` (in-memory, for tests). |
+| Field                                      | What it does                                                                                                                                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                                      | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                     |
+| `allowPaths`                               | Extra readable roots outside `cwd`.                                                                                                                                                                              |
+| `denyPaths`                                | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                 |
+| `shell.allow` / `shell.deny`               | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
+| `shell.inheritEnv`                         | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                  |
+| `shell.env`                                | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                         |
+| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                      |
+| `read.defaultLines` / `read.maxBytes`      | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                               |
+| `backend`                                  | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                              |
 
 > **The most common gotcha:** `run_shell` fails to find `node`/`npm` because the env is empty. Add `shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] }`.
 
@@ -157,9 +157,9 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 Commands are tokenized (via `tokenizeCommand`) into an argv and spawned with **no shell semantics** — no pipes, redirection, chaining, backticks, or variable expansion. `npm test && rm -rf /` or `` `curl evil` `` doesn't chain or substitute; it's rejected outright rather than executed piecemeal:
 
 ```ts
-await ws.exec("npm test");                    // OK — ["npm", "test"]
-await ws.exec('node -e "console.log(1)"');     // OK — quotes respected, one argv element
-await ws.exec("npm test; curl http://evil");   // rejected — unquoted `;` is a metacharacter
+await ws.exec("npm test"); // OK — ["npm", "test"]
+await ws.exec('node -e "console.log(1)"'); // OK — quotes respected, one argv element
+await ws.exec("npm test; curl http://evil"); // rejected — unquoted `;` is a metacharacter
 ```
 
 - **Quoting is respected**; **unquoted** shell metacharacters — `;` `&` `|` `<` `>` `` ` `` `$` `(` `)` and newlines — are rejected as a `WorkspacePolicyError` `type: "denied-command"` before anything spawns. The `shell.allow`/`shell.deny` basename check runs against the tokenized argv's first element, not a raw string prefix, so a disguised leading token can't slip past the gate.
@@ -174,10 +174,10 @@ await ws.exec("npm test; curl http://evil");   // rejected — unquoted `;` is a
 Each tool is a `ToolContract` ready for `ai.agent({ tools })`. The seven LLM-visible tool names are `read_file`, `edit_file`, `write_file`, `run_shell`, `run_tests`, `grep`, `glob`.
 
 ```ts
-ws.tools.all();                              // all seven, canonical order
-ws.tools.pick("readFile", "grep", "glob");   // a least-privilege subset
-ws.tools.readFile({ name: "open" });          // one tool, optionally renamed
-ws.tools.runTests({ command: "vitest run" });  // override the test base command
+ws.tools.all(); // all seven, canonical order
+ws.tools.pick("readFile", "grep", "glob"); // a least-privilege subset
+ws.tools.readFile({ name: "open" }); // one tool, optionally renamed
+ws.tools.runTests({ command: "vitest run" }); // override the test base command
 ```
 
 ### Human-facing — direct methods
@@ -185,10 +185,13 @@ ws.tools.runTests({ command: "vitest run" });  // override the test base command
 The same policy seam, callable from code (no LLM):
 
 ```ts
-const { content, hash, totalLines } = await ws.readFile("src/index.ts", { offset: 1, limit: 200 });
+const { content, hash, totalLines, endLine, truncated, bytesCapped } = await ws.readFile(
+  "src/index.ts",
+  { offset: 1, limit: 200 },
+);
 await ws.writeFile("src/new.ts", "export const x = 1;\n");
 await ws.editFile({ path: "src/index.ts", oldString: "old", newString: "new", expectHash: hash });
-const { exitCode, stdout, stderr, timedOut, truncated } = await ws.exec("npm test");
+const { exitCode, stdout, stderr, timedOut, cancelled, truncated } = await ws.exec("npm test");
 const { matches } = await ws.grep("TODO", { glob: "src/**/*.ts", ignoreCase: true });
 const paths = await ws.glob("src/models/**/*.ts");
 await ws.exists("package.json");
@@ -200,9 +203,45 @@ await ws.remove("dist");
 
 The model supplies `pattern` freely, so `grep` treats it as untrusted input before compiling it into a `RegExp`: patterns over 200 characters and patterns matching a nested-quantifier shape (`(x+)+`, `(x*)*`, `(x+)*`, `(x*)+`-style groups — the classic catastrophic-backtracking shape) are rejected up front as a `WorkspacePolicyError` `type: "unsafe-pattern"`, before any regex is compiled. Any scanned line longer than 2000 characters is skipped (not tested), bounding the worst-case backtracking cost of any single call regardless of pattern shape.
 
+## Read windows and the byte ceiling
+
+`readFile()` and the `read_file` tool return the same result for the same arguments: a `cat -n` numbered window plus `{ startLine, endLine, totalLines, totalBytes, truncated, bytesCapped, hash }`.
+
+- The window starts at `offset` (`startLine` on the tool) and holds at most `limit` lines (default `read.defaultLines`, else 2000).
+- `read.maxBytes` caps the UTF-8 bytes of the returned `content` itself — line-number prefixes and newlines count. Whole lines are kept while they fit; the first line that doesn't is cut on a **character boundary** (never mid-character), so a single very long line still comes back bounded. `bytesCapped` is `true` whenever the cap cut anything, and `endLine` is the last line included, possibly partially.
+- `truncated` is `true` when anything after `content` was withheld — later lines (by `limit`, the default window or the cap) or the tail of `endLine`.
+- `hash` is always the SHA-256 of the **whole file**, not the window, so it is a valid `expectHash` whatever was returned. `totalBytes` is the whole file's size.
+- No `maxBytes` ⇒ no byte cap (only the line window applies).
+
+```ts
+const ws = ai.workspace({ cwd, read: { maxBytes: 64_000, defaultLines: 400 } });
+const page = await ws.readFile("dist/bundle.js");
+if (page.bytesCapped) console.warn(`Only part of line ${page.endLine} fit in the read budget.`);
+```
+
+## Cancelling a command
+
+`exec()` accepts a per-call `signal`; `run_shell` and `run_tests` pass the agent run's signal (the dispatch `ctx.signal`) automatically, so cancelling the agent run stops the command it is waiting on.
+
+- Already aborted ⇒ the command is **not started** (`exitCode: 130`).
+- Aborted mid-run ⇒ the whole process tree is SIGKILLed, as on a timeout.
+- Either way the result says `cancelled: true` — it resolves, it doesn't throw — and `cancelled` and `timedOut` are never both `true`. Branch on those flags, not on the exit code.
+- The signal belongs to that one call; the workspace never stores it, so one workspace can serve many runs. The abort listener is removed once the command settles.
+
+```ts
+const controller = new AbortController();
+const pending = ws.exec("npm test", { signal: controller.signal, timeoutMs: 120_000 });
+controller.abort();
+const { cancelled } = await pending; // true
+```
+
+A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` and should follow the same rules, reporting `cancelled: true` in its result.
+
 ## Read-before-edit (the stale-hash guard)
 
 `readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **exact and unique** — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
+
+Writes, edits and removes of the same path run one after another, even when the agent dispatches tool calls concurrently: of two edits pinned to the same `expectHash`, the second is rejected as stale instead of silently overwriting the first. `read.maxBytes` bounds what a read returns, not memory — the whole file is still read and hashed.
 
 ## Errors flow as data, not throws
 
@@ -226,7 +265,7 @@ try {
 ## Composition — `readonly()` and `scope()`
 
 ```ts
-const ro = ws.readonly();         // vends only read/grep/glob; mutating direct methods reject
+const ro = ws.readonly(); // vends only read/grep/glob; mutating direct methods reject
 const api = ws.scope("packages/api"); // a sub-jailed workspace rooted at the subdir
 ```
 
@@ -246,3 +285,30 @@ const ws = ai.workspace({ cwd: "/srv/app", backend: "mock", shell: { allow: ["np
 - The `build-loop-agent` topic — wiring these tools into a read → edit → test agent loop.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes `ws.tools.all()`.
 - The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every workspace tool is built on.
+
+## Complete bounded-read and cancellation example
+
+```ts
+import { workspace } from "@warlock.js/ai-workspace";
+
+export async function inspectWorkspace(cwd: string) {
+  const ws = workspace({
+    cwd,
+    read: { maxBytes: 64_000, defaultLines: 400 },
+    shell: { allow: ["node"], inheritEnv: ["PATH"] },
+  });
+  const page = await ws.readFile("package.json");
+  console.info(page.bytesCapped, page.endLine, page.hash);
+
+  const controller = new AbortController();
+  controller.abort();
+  const result = await ws.exec('node -e "console.log(1)"', { signal: controller.signal });
+  if (result.cancelled) console.info("Command cancelled before it started");
+  return page;
+}
+```
+
+The caller supplies an absolute existing workspace root. The already-aborted
+signal demonstrates the no-spawn path; a later abort also kills a running
+command's process tree. The byte ceiling limits returned content, while the
+hash still describes the whole file.

@@ -200,9 +200,9 @@ describe("registration-time collection", () => {
 
   it("falls back to (anonymous) for an unnamed handler", () => {
     inspectHandlerSignature(
-      (function (request: any, response: any) {
+      function (request: any, response: any) {
         return [request, response];
-      }).bind(null),
+      }.bind(null),
       { method: "POST", path: "/anon", sourceFile },
     );
 

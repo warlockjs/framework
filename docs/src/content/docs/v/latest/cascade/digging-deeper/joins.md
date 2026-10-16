@@ -49,7 +49,7 @@ User.query().join("profiles", "id", "user_id").get();
 **Driver behavior diverges here**, so read carefully:
 
 - **SQL (Postgres)** → emits `INNER JOIN`. Rows without a matching profile are excluded.
-- **MongoDB** → emits `$lookup`, which is *inherently a left outer join*. Rows without a matching profile are included with an empty array.
+- **MongoDB** → emits `$lookup`, which is _inherently a left outer join_. Rows without a matching profile are included with an empty array.
 
 If you mean "INNER JOIN" semantically — only return rows that have a match — use `.innerJoin()` explicitly. On MongoDB it adds the `$match` that filters out empty joins.
 
@@ -77,9 +77,9 @@ User.query().rightJoin("profiles", "id", "user_id").get();
 
 :::caution — MongoDB silently emulates this as LEFT JOIN
 
-`$lookup` is one-directional (always left-flavored from the input collection). When you call `.rightJoin()` on MongoDB, Cascade falls back to a left join with the same fields — *not* the semantic you asked for.
+`$lookup` is one-directional (always left-flavored from the input collection). When you call `.rightJoin()` on MongoDB, Cascade falls back to a left join with the same fields — _not_ the semantic you asked for.
 
-If you genuinely need RIGHT JOIN semantics on MongoDB, restructure the query to put what you want as the "right side" as the *primary* collection instead, and use `.leftJoin()`.
+If you genuinely need RIGHT JOIN semantics on MongoDB, restructure the query to put what you want as the "right side" as the _primary_ collection instead, and use `.leftJoin()`.
 
 :::
 
@@ -93,7 +93,7 @@ User.query().fullJoin("profiles", "id", "user_id").get();
 
 :::caution — MongoDB silently emulates this as LEFT JOIN
 
-MongoDB has no native FULL OUTER JOIN. Cascade falls back to a left join — again, *not* what you asked for. For true full-outer semantics on MongoDB you need `$unionWith` + dedup logic, which sits outside the structured join methods (see [`.joinRaw()`](#joinraw--escape-hatch) below).
+MongoDB has no native FULL OUTER JOIN. Cascade falls back to a left join — again, _not_ what you asked for. For true full-outer semantics on MongoDB you need `$unionWith` + dedup logic, which sits outside the structured join methods (see [`.joinRaw()`](#joinraw--escape-hatch) below).
 
 :::
 
@@ -124,7 +124,7 @@ User.query().join({
   table: "profiles",
   localField: "id",
   foreignField: "user_id",
-  alias: "profile",       // alias the joined relation
+  alias: "profile", // alias the joined relation
   select: ["bio", "avatar"], // project only these columns from profiles
 });
 ```
@@ -133,16 +133,16 @@ The shape — see `JoinOptions` in the reference — supports `alias`, `type`, `
 
 ## Decision table — which join to reach for
 
-| Situation | Reach for |
-| --------- | --------- |
-| INNER semantics across both drivers | `.innerJoin()` |
-| Keep all left + matches (most predictable cross-driver) | `.leftJoin()` |
-| Keep all right + matches | `.rightJoin()` — **SQL only**, silently emulated on MongoDB |
-| Everything from both sides | `.fullJoin()` — **SQL only**, silently emulated on MongoDB |
-| Every combination | `.crossJoin()` — supported on both, used sparingly |
-| Driver-specific shape Cascade can't express | `.joinRaw()` |
-| The tables are connected by a declared relation | `.with()` / `.joinWith()` — see [Relationships](../the-basics/03-relationships.md) |
-| Not sure | `.leftJoin()`. It's the only join that behaves the same on both drivers. |
+| Situation                                               | Reach for                                                                          |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| INNER semantics across both drivers                     | `.innerJoin()`                                                                     |
+| Keep all left + matches (most predictable cross-driver) | `.leftJoin()`                                                                      |
+| Keep all right + matches                                | `.rightJoin()` — **SQL only**, silently emulated on MongoDB                        |
+| Everything from both sides                              | `.fullJoin()` — **SQL only**, silently emulated on MongoDB                         |
+| Every combination                                       | `.crossJoin()` — supported on both, used sparingly                                 |
+| Driver-specific shape Cascade can't express             | `.joinRaw()`                                                                       |
+| The tables are connected by a declared relation         | `.with()` / `.joinWith()` — see [Relationships](../the-basics/03-relationships.md) |
+| Not sure                                                | `.leftJoin()`. It's the only join that behaves the same on both drivers.           |
 
 ## `.joinRaw()` — escape hatch
 
@@ -151,7 +151,7 @@ For joins the structured methods can't express. Two genuine use cases:
 ```ts
 // SQL: lateral join — no structured equivalent in Cascade
 query.joinRaw(
-  "LEFT JOIN LATERAL (SELECT * FROM events WHERE events.user_id = users.id ORDER BY ts DESC LIMIT 1) e ON true"
+  "LEFT JOIN LATERAL (SELECT * FROM events WHERE events.user_id = users.id ORDER BY ts DESC LIMIT 1) e ON true",
 );
 
 // MongoDB: $graphLookup — recursive lookup, not $lookup at all
@@ -170,7 +170,7 @@ query.joinRaw({
 
 :::tip — `.joinRaw()` is the escape hatch, not the typical MongoDB path
 
-If you find yourself writing `{ $lookup: { from, localField, foreignField, as } }` inside `.joinRaw()`, you almost certainly want `.leftJoin({ table, ... })` instead — that's what the structured method emits anyway. Reach for `.joinRaw()` when the stage you need *isn't* `$lookup` (e.g. `$graphLookup`, `$unionWith`, `$facet`) or when the SQL needs lateral / cross-apply / similar.
+If you find yourself writing `{ $lookup: { from, localField, foreignField, as } }` inside `.joinRaw()`, you almost certainly want `.leftJoin({ table, ... })` instead — that's what the structured method emits anyway. Reach for `.joinRaw()` when the stage you need _isn't_ `$lookup` (e.g. `$graphLookup`, `$unionWith`, `$facet`) or when the SQL needs lateral / cross-apply / similar.
 
 :::
 
@@ -220,15 +220,15 @@ const rows = await User.query()
 
 ## Driver caveats — single reference
 
-| Method | SQL (Postgres) | MongoDB |
-| ------ | -------------- | ------- |
-| `.join()` | INNER JOIN | LEFT-flavored `$lookup` (different default!) |
-| `.leftJoin()` | LEFT JOIN | `$lookup` (native left semantics) |
-| `.rightJoin()` | RIGHT JOIN | **Silently emulated as LEFT** ⚠️ |
-| `.innerJoin()` | INNER JOIN | `$lookup` + `$match` to drop empty joins |
-| `.fullJoin()` | FULL OUTER JOIN | **Silently emulated as LEFT** ⚠️ |
-| `.crossJoin()` | CROSS JOIN | Emulated via `$lookup` + `$match: {}` |
-| `.joinRaw()` | Raw SQL fragment + bindings | Raw aggregation stage object |
+| Method         | SQL (Postgres)              | MongoDB                                      |
+| -------------- | --------------------------- | -------------------------------------------- |
+| `.join()`      | INNER JOIN                  | LEFT-flavored `$lookup` (different default!) |
+| `.leftJoin()`  | LEFT JOIN                   | `$lookup` (native left semantics)            |
+| `.rightJoin()` | RIGHT JOIN                  | **Silently emulated as LEFT** ⚠️             |
+| `.innerJoin()` | INNER JOIN                  | `$lookup` + `$match` to drop empty joins     |
+| `.fullJoin()`  | FULL OUTER JOIN             | **Silently emulated as LEFT** ⚠️             |
+| `.crossJoin()` | CROSS JOIN                  | Emulated via `$lookup` + `$match: {}`        |
+| `.joinRaw()`   | Raw SQL fragment + bindings | Raw aggregation stage object                 |
 
 The rows with ⚠️ are the silent-semantic-mismatch footguns. If your code base targets both drivers — or might in the future — use `.leftJoin()`/`.innerJoin()` for cross-driver correctness, and lean on `.joinRaw()` when you need stronger SQL-side semantics.
 

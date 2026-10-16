@@ -580,24 +580,26 @@ export class FilesHealthcareManager {
    * Shutdown all workers
    */
   public async shutdown(): Promise<void> {
-    await Promise.all([...this.workers.values()].map(async worker => {
-      try {
-        // Let the shutdown handler release CLI children before forced termination.
-        await new Promise<void>(resolve => {
-          const finish = () => {
-            clearTimeout(timer);
-            worker.off("exit", finish);
-            resolve();
-          };
-          const timer = setTimeout(finish, 500);
-          worker.once("exit", finish);
-          worker.postMessage({ type: "shutdown" });
-        });
-        await worker.terminate();
-      } catch {
-        // Worker may already be terminated.
-      }
-    }));
+    await Promise.all(
+      [...this.workers.values()].map(async (worker) => {
+        try {
+          // Let the shutdown handler release CLI children before forced termination.
+          await new Promise<void>((resolve) => {
+            const finish = () => {
+              clearTimeout(timer);
+              worker.off("exit", finish);
+              resolve();
+            };
+            const timer = setTimeout(finish, 500);
+            worker.once("exit", finish);
+            worker.postMessage({ type: "shutdown" });
+          });
+          await worker.terminate();
+        } catch {
+          // Worker may already be terminated.
+        }
+      }),
+    );
 
     this.workers.clear();
     this.workerInitPromises.clear();

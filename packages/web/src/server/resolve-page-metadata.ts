@@ -170,7 +170,13 @@ export function resolvePageMetadata(input: ResolvePageMetadataInput): ResolvedPa
     for (const ancestor of [...(input.ancestors ?? [])].reverse()) {
       if (!ancestor.metadata) continue;
       throwingLevel = ancestor.kind === "root" ? "app" : "layout";
-      const own = evaluate(ancestor.metadata, ancestor.data, input.shared, input.route as PageRoute, nested);
+      const own = evaluate(
+        ancestor.metadata,
+        ancestor.data,
+        input.shared,
+        input.route as PageRoute,
+        nested,
+      );
       resolved = own.callback
         ? composeCallback(own.input, resolved)
         : composeStatic(own.input, resolved);

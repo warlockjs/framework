@@ -23,7 +23,7 @@ export default access;
 
 ## `resolver` (required)
 
-The resolver is the one piece you must supply: it tells the engine how to read a user's roles and permissions. There is **no separate role map in config** — the role→permission catalog lives *inside* the resolver. Two paths:
+The resolver is the one piece you must supply: it tells the engine how to read a user's roles and permissions. There is **no separate role map in config** — the role→permission catalog lives _inside_ the resolver. Two paths:
 
 - **Dynamic, DB-backed (the default eject)** — `new DatabaseAccessResolver()`. Reads roles from the `user_roles` table and maps them through the `roles` catalog table. Roles and their permissions are managed at runtime, so admins add a role or change a grant without a deploy. This is what `npx warlock add access` wires up.
 - **Fixed, code-defined** — `new DefaultAccessResolver({ editor: ["orders.*"], viewer: ["orders.view"] })`. The catalog is passed inline and the user's roles are read from `user.get("roles")` (or a single `user.get("role")`). No tables, no migration. Best for a small, stable role set.
@@ -39,7 +39,9 @@ Omitting `resolver` is a developer mistake, not a runtime denial — the framewo
 How long a user's resolved permission/role set is cached (default `"10m"`). The cache is **best-effort**: if it's down, the engine reads straight from the resolver — it never denies because the cache failed. After changing a user's roles out of band, call `access.flush(user, tenant)`.
 
 ```ts
-cache: { ttl: "10m" }; // string duration or a number of seconds
+cache: {
+  ttl: "10m";
+} // string duration or a number of seconds
 ```
 
 ## `strictPolicies`

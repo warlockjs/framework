@@ -59,12 +59,12 @@ Purely additive. Existing code unaffected.
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Three events per relation or one? | **Three.** Different use cases need different timing; cheap to wire. |
-| 2 | Per-relation event names or one event with relation in payload? | **Per-relation names.** Lets listeners subscribe selectively; reduces filter logic in listeners. |
-| 3 | Default-off or always emit? | **Always emit.** No-op if no listeners. Cost is negligible. |
-| 4 | Recursion guard built in? | **No, just an opt-out.** Listeners that cause recursion own the bug. |
+| #   | Question                                                        | Recommendation                                                                                   |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1   | Three events per relation or one?                               | **Three.** Different use cases need different timing; cheap to wire.                             |
+| 2   | Per-relation event names or one event with relation in payload? | **Per-relation names.** Lets listeners subscribe selectively; reduces filter logic in listeners. |
+| 3   | Default-off or always emit?                                     | **Always emit.** No-op if no listeners. Cost is negligible.                                      |
+| 4   | Recursion guard built in?                                       | **No, just an opt-out.** Listeners that cause recursion own the bug.                             |
 
 ## Verification
 

@@ -26,7 +26,9 @@ import {
 const temporaryRoots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 /**
@@ -42,7 +44,12 @@ async function fixtureRoot(): Promise<string> {
   return root;
 }
 
-async function writeFixturePackage(root: string, dir: string, name: string, indexBody: string): Promise<WorkspacePackage> {
+async function writeFixturePackage(
+  root: string,
+  dir: string,
+  name: string,
+  indexBody: string,
+): Promise<WorkspacePackage> {
   const absPath = path.join(root, dir);
   await mkdir(path.join(absPath, "src"), { recursive: true });
   await writeFile(path.join(absPath, "package.json"), JSON.stringify({ name }), "utf8");
@@ -74,9 +81,18 @@ describe("discoverPackages / discoverSkillFiles", () => {
 
   it("finds every SKILL.md under a package's skills/ tree, at any depth", async () => {
     const root = await fixtureRoot();
-    const pkg = await writeFixturePackage(root, "widgets", "@fixture/widgets", "export const widget = 1;\n");
+    const pkg = await writeFixturePackage(
+      root,
+      "widgets",
+      "@fixture/widgets",
+      "export const widget = 1;\n",
+    );
     await mkdir(path.join(pkg.absPath, "skills", "make-a-widget"), { recursive: true });
-    await writeFile(path.join(pkg.absPath, "skills", "make-a-widget", "SKILL.md"), "# widget\n", "utf8");
+    await writeFile(
+      path.join(pkg.absPath, "skills", "make-a-widget", "SKILL.md"),
+      "# widget\n",
+      "utf8",
+    );
 
     const skills = discoverSkillFiles(pkg);
     assert.equal(skills.length, 1);
@@ -91,7 +107,7 @@ describe("extractFencedBlocks", () => {
   it("extracts ts and tsx fences with their title= attribute", () => {
     const markdown = [
       '```ts title="src/app/a.ts"',
-      'export const a = 1;',
+      "export const a = 1;",
       "```",
       "",
       "```tsx",
@@ -112,7 +128,9 @@ describe("extractFencedBlocks", () => {
   });
 
   it("does not treat prose titles as file paths", () => {
-    const markdown = ['```ts title="inside your connector class"', "doSomething();", "```"].join("\n");
+    const markdown = ['```ts title="inside your connector class"', "doSomething();", "```"].join(
+      "\n",
+    );
     const blocks = extractFencedBlocks(markdown, skill);
     assert.equal(blocks[0].titlePath, undefined);
   });
@@ -124,7 +142,11 @@ describe("classifyBlock — partial vs. broken", () => {
 
   it("always compiles a titled block, even with zero imports (the defect shape this gate must catch)", () => {
     const [block] = extractFencedBlocks(
-      ['```ts title="src/app/x.controller.ts"', "export const h = (req, res) => res.success();", "```"].join("\n"),
+      [
+        '```ts title="src/app/x.controller.ts"',
+        "export const h = (req, res) => res.success();",
+        "```",
+      ].join("\n"),
       skill,
     );
     const classified = classifyBlock(block);
@@ -133,7 +155,7 @@ describe("classifyBlock — partial vs. broken", () => {
 
   it("compiles an untitled block that carries its own import", () => {
     const [block] = extractFencedBlocks(
-      ['```ts', 'import { x } from "@warlock.js/x";', "x();", "```"].join("\n"),
+      ["```ts", 'import { x } from "@warlock.js/x";', "x();", "```"].join("\n"),
       skill,
     );
     const classified = classifyBlock(block);
@@ -141,7 +163,10 @@ describe("classifyBlock — partial vs. broken", () => {
   });
 
   it("skips an untitled, import-free fragment as deliberate", () => {
-    const [block] = extractFencedBlocks(["```ts", "return response.success({ ok: true });", "```"].join("\n"), skill);
+    const [block] = extractFencedBlocks(
+      ["```ts", "return response.success({ ok: true });", "```"].join("\n"),
+      skill,
+    );
     const classified = classifyBlock(block);
     assert.equal(classified.kind, "skip");
   });
@@ -187,7 +212,7 @@ describe("compileSkill — real compilation against real declarations, with a re
       '```ts title="src/app/greet.ts"',
       'import { greet } from "@fixture/pkg";',
       "",
-      "export const message = greet(\"world\");",
+      'export const message = greet("world");',
       "```",
     ].join("\n");
     await writeFile(skillFile, goodMarkdown, "utf8");
@@ -203,7 +228,10 @@ describe("compileSkill — real compilation against real declarations, with a re
     // have compiled — not asserted from memory.
     const { readFile } = await import("node:fs/promises");
     const onDisk = await readFile(passing.files[0].absolutePath, "utf8");
-    assert.equal(onDisk, 'import { greet } from "@fixture/pkg";\n\nexport const message = greet("world");\n');
+    assert.equal(
+      onDisk,
+      'import { greet } from "@fixture/pkg";\n\nexport const message = greet("world");\n',
+    );
 
     // RED CONTROL: strip the import in a temp copy of the same snippet — the
     // exact "no import lines at all" defect shape — and prove the gate fails
@@ -212,7 +240,10 @@ describe("compileSkill — real compilation against real declarations, with a re
     await writeFile(skillFile, brokenMarkdown, "utf8");
     const failing = compileSkill(skill, [pkg], gateTmpRoot);
     assert.equal(failing.files.length, 1);
-    assert.ok(failing.files[0].diagnostics.length > 0, "expected the compiler to report a real error");
+    assert.ok(
+      failing.files[0].diagnostics.length > 0,
+      "expected the compiler to report a real error",
+    );
     assert.ok(
       failing.files[0].diagnostics.some((d) => /Cannot find name 'greet'/.test(d)),
       `expected a "Cannot find name 'greet'" diagnostic, got: ${failing.files[0].diagnostics.join(" | ")}`,
@@ -226,35 +257,73 @@ describe("compileSkill — real compilation against real declarations, with a re
 
   it("resolves source subpaths and the skill owner's installed dependency subpaths", async () => {
     const root = await fixtureRoot();
-    const pkg = await writeFixturePackage(root, "widgets", "@fixture/widgets", "export const widget = 1;\n");
+    const pkg = await writeFixturePackage(
+      root,
+      "widgets",
+      "@fixture/widgets",
+      "export const widget = 1;\n",
+    );
     await mkdir(path.join(pkg.absPath, "src", "tests"), { recursive: true });
-    await writeFile(path.join(pkg.absPath, "src", "tests", "index.ts"), "export const request = () => 200;\n");
+    await writeFile(
+      path.join(pkg.absPath, "src", "tests", "index.ts"),
+      "export const request = () => 200;\n",
+    );
     const dependency = path.join(pkg.absPath, "node_modules", "fixture-test-runner");
     await mkdir(dependency, { recursive: true });
-    await writeFile(path.join(dependency, "package.json"), JSON.stringify({ name: "fixture-test-runner", exports: { "./config": "./config.d.ts" } }));
-    await writeFile(path.join(dependency, "config.d.ts"), "export declare function defineConfig(value: { status: number }): unknown;\n");
+    await writeFile(
+      path.join(dependency, "package.json"),
+      JSON.stringify({ name: "fixture-test-runner", exports: { "./config": "./config.d.ts" } }),
+    );
+    await writeFile(
+      path.join(dependency, "config.d.ts"),
+      "export declare function defineConfig(value: { status: number }): unknown;\n",
+    );
     const skillFile = path.join(pkg.absPath, "skills", "SKILL.md");
-    await writeFile(skillFile, [
-      '```ts title="src/example.ts"',
-      'import { request } from "@fixture/widgets/tests";',
-      'import { defineConfig } from "fixture-test-runner/config";',
-      'export default defineConfig({ status: request() });',
-      '```',
-    ].join("\n"));
-    const result = compileSkill(skillFor(pkg, "http-test", skillFile), [pkg], path.join(root, ".gate-tmp"));
+    await writeFile(
+      skillFile,
+      [
+        '```ts title="src/example.ts"',
+        'import { request } from "@fixture/widgets/tests";',
+        'import { defineConfig } from "fixture-test-runner/config";',
+        "export default defineConfig({ status: request() });",
+        "```",
+      ].join("\n"),
+    );
+    const result = compileSkill(
+      skillFor(pkg, "http-test", skillFile),
+      [pkg],
+      path.join(root, ".gate-tmp"),
+    );
     assert.deepEqual(result.files[0].diagnostics, []);
 
-    await writeFile(skillFile, '```ts\nimport { missing } from "@fixture/widgets/does-not-exist";\nmissing();\n```');
-    const broken = compileSkill(skillFor(pkg, "http-test", skillFile), [pkg], path.join(root, ".gate-tmp"));
-    assert.ok(broken.files[0].diagnostics.some((diagnostic) => /Cannot find module/.test(diagnostic)));
+    await writeFile(
+      skillFile,
+      '```ts\nimport { missing } from "@fixture/widgets/does-not-exist";\nmissing();\n```',
+    );
+    const broken = compileSkill(
+      skillFor(pkg, "http-test", skillFile),
+      [pkg],
+      path.join(root, ".gate-tmp"),
+    );
+    assert.ok(
+      broken.files[0].diagnostics.some((diagnostic) => /Cannot find module/.test(diagnostic)),
+    );
   });
 
   it("keeps application declaration merging isolated to the skill that declares it", async () => {
     const root = await fixtureRoot();
-    const pkg = await writeFixturePackage(root, "widgets", "@fixture/widgets", "export interface Registry {}\nexport type Name = keyof Registry extends never ? string : keyof Registry;\nexport function name(value: Name) { return value; }\n");
+    const pkg = await writeFixturePackage(
+      root,
+      "widgets",
+      "@fixture/widgets",
+      "export interface Registry {}\nexport type Name = keyof Registry extends never ? string : keyof Registry;\nexport function name(value: Name) { return value; }\n",
+    );
     const skills: DiscoveredSkill[] = [];
     for (const [slug, body] of [
-      ["registered", 'import { name } from "@fixture/widgets";\ndeclare module "@fixture/widgets" { interface Registry { registered: true } }\nname("registered");'],
+      [
+        "registered",
+        'import { name } from "@fixture/widgets";\ndeclare module "@fixture/widgets" { interface Registry { registered: true } }\nname("registered");',
+      ],
       ["unregistered", 'import { name } from "@fixture/widgets";\nname("other-app-route");'],
     ]) {
       const file = path.join(pkg.absPath, "skills", slug, "SKILL.md");
@@ -263,12 +332,20 @@ describe("compileSkill — real compilation against real declarations, with a re
       skills.push(skillFor(pkg, slug, file));
     }
     const results = compileManySkills(skills, [pkg], path.join(root, ".gate-tmp"));
-    assert.deepEqual(results.flatMap((result) => result.files.flatMap((file) => file.diagnostics)), []);
+    assert.deepEqual(
+      results.flatMap((result) => result.files.flatMap((file) => file.diagnostics)),
+      [],
+    );
   });
 
   it("fails a titled block whose relative import names a file that does not exist (defect #1's shape)", async () => {
     const root = await fixtureRoot();
-    const pkg = await writeFixturePackage(root, "fixture-pkg", "@fixture/pkg", "export const noop = 1;\n");
+    const pkg = await writeFixturePackage(
+      root,
+      "fixture-pkg",
+      "@fixture/pkg",
+      "export const noop = 1;\n",
+    );
     await mkdir(path.join(pkg.absPath, "skills", "missing-schema"), { recursive: true });
     const skillFile = path.join(pkg.absPath, "skills", "missing-schema", "SKILL.md");
     const markdown = [
@@ -299,7 +376,12 @@ describe("ratchet — per-package baseline enforcement", () => {
     return { skill, index: 0, lang: "ts", info: "", body: "", line: 1 };
   }
 
-  function resultWith(pkg: WorkspacePackage, slug: string, failedCount: number, passedCount: number): SkillCompileResult {
+  function resultWith(
+    pkg: WorkspacePackage,
+    slug: string,
+    failedCount: number,
+    passedCount: number,
+  ): SkillCompileResult {
     const skill = skillFor(pkg, slug, `/${pkg.dir}/skills/${slug}/SKILL.md`);
     const files = [
       ...Array.from({ length: failedCount }, (_, i) => ({
@@ -315,10 +397,21 @@ describe("ratchet — per-package baseline enforcement", () => {
         diagnostics: [] as string[],
       })),
     ];
-    return { skill, skillRoot: `/tmp/${pkg.dir}/${slug}`, tsconfigPath: `/tmp/${pkg.dir}/${slug}/tsconfig.json`, files, skipped: [], duplicateTitles: [] };
+    return {
+      skill,
+      skillRoot: `/tmp/${pkg.dir}/${slug}`,
+      tsconfigPath: `/tmp/${pkg.dir}/${slug}/tsconfig.json`,
+      files,
+      skipped: [],
+      duplicateTitles: [],
+    };
   }
 
-  function reportWith(results: SkillCompileResult[], packages: WorkspacePackage[], conflicts: GateReport["typePathConflicts"] = []): GateReport {
+  function reportWith(
+    results: SkillCompileResult[],
+    packages: WorkspacePackage[],
+    conflicts: GateReport["typePathConflicts"] = [],
+  ): GateReport {
     return { packages, skills: results.map((r) => r.skill), results, typePathConflicts: conflicts };
   }
 
@@ -334,7 +427,10 @@ describe("ratchet — per-package baseline enforcement", () => {
   });
 
   it("passes when every package is at or under its allowance", () => {
-    const report = reportWith([resultWith(pkgA, "s1", 3, 0), resultWith(pkgB, "s2", 0, 1)], [pkgA, pkgB]);
+    const report = reportWith(
+      [resultWith(pkgA, "s1", 3, 0), resultWith(pkgB, "s2", 0, 1)],
+      [pkgA, pkgB],
+    );
     const ratchet = evaluateRatchet(report, { a: 3, b: 0 });
     assert.equal(ratchet.failed, false);
     assert.equal(ratchet.totalFailed, 3);
@@ -342,16 +438,21 @@ describe("ratchet — per-package baseline enforcement", () => {
   });
 
   it("RED CONTROL: one NEW failure over the baseline fails the ratchet", () => {
-    const report = reportWith([resultWith(pkgA, "s1", 4, 0), resultWith(pkgB, "s2", 0, 1)], [pkgA, pkgB]);
+    const report = reportWith(
+      [resultWith(pkgA, "s1", 4, 0), resultWith(pkgB, "s2", 0, 1)],
+      [pkgA, pkgB],
+    );
     const ratchet = evaluateRatchet(report, { a: 3, b: 0 });
     assert.equal(ratchet.failed, true);
     assert.equal(ratchet.rows.find((r) => r.dir === "a")?.over, 1);
   });
 
   it("a cross-skill type/path conflict fails the ratchet even at a clean baseline (hard zero)", () => {
-    const report = reportWith([resultWith(pkgA, "s1", 0, 1)], [pkgA], [
-      { typeName: "Product", occurrences: [] },
-    ]);
+    const report = reportWith(
+      [resultWith(pkgA, "s1", 0, 1)],
+      [pkgA],
+      [{ typeName: "Product", occurrences: [] }],
+    );
     const ratchet = evaluateRatchet(report, { a: 0 });
     assert.equal(ratchet.failed, true);
     assert.equal(ratchet.typePathConflicts, 1);
@@ -359,7 +460,10 @@ describe("ratchet — per-package baseline enforcement", () => {
 
   it("a measured package with no recorded allowance throws (never silently treated as zero)", () => {
     const report = reportWith([resultWith(pkgA, "s1", 1, 0)], [pkgA]);
-    assert.throws(() => evaluateRatchet(report, {}), /No skill-snippet allowance recorded for package 'a'/);
+    assert.throws(
+      () => evaluateRatchet(report, {}),
+      /No skill-snippet allowance recorded for package 'a'/,
+    );
   });
 
   it("the committed baseline is valid JSONC with numeric allowances", () => {
@@ -369,7 +473,10 @@ describe("ratchet — per-package baseline enforcement", () => {
       assert.ok(value >= 0, `allowance for '${dir}' must be >= 0`);
     }
     // Sanity: the baseline recorded at authoring time.
-    assert.equal(Object.values(allowances).reduce((sum, n) => sum + n, 0), 308);
+    assert.equal(
+      Object.values(allowances).reduce((sum, n) => sum + n, 0),
+      308,
+    );
   });
 });
 
@@ -379,11 +486,19 @@ describe("findCrossSkillTypePathConflicts", () => {
     const skillA = skillFor(pkg, "a", "/x/skills/a/SKILL.md");
     const skillB = skillFor(pkg, "b", "/x/skills/b/SKILL.md");
     const blockA = extractFencedBlocks(
-      ['```ts title="src/app/products/models/product.model.ts"', "export type Product = { id: string };", "```"].join("\n"),
+      [
+        '```ts title="src/app/products/models/product.model.ts"',
+        "export type Product = { id: string };",
+        "```",
+      ].join("\n"),
       skillA,
     )[0];
     const blockB = extractFencedBlocks(
-      ['```ts title="src/app/catalog/models/product.model.ts"', "export type Product = { id: string };", "```"].join("\n"),
+      [
+        '```ts title="src/app/catalog/models/product.model.ts"',
+        "export type Product = { id: string };",
+        "```",
+      ].join("\n"),
       skillB,
     )[0];
 
@@ -392,7 +507,14 @@ describe("findCrossSkillTypePathConflicts", () => {
         skill: skillA,
         skillRoot: "/tmp/a",
         tsconfigPath: "/tmp/a/tsconfig.json",
-        files: [{ virtualPath: "src/app/products/models/product.model.ts", absolutePath: "/tmp/a/x.ts", block: blockA, diagnostics: [] }],
+        files: [
+          {
+            virtualPath: "src/app/products/models/product.model.ts",
+            absolutePath: "/tmp/a/x.ts",
+            block: blockA,
+            diagnostics: [],
+          },
+        ],
         skipped: [],
         duplicateTitles: [],
       },
@@ -400,7 +522,14 @@ describe("findCrossSkillTypePathConflicts", () => {
         skill: skillB,
         skillRoot: "/tmp/b",
         tsconfigPath: "/tmp/b/tsconfig.json",
-        files: [{ virtualPath: "src/app/catalog/models/product.model.ts", absolutePath: "/tmp/b/x.ts", block: blockB, diagnostics: [] }],
+        files: [
+          {
+            virtualPath: "src/app/catalog/models/product.model.ts",
+            absolutePath: "/tmp/b/x.ts",
+            block: blockB,
+            diagnostics: [],
+          },
+        ],
         skipped: [],
         duplicateTitles: [],
       },
@@ -415,7 +544,11 @@ describe("findCrossSkillTypePathConflicts", () => {
     const skillA = skillFor(pkg, "a", "/x/skills/a/SKILL.md");
     const skillB = skillFor(pkg, "b", "/x/skills/b/SKILL.md");
     const block = extractFencedBlocks(
-      ['```ts title="src/app/products/models/product.model.ts"', "export type Product = { id: string };", "```"].join("\n"),
+      [
+        '```ts title="src/app/products/models/product.model.ts"',
+        "export type Product = { id: string };",
+        "```",
+      ].join("\n"),
       skillA,
     )[0];
 
@@ -424,7 +557,14 @@ describe("findCrossSkillTypePathConflicts", () => {
         skill: skillA,
         skillRoot: "/tmp/a",
         tsconfigPath: "/tmp/a/tsconfig.json",
-        files: [{ virtualPath: "src/app/products/models/product.model.ts", absolutePath: "/tmp/a/x.ts", block, diagnostics: [] }],
+        files: [
+          {
+            virtualPath: "src/app/products/models/product.model.ts",
+            absolutePath: "/tmp/a/x.ts",
+            block,
+            diagnostics: [],
+          },
+        ],
         skipped: [],
         duplicateTitles: [],
       },
@@ -432,7 +572,14 @@ describe("findCrossSkillTypePathConflicts", () => {
         skill: skillB,
         skillRoot: "/tmp/b",
         tsconfigPath: "/tmp/b/tsconfig.json",
-        files: [{ virtualPath: "src/app/products/models/product.model.ts", absolutePath: "/tmp/b/x.ts", block, diagnostics: [] }],
+        files: [
+          {
+            virtualPath: "src/app/products/models/product.model.ts",
+            absolutePath: "/tmp/b/x.ts",
+            block,
+            diagnostics: [],
+          },
+        ],
         skipped: [],
         duplicateTitles: [],
       },

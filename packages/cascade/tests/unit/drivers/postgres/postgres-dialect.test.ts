@@ -89,9 +89,7 @@ describe("PostgresDialect", () => {
     });
 
     it("wraps the value under the path when a path is given", () => {
-      expect(dialect.jsonContains("data", "NYC", "city")).toBe(
-        `"data" @> '{"city":"NYC"}'::jsonb`,
-      );
+      expect(dialect.jsonContains("data", "NYC", "city")).toBe(`"data" @> '{"city":"NYC"}'::jsonb`);
     });
   });
 
@@ -173,7 +171,11 @@ describe("PostgresDialect", () => {
 
     it("translates $agg.sum over a composed expression to SUM(<expr>)", () => {
       expect(
-        dialect.aggregateToSql({ __agg: "sum", __field: null, __expr: $expr.mul("price", "quantity") }),
+        dialect.aggregateToSql({
+          __agg: "sum",
+          __field: null,
+          __expr: $expr.mul("price", "quantity"),
+        }),
       ).toBe(`SUM(("price" * "quantity"))`);
     });
 
@@ -205,16 +207,20 @@ describe("PostgresDialect", () => {
     });
 
     it("parenthesises multiply / add / subtract / divide", () => {
-      expect(dialect.columnExpressionToSql($expr.mul("price", "quantity"))).toBe(`("price" * "quantity")`);
+      expect(dialect.columnExpressionToSql($expr.mul("price", "quantity"))).toBe(
+        `("price" * "quantity")`,
+      );
       expect(dialect.columnExpressionToSql($expr.add("a", "b"))).toBe(`("a" + "b")`);
       expect(dialect.columnExpressionToSql($expr.sub("a", "b"))).toBe(`("a" - "b")`);
       expect(dialect.columnExpressionToSql($expr.div("a", "b"))).toBe(`("a" / "b")`);
     });
 
     it("composes nested expressions: price * quantity * (1 - discount)", () => {
-      expect(dialect.columnExpressionToSql($expr.mul("price", "quantity", $expr.sub($expr.lit(1), $expr.col("discount"))))).toBe(
-        `("price" * "quantity" * (1 - "discount"))`,
-      );
+      expect(
+        dialect.columnExpressionToSql(
+          $expr.mul("price", "quantity", $expr.sub($expr.lit(1), $expr.col("discount"))),
+        ),
+      ).toBe(`("price" * "quantity" * (1 - "discount"))`);
     });
 
     it("emits a raw node verbatim", () => {

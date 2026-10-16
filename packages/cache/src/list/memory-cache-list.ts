@@ -44,7 +44,7 @@ export class MemoryCacheList<T> implements CacheListAccessor<T> {
   private async mutate<R>(mutation: (items: T[]) => R): Promise<R> {
     let result!: R;
 
-    await this.driver.update<T[]>(this.key, current => {
+    await this.driver.update<T[]>(this.key, (current) => {
       const items = Array.isArray(current) ? [...current] : [];
 
       result = mutation(items);
@@ -59,7 +59,7 @@ export class MemoryCacheList<T> implements CacheListAccessor<T> {
    * {@inheritdoc}
    */
   public push(...items: T[]): Promise<number> {
-    return this.mutate(current => {
+    return this.mutate((current) => {
       current.push(...items);
 
       return current.length;
@@ -70,7 +70,7 @@ export class MemoryCacheList<T> implements CacheListAccessor<T> {
    * {@inheritdoc}
    */
   public unshift(...items: T[]): Promise<number> {
-    return this.mutate(current => {
+    return this.mutate((current) => {
       current.unshift(...items);
 
       return current.length;
@@ -81,14 +81,14 @@ export class MemoryCacheList<T> implements CacheListAccessor<T> {
    * {@inheritdoc}
    */
   public pop(): Promise<T | null> {
-    return this.mutate(current => (current.length === 0 ? null : (current.pop() as T)));
+    return this.mutate((current) => (current.length === 0 ? null : (current.pop() as T)));
   }
 
   /**
    * {@inheritdoc}
    */
   public shift(): Promise<T | null> {
-    return this.mutate(current => (current.length === 0 ? null : (current.shift() as T)));
+    return this.mutate((current) => (current.length === 0 ? null : (current.shift() as T)));
   }
 
   /**
@@ -119,7 +119,7 @@ export class MemoryCacheList<T> implements CacheListAccessor<T> {
    * indexes count from the end.
    */
   public async trim(start: number, end: number): Promise<void> {
-    await this.mutate(current => {
+    await this.mutate((current) => {
       const length = current.length;
       const from = start < 0 ? Math.max(length + start, 0) : start;
       const to = end < 0 ? length + end : end;

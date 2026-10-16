@@ -19,7 +19,13 @@ describe("DatabaseRestorer - Mongo assignNew id", () => {
     insert.mockResolvedValue({ document: {} });
 
     const driver = createMockDriver({ name: "mongodb" } as any);
-    const trashed = { _id: "old-oid", id: 7, name: "Ann", deletedAt: new Date(), originalTable: "users" };
+    const trashed = {
+      _id: "old-oid",
+      id: 7,
+      name: "Ann",
+      deletedAt: new Date(),
+      originalTable: "users",
+    };
     const queryBuilder = {
       where: vi.fn().mockReturnThis(),
       first: vi.fn().mockResolvedValue(trashed),

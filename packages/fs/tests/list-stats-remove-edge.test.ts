@@ -49,18 +49,14 @@ describe("list — empty directory", () => {
     await putFileAsync(path.join(dir, "keep.txt"), "x");
     await ensureDirectoryAsync(path.join(dir, "ignored"));
 
-    expect(listFiles(dir).map((entry) => path.basename(entry))).toEqual([
-      "keep.txt",
-    ]);
+    expect(listFiles(dir).map((entry) => path.basename(entry))).toEqual(["keep.txt"]);
   });
 
   it("listDirectories (sync) ignores files", async () => {
     await putFileAsync(path.join(dir, "ignored.txt"), "x");
     await ensureDirectoryAsync(path.join(dir, "keep"));
 
-    expect(listDirectories(dir).map((entry) => path.basename(entry))).toEqual([
-      "keep",
-    ]);
+    expect(listDirectories(dir).map((entry) => path.basename(entry))).toEqual(["keep"]);
   });
 });
 

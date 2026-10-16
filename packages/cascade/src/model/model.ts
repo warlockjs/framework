@@ -592,9 +592,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * current value, which is what an insert would use anyway.
    */
   public get trustedPrimaryKey(): any {
-    return this.primaryKeyCaptured
-      ? this.capturedPrimaryKey
-      : this.get(this.self().primaryKey);
+    return this.primaryKeyCaptured ? this.capturedPrimaryKey : this.get(this.self().primaryKey);
   }
 
   /**
@@ -729,9 +727,11 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * @param relationData
    */
   public setRelation(relationName: string, relationData: LoadedRelationResult): void {
-    const definition = (this.self() as unknown as {
-      relations?: Record<string, RelationDefinition>;
-    }).relations?.[relationName];
+    const definition = (
+      this.self() as unknown as {
+        relations?: Record<string, RelationDefinition>;
+      }
+    ).relations?.[relationName];
 
     if (definition?.type === "belongsTo" && !Array.isArray(relationData)) {
       const foreignKey =

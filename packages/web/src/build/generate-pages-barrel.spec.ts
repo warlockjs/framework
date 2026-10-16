@@ -67,11 +67,11 @@ describe("generatePagesBarrel", () => {
 
     expect(result.contents).toContain('site: "landing"');
     expect(result.contents).toContain('site: "platform"');
-    expect(result.contents).toContain('sites: {');
-    expect(result.contents).toContain('errorPage: { module: errorPage0');
-    expect(result.contents).toContain('errorPage: { module: errorPage1');
+    expect(result.contents).toContain("sites: {");
+    expect(result.contents).toContain("errorPage: { module: errorPage0");
+    expect(result.contents).toContain("errorPage: { module: errorPage1");
     expect(result.contents).not.toContain("hydrationEntry");
-    expect(result.contents).toContain('appSetup: { module: appSetup1');
+    expect(result.contents).toContain("appSetup: { module: appSetup1");
   });
 
   it("keeps the single-site barrel byte-for-byte identical when sites are absent", async () => {
@@ -396,7 +396,11 @@ describe("the Vite-switch tripwire", () => {
       });
 
       await expect(
-        generatePagesBarrel({ appRoot, productionDir: productionDirOf(appRoot), clientDir: "dist/client" }),
+        generatePagesBarrel({
+          appRoot,
+          productionDir: productionDirOf(appRoot),
+          clientDir: "dist/client",
+        }),
       ).resolves.toMatchObject({ pageCount: 1 });
     });
 
@@ -425,7 +429,11 @@ describe("the Vite-switch tripwire", () => {
       });
 
       await expect(
-        generatePagesBarrel({ appRoot, productionDir: productionDirOf(appRoot), clientDir: "dist/client" }),
+        generatePagesBarrel({
+          appRoot,
+          productionDir: productionDirOf(appRoot),
+          clientDir: "dist/client",
+        }),
       ).rejects.toThrowError(/count-queries\.ts/);
     });
 
@@ -448,7 +456,11 @@ describe("the Vite-switch tripwire", () => {
       }
 
       await expect(
-        generatePagesBarrel({ appRoot, productionDir: productionDirOf(appRoot), clientDir: "dist/client" }),
+        generatePagesBarrel({
+          appRoot,
+          productionDir: productionDirOf(appRoot),
+          clientDir: "dist/client",
+        }),
       ).rejects.toThrowError(/helper\.ts/);
     });
 

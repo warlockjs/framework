@@ -6,15 +6,18 @@ slug: v/latest/cache/memory
 In-memory storage with optional automatic eviction when a size limit is reached.
 
 ## When to Use
+
 - Local development
 - Caching data for the duration of a process
 - Fastest possible cache (no disk or network I/O)
 
 ## Best For
+
 - Temporary data
 - Caching API responses, user sessions, or computed values
 
 ## Limitations
+
 - Data is lost on restart
 - Not shared between processes or servers — with more than one server use [Redis](/v/latest/cache/redis/) or [Postgres](/v/latest/cache/pg/)
 - Keys are stored flat: `get("users")` after `set("users.1", …)` is a miss, and `maxSize` counts entries (evicting in LRU order)
@@ -22,6 +25,7 @@ In-memory storage with optional automatic eviction when a size limit is reached.
 - Memory growth: Without `maxSize`, cache can grow indefinitely (use `maxSize` or [LRU Memory Cache Driver](/v/latest/cache/lru-memory/) for automatic eviction)
 
 ## Alternatives
+
 - [Memory Extended Cache Driver](/v/latest/cache/memory-extended/): Sliding expiration (TTL resets on access)
 - [LRU Memory Cache Driver](/v/latest/cache/lru-memory/): Evicts least recently used items when full
 
@@ -49,11 +53,12 @@ export default cacheConfigurations;
 ```
 
 ## Options
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
-| `ttl` | number \| string | `Infinity` | Default TTL — seconds or a duration string (`"1h"`, `"7d"`) |
-| `maxSize` | number | `undefined` | Maximum number of items. When exceeded, least recently used items are evicted |
+
+| Option         | Type               | Default     | Description                                                                   |
+| -------------- | ------------------ | ----------- | ----------------------------------------------------------------------------- |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys                                              |
+| `ttl`          | number \| string   | `Infinity`  | Default TTL — seconds or a duration string (`"1h"`, `"7d"`)                   |
+| `maxSize`      | number             | `undefined` | Maximum number of items. When exceeded, least recently used items are evicted |
 
 ### Global Prefix
 
@@ -91,11 +96,13 @@ The `maxSize` option limits the number of items in the cache. When the limit is 
 ```
 
 **When to use maxSize:**
+
 - You want to prevent unbounded memory growth
 - You have predictable cache size requirements
 - You want automatic eviction without using the dedicated LRU driver
 
 **How it works:**
+
 - Uses LRU (Least Recently Used) eviction algorithm
 - Tracks access order automatically
 - Evicts oldest items when limit is reached
@@ -112,8 +119,8 @@ const cacheConfigurations: CacheConfigurations = {
   },
   options: {
     memory: {
-      maxSize: 500,    // max 500 items
-      ttl: "1h",       // items expire after 1 hour
+      maxSize: 500, // max 500 items
+      ttl: "1h", // items expire after 1 hour
       // items can be removed by: expiration OR eviction when full
     },
   },
@@ -127,6 +134,7 @@ For dedicated LRU caching with more control, consider using the [LRU Memory Cach
 ## Example Usage
 
 ## Storing and Retrieving Data
+
 ```ts
 import { cache } from "@warlock.js/cache";
 
@@ -145,6 +153,7 @@ The memory driver uses an in-memory data structure to store cache entries. Key p
 - **Process isolation**: Each Node.js process has its own cache instance
 
 ## Troubleshooting
+
 - **Data disappears after restart**: This is expected. Use [File](/v/latest/cache/file/) or [Redis](/v/latest/cache/redis/) drivers for persistence.
 - **Cache not shared between processes**: Use [Redis](/v/latest/cache/redis/) for distributed cache.
 - **Memory usage growing**: Set `maxSize` option or use [LRU Memory Cache Driver](/v/latest/cache/lru-memory/) for automatic eviction.

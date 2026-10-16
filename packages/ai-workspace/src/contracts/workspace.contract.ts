@@ -77,16 +77,10 @@ export interface Workspace {
    * the full file's SHA-256 `hash` (for read-before-edit), and the window
    * metadata — the same shape the `read_file` tool returns.
    */
-  readFile(
-    path: string,
-    opts?: { offset?: number; limit?: number },
-  ): Promise<ReadFileResult>;
+  readFile(path: string, opts?: { offset?: number; limit?: number }): Promise<ReadFileResult>;
 
   /** Atomically write full content to a jailed path. */
-  writeFile(
-    path: string,
-    content: string,
-  ): Promise<{ hash: string; bytesWritten: number }>;
+  writeFile(path: string, content: string): Promise<{ hash: string; bytesWritten: number }>;
 
   /** Apply an exact-string edit under the read-before-edit stale guard. */
   editFile(input: EditFileInput): Promise<EditFileResult>;
@@ -99,10 +93,7 @@ export interface Workspace {
   exec(command: string, opts?: ExecOptions): Promise<RunShellResult>;
 
   /** Search jailed file contents for a regex pattern. */
-  grep(
-    pattern: string,
-    opts?: { glob?: string; ignoreCase?: boolean },
-  ): Promise<GrepResult>;
+  grep(pattern: string, opts?: { glob?: string; ignoreCase?: boolean }): Promise<GrepResult>;
 
   /** Resolve a glob to matching workspace-relative paths within the jail. */
   glob(pattern: string): Promise<string[]>;

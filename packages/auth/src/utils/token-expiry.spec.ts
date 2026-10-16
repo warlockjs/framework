@@ -45,9 +45,11 @@ describe("tokenHasExpClaim", () => {
   });
 
   it("does not require a valid signature — it reads claims, not trust", () => {
-    const foreign = createSigner({ key: "a-completely-different-key-0123456789", expiresIn: 1000 })({
-      id: 1,
-    }) as unknown as string;
+    const foreign = createSigner({ key: "a-completely-different-key-0123456789", expiresIn: 1000 })(
+      {
+        id: 1,
+      },
+    ) as unknown as string;
 
     expect(tokenHasExpClaim(foreign)).toBe(true);
   });

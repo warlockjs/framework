@@ -38,7 +38,8 @@ export type ResolveRequestUserOptions = {
 export type RequestUserFailure = "missing" | "invalid" | "forbidden" | "unauthorized";
 
 export type RequestUserOutcome<TUser = any> =
-  { user: TUser; failure?: undefined } | { user: null; failure: RequestUserFailure };
+  | { user: TUser; failure?: undefined }
+  | { user: null; failure: RequestUserFailure };
 
 /**
  * Whether the persisted row says the token is dead.

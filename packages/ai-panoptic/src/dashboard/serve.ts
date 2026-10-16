@@ -212,7 +212,14 @@ export function createRequestHandler(
         "content-type": "text/html; charset=utf-8",
         ...SECURITY_HEADERS,
       });
-      res.end(dashboardHtml(base, config.title, Boolean(config.evaluate), config.evaluate?.instructions ?? ""));
+      res.end(
+        dashboardHtml(
+          base,
+          config.title,
+          Boolean(config.evaluate),
+          config.evaluate?.instructions ?? "",
+        ),
+      );
 
       return;
     }

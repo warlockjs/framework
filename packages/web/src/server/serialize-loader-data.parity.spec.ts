@@ -15,7 +15,11 @@ class PostResourceLike {
   public constructor(private readonly id: number) {}
 
   public toJSON(): PostOutput {
-    return { id: this.id, title: `Post ${this.id}`, publishedAt: new Date("2026-09-01T00:00:00.000Z") };
+    return {
+      id: this.id,
+      title: `Post ${this.id}`,
+      publishedAt: new Date("2026-09-01T00:00:00.000Z"),
+    };
   }
 }
 

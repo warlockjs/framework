@@ -184,7 +184,9 @@ describe("cache.namespace — scope tags", () => {
     await feed.set("ads", "data", { tags: ["sponsored"] });
 
     const userTagged = (await cache.currentDriver!.tagMembers!("cache:tags:user.42")) as string[];
-    const sponsoredTagged = (await cache.currentDriver!.tagMembers!("cache:tags:sponsored")) as string[];
+    const sponsoredTagged = (await cache.currentDriver!.tagMembers!(
+      "cache:tags:sponsored",
+    )) as string[];
     expect(userTagged).toContain("feed.42.ads");
     expect(sponsoredTagged).toContain("feed.42.ads");
   });
@@ -275,7 +277,9 @@ describe("cache.namespace — TaggedScopedCache", () => {
     expect(result).toBe("freshly");
     expect(storedTtl(cache, "feed.42.home")).toBe(120);
     const userTagged = (await cache.currentDriver!.tagMembers!("cache:tags:user.42")) as string[];
-    const computedTagged = (await cache.currentDriver!.tagMembers!("cache:tags:computed")) as string[];
+    const computedTagged = (await cache.currentDriver!.tagMembers!(
+      "cache:tags:computed",
+    )) as string[];
     expect(userTagged).toContain("feed.42.home");
     expect(computedTagged).toContain("feed.42.home");
   });

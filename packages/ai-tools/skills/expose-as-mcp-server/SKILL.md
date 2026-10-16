@@ -11,10 +11,10 @@ description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a ra
 import "@warlock.js/ai-tools";
 import { ai } from "@warlock.js/ai";
 
-const server = ai.mcp.serve(
-  [ai.tools.calculator(), ai.tools.dateTime()],
-  { name: "warlock-utils", transport: { type: "stdio" } },
-);
+const server = ai.mcp.serve([ai.tools.calculator(), ai.tools.dateTime()], {
+  name: "warlock-utils",
+  transport: { type: "stdio" },
+});
 
 await server.start();
 // ...later, on teardown:
@@ -37,10 +37,10 @@ The tools are snapshotted at construction (`source.tools()` is called once), so 
 
 ```ts
 ai.mcp.serve(source, {
-  name: "warlock-utils",          // advertised in the initialize response (required)
-  version: "1.0.0",               // default: the package version
-  transport: { type: "stdio" },   // default: stdio
-  schemaTarget: "draft-2020-12",  // JSON-Schema dialect for each tool's inputSchema
+  name: "warlock-utils", // advertised in the initialize response (required)
+  version: "1.0.0", // default: the package version
+  transport: { type: "stdio" }, // default: stdio
+  schemaTarget: "draft-2020-12", // JSON-Schema dialect for each tool's inputSchema
 });
 ```
 
@@ -76,7 +76,7 @@ const response = await handler.handle(jsonRpcRequest); // request → response, 
 
 ## Errors
 
-`McpTransportError` covers serve-side failures (`type: "connect"` when `start()` is asked to bind an unsupported transport; `type: "protocol"` for a malformed `tools/call` or an unknown tool name). Tool-level failures are *not* errors here — they come back as `isError: true` results, exactly as MCP expects.
+`McpTransportError` covers serve-side failures (`type: "connect"` when `start()` is asked to bind an unsupported transport; `type: "protocol"` for a malformed `tools/call` or an unknown tool name). Tool-level failures are _not_ errors here — they come back as `isError: true` results, exactly as MCP expects.
 
 ## See also
 

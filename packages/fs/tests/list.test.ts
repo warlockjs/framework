@@ -26,22 +26,24 @@ describe("list", () => {
   afterEach(() => cleanup());
 
   it("listAsync returns immediate children (files + dirs)", async () => {
-    const entries = (await listAsync(dir)).map(p => path.basename(p)).sort();
+    const entries = (await listAsync(dir)).map((p) => path.basename(p)).sort();
     expect(entries).toEqual(["a.txt", "b.txt", "sub1", "sub2"]);
   });
 
   it("listFilesAsync returns only files", async () => {
-    const files = (await listFilesAsync(dir)).map(p => path.basename(p)).sort();
+    const files = (await listFilesAsync(dir)).map((p) => path.basename(p)).sort();
     expect(files).toEqual(["a.txt", "b.txt"]);
   });
 
   it("listDirectoriesAsync returns only directories", async () => {
-    const dirs = (await listDirectoriesAsync(dir)).map(p => path.basename(p)).sort();
+    const dirs = (await listDirectoriesAsync(dir)).map((p) => path.basename(p)).sort();
     expect(dirs).toEqual(["sub1", "sub2"]);
   });
 
   it("listFiles (sync) returns only files", () => {
-    const files = listFiles(dir).map(p => path.basename(p)).sort();
+    const files = listFiles(dir)
+      .map((p) => path.basename(p))
+      .sort();
     expect(files).toEqual(["a.txt", "b.txt"]);
   });
 });

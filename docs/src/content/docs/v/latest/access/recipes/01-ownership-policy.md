@@ -6,7 +6,7 @@ sidebar:
   label: "Owner-or-editor"
 ---
 
-A blog where authors edit their own posts and editors edit anyone's. RBAC grants the *ability*; a policy enforces *ownership*.
+A blog where authors edit their own posts and editors edit anyone's. RBAC grants the _ability_; a policy enforces _ownership_.
 
 ## Roles
 
@@ -32,8 +32,9 @@ Both `author` and `editor` hold `posts.update`. The difference between "own post
 ```ts title="src/app/posts/policies/index.ts"
 import { definePolicy } from "@warlock.js/access";
 
-definePolicy("posts.update", (user, post, ctx) =>
-  post.get("author_id") === user.id || ctx.hasRole("editor"),
+definePolicy(
+  "posts.update",
+  (user, post, ctx) => post.get("author_id") === user.id || ctx.hasRole("editor"),
 );
 ```
 

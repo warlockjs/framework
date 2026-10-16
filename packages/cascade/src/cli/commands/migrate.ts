@@ -1,9 +1,5 @@
 import { defineCommand } from "citty";
-import {
-  exportMigrationsSQL,
-  freshMigrate,
-  runMigrations,
-} from "../../operations/migrations";
+import { exportMigrationsSQL, freshMigrate, runMigrations } from "../../operations/migrations";
 import { loadMigrations } from "../load-migrations";
 import { printRunSummary } from "../printers";
 import { withCliConnection } from "../with-cli-connection";

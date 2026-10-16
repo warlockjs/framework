@@ -71,7 +71,9 @@ export type ClassifierOutput = {
  *   shallow-merge slice into state.
  */
 export type ClassifierRefineResult =
-  undefined | EndSentinel | (Record<string, unknown> & { intent?: string | EndSentinel });
+  | undefined
+  | EndSentinel
+  | (Record<string, unknown> & { intent?: string | EndSentinel });
 
 /**
  * Read-only context passed to a classifier callback or to a

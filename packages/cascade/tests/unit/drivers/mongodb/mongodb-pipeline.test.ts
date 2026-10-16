@@ -98,15 +98,9 @@ describe("MongoQueryBuilder — pipeline shape", () => {
     // SQL semantics: WHERE applies to source columns regardless of call order.
     // Without the hoist, the $project would strip `rel_user_id` before the
     // $match sees it and every document would be dropped.
-    const pipeline = builder()
-      .select(["rel_role_id"])
-      .where("rel_user_id", 7)
-      .parse().pipeline;
+    const pipeline = builder().select(["rel_role_id"]).where("rel_user_id", 7).parse().pipeline;
 
-    expect(pipeline).toEqual([
-      { $match: { rel_user_id: 7 } },
-      { $project: { rel_role_id: 1 } },
-    ]);
+    expect(pipeline).toEqual([{ $match: { rel_user_id: 7 } }, { $project: { rel_role_id: 1 } }]);
   });
 
   it("does not hoist a where() past a $group barrier", () => {
@@ -191,7 +185,9 @@ describe("MongoQueryBuilder — pipeline shape", () => {
   it("compiles a nested composed expression with a literal", () => {
     const pipeline = builder()
       .groupBy("status", {
-        net: $agg.sum($expr.mul("price", "quantity", $expr.sub($expr.lit(1), $expr.col("discount")))),
+        net: $agg.sum(
+          $expr.mul("price", "quantity", $expr.sub($expr.lit(1), $expr.col("discount"))),
+        ),
       })
       .parse().pipeline;
 
@@ -212,7 +208,9 @@ describe("MongoQueryBuilder — pipeline shape", () => {
 
   it("throws on $agg.sumRaw — a raw SQL fragment is not portable to a pipeline", () => {
     expect(() =>
-      builder().groupBy("status", { net: $agg.sumRaw("price * quantity") }).parse(),
+      builder()
+        .groupBy("status", { net: $agg.sumRaw("price * quantity") })
+        .parse(),
     ).toThrow(/not portable to a MongoDB pipeline/);
   });
 

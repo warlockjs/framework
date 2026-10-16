@@ -384,7 +384,10 @@ function isTestOnlySource(
 }
 
 /** Every file the barrel imports directly, so none of them can be exempted. */
-function pageGraphFiles(pages: readonly DiscoveredPage[], appFiles: readonly string[]): Set<string> {
+function pageGraphFiles(
+  pages: readonly DiscoveredPage[],
+  appFiles: readonly string[],
+): Set<string> {
   const files = new Set<string>(appFiles);
 
   for (const page of pages) {
@@ -717,7 +720,9 @@ export async function generatePagesBarrel(
               `import * as ${site.identifier} from ${quote(importSpecifierFor(productionDir, site.rootFile))};`,
           )),
     ...(options.sites === undefined && routablePages[0]?.appSetupFile !== undefined
-      ? [`import * as appSetup from ${quote(importSpecifierFor(productionDir, routablePages[0].appSetupFile))};`]
+      ? [
+          `import * as appSetup from ${quote(importSpecifierFor(productionDir, routablePages[0].appSetupFile))};`,
+        ]
       : siteApps.flatMap((site) =>
           site.setupFile === undefined
             ? []
@@ -733,7 +738,9 @@ export async function generatePagesBarrel(
                 `import * as errorPage from ${quote(importSpecifierFor(productionDir, errorPage!.pageFile))};`,
                 ...(errorPage!.setupFile === undefined
                   ? []
-                  : [`import * as errorPageSetup from ${quote(importSpecifierFor(productionDir, errorPage!.setupFile))};`]),
+                  : [
+                      `import * as errorPageSetup from ${quote(importSpecifierFor(productionDir, errorPage!.setupFile))};`,
+                    ]),
               ]
             : siteErrorPages.flatMap((page, index) =>
                 page === undefined
@@ -742,7 +749,9 @@ export async function generatePagesBarrel(
                       `import * as errorPage${index} from ${quote(importSpecifierFor(productionDir, page.pageFile))};`,
                       ...(page.setupFile === undefined
                         ? []
-                        : [`import * as errorPageSetup${index} from ${quote(importSpecifierFor(productionDir, page.setupFile))};`]),
+                        : [
+                            `import * as errorPageSetup${index} from ${quote(importSpecifierFor(productionDir, page.setupFile))};`,
+                          ]),
                     ],
               )),
         ]),
@@ -750,13 +759,17 @@ export async function generatePagesBarrel(
       `import * as ${layout.identifier} from ${quote(importSpecifierFor(productionDir, layoutFile))};`,
       ...(layout.setupFile === undefined
         ? []
-        : [`import * as ${layout.identifier}Setup from ${quote(importSpecifierFor(productionDir, layout.setupFile))};`]),
+        : [
+            `import * as ${layout.identifier}Setup from ${quote(importSpecifierFor(productionDir, layout.setupFile))};`,
+          ]),
     ]),
     ...pages.flatMap((page) => [
       `import * as ${page.identifier} from ${quote(importSpecifierFor(productionDir, page.sourceFile))};`,
       ...(page.setupFile === undefined
         ? []
-        : [`import * as ${page.identifier}Setup from ${quote(importSpecifierFor(productionDir, page.setupFile))};`]),
+        : [
+            `import * as ${page.identifier}Setup from ${quote(importSpecifierFor(productionDir, page.setupFile))};`,
+          ]),
     ]),
   ];
 
@@ -804,20 +817,20 @@ export async function generatePagesBarrel(
       ? []
       : options.sites === undefined
         ? [
-          `  app: { module: app, sourceFile: ${relativeToApp(appFile)}${
-            routablePages[0]?.appSetupFile === undefined
-              ? ""
-              : `, setupModule: appSetup, setupSourceFile: ${relativeToApp(routablePages[0].appSetupFile)}`
-          } },`,
-        ]
+            `  app: { module: app, sourceFile: ${relativeToApp(appFile)}${
+              routablePages[0]?.appSetupFile === undefined
+                ? ""
+                : `, setupModule: appSetup, setupSourceFile: ${relativeToApp(routablePages[0].appSetupFile)}`
+            } },`,
+          ]
         : [
             "  sites: {",
             ...siteApps.map(
               (site, index) =>
                 `    ${quote(site.site)}: { app: { module: ${site.identifier}, sourceFile: ${relativeToApp(site.rootFile)} }${
-                site.setupFile === undefined
-                  ? ""
-                  : `, appSetup: { module: ${site.setupIdentifier}, sourceFile: ${relativeToApp(site.setupFile)} }`
+                  site.setupFile === undefined
+                    ? ""
+                    : `, appSetup: { module: ${site.setupIdentifier}, sourceFile: ${relativeToApp(site.setupFile)} }`
                 }${
                   siteErrorPages[index] === undefined
                     ? ""

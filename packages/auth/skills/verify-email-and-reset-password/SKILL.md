@@ -94,10 +94,10 @@ router.post("/auth/reset-password", resetPasswordController, {
 
 Both presets wrap `loginThrottleMiddleware` and accept its options:
 
-| Preset | Tracks | Counts | Default |
-| --- | --- | --- | --- |
-| `tokenIssueThrottleMiddleware` | email + IP | **every** request (a reset request's success is the anti-enumeration answer, so failure-aware counting would never trip) | 3 / 1h, 1h lock |
-| `tokenConsumeThrottleMiddleware` | IP | failures only, cleared on success | 10 / 15m, 15m lock |
+| Preset                           | Tracks     | Counts                                                                                                                   | Default            |
+| -------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| `tokenIssueThrottleMiddleware`   | email + IP | **every** request (a reset request's success is the anti-enumeration answer, so failure-aware counting would never trip) | 3 / 1h, 1h lock    |
+| `tokenConsumeThrottleMiddleware` | IP         | failures only, cleared on success                                                                                        | 10 / 15m, 15m lock |
 
 ## Configuration (`src/config/auth.ts`)
 
@@ -115,7 +115,9 @@ const authConfigurations: AuthConfigurations = {
     identifierField: "email",
     url: (token) => `${env("APP_URL")}/reset-password?token=${token}`,
     notification: myResetNotification,
-    setPassword: async (user, plain) => { /* optional */ },
+    setPassword: async (user, plain) => {
+      /* optional */
+    },
   },
   oneTimeToken: { model: AppOneTimeToken }, // optional model override
 };

@@ -160,9 +160,9 @@ Modern async middleware (Express 5, Koa, Fastify, Hono) all support async handle
 ## Reading: `get`, `getStore`, `hasContext`
 
 ```ts
-const userId = userContext.get("userId");        // TStore["userId"] | undefined
-const store = userContext.getStore();             // TStore | undefined
-const inside = userContext.hasContext();          // boolean
+const userId = userContext.get("userId"); // TStore["userId"] | undefined
+const store = userContext.getStore(); // TStore | undefined
+const inside = userContext.hasContext(); // boolean
 ```
 
 Most of the time you want `get`. `getStore` shows up when you need to log the whole record or hand it to a function that takes the full shape. `hasContext` is for safety checks at boundaries that might run inside or outside a context (a generic logger, a metrics helper).
@@ -172,9 +172,9 @@ The distinction `hasContext` exists for: `get("userId")` returns `undefined` eit
 ## Writing: `set`, `update`, `clear`
 
 ```ts
-userContext.set("role", "admin");                 // single key
-userContext.update({ role: "admin" });            // partial merge
-userContext.clear();                              // wipe the store
+userContext.set("role", "admin"); // single key
+userContext.update({ role: "admin" }); // partial merge
+userContext.clear(); // wipe the store
 ```
 
 `set` is sugar for `update({ key: value })`. Both call `Object.assign(currentStore, partial)` — top-level merge, no deep copy. Both should be called inside an active context; outside, `update` silently `enter()`s a new context with the partial, which is rarely what you want.

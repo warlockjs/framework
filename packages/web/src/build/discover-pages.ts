@@ -54,7 +54,11 @@ import { canonicalizeRouteExport, resolvePageRouteIdentity } from "../routing/ro
 import { routeIdentityKey } from "../routing/route-identity-key";
 import { assertPageHasDefaultExport } from "./page-default-export";
 import { UnknownMetadataKeyError, readMetadataKeys } from "./read-metadata-keys";
-import { mergeModuleConfigReads, readModuleConfig, type ModuleConfigRead } from "./read-module-config";
+import {
+  mergeModuleConfigReads,
+  readModuleConfig,
+  type ModuleConfigRead,
+} from "./read-module-config";
 import { pageSetupFileFor, pageSetupOwnerFileFor } from "./page-setup-file";
 import { toPosix } from "../shared/to-posix";
 import { validateSitesConfig } from "../sites/validate-sites-config";
@@ -861,7 +865,9 @@ function prepareSites(
     const unit = unitOwning(units, pageFile);
 
     if (unit === undefined) {
-      problems.push(`${relativeToApp(pageFile)}: unassigned page; it is outside every site folder.`);
+      problems.push(
+        `${relativeToApp(pageFile)}: unassigned page; it is outside every site folder.`,
+      );
       continue;
     }
 
@@ -929,12 +935,15 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
     // convention segment reaches a URL or generated route name.
     const siteRouteRoot = unit.root ?? webRoot;
     const setupCandidate = pageSetupFileFor(pageFile);
-    const setupFile = setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
+    const setupFile =
+      setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
     const pageSource = fs.readFileSync(pageFile, "utf-8");
     assertPageHasDefaultExport(relativeToApp(pageFile), pageSource);
     const pageRead = readDeclarations(pageFile, declarations, pageSource, "page");
     const setupRead =
-      setupFile === undefined ? undefined : readDeclarations(setupFile, declarations, undefined, "page");
+      setupFile === undefined
+        ? undefined
+        : readDeclarations(setupFile, declarations, undefined, "page");
     const {
       route,
       actionNames,
@@ -1013,8 +1022,15 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
     );
     const layoutFacts = layouts.map((layout) => {
       const setupCandidate = pageSetupFileFor(layout);
-      const setupFile = setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
-      const declaration = readComposedDeclarations(layout, declarations, undefined, setupFile, "layout");
+      const setupFile =
+        setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
+      const declaration = readComposedDeclarations(
+        layout,
+        declarations,
+        undefined,
+        setupFile,
+        "layout",
+      );
       return {
         layout,
         renders: declaration.hasDefault,
@@ -1047,8 +1063,8 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
     // page). The not-found page renders outside all of it and is never guarded.
     const rootGuardsUser =
       appFile !== undefined &&
-      readComposedDeclarations(appFile, declarations, undefined, appSetupFile, "root").guardsUser ===
-        true;
+      readComposedDeclarations(appFile, declarations, undefined, appSetupFile, "root")
+        .guardsUser === true;
     const guardsUser =
       !isNotFoundPage &&
       (pageGuardsUser === true || rootGuardsUser || layoutFacts.some((fact) => fact.guardsUser));
@@ -1056,24 +1072,30 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
     // EVERY prefix on the path, outermost first: a `prefix`-only layout is
     // still a segment of the URL, and composing only the rendering layout's
     // would serve the subtree from a path nobody declared.
-    const layoutPrefix = layouts.reduce(
-      (composed, layoutFile) => {
-        const setupCandidate = pageSetupFileFor(layoutFile);
-        const setupFile = setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
-        return composeRoutePath(
-          composed,
-          readComposedDeclarations(layoutFile, declarations, undefined, setupFile, "layout").prefix ?? "/",
-        );
-      },
-      "/",
-    );
+    const layoutPrefix = layouts.reduce((composed, layoutFile) => {
+      const setupCandidate = pageSetupFileFor(layoutFile);
+      const setupFile =
+        setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
+      return composeRoutePath(
+        composed,
+        readComposedDeclarations(layoutFile, declarations, undefined, setupFile, "layout").prefix ??
+          "/",
+      );
+    }, "/");
 
     const relativePageFile = toPosix(path.relative(siteRouteRoot, pageFile));
     const layoutPrefixes = Object.fromEntries(
       layouts.flatMap((layoutFile) => {
         const setupCandidate = pageSetupFileFor(layoutFile);
-        const setupFile = setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
-        const prefix = readComposedDeclarations(layoutFile, declarations, undefined, setupFile, "layout").prefix;
+        const setupFile =
+          setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
+        const prefix = readComposedDeclarations(
+          layoutFile,
+          declarations,
+          undefined,
+          setupFile,
+          "layout",
+        ).prefix;
         if (prefix === undefined) return [];
 
         const directory = toPosix(path.relative(siteRouteRoot, path.dirname(layoutFile)));

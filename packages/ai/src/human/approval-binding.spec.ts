@@ -45,7 +45,10 @@ function makePending(sessionId: string, args: unknown): PendingInterrupt {
   };
 }
 
-function makeAgent(before: (ctx: MiddlewareToolContext) => Promise<void>, context: MiddlewareToolContext): AgentContract {
+function makeAgent(
+  before: (ctx: MiddlewareToolContext) => Promise<void>,
+  context: MiddlewareToolContext,
+): AgentContract {
   return {
     name: "support",
     isAnonymous: false,
@@ -62,10 +65,16 @@ describe("approval binding", () => {
     const pending = makePending("session-a", { amount: 50 });
     await store.save(pending);
     const handler = vi.fn(() => ({ type: "reject" as const, reason: "needs approval" }));
-    const gate = humanApproval({ policy: { type: "allowlist", tools: ["refundCustomer"] }, handler });
-    const agent = makeAgent(async (ctx) => {
-      await gate.tool!.before!(ctx);
-    }, makeContext("session-b", { amount: 50 }));
+    const gate = humanApproval({
+      policy: { type: "allowlist", tools: ["refundCustomer"] },
+      handler,
+    });
+    const agent = makeAgent(
+      async (ctx) => {
+        await gate.tool!.before!(ctx);
+      },
+      makeContext("session-b", { amount: 50 }),
+    );
 
     await resume(pending.interruptId, { type: "approve" }, { store, agent });
 
@@ -77,10 +86,16 @@ describe("approval binding", () => {
     const pending = makePending("session-a", { amount: 50 });
     await store.save(pending);
     const handler = vi.fn(() => ({ type: "reject" as const, reason: "needs approval" }));
-    const gate = humanApproval({ policy: { type: "allowlist", tools: ["refundCustomer"] }, handler });
-    const agent = makeAgent(async (ctx) => {
-      await gate.tool!.before!(ctx);
-    }, makeContext("session-a", { amount: 500 }));
+    const gate = humanApproval({
+      policy: { type: "allowlist", tools: ["refundCustomer"] },
+      handler,
+    });
+    const agent = makeAgent(
+      async (ctx) => {
+        await gate.tool!.before!(ctx);
+      },
+      makeContext("session-a", { amount: 500 }),
+    );
 
     await resume(pending.interruptId, { type: "approve" }, { store, agent });
 
@@ -92,7 +107,10 @@ describe("approval binding", () => {
     const pending = makePending("session-a", { amount: 50 });
     await store.save(pending);
     const handler = vi.fn(() => ({ type: "reject" as const, reason: "must not run" }));
-    const gate = humanApproval({ policy: { type: "allowlist", tools: ["refundCustomer"] }, handler });
+    const gate = humanApproval({
+      policy: { type: "allowlist", tools: ["refundCustomer"] },
+      handler,
+    });
     const context = makeContext("session-a", { amount: 50 });
     const agent = makeAgent(async (ctx) => {
       await gate.tool!.before!(ctx);
@@ -104,8 +122,18 @@ describe("approval binding", () => {
   });
 
   it("makes binding keys independent of object key order", () => {
-    const first = { agentName: "support", sessionId: "session-a", toolName: "refundCustomer", args: { amount: 50, orderId: "a" } };
-    const second = { toolName: "refundCustomer", args: { orderId: "a", amount: 50 }, sessionId: "session-a", agentName: "support" };
+    const first = {
+      agentName: "support",
+      sessionId: "session-a",
+      toolName: "refundCustomer",
+      args: { amount: 50, orderId: "a" },
+    };
+    const second = {
+      toolName: "refundCustomer",
+      args: { orderId: "a", amount: 50 },
+      sessionId: "session-a",
+      agentName: "support",
+    };
 
     expect(stableStringify(first)).toBe(stableStringify(second));
     expect(createApprovalBindingKey(first)).toBe(createApprovalBindingKey(second));

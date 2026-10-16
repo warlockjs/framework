@@ -8,11 +8,11 @@ sidebar:
 
 Three different jobs, three different tools. Picking the right one is the difference between a secure system and a credentials leak waiting to happen.
 
-| Tool                                  | Direction  | Algorithm    | Use for                                                         |
-| ------------------------------------- | ---------- | ------------ | --------------------------------------------------------------- |
-| `hashPassword` / `verifyPassword`     | one-way    | bcrypt (slow) | User-typed passwords. **Only** passwords.                       |
-| `encrypt` / `decrypt`                 | reversible | AES-256-GCM  | Secrets you need to read back — API keys, OAuth tokens.         |
-| `hmacHash`                            | one-way    | HMAC-SHA256  | Deterministic fingerprints for lookup / dedup of encrypted data. |
+| Tool                              | Direction  | Algorithm     | Use for                                                          |
+| --------------------------------- | ---------- | ------------- | ---------------------------------------------------------------- |
+| `hashPassword` / `verifyPassword` | one-way    | bcrypt (slow) | User-typed passwords. **Only** passwords.                        |
+| `encrypt` / `decrypt`             | reversible | AES-256-GCM   | Secrets you need to read back — API keys, OAuth tokens.          |
+| `hmacHash`                        | one-way    | HMAC-SHA256   | Deterministic fingerprints for lookup / dedup of encrypted data. |
 
 All three live in `@warlock.js/core`. Configure them with `src/config/encryption.ts`.
 
@@ -40,13 +40,7 @@ Mixing these is the most common security mistake. Encrypting a password means a 
 ## The shape
 
 ```ts
-import {
-  hashPassword,
-  verifyPassword,
-  encrypt,
-  decrypt,
-  hmacHash,
-} from "@warlock.js/core";
+import { hashPassword, verifyPassword, encrypt, decrypt, hmacHash } from "@warlock.js/core";
 
 // Password — one-way, slow, salted (bcrypt)
 const hashed = await hashPassword("user-password-123");
@@ -71,22 +65,22 @@ import type { EncryptionConfigurations } from "@warlock.js/core";
 import { env } from "@warlock.js/core";
 
 const encryptionConfig: EncryptionConfigurations = {
-  key: env("APP_ENCRYPTION_KEY"),       // 64 hex chars = 32 bytes — required for encrypt/decrypt
-  algorithm: "aes-256-gcm",              // optional, default
-  hmacKey: env("APP_HMAC_KEY"),         // 64 hex chars — falls back to `key` if absent
+  key: env("APP_ENCRYPTION_KEY"), // 64 hex chars = 32 bytes — required for encrypt/decrypt
+  algorithm: "aes-256-gcm", // optional, default
+  hmacKey: env("APP_HMAC_KEY"), // 64 hex chars — falls back to `key` if absent
   password: {
-    salt: 12,                            // bcrypt rounds. 10–12 is the standard band.
+    salt: 12, // bcrypt rounds. 10–12 is the standard band.
   },
 };
 
 export default encryptionConfig;
 ```
 
-| Field          | Purpose                                                                       |
-| -------------- | ----------------------------------------------------------------------------- |
-| `key`          | 32-byte hex key for `encrypt` / `decrypt`. **Never rotate without migration.** |
-| `algorithm`    | Cipher algorithm. Default `aes-256-gcm`. Other GCM variants work.              |
-| `hmacKey`      | Separate HMAC key for `hmacHash`. Falls back to `key` if not set.              |
+| Field           | Purpose                                                                        |
+| --------------- | ------------------------------------------------------------------------------ |
+| `key`           | 32-byte hex key for `encrypt` / `decrypt`. **Never rotate without migration.** |
+| `algorithm`     | Cipher algorithm. Default `aes-256-gcm`. Other GCM variants work.              |
+| `hmacKey`       | Separate HMAC key for `hmacHash`. Falls back to `key` if not set.              |
 | `password.salt` | bcrypt rounds. Higher = slower = more secure. 10–12 standard.                  |
 
 The encryption key is a forever decision. Every value you encrypt under it depends on that key for recovery — if you change it, every existing ciphertext becomes garbage. Plan a migration if you ever genuinely need to rotate (decrypt-all + re-encrypt under new key + atomic cutover).
@@ -193,9 +187,9 @@ export async function createAiApiKeyService(data: {
 
   return AiApiKey.create({
     ...data,
-    key: encrypt(data.key),                  // the secret, recoverable
-    hash: hmacHash(data.key),                // the fingerprint, lookup-able
-    last_four_chars: data.key.slice(-4),     // for UI ("ending in 1234")
+    key: encrypt(data.key), // the secret, recoverable
+    hash: hmacHash(data.key), // the fingerprint, lookup-able
+    last_four_chars: data.key.slice(-4), // for UI ("ending in 1234")
   });
 }
 ```
@@ -269,8 +263,8 @@ The canonical pattern from `create-ai-api-key.service.ts`:
 ```ts
 await Model.create({
   key: encrypt(plain),
-  hash: hmacHash(plain),                     // for lookups
-  last_four_chars: plain.slice(-4),          // for UI display ("ending in 1234")
+  hash: hmacHash(plain), // for lookups
+  last_four_chars: plain.slice(-4), // for UI display ("ending in 1234")
 });
 ```
 
@@ -333,7 +327,7 @@ secret.setValue("sk-proj-12345");
 await secret.save();
 
 // Later:
-const plain = secret.getValue();    // "sk-proj-12345"
+const plain = secret.getValue(); // "sk-proj-12345"
 ```
 
 Now controllers never touch `encrypt` directly. If the model changes (key rotation, algorithm change), there's one place to fix.

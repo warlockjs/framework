@@ -44,14 +44,14 @@ Pick one style and stay consistent — `module` and `action` become searchable k
 
 ## The six log levels
 
-| Level | Method | When to use | Console style |
-| --- | --- | --- | --- |
-| `debug` | `log.debug()` | Dev diagnostics, variable dumps, flow tracing | magenta |
-| `info` | `log.info()` | Normal operational events (user registered, job queued) | blue |
-| `warn` | `log.warn()` | Unexpected but recoverable conditions (retry, fallback) | yellow |
-| `error` | `log.error()` | Handled failures that need attention; app continues | red |
-| `success` | `log.success()` | Explicit happy-path confirmation (payment completed) | green |
-| `fatal` | `log.fatal()` | Unrecoverable failures; the app is going down (boot fail, `uncaughtException`) | bright red on red background |
+| Level     | Method          | When to use                                                                    | Console style                |
+| --------- | --------------- | ------------------------------------------------------------------------------ | ---------------------------- |
+| `debug`   | `log.debug()`   | Dev diagnostics, variable dumps, flow tracing                                  | magenta                      |
+| `info`    | `log.info()`    | Normal operational events (user registered, job queued)                        | blue                         |
+| `warn`    | `log.warn()`    | Unexpected but recoverable conditions (retry, fallback)                        | yellow                       |
+| `error`   | `log.error()`   | Handled failures that need attention; app continues                            | red                          |
+| `success` | `log.success()` | Explicit happy-path confirmation (payment completed)                           | green                        |
+| `fatal`   | `log.fatal()`   | Unrecoverable failures; the app is going down (boot fail, `uncaughtException`) | bright red on red background |
 
 ```ts
 log.debug("cache", "miss", "Key not found, fetching from DB");

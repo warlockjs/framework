@@ -81,7 +81,7 @@ status: in-progress
    whatever is armed via the new `DevServerShortcuts.list()`.
    - Bug this exposed: with the bar armed, `unregister("u")` no longer empties the map, so raw
      mode would have stayed on while the package-manager install owned stdio. The `u` handler now
-     calls `release()` explicitly and `resume()` only when it is *not* restarting.
+     calls `release()` explicitly and `resume()` only when it is _not_ restarting.
 2. **Yes** → 4.9.0. ⚠ A concurrent session had already staged a 4.9.0 entry in
    `docs/src/data/releases.json` (ai + ai-openai, dated July 22 2026). Lockstep means one version
    carries every package, so core's changes were **appended** to that entry rather than replacing
@@ -113,7 +113,7 @@ and no console errors.
 
 ## Round 3 — workspace split + supervisor decision
 
-**Supervisor: APPROVED as recommended** — not a standalone roadmap item; it is *how* auto-restart
+**Supervisor: APPROVED as recommended** — not a standalone roadmap item; it is _how_ auto-restart
 on config change gets built. Queued with items 2 (bun in the updater), 3 (cache the update check),
 and the `spawn("node")` → `process.execPath` one-liner in `start-production.command.ts`.
 
@@ -122,11 +122,11 @@ warlock builder. I had **not** — I kept the full copy and raised it as an open
 
 **Runner split (one per family, registries disjoint):**
 
-| Runner | Owns | Packages |
-| --- | --- | --- |
-| `@warlock.js/builder` (`warlock-release-runner`) | `warlock` family only | 27 |
-| `@mongez/builder` (`mongez-release-runner`) | `@mongez/*` only | 25 (20 standalone + `atom` + `localization`) |
-| `compiler-v2` | legacy, trimmed to mongez-only, superseded | 25 |
+| Runner                                           | Owns                                       | Packages                                     |
+| ------------------------------------------------ | ------------------------------------------ | -------------------------------------------- |
+| `@warlock.js/builder` (`warlock-release-runner`) | `warlock` family only                      | 27                                           |
+| `@mongez/builder` (`mongez-release-runner`)      | `@mongez/*` only                           | 25 (20 standalone + `atom` + `localization`) |
+| `compiler-v2`                                    | legacy, trimmed to mongez-only, superseded | 25                                           |
 
 Split done by bracket-matching the `standalone` / `families` arrays (no line-number assumptions);
 backups of both original configs are in the session scratchpad. Verified: `pkgist validate` clean
@@ -147,6 +147,7 @@ Anything else is mirrored and the supervisor stops. Marker is `WARLOCK_DEV_WORKE
 CLI flag, so the public surface is unchanged).
 
 Two design points that mattered:
+
 - The branch lives in the command's **`preAction`, not `action`** — preAction runs BEFORE the
   preloaders, so the supervisor never loads config or starts connectors. In `action` it would have
   held a second DB connection open for the whole session. `superviseDevServer()` returns a promise
@@ -213,7 +214,7 @@ test — but it took the 5 `probeFile` tests down with it and left the resolver-
 unverified while looking covered. Rewritten against `resolvePathAlias`, mirroring the hook.
 
 **Crash recovery** — supervisor now replaces a worker that dies **after ≥5s of uptime** (OOM,
-native crash, dead loader thread). A worker that dies sooner failed to *boot* and has already
+native crash, dead loader thread). A worker that dies sooner failed to _boot_ and has already
 printed why, so it is NOT restarted — restarting would reprint the same error and bury it. That
 minimum-healthy-uptime rule is what separates the two cases without a noisy retry loop. Flapping
 capped at 3 crashes / 60s. An explicit restart (`r`/`u`/config change) uses the restart exit code,

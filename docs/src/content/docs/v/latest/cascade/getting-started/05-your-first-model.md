@@ -38,7 +38,7 @@ Four things to notice:
 
 :::tip — this minimal schema grows as you go
 
-Later pages reference fields that aren't in this kickoff schema — `image`, `age`, `role`, `online_state`, etc. Extend `userSchema` as you follow along so the snippets compile against your model. The three fields above are the *minimum* to get a working first record; nothing more is required for this page.
+Later pages reference fields that aren't in this kickoff schema — `image`, `age`, `role`, `online_state`, etc. Extend `userSchema` as you follow along so the snippets compile against your model. The three fields above are the _minimum_ to get a working first record; nothing more is required for this page.
 
 :::
 
@@ -76,8 +76,8 @@ const user = await User.create({
   email: "ada@example.com",
 });
 
-console.log(user.id);              // the new ID Cascade assigned
-console.log(user.get("status"));   // "active" — the schema default kicked in
+console.log(user.id); // the new ID Cascade assigned
+console.log(user.get("status")); // "active" — the schema default kicked in
 ```
 
 What just happened:

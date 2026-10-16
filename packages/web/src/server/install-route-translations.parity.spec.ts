@@ -133,10 +133,12 @@ describe("route-locales installer parity", () => {
     const appRoot = makeAppTree({
       "src/web/$sites/platform/root.tsx": "export default function Root() { return null; }",
       "src/web/$sites/platform/index.page.tsx": "export default function Page() { return null; }",
-      "src/web/$sites/platform/locales.json": '{"platform":{"title":{"en":"Platform","ar":"Ø§Ù„Ù…Ù†ØµØ©"}}}',
+      "src/web/$sites/platform/locales.json":
+        '{"platform":{"title":{"en":"Platform","ar":"Ø§Ù„Ù…Ù†ØµØ©"}}}',
       "src/web/$sites/landing/root.tsx": "export default function Root() { return null; }",
       "src/web/$sites/landing/index.page.tsx": "export default function Page() { return null; }",
-      "src/web/$sites/landing/locales.json": '{"landing":{"title":{"en":"Landing","ar":"Ø§Ù„Ù‡Ø¨ÙˆØ·"}}}',
+      "src/web/$sites/landing/locales.json":
+        '{"landing":{"title":{"en":"Landing","ar":"Ø§Ù„Ù‡Ø¨ÙˆØ·"}}}',
     });
     const localeFiles = serializeRouteLocales(
       discoverPageGraph({
@@ -162,9 +164,7 @@ describe("route-locales installer parity", () => {
           site: "platform",
         },
       ],
-      localeFiles: [
-        ...localeFiles,
-      ],
+      localeFiles: [...localeFiles],
     };
 
     installPageRoutesFromManifest({ router: router(), manifest, createHandler });

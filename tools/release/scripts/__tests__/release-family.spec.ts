@@ -267,9 +267,15 @@ describe("runReleaseFamily gate mode", () => {
     assert.equal(control.gateInputs.length, 1);
     assert.deepEqual(control.handoffs, [handoff]);
 
-    const regeneration = control.commands.findIndex(command => command.args[0]?.endsWith("scripts/regenerate-llms.mjs"));
-    const publicText = control.commands.findIndex(command => command.args[0]?.endsWith("scripts/check-public-text.mjs"));
-    const cleanTree = control.commands.findIndex(command => command.command === "git" && command.args[0] === "status");
+    const regeneration = control.commands.findIndex((command) =>
+      command.args[0]?.endsWith("scripts/regenerate-llms.mjs"),
+    );
+    const publicText = control.commands.findIndex((command) =>
+      command.args[0]?.endsWith("scripts/check-public-text.mjs"),
+    );
+    const cleanTree = control.commands.findIndex(
+      (command) => command.command === "git" && command.args[0] === "status",
+    );
     assert.ok(regeneration >= 0 && regeneration < publicText && regeneration < cleanTree);
     const builds = control.commands.filter((command) => command.args[1] === "build");
     assert.equal(builds.length, FAMILY.members.length);

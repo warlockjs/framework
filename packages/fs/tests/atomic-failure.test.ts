@@ -34,9 +34,7 @@ describe("atomic write — failure + cleanup", () => {
 
     await expect(atomicWriteAsync(target, "data")).rejects.toThrow();
 
-    const leftoverTemp = (await readdir(dir)).filter((entry) =>
-      entry.endsWith(".tmp"),
-    );
+    const leftoverTemp = (await readdir(dir)).filter((entry) => entry.endsWith(".tmp"));
     expect(leftoverTemp).toEqual([]);
   });
 
@@ -44,9 +42,7 @@ describe("atomic write — failure + cleanup", () => {
     const blocker = path.join(dir, "blocker");
     await writeFile(blocker, "i am a file");
 
-    await expect(
-      atomicWriteAsync(path.join(blocker, "child.txt"), "data"),
-    ).rejects.toThrow();
+    await expect(atomicWriteAsync(path.join(blocker, "child.txt"), "data")).rejects.toThrow();
   });
 
   it("does not disturb the existing file when the write fails", async () => {
@@ -78,9 +74,7 @@ describe("atomic write — JSON formatting + concurrency", () => {
     await atomicWriteJsonAsync(target, { name: "warlock", nested: { ok: true } });
 
     const raw = await readFile(target, "utf-8");
-    expect(raw).toBe(
-      '{\n  "name": "warlock",\n  "nested": {\n    "ok": true\n  }\n}',
-    );
+    expect(raw).toBe('{\n  "name": "warlock",\n  "nested": {\n    "ok": true\n  }\n}');
   });
 
   it("writes an empty string and yields an empty file", async () => {
@@ -111,9 +105,7 @@ describe("atomic write — JSON formatting + concurrency", () => {
     }
 
     // Every temp got renamed; nothing left behind.
-    const leftoverTemp = (await readdir(dir)).filter((entry) =>
-      entry.endsWith(".tmp"),
-    );
+    const leftoverTemp = (await readdir(dir)).filter((entry) => entry.endsWith(".tmp"));
     expect(leftoverTemp).toEqual([]);
   });
 });

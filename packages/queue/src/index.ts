@@ -17,5 +17,11 @@ export {
   type QueueContext,
 } from "./queue-context";
 export { QueueDashboardUnguardedError } from "./queue-dashboard-unguarded.error";
-export { closeQueue, getQueue, runningWorkers, startWorkers, type CloseQueueOptions } from "./queue-manager";
+export {
+  closeQueue,
+  getQueue,
+  runningWorkers,
+  startWorkers,
+  type CloseQueueOptions,
+} from "./queue-manager";
 export * from "./types";

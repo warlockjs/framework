@@ -157,7 +157,12 @@ function namedImportsFrom(source: string, moduleName: string): string[] {
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean)
-    .map((entry) => entry.replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim());
+    .map((entry) =>
+      entry
+        .replace(/^type\s+/, "")
+        .split(/\s+as\s+/)[0]
+        .trim(),
+    );
 }
 
 describe("migration templates use only current cascade column helpers", () => {
@@ -193,21 +198,12 @@ describe("migration templates use only current cascade column helpers", () => {
 
       // Collect every `helper(<args>)` call whose first arg is numeric, then make
       // sure the helper is one that legitimately takes a numeric/sized argument.
-      const sizedCalls = [...source.matchAll(/\b([a-zA-Z]+)\s*\(\s*\d/g)].map(
-        (match) => match[1],
-      );
+      const sizedCalls = [...source.matchAll(/\b([a-zA-Z]+)\s*\(\s*\d/g)].map((match) => match[1]);
 
-      const helpersThatTakeArgs = new Set([
-        "string",
-        "char",
-        "decimal",
-        "vector",
-        "smallInteger",
-      ]);
+      const helpersThatTakeArgs = new Set(["string", "char", "decimal", "vector", "smallInteger"]);
 
       const offenders = sizedCalls.filter(
-        (helper) =>
-          cascadeColumnExports.has(helper) && !helpersThatTakeArgs.has(helper),
+        (helper) => cascadeColumnExports.has(helper) && !helpersThatTakeArgs.has(helper),
       );
 
       expect(offenders).toEqual([]);
@@ -286,7 +282,7 @@ describe("template typecheck prerequisites", () => {
   });
 
   it("never reads request.client — v5 removed the index signature that allowed it", () => {
-    const offenders = templateSourceFiles().filter(file =>
+    const offenders = templateSourceFiles().filter((file) =>
       /\brequest\.client\b/.test(stripComments(read(file))),
     );
 
@@ -421,9 +417,7 @@ describe("cache config's globalPrefix is fixed and app-owned, not request-derive
 
   it("default globalPrefix never reads originDomain, a domain header, or domain input", () => {
     const source = cacheConfig();
-    const globalPrefixMatch = source.match(
-      /const globalPrefix = \(\) => env\("APP_NAME"[\s\S]*?;/,
-    );
+    const globalPrefixMatch = source.match(/const globalPrefix = \(\) => env\("APP_NAME"[\s\S]*?;/);
 
     expect(globalPrefixMatch).not.toBeNull();
     expect(source).not.toMatch(/originDomain/);
@@ -449,9 +443,7 @@ describe("optional Oxc toolchain templates", () => {
     const lint = JSON.parse(read("../toolchains/oxc/.oxlintrc.json"));
     const format = JSON.parse(read("../toolchains/oxc/.oxfmtrc.json"));
     const prettier = JSON.parse(read(".prettierrc.json"));
-    expect(lint.rules["typescript/explicit-member-accessibility"][0]).toBe(
-      "error",
-    );
+    expect(lint.rules["typescript/explicit-member-accessibility"][0]).toBe("error");
     expect(lint.rules["typescript/consistent-type-imports"][0]).toBe("error");
     for (const key of [
       "semi",

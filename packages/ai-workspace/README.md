@@ -16,7 +16,7 @@ OS sandbox. Every path is `realpath`-resolved and must sit under `cwd` (or an
 `allowPaths` root); `denyPaths` globs are blocked even inside `cwd`; shell commands
 are gated by an executable allow/deny list; and `process.env` is **never** inherited
 wholesale (a command can't even find `node`/`npm` unless the policy opts in via
-`shell.inheritEnv: ["PATH"]`). What it does **not** do is contain what an *allowed*
+`shell.inheritEnv: ["PATH"]`). What it does **not** do is contain what an _allowed_
 process does once it runs — an allowed `node` can still open a socket or read a file
 its own user can reach. For untrusted code you want real isolation (a container /
 microVM backend), which is a later phase. Treat this as least-privilege guardrails
@@ -41,7 +41,7 @@ import "@warlock.js/ai-workspace";
 ### 1. Minimal build-loop agent
 
 Hand the whole tool set to an agent and let it read, edit, and run tests until green.
-The failure comes back as tool *data*, so the agent self-corrects.
+The failure comes back as tool _data_, so the agent self-corrects.
 
 ```ts
 import "@warlock.js/ai-workspace";
@@ -66,7 +66,7 @@ await dev.execute("`npm test` fails on the cart-total suite. Make it green.");
 
 A reviewer needs to read and search — never to write or run a shell. Pick exactly
 those three tools, or take a `readonly()` projection (which omits every mutating tool
-*and* rejects the mutating direct methods).
+_and_ rejects the mutating direct methods).
 
 ```ts
 const ws = ai.workspace({ cwd: "/srv/acme-api" });
@@ -152,4 +152,7 @@ Progressive-disclosure, per-task docs live under [`skills/`](./skills/README.md)
   and operate it (policy, tools, direct methods, `readonly` / `scope`).
 - [`build-loop-agent/`](./skills/build-loop-agent/SKILL.md) — wire `ws.tools.all()`
   into a coding agent that reads → edits → runs tests until green.
+
+```
+
 ```

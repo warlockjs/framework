@@ -60,7 +60,9 @@ export function buildOpenApiDocument(
   context: OpenApiContext,
 ): OpenApiBuildResult {
   const warnings: string[] = [];
-  const registry = new SchemaRegistry(context.resolveResourceName, (message) => warnings.push(message));
+  const registry = new SchemaRegistry(context.resolveResourceName, (message) =>
+    warnings.push(message),
+  );
   const security = new SecuritySchemes();
   const validationShape = resolveValidationResponse(context.validationResponse);
   const paths: OpenApiDocument["paths"] = {};
@@ -96,7 +98,9 @@ export function buildOpenApiDocument(
       paths[pathKey] ??= {};
 
       if (paths[pathKey][method]) {
-        warn(`${method.toUpperCase()} ${pathKey} is already documented by an earlier route; this one is skipped.`);
+        warn(
+          `${method.toUpperCase()} ${pathKey} is already documented by an earlier route; this one is skipped.`,
+        );
 
         continue;
       }
@@ -110,7 +114,9 @@ export function buildOpenApiDocument(
           suffix++;
         }
 
-        warn(`operationId "${operationId}" is already used; renamed to "${operationId}_${suffix}".`);
+        warn(
+          `operationId "${operationId}" is already used; renamed to "${operationId}_${suffix}".`,
+        );
         operationId = `${operationId}_${suffix}`;
       }
 
@@ -124,7 +130,12 @@ export function buildOpenApiDocument(
       const request = buildRequestParts({ method, path: route.path, validation, warn });
 
       const responses: Record<string, OpenApiResponse> = route.isPage
-        ? { "200": { description: "HTML page", content: { "text/html": { schema: { type: "string" } } } } }
+        ? {
+            "200": {
+              description: "HTML page",
+              content: { "text/html": { schema: { type: "string" } } },
+            },
+          }
         : buildDeclaredResponses(handler?.responseSchema, registry, warn);
 
       if (!Object.keys(responses).some((status) => status.startsWith("2"))) {
@@ -190,7 +201,9 @@ export function buildOpenApiDocument(
   return { document, warnings: [...new Set(warnings)] };
 }
 
-function sortResponses(responses: Record<string, OpenApiResponse>): Record<string, OpenApiResponse> {
+function sortResponses(
+  responses: Record<string, OpenApiResponse>,
+): Record<string, OpenApiResponse> {
   return Object.fromEntries(
     Object.entries(responses).sort(([first], [second]) => first.localeCompare(second)),
   );

@@ -45,7 +45,10 @@ describe("normalizeError", () => {
 
   it("preserves name/message/stack on a raw Error cause instead of collapsing to {}", () => {
     const cause = new TypeError("Cannot read properties of null (reading 'use_case')");
-    const error = Object.assign(new Error("ToolExecutionError"), { code: "TOOL_EXEC_FAILED", cause });
+    const error = Object.assign(new Error("ToolExecutionError"), {
+      code: "TOOL_EXEC_FAILED",
+      cause,
+    });
 
     const normalized = normalizeError(error);
 

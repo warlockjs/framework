@@ -18,23 +18,21 @@ Cascade's query builder isn't only for finding records — it crunches numbers t
 ## Scalar aggregates
 
 ```ts
-const total      = await Order.count();                  // count is static on the model
-const revenue    = await Order.query().sum("total");
-const avgTicket  = await Order.query().avg("total");
-const cheapest   = await Order.query().min("total");
-const priciest   = await Order.query().max("total");
+const total = await Order.count(); // count is static on the model
+const revenue = await Order.query().sum("total");
+const avgTicket = await Order.query().avg("total");
+const cheapest = await Order.query().min("total");
+const priciest = await Order.query().max("total");
 
 // Filtered
-const monthRevenue = await Order.query()
-  .whereDateAfter("created_at", startOfMonth)
-  .sum("total");
+const monthRevenue = await Order.query().whereDateAfter("created_at", startOfMonth).sum("total");
 ```
 
 Each returns a single number (`Promise<number>`). Only `count` is a static shortcut on the model; `sum` / `avg` / `min` / `max` (and the date helpers) are query-builder methods — reach them via `Order.query()` or chain off `Order.where(...)`. Date filters take a single date: `whereDate(field, value)` (exact day, time ignored), `whereDateAfter` / `whereDateBefore` (one-sided), `whereDateBetween(field, [a, b])` (range) — there is no 3-arg `whereDate(field, op, value)`. By Cascade convention the scalar terminators return **`0` on zero rows — not `null`** — so you can use the result directly without a null guard.
 
 ## Grouped rollups — two-arg `groupBy(fields, aggregates)`
 
-To compute aggregates *per group*, pass a second argument to `groupBy`: an object mapping output aliases to aggregate expressions. Build the expressions with the `$agg` helpers:
+To compute aggregates _per group_, pass a second argument to `groupBy`: an object mapping output aliases to aggregate expressions. Build the expressions with the `$agg` helpers:
 
 ```ts
 import { $agg } from "@warlock.js/cascade";
@@ -67,8 +65,8 @@ import { $agg, $expr } from "@warlock.js/cascade";
 
 const revenue = await OrderItem.query()
   .groupBy("product_id", {
-    revenue: $agg.sum($expr.mul("price", "quantity")),                       // SUM(price * quantity)
-    net:     $agg.sum($expr.mul($expr.sub($expr.lit(1), "discount"), "price")),// SUM((1 - discount) * price)
+    revenue: $agg.sum($expr.mul("price", "quantity")), // SUM(price * quantity)
+    net: $agg.sum($expr.mul($expr.sub($expr.lit(1), "discount"), "price")), // SUM((1 - discount) * price)
   })
   .get();
 ```
@@ -116,7 +114,7 @@ const monthly = await Order.query()
 
 ## `.having(...)` — filter groups by a computed aggregate
 
-`.where()` filters rows *before* grouping (cheap, uses indexes). `.having()` filters *after* aggregation, by the alias you defined:
+`.where()` filters rows _before_ grouping (cheap, uses indexes). `.having()` filters _after_ aggregation, by the alias you defined:
 
 ```ts
 const big = await Order.query()
@@ -145,14 +143,27 @@ The `orderBy` reference matches the alias from the aggregates object.
 const rows = await Post.query().unwind("tags").where("tags", "news").lean().get();
 
 // Keep posts with no tags; record each tag's position
-await Post.query().unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" }).get();
+await Post.query()
+  .unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" })
+  .get();
 
 // Computed field, existing fields kept
-await Post.query().addFields({ score: { $add: ["$likes", "$shares"] } }).orderBy("score", "desc").get();
+await Post.query()
+  .addFields({ score: { $add: ["$likes", "$shares"] } })
+  .orderBy("score", "desc")
+  .get();
 
 // Pipeline $lookup
-await Post.query().join({ table: "comments", localField: "id", foreignField: "postId",
-  alias: "approved", pipeline: [{ $match: { approved: true } }] }).lean().get();
+await Post.query()
+  .join({
+    table: "comments",
+    localField: "id",
+    foreignField: "postId",
+    alias: "approved",
+    pipeline: [{ $match: { approved: true } }],
+  })
+  .lean()
+  .get();
 ```
 
 `unwind()` returns several rows for one stored document. Use `.lean()` when you only read them. `addFields` expressions are raw aggregation expressions: write them in code, never from request data. Computed columns in the output also work with `selectRaw({ alias: expr })` (`$project`). There is no `$facet` method yet.
@@ -164,7 +175,7 @@ Raw stages: `joinRaw({ $lookup: { from, let, pipeline, as } })` (or an array of 
 ## Gotchas
 
 - **`where` vs `having`.** Row filters go in `.where()` (before grouping, index-friendly); aggregate filters go in `.having()`.
-- **Empty sets.** Scalar terminators return `0` on zero rows (above). For *grouped* reports, a group with no rows simply doesn't appear — a report over an empty range returns `[]`, not a row of zeros.
+- **Empty sets.** Scalar terminators return `0` on zero rows (above). For _grouped_ reports, a group with no rows simply doesn't appear — a report over an empty range returns `[]`, not a row of zeros.
 - **Don't `.all()` then `array.reduce`.** Always push aggregates to the database.
 
 ## See also
@@ -194,15 +205,19 @@ Use `Migration.alter` to evolve an existing table — adding or dropping columns
 import { Migration, text } from "@warlock.js/cascade";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  add: {
-    phone: text().nullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      phone: text().nullable(),
+    },
   },
-}, {
-  down() {
-    this.dropColumn("phone");
+  {
+    down() {
+      this.dropColumn("phone");
+    },
   },
-});
+);
 ```
 
 ---
@@ -232,21 +247,25 @@ import { Migration, text, integer, bool, uuid } from "@warlock.js/cascade";
 import { Organization } from "app/organizations/models/organization";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  add: {
-    phone:           text().nullable(),
-    login_attempts:  integer().notNullable().default(0),
-    is_verified:     bool().notNullable().default(false),
-    organization_id: uuid().references(Organization.table).onDelete("cascade").notNullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      phone: text().nullable(),
+      login_attempts: integer().notNullable().default(0),
+      is_verified: bool().notNullable().default(false),
+      organization_id: uuid().references(Organization.table).onDelete("cascade").notNullable(),
+    },
   },
-}, {
-  down() {
-    this.dropColumn("phone");
-    this.dropColumn("login_attempts");
-    this.dropColumn("is_verified");
-    this.dropColumn("organization_id");
+  {
+    down() {
+      this.dropColumn("phone");
+      this.dropColumn("login_attempts");
+      this.dropColumn("is_verified");
+      this.dropColumn("organization_id");
+    },
   },
-});
+);
 ```
 
 Column helpers (`text`, `integer`, `bool`, `uuid`, `double`, `json`, `timestamp`, `date`, …) are imported from `@warlock.js/cascade` and support the same modifier chain as in `Migration.create`.
@@ -254,31 +273,39 @@ Column helpers (`text`, `integer`, `bool`, `uuid`, `double`, `json`, `timestamp`
 ### `drop` — remove columns
 
 ```ts
-export default Migration.alter(User, {
-  drop: ["legacy_token", "old_avatar_url"],
-}, {
-  down() {
-    // re-add with the original definition if rollback is meaningful
-    this.text("legacy_token").nullable();
-    this.text("old_avatar_url").nullable();
+export default Migration.alter(
+  User,
+  {
+    drop: ["legacy_token", "old_avatar_url"],
   },
-});
+  {
+    down() {
+      // re-add with the original definition if rollback is meaningful
+      this.text("legacy_token").nullable();
+      this.text("old_avatar_url").nullable();
+    },
+  },
+);
 ```
 
 ### `rename` — rename columns
 
 ```ts
-export default Migration.alter(Post, {
-  rename: {
-    body:      "content",
-    thumb_url: "thumbnail_url",
+export default Migration.alter(
+  Post,
+  {
+    rename: {
+      body: "content",
+      thumb_url: "thumbnail_url",
+    },
   },
-}, {
-  down() {
-    this.renameColumn("content",       "body");
-    this.renameColumn("thumbnail_url", "thumb_url");
+  {
+    down() {
+      this.renameColumn("content", "body");
+      this.renameColumn("thumbnail_url", "thumb_url");
+    },
   },
-});
+);
 ```
 
 ### `modify` — change column type or nullability
@@ -287,17 +314,21 @@ export default Migration.alter(Post, {
 import { Migration, string } from "@warlock.js/cascade";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  modify: {
-    // widen email from text to varchar(320) and keep not-null
-    email: string(320).notNullable(),
+export default Migration.alter(
+  User,
+  {
+    modify: {
+      // widen email from text to varchar(320) and keep not-null
+      email: string(320).notNullable(),
+    },
   },
-}, {
-  down() {
-    // revert to unbounded text
-    this.text("email").notNullable();
+  {
+    down() {
+      // revert to unbounded text
+      this.text("email").notNullable();
+    },
   },
-});
+);
 ```
 
 > `modify` re-declares the column. Include every modifier you want to keep (`.notNullable()`, `.default(…)`, etc.) — the declaration replaces the old one entirely.
@@ -309,29 +340,37 @@ export default Migration.alter(User, {
 ### Regular indexes — `addIndex` / `dropIndex`
 
 ```ts
-export default Migration.alter(Order, {
-  // single column
-  addIndex: [{ columns: "status" }],
-}, {
-  down() {
-    this.dropIndex("status");
+export default Migration.alter(
+  Order,
+  {
+    // single column
+    addIndex: [{ columns: "status" }],
   },
-});
+  {
+    down() {
+      this.dropIndex("status");
+    },
+  },
+);
 ```
 
 ```ts
 // composite index with an explicit name
-export default Migration.alter(Order, {
-  addIndex: [
-    { columns: ["organization_id", "status"], name: "idx_org_status" },
-    { columns: "created_at" },
-  ],
-}, {
-  down() {
-    this.dropIndex("idx_org_status");
-    this.dropIndex("created_at");
+export default Migration.alter(
+  Order,
+  {
+    addIndex: [
+      { columns: ["organization_id", "status"], name: "idx_org_status" },
+      { columns: "created_at" },
+    ],
   },
-});
+  {
+    down() {
+      this.dropIndex("idx_org_status");
+      this.dropIndex("created_at");
+    },
+  },
+);
 ```
 
 `dropIndex` accepts a name string or a columns array:
@@ -345,63 +384,79 @@ export default Migration.alter(Order, {
 `options.concurrently: true` builds the index without locking the table (Postgres):
 
 ```ts
-addIndex: [{ columns: "email", options: { concurrently: true } }]
+addIndex: [{ columns: "email", options: { concurrently: true } }];
 ```
 
 ### Unique constraints — `addUnique` / `dropUnique`
 
 ```ts
 // promote an indexed column to unique
-export default Migration.alter(User, {
-  addUnique: [{ columns: "email" }],
-}, {
-  down() {
-    this.dropUnique("email");
+export default Migration.alter(
+  User,
+  {
+    addUnique: [{ columns: "email" }],
   },
-});
+  {
+    down() {
+      this.dropUnique("email");
+    },
+  },
+);
 ```
 
 Composite unique constraint:
 
 ```ts
-export default Migration.alter(Membership, {
-  addUnique: [{ columns: ["organization_id", "user_id"], name: "uq_org_member" }],
-}, {
-  down() {
-    this.dropUnique(["organization_id", "user_id"]);
+export default Migration.alter(
+  Membership,
+  {
+    addUnique: [{ columns: ["organization_id", "user_id"], name: "uq_org_member" }],
   },
-});
+  {
+    down() {
+      this.dropUnique(["organization_id", "user_id"]);
+    },
+  },
+);
 ```
 
 Downgrade a unique to a plain index (the pattern used in this session):
 
 ```ts
-export default Migration.alter(User, {
-  dropUnique: [["email"]],
-  addIndex:   [{ columns: "email", name: "users_email_index" }],
-}, {
-  down() {
-    this.dropIndex("users_email_index");
-    this.unique("email");
+export default Migration.alter(
+  User,
+  {
+    dropUnique: [["email"]],
+    addIndex: [{ columns: "email", name: "users_email_index" }],
   },
-});
+  {
+    down() {
+      this.dropIndex("users_email_index");
+      this.unique("email");
+    },
+  },
+);
 ```
 
 ### Expression indexes — `addExpressionIndex` (Postgres)
 
 ```ts
-export default Migration.alter(User, {
-  addExpressionIndex: [
-    { expressions: "lower(email)",          name: "idx_email_ci" },
-    { expressions: "lower(name)",           name: "idx_name_ci" },
-    { expressions: ["year(created_at)", "status"] },
-  ],
-}, {
-  down() {
-    this.dropIndex("idx_email_ci");
-    this.dropIndex("idx_name_ci");
+export default Migration.alter(
+  User,
+  {
+    addExpressionIndex: [
+      { expressions: "lower(email)", name: "idx_email_ci" },
+      { expressions: "lower(name)", name: "idx_name_ci" },
+      { expressions: ["year(created_at)", "status"] },
+    ],
   },
-});
+  {
+    down() {
+      this.dropIndex("idx_email_ci");
+      this.dropIndex("idx_name_ci");
+    },
+  },
+);
 ```
 
 ---
@@ -411,30 +466,38 @@ export default Migration.alter(User, {
 ### Full-text — `addFullText` / `dropFullText`
 
 ```ts
-export default Migration.alter(Article, {
-  addFullText: [
-    {
-      columns: ["title", "body"],
-      options: { name: "ft_article_search", language: "english" },
-    },
-  ],
-}, {
-  down() {
-    this.dropFullText("ft_article_search");
+export default Migration.alter(
+  Article,
+  {
+    addFullText: [
+      {
+        columns: ["title", "body"],
+        options: { name: "ft_article_search", language: "english" },
+      },
+    ],
   },
-});
+  {
+    down() {
+      this.dropFullText("ft_article_search");
+    },
+  },
+);
 ```
 
 ### Geo-spatial — `addGeoIndex` / `dropGeoIndex`
 
 ```ts
-export default Migration.alter(Store, {
-  addGeoIndex: [{ column: "location" }],
-}, {
-  down() {
-    this.dropGeoIndex("location");
+export default Migration.alter(
+  Store,
+  {
+    addGeoIndex: [{ column: "location" }],
   },
-});
+  {
+    down() {
+      this.dropGeoIndex("location");
+    },
+  },
+);
 ```
 
 Options: `{ name?, type?: "2dsphere" | "2d", min?, max? }`
@@ -442,16 +505,22 @@ Options: `{ name?, type?: "2dsphere" | "2d", min?, max? }`
 ### Vector (AI embeddings) — `addVectorIndex` / `dropVectorIndex`
 
 ```ts
-export default Migration.alter(Document, {
-  addVectorIndex: [{
-    column: "embedding",
-    options: { dimensions: 1536, similarity: "cosine", name: "idx_doc_embedding" },
-  }],
-}, {
-  down() {
-    this.dropVectorIndex("embedding");
+export default Migration.alter(
+  Document,
+  {
+    addVectorIndex: [
+      {
+        column: "embedding",
+        options: { dimensions: 1536, similarity: "cosine", name: "idx_doc_embedding" },
+      },
+    ],
   },
-});
+  {
+    down() {
+      this.dropVectorIndex("embedding");
+    },
+  },
+);
 ```
 
 Similarity options: `"cosine"` | `"euclidean"` | `"dotProduct"`.
@@ -461,13 +530,17 @@ Similarity options: `"cosine"` | `"euclidean"` | `"dotProduct"`.
 Expires documents automatically after a fixed duration:
 
 ```ts
-export default Migration.alter(Session, {
-  addTTLIndex: [{ column: "created_at", expireAfterSeconds: 86400 }], // 24 h
-}, {
-  down() {
-    this.dropTTLIndex("created_at");
+export default Migration.alter(
+  Session,
+  {
+    addTTLIndex: [{ column: "created_at", expireAfterSeconds: 86400 }], // 24 h
   },
-});
+  {
+    down() {
+      this.dropTTLIndex("created_at");
+    },
+  },
+);
 ```
 
 ---
@@ -483,17 +556,21 @@ import { Migration } from "@warlock.js/cascade";
 import { Team } from "app/teams/models/team";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  addForeign: [
-    { column: "team_id",  references: Team,     onDelete: "cascade" },
-    { column: "owner_id", references: "users",  on: "id", onDelete: "setNull" },
-  ],
-}, {
-  down() {
-    this.dropForeign("team_id",  Team.table);
-    this.dropForeign("owner_id", "users");
+export default Migration.alter(
+  User,
+  {
+    addForeign: [
+      { column: "team_id", references: Team, onDelete: "cascade" },
+      { column: "owner_id", references: "users", on: "id", onDelete: "setNull" },
+    ],
   },
-});
+  {
+    down() {
+      this.dropForeign("team_id", Team.table);
+      this.dropForeign("owner_id", "users");
+    },
+  },
+);
 ```
 
 `onDelete` / `onUpdate` values: `"cascade"` | `"restrict"` | `"setNull"` | `"noAction"`. Both default to `"restrict"` when omitted.
@@ -501,23 +578,27 @@ export default Migration.alter(User, {
 Drop by constraint name when you named it manually:
 
 ```ts
-dropForeign: [{ columnOrConstraint: "fk_my_custom_name" }]
+dropForeign: [{ columnOrConstraint: "fk_my_custom_name" }];
 ```
 
 ### CHECK constraints — `addCheck` / `dropCheck`
 
 ```ts
-export default Migration.alter(Product, {
-  addCheck: [
-    { name: "price_positive",    expression: "price_cents >= 0" },
-    { name: "stock_non_negative", expression: "stock >= 0" },
-  ],
-}, {
-  down() {
-    this.dropCheck("price_positive");
-    this.dropCheck("stock_non_negative");
+export default Migration.alter(
+  Product,
+  {
+    addCheck: [
+      { name: "price_positive", expression: "price_cents >= 0" },
+      { name: "stock_non_negative", expression: "stock >= 0" },
+    ],
   },
-});
+  {
+    down() {
+      this.dropCheck("price_positive");
+      this.dropCheck("stock_non_negative");
+    },
+  },
+);
 ```
 
 ---
@@ -527,16 +608,20 @@ export default Migration.alter(Product, {
 Use `raw` when you need a one-off SQL statement alongside declarative changes (e.g. backfilling a new column in the same migration when the table is small):
 
 ```ts
-export default Migration.alter(User, {
-  add: {
-    full_name: text().nullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      full_name: text().nullable(),
+    },
+    raw: `UPDATE users SET full_name = first_name || ' ' || last_name`,
   },
-  raw: `UPDATE users SET full_name = first_name || ' ' || last_name`,
-}, {
-  down() {
-    this.dropColumn("full_name");
+  {
+    down() {
+      this.dropColumn("full_name");
+    },
   },
-});
+);
 ```
 
 Pass an array for multiple statements:
@@ -545,7 +630,7 @@ Pass an array for multiple statements:
 raw: [
   `UPDATE users SET status = 'active' WHERE status IS NULL`,
   `UPDATE users SET role = 'member' WHERE role IS NULL`,
-]
+];
 ```
 
 ---
@@ -554,24 +639,24 @@ raw: [
 
 `Migration.alter` **never** auto-infers rollback. Supply `down()` in options whenever you want `cascade migrate:rollback` to work. Inside `down()`, `this` is a full `Migration` instance — every class-form builder is available:
 
-| Operation | Class-form call in `down()` |
-|---|---|
-| Drop an added column | `this.dropColumn("name")` |
-| Re-add a dropped column | `this.text("name").nullable()` |
-| Undo a rename | `this.renameColumn("new", "old")` |
-| Undo a column modify | `this.text("col").notNullable()` |
-| Drop a plain index (by name) | `this.dropIndex("idx_name")` |
-| Drop a plain index (by columns) | `this.dropIndex(["col_a", "col_b"])` |
-| Drop a unique constraint | `this.dropUnique("email")` or `this.dropUnique(["a", "b"])` |
-| Add a unique constraint back | `this.unique("email")` |
-| Add a plain index back | `this.index("email", "idx_name")` |
-| Drop a foreign key | `this.dropForeign("col", "ref_table")` |
-| Drop a CHECK constraint | `this.dropCheck("constraint_name")` |
-| Drop full-text index | `this.dropFullText("ft_name")` |
-| Drop geo index | `this.dropGeoIndex("column")` |
-| Drop vector index | `this.dropVectorIndex("column")` |
-| Drop TTL index | `this.dropTTLIndex("column")` |
-| Raw SQL | `this.raw("SQL statement")` |
+| Operation                       | Class-form call in `down()`                                 |
+| ------------------------------- | ----------------------------------------------------------- |
+| Drop an added column            | `this.dropColumn("name")`                                   |
+| Re-add a dropped column         | `this.text("name").nullable()`                              |
+| Undo a rename                   | `this.renameColumn("new", "old")`                           |
+| Undo a column modify            | `this.text("col").notNullable()`                            |
+| Drop a plain index (by name)    | `this.dropIndex("idx_name")`                                |
+| Drop a plain index (by columns) | `this.dropIndex(["col_a", "col_b"])`                        |
+| Drop a unique constraint        | `this.dropUnique("email")` or `this.dropUnique(["a", "b"])` |
+| Add a unique constraint back    | `this.unique("email")`                                      |
+| Add a plain index back          | `this.index("email", "idx_name")`                           |
+| Drop a foreign key              | `this.dropForeign("col", "ref_table")`                      |
+| Drop a CHECK constraint         | `this.dropCheck("constraint_name")`                         |
+| Drop full-text index            | `this.dropFullText("ft_name")`                              |
+| Drop geo index                  | `this.dropGeoIndex("column")`                               |
+| Drop vector index               | `this.dropVectorIndex("column")`                            |
+| Drop TTL index                  | `this.dropTTLIndex("column")`                               |
+| Raw SQL                         | `this.raw("SQL statement")`                                 |
 
 If a migration is genuinely irreversible, throw inside `down()` so accidental rollbacks fail loudly:
 
@@ -587,28 +672,32 @@ If a migration is genuinely irreversible, throw inside `down()` so accidental ro
 
 ## Options (`MigrationAlterOptions`)
 
-| Key | Type | Purpose |
-|---|---|---|
-| `down` | `(this: Migration) => void \| Promise<void>` | Rollback logic (not auto-inferred) |
-| `up` | `(this: Migration) => void \| Promise<void>` | Extra imperative logic to run after declarative changes |
-| `order` | `number` | Execution order override (default `0`) |
-| `createdAt` | `string` | ISO timestamp override for migration name ordering |
-| `transactional` | `boolean` | Wrap the migration in a DB transaction |
+| Key             | Type                                         | Purpose                                                 |
+| --------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `down`          | `(this: Migration) => void \| Promise<void>` | Rollback logic (not auto-inferred)                      |
+| `up`            | `(this: Migration) => void \| Promise<void>` | Extra imperative logic to run after declarative changes |
+| `order`         | `number`                                     | Execution order override (default `0`)                  |
+| `createdAt`     | `string`                                     | ISO timestamp override for migration name ordering      |
+| `transactional` | `boolean`                                    | Wrap the migration in a DB transaction                  |
 
 The `up` hook runs **after** the declarative schema changes, making it useful for data backfills or conditional DDL that depends on the added schema:
 
 ```ts
-export default Migration.alter(User, {
-  add: { verified_at: timestamp().nullable() },
-}, {
-  up() {
-    // backfill: mark existing confirmed users as verified
-    this.raw(`UPDATE users SET verified_at = updated_at WHERE status = 'confirmed'`);
+export default Migration.alter(
+  User,
+  {
+    add: { verified_at: timestamp().nullable() },
   },
-  down() {
-    this.dropColumn("verified_at");
+  {
+    up() {
+      // backfill: mark existing confirmed users as verified
+      this.raw(`UPDATE users SET verified_at = updated_at WHERE status = 'confirmed'`);
+    },
+    down() {
+      this.dropColumn("verified_at");
+    },
   },
-});
+);
 ```
 
 ---
@@ -622,48 +711,58 @@ import { Migration, uuid } from "@warlock.js/cascade";
 import { Team } from "app/teams/models/team";
 import { User } from "../user.model";
 
-export default Migration.alter(User, {
-  add: {
-    team_id: uuid().nullable(),
+export default Migration.alter(
+  User,
+  {
+    add: {
+      team_id: uuid().nullable(),
+    },
+    addForeign: [{ column: "team_id", references: Team, onDelete: "setNull" }],
+    addIndex: [{ columns: "team_id" }],
   },
-  addForeign: [
-    { column: "team_id", references: Team, onDelete: "setNull" },
-  ],
-  addIndex: [{ columns: "team_id" }],
-}, {
-  down() {
-    this.dropForeign("team_id", Team.table);
-    this.dropIndex("team_id");
-    this.dropColumn("team_id");
+  {
+    down() {
+      this.dropForeign("team_id", Team.table);
+      this.dropIndex("team_id");
+      this.dropColumn("team_id");
+    },
   },
-});
+);
 ```
 
 ### Swap unique → plain index
 
 ```ts
-export default Migration.alter(User, {
-  dropUnique: [["email"]],
-  addIndex:   [{ columns: "email", name: "users_email_index" }],
-}, {
-  down() {
-    this.dropIndex("users_email_index");
-    this.unique("email");
+export default Migration.alter(
+  User,
+  {
+    dropUnique: [["email"]],
+    addIndex: [{ columns: "email", name: "users_email_index" }],
   },
-});
+  {
+    down() {
+      this.dropIndex("users_email_index");
+      this.unique("email");
+    },
+  },
+);
 ```
 
 ### Rename + widen a column
 
 ```ts
-export default Migration.alter(Post, {
-  rename: { body: "content" },
-  modify: { content: text().notNullable() },
-}, {
-  down() {
-    this.renameColumn("content", "body");
+export default Migration.alter(
+  Post,
+  {
+    rename: { body: "content" },
+    modify: { content: text().notNullable() },
   },
-});
+  {
+    down() {
+      this.renameColumn("content", "body");
+    },
+  },
+);
 ```
 
 ### Multiple operations in one migration
@@ -671,22 +770,26 @@ export default Migration.alter(Post, {
 Combine freely — all operations run in a single `up()` call:
 
 ```ts
-export default Migration.alter(Product, {
-  add:    { sku: text().unique().notNullable() },
-  drop:   ["old_code"],
-  rename: { price: "price_cents" },
-  modify: { price_cents: integer().notNullable() },
-  addIndex:  [{ columns: ["category_id", "status"], name: "idx_cat_status" }],
-  addCheck:  [{ name: "price_non_negative", expression: "price_cents >= 0" }],
-}, {
-  down() {
-    this.dropCheck("price_non_negative");
-    this.dropIndex("idx_cat_status");
-    this.renameColumn("price_cents", "price");
-    this.text("old_code").nullable();
-    this.dropColumn("sku");
+export default Migration.alter(
+  Product,
+  {
+    add: { sku: text().unique().notNullable() },
+    drop: ["old_code"],
+    rename: { price: "price_cents" },
+    modify: { price_cents: integer().notNullable() },
+    addIndex: [{ columns: ["category_id", "status"], name: "idx_cat_status" }],
+    addCheck: [{ name: "price_non_negative", expression: "price_cents >= 0" }],
   },
-});
+  {
+    down() {
+      this.dropCheck("price_non_negative");
+      this.dropIndex("idx_cat_status");
+      this.renameColumn("price_cents", "price");
+      this.text("old_code").nullable();
+      this.dropColumn("sku");
+    },
+  },
+);
 ```
 
 ---
@@ -768,12 +871,12 @@ export class User extends Model<UserSchema> {
 
 // Write
 const user = await User.create({ name: "Ada Lovelace", email: "ada@example.com" });
-user.id;                  // generated ID — direct property
-user.get("status");        // "active" — default fired
+user.id; // generated ID — direct property
+user.get("status"); // "active" — default fired
 
 // Read
 const found = await User.find(user.id);
-found?.get("email");       // "ada@example.com"
+found?.get("email"); // "ada@example.com"
 
 // Filter
 const active = await User.where("status", "active").get();
@@ -782,22 +885,22 @@ const page = await User.paginate({ page: 1, limit: 20 });
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Defining a model class — schema, decorators, `Model<TSchema>`, accessors | The `define-model` topic |
-| Querying — `.where`, `.find`, `.first`, `.all`, `.count`, `.exists`, ordering | The `query-data` topic |
-| Pagination — `.paginate`, `cursorPaginate`, `chunk` | The `paginate-results` topic |
-| Relations — `belongsTo` / `hasMany` / `belongsToMany`, eager loading | The `define-relations` topic |
-| Migrations — `migration` definition, `up`/`down`, CLI | The `write-migration` topic |
-| Transactions — `transaction(fn)`, rollback, isolation | The `manage-transactions` topic |
-| Dirty tracking — `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues` | The `track-changes` topic |
-| Lifecycle hooks — `saving`, `saved`, `deleting`, `deleted` | The `subscribe-to-model-events` topic |
-| Soft / hard / trash deletes + restore | The `configure-delete-strategy` topic |
-| Atomic ops — `Model.increase`, `decrease`, `atomic`, `Model.delete(filter)` | The `perform-atomic-ops` topic |
-| Aggregates — `.sum`, `.avg`, `.count`, `.groupBy`, `.having` | The `aggregate-data` topic |
-| Vector search — `similarTo`, pgvector / Atlas vector index | The `search-by-vector` topic |
-| Multiple databases — `connectToDatabase`, per-model `static dataSource` | The `manage-data-sources` topic |
-| CLI + Operations API — `cascade migrate`, `migrate:rollback`, programmatic | The `run-cascade-cli` topic |
+| If the task is about…                                                                    | Load                                  |
+| ---------------------------------------------------------------------------------------- | ------------------------------------- |
+| Defining a model class — schema, decorators, `Model<TSchema>`, accessors                 | The `define-model` topic              |
+| Querying — `.where`, `.find`, `.first`, `.all`, `.count`, `.exists`, ordering            | The `query-data` topic                |
+| Pagination — `.paginate`, `cursorPaginate`, `chunk`                                      | The `paginate-results` topic          |
+| Relations — `belongsTo` / `hasMany` / `belongsToMany`, eager loading                     | The `define-relations` topic          |
+| Migrations — `migration` definition, `up`/`down`, CLI                                    | The `write-migration` topic           |
+| Transactions — `transaction(fn)`, rollback, isolation                                    | The `manage-transactions` topic       |
+| Dirty tracking — `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues` | The `track-changes` topic             |
+| Lifecycle hooks — `saving`, `saved`, `deleting`, `deleted`                               | The `subscribe-to-model-events` topic |
+| Soft / hard / trash deletes + restore                                                    | The `configure-delete-strategy` topic |
+| Atomic ops — `Model.increase`, `decrease`, `atomic`, `Model.delete(filter)`              | The `perform-atomic-ops` topic        |
+| Aggregates — `.sum`, `.avg`, `.count`, `.groupBy`, `.having`                             | The `aggregate-data` topic            |
+| Vector search — `similarTo`, pgvector / Atlas vector index                               | The `search-by-vector` topic          |
+| Multiple databases — `connectToDatabase`, per-model `static dataSource`                  | The `manage-data-sources` topic       |
+| CLI + Operations API — `cascade migrate`, `migrate:rollback`, programmatic               | The `run-cascade-cli` topic           |
 
 ## Things NOT to do
 
@@ -824,11 +927,11 @@ description: 'Pick the delete behavior — `permanent` (hard delete), `soft` (se
 
 `DeleteStrategy` is `"permanent" | "soft" | "trash"`.
 
-| Strategy | Behavior | Reversible? |
-| --- | --- | --- |
-| `permanent` | DELETE the row / document (the default fallback) | No |
-| `soft` | Set the `deletedAt` column; the row stays in the table | Yes — via `Model.restore(id)` |
-| `trash` | Move the record to a separate table / collection, then delete the original | Yes — via `Model.restore(id)` |
+| Strategy    | Behavior                                                                   | Reversible?                   |
+| ----------- | -------------------------------------------------------------------------- | ----------------------------- |
+| `permanent` | DELETE the row / document (the default fallback)                           | No                            |
+| `soft`      | Set the `deletedAt` column; the row stays in the table                     | Yes — via `Model.restore(id)` |
+| `trash`     | Move the record to a separate table / collection, then delete the original | Yes — via `Model.restore(id)` |
 
 ## Set the default per-model
 
@@ -849,9 +952,9 @@ When the strategy resolves to `"soft"`, `Migration.create(Model, { … })` adds 
 ## Override per-call
 
 ```ts
-await user.destroy();                            // uses the model's strategy
-await user.destroy({ strategy: "permanent" });   // GDPR-compliant hard delete
-await user.destroy({ strategy: "trash" });       // move to the trash table
+await user.destroy(); // uses the model's strategy
+await user.destroy({ strategy: "permanent" }); // GDPR-compliant hard delete
+await user.destroy({ strategy: "trash" }); // move to the trash table
 ```
 
 Resolution order: `destroy({ strategy })` → `static deleteStrategy` → data source `defaultDeleteStrategy` → `"permanent"`.
@@ -863,10 +966,10 @@ After a `"soft"` destroy the in-memory instance reflects the change — `model.g
 Restore is a **static** operation keyed by the record's id. It auto-detects whether the record was soft-deleted or trashed:
 
 ```ts
-const user = await User.restore(123);            // clears deletedAt or pulls from trash; fires "restored"
+const user = await User.restore(123); // clears deletedAt or pulls from trash; fires "restored"
 const user2 = await User.restore(123, { onIdConflict: "fail" });
 
-await User.restoreAll();                          // restore every deleted record for this model
+await User.restoreAll(); // restore every deleted record for this model
 ```
 
 There is no instance `user.restore()` — call `User.restore(id)`. `restoreAll(options?)` restores all soft-deleted (or all trashed) records for the model's table.
@@ -904,7 +1007,7 @@ export class User extends Model<UserSchema> {
 With that scope in place:
 
 ```ts
-await User.all();                                          // active only (scope applied)
+await User.all(); // active only (scope applied)
 await User.query().withoutGlobalScope("notDeleted").get(); // active + soft-deleted
 await User.query().withoutGlobalScope("notDeleted").whereNotNull("deletedAt").get(); // only deleted
 ```
@@ -995,10 +1098,10 @@ export class User extends Model<UserSchema> {
 ## Read state — `.id`, `.uuid`, and `.get(field)`
 
 ```ts
-user.id;                   // direct property — ID is so common cascade exposes it directly
-user.uuid;                 // the same id, narrowed to `string` (see below)
-user.get("status");        // canonical reader for every other column
-user.get<number>("age");   // TypeScript generic for typed reads
+user.id; // direct property — ID is so common cascade exposes it directly
+user.uuid; // the same id, narrowed to `string` (see below)
+user.get("status"); // canonical reader for every other column
+user.get<number>("age"); // TypeScript generic for typed reads
 ```
 
 Use the direct `.id` property; use `.get("field")` for everything else. Add a typed getter on the model class when the same field is read in many places — turns N typed-cast call sites into one named accessor.
@@ -1007,18 +1110,20 @@ Use the direct `.id` property; use `.get("field")` for everything else. Add a ty
 
 Both getters return the model's primary id (`this.get("id")`); the only difference is the **static type**:
 
-| Accessor | Return type | Use when |
-|---|---|---|
-| `model.id` | `string \| number` | You want the real id type — SQL auto-increment is `number`, MongoDB's ObjectId is `string`. |
-| `model.uuid` | `string` | You want to pass the id to code typed for a single `string` id, without leaking the engine's `string \| number` union everywhere. |
+| Accessor     | Return type        | Use when                                                                                                                          |
+| ------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `model.id`   | `string \| number` | You want the real id type — SQL auto-increment is `number`, MongoDB's ObjectId is `string`.                                       |
+| `model.uuid` | `string`           | You want to pass the id to code typed for a single `string` id, without leaking the engine's `string \| number` union everywhere. |
 
 `uuid` does **not** validate or coerce the value to a UUID — the name is historical. It simply returns the same id, typed as `string`, so a helper typed for a string id accepts it on either engine:
 
 ```ts
-function shareLink(modelId: string) { /* ... */ }
+function shareLink(modelId: string) {
+  /* ... */
+}
 
-shareLink(user.uuid);  // ✓ typechecks on both Postgres and MongoDB
-shareLink(user.id);    // ✗ TS error on SQL: `number` is not assignable to `string`
+shareLink(user.uuid); // ✓ typechecks on both Postgres and MongoDB
+shareLink(user.id); // ✗ TS error on SQL: `number` is not assignable to `string`
 ```
 
 ## Write — three update idioms
@@ -1041,7 +1146,7 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 
 The everyday case. Service takes `Partial<UserSchema>` from a request body, merges it into the instance, saves. Existing fields not in the object are untouched.
 
-**Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an *existing* record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
+**Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an _existing_ record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
 
 ### `.save()` after manual mutation — when changes are spread
 
@@ -1057,11 +1162,11 @@ await user.save();
 
 Quick reference:
 
-| Situation | Pattern |
-| --- | --- |
-| 1–2 specific fields | `user.set(k, v).save()` |
-| Bulk from an object | `user.merge(data).save()` |
-| After spread mutations | `user.save()` |
+| Situation              | Pattern                   |
+| ---------------------- | ------------------------- |
+| 1–2 specific fields    | `user.set(k, v).save()`   |
+| Bulk from an object    | `user.merge(data).save()` |
+| After spread mutations | `user.save()`             |
 
 ## Remove a field — `.unset(field)`
 
@@ -1206,7 +1311,7 @@ export class User extends Model<UserSchema> {
 
   @BelongsToMany("Role", {
     pivot: "user_roles",
-    localKey: "user_id",   // pivot column → this model (User)
+    localKey: "user_id", // pivot column → this model (User)
     foreignKey: "role_id", // pivot column → the related model (Role)
   })
   public roles!: Role[];
@@ -1220,12 +1325,12 @@ export class User extends Model<UserSchema> {
 Manage pivot rows through `model.pivot(relation)`, which returns the relation's `PivotOperations` handle:
 
 ```ts
-await user.pivot("roles").attach([adminId, editorId]);             // add (skips existing)
+await user.pivot("roles").attach([adminId, editorId]); // add (skips existing)
 await user.pivot("roles").attach([adminId], { addedBy: actorId }); // + extra pivot columns
-await user.pivot("roles").detach([editorId]);                      // remove a subset
-await user.pivot("roles").detach();                                // remove all
-await user.pivot("roles").sync([adminId]);                         // replace the whole set
-await user.pivot("roles").toggle([adminId]);                       // flip each id
+await user.pivot("roles").detach([editorId]); // remove a subset
+await user.pivot("roles").detach(); // remove all
+await user.pivot("roles").sync([adminId]); // replace the whole set
+await user.pivot("roles").toggle([adminId]); // flip each id
 ```
 
 `model.attach(relation, ids, pivotData?)` and `model.detach(relation, ids?)` are thin shortcuts for the two most common ops; `.sync()` / `.toggle()` live only on the `pivot(relation)` handle (or the standalone `createPivotOperations(model, relation)`). Passing a non-`belongsToMany` relation throws. Routing through `model.pivot(relation)` keeps the join-table `.sync()` distinct from `Model.sync(Target, field)` (the denormalization-embed feature). Pivot ops run direct driver writes — no model lifecycle events fire on the related model.
@@ -1238,7 +1343,7 @@ Load related models in the same query, avoiding N+1:
 const posts = await Post.with("author").get();
 
 for (const post of posts) {
-  post.getRelation("author");   // already loaded — no second query
+  post.getRelation("author"); // already loaded — no second query
 }
 ```
 
@@ -1260,11 +1365,9 @@ await User.with("posts.comments").get();
 Filter parents based on conditions on children:
 
 ```ts
-const usersWithPublishedPosts = await User
-  .whereHas("posts", (query) => {
-    query.where("status", "published");
-  })
-  .get();
+const usersWithPublishedPosts = await User.whereHas("posts", (query) => {
+  query.where("status", "published");
+}).get();
 ```
 
 `.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z."
@@ -1287,8 +1390,8 @@ Why not `post.set("author", currentUser)`? `set` treats the value as a column wr
 ```ts
 const post = await Post.with("author").first();
 
-post.getRelation("author");     // typed access to the loaded User
-post.author;                    // direct field — only if you declared it as a typed field
+post.getRelation("author"); // typed access to the loaded User
+post.author; // direct field — only if you declared it as a typed field
 
 // Without eager loading — load on demand, then read:
 await post.load("author");
@@ -1302,10 +1405,7 @@ const author = post.getRelation("author");
 `.with()` runs separate queries and hydrates relations. `.joinWith()` joins at the SQL/aggregation level:
 
 ```ts
-const result = await User
-  .joinWith("posts")
-  .where("posts.status", "published")
-  .get();
+const result = await User.joinWith("posts").where("posts.status", "published").get();
 ```
 
 Use `.joinWith` when you need conditions across both tables in a single query. Use `.with` when you want hydrated relation models without joining.
@@ -1604,9 +1704,12 @@ Throwing works too (and re-throws to the caller); `ctx.rollback()` is the non-th
 Default is the driver's default (typically `READ COMMITTED`). Request a different level via `isolationLevel`:
 
 ```ts
-await transaction(async () => {
-  /* ... */
-}, { isolationLevel: "SERIALIZABLE" });
+await transaction(
+  async () => {
+    /* ... */
+  },
+  { isolationLevel: "SERIALIZABLE" },
+);
 ```
 
 On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurrent transactions conflict — wrap in retry logic at the caller.
@@ -1616,21 +1719,24 @@ On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurre
 Pass `settings` to configure PostgreSQL values only for the current transaction. This is useful for row-level security context, timeouts, and schema selection; Cascade applies each value with parameterized `set_config(..., true)`, so it cannot leak back into the pool:
 
 ```ts
-await transaction(async () => {
-  await Invoice.query().get();
-}, {
-  settings: {
-    "app.tenant_id": tenantId,
-    statement_timeout: 5_000,
+await transaction(
+  async () => {
+    await Invoice.query().get();
   },
-});
+  {
+    settings: {
+      "app.tenant_id": tenantId,
+      statement_timeout: 5_000,
+    },
+  },
+);
 ```
 
 ## Row locking — `lockForUpdate({ skipLocked })` (Postgres)
 
 Chain `lockForUpdate()` on any query to emit `SELECT ... FOR UPDATE`: the matched rows are locked until the transaction ends, so no other transaction can modify or lock them. Only meaningful **inside** a transaction — outside one the lock releases immediately.
 
-`{ skipLocked: true }` adds `SKIP LOCKED` — rows another transaction already holds are silently skipped instead of waited on. That is the standard concurrent queue-claim shape: N workers each grab *different* pending rows with no double-processing and no blocking.
+`{ skipLocked: true }` adds `SKIP LOCKED` — rows another transaction already holds are silently skipped instead of waited on. That is the standard concurrent queue-claim shape: N workers each grab _different_ pending rows with no double-processing and no blocking.
 
 ```ts
 import { transaction } from "@warlock.js/cascade";
@@ -1696,7 +1802,7 @@ const { rows: counts } = await dataSource.raw<{ count: number }>(
 
 ### Native-array columns (`JSONB[]` / `TEXT[]` / `INTEGER[]`)
 
-From a value alone the serializer can't tell a `json` / `jsonb` column (which needs JSON text) from a genuine **native-array** column (`arrayJson()` → `JSONB[]`, `arrayText()` → `TEXT[]`, …, which needs the raw JS array so node-pg emits a `{...}` literal). Guess wrong and Postgres rejects the insert with *"malformed array literal"*.
+From a value alone the serializer can't tell a `json` / `jsonb` column (which needs JSON text) from a genuine **native-array** column (`arrayJson()` → `JSONB[]`, `arrayText()` → `TEXT[]`, …, which needs the raw JS array so node-pg emits a `{...}` literal). Guess wrong and Postgres rejects the insert with _"malformed array literal"_.
 
 **This is handled automatically.** On connect the driver introspects `information_schema` once and remembers which columns are native arrays **per table**, so `arrayText()` / `arrayJson()` columns just work with **no configuration**. Because it's per-table, the same column name being `TEXT[]` in one table and `jsonb` in another is encoded correctly for each; the pgvector all-number array form is still preserved.
 
@@ -1763,8 +1869,8 @@ The everyday case for listings with page numbers:
 ```ts
 const page = await User.paginate({ page: 1, limit: 20 });
 
-page.data;        // User[]
-page.pagination;  // { total, page, limit, pages }
+page.data; // User[]
+page.pagination; // { total, page, limit, pages }
 ```
 
 `PaginationOptions` is `{ page?, limit? }` — there is no `filter` field; filter by chaining `.where()` before `.paginate()` (below).
@@ -1772,9 +1878,7 @@ page.pagination;  // { total, page, limit, pages }
 Chain off `.where()` for filtered pagination:
 
 ```ts
-const activePage = await User
-  .where("status", "active")
-  .paginate({ page: 2, limit: 20 });
+const activePage = await User.where("status", "active").paginate({ page: 2, limit: 20 });
 ```
 
 **Cost characteristic.** Offset pagination scans `offset + limit` rows on every page — page 100 with limit 20 scans 2020 rows just to skip 2000. Fine for the first few pages; not great deep in the result set.
@@ -1786,9 +1890,9 @@ For very large datasets where deep pagination matters:
 ```ts
 const first = await User.query().orderBy("created_at", "desc").cursorPaginate({ limit: 20 });
 
-first.data;                   // User[]
-first.pagination.nextCursor;  // opaque value — pass to the next call
-first.pagination.hasMore;     // boolean
+first.data; // User[]
+first.pagination.nextCursor; // opaque value — pass to the next call
+first.pagination.hasMore; // boolean
 
 const next = await User.query()
   .orderBy("created_at", "desc")
@@ -1894,10 +1998,13 @@ Signature: `Model.increase(filter, field, amount)` / `Model.decrease(filter, fie
 ## Arbitrary atomic mutations — `Model.atomic`
 
 ```ts
-await User.atomic({ id: userId }, {
-  $set: { last_seen: new Date() },
-  $inc: { login_count: 1 },
-});
+await User.atomic(
+  { id: userId },
+  {
+    $set: { last_seen: new Date() },
+    $inc: { login_count: 1 },
+  },
+);
 ```
 
 `Model.atomic(filter, operations)` → `Promise<number>`. Driver-flavored atomic mutation — MongoDB has `$set` / `$inc` / `$push` / `$pull` natively; the Postgres driver supports `$set` / `$unset` / `$inc` / `$dec` (and `$setOnInsert` on upsert) and throws `UnsupportedUpdateOperationError` for the rest. Use when you need to combine multiple field changes atomically without loading the model first.
@@ -1923,7 +2030,11 @@ const granted = await Quota.atomic(
 
 // MongoDB only: pipeline update, $addToSet, arrayFilters
 await Post.findOneAndUpdate({ slug }, [{ $set: { score: { $add: ["$likes", "$shares"] } } }]);
-await Post.atomic({ slug }, { $set: { "grades.$[low].score": 50 } }, { arrayFilters: [{ "low.score": { $lt: 50 } }] });
+await Post.atomic(
+  { slug },
+  { $set: { "grades.$[low].score": 50 } },
+  { arrayFilters: [{ "low.score": { $lt: 50 } }] },
+);
 ```
 
 - `atomic(filter, update, { upsert?, arrayFilters?, trustedFilter? })` → modified + upserted count.
@@ -1931,6 +2042,7 @@ await Post.atomic({ slug }, { $set: { "grades.$[low].score": 50 } }, { arrayFilt
 - `findAndUpdate(filter, update, { upsert?, arrayFilters? })`. No `trustedFilter`, because it reads the rows back with `where(filter)`.
 
 **Postgres.** An upsert runs as `INSERT … ON CONFLICT (target) DO UPDATE … RETURNING *`. The target is the primary key, or a unique index, whose columns are ALL equality keys of the filter. Other filter conditions become `DO UPDATE … WHERE`. If the row exists and fails them, nothing is written and `findOneAndUpdate` returns `null`. The driver throws `UnsupportedUpdateOperationError` (`.operation`, `.driver`) for:
+
 - pipeline updates
 - `arrayFilters`
 - `$push`, `$pull`, `$addToSet` and unknown operators
@@ -1973,10 +2085,7 @@ const rows = await OrderItem.createMany(millionRows, { bulk: true, batchSize: 10
 ## Bulk update — `Model.findAndUpdate(filter, operations)`
 
 ```ts
-const updated = await User.findAndUpdate(
-  { status: "pending" },
-  { $set: { status: "active" } },
-);
+const updated = await User.findAndUpdate({ status: "pending" }, { $set: { status: "active" } });
 // updated: User[] — the matched-and-updated models
 ```
 
@@ -1987,8 +2096,8 @@ const updated = await User.findAndUpdate(
 ## Bulk delete — `Model.delete(filter)`
 
 ```ts
-await User.delete({ status: "spam" });      // delete all matching → count
-await User.deleteOne({ status: "spam" });   // delete the first match → count
+await User.delete({ status: "spam" }); // delete all matching → count
+await User.deleteOne({ status: "spam" }); // delete the first match → count
 ```
 
 `Model.delete(filter?)` and `Model.deleteOne(filter?)` both return `Promise<number>`. These bypass the per-instance delete strategy and `deleted` events — they are raw driver deletes.
@@ -2004,16 +2113,16 @@ for (const user of targets) {
 
 ## When to reach for what
 
-| Task | Reach for |
-| --- | --- |
-| Increment a counter | `Model.increase(filter, field, n)` |
-| Atomically change multiple fields on one record | `Model.atomic(filter, ops)` |
-| Insert N records | `Model.createMany(rows)` |
-| Insert a large batch fast (no per-row events) | `Model.createMany(rows, { bulk: true, batchSize })` |
-| Update many rows with operators | `Model.findAndUpdate(filter, { $set: {...} })` |
-| Update one record by id | `Model.update(id, data)` |
-| Delete many rows (raw) | `Model.delete(filter)` |
-| Multi-row read-modify-write | Wrap in a transaction (see the `manage-transactions` topic) |
+| Task                                            | Reach for                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| Increment a counter                             | `Model.increase(filter, field, n)`                            |
+| Atomically change multiple fields on one record | `Model.atomic(filter, ops)`                                   |
+| Insert N records                                | `Model.createMany(rows)`                                      |
+| Insert a large batch fast (no per-row events)   | `Model.createMany(rows, { bulk: true, batchSize })`           |
+| Update many rows with operators                 | `Model.findAndUpdate(filter, { $set: {...} })`                |
+| Update one record by id                         | `Model.update(id, data)`                                      |
+| Delete many rows (raw)                          | `Model.delete(filter)`                                        |
+| Multi-row read-modify-write                     | Wrap in a transaction (see the `manage-transactions` topic)   |
 | Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()` |
 
 ## Things NOT to do
@@ -2055,9 +2164,9 @@ const activeUsers = await User.where("status", "active").get();
 ### Operators
 
 ```ts
-const adults     = await User.where("age", ">", 18).get();
-const recent     = await User.where("created_at", ">=", lastWeek).get();
-const nonAdmins  = await User.where("role", "!=", "admin").get();
+const adults = await User.where("age", ">", 18).get();
+const recent = await User.where("created_at", ">=", lastWeek).get();
+const nonAdmins = await User.where("role", "!=", "admin").get();
 ```
 
 3-argument form. Common operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `notIn`, `like`, `between`. Same syntax across MongoDB and Postgres.
@@ -2065,10 +2174,7 @@ const nonAdmins  = await User.where("role", "!=", "admin").get();
 ### Compound conditions
 
 ```ts
-const activeAdmins = await User
-  .where("status", "active")
-  .where("role", "admin")
-  .get();
+const activeAdmins = await User.where("status", "active").where("role", "admin").get();
 ```
 
 Chained `.where()` calls combine with `AND`.
@@ -2093,7 +2199,7 @@ await User.first({ email, password }); // throws UnsafeFilterError if password i
 
 ```ts
 query.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }); // object form — MongoDB
-query.whereRaw("age > ?", [30]);                             // string form — SQL, real bindings
+query.whereRaw("age > ?", [30]); // string form — SQL, real bindings
 ```
 
 The **object form** is checked like any other filter value, plus it rejects the server-side-JavaScript operators `$where`, `$function` and `$accumulator` anywhere in the expression (throws `UnsafeRawExpressionError`); `$expr` and the other aggregation operators keep working. The **string form on the MongoDB driver throws `UnsafeRawExpressionError`** — a string used to compile to `{ $where: "<js>" }`, executing arbitrary JavaScript inside `mongod` per scanned document; there is no safe way to parameterize that, so it's rejected outright. Use the object form instead. SQL drivers keep string mode with real `?` bindings (unchanged).
@@ -2103,15 +2209,15 @@ The **object form** is checked like any other filter value, plus it rejects the 
 ### By ID
 
 ```ts
-const user = await User.find(id);  // User | null
+const user = await User.find(id); // User | null
 ```
 
 ### First match
 
 ```ts
-const anyUser    = await User.first();                              // first user, any
-const firstAdmin = await User.first({ role: "admin" });             // first admin
-const filtered   = await User.where("status", "active").first();    // chain into .first()
+const anyUser = await User.first(); // first user, any
+const firstAdmin = await User.first({ role: "admin" }); // first admin
+const filtered = await User.where("status", "active").first(); // chain into .first()
 ```
 
 `.first()` with no args returns the very first record (driver-dependent default order). With a filter object, the first match by equality. Chain off `.where()` when you need operators.
@@ -2129,10 +2235,7 @@ Throws when nothing matches — useful when you KNOW it should exist and want th
 ## Order and paginate
 
 ```ts
-const newest = await User
-  .where("status", "active")
-  .orderBy("created_at", "desc")
-  .get();
+const newest = await User.where("status", "active").orderBy("created_at", "desc").get();
 ```
 
 `.orderBy(field, "asc" | "desc")` sorts. Default direction is `"asc"`. Chain multiple `.orderBy()` for tiebreakers.
@@ -2151,11 +2254,11 @@ rows[0].name; // typed as UserSchema, not a User instance
 ## Count and existence
 
 ```ts
-const total       = await User.count();
+const total = await User.count();
 const activeCount = await User.count({ status: "active" });
-const adminCount  = await User.where("role", "admin").count();
+const adminCount = await User.where("role", "admin").count();
 
-const hasAdmin    = await User.where("role", "admin").exists();      // boolean, short-circuits
+const hasAdmin = await User.where("role", "admin").exists(); // boolean, short-circuits
 const noneBlocked = await User.where("status", "blocked").notExists();
 ```
 
@@ -2164,7 +2267,7 @@ const noneBlocked = await User.where("status", "blocked").notExists();
 ## Get many — `.all(filter?)`
 
 ```ts
-const allUsers    = await User.all();
+const allUsers = await User.all();
 const activeUsers = await User.all({ status: "active" });
 ```
 
@@ -2176,19 +2279,19 @@ const activeUsers = await User.all({ status: "active" });
 
 Cascade's query builder has around 60 methods. Reach for these as the need arises:
 
-| Reach for | When |
-| --- | --- |
-| `.whereIn(field, values)` / `.whereNotIn(field, values)` | Match against / exclude a list |
-| `.whereNull(field)` / `.whereNotNull(field)` | Nullability checks |
-| `.whereBetween(field, [a, b])` | Inclusive range |
-| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch` | Pattern matching — see below for literal-vs-regex semantics |
-| `.whereHas(relation, callback)` | Filter by conditions on a related model |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)` | Aggregates — the `aggregate-data` topic |
-| `.distinct(field)` / `.pluck(field)` | Single-field reads (distinct values, flat list) |
-| `.chunk(size, callback)` | Stream a large table in batches |
-| `.cursorPaginate({ limit, cursor })` | Cursor pagination — the `paginate-results` topic |
-| `.similarTo(column, embedding)` | Vector similarity — the `search-by-vector` topic |
+| Reach for                                                                              | When                                                        |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `.whereIn(field, values)` / `.whereNotIn(field, values)`                               | Match against / exclude a list                              |
+| `.whereNull(field)` / `.whereNotNull(field)`                                           | Nullability checks                                          |
+| `.whereBetween(field, [a, b])`                                                         | Inclusive range                                             |
+| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers                                                |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`  | Pattern matching — see below for literal-vs-regex semantics |
+| `.whereHas(relation, callback)`                                                        | Filter by conditions on a related model                     |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                          | Aggregates — the `aggregate-data` topic                     |
+| `.distinct(field)` / `.pluck(field)`                                                   | Single-field reads (distinct values, flat list)             |
+| `.chunk(size, callback)`                                                               | Stream a large table in batches                             |
+| `.cursorPaginate({ limit, cursor })`                                                   | Cursor pagination — the `paginate-results` topic            |
+| `.similarTo(column, embedding)`                                                        | Vector similarity — the `search-by-vector` topic            |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 
@@ -2271,6 +2374,7 @@ cascade migrate:export-sql      # write .up.sql / .down.sql instead of executing
 ```
 
 Flags:
+
 - `migrate` — `-f/--fresh` (drop everything and re-run), `-s/--sql` (export SQL instead of executing), `--pending-only`, `-c/--compact`, `-p/--path <glob>`
 - `migrate:rollback` — `-a/--all` (roll back everything), `--batches N`, `-p/--path <glob>`
 - `migrate:export-sql` — `--pending-only`, `-c/--compact`, `-p/--path <glob>`
@@ -2354,16 +2458,16 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 
 ## Common task → command
 
-| You want to… | Command |
-|---|---|
-| Run all pending migrations | `cascade migrate` |
-| Drop everything and re-run | `cascade migrate -f` |
-| Roll back the last batch | `cascade migrate:rollback` |
-| Roll back everything | `cascade migrate:rollback --all` |
-| Generate SQL without executing | `cascade migrate --sql` |
-| Generate SQL for pending only | `cascade migrate --sql --pending-only` |
-| See what's been executed | `cascade migrate:list` |
-| Run from a non-default folder | `cascade migrate -p "<glob>"` |
+| You want to…                   | Command                                |
+| ------------------------------ | -------------------------------------- |
+| Run all pending migrations     | `cascade migrate`                      |
+| Drop everything and re-run     | `cascade migrate -f`                   |
+| Roll back the last batch       | `cascade migrate:rollback`             |
+| Roll back everything           | `cascade migrate:rollback --all`       |
+| Generate SQL without executing | `cascade migrate --sql`                |
+| Generate SQL for pending only  | `cascade migrate --sql --pending-only` |
+| See what's been executed       | `cascade migrate:list`                 |
+| Run from a non-default folder  | `cascade migrate -p "<glob>"`          |
 
 ## Things NOT to do
 
@@ -2477,7 +2581,10 @@ async function answer(question: string) {
   // optional: drop low-similarity hits in code
   const relevant = context.filter((document) => document.score >= 0.75);
 
-  const prompt = buildPrompt(question, relevant.map((document) => document.body));
+  const prompt = buildPrompt(
+    question,
+    relevant.map((document) => document.body),
+  );
   return ai.complete(prompt);
 }
 ```
@@ -2486,11 +2593,11 @@ A score threshold isn't a query option — filter on the `score` column in code 
 
 ## Driver support
 
-| Driver | Vector |
-| --- | --- |
-| Postgres (with `CREATE EXTENSION vector`) | ✅ pgvector + IVFFlat index |
+| Driver                                         | Vector                               |
+| ---------------------------------------------- | ------------------------------------ |
+| Postgres (with `CREATE EXTENSION vector`)      | ✅ pgvector + IVFFlat index          |
 | MongoDB Atlas (paid tier + Atlas Search index) | ✅ `$vectorSearch` aggregation stage |
-| MongoDB community / self-hosted / local | ❌ Atlas-only |
+| MongoDB community / self-hosted / local        | ❌ Atlas-only                        |
 
 For local dev with MongoDB, develop the vector path against Postgres + pgvector.
 
@@ -2537,18 +2644,18 @@ Listeners are async-aware — the model's persistence awaits the listener before
 
 The events fire in this order. The **gerund** form (`saving`, `creating`) is the "before" hook — there is no `beforeSave` alias.
 
-| Event | Fires |
-| --- | --- |
-| `saving` | Before validation, on every `save()` (both insert and update paths) |
-| `validating` / `validated` | Around schema validation |
-| `creating` | Before a new record is inserted (first save) |
-| `updating` | Before an existing record's update is written |
-| `saved` | After a successful write (any branch — insert or update) |
-| `created` | After a new record is inserted |
-| `updated` | After an existing record's update is written |
-| `deleting` / `deleted` | Before / after the delete strategy runs |
-| `restoring` / `restored` | Before / after a soft-deleted or trashed record is restored |
-| `fetching` / `fetched` / `hydrating` | Around reads / instance hydration |
+| Event                                | Fires                                                               |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| `saving`                             | Before validation, on every `save()` (both insert and update paths) |
+| `validating` / `validated`           | Around schema validation                                            |
+| `creating`                           | Before a new record is inserted (first save)                        |
+| `updating`                           | Before an existing record's update is written                       |
+| `saved`                              | After a successful write (any branch — insert or update)            |
+| `created`                            | After a new record is inserted                                      |
+| `updated`                            | After an existing record's update is written                        |
+| `deleting` / `deleted`               | Before / after the delete strategy runs                             |
+| `restoring` / `restored`             | Before / after a soft-deleted or trashed record is restored         |
+| `fetching` / `fetched` / `hydrating` | Around reads / instance hydration                                   |
 
 `saving` fires for both inserts and updates; `creating` / `updating` narrow to the branch. So `saved` always fires; exactly one of `created` / `updated` follows.
 
@@ -2627,7 +2734,7 @@ Model.on("updated", async (instance) => {
 });
 ```
 
-Use `updated` (not `saved`) when you only want change diffs — `getDirtyColumnsWithValues()` is still populated in the post-write events because the tracker resets *after* they fire.
+Use `updated` (not `saved`) when you only want change diffs — `getDirtyColumnsWithValues()` is still populated in the post-write events because the tracker resets _after_ they fire.
 
 ### Cache invalidation
 
@@ -2674,11 +2781,11 @@ Every Cascade model carries a dirty tracker that records which fields you've cha
 ## The main reads
 
 ```ts
-user.hasChanges();           // boolean — any field changed (or removed)?
-user.isDirty("email");       // boolean — specifically this column?
+user.hasChanges(); // boolean — any field changed (or removed)?
+user.isDirty("email"); // boolean — specifically this column?
 
-user.getDirtyColumns();      // string[] — names of changed columns
-user.getRemovedColumns();    // string[] — columns explicitly unset since load
+user.getDirtyColumns(); // string[] — names of changed columns
+user.getRemovedColumns(); // string[] — columns explicitly unset since load
 
 user.getDirtyColumnsWithValues();
 // Record<string, { oldValue, newValue }> — the full diff, old + new per column
@@ -2723,9 +2830,9 @@ await AuditLog.create({
 
 ```ts
 user.set("name", "Augusta");
-user.isDirty("name");        // true
+user.isDirty("name"); // true
 await user.save();
-user.isDirty("name");        // false — tracker reset to the just-saved state
+user.isDirty("name"); // false — tracker reset to the just-saved state
 ```
 
 `save()` resets the tracker's baseline to the persisted state. Subsequent `isDirty()` checks measure changes since the last `save()`, not since the original load.
@@ -2767,12 +2874,12 @@ for (const [field, { oldValue, newValue }] of Object.entries(dirty)) {
 
 ```ts
 // plain object → merged key-by-key, siblings survive
-user.merge({ profile: { age: 26 } });     // profile.city untouched
-user.getDirtyColumns();                    // ["profile.age"]
+user.merge({ profile: { age: 26 } }); // profile.city untouched
+user.getDirtyColumns(); // ["profile.age"]
 
 // Date → replaced, not merged
 conversation.merge({ lastOutboundAt: new Date() });
-conversation.getDirtyColumns();            // ["lastOutboundAt"]
+conversation.getDirtyColumns(); // ["lastOutboundAt"]
 ```
 
 :::note[Fixed in 4.9.1]
@@ -2924,10 +3031,10 @@ Class-form builders include `createTable()` / `createTableIfNotExists()`, `dropT
 `this.foreignId(name)` (5.8+) derives the column's type from `migrationDefaults.primaryKey` so a foreign-key column always matches the type of the `id` it points at, instead of hardcoding one:
 
 | `migrationDefaults.primaryKey` | `foreignId` produces |
-| --- | --- |
-| `uuid` | `uuid` column |
-| `bigInt` | `bigInteger` column |
-| anything else (default) | `integer` column |
+| ------------------------------ | -------------------- |
+| `uuid`                         | `uuid` column        |
+| `bigInt`                       | `bigInteger` column  |
+| anything else (default)        | `integer` column     |
 
 ```ts
 import { Migration } from "@warlock.js/cascade";

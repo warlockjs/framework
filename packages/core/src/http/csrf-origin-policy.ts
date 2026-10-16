@@ -100,7 +100,7 @@ export function isAllowedCsrfOrigin(origin: string, request: Request): boolean {
 
   const normalized = normalizeOrigin(origin);
 
-  return allowedOrigins.some(allowed => normalizeOrigin(allowed) === normalized);
+  return allowedOrigins.some((allowed) => normalizeOrigin(allowed) === normalized);
 }
 
 /**

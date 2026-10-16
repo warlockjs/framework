@@ -36,12 +36,12 @@ The promise rejects if no reply arrives within `timeout` ms. Pick a sane number 
 
 ## When to use it vs HTTP
 
-| Use HTTP | Use request/respond |
-| --- | --- |
+| Use HTTP                        | Use request/respond                         |
+| ------------------------------- | ------------------------------------------- |
 | Stateless, fast, idempotent ops | Slow / queued ops where the caller can wait |
-| Public API surface | Internal service-to-service |
-| Frontend consumption | Backend orchestration |
-| Synchronous user-facing flow | Async-but-needs-result patterns |
+| Public API surface              | Internal service-to-service                 |
+| Frontend consumption            | Backend orchestration                       |
+| Synchronous user-facing flow    | Async-but-needs-result patterns             |
 
 The bus adds queue persistence and retry. HTTP is faster for sub-100ms ops; the bus shines when the operation has variable duration or needs a queue's backpressure.
 

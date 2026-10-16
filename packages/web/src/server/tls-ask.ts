@@ -36,7 +36,7 @@ export function createTlsAskHandler({ sites, resolveHost, resolveCache }: TlsAsk
 
     const host = normalizeHost(domain);
     const fixedHost = Object.values(sites).some(
-      site => "hosts" in site && site.hosts.includes(host),
+      (site) => "hosts" in site && site.hosts.includes(host),
     );
 
     if (fixedHost) return { status: 200 };

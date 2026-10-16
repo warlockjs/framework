@@ -61,7 +61,7 @@ export class UnionValidator extends BaseValidator {
     const validators = (opts?.validators ?? []) as BaseValidator[];
 
     return {
-      oneOf: validators.map(v => v.toJsonSchema(target)),
+      oneOf: validators.map((v) => v.toJsonSchema(target)),
     };
   }
 }

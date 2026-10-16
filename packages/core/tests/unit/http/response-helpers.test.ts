@@ -65,10 +65,7 @@ describe("Response — parse()", () => {
   it("maps over arrays, parsing each item", async () => {
     const response = new Response();
 
-    const value = [
-      { toJSON: () => ({ a: 1 }) },
-      { toJSON: () => ({ b: 2 }) },
-    ];
+    const value = [{ toJSON: () => ({ a: 1 }) }, { toJSON: () => ({ b: 2 }) }];
 
     expect(await response.parse(value)).toEqual([{ a: 1 }, { b: 2 }]);
   });

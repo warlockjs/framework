@@ -54,13 +54,13 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 `.merge()` copies each key from the object into the instance's pending state (only the keys present), then `.save()` persists. Existing fields not in the object are untouched. A typical update service in your codebase looks exactly like that one line.
 
 :::note[Safe by design against id-spoofing]
-`user.merge(req.body); await user.save();` is exactly this idiom, and `req.body` is attacker-controlled — so on an **already-persisted** instance, `.merge()` drops identity columns (`id`, `_id`, whatever `static primaryKey` names) instead of applying them. A body carrying `{ id: "<victim-id>", role: "admin" }` can't redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey`, the id captured when the instance became persisted (hydration, or right after an insert) — never the current in-memory value, so a post-merge mutation of `id` can't change what gets written. Identity columns are also excluded from the generated `$set`/`$unset`, so an explicit `user.set("id", ...)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only guards an *existing* record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. To deliberately change a primary key, go through the [atomic/raw APIs](../digging-deeper/atomic-operations.md) instead of `merge()`.
+`user.merge(req.body); await user.save();` is exactly this idiom, and `req.body` is attacker-controlled — so on an **already-persisted** instance, `.merge()` drops identity columns (`id`, `_id`, whatever `static primaryKey` names) instead of applying them. A body carrying `{ id: "<victim-id>", role: "admin" }` can't redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey`, the id captured when the instance became persisted (hydration, or right after an insert) — never the current in-memory value, so a post-merge mutation of `id` can't change what gets written. Identity columns are also excluded from the generated `$set`/`$unset`, so an explicit `user.set("id", ...)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only guards an _existing_ record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. To deliberately change a primary key, go through the [atomic/raw APIs](../digging-deeper/atomic-operations.md) instead of `merge()`.
 :::
 
 **Nested values follow one rule:** plain objects are merged key-by-key, so siblings survive; everything else — primitives, arrays, and class instances such as `Date`, `Map`, `Set`, `RegExp` — replaces the old value outright.
 
 ```ts
-await user.merge({ profile: { age: 26 } }).save();   // profile.city untouched
+await user.merge({ profile: { age: 26 } }).save(); // profile.city untouched
 await user.merge({ lastSeenAt: new Date() }).save(); // replaces the previous Date
 ```
 
@@ -94,15 +94,15 @@ Without `await user.save()`, your changes live only on the instance and never re
 
 ### Quick reference
 
-| Situation | Pattern | Notes |
-| --------- | ------- | ----- |
-| 1–2 specific fields | `user.set(k, v).save()` | Reads like a sentence |
-| Bulk from an object | `user.merge(data).save()` | The update-service idiom |
-| After spread mutations | `user.save()` | Easy to forget the await |
+| Situation              | Pattern                   | Notes                    |
+| ---------------------- | ------------------------- | ------------------------ |
+| 1–2 specific fields    | `user.set(k, v).save()`   | Reads like a sentence    |
+| Bulk from an object    | `user.merge(data).save()` | The update-service idiom |
+| After spread mutations | `user.save()`             | Easy to forget the await |
 
 ## Remove a field — `.unset()`
 
-Sometimes you want a field *gone* — not set to `null` or `""`, but actually removed from the record. That's `.unset()`:
+Sometimes you want a field _gone_ — not set to `null` or `""`, but actually removed from the record. That's `.unset()`:
 
 ```ts
 await user.unset("image").save();
@@ -110,7 +110,7 @@ await user.unset("image").save();
 
 `.unset()` marks the field for removal on the next save. On Postgres, the column gets set to `NULL`. On MongoDB, the field is dropped from the document entirely.
 
-The reason this is its own idiom: "I have no image" and "image field is the empty string" mean different things. `.unset()` says "treat this field as if it was never there"; `.set("image", null)` would store an explicit null (and may fail validation if the field isn't `.optional()`). Use `unset` when you mean *gone*, not *blank*.
+The reason this is its own idiom: "I have no image" and "image field is the empty string" mean different things. `.unset()` says "treat this field as if it was never there"; `.set("image", null)` would store an explicit null (and may fail validation if the field isn't `.optional()`). Use `unset` when you mean _gone_, not _blank_.
 
 ## Delete — `.destroy()`
 
@@ -148,4 +148,5 @@ Continue to **[Querying](./02-querying.md)** for the read story — filtering, o
 - **Bulk updates and deletes** — `Model.delete(filter)` and query-builder mass mutations
 
 > **Changed in 5.21:** static `Model.delete()` with no filter now throws instead of wiping the table. Pass an explicit filter, or call `Model.deleteAll()` when you really mean every row. Static delete/update also honour global scopes.
+
 - **Dirty tracking** — knowing which fields changed before save: [Dirty tracking guide](../architecture-concepts/dirty-tracking.md)

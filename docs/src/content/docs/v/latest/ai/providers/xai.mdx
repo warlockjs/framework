@@ -21,21 +21,9 @@ workflow, and supervisor already speaks.
 ## Install
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm install @warlock.js/ai @warlock.js/ai-xai
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-xai
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-xai
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm install @warlock.js/ai @warlock.js/ai-xai ```</TabItem>
+  <TabItem label="yarn">```bash pnpm add @warlock.js/ai @warlock.js/ai-xai ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm add @warlock.js/ai @warlock.js/ai-xai ```</TabItem>
 </Tabs>
 
 ## Construct
@@ -106,13 +94,13 @@ This adapter ships xAI's own name lists — Grok ids don't match OpenAI's
 `gpt-*` / `o*` prefixes. Capabilities are injected per model before delegating;
 an explicit value always wins over inference.
 
-| Model | `vision` | `reasoning` |
-| --- | --- | --- |
-| `grok-4` | true | true (reasoning-first) |
-| `grok-3` | false | false |
-| `grok-3-mini` | false | true (the "think" variant) |
-| `grok-2-vision` | true | false |
-| `grok-2` | false | false |
+| Model           | `vision` | `reasoning`                |
+| --------------- | -------- | -------------------------- |
+| `grok-4`        | true     | true (reasoning-first)     |
+| `grok-3`        | false    | false                      |
+| `grok-3-mini`   | false    | true (the "think" variant) |
+| `grok-2-vision` | true     | false                      |
+| `grok-2`        | false    | false                      |
 
 - `vision` — inferred `true` for the `grok-4` and `grok-2-vision` prefixes; `false` otherwise.
 - `reasoning` — inferred `true` for `grok-4` and `grok-3-mini`; drives whether `reasoning.effort` is forwarded as `reasoning_effort` on the wire.

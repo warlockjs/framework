@@ -51,14 +51,14 @@ With neither `client` nor `options`, the channel reuses whatever global Sentry c
 
 This is the quota-control decision. Only the levels in `eventLevels` create Sentry **events** (which consume your error quota); every other level becomes a **breadcrumb** that rides along with the next event for free.
 
-| Logger level | Default | Sentry call |
-| --- | --- | --- |
-| `fatal` | event | `captureException` for an `Error` message, otherwise `captureMessage(…, "fatal")` |
-| `error` | event | `captureException` for an `Error` message, otherwise `captureMessage(…, "error")` |
-| `warn` | event | `captureMessage(…, "warning")` |
-| `success` | breadcrumb | `addBreadcrumb({ level: "info" })` |
-| `info` | breadcrumb | `addBreadcrumb({ level: "info" })` |
-| `debug` | breadcrumb | `addBreadcrumb({ level: "debug" })` |
+| Logger level | Default    | Sentry call                                                                       |
+| ------------ | ---------- | --------------------------------------------------------------------------------- |
+| `fatal`      | event      | `captureException` for an `Error` message, otherwise `captureMessage(…, "fatal")` |
+| `error`      | event      | `captureException` for an `Error` message, otherwise `captureMessage(…, "error")` |
+| `warn`       | event      | `captureMessage(…, "warning")`                                                    |
+| `success`    | breadcrumb | `addBreadcrumb({ level: "info" })`                                                |
+| `info`       | breadcrumb | `addBreadcrumb({ level: "info" })`                                                |
+| `debug`      | breadcrumb | `addBreadcrumb({ level: "debug" })`                                               |
 
 - **Errors keep their stack.** An `Error` message goes through `captureException`, so Sentry parses the real stack and groups correctly — the channel never pre-stringifies it.
 - **`module` / `action` become tags** and the entry's `context` becomes a structured Sentry context, both scoped to that single event via `withScope`.
@@ -101,12 +101,12 @@ The channel never crashes your app. The dynamic import failure is swallowed, the
 
 ## Options
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `client` | Sentry namespace / forwarder | — | Reuse an already-initialized Sentry instance. |
-| `options` | `SentryInitOptions` | — | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`). |
-| `eventLevels` | `LogLevel[]` | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
-| `flushTimeout` | `number` | `2000` | Milliseconds `flush()` waits for the transport to drain. |
+| Option         | Type                         | Default                      | Description                                                   |
+| -------------- | ---------------------------- | ---------------------------- | ------------------------------------------------------------- |
+| `client`       | Sentry namespace / forwarder | —                            | Reuse an already-initialized Sentry instance.                 |
+| `options`      | `SentryInitOptions`          | —                            | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`). |
+| `eventLevels`  | `LogLevel[]`                 | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs.           |
+| `flushTimeout` | `number`                     | `2000`                       | Milliseconds `flush()` waits for the transport to drain.      |
 
 Plus everything from `BasicLogConfigurations` (`levels`, `filter`, `dateFormat`, `redact`).
 

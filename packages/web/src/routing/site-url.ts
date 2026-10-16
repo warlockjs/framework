@@ -23,7 +23,9 @@ type CurrentSiteResolverHost = typeof globalThis & {
 let browserSite: Pick<CurrentSite, "key" | "basePath"> | undefined;
 
 /** Connect core's ALS-backed request reader without making the client bundle import core. */
-export function connectCurrentSite(resolve: CurrentSiteResolver | undefined): CurrentSiteResolver | undefined {
+export function connectCurrentSite(
+  resolve: CurrentSiteResolver | undefined,
+): CurrentSiteResolver | undefined {
   const host = globalThis as CurrentSiteResolverHost;
   const previous = host[CURRENT_SITE_RESOLVER_SLOT];
   host[CURRENT_SITE_RESOLVER_SLOT] = resolve;
@@ -33,8 +35,14 @@ export function connectCurrentSite(resolve: CurrentSiteResolver | undefined): Cu
 /** The current site on the server; browser callers have an origin but no site key. */
 export function currentSite(): CurrentSite | undefined {
   const serverSite = (globalThis as CurrentSiteResolverHost)[CURRENT_SITE_RESOLVER_SLOT]?.();
-  if (serverSite !== undefined || typeof location === "undefined" || browserSite === undefined) return serverSite;
-  return { ...browserSite, host: location.hostname, protocol: location.protocol, port: location.port };
+  if (serverSite !== undefined || typeof location === "undefined" || browserSite === undefined)
+    return serverSite;
+  return {
+    ...browserSite,
+    host: location.hostname,
+    protocol: location.protocol,
+    port: location.port,
+  };
 }
 
 /** Hydration installs the active client site; it contains no resolver or request data. */

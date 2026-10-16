@@ -8,7 +8,10 @@ import type { OpenApiRouteInput } from "../types";
 import { openApiToPostmanCollection } from "./openapi-to-postman-collection";
 import type { PostmanFolder, PostmanItem, PostmanRequestItem } from "./postman-types";
 
-const goldenPath = path.resolve(__dirname, "../../../tests/fixtures/postman/shop-collection.golden.json");
+const goldenPath = path.resolve(
+  __dirname,
+  "../../../tests/fixtures/postman/shop-collection.golden.json",
+);
 
 function isFolder(item: PostmanItem): item is PostmanFolder {
   return "item" in item;
@@ -49,7 +52,9 @@ describe("openApiToPostmanCollection", () => {
     const collection = openApiToPostmanCollection(shopOpenApiDocument);
 
     expect(JSON.parse(JSON.stringify(collection))).toEqual(collection);
-    expect(JSON.stringify(openApiToPostmanCollection(shopOpenApiDocument))).toBe(JSON.stringify(collection));
+    expect(JSON.stringify(openApiToPostmanCollection(shopOpenApiDocument))).toBe(
+      JSON.stringify(collection),
+    );
   });
 
   it("derives a deterministic _postman_id from the title", () => {
@@ -78,12 +83,17 @@ describe("openApiToPostmanCollection", () => {
     const health = requestNamed(item, "health");
 
     expect(show.request.url.path).toEqual(["users", ":id"]);
-    expect(show.request.url.variable).toEqual([{ key: "id", value: "", description: "The user id." }]);
+    expect(show.request.url.variable).toEqual([
+      { key: "id", value: "", description: "The user id." },
+    ]);
     expect(health.request.method).toBe("GET");
   });
 
   it("emits only enabled query rows in raw and disables optional ones", () => {
-    const { url } = requestNamed(openApiToPostmanCollection(shopOpenApiDocument).item, "Show a user").request;
+    const { url } = requestNamed(
+      openApiToPostmanCollection(shopOpenApiDocument).item,
+      "Show a user",
+    ).request;
 
     expect(url.raw).toBe("{{baseUrl}}/users/:id?page=");
     expect(url.query).toEqual([
@@ -93,11 +103,18 @@ describe("openApiToPostmanCollection", () => {
   });
 
   it("sends a JSON body with a Content-Type header and a generated example", () => {
-    const { request } = requestNamed(openApiToPostmanCollection(shopOpenApiDocument).item, "Create a user");
+    const { request } = requestNamed(
+      openApiToPostmanCollection(shopOpenApiDocument).item,
+      "Create a user",
+    );
 
-    expect(request.header).toEqual([{ key: "Content-Type", value: "application/json", type: "text" }]);
+    expect(request.header).toEqual([
+      { key: "Content-Type", value: "application/json", type: "text" },
+    ]);
     expect(request.body).toMatchObject({ mode: "raw", options: { raw: { language: "json" } } });
-    expect(request.body && "raw" in request.body ? JSON.parse(request.body.raw) : undefined).toEqual({
+    expect(
+      request.body && "raw" in request.body ? JSON.parse(request.body.raw) : undefined,
+    ).toEqual({
       email: "user@example.com",
       name: "string",
       role: "admin",
@@ -107,7 +124,10 @@ describe("openApiToPostmanCollection", () => {
   });
 
   it("turns a multipart body into formdata with a file row and no explicit Content-Type", () => {
-    const { request } = requestNamed(openApiToPostmanCollection(shopOpenApiDocument).item, "Upload an avatar");
+    const { request } = requestNamed(
+      openApiToPostmanCollection(shopOpenApiDocument).item,
+      "Upload an avatar",
+    );
 
     expect(request.header).toEqual([]);
     expect(request.body).toEqual({
@@ -133,11 +153,17 @@ describe("openApiToPostmanCollection", () => {
 
     const { request } = requestNamed(openApiToPostmanCollection(document).item, "Create a user");
 
-    expect(request.body).toEqual({ mode: "urlencoded", urlencoded: [{ key: "name", value: "string", type: "text" }] });
+    expect(request.body).toEqual({
+      mode: "urlencoded",
+      urlencoded: [{ key: "name", value: "string", type: "text" }],
+    });
   });
 
   it("saves one response per declared status with status text, code and an example body", () => {
-    const { response } = requestNamed(openApiToPostmanCollection(shopOpenApiDocument).item, "Create a user");
+    const { response } = requestNamed(
+      openApiToPostmanCollection(shopOpenApiDocument).item,
+      "Create a user",
+    );
 
     expect(response.map((saved) => [saved.code, saved.status])).toEqual([
       [201, "Created"],
@@ -152,9 +178,15 @@ describe("openApiToPostmanCollection", () => {
   });
 
   it("cuts the resource cycle in saved response bodies", () => {
-    const { response } = requestNamed(openApiToPostmanCollection(shopOpenApiDocument).item, "Show a user");
+    const { response } = requestNamed(
+      openApiToPostmanCollection(shopOpenApiDocument).item,
+      "Show a user",
+    );
 
-    expect(JSON.parse(defined(response[0], "200 response").body)).toMatchObject({ id: 0, friends: [] });
+    expect(JSON.parse(defined(response[0], "200 response").body)).toMatchObject({
+      id: 0,
+      friends: [],
+    });
     expect(JSON.parse(defined(response[0], "200 response").body)).not.toHaveProperty("parent");
   });
 
@@ -197,16 +229,21 @@ describe("openApiToPostmanCollection", () => {
   it("falls back to localhost and honours the baseUrl and title options", () => {
     const { servers: _servers, ...withoutServers } = shopOpenApiDocument;
 
-    expect(openApiToPostmanCollection(withoutServers).variable[0]?.value).toBe("http://localhost:3000");
-    expect(openApiToPostmanCollection(shopOpenApiDocument, { baseUrl: "http://x.test:1/" }).variable[0]?.value).toBe(
-      "http://x.test:1",
+    expect(openApiToPostmanCollection(withoutServers).variable[0]?.value).toBe(
+      "http://localhost:3000",
     );
+    expect(
+      openApiToPostmanCollection(shopOpenApiDocument, { baseUrl: "http://x.test:1/" }).variable[0]
+        ?.value,
+    ).toBe("http://x.test:1");
   });
 
   it("converts a document built from real routes", () => {
     const middleware = () => undefined;
 
-    Object.defineProperty(middleware, Symbol.for("warlock.auth"), { value: { sources: ["header"], userTypes: [] } });
+    Object.defineProperty(middleware, Symbol.for("warlock.auth"), {
+      value: { sources: ["header"], userTypes: [] },
+    });
 
     const handler = Object.assign(() => undefined, {
       validation: { schema: v.object({ email: v.string().required() }) },
@@ -215,7 +252,11 @@ describe("openApiToPostmanCollection", () => {
     const { document } = buildOpenApiDocument(
       [
         { method: "POST", path: "/users", handler, middleware: [middleware] },
-        { method: "GET", path: "/users/:id", handler: (() => undefined) as unknown as OpenApiRouteInput["handler"] },
+        {
+          method: "GET",
+          path: "/users/:id",
+          handler: (() => undefined) as unknown as OpenApiRouteInput["handler"],
+        },
       ],
       { info: { title: "App", version: "1.0.0" }, servers: ["http://localhost:2030"] },
     );
@@ -226,7 +267,9 @@ describe("openApiToPostmanCollection", () => {
     expect(isFolder(folder) && folder.name).toBe("users");
     expect(collection.auth?.type).toBe("bearer");
     expect(requestNamed(collection.item, "post_users").request.body).toMatchObject({ mode: "raw" });
-    expect(requestNamed(collection.item, "get_users_id").request.url.raw).toBe("{{baseUrl}}/users/:id");
+    expect(requestNamed(collection.item, "get_users_id").request.url.raw).toBe(
+      "{{baseUrl}}/users/:id",
+    );
     expect(requestNamed(collection.item, "get_users_id").request.auth).toEqual({ type: "noauth" });
   });
 });

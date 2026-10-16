@@ -8,7 +8,7 @@ sidebar:
 
 A **connector** is the framework's adapter for a subsystem that has a lifecycle — connect at boot, restart on config change, disconnect cleanly at exit. The database, the HTTP server, the cache, storage, the mailer, the logger, the message broker (herald), the socket server, notifications, the authorization layer (access), and the AI toolkit (ai) are each owned by one. The framework starts them in priority order around your app code, and tears them down in reverse order on shutdown.
 
-This is the catalog page: it names every built-in, tells you the one rule that governs whether a connector does anything (the config file), and lists the priorities and phases at a glance. For the boot *sequence* in detail — and for writing your own connector — see [Bootstrap and connectors](./bootstrap-and-connectors.md).
+This is the catalog page: it names every built-in, tells you the one rule that governs whether a connector does anything (the config file), and lists the priorities and phases at a glance. For the boot _sequence_ in detail — and for writing your own connector — see [Bootstrap and connectors](./bootstrap-and-connectors.md).
 
 ## The 30-second look
 
@@ -37,7 +37,7 @@ So you never "attach" a connector to enable a feature. You drop the matching `sr
 
 This is the point people get wrong, so it's worth being blunt: there is **no config flag that detaches a connector**. The constructor of `ConnectorsManager` runs `this.register(new LoggerConnector())`, `new DatabaseConnector()`, and so on through all ten — every time, in every app.
 
-What the config file controls is whether the connector *does anything when its `start()` runs*:
+What the config file controls is whether the connector _does anything when its `start()` runs_:
 
 ```ts title="src/connectors/database-connector.ts (shape)"
 public async start(): Promise<void> {
@@ -59,20 +59,20 @@ Every built-in follows this pattern. The storage connector (`storage`) skips the
 
 All ten connectors, in priority order (lower starts first). The **public name** is the value the connector registers under (used in logs and the registry) — note that the priority **constant** for herald is `COMMUNICATOR`, but the connector's runtime name is `"herald"`.
 
-| Priority | Public name     | Class                    | Phase | Watches                          | What it wires                                                                                 |
-| -------- | --------------- | ------------------------ | ----- | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| 0        | `logger`        | `LoggerConnector`        | Early | `src/config/log.ts`              | `setLogConfigurations(...)`; flushes synchronously on shutdown so final lines hit disk        |
-| 1        | `mailer`        | `MailerConnector`        | Early | `src/config/mail.ts`, `.env`     | `setMailConfigurations(...)`; `closeAllMailers()` on shutdown to release SMTP pools           |
-| 2        | `database`      | `DatabaseConnector`      | Early | `src/config/database.ts`         | `connectToDatabase(...)` (Cascade); stores the `DataSource` in the container at `"database.source"` |
-| 3        | `herald`        | `HeraldConnector`        | Early | `src/config/herald.ts`           | lazy-imports `@warlock.js/herald`, `connectToBroker(...)` (message broker / queues)           |
-| 4        | `cache`         | `CacheConnector`         | Early | `src/config/cache.ts`            | `cache.setCacheConfigurations(...)` then `await cache.init()`                                  |
-| 5        | `http`          | `HttpConnector`          | Late  | `src/config/http.ts`             | builds Fastify in `boot()`, scans the router in `start()`, stores the instance at `"http.server"` |
-| 6        | `storage`       | `StorageConnector`       | Early | `src/config/storage.ts`          | `loadS3()` (lazy AWS SDK) then `await storage.init()`                                          |
-| 7        | `socket`        | `SocketConnector`        | Late  | `src/config/socket.ts`           | lazy-imports `socket.io`, builds the Socket.IO `Server` in `boot()`, stores it at `"socket"`   |
-| 8        | `notifications` | `NotificationsConnector` | Early | `src/config/notifications.ts`    | lazy-imports `@warlock.js/notifications`, `setNotificationConfig(...)`                          |
-| 9        | `access`        | `AccessConnector`        | Early | `src/config/access.ts`           | lazy-imports `@warlock.js/access`, `setAccessConfig(...)` — validates a resolver is present so a misconfigured authorization layer fails at STARTUP |
-| 10       | `ai`            | `AiConnector`            | Early | `src/config/ai.ts`               | lazy-imports `@warlock.js/ai`, `ai.config(...)` from the ejected `config/ai.ts`; satellite side-effect imports at the top of that file register their surface first |
-| 5.5      | `web`           | `WebConnector` (`@warlock.js/web`) | Late  | —                        | registers page routes (dev: discovered and loaded through Vite; production: read from the build's page manifest); mounts Vite in middleware mode in dev |
+| Priority | Public name     | Class                              | Phase | Watches                       | What it wires                                                                                                                                                       |
+| -------- | --------------- | ---------------------------------- | ----- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0        | `logger`        | `LoggerConnector`                  | Early | `src/config/log.ts`           | `setLogConfigurations(...)`; flushes synchronously on shutdown so final lines hit disk                                                                              |
+| 1        | `mailer`        | `MailerConnector`                  | Early | `src/config/mail.ts`, `.env`  | `setMailConfigurations(...)`; `closeAllMailers()` on shutdown to release SMTP pools                                                                                 |
+| 2        | `database`      | `DatabaseConnector`                | Early | `src/config/database.ts`      | `connectToDatabase(...)` (Cascade); stores the `DataSource` in the container at `"database.source"`                                                                 |
+| 3        | `herald`        | `HeraldConnector`                  | Early | `src/config/herald.ts`        | lazy-imports `@warlock.js/herald`, `connectToBroker(...)` (message broker / queues)                                                                                 |
+| 4        | `cache`         | `CacheConnector`                   | Early | `src/config/cache.ts`         | `cache.setCacheConfigurations(...)` then `await cache.init()`                                                                                                       |
+| 5        | `http`          | `HttpConnector`                    | Late  | `src/config/http.ts`          | builds Fastify in `boot()`, scans the router in `start()`, stores the instance at `"http.server"`                                                                   |
+| 6        | `storage`       | `StorageConnector`                 | Early | `src/config/storage.ts`       | `loadS3()` (lazy AWS SDK) then `await storage.init()`                                                                                                               |
+| 7        | `socket`        | `SocketConnector`                  | Late  | `src/config/socket.ts`        | lazy-imports `socket.io`, builds the Socket.IO `Server` in `boot()`, stores it at `"socket"`                                                                        |
+| 8        | `notifications` | `NotificationsConnector`           | Early | `src/config/notifications.ts` | lazy-imports `@warlock.js/notifications`, `setNotificationConfig(...)`                                                                                              |
+| 9        | `access`        | `AccessConnector`                  | Early | `src/config/access.ts`        | lazy-imports `@warlock.js/access`, `setAccessConfig(...)` — validates a resolver is present so a misconfigured authorization layer fails at STARTUP                 |
+| 10       | `ai`            | `AiConnector`                      | Early | `src/config/ai.ts`            | lazy-imports `@warlock.js/ai`, `ai.config(...)` from the ejected `config/ai.ts`; satellite side-effect imports at the top of that file register their surface first |
+| 5.5      | `web`           | `WebConnector` (`@warlock.js/web`) | Late  | —                             | registers page routes (dev: discovered and loaded through Vite; production: read from the build's page manifest); mounts Vite in middleware mode in dev             |
 
 `web` is not one of the framework's built-ins above — it's registered by `warlock add web`, which wires it into `warlock.config.ts > connectors`. Its priority (`5.5`) sits deliberately between `http` (5) and `storage` (6): its `boot()` needs the Fastify instance `http.boot()` just published in the container, and reverse-priority teardown closes Vite before the HTTP server does.
 
@@ -88,25 +88,25 @@ A few notes worth calling out:
 
 Each connector is a thin lifecycle adapter — it reads its config and hands it to one subsystem's setup function. The actual DRIVER selection (which cache store, which storage disk, which mail transport, which database/broker driver) happens INSIDE that subsystem via its config, not in the connector. The herald/notifications/access connectors additionally lazy-import their package, which is what keeps those packages optional peers.
 
-| Connector       | Adapts (package / runtime) | Driver layer (selected via config)            | Driver docs                                                  |
-| --------------- | -------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
-| logger          | `@warlock.js/logger`       | log channels                                  | Logger topic / [Logging](../digging-deeper/logging.md)      |
-| mailer          | core mail layer            | SMTP / AWS SES transports                     | [Mail](../digging-deeper/mail.md)                           |
-| database        | `@warlock.js/cascade`      | DataSource driver (mongodb/postgres/mysql)    | Cascade topic                                               |
-| herald          | `@warlock.js/herald`       | broker driver (`heraldConfig.driver`)         | Herald topic                                                |
-| cache           | `@warlock.js/cache`        | cache driver (memory/redis/file/pg/…)         | Cache topic                                                 |
-| http            | Fastify                    | — (plugins: cors/cookies/upload/rate-limit)   | [Request lifecycle](./01-the-request-lifecycle.md)          |
-| storage         | core storage layer         | disk driver (local/s3/r2/spaces)              | [Storage](../digging-deeper/storage.md)                     |
-| socket          | socket.io                  | —                                             | [Sockets](../digging-deeper/socket.md)                      |
-| notifications   | `@warlock.js/notifications`| optional queue worker + broker                | Notifications topic                                         |
-| access          | `@warlock.js/access`       | authorization resolver                        | Access topic                                                |
-| ai              | `@warlock.js/ai`           | model providers (openai/google/anthropic/…) + satellite packages | AI topic                                 |
+| Connector     | Adapts (package / runtime)  | Driver layer (selected via config)                               | Driver docs                                            |
+| ------------- | --------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| logger        | `@warlock.js/logger`        | log channels                                                     | Logger topic / [Logging](../digging-deeper/logging.md) |
+| mailer        | core mail layer             | SMTP / AWS SES transports                                        | [Mail](../digging-deeper/mail.md)                      |
+| database      | `@warlock.js/cascade`       | DataSource driver (mongodb/postgres/mysql)                       | Cascade topic                                          |
+| herald        | `@warlock.js/herald`        | broker driver (`heraldConfig.driver`)                            | Herald topic                                           |
+| cache         | `@warlock.js/cache`         | cache driver (memory/redis/file/pg/…)                            | Cache topic                                            |
+| http          | Fastify                     | — (plugins: cors/cookies/upload/rate-limit)                      | [Request lifecycle](./01-the-request-lifecycle.md)     |
+| storage       | core storage layer          | disk driver (local/s3/r2/spaces)                                 | [Storage](../digging-deeper/storage.md)                |
+| socket        | socket.io                   | —                                                                | [Sockets](../digging-deeper/socket.md)                 |
+| notifications | `@warlock.js/notifications` | optional queue worker + broker                                   | Notifications topic                                    |
+| access        | `@warlock.js/access`        | authorization resolver                                           | Access topic                                           |
+| ai            | `@warlock.js/ai`            | model providers (openai/google/anthropic/…) + satellite packages | AI topic                                               |
 
 ## Early vs Late phases
 
 Connectors boot in two passes around your app code, gated by `ConnectorLifecyclePhase`:
 
-- **`Early`** (the default) — runs **before** your `main.ts` / `routes.ts` / `events.ts` / model files import. These are the subsystems your code needs *at import time*: the database must be connected before a model registers its schema, the logger must exist before a module logs. Nine of the eleven built-ins are Early.
+- **`Early`** (the default) — runs **before** your `main.ts` / `routes.ts` / `events.ts` / model files import. These are the subsystems your code needs _at import time_: the database must be connected before a model registers its schema, the logger must exist before a module logs. Nine of the eleven built-ins are Early.
 - **`Late`** — runs **after** your app code imports, because it reads what that code just registered. Only `http` (scans the router your `routes.ts` files populated) and `socket` (reads HTTP's instance) are Late.
 
 Within a single phase the manager calls **every connector's `boot()` first, then every connector's `start()`** — that two-stage pass is what lets `socket.boot()` read the Fastify instance that `http.boot()` just created.
@@ -152,7 +152,7 @@ A connector may additionally export a `build` object (`ConnectorBuildContributio
 - **`generate(context)`** — write files into the production output directory and/or return extra entry-file import lines. Runs after the generated-imports check and before esbuild bundles. This is how `@warlock.js/web` gets its `pages` barrel imported into the generated production entry, and how it emits the page-route manifest `routes:diff` reads.
 - **`emit(context)`** — produce artifacts esbuild itself does not, such as a separate client bundle. Runs after esbuild and before `.warlock/production` is removed. `@warlock.js/web` uses this to build the hydration client.
 
-The context handed to both is deliberately narrow — the production directory, the app root, and the resolved build config, nothing that lets a heavy plugin instance or compiled pipeline live on the contribution object itself. Anything heavy is constructed *inside* the hook, after a dynamic import, so a connector's static import graph never drags Vite/esbuild plugin instances into the runtime the built app actually ships. A connector that declares an unknown key on `build` fails the build rather than being silently ignored.
+The context handed to both is deliberately narrow — the production directory, the app root, and the resolved build config, nothing that lets a heavy plugin instance or compiled pipeline live on the contribution object itself. Anything heavy is constructed _inside_ the hook, after a dynamic import, so a connector's static import graph never drags Vite/esbuild plugin instances into the runtime the built app actually ships. A connector that declares an unknown key on `build` fails the build rather than being silently ignored.
 
 ## Writing your own connector
 

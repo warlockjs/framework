@@ -50,7 +50,7 @@ export class User extends Model<UserSchema> {
 
   @BelongsToMany("Role", {
     pivot: "user_roles",
-    localKey: "user_id",   // pivot column → this model (User)
+    localKey: "user_id", // pivot column → this model (User)
     foreignKey: "role_id", // pivot column → the related model (Role)
   })
   public roles!: Role[];
@@ -64,12 +64,12 @@ export class User extends Model<UserSchema> {
 Manage pivot rows through `model.pivot(relation)`, which returns the relation's `PivotOperations` handle:
 
 ```ts
-await user.pivot("roles").attach([adminId, editorId]);             // add (skips existing)
+await user.pivot("roles").attach([adminId, editorId]); // add (skips existing)
 await user.pivot("roles").attach([adminId], { addedBy: actorId }); // + extra pivot columns
-await user.pivot("roles").detach([editorId]);                      // remove a subset
-await user.pivot("roles").detach();                                // remove all
-await user.pivot("roles").sync([adminId]);                         // replace the whole set
-await user.pivot("roles").toggle([adminId]);                       // flip each id
+await user.pivot("roles").detach([editorId]); // remove a subset
+await user.pivot("roles").detach(); // remove all
+await user.pivot("roles").sync([adminId]); // replace the whole set
+await user.pivot("roles").toggle([adminId]); // flip each id
 ```
 
 `model.attach(relation, ids, pivotData?)` and `model.detach(relation, ids?)` are thin shortcuts for the two most common ops; `.sync()` / `.toggle()` live only on the `pivot(relation)` handle (or the standalone `createPivotOperations(model, relation)`). Passing a non-`belongsToMany` relation throws. Routing through `model.pivot(relation)` keeps the join-table `.sync()` distinct from `Model.sync(Target, field)` (the denormalization-embed feature). Pivot ops run direct driver writes — no model lifecycle events fire on the related model.
@@ -82,7 +82,7 @@ Load related models in the same query, avoiding N+1:
 const posts = await Post.with("author").get();
 
 for (const post of posts) {
-  post.getRelation("author");   // already loaded — no second query
+  post.getRelation("author"); // already loaded — no second query
 }
 ```
 
@@ -104,11 +104,9 @@ await User.with("posts.comments").get();
 Filter parents based on conditions on children:
 
 ```ts
-const usersWithPublishedPosts = await User
-  .whereHas("posts", (query) => {
-    query.where("status", "published");
-  })
-  .get();
+const usersWithPublishedPosts = await User.whereHas("posts", (query) => {
+  query.where("status", "published");
+}).get();
 ```
 
 `.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z."
@@ -131,8 +129,8 @@ Why not `post.set("author", currentUser)`? `set` treats the value as a column wr
 ```ts
 const post = await Post.with("author").first();
 
-post.getRelation("author");     // typed access to the loaded User
-post.author;                    // direct field — only if you declared it as a typed field
+post.getRelation("author"); // typed access to the loaded User
+post.author; // direct field — only if you declared it as a typed field
 
 // Without eager loading — load on demand, then read:
 await post.load("author");
@@ -146,10 +144,7 @@ const author = post.getRelation("author");
 `.with()` runs separate queries and hydrates relations. `.joinWith()` joins at the SQL/aggregation level:
 
 ```ts
-const result = await User
-  .joinWith("posts")
-  .where("posts.status", "published")
-  .get();
+const result = await User.joinWith("posts").where("posts.status", "published").get();
 ```
 
 Use `.joinWith` when you need conditions across both tables in a single query. Use `.with` when you want hydrated relation models without joining.

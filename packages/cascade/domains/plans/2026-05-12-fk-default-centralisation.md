@@ -10,10 +10,10 @@
 
 The default-FK convention differs between the three relation-resolution code paths:
 
-| Code path | belongsTo default FK | Where defined |
-|-----------|---------------------|---------------|
-| `with()` (RelationLoader) | `${name}_id` (snake_case) | [`relation-loader.ts:283`](../../../@warlock.js/cascade/src/relations/relation-loader.ts:283) |
-| `joinWith()` (`applyJoinRelations`) | `${relationName}Id` (camelCase) | [`postgres-query-builder.ts:988`](../../../@warlock.js/cascade/src/drivers/postgres/postgres-query-builder.ts:988) |
+| Code path                             | belongsTo default FK            | Where defined                                                                                                                 |
+| ------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `with()` (RelationLoader)             | `${name}_id` (snake_case)       | [`relation-loader.ts:283`](../../../@warlock.js/cascade/src/relations/relation-loader.ts:283)                                 |
+| `joinWith()` (`applyJoinRelations`)   | `${relationName}Id` (camelCase) | [`postgres-query-builder.ts:988`](../../../@warlock.js/cascade/src/drivers/postgres/postgres-query-builder.ts:988)            |
 | `withCount()` (`applyCountRelations`) | `${relationName}Id` (camelCase) | [`postgres-query-builder.ts`](../../../@warlock.js/cascade/src/drivers/postgres/postgres-query-builder.ts) (added 2026-05-11) |
 
 For `hasMany`/`hasOne`/`belongsToMany`, similar drift exists — `inferForeignKey(modelName)` in RelationLoader returns camelCase `userId`, while the codebase actually uses snake_case columns (`organization_id`, `image_id`, `chat_id`).
@@ -79,13 +79,14 @@ Wrapper preprocess (private to the module):
 ```ts
 function snake(input: string): string {
   const normalised = input
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")  // "AIModel" → "AI_Model"
-    .replace(/([a-z\d])([A-Z])/g, "$1_$2");     // "BlogPost" → "Blog_Post"
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2") // "AIModel" → "AI_Model"
+    .replace(/([a-z\d])([A-Z])/g, "$1_$2"); // "BlogPost" → "Blog_Post"
   return toSnakeCase(normalised).toLowerCase();
 }
 ```
 
 Verified against:
+
 ```
 snake("User")            → "user"
 snake("BlogPost")        → "blog_post"
@@ -98,16 +99,16 @@ snake("organizationId")  → "organization_id"
 
 ### Backward-compatibility
 
-The runtime change is the default value. Anything passing `foreignKey: "..."` explicitly is unaffected. Anything relying on the defaults today is *already* operating on shaky ground because the three paths disagree — moving everyone to one consistent default fixes more than it breaks.
+The runtime change is the default value. Anything passing `foreignKey: "..."` explicitly is unaffected. Anything relying on the defaults today is _already_ operating on shaky ground because the three paths disagree — moving everyone to one consistent default fixes more than it breaks.
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | snake_case or camelCase default? | **snake_case.** Matches DB column convention used in this codebase and PG idiom. |
-| 2 | Keep `RelationLoader.inferForeignKey` as a private method or move? | **Move to `key-conventions.ts`** as a named export. Private duplication invites drift. |
-| 3 | Should the central helper read a config option (so app can flip to camelCase)? | **No, v1.** Add config later if a real consumer needs it. YAGNI now. |
-| 4 | Audit-then-fix or ship-then-fix? | **Audit first.** A grep across `src/app/**` for `belongsTo\|hasMany\|hasOne\|belongsToMany` callsites without `foreignKey` is fast and catches real regressions. |
+| #   | Question                                                                       | Recommendation                                                                                                                                                   |
+| --- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | snake_case or camelCase default?                                               | **snake_case.** Matches DB column convention used in this codebase and PG idiom.                                                                                 |
+| 2   | Keep `RelationLoader.inferForeignKey` as a private method or move?             | **Move to `key-conventions.ts`** as a named export. Private duplication invites drift.                                                                           |
+| 3   | Should the central helper read a config option (so app can flip to camelCase)? | **No, v1.** Add config later if a real consumer needs it. YAGNI now.                                                                                             |
+| 4   | Audit-then-fix or ship-then-fix?                                               | **Audit first.** A grep across `src/app/**` for `belongsTo\|hasMany\|hasOne\|belongsToMany` callsites without `foreignKey` is fast and catches real regressions. |
 
 ## Verification
 

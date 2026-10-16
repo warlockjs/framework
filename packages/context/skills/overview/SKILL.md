@@ -42,17 +42,18 @@ singleton and run them all together with a single call. Covers
 `clearAll`, `getContext` / `hasContext`.
 
 Load when several contexts apply to the same scope (request + database
-+ trace + tenant) and you'd otherwise nest `run()` calls by hand.
+
+- trace + tenant) and you'd otherwise nest `run()` calls by hand.
 
 ## Two operating modes — when to pick which
 
-| Situation | Reach for |
-| --- | --- |
-| Framework gives you a callback to wrap | `context.run(store, callback)` |
-| Framework expects middleware that returns synchronously (Express, etc.) | `context.enter(store)` |
-| You have 2+ contexts active for the same request | `contextManager.runAll(stores, callback)` |
-| Middleware-style with 2+ contexts | `contextManager.enterAll(stores)` then `clearAll()` at end |
-| You only have one context and the framework cooperates | Single `context.run(...)`. Skip the manager. |
+| Situation                                                               | Reach for                                                  |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Framework gives you a callback to wrap                                  | `context.run(store, callback)`                             |
+| Framework expects middleware that returns synchronously (Express, etc.) | `context.enter(store)`                                     |
+| You have 2+ contexts active for the same request                        | `contextManager.runAll(stores, callback)`                  |
+| Middleware-style with 2+ contexts                                       | `contextManager.enterAll(stores)` then `clearAll()` at end |
+| You only have one context and the framework cooperates                  | Single `context.run(...)`. Skip the manager.               |
 
 ## What this package deliberately doesn't do
 

@@ -45,7 +45,9 @@ describe("fs.files facade", () => {
     await fs.files.put(at("atomic.txt"), "x", { atomic: true });
     expect(await fs.files.get(at("atomic.txt"))).toBe("x");
     await fs.files.put(at("buf.bin"), Buffer.from("bytes"));
-    expect((await fs.files.get(at("buf.bin"), { encoding: null }) as Buffer).toString()).toBe("bytes");
+    expect(((await fs.files.get(at("buf.bin"), { encoding: null })) as Buffer).toString()).toBe(
+      "bytes",
+    );
   });
 
   it("create refuses to overwrite; put overwrites", async () => {

@@ -12,10 +12,7 @@ describe("cached()", () => {
       logging: false,
       // `alt` is a custom driver name (not one of the built-in keys), so the
       // literal needs a permissive cast to register alongside `memory`.
-      drivers: { memory: MemoryCacheDriver, alt: MemoryCacheDriver } as Record<
-        string,
-        DriverClass
-      >,
+      drivers: { memory: MemoryCacheDriver, alt: MemoryCacheDriver } as Record<string, DriverClass>,
       options: { memory: {}, alt: {} } as Record<string, Record<string, never>>,
     });
     await cache.init();
@@ -47,8 +44,14 @@ describe("cached()", () => {
       await getUser(1);
 
       expect(source).toHaveBeenCalledTimes(2);
-      await expect(cache.get(deriveAutoKey("user", [1]))).resolves.toEqual({ id: 1, name: "user-1" });
-      await expect(cache.get(deriveAutoKey("user", [2]))).resolves.toEqual({ id: 2, name: "user-2" });
+      await expect(cache.get(deriveAutoKey("user", [1]))).resolves.toEqual({
+        id: 1,
+        name: "user-1",
+      });
+      await expect(cache.get(deriveAutoKey("user", [2]))).resolves.toEqual({
+        id: 2,
+        name: "user-2",
+      });
     });
   });
 
@@ -155,9 +158,7 @@ describe("cached()", () => {
 
       const getter = cached(source, "stampede", "1h");
 
-      const results = await Promise.all(
-        Array.from({ length: 10 }, () => getter()),
-      );
+      const results = await Promise.all(Array.from({ length: 10 }, () => getter()));
 
       expect(calls).toBe(1);
       expect(results.every((r) => r === 1)).toBe(true);

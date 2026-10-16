@@ -119,9 +119,7 @@ export function expiresAtToTtl(expiresAt: number | Date): number {
  * - `number` / `string` (positional TTL) → `{ ttl }`
  * - already an options object → returned as-is
  */
-export function normalizeToOptions(
-  input?: CacheTtl | CacheSetOptions,
-): CacheSetOptions {
+export function normalizeToOptions(input?: CacheTtl | CacheSetOptions): CacheSetOptions {
   if (input === undefined || input === null) {
     return {};
   }
@@ -144,9 +142,7 @@ export function normalizeToOptions(
  * normalizeToRememberOptions("1h");           // { ttl: "1h" }
  * normalizeToRememberOptions({ ttl: "1h", tags: ["x"] }); // returned as-is
  */
-export function normalizeToRememberOptions(
-  input?: CacheTtl | RememberOptions,
-): RememberOptions {
+export function normalizeToRememberOptions(input?: CacheTtl | RememberOptions): RememberOptions {
   if (input === undefined || input === null) {
     return {};
   }
@@ -205,9 +201,7 @@ export function resolveTtl(
  * mergeTagSets(undefined, undefined);            // undefined
  * mergeTagSets([], []);                          // undefined
  */
-export function mergeTagSets(
-  ...lists: (string[] | undefined)[]
-): string[] | undefined {
+export function mergeTagSets(...lists: (string[] | undefined)[]): string[] | undefined {
   const flat: string[] = [];
 
   for (const list of lists) {
@@ -234,10 +228,7 @@ export function mergeTagSets(
  * injectTags({ ttl: "1h" }, ["unread"]);         // { ttl: "1h", tags: ["unread"] }
  * injectTags({ tags: ["a"] }, ["b"]);            // { tags: ["a", "b"] }
  */
-export function injectTags<T extends { tags?: string[] }>(
-  options: T,
-  extraTags: string[],
-): T {
+export function injectTags<T extends { tags?: string[] }>(options: T, extraTags: string[]): T {
   if (extraTags.length === 0) {
     return options;
   }

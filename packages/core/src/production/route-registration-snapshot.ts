@@ -119,4 +119,3 @@ function isRequestMethod(value: unknown): value is RequestMethod {
 function normalizeRequestMethod(value: RequestMethod | string): RequestMethod {
   return value.toLowerCase() === "all" ? "all" : (value.toUpperCase() as RequestMethod);
 }
-

@@ -20,7 +20,7 @@ describe("MigrationRunner.runAll — statement order", () => {
       'ALTER TABLE "users" ADD COLUMN "phone" text',
     ]);
     const B = fakeMigration("backfill-phone", "02-01-2026_10-00-00", [
-      "UPDATE \"users\" SET \"phone\" = ''",
+      'UPDATE "users" SET "phone" = \'\'',
       'ALTER TABLE "users" ALTER COLUMN "phone" SET NOT NULL',
     ]);
 

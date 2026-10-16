@@ -12,10 +12,10 @@ When you'll touch the same prefix more than a couple of times, grab a scoped han
 ```ts
 const chat = cache.namespace(`chats.${id}`, { ttl: "30d", tags: [`user.${userId}`] });
 
-await chat.set("messages.10", msg);          // chats.<id>.messages.10, 30d, user.<userId>
-await chat.set("draft", d, { ttl: "1h" });   // per-call ttl wins
-await chat.tags(["unread"]).set("ping", p);  // tags merge: user.<userId> + unread
-await chat.clear();                           // sugar for removeNamespace
+await chat.set("messages.10", msg); // chats.<id>.messages.10, 30d, user.<userId>
+await chat.set("draft", d, { ttl: "1h" }); // per-call ttl wins
+await chat.tags(["unread"]).set("ping", p); // tags merge: user.<userId> + unread
+await chat.clear(); // sugar for removeNamespace
 ```
 
 Scopes are pure views — same connection, same driver, no extra state. Per-call options always win over scope defaults; tags merge additively.
@@ -24,9 +24,9 @@ Scopes are pure views — same connection, same driver, no extra state. Per-call
 
 ```ts
 const chat = cache.namespace(`chats.${id}`, { ttl: "30d" });
-const typing = chat.namespace("typing", { ttl: "5s" });  // overrides parent ttl
+const typing = chat.namespace("typing", { ttl: "5s" }); // overrides parent ttl
 
-await typing.set("user.42", true);                       // chats.<id>.typing.user.42, 5s
+await typing.set("user.42", true); // chats.<id>.typing.user.42, 5s
 ```
 
 Nested scopes inherit defaults and can override. Tags accumulate.
@@ -41,14 +41,14 @@ Inline prefixes are still fine for one-off writes.
 
 ## Plain `removeNamespace` when you already have the prefix
 
-When you *do* know the prefix string and don't need a scoped handle for repeated reads/writes:
+When you _do_ know the prefix string and don't need a scoped handle for repeated reads/writes:
 
 ```ts
 await cache.set("user:1:profile", profile);
-await cache.set("user:1:prefs",   prefs);
+await cache.set("user:1:prefs", prefs);
 await cache.set("user:2:profile", otherProfile);
 
-await cache.removeNamespace("user.1");  // drops both user:1 entries, keeps user:2
+await cache.removeNamespace("user.1"); // drops both user:1 entries, keeps user:2
 ```
 
 Cheaper than tags (no reverse index to maintain). Every real driver supports it — memory family and `lru` by prefix-scan, `file` by directory (including dotted sibling keys like `ns.a`), `redis` by non-blocking `SCAN` (not `KEYS`), `pg` by key/`LIKE` prefix; `null` no-ops. Namespace strings are treated as data, not glob/path input — see the `pick-cache-driver` topic for the file-path-containment and redis-glob-escaping details.
@@ -71,10 +71,8 @@ options: {
 ```ts
 const feed = cache.namespace(`feed.${userId}`, { tags: [`user.${userId}`] });
 
-await feed.swr(
-  "home",
-  { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
-  () => buildHomeFeed(userId),
+await feed.swr("home", { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] }, () =>
+  buildHomeFeed(userId),
 );
 // stored at feed.<userId>.home, tagged [user.<userId>, computed]
 ```

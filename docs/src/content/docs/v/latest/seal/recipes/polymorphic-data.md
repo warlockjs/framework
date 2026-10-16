@@ -78,20 +78,20 @@ The discriminator contract is checked when you build the validator, not when you
 // 1. Missing discriminator field on some branch
 v.discriminatedUnion("type", [
   v.object({ type: v.literal("a"), x: v.string() }),
-  v.object({ y: v.string() }),                     // ❌ no "type" field
+  v.object({ y: v.string() }), // ❌ no "type" field
 ]);
 // Throws: [Seal] discriminatedUnion: branch missing discriminator field "type"
 
 // 2. Non-literal discriminator
 v.discriminatedUnion("type", [
-  v.object({ type: v.string(), x: v.string() }),   // ❌ not a v.literal
+  v.object({ type: v.string(), x: v.string() }), // ❌ not a v.literal
 ]);
 // Throws: [Seal] discriminatedUnion: discriminator "type" must be v.literal(...) on every branch
 
 // 3. Duplicate discriminator values
 v.discriminatedUnion("type", [
   v.object({ type: v.literal("a"), x: v.string() }),
-  v.object({ type: v.literal("a"), y: v.string() }),   // ❌ "a" used twice
+  v.object({ type: v.literal("a"), y: v.string() }), // ❌ "a" used twice
 ]);
 // Throws: [Seal] discriminatedUnion: duplicate discriminator value "a"
 ```
@@ -170,7 +170,7 @@ Pair with `Infer<typeof toolCall>` and TS narrows the args type inside `if (call
 `v.discriminatedUnion(...).toJsonSchema()` emits `oneOf` with each branch's own JSON Schema. Each branch's `type` discriminator becomes `properties.type.const`, so JSON-Schema-aware tooling (OpenAPI generators, AJV with discriminator support) can route as well:
 
 ```ts
-notification.toJsonSchema("openai-strict")
+notification.toJsonSchema("openai-strict");
 // → {
 //   oneOf: [
 //     { type: "object", properties: { type: { const: "email" }, to: ..., subject: ... }, required: [...], additionalProperties: false },
@@ -185,15 +185,18 @@ OpenAI strict mode accepts this shape — every branch's required fields are lis
 ## When to reach for it (and when not)
 
 **Use `v.discriminatedUnion` when:**
+
 - Multiple branches share a common tag field
 - The tag is a literal value (`v.literal(...)`) per branch
 - You want precise errors from the matched branch
 
 **Stay on `v.union` when:**
-- The branches are different *types* (string vs number vs boolean) — `matchesType` handles those well
+
+- The branches are different _types_ (string vs number vs boolean) — `matchesType` handles those well
 - There's no natural discriminator
 
 **Use a single `v.object` with `v.literal(...one-of...)` when:**
+
 - The non-discriminator fields are identical across branches — discriminator is just a tag, not a router
 
 ## Related

@@ -46,7 +46,8 @@ export class SQLGrammar {
     // Phase 3 / 4 / 5: ALTER TABLE — broken down by clause
     if (s.startsWith("ALTER TABLE")) {
       if (s.includes("ADD CONSTRAINT") && s.includes("FOREIGN KEY")) return 4;
-      if (s.includes("DROP COLUMN") || s.includes("DROP CONSTRAINT") || s.includes("ALTER COLUMN")) return 5;
+      if (s.includes("DROP COLUMN") || s.includes("DROP CONSTRAINT") || s.includes("ALTER COLUMN"))
+        return 5;
       if (s.includes("ADD COLUMN")) return 3;
       if (s.includes("ADD CONSTRAINT") && s.includes("PRIMARY KEY")) return 3;
     }
@@ -57,7 +58,11 @@ export class SQLGrammar {
     }
 
     // Phase 5: Destructive table/index operations
-    if (s.startsWith("DROP TABLE") || s.startsWith("TRUNCATE TABLE") || s.startsWith("DROP INDEX")) {
+    if (
+      s.startsWith("DROP TABLE") ||
+      s.startsWith("TRUNCATE TABLE") ||
+      s.startsWith("DROP INDEX")
+    ) {
       return 5;
     }
 
@@ -125,9 +130,7 @@ export class SQLGrammar {
    */
   public static extractExtensionName(sql: string): string | undefined {
     // Matches: CREATE EXTENSION [IF NOT EXISTS] <name>
-    const match = sql
-      .trim()
-      .match(/^CREATE\s+EXTENSION\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+    const match = sql.trim().match(/^CREATE\s+EXTENSION\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
 
     return match?.[1]?.toLowerCase();
   }

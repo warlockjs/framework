@@ -439,7 +439,11 @@ describe("server-side page cache (route.cache.serverCache)", () => {
   it("with app.url set, a foreign Host bypasses the cache and stores nothing", async () => {
     setConfig("app.url", "https://example.test");
 
-    await server.inject({ method: "GET", url: "/__scache-basic", headers: { host: "example.test" } });
+    await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { host: "example.test" },
+    });
 
     const foreign = await server.inject({
       method: "GET",
@@ -1470,7 +1474,9 @@ describe("server-side page cache (route.cache.serverCache)", () => {
       expect(renderPageRequest).toHaveBeenCalled();
 
       const report = logged.mock.calls.find(
-        (args) => typeof args[0] === "string" && args[0].startsWith("[warlock:web] page-cache lookup failed"),
+        (args) =>
+          typeof args[0] === "string" &&
+          args[0].startsWith("[warlock:web] page-cache lookup failed"),
       );
 
       expect(report).toBeDefined();

@@ -15,7 +15,8 @@ import { ai } from "@warlock.js/ai";
 const agent = ai.agent({
   model: openai.model({ name: "gpt-4o" }),
   systemPrompt: "You are a build assistant.",
-  skills: {                                   // a SkillsConfig OR an ai.skills(...) instance
+  skills: {
+    // a SkillsConfig OR an ai.skills(...) instance
     name: "build-skills",
     sources: [{ type: "directory", path: "./agent-skills" }],
   },
@@ -28,13 +29,13 @@ When `skills` is set the agent owns the runtime flow at execute time: it **prepe
 
 ```ts
 const lib = ai.skills({
-  name: "build-skills",                        // surfaced in analytics + the catalog block
+  name: "build-skills", // surfaced in analytics + the catalog block
   sources: [{ type: "directory", path: "./agent-skills" }], // >= 1; later source wins on name clash
-  inject: { select: "semantic", topK: 2, embedder },        // body-injection policy (see below)
-  maxLoadsPerRun: 4,                           // cap on loadSkill calls per run. default 5
-  scope: { tags: ["frontend"] },               // only skills whose tags intersect are catalogued
-  review: { approve, store },                  // Phase 2 — absent ⇒ saveSkill is NOT exposed
-  analytics: (event) => track(event),          // optional efficacy sink (errors swallowed)
+  inject: { select: "semantic", topK: 2, embedder }, // body-injection policy (see below)
+  maxLoadsPerRun: 4, // cap on loadSkill calls per run. default 5
+  scope: { tags: ["frontend"] }, // only skills whose tags intersect are catalogued
+  review: { approve, store }, // Phase 2 — absent ⇒ saveSkill is NOT exposed
+  analytics: (event) => track(event), // optional efficacy sink (errors swallowed)
 });
 ```
 
@@ -59,10 +60,10 @@ The metadata catalog is **always** injected (it's cheap). `inject` controls whet
 ```ts
 interface SkillsContract {
   readonly name: string;
-  catalog(scopeInput?: string): Promise<SkillCatalogEntry[]>;  // cheap metadata, body omitted
-  catalogPrompt(scopeInput?: string): Promise<string>;          // catalog rendered as a system block
-  preload(input: string): Promise<SkillRecord[]>;               // bodies per `inject`; [] when omitted
-  tools(runId?: string): AgentToolEntry<any, any>[];            // loadSkill always; saveSkill iff review
+  catalog(scopeInput?: string): Promise<SkillCatalogEntry[]>; // cheap metadata, body omitted
+  catalogPrompt(scopeInput?: string): Promise<string>; // catalog rendered as a system block
+  preload(input: string): Promise<SkillRecord[]>; // bodies per `inject`; [] when omitted
+  tools(runId?: string): AgentToolEntry<any, any>[]; // loadSkill always; saveSkill iff review
 }
 ```
 

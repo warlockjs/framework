@@ -19,11 +19,11 @@ await fs.files.put("out/log.txt", "hello\n");
 That's the whole idea. You don't hunt for a function named
 `putFileAsync` — you reach for `fs`, then say what you're touching. This
 page is the map: five namespaces, one naming rule, and a couple of things
-`fs` deliberately does *not* do.
+`fs` deliberately does _not_ do.
 
 ## The shape of `fs`
 
-`fs` groups its surface by *what you're acting on*, so the call reads like
+`fs` groups its surface by _what you're acting on_, so the call reads like
 a sentence.
 
 `fs.files.*` — everything you do to a file. Read, write, JSON, append,
@@ -53,15 +53,17 @@ await pkg.editJson((p) => ({ ...p, version: "4.7.0" }));
 directories stream from disk.
 
 ```ts
-fs.hash.string("hello");            // sync
-await fs.hash.file("bundle.js");    // async
+fs.hash.string("hello"); // sync
+await fs.hash.file("bundle.js"); // async
 ```
 
 `fs.exists(path)` — a type-agnostic existence check. True whether the path
 is a file or a directory.
 
 ```ts
-if (await fs.exists("cache")) { /* something is there */ }
+if (await fs.exists("cache")) {
+  /* something is there */
+}
 ```
 
 Each namespace has its own page. Jump wherever your task lives:
@@ -78,7 +80,7 @@ no `Async` suffix to remember — the facade is async, full stop, so you
 just `await` it.
 
 ```ts
-const text = await fs.files.get("config.toml");   // Promise<string>
+const text = await fs.files.get("config.toml"); // Promise<string>
 ```
 
 Under the hood, though, this package ships two layers of every operation:
@@ -93,7 +95,7 @@ to the bare **synchronous** primitives:
 ```ts
 import { getFile, putJsonFile } from "@warlock.js/fs";
 
-const raw = getFile("config.toml");        // blocking, no await
+const raw = getFile("config.toml"); // blocking, no await
 putJsonFile("out.json", { ok: true });
 ```
 
@@ -110,23 +112,23 @@ server or any request handler, always stay on the async facade — one
 
 ## "I want to…" → use
 
-| I want to… | Use |
-| --- | --- |
-| Read a text file | `fs.files.get(path)` |
-| Read + parse JSON (typed) | `fs.files.getJson<T>(path)` |
-| Write a file (create parents) | `fs.files.put(path, content)` |
-| Write JSON | `fs.files.putJson(path, value)` |
-| Patch a JSON object | `fs.files.mergeJson(path, partial)` |
-| Transform a file in place | `fs.files.edit(path, fn)` |
-| Make a directory (mkdir -p) | `fs.dirs.ensure(path)` |
-| Empty a directory, keep it | `fs.dirs.empty(path)` |
-| Delete a directory tree | `fs.dirs.remove(path)` |
-| List / walk a tree | `fs.dirs.list(path)` / `fs.dirs.walk(path)` |
-| Hash a string or buffer | `fs.hash.string(s)` / `fs.hash.buffer(b)` |
-| Hash a file or a whole tree | `fs.hash.file(path)` / `fs.hash.dir(path)` |
-| Check if *anything* is there | `fs.exists(path)` |
-| Hold one path and reuse it | `fs.file(path)` / `fs.dir(path)` |
-| Read/write synchronously | bare `getFile` / `putFile` primitives |
+| I want to…                    | Use                                         |
+| ----------------------------- | ------------------------------------------- |
+| Read a text file              | `fs.files.get(path)`                        |
+| Read + parse JSON (typed)     | `fs.files.getJson<T>(path)`                 |
+| Write a file (create parents) | `fs.files.put(path, content)`               |
+| Write JSON                    | `fs.files.putJson(path, value)`             |
+| Patch a JSON object           | `fs.files.mergeJson(path, partial)`         |
+| Transform a file in place     | `fs.files.edit(path, fn)`                   |
+| Make a directory (mkdir -p)   | `fs.dirs.ensure(path)`                      |
+| Empty a directory, keep it    | `fs.dirs.empty(path)`                       |
+| Delete a directory tree       | `fs.dirs.remove(path)`                      |
+| List / walk a tree            | `fs.dirs.list(path)` / `fs.dirs.walk(path)` |
+| Hash a string or buffer       | `fs.hash.string(s)` / `fs.hash.buffer(b)`   |
+| Hash a file or a whole tree   | `fs.hash.file(path)` / `fs.hash.dir(path)`  |
+| Check if _anything_ is there  | `fs.exists(path)`                           |
+| Hold one path and reuse it    | `fs.file(path)` / `fs.dir(path)`            |
+| Read/write synchronously      | bare `getFile` / `putFile` primitives       |
 
 ## Options ride along the last argument
 
@@ -136,9 +138,9 @@ everywhere.
 
 ```ts
 await fs.files.put("cache/data.json", "{}", {
-  atomic: true,      // write to a temp file, then rename onto target
-  overwrite: false,  // fail instead of clobbering an existing file
-  ensureDir: true,   // create parent directories first
+  atomic: true, // write to a temp file, then rename onto target
+  overwrite: false, // fail instead of clobbering an existing file
+  ensureDir: true, // create parent directories first
 });
 ```
 
@@ -164,7 +166,7 @@ default behavior — atomic writes, no-clobber creates, schema-checked reads.
 The facade treats whatever path you hand it as gospel — `"../../etc/passwd"`
 resolves and reads just fine. **Path containment is the storage layer's
 job**, not this package's. If you're accepting paths from user input, run
-them through your storage layer (or validate them yourself) *before*
+them through your storage layer (or validate them yourself) _before_
 they reach `fs`. `@warlock.js/fs` is the low-level toolkit; it trusts its
 caller.
 :::

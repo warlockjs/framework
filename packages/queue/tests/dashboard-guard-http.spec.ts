@@ -49,81 +49,84 @@ function buildGuard(): Middleware {
 
 const redisAvailable = await redisTestsAvailable();
 
-describe.skipIf(!redisAvailable)("a guard middleware running on the bull-board dashboard over real HTTP", () => {
-  let server: FastifyInstance;
-  let baseUrl: string;
+describe.skipIf(!redisAvailable)(
+  "a guard middleware running on the bull-board dashboard over real HTTP",
+  () => {
+    let server: FastifyInstance;
+    let baseUrl: string;
 
-  afterEach(async () => {
-    await server.close();
-    await closeQueue();
-  });
+    afterEach(async () => {
+      await server.close();
+      await closeQueue();
+    });
 
-  async function bootGuardedDashboard(): Promise<void> {
-    setQueueConfig(testQueueConfig());
+    async function bootGuardedDashboard(): Promise<void> {
+      setQueueConfig(testQueueConfig());
 
-    server = Fastify();
-    await server.register(fastifyCookie);
-    await queueDashboard(server, { basePath: "/admin/queues", middleware: [buildGuard()] });
-    await server.listen({ port: 0, host: "127.0.0.1" });
+      server = Fastify();
+      await server.register(fastifyCookie);
+      await queueDashboard(server, { basePath: "/admin/queues", middleware: [buildGuard()] });
+      await server.listen({ port: 0, host: "127.0.0.1" });
 
-    const address = server.server.address();
+      const address = server.server.address();
 
-    if (address === null || typeof address === "string") {
-      throw new Error("expected a listening TCP socket with an assigned port");
+      if (address === null || typeof address === "string") {
+        throw new Error("expected a listening TCP socket with an assigned port");
+      }
+
+      baseUrl = `http://127.0.0.1:${address.port}`;
     }
 
-    baseUrl = `http://127.0.0.1:${address.port}`;
-  }
+    it("rejects a request with no credential with the guard's own 401 payload", async () => {
+      await bootGuardedDashboard();
 
-  it("rejects a request with no credential with the guard's own 401 payload", async () => {
-    await bootGuardedDashboard();
+      const response = await fetch(`${baseUrl}/admin/queues`);
 
-    const response = await fetch(`${baseUrl}/admin/queues`);
-
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({
-      error: expect.any(String),
-      errorCode: "DASHBOARD_UNAUTHORIZED",
-    });
-  });
-
-  it("rejects a wrong credential", async () => {
-    await bootGuardedDashboard();
-
-    const response = await fetch(`${baseUrl}/admin/queues`, {
-      headers: { authorization: "Bearer wrong-token" },
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        error: expect.any(String),
+        errorCode: "DASHBOARD_UNAUTHORIZED",
+      });
     });
 
-    expect(response.status).toBe(401);
-  });
+    it("rejects a wrong credential", async () => {
+      await bootGuardedDashboard();
 
-  it("lets a right credential in the Authorization header through to bull-board's own handler", async () => {
-    await bootGuardedDashboard();
+      const response = await fetch(`${baseUrl}/admin/queues`, {
+        headers: { authorization: "Bearer wrong-token" },
+      });
 
-    const response = await fetch(`${baseUrl}/admin/queues`, {
-      headers: { authorization: `Bearer ${VALID_TOKEN}` },
+      expect(response.status).toBe(401);
     });
 
-    expect(response.status).not.toBe(401);
-    expect(response.status).toBe(200);
-  });
+    it("lets a right credential in the Authorization header through to bull-board's own handler", async () => {
+      await bootGuardedDashboard();
 
-  it("lets a right credential in a cookie through, proving request.cookie works on the bare Request", async () => {
-    await bootGuardedDashboard();
+      const response = await fetch(`${baseUrl}/admin/queues`, {
+        headers: { authorization: `Bearer ${VALID_TOKEN}` },
+      });
 
-    const response = await fetch(`${baseUrl}/admin/queues`, {
-      headers: { cookie: `token=${VALID_TOKEN}` },
+      expect(response.status).not.toBe(401);
+      expect(response.status).toBe(200);
     });
 
-    expect(response.status).not.toBe(401);
-    expect(response.status).toBe(200);
-  });
+    it("lets a right credential in a cookie through, proving request.cookie works on the bare Request", async () => {
+      await bootGuardedDashboard();
 
-  it("rejects a second dashboard route with no credential, proving the guard covers every route", async () => {
-    await bootGuardedDashboard();
+      const response = await fetch(`${baseUrl}/admin/queues`, {
+        headers: { cookie: `token=${VALID_TOKEN}` },
+      });
 
-    const response = await fetch(`${baseUrl}/admin/queues/api/queues`);
+      expect(response.status).not.toBe(401);
+      expect(response.status).toBe(200);
+    });
 
-    expect(response.status).toBe(401);
-  });
-});
+    it("rejects a second dashboard route with no credential, proving the guard covers every route", async () => {
+      await bootGuardedDashboard();
+
+      const response = await fetch(`${baseUrl}/admin/queues/api/queues`);
+
+      expect(response.status).toBe(401);
+    });
+  },
+);

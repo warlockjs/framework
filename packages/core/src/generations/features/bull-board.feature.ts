@@ -21,7 +21,7 @@ async function isQueueInstalled(): Promise<boolean> {
 
   return Boolean(
     packageJson.dependencies?.["@warlock.js/queue"] ||
-      packageJson.devDependencies?.["@warlock.js/queue"],
+    packageJson.devDependencies?.["@warlock.js/queue"],
   );
 }
 
@@ -82,7 +82,7 @@ async function completeBullBoardInstallation(_options: CommandActionData): Promi
 
   console.log(
     "\nNext: guard the dashboard with a middleware before it ships to production — an empty " +
-      "middleware list throws QueueDashboardUnguardedError at boot when NODE_ENV is \"production\".",
+      'middleware list throws QueueDashboardUnguardedError at boot when NODE_ENV is "production".',
   );
 }
 

@@ -320,7 +320,6 @@ export class SyncManager {
 
       // Emit syncing event
       await this.emitSyncingEvent(instruction);
-
     }
 
     return instructions;

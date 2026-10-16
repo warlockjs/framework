@@ -29,20 +29,23 @@ await connectToBroker({ driver: "rabbitmq", host: process.env.RABBITMQ_HOST });
 
 await herald()
   .channel<UserPayload>("user.created")
-  .subscribe(async (message, ctx) => {
-    await sendWelcomeEmail(message.payload.email);
-    // Throw on failure — let smart-nack route through retry → DLQ
-  }, {
-    prefetch: 10,
-    retry: {
-      maxRetries: 3,   // redelivery ceiling on throw; delay is inert here (see note)
-      delay: 0,
+  .subscribe(
+    async (message, ctx) => {
+      await sendWelcomeEmail(message.payload.email);
+      // Throw on failure — let smart-nack route through retry → DLQ
     },
-    deadLetter: {
-      channel: "user.created.failed",
-      preserveOriginal: true,
+    {
+      prefetch: 10,
+      retry: {
+        maxRetries: 3, // redelivery ceiling on throw; delay is inert here (see note)
+        delay: 0,
+      },
+      deadLetter: {
+        channel: "user.created.failed",
+        preserveOriginal: true,
+      },
     },
-  });
+  );
 ```
 
 What this does:

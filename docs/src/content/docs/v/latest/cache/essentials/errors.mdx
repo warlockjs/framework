@@ -77,6 +77,7 @@ await cache.get("user.1");
 The driver doesn't implement the requested operation.
 
 Today this fires on:
+
 - `cache.update()` / `cache.merge()` on the file driver (no file-lock primitive yet)
 - `cache.set(k, v, { vector })` and `cache.similar(...)` on drivers that don't index vectors (file, redis until RediSearch lands, pg without the `vector` config block) — see [Similarity Retrieval](/v/latest/cache/similarity/)
 
@@ -134,7 +135,7 @@ import { cache, CacheConfigurationError } from "@warlock.js/cache";
 app.post("/cache/:key", async (req, res) => {
   try {
     await cache.set(req.params.key, req.body.value, {
-      ttl: req.body.ttl,     // may be a user-supplied "1h" / "30m" / etc
+      ttl: req.body.ttl, // may be a user-supplied "1h" / "30m" / etc
     });
     res.json({ ok: true });
   } catch (error) {

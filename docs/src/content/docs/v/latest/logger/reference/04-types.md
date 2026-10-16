@@ -98,13 +98,7 @@ type BasicLogConfigurations = {
 The process events `enableAutoFlush()` can hook.
 
 ```ts
-type AutoFlushEvent =
-  | "SIGINT"
-  | "SIGTERM"
-  | "SIGHUP"
-  | "SIGBREAK"
-  | "SIGUSR2"
-  | "beforeExit";
+type AutoFlushEvent = "SIGINT" | "SIGTERM" | "SIGHUP" | "SIGBREAK" | "SIGUSR2" | "beforeExit";
 ```
 
 Signals are flushed then re-raised so Node's default exit runs; `beforeExit` is flushed in place. See [Shutdown & flushing](../advanced/03-shutdown-and-flushing/).
@@ -124,14 +118,12 @@ type RedactConfig = {
 };
 ```
 
-`paths` matches by *location* (dotted glob against `LoggingData`); `keys`/`defaultKeys` match by *key name* at any depth of `context`, `message`, and an `Error`'s own enumerable properties — independent matchers, both applied at the same logger-wide choke point. `DEFAULT_REDACT_KEYS: readonly string[]` is exported for introspection. See [Redaction](../advanced/01-redaction/).
+`paths` matches by _location_ (dotted glob against `LoggingData`); `keys`/`defaultKeys` match by _key name_ at any depth of `context`, `message`, and an `Error`'s own enumerable properties — independent matchers, both applied at the same logger-wide choke point. `DEFAULT_REDACT_KEYS: readonly string[]` is exported for introspection. See [Redaction](../advanced/01-redaction/).
 
 ## `RedactCensor`
 
 ```ts
-type RedactCensor =
-  | string
-  | ((value: any, path: string) => any);
+type RedactCensor = string | ((value: any, path: string) => any);
 ```
 
 A literal string replaces every match; a function receives the original value plus the dotted path and returns the replacement. See [Redaction](../advanced/01-redaction/).

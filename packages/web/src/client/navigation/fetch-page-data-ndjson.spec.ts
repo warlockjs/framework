@@ -446,7 +446,8 @@ describe("fetchPageData — NDJSON streaming (Stage 2 slice S3)", () => {
       ).resolves.toEqual({ productId: i });
 
       const registry = (window as WarlockWindow).__WARLOCK_DEFERRED__ as
-        Record<string, unknown> | undefined;
+        | Record<string, unknown>
+        | undefined;
       const size = registry === undefined ? 0 : Object.keys(registry).length;
 
       // Bounded, not proportional to how many navigations have happened —
@@ -485,7 +486,8 @@ describe("fetchPageData — NDJSON streaming (Stage 2 slice S3)", () => {
     await rejected;
 
     const registry = (window as WarlockWindow).__WARLOCK_DEFERRED__ as
-      Record<string, unknown> | undefined;
+      | Record<string, unknown>
+      | undefined;
 
     expect(Object.keys(registry ?? {})).toHaveLength(0);
   });

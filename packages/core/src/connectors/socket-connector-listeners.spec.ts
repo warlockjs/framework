@@ -35,7 +35,7 @@ describe("SocketConnector shared-server listeners", () => {
     const server = createServer();
     const fastifyHandler = () => {};
     server.on("request", fastifyHandler);
-    const counts = () => events.map(event => server.listenerCount(event));
+    const counts = () => events.map((event) => server.listenerCount(event));
     const initial = counts();
 
     vi.spyOn(config, "get").mockReturnValue({} as never);

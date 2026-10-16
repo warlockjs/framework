@@ -58,7 +58,9 @@ describe("driver query events", () => {
 
     expect(result.rows).toEqual([{ id: 1 }]);
     expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith(expect.not.objectContaining({ error: expect.anything() }));
+    expect(listener).toHaveBeenCalledWith(
+      expect.not.objectContaining({ error: expect.anything() }),
+    );
   });
 
   it("stops delivery after off", async () => {

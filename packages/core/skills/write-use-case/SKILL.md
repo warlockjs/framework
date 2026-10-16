@@ -43,16 +43,16 @@ onExecuting → guards → schema → before → handler → after → onComplet
                                   └ retry + benchmark wrap the handler only ┘
 ```
 
-| Phase         | Signature                                                              | Notes                                                                            |
-| ------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `onExecuting` | `(ctx: UseCaseOnExecutingContext) => void`                            | Fires first (once). `ctx` carries `id`, `name`, `data`, `schema`, `startedAt`.    |
-| `guards`      | `(data: Readonly<Input>, ctx: Ctx) => void \| Promise<void>`          | Authorization / precondition checks. **Throw to abort.** Enrich `ctx`, don't mutate `data`. |
-| `schema`      | `ObjectValidator` (seal `v.object(...)`)                              | Runs after guards. Failures throw `BadSchemaUseCaseError` and skip the handler.   |
-| `before`      | `(data: Input, ctx) => Input \| Promise<Input>`                       | Runs after schema. Sequential — each return becomes the next's input.            |
-| `handler`     | `(data: Input, ctx) => Promise<Output>`                               | The work. Receives the post-`before` payload. Retry + benchmark wrap **this**.   |
-| `after`       | `(output: Output, ctx) => void \| Promise<void>`                      | Fire-and-forget side effects on success. Errors are logged, never re-thrown.     |
-| `onCompleted` | `(result: UseCaseResult<Output>) => void`                            | Lifecycle event with the full `UseCaseResult` snapshot.                          |
-| `onError`     | `(ctx: UseCaseErrorResult) => void`                                  | Lifecycle event with the error + execution metadata.                            |
+| Phase         | Signature                                                    | Notes                                                                                       |
+| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `onExecuting` | `(ctx: UseCaseOnExecutingContext) => void`                   | Fires first (once). `ctx` carries `id`, `name`, `data`, `schema`, `startedAt`.              |
+| `guards`      | `(data: Readonly<Input>, ctx: Ctx) => void \| Promise<void>` | Authorization / precondition checks. **Throw to abort.** Enrich `ctx`, don't mutate `data`. |
+| `schema`      | `ObjectValidator` (seal `v.object(...)`)                     | Runs after guards. Failures throw `BadSchemaUseCaseError` and skip the handler.             |
+| `before`      | `(data: Input, ctx) => Input \| Promise<Input>`              | Runs after schema. Sequential — each return becomes the next's input.                       |
+| `handler`     | `(data: Input, ctx) => Promise<Output>`                      | The work. Receives the post-`before` payload. Retry + benchmark wrap **this**.              |
+| `after`       | `(output: Output, ctx) => void \| Promise<void>`             | Fire-and-forget side effects on success. Errors are logged, never re-thrown.                |
+| `onCompleted` | `(result: UseCaseResult<Output>) => void`                    | Lifecycle event with the full `UseCaseResult` snapshot.                                     |
+| `onError`     | `(ctx: UseCaseErrorResult) => void`                          | Lifecycle event with the error + execution metadata.                                        |
 
 `ctx` is a `UseCaseContext` shared across every phase. With the optional `Ctx` generic (`useCase<Output, Input, MyCtx>`) it's typed end-to-end; guards write `ctx.currentUser`, the handler reads it.
 
@@ -72,7 +72,7 @@ type UseCase<Output, Input, Ctx = UseCaseContext> = {
   onExecuting?: (ctx: UseCaseOnExecutingContext) => void;
   onCompleted?: (result: UseCaseResult<Output>) => void;
   onError?: (ctx: UseCaseErrorResult) => void;
-  retry?: RetryOptions;                 // from @mongez/reinforcements
+  retry?: RetryOptions; // from @mongez/reinforcements
   benchmark?: boolean | BenchmarkOptions;
   broadcast?: boolean | { event?: string; output?: (output, result) => unknown };
 };
@@ -88,7 +88,7 @@ Defaults come from `config.get("use-cases")` (`src/config/use-cases.ts`); per-us
 export const flakyApiCallUseCase = useCase({
   name: "external.callFlakyApi",
   retry: {
-    attempts: 4,                         // initial try + 3 retries
+    attempts: 4, // initial try + 3 retries
     delay: 500,
     backoff: "exponential",
     shouldRetry: (error) => !(error instanceof ValidationError), // skip 4xx
@@ -121,7 +121,7 @@ export const createUserUseCase = useCase({
   name: "users.create",
   schema: createUserSchema,
   handler: async (data) => User.create(data),
-  broadcast: true,                       // → channel "users.create", payload = output as-is
+  broadcast: true, // → channel "users.create", payload = output as-is
 });
 
 // Project / rename to avoid leaking sensitive fields:
@@ -130,7 +130,7 @@ export const signupUseCase = useCase({
   schema: signupSchema,
   handler: async (data) => signupService(data),
   broadcast: {
-    event: "auth.signup",                // custom channel name (default = use case name)
+    event: "auth.signup", // custom channel name (default = use case name)
     output: (result) => ({ id: result.id, email: result.email }), // never the raw model
   },
 });
@@ -142,7 +142,7 @@ import { heraldBroadcast } from "@warlock.js/herald";
 
 export default {
   broadcast: {
-    enabled: true,                       // global kill-switch
+    enabled: true, // global kill-switch
     channels: [heraldBroadcast({ broker: "default" })],
   },
 } satisfies UseCaseConfigurations;
@@ -244,8 +244,8 @@ Global listeners exist too — `globalUseCasesEvents.onExecuting(...)` / `onComp
 
 ```ts
 export default {
-  benchmark: true,                       // benchmark every handler by default
-  log: false,                            // per-step debug logging via @warlock.js/logger
+  benchmark: true, // benchmark every handler by default
+  log: false, // per-step debug logging via @warlock.js/logger
   history: { enabled: true, ttl: 3600, maxEntries: 100 },
   broadcast: { enabled: false, channels: [] },
 } satisfies UseCaseConfigurations;
@@ -255,8 +255,8 @@ export default {
 
 ```ts
 await placeOrderUseCase(input, {
-  id: "order-tracking-123",              // override auto-generated execution id
-  ctx: { currentUser: user },            // pre-populate context for guards
+  id: "order-tracking-123", // override auto-generated execution id
+  ctx: { currentUser: user }, // pre-populate context for guards
   onCompleted: (result) => log.debug("done", result.benchmarkResult),
   onError: ({ error }) => log.error("failed", error),
 });
@@ -266,10 +266,10 @@ Per-invocation callbacks fire first, then use-case-level, then globals. The retu
 
 ## Use case vs service vs controller
 
-| Layer      | What it owns                                                              | When to use                                |
-| ---------- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| Controller | Pull from `request`, return via `response.<helper>()`                     | Always — the HTTP edge.                    |
-| Service    | One unit of work, plain async function, no observability magic           | Most CRUD; one or two model touches.       |
+| Layer      | What it owns                                                             | When to use                                                                                                         |
+| ---------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Controller | Pull from `request`, return via `response.<helper>()`                    | Always — the HTTP edge.                                                                                             |
+| Service    | One unit of work, plain async function, no observability magic           | Most CRUD; one or two model touches.                                                                                |
 | Use case   | Guards/validation/handler/after + retry + benchmark + broadcast + events | Cross-cutting concerns, multi-service orchestration, anything called from multiple transports (HTTP + CLI + queue). |
 
 Don't reach for `useCase` for a 5-line service — the ceremony outweighs the benefit.
@@ -292,4 +292,3 @@ For the plain-function flavour (`warlock generate.use-case <module>/<verb-noun>`
 
 - The `create-controller` topic — the usual next step: invoke this use case from an HTTP controller.
 - The `publish-message` topic of the `warlock-js-herald` skill — the message bus the `broadcast` adapter publishes to (cross-package).
-

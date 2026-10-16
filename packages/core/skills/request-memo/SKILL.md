@@ -12,7 +12,7 @@ description: 'Memoize async work for one HTTP request with `requestMemo<T>(key, 
 From `core/src/http/context/request-memo.ts`:
 
 ```ts
-export function requestMemo<T>(key: string, fn: () => Promise<T>): Promise<T>
+export function requestMemo<T>(key: string, fn: () => Promise<T>): Promise<T>;
 ```
 
 Import it from the package root:

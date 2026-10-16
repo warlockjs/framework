@@ -53,20 +53,20 @@ Default to `defineResource`. Reach for a subclass only when a hook would be ugli
 
 ## Cast types
 
-| Cast        | Source                  | Output                                        |
-| ----------- | ----------------------- | --------------------------------------------- |
-| `string`    | any                     | `String(value)`                               |
-| `number`    | any                     | `Number(value)` (NaN → `undefined` or `null`) |
-| `int`       | any                     | `parseInt(value)`                             |
-| `float`     | any                     | `parseFloat(value)`                           |
-| `boolean`   | any                     | `Boolean(value)`                              |
-| `date`      | `Date` / ISO string     | configurable object (format/iso/timestamp/humanTime) |
-| `localized` | `LocalizedObject[]`     | string for the request's locale               |
-| `url`       | path                    | absolute URL via `url()` helper               |
-| `uploadsUrl`| path                    | absolute URL under the uploads prefix         |
-| `storageUrl`| path                    | absolute URL via `storage.url(...)`           |
-| `object`    | any object              | passes through if non-empty object            |
-| `array`     | any                     | passes through if array                       |
+| Cast         | Source              | Output                                               |
+| ------------ | ------------------- | ---------------------------------------------------- |
+| `string`     | any                 | `String(value)`                                      |
+| `number`     | any                 | `Number(value)` (NaN → `undefined` or `null`)        |
+| `int`        | any                 | `parseInt(value)`                                    |
+| `float`      | any                 | `parseFloat(value)`                                  |
+| `boolean`    | any                 | `Boolean(value)`                                     |
+| `date`       | `Date` / ISO string | configurable object (format/iso/timestamp/humanTime) |
+| `localized`  | `LocalizedObject[]` | string for the request's locale                      |
+| `url`        | path                | absolute URL via `url()` helper                      |
+| `uploadsUrl` | path                | absolute URL under the uploads prefix                |
+| `storageUrl` | path                | absolute URL via `storage.url(...)`                  |
+| `object`     | any object          | passes through if non-empty object                   |
+| `array`      | any                 | passes through if array                              |
 
 ### Suffix modifiers
 
@@ -232,20 +232,20 @@ const json = new UserResource(user).toJSON(); // typed as UserJson
 
 How each schema entry is typed:
 
-| Schema entry                                                      | Output type                                                           |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"` | `string`                                                              |
-| `"number"`, `"float"`, `"int"`                                    | `number`                                                              |
-| `"boolean"`                                                       | `boolean`                                                             |
-| `"date"`                                                          | `{ iso: string; format: string; timestamp: number; humanTime: string }` (the default date output) |
-| `"object"` / `"array"`                                            | `Record<string, unknown>` / `unknown[]`                               |
-| `"x[]"`                                                           | array of the base type                                                |
-| `"x?"`                                                            | `T \| null`; the key is always present, never optional               |
-| a nested resource, `lazy(() => R)`                                | that resource's output (one object, even if the model holds an array) |
-| `"self"` / `"self[]"`                                             | this resource's own output / an array of it                           |
-| `["inputKey", "cast"]` tuple                                      | the cast's type                                                       |
-| a resolver function                                               | its return type (an `any` return becomes `unknown`)                   |
-| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`) | `unknown`                                                             |
+| Schema entry                                                        | Output type                                                                                       |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"`  | `string`                                                                                          |
+| `"number"`, `"float"`, `"int"`                                      | `number`                                                                                          |
+| `"boolean"`                                                         | `boolean`                                                                                         |
+| `"date"`                                                            | `{ iso: string; format: string; timestamp: number; humanTime: string }` (the default date output) |
+| `"object"` / `"array"`                                              | `Record<string, unknown>` / `unknown[]`                                                           |
+| `"x[]"`                                                             | array of the base type                                                                            |
+| `"x?"`                                                              | `T \| null`; the key is always present, never optional                                            |
+| a nested resource, `lazy(() => R)`                                  | that resource's output (one object, even if the model holds an array)                             |
+| `"self"` / `"self[]"`                                               | this resource's own output / an array of it                                                       |
+| `["inputKey", "cast"]` tuple                                        | the cast's type                                                                                   |
+| a resolver function                                                 | its return type (an `any` return becomes `unknown`)                                               |
+| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`) | `unknown`                                                                                         |
 
 The type reflects the schema only, not the data: mark a field `?` when the model may not have a value. `boot`, `extend`, `transform` and builders can change the real shape; when they do, state the output with a type argument, which replaces the inferred type:
 
@@ -296,7 +296,10 @@ Rules, in the order the runtime applies them:
 ```ts title=".warlock/typings/model-resources.d.ts (generated)"
 declare module "@warlock.js/core" {
   interface ModelResourceRegistry {
-    "User": { model: import("../../src/app/users/models/user.model").User; resource: typeof import("../../src/app/users/resources/user.resource").UserResource };
+    User: {
+      model: import("../../src/app/users/models/user.model").User;
+      resource: typeof import("../../src/app/users/resources/user.resource").UserResource;
+    };
   }
 }
 ```

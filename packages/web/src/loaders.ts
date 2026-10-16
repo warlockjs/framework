@@ -50,14 +50,15 @@ export type PageLoaderContext<
   TValidation extends PageValidation | undefined = undefined,
   TRoute extends RouteDeclaration | undefined = undefined,
   TName extends string | undefined = DeclaredRouteName<TRoute>,
-> = IsGuardedName<TName> extends true
-  ? Omit<UnguardedPageLoaderContext<TValidation>, "request" | "session"> & {
-      request: UnguardedPageLoaderContext<TValidation>["request"] & {
-        locals: { user: GuardedLocalsUser };
-      };
-      session: GuardedPageSession;
-    }
-  : UnguardedPageLoaderContext<TValidation>;
+> =
+  IsGuardedName<TName> extends true
+    ? Omit<UnguardedPageLoaderContext<TValidation>, "request" | "session"> & {
+        request: UnguardedPageLoaderContext<TValidation>["request"] & {
+          locals: { user: GuardedLocalsUser };
+        };
+        session: GuardedPageSession;
+      }
+    : UnguardedPageLoaderContext<TValidation>;
 
 type UnguardedPageLoaderContext<TValidation extends PageValidation | undefined> = {
   /**
@@ -123,7 +124,9 @@ type ActionValidatedOutput<TConfig> = TConfig extends {
  * own validated body and the buffered `ActionResponse` (failure helpers
  * included). `TConfig` is `typeof config.action` (or one `config.actions.<name>`).
  */
-export type PageActionContext<TConfig extends PageActionConfig | BaseValidator | undefined = undefined> = {
+export type PageActionContext<
+  TConfig extends PageActionConfig | BaseValidator | undefined = undefined,
+> = {
   request: Request<ActionValidatedOutput<TConfig>>;
   response: ActionResponse;
   shared: SharedContext;

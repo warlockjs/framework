@@ -10,6 +10,7 @@ description: 'Wrap an async function with cached(fn, options) — declare the ca
 ## When to use
 
 Reach for `cached()` instead of `cache.remember()` when:
+
 - You have a function you'll call from many places.
 - You want the caching strategy declared once, not repeated at every call site.
 - You want `.invalidate()` available without manually deriving keys.
@@ -38,11 +39,11 @@ cached(fn, {
 
 ## Auto-key rules (shorthand only)
 
-| Args | Key |
-|------|-----|
-| None | `prefix` |
-| Any args | `prefix.<16 hex>` — sha1 of a stable JSON encoding of the args, truncated |
-| `Map` / `Set` / function / symbol / class instance / circular | throws `CacheConfigurationError` |
+| Args                                                          | Key                                                                       |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| None                                                          | `prefix`                                                                  |
+| Any args                                                      | `prefix.<16 hex>` — sha1 of a stable JSON encoding of the args, truncated |
+| `Map` / `Set` / function / symbol / class instance / circular | throws `CacheConfigurationError`                                          |
 
 The hash keeps distinct args on distinct keys (`("1.private", "")` ≠ `("1", "private")`). Object keys are sorted; `Date` → ISO string; order of args matters. Never build keys by hand: call `.invalidate(...args)`, which honours `config.driver`. When auto-key fails, use the options form with a custom `key` fn.
 
@@ -76,7 +77,7 @@ await getUser.invalidate(42);
 const getUser = cached(fn, { key: (id) => `user.${id}`, ttl: "1h", tags: ["users"] });
 const getPosts = cached(fn, { key: (u) => `posts.by.${u}`, ttl: "30m", tags: ["users", "posts"] });
 
-await cache.tags(["users"]).invalidate();   // drops both wrappers' caches
+await cache.tags(["users"]).invalidate(); // drops both wrappers' caches
 ```
 
 See the `use-cache-tags` topic.
@@ -86,7 +87,7 @@ See the `use-cache-tags` topic.
 ```ts
 const getCategoryMeta = cached(
   (filters: Filters) => db.categories.meta(filters.category),
-  { key: (f) => `category.meta.${f.category}`, ttl: "1h" },   // ignores `sort`, `page`
+  { key: (f) => `category.meta.${f.category}`, ttl: "1h" }, // ignores `sort`, `page`
 );
 ```
 

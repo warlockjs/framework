@@ -83,7 +83,9 @@ describe("renderPageFailure — an error page that fails because the first error
     const [message, thrown] = errorPageReports[0] as [string, Error];
 
     expect(message).toContain("CONSEQUENCE");
-    expect(message).toContain("ROOT CAUSE: Error: server-only barrel evaluated in the browser graph");
+    expect(message).toContain(
+      "ROOT CAUSE: Error: server-only barrel evaluated in the browser graph",
+    );
     expect(thrown.message).toMatch(LOCALE_PROVIDER_MESSAGE);
   });
 

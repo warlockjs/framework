@@ -14,7 +14,7 @@ The recommended pattern is the **callback form**: wrap your work in `transaction
 ```ts
 import { transaction } from "@warlock.js/cascade";
 
-const order = await transaction(async ctx => {
+const order = await transaction(async (ctx) => {
   const newOrder = await Order.create({ userId, total });
 
   for (const item of items) {
@@ -42,7 +42,7 @@ This is the right shape for ~95% of transaction use. You don't manage the sessio
 If the work inside the callback decides the transaction shouldn't commit (validation failure, business-rule veto), call `ctx.rollback(reason?)`:
 
 ```ts
-await transaction(async ctx => {
+await transaction(async (ctx) => {
   const balance = await Account.whereId(accountId).value<number>("balance");
   if (balance < amount) {
     ctx.rollback("Insufficient funds");
@@ -104,7 +104,7 @@ Anything that goes through the driver during the callback is part of the transac
 - Query builder reads — `User.where(...).first()`, etc.
 - Direct driver calls — `driver.insert(...)`, `driver.update(...)`, etc.
 
-Operations *outside* the driver — file writes, HTTP calls, cache invalidations — are **not** transactional. If you need them to roll back on transaction failure, do the irreversible work *after* the transaction completes:
+Operations _outside_ the driver — file writes, HTTP calls, cache invalidations — are **not** transactional. If you need them to roll back on transaction failure, do the irreversible work _after_ the transaction completes:
 
 ```ts
 const order = await driver.transaction(async ctx => {
@@ -143,7 +143,7 @@ For that reason, side effects that should respect transaction outcome belong in 
 ```ts
 import { afterCommit } from "@warlock.js/cascade";
 
-User.events().onCreated(user => {
+User.events().onCreated((user) => {
   afterCommit(() => sendWelcomeEmail(user.get("email")));
 });
 
@@ -163,7 +163,7 @@ Good fits: cache clears, sitemap regeneration, emails, webhooks. `afterCommit` i
 
 ```ts
 async function transferFunds(from: string, to: string, amount: number) {
-  return transaction(async ctx => {
+  return transaction(async (ctx) => {
     const fromBalance = await Account.whereId(from).value<number>("balance");
     if (fromBalance < amount) ctx.rollback("Insufficient funds");
 
@@ -177,7 +177,7 @@ async function transferFunds(from: string, to: string, amount: number) {
 ### Bulk operations with all-or-nothing semantics
 
 ```ts
-await transaction(async ctx => {
+await transaction(async (ctx) => {
   for (const row of csvRows) {
     await User.create(row); // any one failure rolls everything back
   }
@@ -189,7 +189,7 @@ For large bulk imports, consider chunking the transactions — one giant transac
 ### Reading-then-writing safely
 
 ```ts
-await transaction(async ctx => {
+await transaction(async (ctx) => {
   const post = await Post.whereId(id).first();
   if (!post) ctx.rollback("Post not found");
 

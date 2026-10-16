@@ -10,7 +10,8 @@ export type RoutePathParameter = {
  * than the router can accept.
  */
 export type RoutePathParameterParse =
-  { type: "precise"; parameters: readonly RoutePathParameter[] } | { type: "broad" };
+  | { type: "precise"; parameters: readonly RoutePathParameter[] }
+  | { type: "broad" };
 
 const PARAMETER_SEGMENT = /^:([A-Za-z0-9_]+)(\?)?$/;
 

@@ -115,7 +115,14 @@ describe("ArrayValidator - extended coverage", () => {
 
     it("validates arrays of arrays", async () => {
       const validator = v.array(v.array(v.number()));
-      expect((await validate(validator, [[1, 2], [3, 4]])).isValid).toBe(true);
+      expect(
+        (
+          await validate(validator, [
+            [1, 2],
+            [3, 4],
+          ])
+        ).isValid,
+      ).toBe(true);
       expect((await validate(validator, [[1, 2], ["x"]])).isValid).toBe(false);
     });
   });

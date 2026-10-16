@@ -5,7 +5,7 @@ description: 'Gate an agent''s tool calls behind a human with `ai.human.approval
 
 # Approve tool calls — the human-in-the-loop gate
 
-`ai.human.approval(options)` returns an `AgentMiddleware` with **one** hook — `tool.before` — that pauses *before a specific tool call* and routes it to a human. The human can **approve** (run the real tool unchanged), **reject** (the model sees a typed error and self-corrects), or **edit** (run the tool with replaced args). Every call the policy doesn't gate passes through untouched.
+`ai.human.approval(options)` returns an `AgentMiddleware` with **one** hook — `tool.before` — that pauses _before a specific tool call_ and routes it to a human. The human can **approve** (run the real tool unchanged), **reject** (the model sees a typed error and self-corrects), or **edit** (run the tool with replaced args). Every call the policy doesn't gate passes through untouched.
 
 `ai.human.*` ships natively on the shared `ai` object from `@warlock.js/ai` core — no extra import or registration step. The named `humanApproval` export is the same factory.
 
@@ -34,11 +34,11 @@ await support.execute("Refund order #4821"); // pauses at refundCustomer, awaits
 
 A handler turns an `ApprovalRequest` into an `ApprovalDecision` — a union discriminated by `type` (never `kind`):
 
-| `decision.type` | Effect | What the model sees next |
-|---|---|---|
-| `"approve"` | The real tool runs with the model's original args. | The tool's normal result. |
-| `"reject"` | Short-circuits an `ApprovalRejectedError` carrying `reason`. | `{ error }` on the next trip — it can self-correct. |
-| `"edit"` | The reviewer's `args` replace the model's; the real tool then runs. | The tool's result for the edited args. |
+| `decision.type` | Effect                                                              | What the model sees next                            |
+| --------------- | ------------------------------------------------------------------- | --------------------------------------------------- |
+| `"approve"`     | The real tool runs with the model's original args.                  | The tool's normal result.                           |
+| `"reject"`      | Short-circuits an `ApprovalRejectedError` carrying `reason`.        | `{ error }` on the next trip — it can self-correct. |
+| `"edit"`        | The reviewer's `args` replace the model's; the real tool then runs. | The tool's result for the edited args.              |
 
 ```ts
 type ApprovalDecision =
@@ -51,13 +51,13 @@ An `edit` still goes through the tool's own Standard-Schema validation — if th
 
 ## The interrupt policy — which calls need a human
 
-`policy` decides *which* tool calls are gated. It's a union keyed on `type`:
+`policy` decides _which_ tool calls are gated. It's a union keyed on `type`:
 
-| `policy.type` | Gates a call when… | Tags |
-|---|---|---|
-| `"allowlist"` | the tool name **is** in `tools`. | optional `tags(toolName)` callback |
-| `"denylist"` | the tool name is **not** in `tools` (gate everything else). | optional `tags(toolName)` callback |
-| `"predicate"` | `requiresApproval(ctx)` returns a truthy value. | a returned `string[]` doubles as the tags |
+| `policy.type` | Gates a call when…                                          | Tags                                      |
+| ------------- | ----------------------------------------------------------- | ----------------------------------------- |
+| `"allowlist"` | the tool name **is** in `tools`.                            | optional `tags(toolName)` callback        |
+| `"denylist"`  | the tool name is **not** in `tools` (gate everything else). | optional `tags(toolName)` callback        |
+| `"predicate"` | `requiresApproval(ctx)` returns a truthy value.             | a returned `string[]` doubles as the tags |
 
 ```ts
 // Allowlist — only refunds need sign-off:
@@ -88,18 +88,18 @@ For a gated call the middleware builds an `ApprovalRequest` and hands it to your
 
 ```ts
 interface ApprovalRequest {
-  interruptId: string;          // stable id; durable mode keys the store on it
+  interruptId: string; // stable id; durable mode keys the store on it
   toolName: string;
   toolDescription?: string;
-  args: unknown;                // the model's exact args
+  args: unknown; // the model's exact args
   context: {
     agentName: string;
     tripIndex: number;
     sessionId?: string;
-    originalInput?: string;     // the run's prompt (used by durable re-run)
-    tags?: string[];            // from the policy match
+    originalInput?: string; // the run's prompt (used by durable re-run)
+    tags?: string[]; // from the policy match
   };
-  requestedAt: string;          // ISO-8601
+  requestedAt: string; // ISO-8601
 }
 ```
 
@@ -120,12 +120,12 @@ if (result.error instanceof ApprovalRejectedError) {
 }
 ```
 
-Only a *handler bug* — a non-sentinel throw from your handler — propagates, and even then the agent dispatch funnels it onto `result.error` rather than crashing the run. The gate never swallows a bug into a silent approval.
+Only a _handler bug_ — a non-sentinel throw from your handler — propagates, and even then the agent dispatch funnels it onto `result.error` rather than crashing the run. The gate never swallows a bug into a silent approval.
 
 ## Edge cases
 
 - **Duplicate middleware name.** Middleware names are validated unique per agent. The default name is `"human-approval"`, so two approval middlewares on one agent need distinct `name`s.
-- **Silent tools.** A `silent`-mode tool's result isn't fed back to the model, but approval still runs (we gate *before* dispatch). A `reject` on a silent tool writes a tool message that's harmless but unread.
+- **Silent tools.** A `silent`-mode tool's result isn't fed back to the model, but approval still runs (we gate _before_ dispatch). A `reject` on a silent tool writes a tool message that's harmless but unread.
 - **Abort during an interactive await.** `ctx.signal` is in scope; honor it in a long-running handler so a cancelled run rejects rather than hanging.
 
 ## See also

@@ -51,18 +51,26 @@ The same driver instance handles snapshot resume AND semantic retrieval.
 async function indexDocument(id: string, title: string, body: string) {
   const { vector } = await embedder.embed(`${title}\n\n${body}`);
 
-  await cache.driver("pg").set(id, {
-    title,
-    body,
-    indexedAt: new Date().toISOString(),
-  }, {
-    vector,
-    tags: ["kb-doc"],
-    ttlMs: 30 * 24 * 60 * 60 * 1000,  // 30 days
-  });
+  await cache.driver("pg").set(
+    id,
+    {
+      title,
+      body,
+      indexedAt: new Date().toISOString(),
+    },
+    {
+      vector,
+      tags: ["kb-doc"],
+      ttlMs: 30 * 24 * 60 * 60 * 1000, // 30 days
+    },
+  );
 }
 
-await indexDocument("doc-1", "Returning a product", "Customers may return any unused product within 30 days...");
+await indexDocument(
+  "doc-1",
+  "Returning a product",
+  "Customers may return any unused product within 30 days...",
+);
 await indexDocument("doc-2", "Shipping internationally", "We ship to 47 countries via DHL...");
 ```
 
@@ -73,7 +81,8 @@ import { v } from "@warlock.js/seal";
 
 const searchKb = ai.tool({
   name: "search_kb",
-  description: "Search the knowledge base for passages relevant to a customer question. Returns the top matches with titles and body excerpts.",
+  description:
+    "Search the knowledge base for passages relevant to a customer question. Returns the top matches with titles and body excerpts.",
   action: ({ query }) => `Searching the knowledge base for "${query}"`,
   input: v.object({ query: v.string(), k: v.number().optional() }),
   execute: async ({ query, k }) => {
@@ -102,10 +111,13 @@ const searchKb = ai.tool({
 const supportAgent = ai.agent({
   name: "kb-support",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a support agent for Acme Corp.")
     .instruction("ALWAYS search the knowledge base before answering policy questions.")
-    .instruction("If the search returns no relevant passages, say so honestly — never make up policy."),
+    .instruction(
+      "If the search returns no relevant passages, say so honestly — never make up policy.",
+    ),
   tools: [searchKb],
   maxTrips: 4,
 });
@@ -122,8 +134,7 @@ console.log(text);
 
 // Inspect what the agent retrieved
 const searchCalls = report.children.filter(
-  (c): c is import("@warlock.js/ai").ToolCall =>
-    c.type === "tool" && c.name === "search_kb",
+  (c): c is import("@warlock.js/ai").ToolCall => c.type === "tool" && c.name === "search_kb",
 );
 for (const call of searchCalls) {
   console.log("retrieved:", call.output);
@@ -147,7 +158,7 @@ const supportAgent = ai.agent({
     ai.middleware.semanticCache({
       embedder,
       threshold: 0.95,
-      ttlMs: 60 * 60 * 1000,   // 1 hour
+      ttlMs: 60 * 60 * 1000, // 1 hour
       namespace: "kb-support",
     }),
   ],

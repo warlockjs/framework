@@ -20,13 +20,7 @@ import { resolveExternalsFromCore } from "../../../src/dev-server/loader/registe
  * a future import added anywhere in the hook's module graph is covered too.
  */
 
-const hookEntry = path.join(
-  process.cwd(),
-  "src",
-  "dev-server",
-  "loader",
-  "hook-thread.ts",
-);
+const hookEntry = path.join(process.cwd(), "src", "dev-server", "loader", "hook-thread.ts");
 
 /** Build the hook exactly as `registerLoader` does. */
 async function bundleHook(withPlugin: boolean) {
@@ -47,8 +41,8 @@ async function bundleHook(withPlugin: boolean) {
 /** Every import specifier in the bundle that isn't a Node built-in. */
 function npmImports(code: string): string[] {
   return [...code.matchAll(/from\s+"([^"]+)"/g)]
-    .map(match => match[1])
-    .filter(specifier => !specifier.startsWith("node:"));
+    .map((match) => match[1])
+    .filter((specifier) => !specifier.startsWith("node:"));
 }
 
 const isBareSpecifier = (specifier: string) =>

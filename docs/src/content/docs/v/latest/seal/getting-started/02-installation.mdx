@@ -11,21 +11,9 @@ import { Tabs, TabItem } from "@astrojs/starlight/components";
 Seal is standalone — no framework required. Inside a Warlock app it ships transitively through `@warlock.js/core`, so if you're already on core you can import `v` directly without installing anything. Otherwise, add it with your package manager:
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm install @warlock.js/seal
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm add @warlock.js/seal
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm add @warlock.js/seal
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm install @warlock.js/seal ```</TabItem>
+  <TabItem label="yarn">```bash pnpm add @warlock.js/seal ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm add @warlock.js/seal ```</TabItem>
 </Tabs>
 
 Seal has two runtime dependencies (`@mongez/supportive-is` and `dayjs`), both pulled in transitively. No peer dependencies to install separately.
@@ -84,7 +72,7 @@ const schema = v.string().email();
 const result = await validate(schema, "ada@example.com");
 
 console.log(result.isValid); // true
-console.log(result.data);    // "ada@example.com"
+console.log(result.data); // "ada@example.com"
 ```
 
 If that prints `true` and the email back, you're set.

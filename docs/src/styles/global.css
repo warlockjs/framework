@@ -174,7 +174,9 @@ header.header {
   text-decoration-color: color-mix(in srgb, var(--sl-color-text-accent) 40%, transparent);
   text-underline-offset: 3px;
   text-decoration-thickness: 1.5px;
-  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+  transition:
+    text-decoration-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .sl-markdown-content a:not(.not-content *):hover {
@@ -211,7 +213,9 @@ header.header {
 code,
 pre {
   font-variant-ligatures: none;
-  font-feature-settings: "liga" 0, "calt" 0;
+  font-feature-settings:
+    "liga" 0,
+    "calt" 0;
 }
 
 .expressive-code .frame,
@@ -237,7 +241,10 @@ pre {
   border-radius: var(--warlock-radius) !important;
   border: 1px solid var(--sl-color-hairline) !important;
   background-color: var(--warlock-surface-dark);
-  transition: border-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.05s ease,
+    box-shadow 0.15s ease;
 }
 
 :root[data-theme="light"] .sl-link-card,
@@ -307,12 +314,11 @@ pre {
   gap: 0.65rem;
   width: 100%;
   padding: 0.55rem 0.6rem 0.55rem 0.55rem;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sl-color-text-accent) 4%, var(--warlock-surface-dark)) 0%,
-      var(--warlock-surface-dark) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sl-color-text-accent) 4%, var(--warlock-surface-dark)) 0%,
+    var(--warlock-surface-dark) 100%
+  );
   border: 1px solid var(--sl-color-hairline);
   border-radius: var(--warlock-radius);
   color: var(--sl-color-white);
@@ -326,12 +332,11 @@ pre {
 }
 
 :root[data-theme="light"] .warlock-pkg-trigger {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sl-color-text-accent) 5%, #ffffff) 0%,
-      #ffffff 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sl-color-text-accent) 5%, #ffffff) 0%,
+    #ffffff 100%
+  );
   color: var(--sl-color-text);
 }
 
@@ -386,7 +391,9 @@ pre {
 
 .warlock-pkg-trigger-chevron {
   color: var(--sl-color-gray-3);
-  transition: transform 0.18s ease, color 0.15s ease;
+  transition:
+    transform 0.18s ease,
+    color 0.15s ease;
 }
 
 .warlock-pkg.is-open .warlock-pkg-trigger-chevron {
@@ -421,8 +428,14 @@ pre {
 }
 
 @keyframes warlockPkgIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .warlock-pkg-group + .warlock-pkg-group {
@@ -566,7 +579,9 @@ pre {
   color: var(--sl-color-gray-3);
   border-radius: var(--warlock-radius-sm);
   white-space: nowrap;
-  transition: color 0.12s ease, background-color 0.12s ease;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
 }
 
 .sidebar-content ul.top-level > li > details > summary:hover,
@@ -684,8 +699,14 @@ pre {
 }
 
 @keyframes warlockSidebarReveal {
-  from { opacity: 0; transform: translateY(-3px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Indentation guide for nested levels */
@@ -718,7 +739,10 @@ starlight-toc nav a {
   border-left: 1.5px solid transparent;
   padding-inline-start: 0.85rem;
   padding-block: 0.3rem;
-  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 starlight-toc nav a:hover {
@@ -791,7 +815,9 @@ pre.mermaid {
     0 10px 30px -20px rgba(0, 0, 0, 0.5);
   /* While mermaid is parsing, the raw source flashes — hide it. */
   color: transparent;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 pre.mermaid:hover {
@@ -802,9 +828,7 @@ pre.mermaid:hover {
 }
 
 :root[data-theme="light"] pre.mermaid {
-  background:
-    linear-gradient(180deg, rgba(161, 98, 7, 0.04), transparent 60%),
-    #ffffff;
+  background: linear-gradient(180deg, rgba(161, 98, 7, 0.04), transparent 60%), #ffffff;
 }
 
 /* Tiny "diagram" tag in the top-right — reinforces this is a chart, not code. */
@@ -925,7 +949,8 @@ starlight-tabs [role="tab"][aria-selected="true"] {
  * only the auto page-title h1, the second holds the actual content. Hide
  * every content-panel that doesn't contain our marker (i.e. the title-only
  * panel). */
-body:has(:is(.warlock-hero, .warlock-features)) .content-panel:not(:has(:is(.warlock-hero, .warlock-features))) {
+body:has(:is(.warlock-hero, .warlock-features))
+  .content-panel:not(:has(:is(.warlock-hero, .warlock-features))) {
   display: none !important;
 }
 

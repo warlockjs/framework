@@ -41,7 +41,9 @@ class CapturingChannel extends LogChannel {
   public name = "capture";
   public terminal = false;
   public received: LoggingData[] = [];
-  public log(data: LoggingData) { this.received.push({ ...data }); }
+  public log(data: LoggingData) {
+    this.received.push({ ...data });
+  }
 }
 ```
 
@@ -100,7 +102,7 @@ No cleanup needed — the local `Logger` is garbage-collected.
 
 ## Why not spy on `log.info`?
 
-`log` is a plain `Logger` instance (`export const log = new Logger()`) and every level method lives on the prototype, so `vi.spyOn(log, "info")` *does* technically work. Prefer the capturing channel anyway:
+`log` is a plain `Logger` instance (`export const log = new Logger()`) and every level method lives on the prototype, so `vi.spyOn(log, "info")` _does_ technically work. Prefer the capturing channel anyway:
 
 - A spy on `log.info` proves the method was **called**, not that an entry was **delivered** — it skips the whole pipeline (`minLevel` floor, redaction, per-channel `levels` / `filter`). A capturing channel asserts on the entry your code under test actually produced after all of that ran.
 - The `log` singleton is shared global state. A spy you forget to `mockRestore()` leaks into the next test; swapping `log.channels` and restoring it in `afterEach` is the same amount of code and isolates cleanly.

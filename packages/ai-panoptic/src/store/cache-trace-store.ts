@@ -324,11 +324,13 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
 
     const candidate =
       typeof this.input === "function"
-        ? (this.input as () =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            | CacheDriver<any, any>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            | Promise<CacheDriver<any, any>>)()
+        ? (
+            this.input as () =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              | CacheDriver<any, any>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              | Promise<CacheDriver<any, any>>
+          )()
         : this.input;
 
     this.driverPending = Promise.resolve(candidate);

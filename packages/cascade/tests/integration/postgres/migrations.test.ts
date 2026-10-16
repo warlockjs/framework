@@ -35,13 +35,7 @@ type ColumnRow = {
   numeric_scale: number | null;
 };
 
-const MIG_TABLES = [
-  "mig_widgets",
-  "mig_books",
-  "mig_authors",
-  "mig_events",
-  "_migrations",
-];
+const MIG_TABLES = ["mig_widgets", "mig_books", "mig_authors", "mig_events", "_migrations"];
 
 describe("Postgres integration — migration runner (up / down)", () => {
   let harness: PostgresHarness;

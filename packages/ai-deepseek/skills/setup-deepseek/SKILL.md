@@ -26,38 +26,38 @@ new DeepSeekSDK({ apiKey, baseURL: "https://my-gateway/deepseek", provider: "dee
 ## Producing a model
 
 ```ts
-deepseek.model({ name: "deepseek-chat" })            // V3 lineage, non-thinking
-deepseek.model({ name: "deepseek-reasoner" })        // R1 lineage, reasoning-capable
-deepseek.model({ name: "deepseek-chat", temperature: 0.2 })
+deepseek.model({ name: "deepseek-chat" }); // V3 lineage, non-thinking
+deepseek.model({ name: "deepseek-reasoner" }); // R1 lineage, reasoning-capable
+deepseek.model({ name: "deepseek-chat", temperature: 0.2 });
 ```
 
 Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 ## Models
 
-| Model | Notes |
-| --- | --- |
-| `deepseek-chat` | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
-| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default. |
-| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default. |
+| Model               | Notes                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
+| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**.        |
+| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                                    |
+| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                                   |
 
 DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are understood by the capability inference. `deepseek.model({ name })` accepts any id the upstream serves.
 
 ## Capabilities — what's auto-set
 
-| Flag | Default |
-| --- | --- |
-| `reasoning` | Inferred from the DeepSeek model name. `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
-| `vision` | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026). |
-| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode. |
-| `promptCaching` | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI. |
+| Flag               | Default                                                                                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reasoning`        | Inferred from the DeepSeek model name. `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
+| `vision`           | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026).                                                                                                 |
+| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode.                                                                                           |
+| `promptCaching`    | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI.                                                                                         |
 
 **Override any flag explicitly** via `.model({ name, reasoning?, vision?, structuredOutput? })` — an explicit value always wins over the injected inference.
 
 ```ts
-deepseek.model({ name: "deepseek-chat", reasoning: true })   // force thinking flag
-deepseek.model({ name: "deepseek-reasoner", reasoning: false }) // suppress it
+deepseek.model({ name: "deepseek-chat", reasoning: true }); // force thinking flag
+deepseek.model({ name: "deepseek-reasoner", reasoning: false }); // suppress it
 ```
 
 ## Uses the OpenAI-compatible endpoint
@@ -67,8 +67,8 @@ Everything on the wire — Chat Completions request/response shape, streaming lo
 Structured output, reasoning effort, and streaming therefore behave exactly as documented for the OpenAI adapter:
 
 ```ts
-const model = deepseek.model({ name: "deepseek-reasoner" });        // reasoning auto-true
-await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+const model = deepseek.model({ name: "deepseek-reasoner" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 ## Embeddings & images

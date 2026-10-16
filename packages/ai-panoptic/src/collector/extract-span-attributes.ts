@@ -102,7 +102,10 @@ export function extractSpanAttributes(report: BaseReport): Record<string, unknow
   return attributes;
 }
 
-function addAgentAttributes(attributes: Record<string, unknown>, extensions: ReportExtensions): void {
+function addAgentAttributes(
+  attributes: Record<string, unknown>,
+  extensions: ReportExtensions,
+): void {
   if (Array.isArray(extensions.trips)) {
     attributes["agent.trips"] = extensions.trips.length;
   }
@@ -128,7 +131,10 @@ function addAgentAttributes(attributes: Record<string, unknown>, extensions: Rep
   }
 }
 
-function addWorkflowAttributes(attributes: Record<string, unknown>, extensions: ReportExtensions): void {
+function addWorkflowAttributes(
+  attributes: Record<string, unknown>,
+  extensions: ReportExtensions,
+): void {
   if (extensions.workflowName !== undefined) {
     attributes["workflow.name"] = extensions.workflowName;
   }
@@ -142,7 +148,10 @@ function addWorkflowAttributes(attributes: Record<string, unknown>, extensions: 
   }
 }
 
-function addSupervisorAttributes(attributes: Record<string, unknown>, extensions: ReportExtensions): void {
+function addSupervisorAttributes(
+  attributes: Record<string, unknown>,
+  extensions: ReportExtensions,
+): void {
   if (extensions.supervisorName !== undefined) {
     attributes["supervisor.name"] = extensions.supervisorName;
   }
@@ -156,7 +165,10 @@ function addSupervisorAttributes(attributes: Record<string, unknown>, extensions
   }
 }
 
-function addOrchestratorAttributes(attributes: Record<string, unknown>, extensions: ReportExtensions): void {
+function addOrchestratorAttributes(
+  attributes: Record<string, unknown>,
+  extensions: ReportExtensions,
+): void {
   if (extensions.turnIndex !== undefined) {
     attributes["orchestrator.turnIndex"] = extensions.turnIndex;
   }
@@ -170,7 +182,10 @@ function addOrchestratorAttributes(attributes: Record<string, unknown>, extensio
   }
 }
 
-function addToolAttributes(attributes: Record<string, unknown>, extensions: ReportExtensions): void {
+function addToolAttributes(
+  attributes: Record<string, unknown>,
+  extensions: ReportExtensions,
+): void {
   if (extensions.tripIndex !== undefined) {
     attributes["tool.tripIndex"] = extensions.tripIndex;
   }

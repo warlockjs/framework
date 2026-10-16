@@ -106,6 +106,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed
@@ -195,7 +196,7 @@ changelogs.
 
 ### Security
 
-- **Secrets are now redacted by default. This is a behavior change — logs that previously showed these values in cleartext will now show `[REDACTED]`.** Redaction used to be a *tool* (`redact.paths`, entirely opt-in): unless an application configured it, a `password` in `context`, an `authorization` header, or an `apiKey` on a logged `Error` reached every sink — console, log file, JSON log file, Sentry — verbatim. Protection existed only where every call site had been configured correctly, with no signal when one hadn't. It is now a *default*.
+- **Secrets are now redacted by default. This is a behavior change — logs that previously showed these values in cleartext will now show `[REDACTED]`.** Redaction used to be a _tool_ (`redact.paths`, entirely opt-in): unless an application configured it, a `password` in `context`, an `authorization` header, or an `apiKey` on a logged `Error` reached every sink — console, log file, JSON log file, Sentry — verbatim. Protection existed only where every call site had been configured correctly, with no signal when one hadn't. It is now a _default_.
 
   A built-in denylist (`DEFAULT_REDACT_KEYS`) censors matching keys at any depth of `context`, `message`, and an `Error`'s own enumerable properties, applied at the same logger-wide choke point as `redact.paths` — so every channel inherits it, including custom ones. The set covers passwords, shared secrets, tokens (access/refresh/id/CSRF/session), API and private keys, HTTP credential headers (`authorization`, `x-api-key`, `cookie`, `set-cookie`), session IDs, connection strings, and high-sensitivity financial PII (card numbers, CVV, SSN, IBAN).
 
@@ -210,7 +211,7 @@ changelogs.
 
   Paths are evaluated before keys, so a function `censor` on an explicit path still receives the original value rather than a mask, and that leaf is not censored twice.
 
-  Known residual gaps, unchanged by this release and documented on `applyRedact`: secrets interpolated into a `message` *string* (`` `token=${t}` ``) cannot be reached by either matcher; `Map` / `Set` / `Buffer` contents are not traversed; and properties exposed only via getters or non-enumerable descriptors are not walked, so an HTTP client that hides its request config behind a getter can still slip through. Enumerable ones — axios's `.config` / `.response`, which carry the outgoing `Authorization` header — *are* now covered.
+  Known residual gaps, unchanged by this release and documented on `applyRedact`: secrets interpolated into a `message` _string_ (`` `token=${t}` ``) cannot be reached by either matcher; `Map` / `Set` / `Buffer` contents are not traversed; and properties exposed only via getters or non-enumerable descriptors are not walked, so an HTTP client that hides its request config behind a getter can still slip through. Enumerable ones — axios's `.config` / `.response`, which carry the outgoing `Authorization` header — _are_ now covered.
 
 ### Fixed
 

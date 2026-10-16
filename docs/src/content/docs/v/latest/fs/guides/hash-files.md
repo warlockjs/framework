@@ -11,8 +11,8 @@ Every project ends up fingerprinting something — a cache key, an ETag, a "did 
 ```ts
 import { fs } from "@warlock.js/fs";
 
-fs.hash.string("hello world");      // sync   → "b94d27b9934d3e08..."
-await fs.hash.file("./bundle.js");  // async  → digest of the file on disk
+fs.hash.string("hello world"); // sync   → "b94d27b9934d3e08..."
+await fs.hash.file("./bundle.js"); // async  → digest of the file on disk
 ```
 
 Two of the four are synchronous and two are asynchronous, for a simple reason explained below.
@@ -29,8 +29,8 @@ const b = fs.hash.buffer(Buffer.from([0x01, 0x02, 0x03]));
 `file` and `dir` are **async** — they read from disk, and `fs.hash.file` streams the file so a 1 GB bundle hashes with a flat memory profile:
 
 ```ts
-const fileDigest = await fs.hash.file("./video.mp4");   // streamed, constant memory
-const treeDigest = await fs.hash.dir("./dist");         // stable tree fingerprint
+const fileDigest = await fs.hash.file("./video.mp4"); // streamed, constant memory
+const treeDigest = await fs.hash.dir("./dist"); // stable tree fingerprint
 ```
 
 :::note[Why the split matters]
@@ -46,12 +46,12 @@ fs.hash.string("data", "sha512");
 await fs.hash.file("./legacy.bin", "md5");
 ```
 
-| Algorithm | When |
-| --- | --- |
-| `"sha256"` (default) | cache keys, ETags, fingerprints, integrity checks |
-| `"sha512"` | longer digests, collision resistance at scale (millions of artifacts) |
-| `"md5"` | only to match an external system (legacy ETags, some CDN APIs) |
-| `"sha1"` | compatibility only (Git, legacy webhook signatures) |
+| Algorithm            | When                                                                  |
+| -------------------- | --------------------------------------------------------------------- |
+| `"sha256"` (default) | cache keys, ETags, fingerprints, integrity checks                     |
+| `"sha512"`           | longer digests, collision resistance at scale (millions of artifacts) |
+| `"md5"`              | only to match an external system (legacy ETags, some CDN APIs)        |
+| `"sha1"`             | compatibility only (Git, legacy webhook signatures)                   |
 
 MD5 and SHA-1 are fine for non-adversarial fingerprinting but **broken for anything security-sensitive** — a determined attacker can craft a colliding file. Don't pick them for new integrity checks.
 
@@ -102,8 +102,7 @@ A content-addressed filename for cache busting — the first 8 hex chars carry p
 
 ```ts
 const digest = await fs.hash.file("./dist/bundle.js");
-const versioned = await fs.file("./dist/bundle.js")
-  .rename(`bundle.${digest.slice(0, 8)}.js`);
+const versioned = await fs.file("./dist/bundle.js").rename(`bundle.${digest.slice(0, 8)}.js`);
 ```
 
 ## The low-level layer
@@ -113,8 +112,8 @@ The facade delegates to a set of bare primitives — reach for them only from **
 ```ts
 import { hashString, hashFileAsync } from "@warlock.js/fs";
 
-const inMemory = hashString("hello");        // sync primitive behind fs.hash.string
-const fromDisk = await hashFileAsync("f");   // async primitive behind fs.hash.file
+const inMemory = hashString("hello"); // sync primitive behind fs.hash.string
+const fromDisk = await hashFileAsync("f"); // async primitive behind fs.hash.file
 ```
 
 There's also `hashBuffer`, `hashFile` (sync, reads the whole file), and `hashFileSmallAsync` (one-shot read for files under ~1 MB). In app and runtime code, prefer `fs.hash.*` — it reads better and streams by default.

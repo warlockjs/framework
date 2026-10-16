@@ -147,7 +147,9 @@ describe("defineNotification", () => {
   });
 
   it("PreferenceProvider drops channels → `skipped` event", async () => {
-    configure({ preferences: { resolveChannels: (_n, _t, req) => req.filter((c) => c !== "mail") } });
+    configure({
+      preferences: { resolveChannels: (_n, _t, req) => req.filter((c) => c !== "mail") },
+    });
 
     const skipped = vi.fn();
     const off = notifications.on("skipped", skipped);
@@ -250,7 +252,10 @@ describe("defineNotification", () => {
 
     expect(mailSend).not.toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "mail", options: expect.objectContaining({ delay: "10m" }) }),
+      expect.objectContaining({
+        channel: "mail",
+        options: expect.objectContaining({ delay: "10m" }),
+      }),
     );
   });
 });

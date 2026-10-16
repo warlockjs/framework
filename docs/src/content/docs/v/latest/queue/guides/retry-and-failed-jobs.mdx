@@ -74,7 +74,9 @@ bound it:
 defineJob({
   name: "webhooks.deliver",
   removeOnFail: 200, // keep only the newest 200
-  async handle(payload) { /* ... */ },
+  async handle(payload) {
+    /* ... */
+  },
 });
 ```
 

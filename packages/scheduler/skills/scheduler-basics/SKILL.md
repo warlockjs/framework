@@ -36,7 +36,7 @@ The 9 things that are true in every scheduler use:
 6. **Validation throws at definition time.** `every(0)`, `at("24:00")`, `on(32)`, `retry(-1)`, malformed cron — all throw immediately when you wire the job, not at runtime.
 7. **`Job.run()` returns a `JobResult`, never throws.** Errors funnel into `result.error`. The scheduler emits `job:error` after all retries are exhausted.
 8. **Parallel mode is within a tick, not across.** Even with `runInParallel(true)`, the NEXT tick waits for the current tick's jobs to all settle.
-9. **Tick interval is drift-compensated.** A tick that takes 200 ms is followed by an 800 ms delay so the cadence between tick *starts* averages `tickInterval`, not `tickInterval + work-time`.
+9. **Tick interval is drift-compensated.** A tick that takes 200 ms is followed by an 800 ms delay so the cadence between tick _starts_ averages `tickInterval`, not `tickInterval + work-time`.
 
 ## 30-second example
 
@@ -53,7 +53,7 @@ scheduler.addJob(
     .at("03:00")
     .inTimezone("America/New_York")
     .preventOverlap()
-    .retry(3, 1000)
+    .retry(3, 1000),
 );
 
 scheduler.start();
@@ -79,13 +79,13 @@ scheduler.around((job, run) => storage.run({ job: job.name }, run));
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Building schedules via `every*`/`daily`/`weekly`/`monthly`/`at`/`on`/`beginOf`/`endOf` | the `schedule-fluently` topic |
-| Writing `.cron("…")` expressions, debugging DOM/DOW behavior, using `parseCron()` for preview | the `schedule-with-cron` topic |
+| If the task is about…                                                                                 | Load                                    |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| Building schedules via `every*`/`daily`/`weekly`/`monthly`/`at`/`on`/`beginOf`/`endOf`                | the `schedule-fluently` topic           |
+| Writing `.cron("…")` expressions, debugging DOM/DOW behavior, using `parseCron()` for preview         | the `schedule-with-cron` topic          |
 | Configuring `.retry()` / exponential backoff, `.preventOverlap()`, understanding failure rescheduling | the `configure-retry-and-overlap` topic |
-| Subscribing to scheduler events, reading `JobResult`, lifecycle, graceful shutdown | the `observe-scheduler` topic |
-| Per-job `.inTimezone()`, multi-region patterns, DST handling | the `pin-schedule-timezone` topic |
+| Subscribing to scheduler events, reading `JobResult`, lifecycle, graceful shutdown                    | the `observe-scheduler` topic           |
+| Per-job `.inTimezone()`, multi-region patterns, DST handling                                          | the `pin-schedule-timezone` topic       |
 
 ## When NOT to use this skill
 

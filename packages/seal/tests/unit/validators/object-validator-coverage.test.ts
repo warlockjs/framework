@@ -44,10 +44,12 @@ describe("ObjectValidator - extended coverage", () => {
 
   describe("trim mutator", () => {
     it("trims string values recursively by default", async () => {
-      const validator = v.object({
-        name: v.string(),
-        nested: v.object({ city: v.string() }),
-      }).trim();
+      const validator = v
+        .object({
+          name: v.string(),
+          nested: v.object({ city: v.string() }),
+        })
+        .trim();
 
       const result = await validate(validator, {
         name: "  Alice  ",

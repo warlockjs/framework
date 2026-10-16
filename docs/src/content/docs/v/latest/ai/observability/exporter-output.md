@@ -19,13 +19,13 @@ The console exporter renders each span through `formatSpanLine`, which produces 
 
 The status `marker` is plain ASCII (no color, no emoji) so it survives log aggregators and CI:
 
-| Status | Marker |
-|---|---|
-| `completed` | `ok` |
-| `failed` | `ERR` |
-| `cancelled` | `cancel` |
+| Status           | Marker     |
+| ---------------- | ---------- |
+| `completed`      | `ok`       |
+| `failed`         | `ERR`      |
+| `cancelled`      | `cancel`   |
 | `max-iterations` | `max-iter` |
-| `awaiting-input` | `await` |
+| `awaiting-input` | `await`    |
 
 The cost suffix (`, $0.0094`) is only appended when the span's `usage.cost` breakdown is present — an unpriced run omits it entirely rather than printing a misleading `$0.0000`.
 
@@ -63,7 +63,60 @@ Each line is routed independently: a `failed`/`cancelled` span goes to `console.
 The file exporter appends one JSON record per line. Each record is a `TraceRecord` envelope — `{ type: "trace", exportedAt, trace }` — wrapping the completed `Trace` verbatim:
 
 ```json
-{"type":"trace","exportedAt":"2026-06-18T10:00:02.150Z","trace":{"traceId":"run-9f2","sessionId":"sess-1","root":{"spanId":"run-9f2","traceId":"run-9f2","sessionId":"sess-1","name":"checkout","type":"workflow","status":"completed","startedAt":"2026-06-18T10:00:00.000Z","endedAt":"2026-06-18T10:00:02.103Z","duration":2103,"usage":{"input":1500,"output":320,"total":1820,"cost":{"input":0.0045,"output":0.0049}},"children":[{"spanId":"run-9f3","parentSpanId":"run-9f2","traceId":"run-9f2","name":"router","type":"agent","status":"completed","startedAt":"2026-06-18T10:00:00.010Z","endedAt":"2026-06-18T10:00:01.250Z","duration":1240,"usage":{"input":300,"output":170,"total":470},"attributes":{"agent.model.name":"gpt-4o","agent.model.provider":"openai","agent.trips":2},"children":[]}]},"startedAt":"2026-06-18T10:00:00.000Z","endedAt":"2026-06-18T10:00:02.103Z","duration":2103,"usage":{"input":1500,"output":320,"total":1820,"cost":{"input":0.0045,"output":0.0049}}}}
+{
+  "type": "trace",
+  "exportedAt": "2026-06-18T10:00:02.150Z",
+  "trace": {
+    "traceId": "run-9f2",
+    "sessionId": "sess-1",
+    "root": {
+      "spanId": "run-9f2",
+      "traceId": "run-9f2",
+      "sessionId": "sess-1",
+      "name": "checkout",
+      "type": "workflow",
+      "status": "completed",
+      "startedAt": "2026-06-18T10:00:00.000Z",
+      "endedAt": "2026-06-18T10:00:02.103Z",
+      "duration": 2103,
+      "usage": {
+        "input": 1500,
+        "output": 320,
+        "total": 1820,
+        "cost": { "input": 0.0045, "output": 0.0049 }
+      },
+      "children": [
+        {
+          "spanId": "run-9f3",
+          "parentSpanId": "run-9f2",
+          "traceId": "run-9f2",
+          "name": "router",
+          "type": "agent",
+          "status": "completed",
+          "startedAt": "2026-06-18T10:00:00.010Z",
+          "endedAt": "2026-06-18T10:00:01.250Z",
+          "duration": 1240,
+          "usage": { "input": 300, "output": 170, "total": 470 },
+          "attributes": {
+            "agent.model.name": "gpt-4o",
+            "agent.model.provider": "openai",
+            "agent.trips": 2
+          },
+          "children": []
+        }
+      ]
+    },
+    "startedAt": "2026-06-18T10:00:00.000Z",
+    "endedAt": "2026-06-18T10:00:02.103Z",
+    "duration": 2103,
+    "usage": {
+      "input": 1500,
+      "output": 320,
+      "total": 1820,
+      "cost": { "input": 0.0045, "output": 0.0049 }
+    }
+  }
+}
 ```
 
 The same record, shown indented for readability (this is what `{ pretty: true }` writes, except pretty mode keeps each record across multiple physical lines):

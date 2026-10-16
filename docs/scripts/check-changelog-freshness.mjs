@@ -161,8 +161,11 @@ export async function getRegistryNewestVersion(/** @type {RegistryFetch} */ fetc
   }
 
   const versions =
-    packument && typeof packument === "object" && "versions" in packument &&
-      typeof packument.versions === "object" && packument.versions !== null
+    packument &&
+    typeof packument === "object" &&
+    "versions" in packument &&
+    typeof packument.versions === "object" &&
+    packument.versions !== null
       ? Object.keys(packument.versions)
       : null;
   if (!versions || versions.length === 0) {
@@ -187,7 +190,10 @@ export async function getRegistryNewestVersion(/** @type {RegistryFetch} */ fetc
 }
 
 /** Pure comparison: is the local newest release behind the registry's newest published version? */
-export function evaluateFreshness(/** @type {string} */ localVersion, /** @type {string} */ registryVersion) {
+export function evaluateFreshness(
+  /** @type {string} */ localVersion,
+  /** @type {string} */ registryVersion,
+) {
   const diff = compareSemverAsc(localVersion, registryVersion);
   if (diff < 0) {
     return {

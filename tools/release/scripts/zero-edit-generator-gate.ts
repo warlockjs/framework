@@ -1,13 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import {
-  mkdir,
-  readFile,
-  realpath,
-  readdir,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, readFile, realpath, readdir, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -182,12 +175,16 @@ export async function runZeroEditGeneratorGate(
   const coreRoot = path.join(baseline, "node_modules", "@warlock.js", "core");
   await assertInstalledIdentity(runtime, coreRoot, "@warlock.js/core", context.candidateVersion);
 
-  const catalogResult = await runRequired(runtime, {
-    command: process.execPath,
-    args: [config.featureCatalogAdapterPath, "--core-root", coreRoot, "--format", "json"],
-    cwd: baseline,
-    env: gateEnvironment(context),
-  }, "installed feature-map adapter");
+  const catalogResult = await runRequired(
+    runtime,
+    {
+      command: process.execPath,
+      args: [config.featureCatalogAdapterPath, "--core-root", coreRoot, "--format", "json"],
+      cwd: baseline,
+      env: gateEnvironment(context),
+    },
+    "installed feature-map adapter",
+  );
   const catalog = parseFeatureCatalog(catalogResult.stdout, await runtime.realPath(coreRoot));
   runtime.onEvent("subjects-derived", catalog.features.join(","));
 
@@ -204,7 +201,13 @@ export async function runZeroEditGeneratorGate(
 
   await exerciseCase(runtime, context, config, baseline, baseline, []);
   for (const feature of selection.isolatedFeatures) {
-    const app = await scaffold(runtime, context, createCli, casesRoot, `feature-${safeName(feature)}`);
+    const app = await scaffold(
+      runtime,
+      context,
+      createCli,
+      casesRoot,
+      `feature-${safeName(feature)}`,
+    );
     await addFeatures(runtime, context, app, [feature]);
     await assertGeneratedAndInstalled(runtime, context, config.npmCliPath, app);
     await exerciseCase(runtime, context, config, app, baseline, [feature]);
@@ -255,15 +258,20 @@ export function resolveFeatureSelection(
   only: readonly string[] | undefined,
 ): FeatureSelection {
   if (!only) {
-    return { isSubset: false, isolatedFeatures: catalogFeatures, runComposed: true, skippedFeatures: [] };
+    return {
+      isSubset: false,
+      isolatedFeatures: catalogFeatures,
+      runComposed: true,
+      skippedFeatures: [],
+    };
   }
   if (only.length === 0) {
     throw new Error("--only requires at least one feature name.");
   }
 
   const catalogSet = new Set(catalogFeatures);
-  const requestedFeatures = only.filter(name => name !== COMPOSED_ROW_KEYWORD);
-  const unknown = requestedFeatures.filter(name => !catalogSet.has(name));
+  const requestedFeatures = only.filter((name) => name !== COMPOSED_ROW_KEYWORD);
+  const unknown = requestedFeatures.filter((name) => !catalogSet.has(name));
   if (unknown.length > 0) {
     throw new Error(
       `--only names unknown feature(s): ${unknown.join(", ")}. Valid features are: ` +
@@ -274,9 +282,9 @@ export function resolveFeatureSelection(
   const requestedSet = new Set(requestedFeatures);
   return {
     isSubset: true,
-    isolatedFeatures: catalogFeatures.filter(feature => requestedSet.has(feature)),
+    isolatedFeatures: catalogFeatures.filter((feature) => requestedSet.has(feature)),
     runComposed: only.includes(COMPOSED_ROW_KEYWORD),
-    skippedFeatures: catalogFeatures.filter(feature => !requestedSet.has(feature)),
+    skippedFeatures: catalogFeatures.filter((feature) => !requestedSet.has(feature)),
   };
 }
 
@@ -289,12 +297,16 @@ async function scaffold(
 ): Promise<string> {
   const app = path.join(parent, name);
   if (existsSync(app)) throw new Error(`Fresh scaffold target already exists: ${app}`);
-  await runRequired(runtime, {
-    command: process.execPath,
-    args: [createCli, name, "--yes", "--no-db", "--no-git", "--no-jwt", "--pm=npm"],
-    cwd: parent,
-    env: { ...gateEnvironment(context), NODE_ENV: "development" },
-  }, `create-warlock ${name}`);
+  await runRequired(
+    runtime,
+    {
+      command: process.execPath,
+      args: [createCli, name, "--yes", "--no-db", "--no-git", "--no-jwt", "--pm=npm"],
+      cwd: parent,
+      env: { ...gateEnvironment(context), NODE_ENV: "development" },
+    },
+    `create-warlock ${name}`,
+  );
   await runtime.readTextFile(path.join(app, "package.json"));
   runtime.onEvent("scaffold-created", name);
   return app;
@@ -308,13 +320,20 @@ async function addFeatures(
 ): Promise<void> {
   if (features.length === 0) throw new Error("Refusing an empty add invocation.");
   const warlockCli = path.join(app, "node_modules", "@warlock.js", "core", "bin", "warlock.js");
-  await runRequired(runtime, {
-    command: process.execPath,
-    args: [warlockCli, "add", ...features, "--no-install"],
-    cwd: app,
-    env: gateEnvironment(context),
-  }, `warlock add ${features.join(" ")}`);
-  runtime.onEvent(features.length === 1 ? "isolated-feature-added" : "composed-features-added", features.join(","));
+  await runRequired(
+    runtime,
+    {
+      command: process.execPath,
+      args: [warlockCli, "add", ...features, "--no-install"],
+      cwd: app,
+      env: gateEnvironment(context),
+    },
+    `warlock add ${features.join(" ")}`,
+  );
+  runtime.onEvent(
+    features.length === 1 ? "isolated-feature-added" : "composed-features-added",
+    features.join(","),
+  );
 }
 
 async function assertGeneratedAndInstalled(
@@ -339,12 +358,16 @@ async function exerciseCase(
   features: readonly string[],
 ): Promise<void> {
   const args = oracleArguments(app, baseline, features, context.candidateVersion);
-  const result = await runRequired(runtime, {
-    command: process.execPath,
-    args: [config.generatedOutputOraclePath, ...args],
-    cwd: app,
-    env: gateEnvironment(context),
-  }, `generated-output oracle (${caseLabel(features)})`);
+  const result = await runRequired(
+    runtime,
+    {
+      command: process.execPath,
+      args: [config.generatedOutputOraclePath, ...args],
+      cwd: app,
+      env: gateEnvironment(context),
+    },
+    `generated-output oracle (${caseLabel(features)})`,
+  );
   const certificate = parseRuntimeCertificate(result.stdout, app, baseline, features);
   runtime.onEvent("generated-output-proved", caseLabel(features));
   if (!certificate.hasWeb) return;
@@ -386,7 +409,10 @@ async function proveBrowserMutation(
       ...request,
       args: [...request.args, "--mutation-control"],
     });
-    if (failed.exitCode === 0 || !/ZERO_EDIT_BROWSER_ORACLE_ASSERTION_FAILED/.test(`${failed.stdout}\n${failed.stderr}`)) {
+    if (
+      failed.exitCode === 0 ||
+      !/ZERO_EDIT_BROWSER_ORACLE_ASSERTION_FAILED/.test(`${failed.stdout}\n${failed.stderr}`)
+    ) {
       throw new Error("Browser oracle did not fail on the real generated-file mutation control.");
     }
   } finally {
@@ -405,21 +431,26 @@ interface RequiredAdapterConfig {
 }
 
 function assertContext(context: GeneratorGateContext, runtime: Runtime): RequiredAdapterConfig {
-  if (!EXACT_VERSION.test(context.candidateVersion)) throw new Error("Generator candidate must be an exact semver.");
-  if (!path.isAbsolute(context.workspaceDirectory)) throw new Error("Generator workspace must be absolute.");
+  if (!EXACT_VERSION.test(context.candidateVersion))
+    throw new Error("Generator candidate must be an exact semver.");
+  if (!path.isAbsolute(context.workspaceDirectory))
+    throw new Error("Generator workspace must be absolute.");
   const registry = new URL(context.registryUrl);
   if (registry.protocol !== "http:" || registry.hostname !== "127.0.0.1" || !registry.port) {
     throw new Error("Generator registry must be an explicit owned 127.0.0.1 HTTP registry.");
   }
   for (const key of REQUIRED_NPM_ENV) {
-    if (!context.npmEnvironment[key]) throw new Error(`Generator npm environment is missing ${key}.`);
+    if (!context.npmEnvironment[key])
+      throw new Error(`Generator npm environment is missing ${key}.`);
   }
   if (context.npmEnvironment.npm_config_registry !== context.registryUrl) {
     throw new Error("Generator npm environment registry does not match its explicit registry URL.");
   }
   const required = (value: string | undefined, envName: string): string => {
     if (!value || !path.isAbsolute(value)) {
-      throw new Error(`${envName} must name an absolute required adapter; this gate never skips or substitutes a fixture.`);
+      throw new Error(
+        `${envName} must name an absolute required adapter; this gate never skips or substitutes a fixture.`,
+      );
     }
     return path.resolve(value);
   };
@@ -429,9 +460,18 @@ function assertContext(context: GeneratorGateContext, runtime: Runtime): Require
   }
   return {
     npmCliPath,
-    featureCatalogAdapterPath: required(context.featureCatalogAdapterPath, "WARLOCK_FEATURE_CATALOG_ADAPTER"),
-    generatedOutputOraclePath: required(context.generatedOutputOraclePath, "WARLOCK_GENERATED_OUTPUT_ORACLE"),
-    browserOracleAdapterPath: required(context.browserOracleAdapterPath, "WARLOCK_GENERATED_BROWSER_ORACLE"),
+    featureCatalogAdapterPath: required(
+      context.featureCatalogAdapterPath,
+      "WARLOCK_FEATURE_CATALOG_ADAPTER",
+    ),
+    generatedOutputOraclePath: required(
+      context.generatedOutputOraclePath,
+      "WARLOCK_GENERATED_OUTPUT_ORACLE",
+    ),
+    browserOracleAdapterPath: required(
+      context.browserOracleAdapterPath,
+      "WARLOCK_GENERATED_BROWSER_ORACLE",
+    ),
   };
 }
 
@@ -443,22 +483,36 @@ async function runNpm(
   args: readonly string[],
 ): Promise<GateCommandResult> {
   const explicit = [
-    "--registry", context.registryUrl,
-    "--cache", context.npmEnvironment.npm_config_cache!,
-    "--userconfig", context.npmEnvironment.npm_config_userconfig!,
-    "--globalconfig", context.npmEnvironment.npm_config_globalconfig!,
-    "--no-audit", "--no-fund",
+    "--registry",
+    context.registryUrl,
+    "--cache",
+    context.npmEnvironment.npm_config_cache!,
+    "--userconfig",
+    context.npmEnvironment.npm_config_userconfig!,
+    "--globalconfig",
+    context.npmEnvironment.npm_config_globalconfig!,
+    "--no-audit",
+    "--no-fund",
   ];
-  return await runRequired(runtime, {
-    command: process.execPath,
-    args: [npmCliPath, ...args, ...explicit],
-    cwd,
-    env: gateEnvironment(context),
-  }, `npm ${args.join(" ")}`);
+  return await runRequired(
+    runtime,
+    {
+      command: process.execPath,
+      args: [npmCliPath, ...args, ...explicit],
+      cwd,
+      env: gateEnvironment(context),
+    },
+    `npm ${args.join(" ")}`,
+  );
 }
 
-async function runRequired(runtime: Runtime, request: GateCommandRequest, label: string): Promise<GateCommandResult> {
-  if (request.command !== process.execPath) throw new Error(`${label} must execute through the current Node binary.`);
+async function runRequired(
+  runtime: Runtime,
+  request: GateCommandRequest,
+  label: string,
+): Promise<GateCommandResult> {
+  if (request.command !== process.execPath)
+    throw new Error(`${label} must execute through the current Node binary.`);
   const result = await runtime.runCommand(request);
   if (result.exitCode !== 0) {
     throw new Error(`${label} exited ${result.exitCode}: ${tail(result.stderr || result.stdout)}`);
@@ -486,20 +540,28 @@ export function assertExactCandidatePins(manifest: Record<string, unknown>, vers
       if (!name.startsWith("@warlock.js/")) continue;
       found += 1;
       if (specification !== version) {
-        throw new Error(`Generated ${field}.${name} must equal ${version}; found ${specification}.`);
+        throw new Error(
+          `Generated ${field}.${name} must equal ${version}; found ${specification}.`,
+        );
       }
     }
   }
   if (found === 0) throw new Error("Generated app declared no @warlock.js/* dependencies.");
 }
 
-async function assertOnePhysicalCore(runtime: Runtime, app: string, version: string): Promise<void> {
+async function assertOnePhysicalCore(
+  runtime: Runtime,
+  app: string,
+  version: string,
+): Promise<void> {
   const roots: string[] = [];
   await walk(app);
   const physical = new Set<string>();
   for (const root of roots) physical.add(await runtime.realPath(root));
   if (physical.size !== 1 || roots.length !== 1) {
-    throw new Error(`Expected exactly one physical @warlock.js/core; found ${roots.length} locations / ${physical.size} real paths.`);
+    throw new Error(
+      `Expected exactly one physical @warlock.js/core; found ${roots.length} locations / ${physical.size} real paths.`,
+    );
   }
   await assertInstalledIdentity(runtime, roots[0], "@warlock.js/core", version);
 
@@ -517,17 +579,30 @@ async function assertOnePhysicalCore(runtime: Runtime, app: string, version: str
   }
 }
 
-async function assertInstalledIdentity(runtime: Runtime, root: string, name: string, version: string): Promise<void> {
+async function assertInstalledIdentity(
+  runtime: Runtime,
+  root: string,
+  name: string,
+  version: string,
+): Promise<void> {
   const manifest = parseObject(await runtime.readTextFile(path.join(root, "package.json")), root);
   if (manifest.name !== name || manifest.version !== version) {
-    throw new Error(`Installed identity mismatch for ${name}: ${String(manifest.name)}@${String(manifest.version)}.`);
+    throw new Error(
+      `Installed identity mismatch for ${name}: ${String(manifest.name)}@${String(manifest.version)}.`,
+    );
   }
 }
 
 export function parseFeatureCatalog(source: string, coreRoot: string): FeatureCatalog {
   const value = parseObject(source, "feature catalog") as Partial<FeatureCatalog>;
-  if (value.schemaVersion !== 1 || value.source !== "installed-core-feature-map" || value.complete !== true) {
-    throw new Error("Feature adapter must return a complete schemaVersion 1 installed-core-feature-map catalog.");
+  if (
+    value.schemaVersion !== 1 ||
+    value.source !== "installed-core-feature-map" ||
+    value.complete !== true
+  ) {
+    throw new Error(
+      "Feature adapter must return a complete schemaVersion 1 installed-core-feature-map catalog.",
+    );
   }
   if (path.resolve(String(value.coreRoot ?? "")) !== path.resolve(coreRoot)) {
     throw new Error("Feature catalog did not identify the installed Core root it inspected.");
@@ -535,27 +610,46 @@ export function parseFeatureCatalog(source: string, coreRoot: string): FeatureCa
   if (!Array.isArray(value.features) || value.features.length === 0) {
     throw new Error("Installed Core feature map produced no top-level features.");
   }
-  if (new Set(value.features).size !== value.features.length || !value.features.every(validFeature)) {
+  if (
+    new Set(value.features).size !== value.features.length ||
+    !value.features.every(validFeature)
+  ) {
     throw new Error("Installed Core feature catalog contains duplicate or unsafe feature keys.");
   }
   return value as FeatureCatalog;
 }
 
-function parseRuntimeCertificate(source: string, app: string, baseline: string, features: readonly string[]): RuntimeCertificate {
-  const value = parseObject(source, "generated-output certificate") as unknown as RuntimeCertificate;
+function parseRuntimeCertificate(
+  source: string,
+  app: string,
+  baseline: string,
+  features: readonly string[],
+): RuntimeCertificate {
+  const value = parseObject(
+    source,
+    "generated-output certificate",
+  ) as unknown as RuntimeCertificate;
   if (
-    value.schemaVersion !== 1 || value.inventoryComplete !== true || value.typecheckPassed !== true ||
+    value.schemaVersion !== 1 ||
+    value.inventoryComplete !== true ||
+    value.typecheckPassed !== true ||
     path.resolve(value.appRoot ?? "") !== path.resolve(app) ||
     path.resolve(value.baselineRoot ?? "") !== path.resolve(baseline) ||
     !sameStrings(value.features, features) ||
-    !phasePassed(value.development) || !phasePassed(value.production) ||
+    !phasePassed(value.development) ||
+    !phasePassed(value.production) ||
     !Array.isArray(value.introducedRoutes) ||
-    value.introducedRoutes.some(route => !route.id || route.developmentRequested !== true || route.productionRequested !== true) ||
+    value.introducedRoutes.some(
+      (route) =>
+        !route.id || route.developmentRequested !== true || route.productionRequested !== true,
+    ) ||
     !Array.isArray(value.introducedCommands) ||
-    value.introducedCommands.some(command => !command.id || command.executed !== true) ||
+    value.introducedCommands.some((command) => !command.id || command.executed !== true) ||
     typeof value.hasWeb !== "boolean"
   ) {
-    throw new Error("Generated-output oracle returned incomplete typecheck/lifecycle/route/command evidence.");
+    throw new Error(
+      "Generated-output oracle returned incomplete typecheck/lifecycle/route/command evidence.",
+    );
   }
   return value;
 }
@@ -563,29 +657,60 @@ function parseRuntimeCertificate(source: string, app: string, baseline: string, 
 function parseBrowserCertificate(source: string, app: string): BrowserCertificate {
   const value = parseObject(source, "browser certificate") as unknown as BrowserCertificate;
   if (
-    value.schemaVersion !== 1 || path.resolve(value.appRoot ?? "") !== path.resolve(app) ||
-    value.development?.clickPassed !== true || value.development?.linkSpaNavigationPassed !== true ||
-    value.development?.hmrStatePreserved !== true || value.development?.consoleErrors?.length !== 0 ||
-    value.development?.pageErrors?.length !== 0 || value.production?.clickPassed !== true ||
-    value.production?.linkSpaNavigationPassed !== true || value.production?.consoleErrors?.length !== 0 ||
-    value.production?.pageErrors?.length !== 0 || !value.mutation?.relativePath || !value.mutation.find ||
+    value.schemaVersion !== 1 ||
+    path.resolve(value.appRoot ?? "") !== path.resolve(app) ||
+    value.development?.clickPassed !== true ||
+    value.development?.linkSpaNavigationPassed !== true ||
+    value.development?.hmrStatePreserved !== true ||
+    value.development?.consoleErrors?.length !== 0 ||
+    value.development?.pageErrors?.length !== 0 ||
+    value.production?.clickPassed !== true ||
+    value.production?.linkSpaNavigationPassed !== true ||
+    value.production?.consoleErrors?.length !== 0 ||
+    value.production?.pageErrors?.length !== 0 ||
+    !value.mutation?.relativePath ||
+    !value.mutation.find ||
     !value.mutation.replacement
   ) {
-    throw new Error("Browser oracle returned incomplete generated-app dev/prod/click/Link/HMR/error evidence.");
+    throw new Error(
+      "Browser oracle returned incomplete generated-app dev/prod/click/Link/HMR/error evidence.",
+    );
   }
   resolveInside(app, value.mutation.relativePath);
   return value;
 }
 
-function oracleArguments(app: string, baseline: string, features: readonly string[], version: string): string[] {
-  return ["--app-root", app, "--baseline-root", baseline, "--features-json", JSON.stringify(features), "--candidate-version", version, "--format", "json"];
+function oracleArguments(
+  app: string,
+  baseline: string,
+  features: readonly string[],
+  version: string,
+): string[] {
+  return [
+    "--app-root",
+    app,
+    "--baseline-root",
+    baseline,
+    "--features-json",
+    JSON.stringify(features),
+    "--candidate-version",
+    version,
+    "--format",
+    "json",
+  ];
 }
 
 function resolveInside(root: string, relative: string): string {
-  if (path.isAbsolute(relative)) throw new Error("Mutation path must be relative to the generated app.");
+  if (path.isAbsolute(relative))
+    throw new Error("Mutation path must be relative to the generated app.");
   const resolved = path.resolve(root, relative);
   const relation = path.relative(path.resolve(root), resolved);
-  if (!relation || relation === ".." || relation.startsWith(`..${path.sep}`) || path.isAbsolute(relation)) {
+  if (
+    !relation ||
+    relation === ".." ||
+    relation.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relation)
+  ) {
     throw new Error("Mutation path escapes or names the generated app root.");
   }
   return resolved;
@@ -594,7 +719,8 @@ function resolveInside(root: string, relative: string): string {
 function parseObject(source: string, label: string): Record<string, unknown> {
   try {
     const value = JSON.parse(source.trim());
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("not an object");
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("not an object");
     return value as Record<string, unknown>;
   } catch (error) {
     throw new Error(`Cannot parse ${label} JSON: ${formatError(error)}.`);
@@ -602,7 +728,12 @@ function parseObject(source: string, label: string): Record<string, unknown> {
 }
 
 function isStringRecord(value: unknown): value is Record<string, string> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value) && Object.values(value as object).every(item => typeof item === "string");
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.values(value as object).every((item) => typeof item === "string")
+  );
 }
 
 function validFeature(value: unknown): value is string {
@@ -619,7 +750,11 @@ function phasePassed(value: RuntimePhaseCertificate | undefined): boolean {
 }
 
 function sameStrings(left: readonly string[] | undefined, right: readonly string[]): boolean {
-  return Array.isArray(left) && left.length === right.length && left.every((item, index) => item === right[index]);
+  return (
+    Array.isArray(left) &&
+    left.length === right.length &&
+    left.every((item, index) => item === right[index])
+  );
 }
 
 function caseLabel(features: readonly string[]): string {
@@ -638,16 +773,27 @@ export function defaultResolveNpmCliPath(): string {
   const require = createRequire(import.meta.url);
   const candidates: string[] = [];
   try {
-    candidates.push(path.join(path.dirname(require.resolve("npm/package.json")), "bin", "npm-cli.js"));
+    candidates.push(
+      path.join(path.dirname(require.resolve("npm/package.json")), "bin", "npm-cli.js"),
+    );
   } catch {
     // Fall through to layouts relative to the active Node executable.
   }
   candidates.push(
     path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
-    path.join(path.dirname(process.execPath), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    path.join(
+      path.dirname(process.execPath),
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
   );
-  const found = candidates.find(candidate => path.isAbsolute(candidate) && existsSync(candidate));
-  if (!found) throw new Error("Cannot resolve an absolute npm-cli.js; pass GeneratorGateContext.npmCliPath.");
+  const found = candidates.find((candidate) => path.isAbsolute(candidate) && existsSync(candidate));
+  if (!found)
+    throw new Error("Cannot resolve an absolute npm-cli.js; pass GeneratorGateContext.npmCliPath.");
   return found;
 }
 
@@ -698,13 +844,13 @@ async function defaultRunCommand(request: GateCommandRequest): Promise<GateComma
         child.kill("SIGKILL");
       }
     }, COMMAND_TIMEOUT_MS);
-    child.stdout?.setEncoding("utf8").on("data", chunk => (stdout += chunk));
-    child.stderr?.setEncoding("utf8").on("data", chunk => (stderr += chunk));
-    child.once("error", error => {
+    child.stdout?.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
+    child.stderr?.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    child.once("error", (error) => {
       clearTimeout(deadline);
       reject(error);
     });
-    child.once("close", code => {
+    child.once("close", (code) => {
       clearTimeout(deadline);
       if (timedOut) {
         resolve({
@@ -728,14 +874,23 @@ async function defaultRunCommand(request: GateCommandRequest): Promise<GateComma
 function withDefaults(dependencies: ZeroEditGeneratorGateDependencies): Runtime {
   return {
     runCommand: dependencies.runCommand ?? defaultRunCommand,
-    makeDirectory: dependencies.makeDirectory ?? (directory => mkdir(directory, { recursive: true }).then(() => undefined)),
-    readTextFile: dependencies.readTextFile ?? (file => readFile(file, "utf8")),
-    writeTextFile: dependencies.writeTextFile ?? ((file, contents) => writeFile(file, contents, "utf8")),
-    realPath: dependencies.realPath ?? (file => realpath(file)),
-    listDirectory: dependencies.listDirectory ?? (directory => readdir(directory)),
-    pathIsDirectory: dependencies.pathIsDirectory ?? (async file => {
-      try { return (await stat(file)).isDirectory(); } catch { return false; }
-    }),
+    makeDirectory:
+      dependencies.makeDirectory ??
+      ((directory) => mkdir(directory, { recursive: true }).then(() => undefined)),
+    readTextFile: dependencies.readTextFile ?? ((file) => readFile(file, "utf8")),
+    writeTextFile:
+      dependencies.writeTextFile ?? ((file, contents) => writeFile(file, contents, "utf8")),
+    realPath: dependencies.realPath ?? ((file) => realpath(file)),
+    listDirectory: dependencies.listDirectory ?? ((directory) => readdir(directory)),
+    pathIsDirectory:
+      dependencies.pathIsDirectory ??
+      (async (file) => {
+        try {
+          return (await stat(file)).isDirectory();
+        } catch {
+          return false;
+        }
+      }),
     resolveNpmCliPath: dependencies.resolveNpmCliPath ?? defaultResolveNpmCliPath,
     onEvent: dependencies.onEvent ?? (() => undefined),
   };

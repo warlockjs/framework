@@ -14,10 +14,10 @@ This recipe wires the production story: a dev-owned Postgres pool for the checkp
 
 `ai.orchestrator()` persists through two **distinct** stores. Confusing them is the most common wiring mistake.
 
-| Store | Factory | Persists | Keyed by | Needed when |
-|---|---|---|---|---|
-| **checkpoint** | `ai.checkpoint.{memory,pg,redis}()` | cross-turn session state (one append-only row per settled turn) | `(orchestrator_name, session_id, turn_index)` | always |
-| **snapshot** | `ai.snapshot.{memory,pg,redis}()` | in-flight internal-supervisor run state | `runId` | only with `iterate: true` |
+| Store          | Factory                             | Persists                                                        | Keyed by                                      | Needed when               |
+| -------------- | ----------------------------------- | --------------------------------------------------------------- | --------------------------------------------- | ------------------------- |
+| **checkpoint** | `ai.checkpoint.{memory,pg,redis}()` | cross-turn session state (one append-only row per settled turn) | `(orchestrator_name, session_id, turn_index)` | always                    |
+| **snapshot**   | `ai.snapshot.{memory,pg,redis}()`   | in-flight internal-supervisor run state                         | `runId`                                       | only with `iterate: true` |
 
 An `iterate: false` orchestrator needs only a checkpoint store. An `iterate: true` orchestrator needs **both**.
 
@@ -252,7 +252,7 @@ async function drainInterruptedSessions() {
 
 ### Why the drain is safe to run on every boot
 
-`resume()` is idempotent by construction, which is what makes the unconditional loop above correct. Internally it loads the latest checkpoint, computes the `runId` of the turn that would have been *next* (the one that was in flight), and loads that supervisor snapshot. It only re-dispatches when a snapshot exists **and** its status is still `running`; in every other case — no in-flight snapshot, a snapshot that already settled, or an `iterate: false` orchestrator that has no snapshot store at all — it returns `null` and touches nothing. So a session that completed cleanly before the crash is a no-op on the next boot, and re-running the whole drain after a second crash mid-drain simply resumes whatever is still `running`. That is why the loop treats `result === null` as the common case (`resumed: result !== null`) rather than an error.
+`resume()` is idempotent by construction, which is what makes the unconditional loop above correct. Internally it loads the latest checkpoint, computes the `runId` of the turn that would have been _next_ (the one that was in flight), and loads that supervisor snapshot. It only re-dispatches when a snapshot exists **and** its status is still `running`; in every other case — no in-flight snapshot, a snapshot that already settled, or an `iterate: false` orchestrator that has no snapshot store at all — it returns `null` and touches nothing. So a session that completed cleanly before the crash is a no-op on the next boot, and re-running the whole drain after a second crash mid-drain simply resumes whatever is still `running`. That is why the loop treats `result === null` as the common case (`resumed: result !== null`) rather than an error.
 
 `resume()` requires both stores to be wired: it reads the checkpoint to find the latest settled turn and reads the snapshot to find the in-flight run. An `iterate: false` orchestrator has no snapshot store, so `resume()` always returns `null` for it — the boot drain is a no-op and you can skip it entirely.
 
@@ -283,15 +283,15 @@ A few mechanics worth knowing:
 - **Pruning is per-session and synchronous-after-save.** It runs in the same turn that wrote the new row, against that one session — it never sweeps the whole table.
 - **`prune()` is an optional store method.** The pg and redis checkpoint stores implement it; a custom store that omits `prune()` is simply never pruned (the orchestrator guards on `typeof store.prune === "function"`). The memory store implements it too, so dev and prod prune identically.
 - **It only ever deletes the latest row's predecessors.** The most recent turn is always retained regardless of `keepSnapshots`, so the live session state can never be pruned away.
-- **`keepSnapshots` is orthogonal to the store `ttl`.** `keepSnapshots` bounds row *count* per session on every save; `ttl` bounds row/key *age* and is applied at prune time (pg) or as a key expiry (redis). Use `keepSnapshots` to cap unbounded growth and `ttl` to retire sessions that have gone quiet.
+- **`keepSnapshots` is orthogonal to the store `ttl`.** `keepSnapshots` bounds row _count_ per session on every save; `ttl` bounds row/key _age_ and is applied at prune time (pg) or as a key expiry (redis). Use `keepSnapshots` to cap unbounded growth and `ttl` to retire sessions that have gone quiet.
 
 ## Running multiple instances
 
-Across a horizontally-scaled deployment, the stores are shared but the orchestrator gives you **no distributed lock for live turns**. The durability model assumes one rule, stated in the redis checkpoint store's own design: traffic is **serialized per `sessionId`**. Two turns for the *same* session must not run concurrently — different sessions in parallel are fine.
+Across a horizontally-scaled deployment, the stores are shared but the orchestrator gives you **no distributed lock for live turns**. The durability model assumes one rule, stated in the redis checkpoint store's own design: traffic is **serialized per `sessionId`**. Two turns for the _same_ session must not run concurrently — different sessions in parallel are fine.
 
 Why it matters for each store:
 
-- **Redis checkpoint store.** A session is one JSON document, and `save()` is a read-modify-write (load the document, push the new row, write it back). Two concurrent turns for one session would interleave that read-modify-write and lose a row. The store is correct *only* under per-session serialization.
+- **Redis checkpoint store.** A session is one JSON document, and `save()` is a read-modify-write (load the document, push the new row, write it back). Two concurrent turns for one session would interleave that read-modify-write and lose a row. The store is correct _only_ under per-session serialization.
 - **Postgres checkpoint store.** `save()` is a single append-only `INSERT`, so the database protects you from a silent clobber — but two concurrent turns would both compute the same next `turn_index` and the second `INSERT` collides on the primary key `(orchestrator_name, session_id, turn_index)` and throws. That is a hard failure, not corruption, but it is still a turn you have to retry. Serializing per session avoids it.
 
 So, regardless of store, route every request for a given `sessionId` through a single in-flight turn at a time. Concretely:

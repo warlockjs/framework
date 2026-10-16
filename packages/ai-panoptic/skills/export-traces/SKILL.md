@@ -21,22 +21,22 @@ Four exporters ship today. Each is a **factory** returning an `ExporterContract`
 
 ## Pick an exporter
 
-| Exporter | Backend | Deps | Use it for |
-|---|---|---|---|
-| `consoleExporter()` | stdout/stderr | none | local dev, CI logs |
-| `fileExporter()` | JSON-Lines file | none | durable local sink, replay, out-of-band shipping |
-| `otelExporter()` | OpenTelemetry | `@opentelemetry/api` (optional peer) | OTel-native stacks, GenAI semantic conventions |
-| `langfuseExporter()` | Langfuse | `langfuse` (optional peer) | LLM-specific dashboards, generations |
+| Exporter             | Backend         | Deps                                 | Use it for                                       |
+| -------------------- | --------------- | ------------------------------------ | ------------------------------------------------ |
+| `consoleExporter()`  | stdout/stderr   | none                                 | local dev, CI logs                               |
+| `fileExporter()`     | JSON-Lines file | none                                 | durable local sink, replay, out-of-band shipping |
+| `otelExporter()`     | OpenTelemetry   | `@opentelemetry/api` (optional peer) | OTel-native stacks, GenAI semantic conventions   |
+| `langfuseExporter()` | Langfuse        | `langfuse` (optional peer)           | LLM-specific dashboards, generations             |
 
-> `@opentelemetry/api` and `langfuse` are **OPTIONAL peer dependencies**, lazily imported by their exporter. Importing `@warlock.js/ai-panoptic` never pulls them in; a missing SDK surfaces as a curated *"install this"* error on first export, never a boot-time stack trace.
+> `@opentelemetry/api` and `langfuse` are **OPTIONAL peer dependencies**, lazily imported by their exporter. Importing `@warlock.js/ai-panoptic` never pulls them in; a missing SDK surfaces as a curated _"install this"_ error on first export, never a boot-time stack trace.
 
 ## Console
 
 ```ts
 import { consoleExporter } from "@warlock.js/ai-panoptic";
 
-collector.use(consoleExporter());                 // one summary line per trace
-collector.use(consoleExporter({ tree: true }));   // full indented span tree
+collector.use(consoleExporter()); // one summary line per trace
+collector.use(consoleExporter({ tree: true })); // full indented span tree
 collector.use(consoleExporter({ streaming: true })); // also print each span as it finalizes
 ```
 
@@ -47,9 +47,9 @@ Failed/cancelled spans route to `console.error`; everything else to `console.log
 ```ts
 import { fileExporter } from "@warlock.js/ai-panoptic";
 
-collector.use(fileExporter({ path: "storage/traces.jsonl" }));      // write every trace
-collector.use(fileExporter({ path: "...", flushEvery: 50 }));       // batch 50 traces per write
-collector.use(fileExporter({ path: "...", pretty: true }));         // multi-line records
+collector.use(fileExporter({ path: "storage/traces.jsonl" })); // write every trace
+collector.use(fileExporter({ path: "...", flushEvery: 50 })); // batch 50 traces per write
+collector.use(fileExporter({ path: "...", pretty: true })); // multi-line records
 ```
 
 Appends one JSON record per line (a `TraceRecord` = `{ type: "trace", exportedAt, trace }`). Buffers in memory and drains on `flush()` / `shutdown()` — call `collector.shutdown()` on teardown so the last batch lands. The parent directory is created on first write.
@@ -100,11 +100,12 @@ Exporters surface `span.input` / `span.output` (console `in:` / `out:`, file JSO
 
 ```ts
 panoptic({
-  exporters: [langfuseExporter({ /* ... */ })],
-  captureContent: true,                 // copy prompts/responses + tool args/results onto spans
-  redactContent: (value, { field }) =>  // optional masker, per value
+  exporters: [langfuseExporter({/* ... */})],
+  captureContent: true, // copy prompts/responses + tool args/results onto spans
+  redactContent: (value, { field }) =>
+    // optional masker, per value
     field === "input" ? "[redacted]" : value,
-  fullHistory: true,                    // emit the WHOLE conversation as span.input (see below)
+  fullHistory: true, // emit the WHOLE conversation as span.input (see below)
 });
 ```
 
@@ -131,11 +132,18 @@ Reach for `fullHistory` when a backend (Langfuse) should show the full multi-tur
 Reusable when authoring a **custom exporter**:
 
 ```ts
-import { walkSpans, toGenAiAttributes, totalCostUsd, GEN_AI_ATTRIBUTES, WARLOCK_ATTRIBUTES } from "@warlock.js/ai-panoptic";
+import {
+  walkSpans,
+  toGenAiAttributes,
+  totalCostUsd,
+  GEN_AI_ATTRIBUTES,
+  WARLOCK_ATTRIBUTES,
+} from "@warlock.js/ai-panoptic";
 
-for (const span of walkSpans(trace.root)) {        // depth-first pre-order
-  const attributes = toGenAiAttributes(span);      // gen_ai.* / warlock.* attribute map
-  const cost = totalCostUsd(span.usage);           // single USD scalar, or undefined
+for (const span of walkSpans(trace.root)) {
+  // depth-first pre-order
+  const attributes = toGenAiAttributes(span); // gen_ai.* / warlock.* attribute map
+  const cost = totalCostUsd(span.usage); // single USD scalar, or undefined
 }
 ```
 
@@ -180,5 +188,5 @@ Reach for `reportToTrace` when you already hold a finished `result.report` and w
 ## See also
 
 - The `observe-with-panoptic` topic — the source end: wiring the `panoptic(...)` subscriber into a run (`attach` / `middleware` / `collect`). The `collector` these exporters register on comes from there.
-- The `query-traces` topic — the in-memory trace store: a sibling sink that *retains* traces (instead of shipping them out) so you can `query` / `aggregate` them after the fact.
+- The `query-traces` topic — the in-memory trace store: a sibling sink that _retains_ traces (instead of shipping them out) so you can `query` / `aggregate` them after the fact.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent and the `BaseReport` shape Panoptic projects into a `Trace`.

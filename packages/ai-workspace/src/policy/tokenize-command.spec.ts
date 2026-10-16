@@ -3,12 +3,7 @@ import { tokenizeCommand } from "./tokenize-command";
 
 describe("tokenizeCommand", () => {
   it("splits a plain command on whitespace", () => {
-    expect(tokenizeCommand("npm run build --watch")).toEqual([
-      "npm",
-      "run",
-      "build",
-      "--watch",
-    ]);
+    expect(tokenizeCommand("npm run build --watch")).toEqual(["npm", "run", "build", "--watch"]);
   });
 
   it("keeps a quoted span (including whitespace and metacharacters) one token", () => {

@@ -70,5 +70,5 @@ the feature multiselect, and a scheduler helper ships). Still-relevant remainder
   the workspace symlink). Tests cover `parseFlags`, `database-drivers`, `features-map`, and `App` template
   emission (copy, `_.gitignore`→`.gitignore` rename, `.env` creation, name + DB-driver substitution,
   scoped-name flattening) using OS temp dirs.
-- The tests validate scaffolder *behavior*; they do not run a full `npm install` of a generated project (no
+- The tests validate scaffolder _behavior_; they do not run a full `npm install` of a generated project (no
   network). Template TS correctness against the live framework API was verified by reading source.

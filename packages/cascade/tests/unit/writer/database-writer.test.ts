@@ -4,10 +4,7 @@ import type { DriverContract } from "../../../src/contracts/database-driver.cont
 import type { DataSource } from "../../../src/data-source/data-source";
 import { Model } from "../../../src/model/model";
 import { DatabaseWriter } from "../../../src/writer/database-writer";
-import {
-  createMockDataSource,
-  createMockDriver,
-} from "../../utils/test-helpers";
+import { createMockDataSource, createMockDriver } from "../../utils/test-helpers";
 
 // Mock model class for testing
 class TestModel extends Model {
@@ -180,11 +177,7 @@ describe("DatabaseWriter", () => {
       const writer = new DatabaseWriter(model);
       await writer.save({ replace: true });
 
-      expect(mockDriver.replace).toHaveBeenCalledWith(
-        "test_models",
-        { id: 1 },
-        expect.any(Object),
-      );
+      expect(mockDriver.replace).toHaveBeenCalledWith("test_models", { id: 1 }, expect.any(Object));
       expect(mockDriver.update).not.toHaveBeenCalled();
     });
   });
@@ -356,32 +349,26 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(
-        dataSourceWithIdGen,
-      );
+      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
 
       const model = new AutoIdModel({ name: "Test using idGenerator" });
       model.isNew = true;
 
       // Make driver mock return the data it received, including the generated ID
-      (mockDriver.insert as any).mockImplementation(
-        (_table: string, data: any) => {
-          return Promise.resolve({
-            document: { ...data, _id: "mock_mongo_id" },
-          });
-        },
-      );
+      (mockDriver.insert as any).mockImplementation((_table: string, data: any) => {
+        return Promise.resolve({
+          document: { ...data, _id: "mock_mongo_id" },
+        });
+      });
 
       const writer = new DatabaseWriter(model);
       await writer.save();
 
-      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
-        {
-          table: "auto_id_models",
-          initialId: 1,
-          incrementIdBy: 1,
-        },
-      );
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith({
+        table: "auto_id_models",
+        initialId: 1,
+        incrementIdBy: 1,
+      });
       expect(model.get("id")).toBe(42);
     });
 
@@ -401,21 +388,17 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(
-        dataSourceWithIdGen,
-      );
+      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
 
       const model = new AutoIdModel({ id: 100, name: "Test II" });
       model.isNew = true;
 
       // Make driver mock return the data it received
-      (mockDriver.insert as any).mockImplementation(
-        (_table: string, data: any) => {
-          return Promise.resolve({
-            document: { ...data, _id: "mock_mongo_id" },
-          });
-        },
-      );
+      (mockDriver.insert as any).mockImplementation((_table: string, data: any) => {
+        return Promise.resolve({
+          document: { ...data, _id: "mock_mongo_id" },
+        });
+      });
 
       const writer = new DatabaseWriter(model);
       await writer.save();
@@ -442,9 +425,7 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(CustomIdModel, "getDataSource").mockReturnValue(
-        dataSourceWithIdGen,
-      );
+      vi.spyOn(CustomIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
 
       const model = new CustomIdModel({ name: "Test" });
       model.isNew = true;
@@ -476,9 +457,7 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(RandomIdModel, "getDataSource").mockReturnValue(
-        dataSourceWithIdGen,
-      );
+      vi.spyOn(RandomIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
 
       const model = new RandomIdModel({ name: "Test" });
       model.isNew = true;
@@ -543,9 +522,7 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(IncrementModel, "getDataSource").mockReturnValue(
-        dataSourceWithIdGen,
-      );
+      vi.spyOn(IncrementModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
 
       const model = new IncrementModel({ name: "Test" });
       model.isNew = true;
@@ -577,9 +554,7 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(RandomIncrModel, "getDataSource").mockReturnValue(
-        dataSourceWithIdGen,
-      );
+      vi.spyOn(RandomIncrModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
 
       const model = new RandomIncrModel({ name: "Test" });
       model.isNew = true;
@@ -611,9 +586,7 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(FnIncrModel, "getDataSource").mockReturnValue(
-        dataSourceWithIdGen,
-      );
+      vi.spyOn(FnIncrModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
 
       const model = new FnIncrModel({ name: "Test" });
       model.isNew = true;
@@ -641,9 +614,7 @@ describe("DatabaseWriter", () => {
         static updatedAtColumn = "modified_date";
       }
 
-      vi.spyOn(CustomTimestampModel, "getDataSource").mockReturnValue(
-        mockDataSource,
-      );
+      vi.spyOn(CustomTimestampModel, "getDataSource").mockReturnValue(mockDataSource);
 
       const model = new CustomTimestampModel({ name: "Test" });
       model.isNew = true;
@@ -710,9 +681,7 @@ describe("DatabaseWriter", () => {
       expect(insertedData.updatedAt).toBeInstanceOf(Date);
       expect(insertedData.updatedAt.getTime()).toBeGreaterThanOrEqual(before);
       // updatedAt must NOT have been pinned to the backdated createdAt value.
-      expect(insertedData.updatedAt.getTime()).toBeGreaterThan(
-        backdated.getTime(),
-      );
+      expect(insertedData.updatedAt.getTime()).toBeGreaterThan(backdated.getTime());
     });
 
     it("preserves a backdated createdAt through insert validation under strict 'strip' mode", async () => {
@@ -726,9 +695,7 @@ describe("DatabaseWriter", () => {
         static updatedAtColumn = "updatedAt";
         static strictMode = "strip" as const;
       }
-      vi.spyOn(StripInsertModel, "getDataSource").mockReturnValue(
-        mockDataSource,
-      );
+      vi.spyOn(StripInsertModel, "getDataSource").mockReturnValue(mockDataSource);
 
       const backdated = new Date("2001-02-03T04:05:06.000Z");
       const model = new StripInsertModel({

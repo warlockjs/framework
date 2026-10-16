@@ -12,27 +12,31 @@ import { notifications } from "@warlock.js/notifications";
 
 // latency + delivery, keyed by recipient
 notifications.on("sent", ({ channel, notifiable, durationMs, options }) =>
-  metrics.timing(`notif.${channel}.sent`, durationMs, { userId: notifiable?.id, ...options.meta }));
+  metrics.timing(`notif.${channel}.sent`, durationMs, { userId: notifiable?.id, ...options.meta }),
+);
 
 notifications.on("failed", ({ channel, notifiable, error }) =>
-  log.error(`notif.${channel}`, error, { userId: notifiable?.id }));
+  log.error(`notif.${channel}`, error, { userId: notifiable?.id }),
+);
 
 notifications.on("skipped", ({ channel, reason }) =>
-  metrics.inc(`notif.${channel}.skipped.${reason}`));
+  metrics.inc(`notif.${channel}.skipped.${reason}`),
+);
 
 // pair `sending` → terminal by dispatchId — open a span / arm a hung-send watchdog
 notifications.on("sending", ({ dispatchId, channel, notifiable }) =>
-  tracer.open(dispatchId, { channel, userId: notifiable?.id }));
+  tracer.open(dispatchId, { channel, userId: notifiable?.id }),
+);
 ```
 
 ## Events
 
-| Event | Fires when | Payload |
-|---|---|---|
-| `sending` | Gates passed; about to hit the transport (sync) / enqueue (queue) | `{ dispatchId, channel, notifiable?, payload, options }` |
-| `sent` | Channel dispatched OR job enqueued | `{ dispatchId, channel, notifiable?, payload, options, durationMs }` |
-| `failed` | `channel.send` (or `queue.dispatch`) threw | `{ dispatchId, channel, notifiable?, payload, error, options, durationMs }` |
-| `skipped` | A pre-send gate dropped this channel | `{ dispatchId, channel, notifiable?, reason, options }` — `reason: "preference" \| "rate-limit"` |
+| Event     | Fires when                                                        | Payload                                                                                          |
+| --------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `sending` | Gates passed; about to hit the transport (sync) / enqueue (queue) | `{ dispatchId, channel, notifiable?, payload, options }`                                         |
+| `sent`    | Channel dispatched OR job enqueued                                | `{ dispatchId, channel, notifiable?, payload, options, durationMs }`                             |
+| `failed`  | `channel.send` (or `queue.dispatch`) threw                        | `{ dispatchId, channel, notifiable?, payload, error, options, durationMs }`                      |
+| `skipped` | A pre-send gate dropped this channel                              | `{ dispatchId, channel, notifiable?, reason, options }` — `reason: "preference" \| "rate-limit"` |
 
 `notifiable` is the recipient **model** (undefined only for raw-target ad-hoc sends like `notify.mail("x@y.com", …)`) — read `notifiable?.id` / `notifiable?.get(...)` to key your metrics or logs.
 

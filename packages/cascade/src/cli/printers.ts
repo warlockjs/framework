@@ -74,7 +74,5 @@ export function printRunSummary(results: readonly MigrationResult[]): void {
     return;
   }
 
-  console.log(
-    `${colors.red("✗")} ${colors.red(`${failed}/${results.length}`)} migrations failed.`,
-  );
+  console.log(`${colors.red("✗")} ${colors.red(`${failed}/${results.length}`)} migrations failed.`);
 }

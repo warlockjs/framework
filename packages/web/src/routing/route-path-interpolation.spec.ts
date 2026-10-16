@@ -17,9 +17,7 @@ describe("interpolateRoutePath", () => {
   it("interpolates and encodes required and wildcard parameters for pages and forms alike", () => {
     publishRouteTable([{ name: "files.show", path: "/files/:id/*" }]);
 
-    expect(href("files.show", { id: "a b", "*": "nested/path" })).toBe(
-      "/files/a%20b/nested/path",
-    );
+    expect(href("files.show", { id: "a b", "*": "nested/path" })).toBe("/files/a%20b/nested/path");
     expect(interpolateFormPath("/files/:id/*", { id: "a b", "*": "nested/path" })).toBe(
       "/files/a%20b/nested/path",
     );

@@ -55,7 +55,11 @@ export class FakeAmqpChannel {
     return { queue: resolvedName };
   }
 
-  public sendToQueue(queue: string, content: Buffer, options: Record<string, unknown> = {}): boolean {
+  public sendToQueue(
+    queue: string,
+    content: Buffer,
+    options: Record<string, unknown> = {},
+  ): boolean {
     this.sent.push({ queue, content, options });
 
     return true;

@@ -145,9 +145,7 @@ function render(date: Date, format: string | undefined, timeZone: string | undef
     }).format(date);
   } catch (error) {
     throw new DateTimeError(
-      `Could not render with format "${format}"${
-        timeZone ? ` in time zone "${timeZone}"` : ""
-      }.`,
+      `Could not render with format "${format}"${timeZone ? ` in time zone "${timeZone}"` : ""}.`,
       { type: "invalid-time-zone", cause: error },
     );
   }
@@ -215,7 +213,7 @@ export function dateTimeTool(
   return tool<DateTimeInput, DateTimeResult>({
     name: options?.name ?? DEFAULT_NAME,
     description:
-      "Work with dates and times. Set op to: \"now\" (current instant), " +
+      'Work with dates and times. Set op to: "now" (current instant), ' +
       '"add" (shift iso by amount of unit), "diff" (signed to − from in unit; ' +
       "pass the start instant as iso or from), " +
       'or "format" (render iso). Units are milliseconds, seconds, minutes, ' +

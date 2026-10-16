@@ -321,9 +321,7 @@ describe("startHttpTestServer", () => {
 
       fixture.failShutdown = true;
 
-      const error = (await stopHttpTestServer().catch(
-        (thrown: unknown) => thrown,
-      )) as Error;
+      const error = (await stopHttpTestServer().catch((thrown: unknown) => thrown)) as Error;
 
       expect(error).toBeInstanceOf(Error);
       // the failure is surfaced — cleaning up is not the same as succeeding

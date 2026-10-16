@@ -41,9 +41,9 @@ Each file **default-exports** a `Seeder`. `recordsCreated` is auto-derived from 
 
 ```ts
 type SeedContext = {
-  track: Track;        // register created records for --drop
-  now: SeedClock;      // injectable clock — () => Date, default () => new Date()
-  batchSize: number;   // from the seeder's batchSize field (0 when unset)
+  track: Track; // register created records for --drop
+  now: SeedClock; // injectable clock — () => Date, default () => new Date()
+  batchSize: number; // from the seeder's batchSize field (0 when unset)
 };
 
 type SeedClock = () => Date;
@@ -75,13 +75,10 @@ const manager = new SeedersManager({ clock: () => new Date("2020-01-01") });
 // 2. Programmatically, via seedCommandAction's overrides argument
 import { seedCommandAction } from "@warlock.js/core";
 
-await seedCommandAction(
-  { command: "seed", options: {} },
-  { clock: () => new Date("2020-01-01") },
-);
+await seedCommandAction({ command: "seed", options: {} }, { clock: () => new Date("2020-01-01") });
 ```
 
-Pinning the clock makes every timestamp the run produces — the seed data *and* the seeds-log rows — resolve to that one value. The CLI never passes `overrides`, so the command-line signature is unchanged; it's a programmatic-only escape hatch for scripts and tests.
+Pinning the clock makes every timestamp the run produces — the seed data _and_ the seeds-log rows — resolve to that one value. The CLI never passes `overrides`, so the command-line signature is unchanged; it's a programmatic-only escape hatch for scripts and tests.
 
 ### `batchSize` — bulk-insert hint
 
@@ -108,9 +105,9 @@ The manager doesn't act on `batchSize` itself — it only hands the value throug
 `track` tells the framework which rows the seed created, so [`warlock seed --drop`](../cli/cli-commands.md#seed) can undo them later. It has three forms, and **every form returns its first argument** so you can wrap a `create()` call inline:
 
 ```ts
-track(model)                 // single model — reads model.getTableName() + model.id
-track([modelA, modelB])      // bulk — array of models
-track("legacy_table", id)    // raw escape hatch — table name + id, no model
+track(model); // single model — reads model.getTableName() + model.id
+track([modelA, modelB]); // bulk — array of models
+track("legacy_table", id); // raw escape hatch — table name + id, no model
 ```
 
 ```ts
@@ -128,14 +125,27 @@ Tracked refs are written inside the **same transaction** the seed runs in — if
 The manager sorts by `order` ascending — lower runs first; seeds without an `order` sort to the end. `dependsOn` is **resolved** via a topological sort layered over that `order` tie-break, so a dependency always runs before its dependents:
 
 ```ts
-seeder({ name: "roles", order: 20, async run() { /* ... */ } });
-seeder({ name: "admin-user", dependsOn: ["roles"], order: 10, async run() { /* ... */ } });
+seeder({
+  name: "roles",
+  order: 20,
+  async run() {
+    /* ... */
+  },
+});
+seeder({
+  name: "admin-user",
+  dependsOn: ["roles"],
+  order: 10,
+  async run() {
+    /* ... */
+  },
+});
 // → roles runs FIRST despite its higher order, because admin-user depends on it.
 ```
 
 Two ways it fails loudly:
 
-- **Unknown dependency** — `dependsOn` names a seeder that isn't registered (or is `enabled: false`, since disabled seeds are filtered out *before* resolution) → `UnknownSeederDependencyError`.
+- **Unknown dependency** — `dependsOn` names a seeder that isn't registered (or is `enabled: false`, since disabled seeds are filtered out _before_ resolution) → `UnknownSeederDependencyError`.
 - **Cycle** — `a → b → a` → `SeederDependencyCycleError` (the message includes the cycle path).
 
 ## Undo — `warlock seed --drop`
@@ -147,7 +157,7 @@ pnpm warlock seed --drop                # undo every tracked record across all s
 pnpm warlock seed --drop=default-roles  # undo just one seeder's records
 ```
 
-Inside a single transaction, `--drop` deletes the tracked records in reverse run/insertion order, clears the refs, then resets the matching seeds-log rows so a `once: true` seed re-runs on the next `warlock seed`. Only **tracked** rows are deleted — a seed that never calls `track()` has nothing to undo. Contrast with `--fresh`, which truncates *every* table; `--drop` is the surgical alternative.
+Inside a single transaction, `--drop` deletes the tracked records in reverse run/insertion order, clears the refs, then resets the matching seeds-log rows so a `once: true` seed re-runs on the next `warlock seed`. Only **tracked** rows are deleted — a seed that never calls `track()` has nothing to undo. Contrast with `--fresh`, which truncates _every_ table; `--drop` is the surgical alternative.
 
 ## Gotchas
 

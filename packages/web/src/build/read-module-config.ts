@@ -84,7 +84,8 @@ function booleanLiteral(node: ValueNode): boolean | undefined {
 
 function propertyName(
   property:
-    ObjectProperty | Extract<ObjectExpression["properties"][number], { type: "ObjectMethod" }>,
+    | ObjectProperty
+    | Extract<ObjectExpression["properties"][number], { type: "ObjectMethod" }>,
   sourceFile: string,
 ): string {
   if (property.computed) fail(sourceFile, "a config object has a computed key");
@@ -146,7 +147,9 @@ function requireUserBindings(body: ReturnType<typeof parse>["program"]["body"]):
       if (specifier.type !== "ImportSpecifier" || specifier.importKind === "type") continue;
 
       const imported =
-        specifier.imported.type === "Identifier" ? specifier.imported.name : specifier.imported.value;
+        specifier.imported.type === "Identifier"
+          ? specifier.imported.name
+          : specifier.imported.value;
 
       if (imported === "requireUser") names.add(specifier.local.name);
     }

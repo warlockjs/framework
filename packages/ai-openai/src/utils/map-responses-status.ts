@@ -50,10 +50,7 @@ export function mapResponsesFinishReason(state: ResponsesTerminalState): FinishR
  * and request id kept on `context`). The response id and model are added so
  * the failure is traceable.
  */
-export function toResponseFailure(
-  response: OpenAI.Responses.Response,
-  model: string,
-): AIError {
+export function toResponseFailure(response: OpenAI.Responses.Response, model: string): AIError {
   const error = response.error;
   const requestId = (response as { _request_id?: string | null })._request_id;
 

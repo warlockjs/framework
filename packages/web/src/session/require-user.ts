@@ -54,7 +54,8 @@ function requireUserInLoader(ctx: RequireUserContext, options: RequireUserOption
   const session = ctx.session;
 
   if (!session?.user) {
-    const loginPath = options.loginPath ?? config.key<string | undefined>("auth.pageAuth.loginPath");
+    const loginPath =
+      options.loginPath ?? config.key<string | undefined>("auth.pageAuth.loginPath");
 
     if (!loginPath || request.authorizationValue) throw new UnAuthorizedError("Unauthorized");
 
@@ -76,7 +77,9 @@ function requireUserInLoader(ctx: RequireUserContext, options: RequireUserOption
     const allowed = options.when(model);
 
     if (allowed instanceof Promise) {
-      throw new Error("requireUser(ctx, { when }) needs a synchronous `when`; use the middleware form for async checks.");
+      throw new Error(
+        "requireUser(ctx, { when }) needs a synchronous `when`; use the middleware form for async checks.",
+      );
     }
 
     if (!allowed) throw new ForbiddenError("Forbidden");
@@ -108,7 +111,8 @@ export function requireUser(
     const resolved = await readResolver()?.resolve(request, response);
 
     if (!resolved) {
-      const loginPath = options.loginPath ?? config.key<string | undefined>("auth.pageAuth.loginPath");
+      const loginPath =
+        options.loginPath ?? config.key<string | undefined>("auth.pageAuth.loginPath");
 
       if (!loginPath || request.authorizationValue) {
         return response.unauthorized({ error: "Unauthorized" });
@@ -124,7 +128,10 @@ export function requireUser(
 
     const model = resolved.model as SessionModel;
 
-    if (options.userType && (model as { userType?: string } | null)?.userType !== options.userType) {
+    if (
+      options.userType &&
+      (model as { userType?: string } | null)?.userType !== options.userType
+    ) {
       return response.forbidden({ error: "Forbidden" });
     }
 

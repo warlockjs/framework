@@ -24,12 +24,12 @@ const supportBot = ai.orchestrator<SessionState>({
   name: "refund-support",
   intents: { classify, lookup, process, compose },
   route: (ctx) => (ctx.iteration === 0 ? "classify" : END),
-  iterate: true,                                  // delegate each turn to a real supervisor
+  iterate: true, // delegate each turn to a real supervisor
   historyWindow: { router: 5, agents: 20 },
-  summarize: { afterTurns: 20, keep: 6 },         // auto-compaction policy
-  keepSnapshots: 100,                             // turns retained per session
+  summarize: { afterTurns: 20, keep: 6 }, // auto-compaction policy
+  keepSnapshots: 100, // turns retained per session
   checkpointStore: ai.checkpoint.pg({ client: pg }),
-  snapshotStore: ai.snapshot.pg({ client: pg }),  // required when iterate: true
+  snapshotStore: ai.snapshot.pg({ client: pg }), // required when iterate: true
 });
 
 const result = await supportBot.execute(message, { sessionId: "sess_42", history });
@@ -43,17 +43,17 @@ if (result.report.status === "awaiting-input") {
 
 ## The session is owned by `sessionId` — passed per call
 
-There is no stateful session object and no implicit "current session" — every method names the session it acts on via `options.sessionId`. `history` is **required** on every `execute` call: the framework never persists raw messages (it owns session *state*, not the message log — that is the dev's store). `state` is a partial seed/patch shallow-merged into the loaded session state; `context` is the request-scoped bag, frozen at intake.
+There is no stateful session object and no implicit "current session" — every method names the session it acts on via `options.sessionId`. `history` is **required** on every `execute` call: the framework never persists raw messages (it owns session _state_, not the message log — that is the dev's store). `state` is a partial seed/patch shallow-merged into the loaded session state; `context` is the request-scoped bag, frozen at intake.
 
 ```ts
 await supportBot.execute(input, {
-  sessionId: "sess_42",       // required — names the session
-  history: priorMessages,     // required — the dev re-supplies prior turns each call
-  state: { tier: "gold" },    // partial patch shallow-merged into loaded state
-  context: { userId, db },    // request-scoped, never persisted
+  sessionId: "sess_42", // required — names the session
+  history: priorMessages, // required — the dev re-supplies prior turns each call
+  state: { tier: "gold" }, // partial patch shallow-merged into loaded state
+  context: { userId, db }, // request-scoped, never persisted
   signal: AbortSignal.timeout(60_000),
-  on: { "orchestrator.turn.awaiting-input": (e) => log(e) },  // tier-3 per-call handlers
-  force: false,               // bypass drift check for this call
+  on: { "orchestrator.turn.awaiting-input": (e) => log(e) }, // tier-3 per-call handlers
+  force: false, // bypass drift check for this call
 });
 ```
 
@@ -74,14 +74,14 @@ A clean turn ends with `orchestrator.turn.awaiting-input` (the session stays ope
 ```ts
 const result = await supportBot.execute(message, { sessionId, history });
 
-result.sessionId;                 // echoes the session this turn acted on
-result.turnIndex;                 // zero-indexed turn number
-result.data;                      // validated against `output`, if set
-result.error;                     // typed AIError — execute() never throws on runtime failure
-result.report.type;               // "orchestrator"
-result.report.status;             // ReportStatus | "awaiting-input"
-result.report.turns;              // TurnSnapshot[] — current turn + prior, bounded by keepSnapshots
-result.compaction;                // CompactionResult when a turn compacted (and no onCompact ran)
+result.sessionId; // echoes the session this turn acted on
+result.turnIndex; // zero-indexed turn number
+result.data; // validated against `output`, if set
+result.error; // typed AIError — execute() never throws on runtime failure
+result.report.type; // "orchestrator"
+result.report.status; // ReportStatus | "awaiting-input"
+result.report.turns; // TurnSnapshot[] — current turn + prior, bounded by keepSnapshots
+result.compaction; // CompactionResult when a turn compacted (and no onCompact ran)
 ```
 
 `report.children[]` carries ONLY the current turn's dispatched primitive reports. Full session history lives on `report.turns[]` — a `children[]` walker will NOT reach prior turns (intentional). Child `supervisor.*` / `agent.*` events bubble up unmodified under their own identity.
@@ -143,15 +143,15 @@ ai.orchestrator({
   name: "support",
   intents,
   route,
-  memory: mem,                                  // bare MemoryContract — recall + remember w/ defaults
+  memory: mem, // bare MemoryContract — recall + remember w/ defaults
   // or finer control:
   memory: {
     store: mem,
-    recall: { k: 5, threshold: 0.7, tier: "semantic" },  // k: 0 = write-only memory
-    remember: true,                             // false = read-only (recall, never write)
+    recall: { k: 5, threshold: 0.7, tier: "semantic" }, // k: 0 = write-only memory
+    remember: true, // false = read-only (recall, never write)
     rememberTier: "semantic",
-    scope: "session",                           // DEFAULT — isolate memories per sessionId
-    injectKey: "memories",                      // ctx.context[injectKey] holds RecalledMemory[]
+    scope: "session", // DEFAULT — isolate memories per sessionId
+    injectKey: "memories", // ctx.context[injectKey] holds RecalledMemory[]
   },
 });
 ```
@@ -167,17 +167,18 @@ const supportTool = supportBot.asTool({
   name: "handle_refund",
   description: "Handle a refund conversation end-to-end.",
   inputSchema: v.object({ message: v.string() }),
-  sessionScope: "fresh",   // default — each call gets a brand-new sessionId
+  sessionScope: "fresh", // default — each call gets a brand-new sessionId
 });
 
 const concierge = ai.agent({ model, tools: [supportTool] });
 ```
 
 The tool boundary is **opaque**: the parent's `signal` / `context` / events do NOT auto-forward — anything the wrapped orchestrator needs must ride on the `inputSchema` payload. `sessionScope`:
+
 - **`"fresh"`** (default) — each invocation gets a generated `sessionId` and empty history; no continuity across calls.
 - **`"shared"`** — the orchestrator joins an existing session named by the DEVELOPER through `session`, never by the model: either a literal id fixed at construction (`session: "sess_42"`) or a resolver reading the out-of-band tool context (`session: (ctx) => String(ctx?.artifacts?.supportSessionId)`). Building a `"shared"` tool without `session` throws at construction, and `sessionId` / `history` in the payload are stripped, not honored.
 
-  A `sessionId` is bearer-equivalent to read/write on that session, so it must not be a model-visible `inputSchema` field: before 4.15.0 it was, and a prompt injection reaching the outer agent could make the nested orchestrator resume, mutate, and echo back a *victim's* conversation. `unsafeAllowModelSessionId: true` restores the old payload path — only for a fully trusted outer context where you verify session ownership yourself.
+  A `sessionId` is bearer-equivalent to read/write on that session, so it must not be a model-visible `inputSchema` field: before 4.15.0 it was, and a prompt injection reaching the outer agent could make the nested orchestrator resume, mutate, and echo back a _victim's_ conversation. `unsafeAllowModelSessionId: true` restores the old payload path — only for a fully trusted outer context where you verify session ownership yourself.
 
 ## Drift detection
 

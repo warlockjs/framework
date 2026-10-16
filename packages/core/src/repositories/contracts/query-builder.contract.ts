@@ -15,7 +15,10 @@ import type {
  * field name, a list of field names, or a driver-specific object form.
  */
 export type GroupByFields =
-  string | string[] | Record<string, unknown> | Array<Record<string, unknown>>;
+  | string
+  | string[]
+  | Record<string, unknown>
+  | Array<Record<string, unknown>>;
 
 /**
  * A single aggregate expression in a `groupBy` / `aggregate` projection.

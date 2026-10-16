@@ -87,11 +87,10 @@ describe("runChecks crash-proofing", () => {
   });
 
   it("a throwing check never aborts the checks that follow it", async () => {
-    const report = await runChecks([
-      throwingCheck("first", "nope"),
-      okCheck("second"),
-      okCheck("third"),
-    ], makeContext());
+    const report = await runChecks(
+      [throwingCheck("first", "nope"), okCheck("second"), okCheck("third")],
+      makeContext(),
+    );
 
     expect(report.results.map((result) => result.name)).toEqual(["first", "second", "third"]);
     expect(report.summary).toEqual({ ok: 2, warn: 0, fail: 1 });

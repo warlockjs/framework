@@ -60,9 +60,7 @@ function imageResponse(
   overrides: Partial<GenerateContentResponse> = {},
 ): Partial<GenerateContentResponse> {
   return {
-    candidates: [
-      { content: { parts: [{ inlineData: { data: "QUJD", mimeType: "image/png" } }] } },
-    ],
+    candidates: [{ content: { parts: [{ inlineData: { data: "QUJD", mimeType: "image/png" } }] } }],
     ...overrides,
   } as Partial<GenerateContentResponse>;
 }

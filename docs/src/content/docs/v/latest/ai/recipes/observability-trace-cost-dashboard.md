@@ -91,12 +91,7 @@ function aggregateCostUsd(stats: TraceAggregate): number {
     return 0;
   }
 
-  return (
-    cost.input +
-    cost.output +
-    (cost.cachedInput ?? 0) +
-    (cost.cachedOutput ?? 0)
-  );
+  return cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
 }
 
 /** Top-line numbers for any slice (a week, a session, a status). */
@@ -176,14 +171,11 @@ console.log(`p95 latency: ${Math.round(p95LatencyMs)}ms`);
 const sessionStats = summarize({ sessionId: "session-7" });
 
 console.log(
-  `session-7: $${sessionStats.totalCostUsd.toFixed(4)} ` +
-    `over ${sessionStats.runs} runs`,
+  `session-7: $${sessionStats.totalCostUsd.toFixed(4)} ` + `over ${sessionStats.runs} runs`,
 );
 
 // Find the single most expensive run in that session:
-const ranked = perRunRows({ sessionId: "session-7" }).sort(
-  (a, b) => b.costUsd - a.costUsd,
-);
+const ranked = perRunRows({ sessionId: "session-7" }).sort((a, b) => b.costUsd - a.costUsd);
 
 console.log("priciest run:", ranked[0]);
 ```

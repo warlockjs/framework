@@ -10,11 +10,11 @@ sidebar:
 
 The whole feature is one mapping:
 
-| team field | becomes supervisor field |
-| --- | --- |
-| `manager` | `route` (deterministic `{ route }`) **XOR** `router` (an agent / `RouterEntry`) |
-| `members` | `intents` |
-| `gate` | `evaluate` |
+| team field | becomes supervisor field                                                        |
+| ---------- | ------------------------------------------------------------------------------- |
+| `manager`  | `route` (deterministic `{ route }`) **XOR** `router` (an agent / `RouterEntry`) |
+| `members`  | `intents`                                                                       |
+| `gate`     | `evaluate`                                                                      |
 
 Everything else (`goal`, `output`, `state`, `maxIterations`, `snapshotStore`, `on`, `observe`) passes through 1:1. The **one** behavioural difference from a hand-rolled supervisor: a team stamps its report/result with `type: "team"` (a first-class `ReportType`, not `"supervisor"`), so observers and Panoptic recognise it as its own type.
 
@@ -27,11 +27,11 @@ import { v } from "@warlock.js/seal";
 const codeTeam = ai.team({
   name: "code-team",
   goal: "Ship a tested module that passes review.",
-  manager: techLeadRouter,                 // agent / RouterEntry → router; or { route } → deterministic
-  members: { builder, reviewer, fixer },   // role-name → agent | workflow
-  gate: "quality",                         // "quality" | "verify" | (ctx) => EvaluateResult
+  manager: techLeadRouter, // agent / RouterEntry → router; or { route } → deterministic
+  members: { builder, reviewer, fixer }, // role-name → agent | workflow
+  gate: "quality", // "quality" | "verify" | (ctx) => EvaluateResult
   output: v.object({ code: v.string() }),
-  maxIterations: 6,                        // default 10 (the supervisor's)
+  maxIterations: 6, // default 10 (the supervisor's)
 });
 
 const { data, report } = await codeTeam.execute("Build a debounce<T> utility.");
@@ -43,10 +43,12 @@ A `member` is an `AgentContract` or a `WorkflowInstance` (the `TeamMemberValue` 
 
 ```ts
 // LLM-driven manager: an agent (or RouterEntry) → becomes SupervisorConfig.router
-manager: techLeadRouter
+manager: techLeadRouter;
 
 // Deterministic manager: { route } → becomes SupervisorConfig.route
-manager: { route: (ctx) => (ctx.iteration === 0 ? "builder" : "reviewer") }
+manager: {
+  route: (ctx) => (ctx.iteration === 0 ? "builder" : "reviewer");
+}
 ```
 
 Exactly one form is forwarded — mutually exclusive, mirroring the supervisor's own `router` XOR `route` rule. A malformed manager surfaces the existing `SupervisorFailedError` downstream.
@@ -87,10 +89,10 @@ The built-in string gates assume canonical role names (`reviewer`, `fixer`, `tes
 ai.team({
   name: "writers",
   manager: editorRouter,
-  members: { drafter, editor, reviser },     // non-canonical names
+  members: { drafter, editor, reviser }, // non-canonical names
   gate: "quality",
   roles: { reviewer: "editor", fixer: "reviser" }, // map gate roles → your member keys
-  gateKey: "shipReady",                       // gate reads state.shipReady instead of state.approved
+  gateKey: "shipReady", // gate reads state.shipReady instead of state.approved
 });
 ```
 

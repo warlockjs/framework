@@ -8,11 +8,11 @@ sidebar:
 
 Three different "too much noise" problems, three different tools:
 
-| Problem | Reach for |
-| --- | --- |
-| "Drop everything below `info` in prod" | logger-wide `minLevel` |
-| "This one file should only collect errors" | per-channel `levels` |
-| "Mute health-check / third-party chatter" | per-channel `filter` |
+| Problem                                    | Reach for              |
+| ------------------------------------------ | ---------------------- |
+| "Drop everything below `info` in prod"     | logger-wide `minLevel` |
+| "This one file should only collect errors" | per-channel `levels`   |
+| "Mute health-check / third-party chatter"  | per-channel `filter`   |
 
 They stack — `minLevel` runs first (before any channel), then each channel applies its own `levels` and `filter`.
 
@@ -37,7 +37,7 @@ Severity order is `debug < info ≈ success < warn < error < fatal`. `minLevel: 
 
 ## Restrict a single channel — `levels`
 
-When the *channel* should only ever handle certain levels — e.g. a file that's just an error log — use its `levels` whitelist. Other channels are unaffected:
+When the _channel_ should only ever handle certain levels — e.g. a file that's just an error log — use its `levels` whitelist. Other channels are unaffected:
 
 ```ts
 import { log, ConsoleLog, FileLog } from "@warlock.js/logger";
@@ -63,9 +63,11 @@ import { ConsoleLog, type LoggingData } from "@warlock.js/logger";
 // Drop GET /health spam from the dev terminal
 new ConsoleLog({
   filter: (data: LoggingData) =>
-    !(data.type === "info" &&
+    !(
+      data.type === "info" &&
       typeof data.message === "string" &&
-      data.message.includes("GET /health")),
+      data.message.includes("GET /health")
+    ),
 });
 
 // Silence all debug output from a noisy third-party module
@@ -100,7 +102,11 @@ log.configure({
         new FileLog({ storagePath: "./storage/logs", chunk: "daily" }),
         // Own directory — two daily files in one directory would collide
         // (daily chunking names the file by date, ignoring `name`).
-        new FileLog({ storagePath: "./storage/logs/errors", levels: ["error", "warn"], chunk: "daily" }),
+        new FileLog({
+          storagePath: "./storage/logs/errors",
+          levels: ["error", "warn"],
+          chunk: "daily",
+        }),
       ]
     : [new ConsoleLog({ showContext: true })],
   minLevel: isProduction ? "info" : "debug",

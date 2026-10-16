@@ -49,7 +49,9 @@ export async function generateOpenApiAction({ options }: CommandActionData): Pro
   );
 
   if (warnings.length > 0) {
-    console.warn(colors.yellowBright(`\n${warnings.length} warning${warnings.length === 1 ? "" : "s"}:`));
+    console.warn(
+      colors.yellowBright(`\n${warnings.length} warning${warnings.length === 1 ? "" : "s"}:`),
+    );
 
     for (const warning of warnings) {
       console.warn(`  - ${warning}`);

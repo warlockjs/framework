@@ -26,9 +26,9 @@ function harness(clock: number[] = [0, 25]) {
   let tick = 0;
 
   const ports: RequestLogPorts = {
-    info: entry => entries.push({ ...entry, level: "info" }),
-    warn: entry => entries.push({ ...entry, level: "warn" }),
-    error: entry => entries.push({ ...entry, level: "error" }),
+    info: (entry) => entries.push({ ...entry, level: "info" }),
+    warn: (entry) => entries.push({ ...entry, level: "warn" }),
+    error: (entry) => entries.push({ ...entry, level: "error" }),
     now: () => clock[Math.min(tick++, clock.length - 1)] as number,
   };
 
@@ -75,9 +75,11 @@ describe("logRequestLifecycle — the completion line", () => {
   it("returns the run's own result untouched", async () => {
     const { ports } = harness();
 
-    await expect(logRequestLifecycle(ports, descriptor(), async () => ({ a: 1 }))).resolves.toEqual({
-      a: 1,
-    });
+    await expect(logRequestLifecycle(ports, descriptor(), async () => ({ a: 1 }))).resolves.toEqual(
+      {
+        a: 1,
+      },
+    );
   });
 
   it("reads the status AFTER the run, not before", async () => {

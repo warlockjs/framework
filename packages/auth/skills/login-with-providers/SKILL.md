@@ -16,13 +16,13 @@ authService.setAuthCookie(response, tokens.accessToken); // cookie session, or r
 
 ## Install
 
-| Method | Command | Installs |
-| --- | --- | --- |
-| Google | `warlock add auth-google` | `jose` |
-| Apple, LinkedIn | `warlock add auth-google` (or `npm install jose`) — there is no separate `auth-apple` / `auth-linkedin` feature yet | `jose` |
-| GitHub, Discord, Facebook, X | nothing — plain OAuth 2 over `fetch` | nothing |
-| Passkeys | `warlock add auth-passkeys` | `@simplewebauthn/server` (add `@simplewebauthn/browser` to your client bundle) |
-| Phone code | `warlock add notifications` + your own `sms`/`whatsapp` channel | nothing else. Auth ships no SMS/WhatsApp driver |
+| Method                       | Command                                                                                                             | Installs                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Google                       | `warlock add auth-google`                                                                                           | `jose`                                                                         |
+| Apple, LinkedIn              | `warlock add auth-google` (or `npm install jose`) — there is no separate `auth-apple` / `auth-linkedin` feature yet | `jose`                                                                         |
+| GitHub, Discord, Facebook, X | nothing — plain OAuth 2 over `fetch`                                                                                | nothing                                                                        |
+| Passkeys                     | `warlock add auth-passkeys`                                                                                         | `@simplewebauthn/server` (add `@simplewebauthn/browser` to your client bundle) |
+| Phone code                   | `warlock add notifications` + your own `sms`/`whatsapp` channel                                                     | nothing else. Auth ships no SMS/WhatsApp driver                                |
 
 The SDKs are optional peers, loaded with `import()` only when a method runs. If one is missing, the call throws `AuthProviderSdkMissingError` (500), and the message names the `warlock add` command. Run the migrations: `authMigrations` now includes `provider_accounts` and `passkey_credentials`, and `one_time_tokens` gained an `attempts` column.
 
@@ -200,17 +200,25 @@ passkeys: { rpID: "example.com", rpName: "Example", origin: "https://example.com
 
 ```ts
 // Register (logged in)
-router.post("/auth/passkeys/register/options", async ({ request, response }) =>
-  response.success(await generatePasskeyRegistrationOptions(request.locals.user)),
-  { middleware: [authMiddleware("user")] });
-router.post("/auth/passkeys/register", async ({ request, response }) => {
-  await verifyPasskeyRegistration(request, request.locals.user, request.input("credential"));
-  return response.success({ registered: true });
-}, { middleware: [authMiddleware("user")] });
+router.post(
+  "/auth/passkeys/register/options",
+  async ({ request, response }) =>
+    response.success(await generatePasskeyRegistrationOptions(request.locals.user)),
+  { middleware: [authMiddleware("user")] },
+);
+router.post(
+  "/auth/passkeys/register",
+  async ({ request, response }) => {
+    await verifyPasskeyRegistration(request, request.locals.user, request.input("credential"));
+    return response.success({ registered: true });
+  },
+  { middleware: [authMiddleware("user")] },
+);
 
 // Log in
 router.post("/auth/passkeys/login/options", async ({ response }) =>
-  response.success(await generatePasskeyAuthenticationOptions()));
+  response.success(await generatePasskeyAuthenticationOptions()),
+);
 router.post("/auth/passkeys/login", async ({ request, response }) => {
   const { tokens } = await verifyPasskeyAuthentication(request, request.input("credential"));
   authService.setAuthCookie(response, tokens.accessToken);
@@ -224,16 +232,23 @@ Browser:
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
 const post = (url: string, body?: unknown) =>
-  fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-    .then((r) => r.json());
+  fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  }).then((r) => r.json());
 
 // register
 const regOptions = await post("/auth/passkeys/register/options");
-await post("/auth/passkeys/register", { credential: await startRegistration({ optionsJSON: regOptions }) });
+await post("/auth/passkeys/register", {
+  credential: await startRegistration({ optionsJSON: regOptions }),
+});
 
 // log in
 const authOptions = await post("/auth/passkeys/login/options");
-await post("/auth/passkeys/login", { credential: await startAuthentication({ optionsJSON: authOptions }) });
+await post("/auth/passkeys/login", {
+  credential: await startAuthentication({ optionsJSON: authOptions }),
+});
 ```
 
 (Unwrap `response.success`'s envelope if your app wraps payloads.)
@@ -250,16 +265,26 @@ otp: { channel: "sms" /* or "whatsapp" */, phoneField: "phone", expiresIn: "5m",
 ```
 
 ```ts
-router.post("/auth/otp/request", async ({ request, response }) => {
-  await requestOtp(User, request.input("phone"), { channel: request.input("via") === "whatsapp" ? "whatsapp" : "sms" });
-  return response.success({ message: "If that number is registered, a code is on its way." });
-}, { middleware: [otpRequestThrottleMiddleware()] }); // 3 / 1h per phone + IP
+router.post(
+  "/auth/otp/request",
+  async ({ request, response }) => {
+    await requestOtp(User, request.input("phone"), {
+      channel: request.input("via") === "whatsapp" ? "whatsapp" : "sms",
+    });
+    return response.success({ message: "If that number is registered, a code is on its way." });
+  },
+  { middleware: [otpRequestThrottleMiddleware()] },
+); // 3 / 1h per phone + IP
 
-router.post("/auth/otp/verify", async ({ request, response }) => {
-  const { tokens } = await verifyOtp(User, request.input("phone"), request.input("code"));
-  authService.setAuthCookie(response, tokens.accessToken);
-  return response.success({ ok: true });
-}, { middleware: [otpVerifyThrottleMiddleware()] }); // 5 failures / 15m per phone + IP
+router.post(
+  "/auth/otp/verify",
+  async ({ request, response }) => {
+    const { tokens } = await verifyOtp(User, request.input("phone"), request.input("code"));
+    authService.setAuthCookie(response, tokens.accessToken);
+    return response.success({ ok: true });
+  },
+  { middleware: [otpVerifyThrottleMiddleware()] },
+); // 5 failures / 15m per phone + IP
 ```
 
 - Codes have 6 digits and are stored in `one_time_tokens` (purpose `otp`) as a salted HMAC keyed from your access-token secret, never as plain SHA-256, which is trivially reversible for 6 digits. A new request invalidates the previous code.

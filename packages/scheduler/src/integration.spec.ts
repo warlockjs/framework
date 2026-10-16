@@ -1,15 +1,7 @@
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone.js";
 import utc from "dayjs/plugin/utc.js";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { job } from "./job";
 import { Scheduler } from "./scheduler";
 import type { JobResult } from "./types";
@@ -30,8 +22,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const sleep = (ms: number) =>
-  new Promise<void>(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Full production setup — multi-job, observability listeners, lifecycle.
@@ -52,13 +43,9 @@ describe("Integration — production-style multi-job setup", () => {
 
     scheduler.on("scheduler:started", () => lifecycleEvents.push("started"));
     scheduler.on("scheduler:stopped", () => lifecycleEvents.push("stopped"));
-    scheduler.on("job:start", name => jobStarts.push(name));
-    scheduler.on("job:complete", (name, result) =>
-      jobCompletes.push({ name, result }),
-    );
-    scheduler.on("job:error", (name, error) =>
-      jobErrors.push({ name, error }),
-    );
+    scheduler.on("job:start", (name) => jobStarts.push(name));
+    scheduler.on("job:complete", (name, result) => jobCompletes.push({ name, result }));
+    scheduler.on("job:error", (name, error) => jobErrors.push({ name, error }));
 
     const cleanupCallback = vi.fn().mockResolvedValue(undefined);
     const reportCallback = vi.fn().mockResolvedValue(undefined);
@@ -66,11 +53,7 @@ describe("Integration — production-style multi-job setup", () => {
 
     scheduler.runEvery(60_000); // 1-minute ticks
     scheduler.addJobs([
-      job("token-cleanup", cleanupCallback)
-        .daily()
-        .at("03:00")
-        .preventOverlap()
-        .retry(3, 0),
+      job("token-cleanup", cleanupCallback).daily().at("03:00").preventOverlap().retry(3, 0),
       job("hourly-report", reportCallback).daily().at("03:30"),
       job("heartbeat", heartbeatCallback).everyMinutes(15),
     ]);
@@ -117,9 +100,7 @@ describe("Integration — flaky API recovers via backoff", () => {
       }
     });
 
-    scheduler.addJob(
-      job("api-sync", callback).everyHour().retry(3, 100, 2),
-    );
+    scheduler.addJob(job("api-sync", callback).everyHour().retry(3, 100, 2));
 
     const startEvents: string[] = [];
     const completeEvents: JobResult[] = [];
@@ -176,9 +157,7 @@ describe("Integration — overlap prevention blocks concurrent runs", () => {
     expect(jobInstance.isRunning).toBe(true);
 
     const skipEvents: { name: string; reason: string }[] = [];
-    scheduler.on("job:skip", (name, reason) =>
-      skipEvents.push({ name, reason }),
-    );
+    scheduler.on("job:skip", (name, reason) => skipEvents.push({ name, reason }));
 
     scheduler.start();
     // Three ticks should see the job still running and skip each one.
@@ -217,7 +196,7 @@ describe("Integration — multi-region daily digest", () => {
     const scheduler = new Scheduler();
     const fires = new Map<string, number>();
 
-    scheduler.on("job:start", name => {
+    scheduler.on("job:start", (name) => {
       fires.set(name, (fires.get(name) ?? 0) + 1);
     });
 
@@ -308,9 +287,7 @@ describe("Integration — permanently failing job", () => {
     const callback = vi.fn(async () => {
       throw new Error("always fails");
     });
-    scheduler.addJob(
-      job("doomed", callback).every(2, "second").retry(0),
-    );
+    scheduler.addJob(job("doomed", callback).every(2, "second").retry(0));
 
     const errorEvents: unknown[] = [];
     scheduler.on("job:error", (_, error) => errorEvents.push(error));
@@ -351,10 +328,7 @@ describe("Integration — dynamic registration during operation", () => {
     expect(originalCallsBeforeRemove).toBeGreaterThanOrEqual(1);
 
     // Add two new jobs and remove the original — all while running.
-    scheduler.addJobs([
-      job("late-1", lateCb1).everySecond(),
-      job("late-2", lateCb2).everySecond(),
-    ]);
+    scheduler.addJobs([job("late-1", lateCb1).everySecond(), job("late-2", lateCb2).everySecond()]);
     scheduler.removeJob("original");
 
     expect(scheduler.jobCount).toBe(2);

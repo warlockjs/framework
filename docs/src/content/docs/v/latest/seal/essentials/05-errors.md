@@ -11,11 +11,11 @@ sidebar:
 ```ts
 type ValidationResult = {
   isValid: boolean;
-  data: any;          // validated + reshaped data; matches Infer.Output<>
+  data: any; // validated + reshaped data; matches Infer.Output<>
   errors: {
-    type: string;     // rule name that failed — "required", "email", "min", ...
-    error: string;    // human-facing message (translated if configured)
-    input: string;    // dot-notation field path — "email", "address.city"
+    type: string; // rule name that failed — "required", "email", "min", ...
+    error: string; // human-facing message (translated if configured)
+    input: string; // dot-notation field path — "email", "address.city"
   }[];
 };
 ```
@@ -35,7 +35,7 @@ const schema = v.object({
 const result = await validate(schema, input);
 
 if (result.isValid) {
-  return result.data;   // typed as Infer.Output<typeof schema>
+  return result.data; // typed as Infer.Output<typeof schema>
 }
 
 return {
@@ -101,9 +101,7 @@ Two layers — per-rule overrides and the global translation hook.
 Most chain methods take an optional `errorMessage` argument:
 
 ```ts
-v.string()
-  .email("Please enter a valid email address")
-  .required("Email is required");
+v.string().email("Please enter a valid email address").required("Email is required");
 ```
 
 That override replaces the rule's default message at this call site only. Reach for it when one rule needs a tailored message in a specific schema.
@@ -184,9 +182,9 @@ If a consumer expects the [Standard Schema](https://standardschema.dev) issue sh
 const result = await schema["~standard"].validate(input);
 
 if ("value" in result) {
-  result.value;   // success — the validated data
+  result.value; // success — the validated data
 } else {
-  result.issues;  // [{ message, path: [{ key }, ...] }, ...]
+  result.issues; // [{ message, path: [{ key }, ...] }, ...]
 }
 ```
 

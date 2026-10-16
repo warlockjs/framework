@@ -15,7 +15,9 @@ const css = `/* .fake { } */
 describe("css modules SSR class names", () => {
   it("maps each local to cssModuleClassName and skips comments and :global", () => {
     const map = JSON.parse(
-      cssModuleServerSource(css, file, root).replace(/^export default /, "").replace(/;$/, ""),
+      cssModuleServerSource(css, file, root)
+        .replace(/^export default /, "")
+        .replace(/;$/, ""),
     );
 
     expect(map).toEqual({

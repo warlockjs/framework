@@ -9,7 +9,7 @@ Calling `user.destroy()` does one of three things, depending on your model's con
 
 - **`permanent`** — row is gone. The default. SQL `DELETE`, Mongo `deleteOne`.
 - **`soft`** — row stays, a timestamp is written to a `deletedAt`-style column. The model can later be restored.
-- **`trash`** — row is moved to a separate *trash* table/collection, then deleted from the original. Can be restored.
+- **`trash`** — row is moved to a separate _trash_ table/collection, then deleted from the original. Can be restored.
 
 Cascade resolves the strategy at call time from a clear precedence chain. This guide explains each strategy, how to pick one per model, how restoration works, and the design tradeoffs you should weigh before committing.
 
@@ -43,7 +43,7 @@ The simplest, the cheapest, the most irreversible. Reach for it when:
 - You have backups for "oops, didn't mean to delete that."
 - Soft-delete state would pollute queries you don't want to think about.
 
-After a permanent delete, the model instance is marked as *new* (no primary key), so calling `.save()` on it again would insert a brand new row.
+After a permanent delete, the model instance is marked as _new_ (no primary key), so calling `.save()` on it again would insert a brand new row.
 
 ## `soft` — keep the row, mark a timestamp
 
@@ -78,10 +78,10 @@ public static deletedAtColumn = "archived_at";
 **Where the filtering happens.** Cascade does **not** automatically hide soft-deleted rows from queries. If you want every `Post.where(...)` query to exclude soft-deleted rows, add a global scope on the model:
 
 ```ts
-Post.addGlobalScope("notDeleted", q => q.whereNull("deletedAt"));
+Post.addGlobalScope("notDeleted", (q) => q.whereNull("deletedAt"));
 ```
 
-This is intentional — *whether* to hide soft-deleted records is a domain decision (sometimes you want to see them in admin views), and a global scope is the right tool for the job. The [scopes guide](./scopes.md) covers global scopes in depth.
+This is intentional — _whether_ to hide soft-deleted records is a domain decision (sometimes you want to see them in admin views), and a global scope is the right tool for the job. The [scopes guide](./scopes.md) covers global scopes in depth.
 
 Reach for soft delete when:
 
@@ -146,7 +146,7 @@ const all = await User.restoreAll();
 
 ### Handling id conflicts on restore
 
-The interesting edge case is *trash → restore* when the original id has since been reused. (For example, you trashed user 42, someone else got assigned user 42 by an auto-increment, and now you want to restore the old user 42.)
+The interesting edge case is _trash → restore_ when the original id has since been reused. (For example, you trashed user 42, someone else got assigned user 42 by an auto-increment, and now you want to restore the old user 42.)
 
 ```ts
 await User.restore(42, { onIdConflict: "assignNew" }); // default
@@ -188,15 +188,15 @@ Useful for fixture cleanup in tests, GDPR hard-deletes that bypass the audit tra
 
 ## Choosing a strategy — a quick decision guide
 
-| You want…                                                              | Reach for     |
-| ---------------------------------------------------------------------- | ------------- |
-| Row gone. Don't care about it afterwards.                              | `permanent`   |
-| Row gone in queries by default, but recoverable                        | `soft` + global scope |
-| Row physically out of the live table, but recoverable                  | `trash`       |
-| Compliance / audit — keep deleted data, separate it from live data     | `trash`       |
-| "Archive" a record without dropping it from history                    | `soft`        |
-| Lean live table, no scope to remember                                  | `trash`       |
-| Already have separate audit logging                                    | `permanent`   |
+| You want…                                                          | Reach for             |
+| ------------------------------------------------------------------ | --------------------- |
+| Row gone. Don't care about it afterwards.                          | `permanent`           |
+| Row gone in queries by default, but recoverable                    | `soft` + global scope |
+| Row physically out of the live table, but recoverable              | `trash`               |
+| Compliance / audit — keep deleted data, separate it from live data | `trash`               |
+| "Archive" a record without dropping it from history                | `soft`                |
+| Lean live table, no scope to remember                              | `trash`               |
+| Already have separate audit logging                                | `permanent`           |
 
 ## Events
 
@@ -204,13 +204,13 @@ All three strategies emit the same lifecycle events: `deleting` (before) and `de
 
 ```ts
 User.events().onDeleting(async (user, ctx) => {
-  console.log(ctx.strategy);          // "permanent" | "soft" | "trash"
-  console.log(ctx.primaryKeyValue);   // the id being deleted
+  console.log(ctx.strategy); // "permanent" | "soft" | "trash"
+  console.log(ctx.primaryKeyValue); // the id being deleted
 });
 
 User.events().onDeleted(async (user, ctx) => {
-  console.log(ctx.deletedCount);      // 1 (or 0 if the row was already gone)
-  console.log(ctx.trashRecord);       // present for "trash" strategy
+  console.log(ctx.deletedCount); // 1 (or 0 if the row was already gone)
+  console.log(ctx.trashRecord); // present for "trash" strategy
 });
 ```
 
@@ -220,5 +220,5 @@ See the [events and hooks guide](../architecture-concepts/events-and-hooks.md) f
 
 - **Hiding soft-deleted rows automatically** — [Scopes guide](./scopes.md)
 - **Listening to delete events** — [Events and hooks guide](../architecture-concepts/events-and-hooks.md)
-- **Restoring from trash across model upgrades** — recipe *(planned)*
-- **GDPR hard-delete workflows** — recipe *(planned)*
+- **Restoring from trash across model upgrades** — recipe _(planned)_
+- **GDPR hard-delete workflows** — recipe _(planned)_

@@ -1,7 +1,4 @@
-import {
-  getAiPackageOptions,
-  getAiProviderOptions,
-} from "../features/features-map";
+import { getAiPackageOptions, getAiProviderOptions } from "../features/features-map";
 
 /**
  * Single source of truth for every CLI flag's help text and default, so
@@ -17,17 +14,15 @@ export type FlagDefinition = {
   defaultValue: string;
 };
 
-const AI_FEATURE_KEYS = [
-  ...getAiProviderOptions(),
-  ...getAiPackageOptions(),
-].map(({ value }) => value);
+const AI_FEATURE_KEYS = [...getAiProviderOptions(), ...getAiPackageOptions()].map(
+  ({ value }) => value,
+);
 
 export const FLAG_DEFINITIONS: FlagDefinition[] = [
   {
     usage: "--name=<name>",
     description: "Project name (or pass it as the first positional arg)",
-    defaultValue:
-      "required — prompted if a TTY is available, otherwise fails naming this flag",
+    defaultValue: "required — prompted if a TTY is available, otherwise fails naming this flag",
   },
   {
     usage: "--stack=<api|web>",
@@ -37,15 +32,13 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
   },
   {
     usage: "--db=<driver> / --no-db",
-    description:
-      "Database driver (e.g. postgres, mongodb), or skip a database entirely",
+    description: "Database driver (e.g. postgres, mongodb), or skip a database entirely",
     defaultValue: "mongodb",
   },
   {
     usage: "--features=<list>",
     description: "Comma-separated feature keys (e.g. test,herald)",
-    defaultValue:
-      'none (or ["web"] when --stack=web and --features is not given)',
+    defaultValue: 'none (or ["web"] when --stack=web and --features is not given)',
   },
   {
     usage: "--ai=<list>",
@@ -55,8 +48,7 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
   {
     usage: "--pm=<manager>",
     description: "Package manager to use (npm, yarn, pnpm, bun)",
-    defaultValue:
-      "inferred from the invoking agent (npm_config_user_agent) or the system",
+    defaultValue: "inferred from the invoking agent (npm_config_user_agent) or the system",
   },
   {
     usage: "--lint=<oxc|eslint>",

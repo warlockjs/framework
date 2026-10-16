@@ -29,66 +29,66 @@ import {
 
 ## Top-level functions
 
-| Export | Signature | Purpose |
-| --- | --- | --- |
-| `connectToBroker` | `(options: ConnectionOptions) => Promise<Broker>` | Open a connection, register the broker, return it. Call once at boot. |
-| `herald` | `(name?: string) => Broker` | Resolve a broker by name (default if omitted). Throws `MissingBrokerError` if not found. |
-| `heraldChannel<TPayload>` | `(name, options?) => ChannelContract<TPayload>` | Shorthand for `herald().channel(name, options)`. |
-| `publishEvent<TPayload>` | `(event: EventMessage<TPayload>) => Promise<void>` | Publish an `EventMessage` instance via the default broker. |
+| Export                        | Signature                                                         | Purpose                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `connectToBroker`             | `(options: ConnectionOptions) => Promise<Broker>`                 | Open a connection, register the broker, return it. Call once at boot.                      |
+| `herald`                      | `(name?: string) => Broker`                                       | Resolve a broker by name (default if omitted). Throws `MissingBrokerError` if not found.   |
+| `heraldChannel<TPayload>`     | `(name, options?) => ChannelContract<TPayload>`                   | Shorthand for `herald().channel(name, options)`.                                           |
+| `publishEvent<TPayload>`      | `(event: EventMessage<TPayload>) => Promise<void>`                | Publish an `EventMessage` instance via the default broker.                                 |
 | `subscribeConsumer<TPayload>` | `(Consumer: EventConsumerClass<TPayload>) => Promise<() => void>` | Subscribe an `EventConsumer` class to the default broker. Returns an unsubscribe function. |
 
 ## Broker registry
 
 `brokerRegistry` is the global singleton holding every registered broker.
 
-| Method | Purpose |
-| --- | --- |
-| `register(options)` | Add a broker to the registry (called by `connectToBroker`). |
-| `get(name?)` | Resolve a broker; throws `MissingBrokerError` if missing. |
-| `has(name)` | Boolean — is this broker registered? |
-| `hasAny()` | Boolean — any brokers at all? |
-| `getAll()` | Array of every registered broker. |
-| `getNames()` | Array of broker names. |
-| `getDefault()` | The default broker, or `undefined`. |
-| `on(event, listener)` | Listen for `"registered"` / `"default-registered"` / `"connected"` / `"disconnected"`. |
-| `off(event, listener)` / `once(event, listener)` | Standard event-emitter pair. |
-| `clear()` | Drop every broker — only for tests. |
+| Method                                           | Purpose                                                                                |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `register(options)`                              | Add a broker to the registry (called by `connectToBroker`).                            |
+| `get(name?)`                                     | Resolve a broker; throws `MissingBrokerError` if missing.                              |
+| `has(name)`                                      | Boolean — is this broker registered?                                                   |
+| `hasAny()`                                       | Boolean — any brokers at all?                                                          |
+| `getAll()`                                       | Array of every registered broker.                                                      |
+| `getNames()`                                     | Array of broker names.                                                                 |
+| `getDefault()`                                   | The default broker, or `undefined`.                                                    |
+| `on(event, listener)`                            | Listen for `"registered"` / `"default-registered"` / `"connected"` / `"disconnected"`. |
+| `off(event, listener)` / `once(event, listener)` | Standard event-emitter pair.                                                           |
+| `clear()`                                        | Drop every broker — only for tests.                                                    |
 
 ## `Broker`
 
 Returned by `connectToBroker` and `herald()`. Wraps a driver with metadata.
 
-| Property / method | Type / signature | Purpose |
-| --- | --- | --- |
-| `name` | `string` | Broker name (registry key). |
-| `isDefault` | `boolean` | Whether this is the default broker. |
-| `isConnected` | `boolean` | Live status — proxies the driver. |
-| `driver` | `BrokerDriverContract` | The underlying driver. Escape hatch for raw AMQP access. |
-| `channel<TPayload>(name, options?)` | `ChannelContract<TPayload>` | Get or create a channel. Cached after first call. |
-| `publish<TPayload>(event)` | `void` | Publish an `EventMessage` (channel name = `event.eventName`). |
-| `subscribe(consumer)` | `() => void` | Subscribe an `EventConsumer` class. Returns an unsubscribe function. |
-| `connect()` / `disconnect()` | `Promise<void>` | Lifecycle. |
-| `startConsuming()` / `stopConsuming()` | `Promise<void>` | Batch consumer control. |
-| `healthCheck()` | `Promise<HealthCheckResult>` | Round-trip liveness + latency. |
+| Property / method                      | Type / signature             | Purpose                                                              |
+| -------------------------------------- | ---------------------------- | -------------------------------------------------------------------- |
+| `name`                                 | `string`                     | Broker name (registry key).                                          |
+| `isDefault`                            | `boolean`                    | Whether this is the default broker.                                  |
+| `isConnected`                          | `boolean`                    | Live status — proxies the driver.                                    |
+| `driver`                               | `BrokerDriverContract`       | The underlying driver. Escape hatch for raw AMQP access.             |
+| `channel<TPayload>(name, options?)`    | `ChannelContract<TPayload>`  | Get or create a channel. Cached after first call.                    |
+| `publish<TPayload>(event)`             | `void`                       | Publish an `EventMessage` (channel name = `event.eventName`).        |
+| `subscribe(consumer)`                  | `() => void`                 | Subscribe an `EventConsumer` class. Returns an unsubscribe function. |
+| `connect()` / `disconnect()`           | `Promise<void>`              | Lifecycle.                                                           |
+| `startConsuming()` / `stopConsuming()` | `Promise<void>`              | Batch consumer control.                                              |
+| `healthCheck()`                        | `Promise<HealthCheckResult>` | Round-trip liveness + latency.                                       |
 
 ## `ChannelContract<TPayload>`
 
 Returned by `broker.channel(name)`. Driver-agnostic pub/sub interface.
 
-| Method | Signature | Purpose |
-| --- | --- | --- |
-| `publish` | `(payload, options?: PublishOptions) => Promise<void>` | Send a single message. |
-| `publishBatch` | `(payloads[], options?) => Promise<void>` | Send many — same options to each. |
-| `subscribe` | `(handler, options?: SubscribeOptions) => Promise<Subscription>` | Register a consumer. |
-| `unsubscribeById` | `(consumerId) => Promise<void>` | Cancel a specific subscription. |
-| `request<TResponse>` | `(payload, options?: RequestOptions) => Promise<TResponse>` | RPC — publish and await reply. |
-| `respond<TResponse>` | `(handler) => Promise<Subscription>` | Register an RPC responder. |
-| `stats` | `() => Promise<ChannelStats>` | `{ messageCount, consumerCount, name }`. |
-| `purge` | `() => Promise<number>` | Drop all pending messages. Returns count purged. |
-| `exists` | `() => Promise<boolean>` | Does the queue exist on the broker? |
-| `delete` | `() => Promise<void>` | Remove queue + cancel subscriptions. |
-| `assert` | `() => Promise<void>` | Force assert (lazy by default). |
-| `stopConsuming` | `() => Promise<void>` | Cancel all subscriptions on this channel. |
+| Method               | Signature                                                        | Purpose                                          |
+| -------------------- | ---------------------------------------------------------------- | ------------------------------------------------ |
+| `publish`            | `(payload, options?: PublishOptions) => Promise<void>`           | Send a single message.                           |
+| `publishBatch`       | `(payloads[], options?) => Promise<void>`                        | Send many — same options to each.                |
+| `subscribe`          | `(handler, options?: SubscribeOptions) => Promise<Subscription>` | Register a consumer.                             |
+| `unsubscribeById`    | `(consumerId) => Promise<void>`                                  | Cancel a specific subscription.                  |
+| `request<TResponse>` | `(payload, options?: RequestOptions) => Promise<TResponse>`      | RPC — publish and await reply.                   |
+| `respond<TResponse>` | `(handler) => Promise<Subscription>`                             | Register an RPC responder.                       |
+| `stats`              | `() => Promise<ChannelStats>`                                    | `{ messageCount, consumerCount, name }`.         |
+| `purge`              | `() => Promise<number>`                                          | Drop all pending messages. Returns count purged. |
+| `exists`             | `() => Promise<boolean>`                                         | Does the queue exist on the broker?              |
+| `delete`             | `() => Promise<void>`                                            | Remove queue + cancel subscriptions.             |
+| `assert`             | `() => Promise<void>`                                            | Force assert (lazy by default).                  |
+| `stopConsuming`      | `() => Promise<void>`                                            | Cancel all subscriptions on this channel.        |
 
 ## Connection options
 
@@ -199,28 +199,28 @@ type Subscription = {
   readonly channel: string;
   readonly consumerTag?: string;
   unsubscribe(): Promise<void>;
-  pause(): Promise<void>;       // also cancels on RabbitMQ
-  resume(): Promise<void>;       // throws on RabbitMQ — re-subscribe instead
+  pause(): Promise<void>; // also cancels on RabbitMQ
+  resume(): Promise<void>; // throws on RabbitMQ — re-subscribe instead
   isActive(): boolean;
 };
 ```
 
 ## Class-based consumers
 
-| Export | Purpose |
-| --- | --- |
-| `EventMessage<TPayload>` | Abstract base for event classes — `eventName`, `version`, `schema`, `toJSON()`, `serialize()`. |
-| `EventConsumer<Payload>` | Abstract base for consumer classes — `eventName` (static), `schema`, `handle(payload, event)`. |
-| `defineEvent(name, options?)` | Factory — returns an `EventMessage` subclass. |
-| `defineConsumer(name, options)` | Factory — registers a consumer + returns the class. |
-| `Consumable(options?)` | Decorator — registers an `EventConsumer` subclass with the broker. |
-| `publishEvent(event)` | Publish an `EventMessage` instance. |
-| `subscribeConsumer(Consumer)` | Subscribe an `EventConsumer` class. |
+| Export                          | Purpose                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `EventMessage<TPayload>`        | Abstract base for event classes — `eventName`, `version`, `schema`, `toJSON()`, `serialize()`. |
+| `EventConsumer<Payload>`        | Abstract base for consumer classes — `eventName` (static), `schema`, `handle(payload, event)`. |
+| `defineEvent(name, options?)`   | Factory — returns an `EventMessage` subclass.                                                  |
+| `defineConsumer(name, options)` | Factory — registers a consumer + returns the class.                                            |
+| `Consumable(options?)`          | Decorator — registers an `EventConsumer` subclass with the broker.                             |
+| `publishEvent(event)`           | Publish an `EventMessage` instance.                                                            |
+| `subscribeConsumer(Consumer)`   | Subscribe an `EventConsumer` class.                                                            |
 
 ## Errors
 
-| Class | Thrown when |
-| --- | --- |
+| Class                | Thrown when                                                              |
+| -------------------- | ------------------------------------------------------------------------ |
 | `MissingBrokerError` | `herald(name)` resolves to an unregistered broker, or no default exists. |
 
 Connection failures throw `Error` with a `"Failed to connect to rabbitmq: ..."` prefix. Schema validation failures throw `Error` with `"Message validation failed: ..."`.

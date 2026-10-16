@@ -229,9 +229,7 @@ export class Job {
    */
   public every(value: number, timeType: TimeType): this {
     if (!Number.isFinite(value) || value <= 0) {
-      throw new Error(
-        `Invalid interval value: ${value}. Must be a positive finite number.`,
-      );
+      throw new Error(`Invalid interval value: ${value}. Must be a positive finite number.`);
     }
 
     this._intervals.every = { type: timeType, value };
@@ -617,9 +615,7 @@ export class Job {
       backoffMultiplier !== undefined &&
       (!Number.isFinite(backoffMultiplier) || backoffMultiplier <= 0)
     ) {
-      throw new Error(
-        `Invalid backoffMultiplier: ${backoffMultiplier}. Must be > 0.`,
-      );
+      throw new Error(`Invalid backoffMultiplier: ${backoffMultiplier}. Must be > 0.`);
     }
 
     this._retryConfig = {
@@ -789,7 +785,7 @@ export class Job {
       return Promise.resolve();
     }
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this._completionResolvers.push(resolve);
     });
   }
@@ -904,7 +900,7 @@ export class Job {
    * Sleep for specified milliseconds
    */
   private _sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

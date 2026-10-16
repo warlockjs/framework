@@ -21,9 +21,7 @@ describe("notifications event bus", () => {
     });
 
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "mail" }),
-    );
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ channel: "mail" }));
 
     off();
   });
@@ -77,7 +75,13 @@ describe("notifications event bus", () => {
 
     notifications.off("sent", a);
 
-    await emit("sent", { dispatchId: "d1", channel: "mail", payload: {}, options: {}, durationMs: 0 });
+    await emit("sent", {
+      dispatchId: "d1",
+      channel: "mail",
+      payload: {},
+      options: {},
+      durationMs: 0,
+    });
 
     expect(a).not.toHaveBeenCalled();
     expect(b).toHaveBeenCalledTimes(1);

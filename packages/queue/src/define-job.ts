@@ -88,7 +88,10 @@ function assertValidDefinition(definition: JobDefinition<unknown, unknown>): voi
     );
   }
 
-  if (definition.attempts !== undefined && !(Number.isInteger(definition.attempts) && definition.attempts >= 1)) {
+  if (
+    definition.attempts !== undefined &&
+    !(Number.isInteger(definition.attempts) && definition.attempts >= 1)
+  ) {
     throw new InvalidJobDefinitionError(
       `defineJob("${definition.name}"): \`attempts\` must be an integer >= 1, got ${definition.attempts}.`,
     );

@@ -39,7 +39,12 @@ export function describeStatus(status: string): string {
  * (array of it), `nullable(Resource)` (the resource or null) or a nested plain object of those. Anything else (a resolver function, a
  * builder) is `{}` plus a warning.
  */
-function bodyValueSchema(value: unknown, path: string, registry: SchemaRegistry, warn: WarningSink): OpenApiSchema {
+function bodyValueSchema(
+  value: unknown,
+  path: string,
+  registry: SchemaRegistry,
+  warn: WarningSink,
+): OpenApiSchema {
   if (typeof value === "string") {
     return registry.cast(value, path, warn);
   }
@@ -53,7 +58,9 @@ function bodyValueSchema(value: unknown, path: string, registry: SchemaRegistry,
       return registry.resourceRef(value);
     }
 
-    warn(`${path}: a function that is not a resource class has no static shape and is documented as {}.`);
+    warn(
+      `${path}: a function that is not a resource class has no static shape and is documented as {}.`,
+    );
 
     return {};
   }

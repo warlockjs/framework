@@ -47,10 +47,10 @@ describe("getIntroBanner", () => {
 
     const shortVersionLine = short
       .split("\n")
-      .find(line => line.includes("v1") && line.includes("│"));
+      .find((line) => line.includes("v1") && line.includes("│"));
     const longVersionLine = long
       .split("\n")
-      .find(line => line.includes("v10.20.30") && line.includes("│"));
+      .find((line) => line.includes("v10.20.30") && line.includes("│"));
 
     expect(shortVersionLine).toBeTruthy();
     expect(longVersionLine).toBeTruthy();
@@ -80,11 +80,8 @@ describe("getSuccessScreen", () => {
 
   it.each([60, 80, 120, undefined, 32])(
     "fits every success-screen line in %s columns without losing features",
-    columns => {
-      const features = Array.from(
-        { length: 22 },
-        (_, index) => `feature-${index}`,
-      );
+    (columns) => {
+      const features = Array.from({ length: 22 }, (_, index) => `feature-${index}`);
       const screen = visible(
         getSuccessScreen(
           {
@@ -98,21 +95,19 @@ describe("getSuccessScreen", () => {
       );
       for (const line of screen.split("\n")) {
         const width = [...line].reduce(
-          (total, char) =>
-            total + (/\p{Extended_Pictographic}/u.test(char) ? 2 : 1),
+          (total, char) => total + (/\p{Extended_Pictographic}/u.test(char) ? 2 : 1),
           0,
         );
         expect(width, line).toBeLessThanOrEqual(columns ?? 80);
       }
       for (const feature of features) expect(screen).toContain(feature);
-      const frame = screen.split("\n").filter(line => /[╭│╰]/u.test(line));
+      const frame = screen.split("\n").filter((line) => /[╭│╰]/u.test(line));
       if (columns === 32) expect(frame).toHaveLength(0);
       else {
         expect(frame.length).toBeGreaterThan(3);
-        const widths = frame.map(line =>
+        const widths = frame.map((line) =>
           [...line].reduce(
-            (total, char) =>
-              total + (/\p{Extended_Pictographic}/u.test(char) ? 2 : 1),
+            (total, char) => total + (/\p{Extended_Pictographic}/u.test(char) ? 2 : 1),
             0,
           ),
         );
@@ -128,20 +123,15 @@ describe("getSuccessScreen", () => {
           projectName: "app",
           database: "MongoDB",
           packageManager: "npm",
-          features: Array.from(
-            { length: 22 },
-            (_, index) => `feature-${index}`,
-          ),
+          features: Array.from({ length: 22 }, (_, index) => `feature-${index}`),
         },
         80,
       ),
     );
     const lines = screen.split("\n");
-    const first = lines.findIndex(line => line.includes("Features:"));
+    const first = lines.findIndex((line) => line.includes("Features:"));
     const column = lines[first].indexOf("feature-0");
-    const continued = lines
-      .slice(first + 1)
-      .filter(line => line.includes("feature-"));
+    const continued = lines.slice(first + 1).filter((line) => line.includes("feature-"));
     expect(continued.length).toBeGreaterThan(0);
     for (const line of continued) expect(line.indexOf("feature-")).toBe(column);
     expect(lines).toContain("     cd app");
@@ -211,15 +201,7 @@ describe("getSuccessScreen", () => {
   });
 
   it("grows the box to fit a long feature list without truncating it", () => {
-    const longFeatures = [
-      "react",
-      "react-email",
-      "mail",
-      "ses",
-      "image",
-      "s3",
-      "redis",
-    ];
+    const longFeatures = ["react", "react-email", "mail", "ses", "image", "s3", "redis"];
 
     const screen = visible(
       getSuccessScreen({
@@ -247,8 +229,8 @@ describe("getSuccessScreen", () => {
     // template indentation are ignored.
     const rows = visible(screen)
       .split("\n")
-      .map(line => line.replace(/\s+$/, ""))
-      .filter(line => line.includes("│"));
+      .map((line) => line.replace(/\s+$/, ""))
+      .filter((line) => line.includes("│"));
 
     expect(rows.length).toBeGreaterThan(3);
 
@@ -267,8 +249,8 @@ describe("getSuccessScreen", () => {
       }),
     );
 
-    const top = screen.split("\n").find(line => line.includes("╭"));
-    const bottom = screen.split("\n").find(line => line.includes("╰"));
+    const top = screen.split("\n").find((line) => line.includes("╭"));
+    const bottom = screen.split("\n").find((line) => line.includes("╰"));
 
     expect(top).toBeTruthy();
     expect(bottom).toBeTruthy();
@@ -290,7 +272,7 @@ describe("console wrappers", () => {
 
     // logo + wordmark + framed banner = three writes.
     expect(logSpy).toHaveBeenCalledTimes(3);
-    const printed = logSpy.mock.calls.map(call => String(call[0])).join("\n");
+    const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
     expect(printed).toContain("v2.3.4");
   });
 

@@ -27,7 +27,10 @@ function compilePostmanValidator(): SchemaValidator {
   ajv.addMetaSchema(requireFromEslint("ajv/lib/refs/json-schema-draft-04.json"));
 
   // Source: https://schema.getpostman.com/json/collection/v2.1.0/collection.json
-  const schemaPath = path.resolve(__dirname, "../../../tests/fixtures/postman/collection-v2.1.0.schema.json");
+  const schemaPath = path.resolve(
+    __dirname,
+    "../../../tests/fixtures/postman/collection-v2.1.0.schema.json",
+  );
 
   return ajv.compile(JSON.parse(readFileSync(schemaPath, "utf8")));
 }
@@ -36,7 +39,9 @@ describe("Postman Collection v2.1.0 schema", () => {
   const validate = compilePostmanValidator();
 
   it("accepts the converted shop collection", () => {
-    const valid = validate(JSON.parse(JSON.stringify(openApiToPostmanCollection(shopOpenApiDocument))));
+    const valid = validate(
+      JSON.parse(JSON.stringify(openApiToPostmanCollection(shopOpenApiDocument))),
+    );
 
     expect(validate.errors ?? null).toBeNull();
     expect(valid).toBe(true);

@@ -77,7 +77,7 @@ Logout on one device kills only that device's family — other devices keep thei
 const sessions = await authService.getActiveSessions(user);
 
 for (const session of sessions) {
-  session.get("device_info");   // { userAgent, ip, deviceId? } if it was provided
+  session.get("device_info"); // { userAgent, ip, deviceId? } if it was provided
   session.get("created_at");
   session.get("expires_at");
 }
@@ -88,7 +88,7 @@ Returns the active (non-revoked, non-expired) `RefreshToken` instances. Use it f
 To revoke a specific session, call `.revoke()` on the instance:
 
 ```ts
-const sessions = await user.activeSessions();   // shortcut for authService.getActiveSessions(this)
+const sessions = await user.activeSessions(); // shortcut for authService.getActiveSessions(this)
 const target = sessions.find((session) => session.get("device_info")?.deviceId === "abc");
 await target?.revoke();
 ```
@@ -166,10 +166,10 @@ Low-level sign / verify, sitting under `authService`. Reach for them only when t
 ```ts
 import { jwt } from "@warlock.js/auth";
 
-const token   = await jwt.generate(payload, { expiresIn: 3600 });
+const token = await jwt.generate(payload, { expiresIn: 3600 });
 const decoded = await jwt.verify(token);
 
-const refresh        = await jwt.generateRefreshToken(payload, { expiresIn });
+const refresh = await jwt.generateRefreshToken(payload, { expiresIn });
 const decodedRefresh = await jwt.verifyRefreshToken(refresh);
 ```
 

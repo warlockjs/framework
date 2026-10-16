@@ -1,0 +1,30 @@
+# Generated files and build output have their own projectors/checks.
+**/node_modules/**
+**/vendor/**
+**/dist/**
+**/esm/**
+**/cjs/**
+**/coverage/**
+**/.astro/**
+**/.warlock/**
+**/.dts-tsc-test/**
+**/.skill-snippet-gate-tmp/**
+**/package-lock.json
+**/pnpm-lock.yaml
+packages/*/llms*.txt
+docs/public/**
+docs/src/data/changelog.json
+packages/core/tests/fixtures/model-resources/typings/model-resources.d.ts
+tools/release/sources/**
+
+# Templates retain their own generated-app toolchain and byte-format checks.
+packages/create-warlock/templates/**
+
+# Historical reports, archived designs and scratch copies are not authored source.
+findings/**
+**/scratchpad/**
+packages/cache/domains/plans/archive/**
+packages/logger/domains/plans/archive/**
+docs/src/content/docs/v/v4/**
+.tmp/**
+temp/**

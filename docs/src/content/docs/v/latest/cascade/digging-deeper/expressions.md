@@ -35,17 +35,17 @@ const stats = await Order.query()
 
 The complete vocabulary:
 
-| Helper | What it does | MongoDB | SQL |
-| ------ | ------------ | ------- | --- |
-| `$agg.count()` | count of rows in the group | `{ $sum: 1 }` | `COUNT(*)` |
-| `$agg.sum(field)` | sum of a numeric field | `{ $sum: "$field" }` | `SUM(field)` |
-| `$agg.avg(field)` | average of a numeric field | `{ $avg: "$field" }` | `AVG(field)` |
-| `$agg.min(field)` | minimum value | `{ $min: "$field" }` | `MIN(field)` |
-| `$agg.max(field)` | maximum value | `{ $max: "$field" }` | `MAX(field)` |
-| `$agg.distinct(field)` | distinct values | `{ $distinct: "$field" }` | **MongoDB-only** — throws on Postgres |
-| `$agg.floor(field)` | floor of a numeric field | `{ $floor: "$field" }` | **MongoDB-only** — throws on Postgres |
-| `$agg.first(field)` | first value in group order | `{ $first: "$field" }` | **MongoDB-only** — throws on Postgres |
-| `$agg.last(field)` | last value in group order | `{ $last: "$field" }` | **MongoDB-only** — throws on Postgres |
+| Helper                 | What it does               | MongoDB                   | SQL                                   |
+| ---------------------- | -------------------------- | ------------------------- | ------------------------------------- |
+| `$agg.count()`         | count of rows in the group | `{ $sum: 1 }`             | `COUNT(*)`                            |
+| `$agg.sum(field)`      | sum of a numeric field     | `{ $sum: "$field" }`      | `SUM(field)`                          |
+| `$agg.avg(field)`      | average of a numeric field | `{ $avg: "$field" }`      | `AVG(field)`                          |
+| `$agg.min(field)`      | minimum value              | `{ $min: "$field" }`      | `MIN(field)`                          |
+| `$agg.max(field)`      | maximum value              | `{ $max: "$field" }`      | `MAX(field)`                          |
+| `$agg.distinct(field)` | distinct values            | `{ $distinct: "$field" }` | **MongoDB-only** — throws on Postgres |
+| `$agg.floor(field)`    | floor of a numeric field   | `{ $floor: "$field" }`    | **MongoDB-only** — throws on Postgres |
+| `$agg.first(field)`    | first value in group order | `{ $first: "$field" }`    | **MongoDB-only** — throws on Postgres |
+| `$agg.last(field)`     | last value in group order  | `{ $last: "$field" }`     | **MongoDB-only** — throws on Postgres |
 
 **The first five are cross-driver. The last four (`distinct`/`floor`/`first`/`last`) are MongoDB-only.** On Postgres they throw at the `.groupBy()` call with an actionable message — Mongo's `$distinct` returns an array (SQL `DISTINCT` is a set quantifier, not a scalar aggregate), `$floor` is a scalar function not an aggregate, and `$first`/`$last` need a window-function ordering context `$agg` doesn't carry. Rather than emit a silently-different query, Postgres fails fast and points at `selectRaw` / `havingRaw` with the equivalent SQL. See the [Aggregates guide](./aggregates.md#with-aggregate-operations--the-useful-form).
 
@@ -80,8 +80,8 @@ query.selectCase(
     { when: { $eq: ["$status", "pending"] }, then: "Awaiting" },
     { when: { $eq: ["$status", "banned"] }, then: "Suspended" },
   ],
-  "Unknown",       // otherwise / default
-  "statusLabel",   // alias
+  "Unknown", // otherwise / default
+  "statusLabel", // alias
 );
 ```
 
@@ -94,9 +94,9 @@ For the "if X then Y else Z" case, `selectWhen` is shorter than the full `select
 ```ts
 query.selectWhen(
   { $gt: ["$age", 18] }, // condition
-  "Adult",               // then
-  "Minor",               // else
-  "ageLabel",            // alias
+  "Adult", // then
+  "Minor", // else
+  "ageLabel", // alias
 );
 ```
 
@@ -154,15 +154,15 @@ The shape is driver-native (MongoDB `$expr`-style here; SQL would take a string 
 Smaller utilities for common projections:
 
 ```ts
-query.selectExists("deletedAt", "isDeleted");           // boolean — does the path exist?
-query.selectCount("permissions", "permissionsCount");   // number — array length
+query.selectExists("deletedAt", "isDeleted"); // boolean — does the path exist?
+query.selectCount("permissions", "permissionsCount"); // number — array length
 ```
 
 These are sugar over what you could write with `selectRaw`, but they read better at the call site and survive driver swaps.
 
 ## `selectAggregate` — single aggregate without `groupBy`
 
-When you want a *single* aggregate as part of a regular projection (not inside `groupBy`), `selectAggregate` is the form:
+When you want a _single_ aggregate as part of a regular projection (not inside `groupBy`), `selectAggregate` is the form:
 
 ```ts
 query.selectAggregate("items.price", "sum", "itemsTotal");
@@ -187,7 +187,7 @@ query.selectRaw("SUM(items.price) AS total");
 // Several at once
 query.selectRawMany([
   { alias: "firstName", expression: "$profile.name.first" },
-  { alias: "isAdult",   expression: { $gte: ["$age", 18] } },
+  { alias: "isAdult", expression: { $gte: ["$age", 18] } },
 ]);
 ```
 
@@ -229,12 +229,12 @@ Covered in detail in the [Joins guide](./joins.md). Use for lateral joins, `$gra
 Last-resort escape hatches that mutate the driver's underlying query object directly:
 
 ```ts
-query.raw(native => {
+query.raw((native) => {
   // Mutate the native query before execution
   return native;
 });
 
-query.selectDriverProjection(projection => {
+query.selectDriverProjection((projection) => {
   projection.score = { $meta: "textScore" }; // MongoDB-specific
 });
 ```
@@ -254,12 +254,7 @@ const report = await Order.query()
     orderCount: $agg.count(),
     avgOrder: $agg.avg("amount"),
   })
-  .selectWhen(
-    { $gt: ["$revenue", 10_000] },
-    "high-volume",
-    "low-volume",
-    "tier",
-  )
+  .selectWhen({ $gt: ["$revenue", 10_000] }, "high-volume", "low-volume", "tier")
   .having("revenue", ">", 0)
   .orderBy("revenue", "desc")
   .get();
@@ -278,18 +273,18 @@ The structured pieces survive driver swaps. The day you reach for `selectRaw` or
 
 ## When to reach for what — quick decision
 
-| Situation | Reach for |
-| --------- | --------- |
-| Standard aggregate inside `groupBy` (works on both drivers) | `$agg.*` helpers |
-| Branching projection with 2 branches | `selectWhen` |
-| Branching projection with 3+ branches | `selectCase` |
-| String concatenation | `selectConcat` |
-| First non-null fallback | `selectCoalesce` |
-| Single aggregate on a non-grouped query | `selectAggregate` |
-| Sub-select inside projection | `selectSub` |
-| Window function (rank, partition aggregates, running totals) | `selectWindow` |
-| Driver-specific aggregate inside `groupBy` | Raw expression in the aggregates object |
-| Anything the structured helpers can't express | `selectRaw` / `whereRaw` / `joinRaw` / etc. |
+| Situation                                                    | Reach for                                   |
+| ------------------------------------------------------------ | ------------------------------------------- |
+| Standard aggregate inside `groupBy` (works on both drivers)  | `$agg.*` helpers                            |
+| Branching projection with 2 branches                         | `selectWhen`                                |
+| Branching projection with 3+ branches                        | `selectCase`                                |
+| String concatenation                                         | `selectConcat`                              |
+| First non-null fallback                                      | `selectCoalesce`                            |
+| Single aggregate on a non-grouped query                      | `selectAggregate`                           |
+| Sub-select inside projection                                 | `selectSub`                                 |
+| Window function (rank, partition aggregates, running totals) | `selectWindow`                              |
+| Driver-specific aggregate inside `groupBy`                   | Raw expression in the aggregates object     |
+| Anything the structured helpers can't express                | `selectRaw` / `whereRaw` / `joinRaw` / etc. |
 
 ## Going further
 

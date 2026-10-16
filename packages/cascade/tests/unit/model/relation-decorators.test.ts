@@ -11,16 +11,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Model } from "../../../src/model/model";
-import {
-  BelongsTo,
-  BelongsToMany,
-  HasMany,
-  HasOne,
-} from "../../../src/model/relation-decorators";
-import {
-  cleanupModelsRegistery,
-  RegisterModel,
-} from "../../../src/model/register-model";
+import { BelongsTo, BelongsToMany, HasMany, HasOne } from "../../../src/model/relation-decorators";
+import { cleanupModelsRegistery, RegisterModel } from "../../../src/model/register-model";
 import type { RelationDefinition } from "../../../src/relations/types";
 
 function relationsOf(ModelClass: unknown): Record<string, RelationDefinition> {
@@ -177,9 +169,7 @@ describe("model/relation-decorators", () => {
         metadata: {},
       } as unknown as ClassFieldDecoratorContext;
 
-      expect(() => decorate(undefined, badContext)).toThrow(
-        /can only be applied to class fields/,
-      );
+      expect(() => decorate(undefined, badContext)).toThrow(/can only be applied to class fields/);
     });
   });
 });

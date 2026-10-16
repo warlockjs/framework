@@ -23,10 +23,7 @@ export class SyncContextManager {
    * @param affectedCount - Number of documents affected
    * @returns A new sync context
    */
-  public static createContext(
-    instruction: SyncInstruction,
-    affectedCount: number,
-  ): SyncContext {
+  public static createContext(instruction: SyncInstruction, affectedCount: number): SyncContext {
     return {
       sourceModel: instruction.sourceModel,
       sourceId: instruction.sourceId,
@@ -115,11 +112,7 @@ export class SyncContextManager {
    * @param maxDepth - Maximum allowed depth
    * @returns True if more syncing is allowed
    */
-  public static canSyncDeeper(
-    currentDepth: number,
-    maxDepth: number,
-  ): boolean {
+  public static canSyncDeeper(currentDepth: number, maxDepth: number): boolean {
     return currentDepth < maxDepth;
   }
 }
-

@@ -159,7 +159,7 @@ export class Scheduler
     this._aroundHooks = [...this._aroundHooks, hook];
 
     return () => {
-      this._aroundHooks = this._aroundHooks.filter(item => item !== hook);
+      this._aroundHooks = this._aroundHooks.filter((item) => item !== hook);
     };
   }
 
@@ -206,7 +206,7 @@ export class Scheduler
    * @returns true if job was found and removed
    */
   public removeJob(jobName: string): boolean {
-    const index = this._jobs.findIndex(j => j.name === jobName);
+    const index = this._jobs.findIndex((j) => j.name === jobName);
 
     if (index !== -1) {
       this._jobs.splice(index, 1);
@@ -223,7 +223,7 @@ export class Scheduler
    * @returns Job instance or undefined
    */
   public getJob(jobName: string): Job | undefined {
-    return this._jobs.find(j => j.name === jobName);
+    return this._jobs.find((j) => j.name === jobName);
   }
 
   /**
@@ -332,12 +332,12 @@ export class Scheduler
     this._isShuttingDown = true;
     this.stop();
 
-    const runningJobs = this._jobs.filter(j => j.isRunning);
+    const runningJobs = this._jobs.filter((j) => j.isRunning);
 
     if (runningJobs.length > 0) {
       await Promise.race([
-        Promise.all(runningJobs.map(j => j.waitForCompletion())),
-        new Promise<void>(resolve => setTimeout(resolve, timeout)),
+        Promise.all(runningJobs.map((j) => j.waitForCompletion())),
+        new Promise<void>((resolve) => setTimeout(resolve, timeout)),
       ]);
     }
   }
@@ -425,7 +425,7 @@ export class Scheduler
   private async _tick(): Promise<void> {
     this.emit("scheduler:tick", new Date());
 
-    const dueJobs = this._jobs.filter(job => {
+    const dueJobs = this._jobs.filter((job) => {
       // Time-based readiness only; running state is checked below so a
       // `job:skip` event fires whenever overlap blocks a due run.
       if (!job.isDue()) return false;
@@ -469,7 +469,7 @@ export class Scheduler
 
     for (const batch of batches) {
       if (this._isShuttingDown) break;
-      await Promise.allSettled(batch.map(job => this._runJob(job)));
+      await Promise.allSettled(batch.map((job) => this._runJob(job)));
     }
   }
 

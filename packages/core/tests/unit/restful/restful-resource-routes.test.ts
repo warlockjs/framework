@@ -196,12 +196,7 @@ describe("Router.restfulResource — only / except", () => {
     const methods = shape().map((entry) => `${entry.method} ${entry.path}`);
 
     // delete + bulkDelete both survive because `except` only lists create/update/patch.
-    expect(methods).toEqual([
-      "GET /users",
-      "GET /users/:id",
-      "DELETE /users/:id",
-      "DELETE /users",
-    ]);
+    expect(methods).toEqual(["GET /users", "GET /users/:id", "DELETE /users/:id", "DELETE /users"]);
   });
 });
 

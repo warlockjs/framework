@@ -76,7 +76,7 @@ To switch the active locale without a full reload, call `changeLocaleCode(code)`
 The hydration payload ships a `translations` key holding **only the active locale's keywords** (never the other locales' tables), and `<Scripts />` carries it to the browser. `useTrans()` reads from it before the first client render, so the hydrated text matches the server's. How it gets there depends on where the copy came from:
 
 - **Route `locales.json` (scoped mode, the `localize-pages` topic).** The payload also carries `translationMode: "scoped"`. `LocaleProvider` receives that snapshot and `useTrans()` translates from it; the route JSON is **not** registered into a process-global localization table, so a request or a client navigation cannot inherit another route's keywords.
-- **Module translations (`groupedTranslations`, module `locales.json`; legacy mode).** There is no `translationMode`, so the client installs the payload's keywords into `@mongez/localization`'s global table for the payload's locale (`extend(locale, translations)`) *before* any `register()` hook runs and before the first client render. The same step runs on every client navigation, `refresh()` and `changeLocaleCode()`, so a page does not need its own `register()` to repeat copy the server already sent.
+- **Module translations (`groupedTranslations`, module `locales.json`; legacy mode).** There is no `translationMode`, so the client installs the payload's keywords into `@mongez/localization`'s global table for the payload's locale (`extend(locale, translations)`) _before_ any `register()` hook runs and before the first client render. The same step runs on every client navigation, `refresh()` and `changeLocaleCode()`, so a page does not need its own `register()` to repeat copy the server already sent.
 
 Either way, a component that calls `useTrans()` under `#vessel` renders the same strings on the server and in the browser. Do not read translations from `navigator.language` or a client-only store during render; that is a hydration mismatch (see the `render-client-only` topic).
 
@@ -190,7 +190,9 @@ import type { RootConfig } from "@warlock.js/web";
 import type { Middleware } from "@warlock.js/core";
 
 declare module "@warlock.js/core" {
-  interface RequestLocals { startedAt?: number }
+  interface RequestLocals {
+    startedAt?: number;
+  }
 }
 
 const attachRequestContext: Middleware = ({ request }) => {

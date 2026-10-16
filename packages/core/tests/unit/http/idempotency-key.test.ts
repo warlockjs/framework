@@ -104,9 +104,7 @@ describe("buildIdempotencyCacheKey", () => {
       decodedAccessToken: { userType: "client" },
     });
 
-    expect(buildIdempotencyCacheKey(request, "01J9XZQ-ABC")).toBe(
-      "idem:client:123:::01J9XZQ-ABC",
-    );
+    expect(buildIdempotencyCacheKey(request, "01J9XZQ-ABC")).toBe("idem:client:123:::01J9XZQ-ABC");
   });
 
   it("falls back to anonymous + client IP when unauthenticated", () => {

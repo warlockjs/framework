@@ -54,11 +54,7 @@ export class GoogleEmbedder implements EmbedderContract {
   private readonly configuredDimensions: number | undefined;
   private readonly logger: Logger = log;
 
-  public constructor(
-    ai: GoogleGenAI,
-    config: GoogleEmbedderConfig,
-    provider: string = "google",
-  ) {
+  public constructor(ai: GoogleGenAI, config: GoogleEmbedderConfig, provider: string = "google") {
     this.ai = ai;
     this.name = config.name;
     this.provider = provider;

@@ -100,9 +100,13 @@ export type { LayoutModuleShape, PageModuleShape, PageRouteExport } from "./page
 /** Re-exported so `web/src/server/index.ts`'s existing barrel export keeps resolving. */
 export { composeRoutePath };
 
-export async function loadComposedModule(vite: ViteDevServer, moduleFile: string): Promise<Record<string, unknown>> {
+export async function loadComposedModule(
+  vite: ViteDevServer,
+  moduleFile: string,
+): Promise<Record<string, unknown>> {
   const setupCandidate = pageSetupFileFor(moduleFile);
-  const setupFile = setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
+  const setupFile =
+    setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
   const [uiModule, setupModule] = await Promise.all([
     vite.ssrLoadModule(moduleFile),
     setupFile === undefined ? undefined : vite.ssrLoadModule(setupFile),
@@ -260,7 +264,8 @@ async function registerFailedPageRoute(input: {
  */
 function pageDeclaresAction(pageFile: string): boolean {
   const setupCandidate = pageSetupFileFor(pageFile);
-  const setupFile = setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
+  const setupFile =
+    setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
 
   return declares(pageFile) || (setupFile !== undefined && declares(setupFile));
 }
@@ -491,7 +496,8 @@ function discoverSiteAppFiles(options: InstallPageRoutesOptions): {
   });
 
   for (const page of graph.pages) {
-    if (page.site !== undefined && page.appFile !== undefined) appFiles.set(page.site, page.appFile);
+    if (page.site !== undefined && page.appFile !== undefined)
+      appFiles.set(page.site, page.appFile);
   }
 
   return { appFiles, graph };
@@ -520,7 +526,11 @@ export async function installPageRoutes(
   const multiSite = options.siteDispatch !== undefined;
 
   if (!multiSite) {
-    normalizePageModule(await loadComposedModule(options.vite, options.appFile), "root", options.appFile);
+    normalizePageModule(
+      await loadComposedModule(options.vite, options.appFile),
+      "root",
+      options.appFile,
+    );
   } else {
     for (const siteAppFile of siteAppFiles.values()) {
       normalizePageModule(await loadComposedModule(options.vite, siteAppFile), "root", siteAppFile);
@@ -593,26 +603,28 @@ export async function installPageRoutes(
       const siteAppFile = siteAppFiles.get(site) ?? path.join(root, "root.tsx");
 
       const installed = await installDiscoveredPageRoutes(
-          {
-            ...options,
-            router: siteRegistrationRouter(dispatch, site, siteConfig.basePath ?? ""),
-            appFile: siteAppFile,
-          },
-          {
-            ...discoveredGraph,
-            pages: discoveredGraph.pages.filter((page) => page.pageFile.startsWith(root + path.sep)),
-          },
-          routeLocaleManifest,
-          undefined,
-          { site, root, localeRouting: siteConfig.localeRouting },
-        );
+        {
+          ...options,
+          router: siteRegistrationRouter(dispatch, site, siteConfig.basePath ?? ""),
+          appFile: siteAppFile,
+        },
+        {
+          ...discoveredGraph,
+          pages: discoveredGraph.pages.filter((page) => page.pageFile.startsWith(root + path.sep)),
+        },
+        routeLocaleManifest,
+        undefined,
+        { site, root, localeRouting: siteConfig.localeRouting },
+      );
       installedPages.push(...installed);
       registerSiteRoutes(site, installed, sites, "installPageRoutes (development)");
     }
 
     // Owned like every page route, so a dev page reload replaces the
     // catch-alls instead of registering their names a second time.
-    await options.router.withSourceFile(SITE_DISPATCH_SOURCE_FILE, () => dispatch.register(options.router));
+    await options.router.withSourceFile(SITE_DISPATCH_SOURCE_FILE, () =>
+      dispatch.register(options.router),
+    );
     artifact?.commit();
 
     return installedPages;

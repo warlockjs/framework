@@ -13,7 +13,7 @@ Self-referencing schemas are impossible today because of JavaScript evaluation o
 ```ts
 const categorySchema = v.object({
   name: v.string(),
-  children: v.array(categorySchema),  // ❌ ReferenceError — categorySchema is undefined
+  children: v.array(categorySchema), // ❌ ReferenceError — categorySchema is undefined
 });
 ```
 
@@ -169,9 +169,7 @@ const category: BaseValidator = v.object({
 const valid = await validate(category, {
   name: "Tech",
   children: [
-    { name: "Web", children: [
-      { name: "TypeScript", children: [] },
-    ]},
+    { name: "Web", children: [{ name: "TypeScript", children: [] }] },
     { name: "Mobile", children: [] },
   ],
 });
@@ -179,9 +177,7 @@ const valid = await validate(category, {
 
 const invalid = await validate(category, {
   name: "Tech",
-  children: [
-    { name: 123 /* not a string */, children: [] },
-  ],
+  children: [{ name: 123 /* not a string */, children: [] }],
 });
 // expect: isValid === false, error path "children.0.name"
 
@@ -201,13 +197,13 @@ const b: BaseValidator = v.object({
 
 ## Decisions to lock with Hasan
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Memoize the thunk result (call once, cache)? | **Yes.** The thunk is supposed to return a stable validator; calling it on every `validate()` is wasteful and could mask bugs where the user accidentally returns a fresh validator each time. |
-| 2 | JSON Schema strategy — simple-resolve (v1) or $ref + $defs (v2)? | **Simple-resolve v1.** Most users generating JSON Schema for recursive shapes do so for documentation, not validation downstream. $ref support adds notable complexity (a generation context, a registry) for a feature few users hit. Document the limitation and add $ref later when a real use case appears. |
-| 3 | Require user-supplied recursive type annotation on the outer validator? | **Yes, document it.** TS can't infer recursion without an explicit alias. Users will need `const x: ObjectValidator<...> = v.object({...})` style. Same as Zod's `z.ZodType<Category>` pattern. |
-| 4 | Make `LazyValidator` itself optional by default (skip required check)? | **Yes.** A lazy wrapper around a required validator should defer the required check to the inner validator. Marking the lazy as `isOptional: true` and `requiredRule: null` does this cleanly. The inner validator's required rules still fire on the actual data. |
-| 5 | Should `.matchesType()` resolve and delegate, or always return true? | **Resolve + delegate.** Critical for `union` rule type-routing — if a lazy validator is part of a union, the union needs to know whether the value matches its eventual type. |
+| #   | Question                                                                | Recommendation                                                                                                                                                                                                                                                                                                  |
+| --- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Memoize the thunk result (call once, cache)?                            | **Yes.** The thunk is supposed to return a stable validator; calling it on every `validate()` is wasteful and could mask bugs where the user accidentally returns a fresh validator each time.                                                                                                                  |
+| 2   | JSON Schema strategy — simple-resolve (v1) or $ref + $defs (v2)?        | **Simple-resolve v1.** Most users generating JSON Schema for recursive shapes do so for documentation, not validation downstream. $ref support adds notable complexity (a generation context, a registry) for a feature few users hit. Document the limitation and add $ref later when a real use case appears. |
+| 3   | Require user-supplied recursive type annotation on the outer validator? | **Yes, document it.** TS can't infer recursion without an explicit alias. Users will need `const x: ObjectValidator<...> = v.object({...})` style. Same as Zod's `z.ZodType<Category>` pattern.                                                                                                                 |
+| 4   | Make `LazyValidator` itself optional by default (skip required check)?  | **Yes.** A lazy wrapper around a required validator should defer the required check to the inner validator. Marking the lazy as `isOptional: true` and `requiredRule: null` does this cleanly. The inner validator's required rules still fire on the actual data.                                              |
+| 5   | Should `.matchesType()` resolve and delegate, or always return true?    | **Resolve + delegate.** Critical for `union` rule type-routing — if a lazy validator is part of a union, the union needs to know whether the value matches its eventual type.                                                                                                                                   |
 
 ## Risks
 
@@ -230,6 +226,7 @@ Landed in commit `fdc5ce6`.
 **What shipped.** `LazyValidator extends BaseValidator` with a thunk + memoised resolver. Marks itself `isOptional: true` and `requiredRule: null` (defers required-handling to inner). Overrides `validate`, `matchesType`, `clone`, and `toJsonSchema` to delegate. Factory entry `v.lazy(() => schema)` returns `LazyValidator<T> & StandardSchemaV1<Infer<T>>`. `Infer<>` walker reads `LazyValidator<infer L>` first to unwrap before any other branch.
 
 **Decisions locked.** All five decisions adopted as-recommended:
+
 - Memoise the thunk (call once, cache)
 - JSON Schema is simple-resolve v1; document `$ref` deferred
 - Require user-supplied recursive type alias

@@ -48,10 +48,15 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const resumeExtractor = ai.agent({
   name: "resume-extractor",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You extract structured candidate data from raw resume text.")
-    .instruction("Pull the candidate's full name, email, total years of professional experience, and skills.")
-    .instruction("If a field is genuinely absent from the text, omit optional fields; never invent an email or a number."),
+    .instruction(
+      "Pull the candidate's full name, email, total years of professional experience, and skills.",
+    )
+    .instruction(
+      "If a field is genuinely absent from the text, omit optional fields; never invent an email or a number.",
+    ),
 });
 ```
 
@@ -78,10 +83,10 @@ if (error) {
   console.error(`extraction failed: ${error.code} — ${error.message}`);
 } else {
   // `data` is fully typed and validated against resumeSchema.
-  console.log(data.fullName);          // "Sara El-Masry"
-  console.log(data.email);             // "sara.elmasry@example.com"
+  console.log(data.fullName); // "Sara El-Masry"
+  console.log(data.email); // "sara.elmasry@example.com"
   console.log(data.yearsOfExperience); // 8
-  console.log(data.skills);            // ["React", "TypeScript", ...]
+  console.log(data.skills); // ["React", "TypeScript", ...]
 }
 
 console.log(`took ${report.duration}ms across ${report.trips.length} trip(s)`);
@@ -112,7 +117,7 @@ const { data } = await resumeExtractor.execute(rawResume, {
 ```
 
 :::note
-`repair` only does anything when `output` (or `responseSchema`) is set — it repairs *validation* failures, not tool-call loops or provider errors. Without a schema there is nothing to validate, so the option is ignored.
+`repair` only does anything when `output` (or `responseSchema`) is set — it repairs _validation_ failures, not tool-call loops or provider errors. Without a schema there is nothing to validate, so the option is ignored.
 :::
 
 ## Production notes

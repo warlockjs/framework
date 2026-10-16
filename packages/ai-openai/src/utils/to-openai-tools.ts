@@ -33,7 +33,9 @@ export function toOpenAITools(
  * failed extraction) degrades to an empty-object schema so the tool
  * still registers and the model simply sees no parameters.
  */
-export function toToolParameters(input: ToolConfig<unknown, unknown>["input"]): Record<string, unknown> {
+export function toToolParameters(
+  input: ToolConfig<unknown, unknown>["input"],
+): Record<string, unknown> {
   const schema = extractJsonSchema(input);
 
   if (schema && schema.type === "object") {

@@ -105,7 +105,10 @@ export function RegisterModel(options?: RegisterModelOptions) {
     if (decoratorRelations && Object.keys(decoratorRelations).length > 0) {
       const ownRelations = Object.prototype.hasOwnProperty.call(value, "relations")
         ? (value as unknown as { relations: Record<string, RelationDefinition> }).relations
-        : { ...((value as unknown as { relations?: Record<string, RelationDefinition> }).relations ?? {}) };
+        : {
+            ...((value as unknown as { relations?: Record<string, RelationDefinition> })
+              .relations ?? {}),
+          };
 
       (value as unknown as { relations: Record<string, RelationDefinition> }).relations = {
         ...ownRelations,
@@ -204,9 +207,7 @@ export function requireModelClass(model: ModelRef): ChildModel<Model> {
  * at call sites that already handle the missing-model case explicitly
  * (e.g. join builders that throw their own contextual error).
  */
-export function tryResolveModelClass(
-  model: ModelRef | undefined,
-): ChildModel<Model> | undefined {
+export function tryResolveModelClass(model: ModelRef | undefined): ChildModel<Model> | undefined {
   if (model === undefined) return undefined;
   if (typeof model === "string") return getModelFromRegistry(model);
   if (isLazy(model)) return model.resolve() as ChildModel<Model>;

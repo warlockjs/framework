@@ -13,18 +13,12 @@ The package ships two CLI commands. Register them once in `warlock.config.ts`; t
 ## Register them
 
 ```ts title="warlock.config.ts"
-import {
-  registerAuthCleanupCommand,
-  registerJWTSecretGeneratorCommand,
-} from "@warlock.js/auth";
+import { registerAuthCleanupCommand, registerJWTSecretGeneratorCommand } from "@warlock.js/auth";
 import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   cli: {
-    commands: [
-      registerJWTSecretGeneratorCommand(),
-      registerAuthCleanupCommand(),
-    ],
+    commands: [registerJWTSecretGeneratorCommand(), registerAuthCleanupCommand()],
   },
 });
 ```
@@ -34,21 +28,9 @@ Both functions return a `CLICommand` — they don't have side effects until the 
 ## `warlock jwt.generate` — bootstrap secrets
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npx warlock jwt.generate
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm warlock jwt.generate
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm warlock jwt.generate
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npx warlock jwt.generate ```</TabItem>
+  <TabItem label="yarn">```bash pnpm warlock jwt.generate ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm warlock jwt.generate ```</TabItem>
 </Tabs>
 
 Generates 32-character random strings for `JWT_SECRET` and `JWT_REFRESH_SECRET` and appends them to `.env`. Idempotent — if a key already exists, it's skipped with a warning.
@@ -69,21 +51,9 @@ Don't commit `.env`. The default Warlock `.gitignore` already excludes it.
 ## `warlock auth.cleanup` — expired-token sweep
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npx warlock auth.cleanup
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm warlock auth.cleanup
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm warlock auth.cleanup
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npx warlock auth.cleanup ```</TabItem>
+  <TabItem label="yarn">```bash pnpm warlock auth.cleanup ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm warlock auth.cleanup ```</TabItem>
 </Tabs>
 
 Runs `authService.cleanupExpiredTokens()` — deletes every refresh token whose `expires_at` is in the past. Fires `token.expired` per token and `cleanup.completed` once with the total count.

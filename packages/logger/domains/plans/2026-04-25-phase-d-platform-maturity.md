@@ -2,7 +2,7 @@
 
 **Status:** not-started
 **Started:** —
-**Context:** [backlog](../backlog.md#phase-d--platform-maturity) · the boring, reliable polish. Most of these are why teams *keep* the logger after they've adopted it.
+**Context:** [backlog](../backlog.md#phase-d--platform-maturity) · the boring, reliable polish. Most of these are why teams _keep_ the logger after they've adopted it.
 
 ## Goal
 

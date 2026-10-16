@@ -59,25 +59,28 @@ The subscriber also exposes `use(exporter)` (register more exporters), `toTrace(
 
 ## Exporters at a glance
 
-| Exporter | Ships | Optional peer |
-| --- | --- | --- |
-| `consoleExporter(opts?)` | Trace summary, or the full span tree with `{ tree: true }` | none (zero-dep) |
-| `fileExporter({ path, flushEvery? })` | Buffered JSON-Lines append; `flushEvery` batches writes | none (zero-dep) |
-| `otelExporter(opts?)` | Maps spans to OpenTelemetry GenAI semantic conventions (`gen_ai.*`) | `@opentelemetry/api` |
-| `langfuseExporter(opts)` | Maps spans to Langfuse traces, generations, and spans | `langfuse` |
+| Exporter                              | Ships                                                               | Optional peer        |
+| ------------------------------------- | ------------------------------------------------------------------- | -------------------- |
+| `consoleExporter(opts?)`              | Trace summary, or the full span tree with `{ tree: true }`          | none (zero-dep)      |
+| `fileExporter({ path, flushEvery? })` | Buffered JSON-Lines append; `flushEvery` batches writes             | none (zero-dep)      |
+| `otelExporter(opts?)`                 | Maps spans to OpenTelemetry GenAI semantic conventions (`gen_ai.*`) | `@opentelemetry/api` |
+| `langfuseExporter(opts)`              | Maps spans to Langfuse traces, generations, and spans               | `langfuse`           |
 
 The OTEL and Langfuse exporters **lazily import** their SDKs — installing `@warlock.js/ai-panoptic` pulls in neither. Each throws an install-instruction error only if you build the exporter without the peer present.
 
 ```ts
 import {
-  consoleExporter, fileExporter, otelExporter, langfuseExporter,
+  consoleExporter,
+  fileExporter,
+  otelExporter,
+  langfuseExporter,
 } from "@warlock.js/ai-panoptic";
 
 panoptic({
   exporters: [
     consoleExporter({ tree: true }),
     fileExporter({ path: "./traces.jsonl", flushEvery: 50 }),
-    otelExporter({ tracerName: "my-app" }),     // or pass a pre-built { tracer }
+    otelExporter({ tracerName: "my-app" }), // or pass a pre-built { tracer }
     langfuseExporter({ publicKey, secretKey }), // or pass a pre-built { client }
   ],
 });

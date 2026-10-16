@@ -186,7 +186,10 @@ function compareIdentifier(/** @type {string} */ x, /** @type {string} */ y) {
 
 // A release outranks its own prerelease; when both have a prerelease, compare
 // dot-separated identifiers left to right, and a shorter equal-prefix loses.
-function comparePrerelease(/** @type {string | undefined} */ a, /** @type {string | undefined} */ b) {
+function comparePrerelease(
+  /** @type {string | undefined} */ a,
+  /** @type {string | undefined} */ b,
+) {
   if (a === undefined && b === undefined) return 0;
   if (a === undefined) return 1;
   if (b === undefined) return -1;
@@ -255,7 +258,8 @@ async function loadReleaseMeta() {
     /** @type {unknown} */ const raw = JSON.parse(await readFile(RELEASES_META, "utf8"));
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
     for (const [version, meta] of Object.entries(raw)) {
-      if (!version.startsWith("_") && meta && typeof meta === "object" && !Array.isArray(meta)) out[version] = meta;
+      if (!version.startsWith("_") && meta && typeof meta === "object" && !Array.isArray(meta))
+        out[version] = meta;
     }
     return out;
   } catch (err) {
@@ -328,7 +332,9 @@ async function main() {
     const pkgPath = resolve(dir, "package.json");
     if (!existsSync(pkgPath)) continue;
 
-    /** @type {{ private?: boolean, name?: string }} */ const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
+    /** @type {{ private?: boolean, name?: string }} */ const pkg = JSON.parse(
+      await readFile(pkgPath, "utf8"),
+    );
     if (pkg.private || !pkg.name) continue;
 
     const clPath = resolve(dir, "CHANGELOG.md");

@@ -33,8 +33,7 @@
 import { getJsonFile } from "@warlock.js/fs";
 import { packageRoot, template } from "./paths";
 
-export type VersionSource =
-  "own-version" | "registry-latest" | "range-fallback";
+export type VersionSource = "own-version" | "registry-latest" | "range-fallback";
 
 export type ResolvedVersion = {
   package: string;
@@ -61,8 +60,7 @@ const REGISTRY_TIMEOUT_MS = 6_000;
  * scaffolder runs through them, so a private mirror is honoured for free.
  */
 function registryUrl(): string {
-  const registry =
-    process.env.npm_config_registry?.trim() || "https://registry.npmjs.org";
+  const registry = process.env.npm_config_registry?.trim() || "https://registry.npmjs.org";
 
   return registry.replace(/\/+$/, "");
 }
@@ -84,9 +82,7 @@ type Packument = {
  * registry cannot be reached (network / timeout) and `null` when the registry
  * answers that the package does not exist.
  */
-async function fetchPackument(
-  packageName: string,
-): Promise<Packument | null | undefined> {
+async function fetchPackument(packageName: string): Promise<Packument | null | undefined> {
   const url = `${registryUrl()}/${packageName.replace("/", "%2F")}`;
 
   try {
@@ -174,9 +170,7 @@ async function resolvePackage(
  * in parallel with) the copy.
  */
 export function templateWarlockDependencies(): string[] {
-  const templatePackageJson = getJsonFile(
-    `${template("warlock")}/package.json`,
-  ) as {
+  const templatePackageJson = getJsonFile(`${template("warlock")}/package.json`) as {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
   };
@@ -194,8 +188,7 @@ export function templateWarlockDependencies(): string[] {
 
 /** The scaffolder's own published version, i.e. the lockstep candidate. */
 export function scaffolderVersion(): string {
-  return (getJsonFile(packageRoot("package.json")) as { version: string })
-    .version;
+  return (getJsonFile(packageRoot("package.json")) as { version: string }).version;
 }
 
 let cached: Promise<VersionResolution> | undefined;
@@ -213,9 +206,7 @@ export function resolveWarlockVersions(
   if (cached) return cached;
 
   cached = (async (): Promise<VersionResolution> => {
-    const resolutions = await Promise.all(
-      packages.map(name => resolvePackage(name, ownVersion)),
-    );
+    const resolutions = await Promise.all(packages.map((name) => resolvePackage(name, ownVersion)));
 
     const versions: Record<string, string> = {};
     const notes: string[] = [];

@@ -54,20 +54,20 @@ The shape is **module / action / message / context** — four positional argumen
 
 Six levels with conventional severity ordering:
 
-| Level     | When to use                                                            |
-| --------- | ---------------------------------------------------------------------- |
-| `debug`   | Verbose internals — disabled by default in production via min-level    |
-| `info`    | Routine events worth observing — request start, job picked up, etc.    |
+| Level     | When to use                                                             |
+| --------- | ----------------------------------------------------------------------- |
+| `debug`   | Verbose internals — disabled by default in production via min-level     |
+| `info`    | Routine events worth observing — request start, job picked up, etc.     |
 | `success` | An outcome you want to highlight — same severity as info, separate icon |
-| `warn`    | Something unexpected but not actionable — partial failures, fallbacks  |
-| `error`   | Something went wrong and you should know about it                      |
-| `fatal`   | Unrecoverable failure — the app is going down                          |
+| `warn`    | Something unexpected but not actionable — partial failures, fallbacks   |
+| `error`   | Something went wrong and you should know about it                       |
+| `fatal`   | Unrecoverable failure — the app is going down                           |
 
 Set a minimum level to drop noise before any channel runs:
 
 ```ts
-log.setMinLevel("info");    // drop debug entries everywhere
-log.setMinLevel("warn");    // production-quiet — only warn/error
+log.setMinLevel("info"); // drop debug entries everywhere
+log.setMinLevel("warn"); // production-quiet — only warn/error
 log.setMinLevel(undefined); // accept all
 ```
 
@@ -87,11 +87,11 @@ import { type LogConfigurations } from "@warlock.js/core";
 import { ConsoleLog, JSONFileLog } from "@warlock.js/logger";
 
 const consoleLog = new ConsoleLog({
-  showContext: true,   // pretty-print context on a second line
+  showContext: true, // pretty-print context on a second line
 });
 
 const logConfigurations: LogConfigurations = {
-  channels: [consoleLog],   // runs in every environment
+  channels: [consoleLog], // runs in every environment
   production: {
     channels: [
       new JSONFileLog({
@@ -105,11 +105,11 @@ const logConfigurations: LogConfigurations = {
 export default logConfigurations;
 ```
 
-| Field           | Read by the core wrapper? | Behaviour                                                          |
-| --------------- | ------------------------- | ----------------------------------------------------------------- |
-| `channels`      | Yes                       | Channels active in **all** environments (merged with env-specific) |
-| `development`   | Yes (its `.channels`)     | Channels added on top when the environment is `development`        |
-| `production`    | Yes (its `.channels`)     | Channels added on top when the environment is `production`         |
+| Field         | Read by the core wrapper? | Behaviour                                                          |
+| ------------- | ------------------------- | ------------------------------------------------------------------ |
+| `channels`    | Yes                       | Channels active in **all** environments (merged with env-specific) |
+| `development` | Yes (its `.channels`)     | Channels added on top when the environment is `development`        |
+| `production`  | Yes (its `.channels`)     | Channels added on top when the environment is `production`         |
 
 The merge is `[...channels, ...env.channels]` — a channel in `channels` runs everywhere, and `production.channels` adds production-only destinations.
 
@@ -142,10 +142,10 @@ Three channels ship with `@warlock.js/logger`. They share a common base — inst
 
 ```ts
 new ConsoleLog({
-  showContext: false,      // default — context is dropped on console
-  contextDepth: 4,         // util.inspect depth, when showContext is true
+  showContext: false, // default — context is dropped on console
+  contextDepth: 4, // util.inspect depth, when showContext is true
   // BasicLogConfigurations:
-  levels: ["info", "warn", "error"],   // per-channel level filter
+  levels: ["info", "warn", "error"], // per-channel level filter
   filter: (data) => !data.message.includes("noisy"),
   redact: { paths: ["context.token"], censor: "[REDACTED]" },
 });
@@ -239,8 +239,8 @@ Channel-level redaction:
 ```ts
 new ConsoleLog({
   redact: {
-    paths: ["context.email"],   // adds to the logger-wide list
-    censor: "[hidden]",          // overrides the censor for this channel
+    paths: ["context.email"], // adds to the logger-wide list
+    censor: "[hidden]", // overrides the censor for this channel
   },
 });
 ```
@@ -305,11 +305,11 @@ Each channel inherits `BasicLogConfigurations`:
 
 ```ts
 type BasicLogConfigurations = {
-  levels?: LogLevel[];                              // accept only these levels
+  levels?: LogLevel[]; // accept only these levels
   dateFormat?: { date?: string; time?: string };
-  filter?: (data: LoggingData) => boolean;          // custom predicate
-  context?: (data: LoggingData) => Promise<Record<string, any>>;  // enrich
-  redact?: RedactConfig;                            // additive on top of logger floor
+  filter?: (data: LoggingData) => boolean; // custom predicate
+  context?: (data: LoggingData) => Promise<Record<string, any>>; // enrich
+  redact?: RedactConfig; // additive on top of logger floor
 };
 ```
 
@@ -381,11 +381,11 @@ The pattern reads like a transcript — start, success, failure with the same `m
 ```ts title="src/config/log.ts"
 const logConfigurations: LogConfigurations = {
   development: {
-    channels: [new ConsoleLog({ showContext: true })],   // debug-friendly
+    channels: [new ConsoleLog({ showContext: true })], // debug-friendly
   },
   production: {
     channels: [
-      new ConsoleLog({ levels: ["info", "success", "warn", "error"] }),  // drop debug
+      new ConsoleLog({ levels: ["info", "success", "warn", "error"] }), // drop debug
       new JSONFileLog({ storagePath: "/var/log/app", rotate: true }),
     ],
   },

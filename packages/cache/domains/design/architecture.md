@@ -30,6 +30,7 @@ CacheManager  ──(delegates)──▶  CacheDriver (current)
 ### Key parsing
 
 `parseCacheKey` in `utils.ts` normalizes input:
+
 - Objects/arrays are JSON-stringified.
 - `{`, `}`, `"`, `[`, `]` are stripped.
 - `:` and `,` become `.` — so `{user:1, posts:2}` ends up as `user.1.posts.2`.

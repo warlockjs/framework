@@ -13,6 +13,8 @@ export function snakeToCamel(value: string): string {
 }
 
 /** Convert top-level database row keys without rewriting nested JSON values. */
-export function snakeKeysToCamel<T extends Record<string, unknown>>(row: T): Record<string, unknown> {
+export function snakeKeysToCamel<T extends Record<string, unknown>>(
+  row: T,
+): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row).map(([key, value]) => [snakeToCamel(key), value]));
 }

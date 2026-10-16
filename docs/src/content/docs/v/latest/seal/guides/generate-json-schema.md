@@ -32,19 +32,19 @@ userSchema.toJsonSchema("draft-2020-12");
 
 ```ts
 type JsonSchemaTarget =
-  | "draft-2020-12"  // default — modern JSON Schema
-  | "draft-07"       // older tooling, Swagger 2.0
-  | "openapi-3.0"    // uses { nullable: true } instead of type unions
+  | "draft-2020-12" // default — modern JSON Schema
+  | "draft-07" // older tooling, Swagger 2.0
+  | "openapi-3.0" // uses { nullable: true } instead of type unions
   | "openai-strict"; // OpenAI Structured Outputs strict mode
 ```
 
 Pick by consumer:
 
-| Consumer | Target |
-| --- | --- |
-| Modern JSON Schema tooling, no specific reason | `"draft-2020-12"` |
-| Swagger 2.0, older OpenAPI, older form builders | `"draft-07"` |
-| OpenAPI 3.0 spec | `"openapi-3.0"` |
+| Consumer                                                        | Target            |
+| --------------------------------------------------------------- | ----------------- |
+| Modern JSON Schema tooling, no specific reason                  | `"draft-2020-12"` |
+| Swagger 2.0, older OpenAPI, older form builders                 | `"draft-07"`      |
+| OpenAPI 3.0 spec                                                | `"openapi-3.0"`   |
 | OpenAI `response_format: { type: "json_schema", strict: true }` | `"openai-strict"` |
 
 ## OpenAI structured outputs
@@ -128,7 +128,7 @@ Same field, different wire format — pick the target your consumer reads.
 
 Some seal constructs have no JSON Schema representation:
 
-- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`, …) — runtime-only. The generated schema describes the *shape*, not the inter-field invariants.
+- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`, …) — runtime-only. The generated schema describes the _shape_, not the inter-field invariants.
 - **Transformers and mutators** — output reshaping doesn't appear in the schema. The schema reflects the post-mutator, pre-transformer shape (since that's what rules see, and what an LLM is asked to produce for `openai-strict`).
 - **`v.computed` / `v.managed`** — they produce `{}` (permissive). They aren't part of the data contract.
 - **`v.instanceof(Ctor)`** — produces `{}`. Class identity isn't expressible. For `File`, attach `{ type: "string", format: "binary" }` manually after generation if you need it for OpenAPI.
@@ -142,7 +142,7 @@ If a runtime constraint matters at the consumer end, enforce it on the consumer 
 If your runtime validator accepts data but the generated JSON Schema rejects it downstream:
 
 - **Cross-field rule.** Not encoded in JSON Schema — the consumer might enforce it separately, or your runtime ran a check at a different stage.
-- **Transformer reshaping the wrong side.** The schema describes the input shape (or strict-mode normalized form). If your transformer reshapes `Date` to ISO string for `result.data`, the *input* still needs to be a Date-parseable thing.
+- **Transformer reshaping the wrong side.** The schema describes the input shape (or strict-mode normalized form). If your transformer reshapes `Date` to ISO string for `result.data`, the _input_ still needs to be a Date-parseable thing.
 - **`openai-strict` optional quirk.** Optional fields show as `["T", "null"]`. If the model omits them entirely (without sending `null`), strict mode fails. The fix is on the prompt side: tell the model to send `null` for unused fields.
 
 ## Recursive schemas

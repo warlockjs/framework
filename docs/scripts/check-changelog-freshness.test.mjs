@@ -211,7 +211,10 @@ test("getRegistryNewestVersion requests a bounded, non-redirecting, non-cached f
   assert.equal(capturedOptions.cache, "no-store");
   assert.equal(capturedOptions.redirect, "manual");
   assert.ok(capturedOptions.signal instanceof AbortSignal);
-  assert.deepEqual(capturedOptions.headers, { "Cache-Control": "no-cache", Accept: "application/json" });
+  assert.deepEqual(capturedOptions.headers, {
+    "Cache-Control": "no-cache",
+    Accept: "application/json",
+  });
 });
 
 test("getRegistryNewestVersion treats an opaque (manual) redirect response as a data error", async () => {
@@ -257,12 +260,15 @@ test("main() passes when local is current with the registry", async () => {
 test("main() throws naming both versions when local is stale", async () => {
   await withChangelogFixture([{ version: "5.2.3" }], async (path) => {
     const fetchImpl = async () => jsonResponse(200, { versions: { "5.2.3": {}, "5.2.4": {} } });
-    await assert.rejects(main(["--changelog", path], { fetchImpl }), (/** @type {unknown} */ err) => {
-      assert.ok(err instanceof Error);
-      assert.match(err.message, /5\.2\.3/);
-      assert.match(err.message, /5\.2\.4/);
-      return true;
-    });
+    await assert.rejects(
+      main(["--changelog", path], { fetchImpl }),
+      (/** @type {unknown} */ err) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /5\.2\.3/);
+        assert.match(err.message, /5\.2\.4/);
+        return true;
+      },
+    );
   });
 });
 
@@ -272,11 +278,14 @@ test("main() throws on registry unreachability by default, naming the escape env
       throw new Error("ECONNRESET");
     };
     delete process.env[ALLOW_UNREACHABLE_ENV];
-    await assert.rejects(main(["--changelog", path], { fetchImpl }), (/** @type {unknown} */ err) => {
-      assert.ok(err instanceof Error);
-      assert.match(err.message, new RegExp(ALLOW_UNREACHABLE_ENV));
-      return true;
-    });
+    await assert.rejects(
+      main(["--changelog", path], { fetchImpl }),
+      (/** @type {unknown} */ err) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, new RegExp(ALLOW_UNREACHABLE_ENV));
+        return true;
+      },
+    );
   });
 });
 
@@ -327,12 +336,15 @@ test("main() never honors the escape env var to bypass a measured stale version"
     const fetchImpl = async () => jsonResponse(200, { versions: { "5.2.3": {}, "5.2.4": {} } });
     process.env[ALLOW_UNREACHABLE_ENV] = "1";
     try {
-      await assert.rejects(main(["--changelog", path], { fetchImpl }), (/** @type {unknown} */ err) => {
-        assert.ok(err instanceof Error);
-        assert.match(err.message, /5\.2\.3/);
-        assert.match(err.message, /5\.2\.4/);
-        return true;
-      });
+      await assert.rejects(
+        main(["--changelog", path], { fetchImpl }),
+        (/** @type {unknown} */ err) => {
+          assert.ok(err instanceof Error);
+          assert.match(err.message, /5\.2\.3/);
+          assert.match(err.message, /5\.2\.4/);
+          return true;
+        },
+      );
     } finally {
       delete process.env[ALLOW_UNREACHABLE_ENV];
     }

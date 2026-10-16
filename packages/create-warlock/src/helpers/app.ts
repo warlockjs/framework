@@ -10,11 +10,7 @@ import {
 } from "@warlock.js/fs";
 import { existsSync, rmSync, unlinkSync } from "node:fs";
 import path from "path";
-import {
-  Application,
-  AppOptions,
-  LintToolchain,
-} from "../commands/create-new-app/types";
+import { Application, AppOptions, LintToolchain } from "../commands/create-new-app/types";
 import { getDatabaseDriver } from "../features/database-drivers";
 import { executeCommand, runCommand } from "./exec";
 import { insertImportInSortedPosition } from "./insert-import";
@@ -111,14 +107,8 @@ export class App {
       // minimumReleaseAgeExclude, does not exist before pnpm 10.16.
       rmSync(workspacePath, { force: true });
       const packageJsonPath = path.join(this.path, "package.json");
-      const packageJson = getJsonFile(packageJsonPath) as Record<
-        string,
-        unknown
-      >;
-      putJsonFile(
-        packageJsonPath,
-        mergePackageJsonBuildApprovals(packageJson, packages),
-      );
+      const packageJson = getJsonFile(packageJsonPath) as Record<string, unknown>;
+      putJsonFile(packageJsonPath, mergePackageJsonBuildApprovals(packageJson, packages));
       // Drop any cached copy so later package.json edits start from this one.
       delete this.jsonFiles[path.resolve(packageJsonPath)];
       return;
@@ -167,8 +157,7 @@ export class App {
   }
 
   public async git() {
-    const { initializeGitRepository } =
-      await import("./project-builder-helpers");
+    const { initializeGitRepository } = await import("./project-builder-helpers");
     return await initializeGitRepository(this.path);
   }
 
@@ -191,9 +180,8 @@ export class App {
 
     const content: any = pkg.content;
 
-    const warlockVersion: string = (
-      getJsonFile(packageRoot("package.json")) as { version: string }
-    ).version;
+    const warlockVersion: string = (getJsonFile(packageRoot("package.json")) as { version: string })
+      .version;
     const defaultRange = fallbackRange(warlockVersion);
 
     for (const field of ["dependencies", "devDependencies"] as const) {
@@ -213,9 +201,7 @@ export class App {
   }
 
   /** Apply the selected development tools before dependency installation. */
-  public configureLintToolchain(
-    toolchain: LintToolchain = this.options.lint ?? "eslint",
-  ) {
+  public configureLintToolchain(toolchain: LintToolchain = this.options.lint ?? "eslint") {
     if (toolchain === "eslint") return this;
 
     // Database and web setup may have edited package.json after it was cached.
@@ -250,11 +236,7 @@ export class App {
     });
     pkg.save();
 
-    for (const fileName of [
-      "eslint.config.js",
-      ".prettierrc.json",
-      ".prettierignore",
-    ]) {
+    for (const fileName of ["eslint.config.js", ".prettierrc.json", ".prettierignore"]) {
       rmSync(path.join(this.path, fileName), { force: true });
     }
     for (const fileName of [".oxlintrc.json", ".oxfmtrc.json"]) {
@@ -321,16 +303,10 @@ export class App {
 
       let envContent = getFile(envPath) as string;
 
-      envContent = envContent.replace(
-        /DB_PORT=\d+/,
-        `DB_PORT=${driver.defaultPort}`,
-      );
+      envContent = envContent.replace(/DB_PORT=\d+/, `DB_PORT=${driver.defaultPort}`);
 
       if (envContent.includes("DB_DRIVER=")) {
-        envContent = envContent.replace(
-          /DB_DRIVER=\w*/,
-          `DB_DRIVER=${driver.value}`,
-        );
+        envContent = envContent.replace(/DB_DRIVER=\w*/, `DB_DRIVER=${driver.value}`);
       } else {
         envContent = envContent.replace(
           /DB_PORT=\d+/,
@@ -407,11 +383,7 @@ export class App {
   public removeDatabaseConfig() {
     const configDir = path.resolve(this.path, "src/config");
 
-    for (const fileName of [
-      "database.ts",
-      "database.tsx",
-      "database.postgres.ts",
-    ]) {
+    for (const fileName of ["database.ts", "database.tsx", "database.postgres.ts"]) {
       const filePath = path.resolve(configDir, fileName);
 
       if (fileExists(filePath)) {
@@ -452,10 +424,7 @@ export class App {
 
       const agentsPath = path.resolve(this.path, "AGENTS.md");
       const agents = getFile(agentsPath) as string;
-      putFile(
-        agentsPath,
-        agents.replace(/^.*\*\*web-code-standards\*\*.*\r?\n/m, ""),
-      );
+      putFile(agentsPath, agents.replace(/^.*\*\*web-code-standards\*\*.*\r?\n/m, ""));
 
       const tsconfigPath = path.resolve(this.path, "tsconfig.json");
       const tsconfig = getFile(tsconfigPath) as string;

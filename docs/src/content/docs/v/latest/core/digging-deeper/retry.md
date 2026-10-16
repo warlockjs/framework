@@ -37,16 +37,16 @@ retry<T>(fn: () => T | Promise<T>, options?: RetryOptions): Promise<T>
 
 ## `RetryOptions`
 
-| Field         | Type                                          | Default      | Notes                                                            |
-| ------------- | --------------------------------------------- | ------------ | ---------------------------------------------------------------- |
-| `attempts`    | `number`                                      | `3`          | **Total** tries, including the first. `attempts: 3` = 3 calls.   |
-| `delay`       | `number` (ms)                                 | `0`          | Base wait between attempts (scaled by `backoff`).               |
-| `backoff`     | `"linear" \| "exponential" \| (attempt, baseDelay) => number` | `"linear"` | Delay growth strategy.                            |
-| `maxDelay`    | `number` (ms)                                 | —            | Ceiling applied to the computed delay (after backoff, before jitter). |
-| `jitter`      | `false \| "full" \| "equal"`                  | `false`      | Randomise each delay to avoid a thundering herd.                |
-| `onError`     | `(error, attempt) => void`                    | —            | Observe each failed attempt (logging/metrics). `attempt` is **1-based**. |
-| `shouldRetry` | `(error, attempt) => boolean \| Promise<boolean>` | —        | Return `false` to stop immediately and re-throw. `attempt` is **1-based**. |
-| `signal`      | `AbortSignal`                                 | —            | Cancel the loop between or during attempts.                     |
+| Field         | Type                                                          | Default    | Notes                                                                      |
+| ------------- | ------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------- |
+| `attempts`    | `number`                                                      | `3`        | **Total** tries, including the first. `attempts: 3` = 3 calls.             |
+| `delay`       | `number` (ms)                                                 | `0`        | Base wait between attempts (scaled by `backoff`).                          |
+| `backoff`     | `"linear" \| "exponential" \| (attempt, baseDelay) => number` | `"linear"` | Delay growth strategy.                                                     |
+| `maxDelay`    | `number` (ms)                                                 | —          | Ceiling applied to the computed delay (after backoff, before jitter).      |
+| `jitter`      | `false \| "full" \| "equal"`                                  | `false`    | Randomise each delay to avoid a thundering herd.                           |
+| `onError`     | `(error, attempt) => void`                                    | —          | Observe each failed attempt (logging/metrics). `attempt` is **1-based**.   |
+| `shouldRetry` | `(error, attempt) => boolean \| Promise<boolean>`             | —          | Return `false` to stop immediately and re-throw. `attempt` is **1-based**. |
+| `signal`      | `AbortSignal`                                                 | —          | Cancel the loop between or during attempts.                                |
 
 A few things worth pulling out:
 
@@ -67,11 +67,11 @@ A few things worth pulling out:
 
 Three buckets in practice:
 
-| Operation                                                | Safe to retry?                            |
-| -------------------------------------------------------- | ----------------------------------------- |
-| GET / SELECT / cache lookup / read from S3               | Always.                                   |
-| PUT with a known ID / Stripe charge with `Idempotency-Key` / DynamoDB conditional write | If the server dedupes — yes.              |
-| POST that creates a record / payment without idempotency key / `INSERT` without unique constraint / `mailer.send` without `Message-ID` | **No.** You'll get duplicates.            |
+| Operation                                                                                                                              | Safe to retry?                 |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| GET / SELECT / cache lookup / read from S3                                                                                             | Always.                        |
+| PUT with a known ID / Stripe charge with `Idempotency-Key` / DynamoDB conditional write                                                | If the server dedupes — yes.   |
+| POST that creates a record / payment without idempotency key / `INSERT` without unique constraint / `mailer.send` without `Message-ID` | **No.** You'll get duplicates. |
 
 When in doubt, gate retries with `shouldRetry`:
 
@@ -81,8 +81,7 @@ import { retry } from "@mongez/reinforcements";
 await retry(() => stripe.charges.create(payload), {
   attempts: 4,
   delay: 500,
-  shouldRetry: (error) =>
-    error instanceof NetworkError || error instanceof TimeoutError,
+  shouldRetry: (error) => error instanceof NetworkError || error instanceof TimeoutError,
 });
 ```
 
@@ -122,8 +121,8 @@ await retry(() => fetch(url), {
   attempts: 6,
   delay: 100,
   backoff: "exponential", // 100, 200, 400, 800 ms ...
-  maxDelay: 2_000,        // never wait more than 2s
-  jitter: "full",         // randomise each delay
+  maxDelay: 2_000, // never wait more than 2s
+  jitter: "full", // randomise each delay
 });
 ```
 
@@ -246,13 +245,10 @@ console.log(result.latency); // total time, all attempts
 
 ```ts
 // measure() INSIDE — each attempt timed individually
-await retry(
-  () => measure("publish-event", () => bus.publish(event)),
-  { attempts: 4, delay: 200 },
-);
+await retry(() => measure("publish-event", () => bus.publish(event)), { attempts: 4, delay: 200 });
 ```
 
-Heads-up on the second form: `measure()` doesn't throw — it returns a discriminated `BenchmarkResult`. Inside `retry()`, that means the inner `fn()` never throws and `retry()` never sees a failure to retry. If you want each attempt timed *and* the retry loop to fire, re-throw from the error result yourself, or use the outside-form. Default to `measure()` on the outside unless you genuinely need per-attempt timings.
+Heads-up on the second form: `measure()` doesn't throw — it returns a discriminated `BenchmarkResult`. Inside `retry()`, that means the inner `fn()` never throws and `retry()` never sees a failure to retry. If you want each attempt timed _and_ the retry loop to fire, re-throw from the error result yourself, or use the outside-form. Default to `measure()` on the outside unless you genuinely need per-attempt timings.
 
 See [Benchmark](./benchmark.md) for the `measure()` surface.
 
@@ -277,7 +273,7 @@ export const sendWebhook = useCase<WebhookResult, WebhookInput>({
 });
 ```
 
-The difference between this and a raw `retry(...)` inside the handler is **the unit of retry**. Use the use-case option when retrying conceptually means *"re-run the handler"*. Use raw `retry()` inside the handler when only one specific step is flaky and the rest of the pipeline should run once. (Guards, validation, and the `onExecuting` prelude do not re-run on each retry attempt — only the handler does.)
+The difference between this and a raw `retry(...)` inside the handler is **the unit of retry**. Use the use-case option when retrying conceptually means _"re-run the handler"_. Use raw `retry()` inside the handler when only one specific step is flaky and the rest of the pipeline should run once. (Guards, validation, and the `onExecuting` prelude do not re-run on each retry attempt — only the handler does.)
 
 A failed payment provider call is usually the inner-`retry()` case. A flaky third-party webhook is usually the use-case-level case.
 

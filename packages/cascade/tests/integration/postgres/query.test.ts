@@ -187,7 +187,10 @@ describe("Postgres integration — query execution", () => {
     });
 
     it("whereNotLike excludes matches", async () => {
-      const rows = await QUser.query().whereNotNull("email").whereNotLike("email", "%example.com").get();
+      const rows = await QUser.query()
+        .whereNotNull("email")
+        .whereNotLike("email", "%example.com")
+        .get();
 
       expect(rows).toHaveLength(0);
     });

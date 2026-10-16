@@ -80,9 +80,7 @@ describe("cacheMiddleware", () => {
     cacheStore.set.mockReset();
     logError.mockReset();
     cacheStore.set.mockResolvedValue(undefined);
-    ({ cacheMiddleware } = await import(
-      "../../../src/http/middleware/cache-response-middleware"
-    ));
+    ({ cacheMiddleware } = await import("../../../src/http/middleware/cache-response-middleware"));
   });
 
   afterEach(() => {
@@ -175,11 +173,7 @@ describe("cacheMiddleware", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(logError).toHaveBeenCalledTimes(1);
-    expect(logError).toHaveBeenCalledWith(
-      "cache-middleware",
-      "set",
-      expect.any(Error),
-    );
+    expect(logError).toHaveBeenCalledWith("cache-middleware", "set", expect.any(Error));
   });
 
   it("does not cache a non-2xx response", async () => {

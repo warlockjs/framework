@@ -15,14 +15,8 @@ export {
 
 // Types
 export { formatSpanIO, formatSpanLine } from "./console";
-export type {
-  ConsoleExporterOptions,
-  ConsoleLike,
-} from "./console";
-export type {
-  FileExporterOptions,
-  TraceRecord,
-} from "./file";
+export type { ConsoleExporterOptions, ConsoleLike } from "./console";
+export type { FileExporterOptions, TraceRecord } from "./file";
 export type {
   LangfuseClientLike,
   LangfuseExporterOptions,

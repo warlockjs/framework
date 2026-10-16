@@ -29,11 +29,11 @@ const policy = guard({ input: [injection({ onMatch: "block" })] });
 
 ## The three phases
 
-| Phase | Hook | Inspected text | Set with |
-|---|---|---|---|
-| **input** | `trip.before` | the outbound prompt (`extractUserText(ctx.messages)`) | `input: [...]` |
-| **output** | `trip.after` | `response.content` | `output: [...]` |
-| **tool** | `tool.before` | `JSON.stringify(toolArgs)` | `tool: [...]` |
+| Phase      | Hook          | Inspected text                                        | Set with        |
+| ---------- | ------------- | ----------------------------------------------------- | --------------- |
+| **input**  | `trip.before` | the outbound prompt (`extractUserText(ctx.messages)`) | `input: [...]`  |
+| **output** | `trip.after`  | `response.content`                                    | `output: [...]` |
+| **tool**   | `tool.before` | `JSON.stringify(toolArgs)`                            | `tool: [...]`   |
 
 Each phase array runs its detectors in **registration order**; the first non-`allow` verdict decides the action for that phase (short-circuit). A phase you don't configure is inert — a guard with no detectors is a no-op middleware.
 
@@ -41,12 +41,12 @@ Each phase array runs its detectors in **registration order**; the first non-`al
 
 A detector inspects text and returns a `GuardrailVerdict`, discriminated by `type` (never `kind`):
 
-| `type` | Effect |
-|---|---|
-| `allow` | Pass to the next detector. |
-| `redact` | Rewrite the inspected text and continue — **output phase only** (see limitation below). |
-| `block` | Short-circuit with the existing `GuardrailViolationError`. |
-| `flag` | Pass, but append a `FlagRecord` into `ctx.state` under `<name>.flags` for a downstream observer (panoptic, the caller). |
+| `type`   | Effect                                                                                                                  |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `allow`  | Pass to the next detector.                                                                                              |
+| `redact` | Rewrite the inspected text and continue — **output phase only** (see limitation below).                                 |
+| `block`  | Short-circuit with the existing `GuardrailViolationError`.                                                              |
+| `flag`   | Pass, but append a `FlagRecord` into `ctx.state` under `<name>.flags` for a downstream observer (panoptic, the caller). |
 
 `agent.execute()` **never throws** — a `block` surfaces on `result.error` as a `GuardrailViolationError`, exactly like every other `AIError`. Branch on it after the run:
 
@@ -83,7 +83,7 @@ const policy = ai.guardrail({
 ```ts
 const policy = ai.guardrail({
   tool: [ai.guardrail.pii({ onMatch: "block" })], // stop PII reaching the tool
-  toolNames: ["send_email", "post_webhook"],      // ...only for these tools
+  toolNames: ["send_email", "post_webhook"], // ...only for these tools
 });
 
 const agent = ai.agent({ model, tools: [sendEmail, postWebhook, lookup], middleware: [policy] });
@@ -94,7 +94,7 @@ A `block` from `tool.before` aborts that tool dispatch and surfaces on `result.e
 
 ## Install order
 
-A guard is a normal `AgentMiddleware`; registration order is execution order (`before` top-down, `after` bottom-up). The canonical order is `[cache, budget, guardrail, observability]`. A `semanticCache` that short-circuits `trip.before` runs *before* the guard — a cached response then skips the **output** detectors, so place the guard before the cache if you don't trust cached contents.
+A guard is a normal `AgentMiddleware`; registration order is execution order (`before` top-down, `after` bottom-up). The canonical order is `[cache, budget, guardrail, observability]`. A `semanticCache` that short-circuits `trip.before` runs _before_ the guard — a cached response then skips the **output** detectors, so place the guard before the cache if you don't trust cached contents.
 
 ## Input-redaction limitation (v1)
 

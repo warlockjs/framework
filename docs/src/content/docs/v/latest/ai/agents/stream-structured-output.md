@@ -6,10 +6,10 @@ sidebar:
   label: "Stream structured output"
 ---
 
-`ai.streamObject` is the first-class primitive for *streaming a structured object*. It does three things at once from a single model call:
+`ai.streamObject` is the first-class primitive for _streaming a structured object_. It does three things at once from a single model call:
 
 1. **`text-delta`** — the raw token text as it arrives, for a live "typing" view.
-2. **`partial`** — a best-effort snapshot of the object *so far*, re-parsed from the accumulated text on each delta (only re-emitted when it actually changed). Use it to render a form that fills in field-by-field.
+2. **`partial`** — a best-effort snapshot of the object _so far_, re-parsed from the accumulated text on each delta (only re-emitted when it actually changed). Use it to render a form that fills in field-by-field.
 3. **`done`** — the terminal event: the complete text is strictly `JSON.parse`'d and validated against your Standard Schema. On success you get the typed `value`; on failure you get a typed `error`.
 
 The key invariant: the tolerant partial parser only ever feeds the live preview. The authoritative final value is always a strict parse plus schema validation — an over-eager partial parse can never corrupt the result you persist.
@@ -22,10 +22,10 @@ It is a standalone async generator, not part of the agent loop. Reach for it whe
 import { ai } from "@warlock.js/ai";
 
 function streamObject<T>(params: {
-  model: ModelContract;        // e.g. openai.model({ name: "gpt-4o" })
-  messages: Message[];         // the prompt
+  model: ModelContract; // e.g. openai.model({ name: "gpt-4o" })
+  messages: Message[]; // the prompt
   schema: StandardSchemaV1<T>; // validates the FINAL object
-  options?: ModelCallOptions;  // responseSchema, temperature, …
+  options?: ModelCallOptions; // responseSchema, temperature, …
 }): AsyncIterable<ObjectStreamEvent<T>>;
 ```
 
@@ -36,12 +36,12 @@ function streamObject<T>(params: {
 ```ts
 type ObjectStreamEvent<T> =
   | { type: "text-delta"; delta: string }
-  | { type: "partial"; value: unknown }                       // tolerant snapshot
-  | { type: "done"; valid: true; value: T; usage: Usage }     // strict + validated
+  | { type: "partial"; value: unknown } // tolerant snapshot
+  | { type: "done"; valid: true; value: T; usage: Usage } // strict + validated
   | { type: "done"; valid: false; error: AIError; usage: Usage };
 ```
 
-- `partial.value` is `unknown` on purpose — it is a *work-in-progress* object that has not been validated and may be missing fields. Never persist it.
+- `partial.value` is `unknown` on purpose — it is a _work-in-progress_ object that has not been validated and may be missing fields. Never persist it.
 - Exactly one `done` event is yielded, last. `valid: true` carries the typed `value`; `valid: false` carries a `SchemaValidationError` (a subclass of `AIError`) — either the streamed text wasn't valid JSON, or it parsed but failed the schema.
 - `usage` on `done` is the token usage reported by the model's terminal stream chunk.
 
@@ -64,9 +64,7 @@ const schema = v.object({
 const stream = ai.streamObject({
   model,
   schema,
-  messages: [
-    { role: "user", content: "Summarize this article as JSON: …" },
-  ],
+  messages: [{ role: "user", content: "Summarize this article as JSON: …" }],
 });
 
 for await (const event of stream) {
@@ -97,9 +95,7 @@ When you don't care about the live preview and just want the validated result (o
 ```ts
 import { collectStreamObject, ai } from "@warlock.js/ai";
 
-const done = await collectStreamObject(
-  ai.streamObject({ model, schema, messages }),
-);
+const done = await collectStreamObject(ai.streamObject({ model, schema, messages }));
 
 if (done.valid) {
   use(done.value);
@@ -117,7 +113,7 @@ The `partial` snapshots are produced by `parsePartialJson`, a tolerant parser th
 ```ts
 import { parsePartialJson } from "@warlock.js/ai";
 
-parsePartialJson('{ "title": "Hel');     // → { title: "Hel" }
+parsePartialJson('{ "title": "Hel'); // → { title: "Hel" }
 parsePartialJson('{ "tags": ["a", "b"'); // → { tags: ["a", "b"] }
 ```
 
@@ -125,12 +121,12 @@ It returns `undefined` when nothing parseable has arrived yet. This is a preview
 
 ## Options
 
-| Option | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `model` | `ModelContract` | yes | The model to stream from (e.g. `openai.model({ name })`). Uses its existing `stream()` seam. |
-| `messages` | `Message[]` | yes | The prompt messages. |
-| `schema` | `StandardSchemaV1<T>` | yes | Validates the final object. Drives the typed `value`. |
-| `options` | `ModelCallOptions` | no | Forwarded to `model.stream(...)` — `responseSchema`, `temperature`, etc. |
+| Option     | Type                  | Required | Notes                                                                                        |
+| ---------- | --------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `model`    | `ModelContract`       | yes      | The model to stream from (e.g. `openai.model({ name })`). Uses its existing `stream()` seam. |
+| `messages` | `Message[]`           | yes      | The prompt messages.                                                                         |
+| `schema`   | `StandardSchemaV1<T>` | yes      | Validates the final object. Drives the typed `value`.                                        |
+| `options`  | `ModelCallOptions`    | no       | Forwarded to `model.stream(...)` — `responseSchema`, `temperature`, etc.                     |
 
 ## Related
 

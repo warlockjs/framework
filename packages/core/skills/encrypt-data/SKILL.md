@@ -7,10 +7,10 @@ description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need 
 
 Two helpers, two different jobs:
 
-| Tool                    | Direction  | Algorithm    | Use for                                                        |
-| ----------------------- | ---------- | ------------ | -------------------------------------------------------------- |
-| `encrypt` / `decrypt`   | reversible | AES-256-GCM  | Secrets you need to read back (API keys, OAuth tokens).        |
-| `hmacHash`              | one-way    | HMAC-SHA256  | Deterministic fingerprint for lookup/dedup of encrypted values. |
+| Tool                  | Direction  | Algorithm   | Use for                                                         |
+| --------------------- | ---------- | ----------- | --------------------------------------------------------------- |
+| `encrypt` / `decrypt` | reversible | AES-256-GCM | Secrets you need to read back (API keys, OAuth tokens).         |
+| `hmacHash`            | one-way    | HMAC-SHA256 | Deterministic fingerprint for lookup/dedup of encrypted values. |
 
 Both live in `@warlock.js/core`. For **password hashing** (a one-way job with very different requirements), reach for the `hash-password` topic instead — bcrypt is the right tool there, not encrypt.
 
@@ -34,9 +34,9 @@ import type { EncryptionConfigurations } from "@warlock.js/core";
 import { env } from "@warlock.js/core";
 
 const encryptionConfig: EncryptionConfigurations = {
-  key: env("APP_ENCRYPTION_KEY"),     // 64 hex chars = 32 bytes — required
-  algorithm: "aes-256-gcm",            // optional, default
-  hmacKey: env("APP_HMAC_KEY"),       // 64 hex chars — falls back to `key` if absent
+  key: env("APP_ENCRYPTION_KEY"), // 64 hex chars = 32 bytes — required
+  algorithm: "aes-256-gcm", // optional, default
+  hmacKey: env("APP_HMAC_KEY"), // 64 hex chars — falls back to `key` if absent
 };
 
 export default encryptionConfig;
@@ -71,8 +71,8 @@ export async function createAiApiKeyService(data: { key: string; organization_id
 
   return AiApiKey.create({
     ...data,
-    key: encrypt(data.key),                // the secret, recoverable
-    hash: hmacHash(data.key),              // the fingerprint, lookup-able
+    key: encrypt(data.key), // the secret, recoverable
+    hash: hmacHash(data.key), // the fingerprint, lookup-able
     last_four_chars: data.key.slice(-4),
   });
 }
@@ -133,8 +133,8 @@ log.info("api-key", "used", { fingerprint: hmacHash(apiKey).slice(0, 8) });
 ```ts
 await Model.create({
   key: encrypt(plain),
-  hash: hmacHash(plain),                   // for lookups
-  last_four_chars: plain.slice(-4),         // for UI display ("ending in 1234")
+  hash: hmacHash(plain), // for lookups
+  last_four_chars: plain.slice(-4), // for UI display ("ending in 1234")
 });
 ```
 
@@ -163,7 +163,7 @@ Keeps the encryption boundary in one place — controllers and services deal in 
 ```ts
 log.info("ai-api-key", "used", {
   organization_id,
-  fingerprint: hmacHash(apiKey).slice(0, 8),  // first 8 hex chars = enough to correlate
+  fingerprint: hmacHash(apiKey).slice(0, 8), // first 8 hex chars = enough to correlate
 });
 ```
 
@@ -172,13 +172,15 @@ You can search logs for the same fingerprint to track usage of a specific key ac
 ### Idempotency keys
 
 ```ts
-const idempotencyKey = hmacHash(JSON.stringify({
-  user_id: user.id,
-  action: "transfer",
-  amount,
-  to,
-  // include a monotonic component if the same exact payload should be allowed twice
-}));
+const idempotencyKey = hmacHash(
+  JSON.stringify({
+    user_id: user.id,
+    action: "transfer",
+    amount,
+    to,
+    // include a monotonic component if the same exact payload should be allowed twice
+  }),
+);
 
 const existing = await idempotencyRepository.first({ key: idempotencyKey });
 if (existing) return existing.get("result");

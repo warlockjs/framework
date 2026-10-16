@@ -48,7 +48,8 @@ const summarizer = ai.agent({
   name: "article-summarizer",
   model: openai.model({ name: "gpt-4o-mini" }),
   output: summarySchema,
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are an editor who writes tight, factual summaries.")
     .instruction("Title is 8 words or fewer.")
     .instruction("Each bullet is one sentence, plain prose, no markdown."),

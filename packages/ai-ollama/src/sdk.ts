@@ -6,11 +6,7 @@ import type {
   SDKAdapterContract,
 } from "@warlock.js/ai";
 import { approximateTokenCount } from "@warlock.js/ai";
-import type {
-  OllamaEmbedderConfig,
-  OllamaModelConfig,
-  OllamaSDKConfig,
-} from "./config.type";
+import type { OllamaEmbedderConfig, OllamaModelConfig, OllamaSDKConfig } from "./config.type";
 import { OllamaEmbedder } from "./embedder";
 import { OllamaModel } from "./model";
 

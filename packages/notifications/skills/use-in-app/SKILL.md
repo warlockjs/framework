@@ -81,7 +81,9 @@ abstract class DatabaseNotification extends Model implements NotificationContrac
 class BaseNotificationsRepository extends RepositoryManager {
   // constructor resolves the model's columnMap → builds `filterBy` +
   // createFor / markRead / markUnread / deleteFor from it.
-  public createFor(recipientId, input, tenantId?)   { /* one insert, starts unread */ }
+  public createFor(recipientId, input, tenantId?) {
+    /* one insert, starts unread */
+  }
 }
 ```
 
@@ -94,9 +96,9 @@ class BaseNotificationsRepository extends RepositoryManager {
 ```ts
 export type NotificationColumnMap = {
   recipient?: string; // recipient FK. Default "user_id"
-  tenant?: string;    // multi-tenant scope, written from the recipient. Omit → single-tenant
-  readAt?: string;    // read-timestamp column
-  isRead?: string;    // read-flag column (indexed)
+  tenant?: string; // multi-tenant scope, written from the recipient. Omit → single-tenant
+  readAt?: string; // read-timestamp column
+  isRead?: string; // read-flag column (indexed)
 };
 ```
 

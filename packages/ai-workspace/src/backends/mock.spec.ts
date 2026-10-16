@@ -7,9 +7,7 @@ describe("createMockBackend", () => {
       "/srv/app/src/index.ts": "export const x = 1;",
     });
 
-    expect(await backend.readFile("/srv/app/src/index.ts")).toBe(
-      "export const x = 1;",
-    );
+    expect(await backend.readFile("/srv/app/src/index.ts")).toBe("export const x = 1;");
   });
 
   it("round-trips a write then read at the same path", async () => {
@@ -23,9 +21,7 @@ describe("createMockBackend", () => {
   it("throws when reading a path that does not exist", async () => {
     const backend = createMockBackend();
 
-    await expect(backend.readFile("/srv/app/missing.ts")).rejects.toThrow(
-      /no such file/i,
-    );
+    await expect(backend.readFile("/srv/app/missing.ts")).rejects.toThrow(/no such file/i);
   });
 
   it("reports existence for seeded files and their implicit parent dirs", async () => {
@@ -70,10 +66,7 @@ describe("createMockBackend", () => {
       "/srv/app/README.md": "z",
     });
 
-    expect(await backend.list("/srv/app")).toEqual([
-      "/srv/app/README.md",
-      "/srv/app/src",
-    ]);
+    expect(await backend.list("/srv/app")).toEqual(["/srv/app/README.md", "/srv/app/src"]);
     expect(await backend.list("/srv/app/src")).toEqual([
       "/srv/app/src/index.ts",
       "/srv/app/src/util",
@@ -83,9 +76,7 @@ describe("createMockBackend", () => {
   it("canonicalizes paths via realpath (collapses . / .. and slashes)", async () => {
     const backend = createMockBackend();
 
-    expect(await backend.realpath("/srv/app/./src/../src/index.ts")).toBe(
-      "/srv/app/src/index.ts",
-    );
+    expect(await backend.realpath("/srv/app/./src/../src/index.ts")).toBe("/srv/app/src/index.ts");
     expect(await backend.realpath("/srv//app///src")).toBe("/srv/app/src");
     // Backslashes are unified so Windows-style cwd roots map to one key.
     expect(await backend.realpath("C:\\srv\\app")).toBe("C:/srv/app");

@@ -12,10 +12,10 @@ A deploy should never drop a request, and a load balancer should never route to 
 
 The HTTP connector registers them directly on the Fastify server during boot — before route scanning — so they exist by the time the server listens, and they're immune to HMR.
 
-| Path     | Probe     | `200` when                                                  | `503` when                                              |
-| -------- | --------- | ---------------------------------------------------------- | ------------------------------------------------------ |
-| `/health`| liveness  | the process is up                                          | shutdown has begun                                     |
-| `/ready` | readiness | booted **and** not shutting down **and** every check passes | before boot, during shutdown, or any failing check    |
+| Path      | Probe     | `200` when                                                  | `503` when                                         |
+| --------- | --------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| `/health` | liveness  | the process is up                                           | shutdown has begun                                 |
+| `/ready`  | readiness | booted **and** not shutting down **and** every check passes | before boot, during shutdown, or any failing check |
 
 The distinction matters for orchestrators:
 

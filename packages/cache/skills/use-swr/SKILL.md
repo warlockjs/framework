@@ -24,11 +24,11 @@ Use `cache.remember()` when freshness is non-negotiable — auth, balances, bill
      │  no upstream call  │  bg refresh        │  like a miss
 ```
 
-| Window | Behavior |
-|---|---|
-| `now < freshTtl` | Return cached. No upstream call. |
+| Window                      | Behavior                                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| `now < freshTtl`            | Return cached. No upstream call.                                                         |
 | `freshTtl ≤ now < staleTtl` | Return cached immediately. Run `fn()` in background; next read sees the refreshed value. |
-| `now ≥ staleTtl` | Block on `fn()`. Same as `remember()`. |
+| `now ≥ staleTtl`            | Block on `fn()`. Same as `remember()`.                                                   |
 
 ## API
 
@@ -57,12 +57,12 @@ await cache.swr(
 
 ## Driver support
 
-| Driver | Background refresh |
-|---|---|
-| memory / memoryExtended / lru / file / mock | ✅ Full |
-| redis | ✅ Full (sidecar key for staleAt — backwards-compatible) |
-| pg | ✅ Full (`stale_at TIMESTAMPTZ` column — provision via `driver.schema()`) |
-| null | ❌ Always-fetch (null caches nothing) |
+| Driver                                      | Background refresh                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------- |
+| memory / memoryExtended / lru / file / mock | ✅ Full                                                                   |
+| redis                                       | ✅ Full (sidecar key for staleAt — backwards-compatible)                  |
+| pg                                          | ✅ Full (`stale_at TIMESTAMPTZ` column — provision via `driver.schema()`) |
+| null                                        | ❌ Always-fetch (null caches nothing)                                     |
 
 ## Common shapes
 
@@ -78,9 +78,7 @@ await cache.swr(`dashboard.${tenantId}`, { freshTtl: "5m", staleTtl: "1h" }, () 
 );
 
 // Third-party API — degrade gracefully when upstream is down
-await cache.swr("exchange.rates", { freshTtl: "10m", staleTtl: "24h" }, () =>
-  fetchFromForexAPI(),
-);
+await cache.swr("exchange.rates", { freshTtl: "10m", staleTtl: "24h" }, () => fetchFromForexAPI());
 ```
 
 ## Through scoped caches
@@ -88,10 +86,8 @@ await cache.swr("exchange.rates", { freshTtl: "10m", staleTtl: "24h" }, () =>
 ```ts
 const feed = cache.namespace(`feed.${userId}`, { tags: [`user.${userId}`] });
 
-await feed.swr(
-  "home",
-  { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
-  () => buildHomeFeed(userId),
+await feed.swr("home", { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] }, () =>
+  buildHomeFeed(userId),
 );
 // stored at feed.<userId>.home, tagged [user.<userId>, computed]
 ```
@@ -99,6 +95,6 @@ await feed.swr(
 ## Things NOT to do
 
 - Don't use SWR when the user must see the latest data (auth, billing). Use `remember()` instead — block-until-fresh is the right semantic there.
-- Don't pick `freshTtl` to be the *same* as `staleTtl` thinking it disables the stale window — that throws. Pick a tight `freshTtl` and wider `staleTtl` that reflects how stale your product can tolerate being.
+- Don't pick `freshTtl` to be the _same_ as `staleTtl` thinking it disables the stale window — that throws. Pick a tight `freshTtl` and wider `staleTtl` that reflects how stale your product can tolerate being.
 - Don't ignore `error` events. A persistent stream of refresh failures means upstream is broken and the cache is masking it.
 - Don't reach for SWR on the null driver — it caches nothing, so SWR always blocks.

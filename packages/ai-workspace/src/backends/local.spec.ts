@@ -136,7 +136,7 @@ describe("createLocalBackend", () => {
   it("should exec a trivial cross-platform command and capture stdout + exit code 0", async () => {
     const backend = createLocalBackend();
 
-    const result = await backend.exec('node -e "process.stdout.write(\'pong\')"', {
+    const result = await backend.exec("node -e \"process.stdout.write('pong')\"", {
       cwd: root,
       env: execEnv,
     });
@@ -150,10 +150,10 @@ describe("createLocalBackend", () => {
   it("should capture stderr and a non-zero exit code from exec", async () => {
     const backend = createLocalBackend();
 
-    const result = await backend.exec(
-      'node -e "process.stderr.write(\'boom\'); process.exit(3)"',
-      { cwd: root, env: execEnv },
-    );
+    const result = await backend.exec("node -e \"process.stderr.write('boom'); process.exit(3)\"", {
+      cwd: root,
+      env: execEnv,
+    });
 
     expect(result.exitCode).toBe(3);
     expect(result.stderr).toBe("boom");
@@ -229,10 +229,10 @@ describe("createLocalBackend", () => {
   it("should pass quoted metacharacters through as literal argument data, not shell syntax", async () => {
     const backend = createLocalBackend();
 
-    const result = await backend.exec(
-      'node -e "process.stdout.write(process.argv[1])" "a;b|c"',
-      { cwd: root, env: execEnv },
-    );
+    const result = await backend.exec('node -e "process.stdout.write(process.argv[1])" "a;b|c"', {
+      cwd: root,
+      env: execEnv,
+    });
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("a;b|c");
@@ -348,7 +348,7 @@ describe("createLocalBackend", () => {
       const add = vi.spyOn(controller.signal, "addEventListener");
       const remove = vi.spyOn(controller.signal, "removeEventListener");
 
-      const result = await backend.exec('node -e "process.stdout.write(\'ok\')"', {
+      const result = await backend.exec("node -e \"process.stdout.write('ok')\"", {
         cwd: root,
         env: execEnv,
         signal: controller.signal,

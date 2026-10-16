@@ -5,16 +5,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const workspaceRoot = path.resolve(root, "..", "..");
 const phases = [
   {
     name: "source format check",
     args: [
-      path.join(root, "node_modules", "prettier", "bin", "prettier.cjs"),
+      path.join(root, "node_modules", "oxfmt", "bin", "oxfmt"),
       "--check",
-      "./src/**/*.{js,jsx,ts,tsx,css,md,json}",
       "--config",
-      "./.prettierrc.json",
+      path.join(workspaceRoot, ".oxfmtrc.json"),
+      "--disable-nested-config",
+      "--ignore-path",
+      path.join(workspaceRoot, ".gitignore"),
+      "--ignore-path",
+      path.join(workspaceRoot, ".oxfmtignore"),
+      path.join(root, "src"),
     ],
+    cwd: workspaceRoot,
   },
   {
     name: "template format check",
@@ -32,7 +39,7 @@ const phases = [
 
 for (const phase of phases) {
   const result = spawnSync(process.execPath, phase.args, {
-    cwd: root,
+    cwd: phase.cwd ?? root,
     stdio: "inherit",
   });
 

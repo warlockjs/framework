@@ -56,7 +56,7 @@ describe("Storage events — async listeners", () => {
     storage.on("afterPut", async () => {
       // A real macrotask, not a bare microtask: a dropped promise is
       // indistinguishable from an awaited one across a single tick.
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       handled = true;
     });
 
@@ -71,7 +71,7 @@ describe("Storage events — async listeners", () => {
     const order: string[] = [];
 
     storage.on("beforePut", async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       order.push("listener");
     });
 

@@ -85,10 +85,10 @@ export default {
 } as SocketOptions;
 ```
 
-| Field     | Type                            | When you need it                                                                 |
-| --------- | ------------------------------- | -------------------------------------------------------------------------------- |
-| `port`    | `number`                        | Only when HTTP is disabled. With HTTP on, Socket.IO attaches to the same server. |
-| `options` | Socket.IO `ServerOptions`       | Anything the [Socket.IO docs](https://socket.io/docs/v4/server-options/) lists — `cors`, `path`, `pingInterval`, `transports`, `maxHttpBufferSize`, etc. |
+| Field     | Type                      | When you need it                                                                                                                                         |
+| --------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `port`    | `number`                  | Only when HTTP is disabled. With HTTP on, Socket.IO attaches to the same server.                                                                         |
+| `options` | Socket.IO `ServerOptions` | Anything the [Socket.IO docs](https://socket.io/docs/v4/server-options/) lists — `cors`, `path`, `pingInterval`, `transports`, `maxHttpBufferSize`, etc. |
 
 > **Editor autocomplete quirk.** The exported `SocketOptions.options` field is currently typed as Node's `http` `ServerOptions` (a source-side type quirk), so your editor won't autocomplete Socket.IO option names — but they DO take effect at runtime, since the value is passed straight into `new Server(server, options)`.
 
@@ -96,7 +96,7 @@ export default {
 
 > **`ssl` is read but not yet on the type.** The connector reads `socketConfig.ssl` at runtime to decide HTTP vs HTTPS, but the exported `SocketOptions` type only declares `port?` and `options?`. Setting `ssl: true` against `as SocketOptions` is a type error today. If you need the standalone HTTPS path, drop the `as SocketOptions` annotation (or cast through `as any`) until the field lands on the type. With HTTP enabled this never matters — SSL is inherited from the Fastify server.
 
-**Editing the config tears the server down — but does *not* hot-apply new options.** The socket connector watches `src/config/socket.ts`. On a change, the dev server calls the connector's `restart()`, which runs `shutdown()` then `start()`. Here's the catch: the Socket.IO server is built in `boot()`, and `restart()` never calls `boot()`. So saving the config disconnects open sockets and shuts the old server down, but a fresh server with your new options is **not** stood back up until a full dev-server restart. This is a current limitation — restart the dev server to apply config changes.
+**Editing the config tears the server down — but does _not_ hot-apply new options.** The socket connector watches `src/config/socket.ts`. On a change, the dev server calls the connector's `restart()`, which runs `shutdown()` then `start()`. Here's the catch: the Socket.IO server is built in `boot()`, and `restart()` never calls `boot()`. So saving the config disconnects open sockets and shuts the old server down, but a fresh server with your new options is **not** stood back up until a full dev-server restart. This is a current limitation — restart the dev server to apply config changes.
 
 ### Multiple servers
 
@@ -178,7 +178,7 @@ The container guarantees you get the same instance on every call — `getSocketS
 
 ## Connecting a client
 
-The framework ships **only the server**. There is no bundled client — connect from the browser (or a Node service, or React Native) with the standard `socket.io-client` package, which you install in the *client* project yourself.
+The framework ships **only the server**. There is no bundled client — connect from the browser (or a Node service, or React Native) with the standard `socket.io-client` package, which you install in the _client_ project yourself.
 
 ```ts title="client-side (browser)"
 import { io } from "socket.io-client";

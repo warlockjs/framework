@@ -4,23 +4,23 @@ Lifecycle management for all framework subsystems (HTTP server, database, cache,
 
 ## Key Files
 
-| File                          | Purpose                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------ |
-| `base-connector.ts`           | `BaseConnector` abstract class — name, priority, `start()`, `shutdown()`                   |
-| `logger-connector.ts`         | Initializes the logging subsystem                                                          |
-| `mail-connector.ts`           | Initializes the mailer subsystem                                                           |
-| `http-connector.ts`           | Starts the Fastify HTTP server; `start()` preflights the configured port via `assertPortIsAvailable()` before `listen()`, so a collision raises `PortInUseError` (actionable message) instead of a raw `EADDRINUSE` |
-| `database-connector.ts`       | Connects to the database via `@warlock.js/cascade`                                         |
-| `herald-connector.ts`         | Connects to message brokers via `@warlock.js/herald`                                       |
-| `cache-connector.ts`          | Initializes the cache subsystem via `@warlock.js/cache`                                    |
-| `storage.connector.ts`        | Initializes file storage drivers                                                           |
-| `socket-connector.ts`         | Starts the Socket.IO realtime server                                                       |
-| `notifications-connector.ts`  | Wires `@warlock.js/notifications` from config                                              |
-| `access-connector.ts`         | Wires `@warlock.js/access` authorization from config                                       |
-| `ai-connector.ts`             | Wires `@warlock.js/ai` from config                                                         |
-| `connectors-manager.ts`       | `ConnectorsManager` — registers, starts, shuts down connectors; handles `SIGINT`/`SIGTERM` |
-| `types.ts`                    | Runtime connector types plus the closed `ConnectorBuildContribution` (`generate` / `emit`) contract used by `warlock build` |
-| `index.ts`                    | Barrel export                                                                              |
+| File                         | Purpose                                                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base-connector.ts`          | `BaseConnector` abstract class — name, priority, `start()`, `shutdown()`                                                                                                                                            |
+| `logger-connector.ts`        | Initializes the logging subsystem                                                                                                                                                                                   |
+| `mail-connector.ts`          | Initializes the mailer subsystem                                                                                                                                                                                    |
+| `http-connector.ts`          | Starts the Fastify HTTP server; `start()` preflights the configured port via `assertPortIsAvailable()` before `listen()`, so a collision raises `PortInUseError` (actionable message) instead of a raw `EADDRINUSE` |
+| `database-connector.ts`      | Connects to the database via `@warlock.js/cascade`                                                                                                                                                                  |
+| `herald-connector.ts`        | Connects to message brokers via `@warlock.js/herald`                                                                                                                                                                |
+| `cache-connector.ts`         | Initializes the cache subsystem via `@warlock.js/cache`                                                                                                                                                             |
+| `storage.connector.ts`       | Initializes file storage drivers                                                                                                                                                                                    |
+| `socket-connector.ts`        | Starts the Socket.IO realtime server                                                                                                                                                                                |
+| `notifications-connector.ts` | Wires `@warlock.js/notifications` from config                                                                                                                                                                       |
+| `access-connector.ts`        | Wires `@warlock.js/access` authorization from config                                                                                                                                                                |
+| `ai-connector.ts`            | Wires `@warlock.js/ai` from config                                                                                                                                                                                  |
+| `connectors-manager.ts`      | `ConnectorsManager` — registers, starts, shuts down connectors; handles `SIGINT`/`SIGTERM`                                                                                                                          |
+| `types.ts`                   | Runtime connector types plus the closed `ConnectorBuildContribution` (`generate` / `emit`) contract used by `warlock build`                                                                                         |
+| `index.ts`                   | Barrel export                                                                                                                                                                                                       |
 
 ## Key Exports
 

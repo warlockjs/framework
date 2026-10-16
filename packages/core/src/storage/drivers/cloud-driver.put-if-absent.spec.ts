@@ -45,9 +45,7 @@ describe("CloudDriver.putIfAbsent()", () => {
   });
 
   it("maps 409 to null", async () => {
-    const driver = makeDriver(() =>
-      Promise.reject(httpError(409, "ConditionalRequestConflict")),
-    );
+    const driver = makeDriver(() => Promise.reject(httpError(409, "ConditionalRequestConflict")));
 
     expect(await driver.putIfAbsent(Buffer.from("x"), "a.txt")).toBeNull();
   });

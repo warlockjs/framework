@@ -37,18 +37,18 @@ The two pipeline mechanisms rescue different failure modes:
 
 ```ts
 // .default(x) — fires when input is ABSENT
-v.string().optional().default("guest")
+v.string().optional().default("guest");
 //   {}              → { x: "guest" }
 //   { x: "alice" }  → { x: "alice" }    ← caller wins
 //   { x: 123 }      → ERROR             ← rules still run on present input
 
 // .catch(y) — fires when input is PRESENT but INVALID
-v.string().email().catch("noreply@example.com")
+v.string().email().catch("noreply@example.com");
 //   { x: "bad" }    → { x: "noreply@example.com" }   ← email rule failed, catch rescued
 //   {}              → ERROR                          ← required, no default to rescue absence
 
 // Combine them for "rescue both" semantics
-v.string().email().optional().default("a@b.com").catch("noreply@example.com")
+v.string().email().optional().default("a@b.com").catch("noreply@example.com");
 //   {}              → { x: "a@b.com" }              ← default fires
 //   { x: "bad" }    → { x: "noreply@example.com" }  ← catch fires
 //   { x: "ok@a.b" } → { x: "ok@a.b" }               ← caller wins
@@ -56,14 +56,14 @@ v.string().email().optional().default("a@b.com").catch("noreply@example.com")
 
 The decision tree:
 
-| Want this | Use |
-| --- | --- |
-| Caller may omit; we don't care | `.optional()` |
-| Caller may omit; we fill with a default | `.optional().default(x)` |
-| Caller may send invalid data; rescue with a fallback | `.catch(y)` |
-| Caller may omit OR send invalid; rescue either way | `.optional().default(x).catch(y)` |
-| `null` is a meaningful value | `.nullable()` (combine with optional if absent is also allowed, or use `.nullish()`) |
-| Required, but rescue any failure | `.catch(y)` (rescues "missing required" too) |
+| Want this                                            | Use                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Caller may omit; we don't care                       | `.optional()`                                                                        |
+| Caller may omit; we fill with a default              | `.optional().default(x)`                                                             |
+| Caller may send invalid data; rescue with a fallback | `.catch(y)`                                                                          |
+| Caller may omit OR send invalid; rescue either way   | `.optional().default(x).catch(y)`                                                    |
+| `null` is a meaningful value                         | `.nullable()` (combine with optional if absent is also allowed, or use `.nullish()`) |
+| Required, but rescue any failure                     | `.catch(y)` (rescues "missing required" too)                                         |
 
 ## Absent vs present-empty — they are not the same
 
@@ -79,15 +79,15 @@ Two payloads, two different validated outputs:
 
 ```ts
 // Payload A — caller never mentioned `tags`
-const a = await validate(schema, { });
-a.data
+const a = await validate(schema, {});
+a.data;
 // → {}
 // `tags` is OMITTED. Not `undefined`-valued — the key isn't there at all.
 // `"tags" in a.data === false`
 
 // Payload B — caller explicitly cleared `tags` to []
 const b = await validate(schema, { tags: [] });
-b.data
+b.data;
 // → { tags: [] }
 // `tags` IS there, just empty. The intent ("I deliberately have no tags")
 // is preserved.
@@ -109,7 +109,7 @@ const schema = v.object({
   deletedAt: v.date().nullable(),
 });
 
-type In  = Infer.Input<typeof schema>;
+type In = Infer.Input<typeof schema>;
 // {
 //   bio?:       string;
 //   status?:    string;       ← default → caller may omit
@@ -130,6 +130,7 @@ type Default = Infer<typeof schema>;
 ```
 
 **Pick by use case:**
+
 - **HTTP request body, form payload, DTO, anything pre-validation** → bare `Infer<>` or `Infer.Input<>`
 - **Cascade `Model<>` params, validated state, post-`validate()` data** → `Infer.Output<>`
 
@@ -144,7 +145,7 @@ const schema = v.object({
   username: v.string().min(3).optional().default("a"),
 });
 
-await validate(schema, { });
+await validate(schema, {});
 // → { isValid: false, errors: [{ type: "min", error: "…", input: "username" }] }
 // "a" failed `min(3)`.
 ```
@@ -160,9 +161,11 @@ Empty defaults follow three rules (5.30):
 For values that should be fresh per validation (timestamps, ids), pass a callback:
 
 ```ts
-v.date().optional().default(() => new Date())
+v.date()
+  .optional()
+  .default(() => new Date());
 // or the sugar:
-v.date().optional().defaultNow()
+v.date().optional().defaultNow();
 ```
 
 The callback runs every time `validate()` is called against an absent input, so each validation gets a unique value. A bare `.default(new Date())` would freeze a single timestamp at schema-definition time — almost never what you want.
@@ -189,10 +192,13 @@ To rescue a whole-container failure, wrap the `validate()` call site in your own
 
 ```ts
 v.object({
-  user_id: v.string().uuid().catch((errors, input) => {
-    log.warn(`bad user_id: ${JSON.stringify(input)}`, { errors });
-    return ANONYMOUS_USER_ID;
-  }),
+  user_id: v
+    .string()
+    .uuid()
+    .catch((errors, input) => {
+      log.warn(`bad user_id: ${JSON.stringify(input)}`, { errors });
+      return ANONYMOUS_USER_ID;
+    }),
 });
 ```
 
@@ -202,37 +208,37 @@ For LLM output parsing, third-party API responses, or stale schema migrations, t
 
 For a field declared as `v.string().optional()` inside `v.object(…)`:
 
-| Input | `data` |
-| --- | --- |
-| `{}` (absent) | `{}` — key omitted |
-| `{ field: undefined }` | `{}` — key omitted |
-| `{ field: "" }` | `{ field: "" }` |
-| `{ field: "x" }` | `{ field: "x" }` |
-| `{ field: null }` | `{}` — key omitted (on an **optional** field `null` coalesces to empty; use `.nullable()` if you want `null` to survive as a value) |
+| Input                  | `data`                                                                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `{}` (absent)          | `{}` — key omitted                                                                                                                  |
+| `{ field: undefined }` | `{}` — key omitted                                                                                                                  |
+| `{ field: "" }`        | `{ field: "" }`                                                                                                                     |
+| `{ field: "x" }`       | `{ field: "x" }`                                                                                                                    |
+| `{ field: null }`      | `{}` — key omitted (on an **optional** field `null` coalesces to empty; use `.nullable()` if you want `null` to survive as a value) |
 
 For `v.string().optional().default("x")`:
 
-| Input | `data` |
-| --- | --- |
-| `{}` | `{ field: "x" }` |
-| `{ field: "y" }` | `{ field: "y" }` |
+| Input                  | `data`           |
+| ---------------------- | ---------------- |
+| `{}`                   | `{ field: "x" }` |
+| `{ field: "y" }`       | `{ field: "y" }` |
 | `{ field: undefined }` | `{ field: "x" }` |
 
 For `v.string().email().catch("noreply@example.com")`:
 
-| Input | `data` |
-| --- | --- |
-| `{}` | error (required, no default; catch doesn't rescue absence here) |
-| `{ field: "bad" }` | `{ field: "noreply@example.com" }` |
-| `{ field: "ok@a.b" }` | `{ field: "ok@a.b" }` |
+| Input                 | `data`                                                          |
+| --------------------- | --------------------------------------------------------------- |
+| `{}`                  | error (required, no default; catch doesn't rescue absence here) |
+| `{ field: "bad" }`    | `{ field: "noreply@example.com" }`                              |
+| `{ field: "ok@a.b" }` | `{ field: "ok@a.b" }`                                           |
 
 For `v.string().optional().nullable()` (or `v.string().nullish()`):
 
-| Input | `data` |
-| --- | --- |
-| `{}` | `{}` — key omitted |
-| `{ field: null }` | `{ field: null }` |
-| `{ field: "x" }` | `{ field: "x" }` |
+| Input             | `data`             |
+| ----------------- | ------------------ |
+| `{}`              | `{}` — key omitted |
+| `{ field: null }` | `{ field: null }`  |
+| `{ field: "x" }`  | `{ field: "x" }`   |
 
 The pattern generalises to every validator type. Absent never produces a synthesized value (use `.default()`); invalid never produces a synthesized value (use `.catch()`); nullable opens up an explicit `null` slot orthogonal to either.
 

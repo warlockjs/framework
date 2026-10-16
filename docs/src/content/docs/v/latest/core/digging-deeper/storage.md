@@ -668,7 +668,12 @@ S3, R2 and Spaces sources can use the same variants through their storage driver
 Configure an explicit public image disk while keeping ordinary uploads local:
 
 ```ts title="src/config/storage.ts"
-import { env, storageConfigurations, storagePath, type StorageConfigurations } from "@warlock.js/core";
+import {
+  env,
+  storageConfigurations,
+  storagePath,
+  type StorageConfigurations,
+} from "@warlock.js/core";
 
 export default {
   default: "local",

@@ -11,7 +11,7 @@ Seal keeps coercion explicit (it never silently coerces behind your back), so yo
 
 ## Numbers — reach for `v.numeric()`
 
-`v.numeric()` accepts numeric strings *and* numbers, and coerces the output to a real number. It's the query-param workhorse.
+`v.numeric()` accepts numeric strings _and_ numbers, and coerces the output to a real number. It's the query-param workhorse.
 
 ```ts
 import { v, validate, type Infer } from "@warlock.js/seal";
@@ -41,7 +41,7 @@ Rule of thumb: **`v.numeric()` for anything that arrives as text** (query, form,
 
 ### Keep integer/number strictness — `.coerce()` (5.9+)
 
-`v.numeric()` accepts *any* numeric string, so `"3.5"` passes as `3.5`. When the **type** matters — you want a strict integer from a query string, so `"3"` is accepted but `"3.5"` is rejected — chain `.coerce()` on the number validator instead:
+`v.numeric()` accepts _any_ numeric string, so `"3.5"` passes as `3.5`. When the **type** matters — you want a strict integer from a query string, so `"3"` is accepted but `"3.5"` is rejected — chain `.coerce()` on the number validator instead:
 
 ```ts
 const listQuery = v.object({
@@ -57,7 +57,7 @@ await validate(listQuery, { page: "3.5" });
 
 `.coerce()` is available on the whole number family (`int`, `number`, `float`, `numeric`). It is **opt-in and only reshapes a numeric-shaped string into a number** — anything non-numeric passes through untouched so it still fails the type rule, and `v.int()` stays strict everywhere you don't add it. The inferred output type is unchanged (`v.int().coerce()` is still `number`).
 
-Use `.coerce()` when the *type* matters (a strict `int` / `float` from text); reach for `v.numeric()` when you just want "a number from text".
+Use `.coerce()` when the _type_ matters (a strict `int` / `float` from text); reach for `v.numeric()` when you just want "a number from text".
 
 ## Enums — `.in()` reads strings directly
 
@@ -68,8 +68,8 @@ const sortQuery = v.object({
   sort: v.string().in(["asc", "desc"]).default("asc"),
 });
 
-await validate(sortQuery, { sort: "desc" });   // → { sort: "desc" }
-await validate(sortQuery, {});                 // → { sort: "asc" }  (default)
+await validate(sortQuery, { sort: "desc" }); // → { sort: "desc" }
+await validate(sortQuery, {}); // → { sort: "asc" }  (default)
 await validate(sortQuery, { sort: "sideways" });
 // → ERROR { type: "in", input: "sort" }
 ```
@@ -78,20 +78,20 @@ Want the inferred type to narrow to `"asc" | "desc"` instead of `string`? Use `v
 
 ## Booleans — `.coerce()` (5.10+)
 
-A flag arrives as `?active=true`, i.e. the string `"true"` — `v.boolean()` only accepts real booleans by default and rejects it. Chain `.coerce()` to reshape the value *before* the boolean type rule runs:
+A flag arrives as `?active=true`, i.e. the string `"true"` — `v.boolean()` only accepts real booleans by default and rejects it. Chain `.coerce()` to reshape the value _before_ the boolean type rule runs:
 
 ```ts
 const filterQuery = v.object({
   active: v.boolean().coerce().default(true),
 });
 
-await validate(filterQuery, { active: "false" });  // → { active: false }
-await validate(filterQuery, { active: "true" });   // → { active: true }
-await validate(filterQuery, { active: "1" });      // → { active: true }
-await validate(filterQuery, { active: "0" });      // → { active: false }
+await validate(filterQuery, { active: "false" }); // → { active: false }
+await validate(filterQuery, { active: "true" }); // → { active: true }
+await validate(filterQuery, { active: "1" }); // → { active: true }
+await validate(filterQuery, { active: "0" }); // → { active: false }
 ```
 
-`.coerce()` converts *exactly* `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`. Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`) passes through unchanged and still fails the type rule. `v.boolean()` does not coerce by default; the inferred output type is unchanged (`v.boolean().coerce()` is still `boolean`). Form-style truthy strings like `"yes"` / `"on"` are a different concern — use `v.boolean().accepted()` / `.declined()` instead (see [pick the right primitive](../guides/pick-the-right-primitive.md)).
+`.coerce()` converts _exactly_ `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`. Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`) passes through unchanged and still fails the type rule. `v.boolean()` does not coerce by default; the inferred output type is unchanged (`v.boolean().coerce()` is still `boolean`). Form-style truthy strings like `"yes"` / `"on"` are a different concern — use `v.boolean().accepted()` / `.declined()` instead (see [pick the right primitive](../guides/pick-the-right-primitive.md)).
 
 ## Dates — `v.date()` already normalizes
 

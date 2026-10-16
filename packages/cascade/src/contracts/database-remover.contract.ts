@@ -109,4 +109,3 @@ export type RemoverResult = {
    */
   trashRecord?: Record<string, unknown>;
 };
-

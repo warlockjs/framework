@@ -10,7 +10,7 @@ them directly when you're writing a custom driver or doing cache-adjacent
 work outside the manager.
 
 You rarely need them at the application call site — `cache.set("k", v, "1h")`
-parses the duration for you. They earn their keep when you step *outside* the
+parses the duration for you. They earn their keep when you step _outside_ the
 normal flow: building a driver that doesn't extend `BaseCacheDriver`, scoring
 vectors by hand, or normalizing a TTL for some non-cache code path.
 
@@ -25,16 +25,16 @@ on unparseable strings or negative numbers.
 ```ts
 import { parseTtl } from "@warlock.js/cache";
 
-parseTtl(3600);         // 3600
-parseTtl("1h");         // 3600
-parseTtl("30m");        // 1800
-parseTtl("7d");         // 604800
-parseTtl("2 weeks");    // 1209600
-parseTtl(Infinity);     // Infinity   (no expiration)
+parseTtl(3600); // 3600
+parseTtl("1h"); // 3600
+parseTtl("30m"); // 1800
+parseTtl("7d"); // 604800
+parseTtl("2 weeks"); // 1209600
+parseTtl(Infinity); // Infinity   (no expiration)
 
-parseTtl(-5);           // throws — negative numbers rejected
-parseTtl("");           // throws — empty string rejected
-parseTtl("forever");    // throws — not a valid duration
+parseTtl(-5); // throws — negative numbers rejected
+parseTtl(""); // throws — empty string rejected
+parseTtl("forever"); // throws — not a valid duration
 ```
 
 Reach for it when you need the numeric seconds value for non-cache code —
@@ -64,13 +64,13 @@ seconds, otherwise the `fallback` (driver default) is used. Supplying both
 ```ts
 import { resolveTtl } from "@warlock.js/cache";
 
-resolveTtl(60, undefined, 9999);                            // 60   — caller ttl wins
-resolveTtl("1h", undefined, 9999);                          // 3600 — duration string parsed
+resolveTtl(60, undefined, 9999); // 60   — caller ttl wins
+resolveTtl("1h", undefined, 9999); // 3600 — duration string parsed
 resolveTtl(undefined, new Date(Date.now() + 60_000), 9999); // ~60  — expiresAt converted
-resolveTtl(undefined, undefined, 1800);                     // 1800 — fallback used
-resolveTtl(undefined, undefined, Infinity);                 // Infinity (no expiry)
+resolveTtl(undefined, undefined, 1800); // 1800 — fallback used
+resolveTtl(undefined, undefined, Infinity); // Infinity (no expiry)
 
-resolveTtl(60, Date.now() + 60_000, 9999);                  // throws — both supplied
+resolveTtl(60, Date.now() + 60_000, 9999); // throws — both supplied
 ```
 
 Used internally by `BaseCacheDriver.resolveSetOptions(...)`. Call it directly
@@ -88,10 +88,10 @@ would hide a caller bug (stale timestamp, wrong unit).
 ```ts
 import { expiresAtToTtl } from "@warlock.js/cache";
 
-expiresAtToTtl(new Date(Date.now() + 60_000));  // ~60
-expiresAtToTtl(Date.now() + 30 * 60 * 1000);    // ~1800
+expiresAtToTtl(new Date(Date.now() + 60_000)); // ~60
+expiresAtToTtl(Date.now() + 30 * 60 * 1000); // ~1800
 
-expiresAtToTtl(Date.now() - 1000);              // throws — past deadline
+expiresAtToTtl(Date.now() - 1000); // throws — past deadline
 ```
 
 ## Normalize to Options
@@ -103,11 +103,11 @@ can skip per-shape branching.
 ```ts
 import { normalizeToOptions } from "@warlock.js/cache";
 
-normalizeToOptions(undefined);                  // {}
-normalizeToOptions(null);                        // {}
-normalizeToOptions(60);                          // { ttl: 60 }
-normalizeToOptions("1h");                         // { ttl: "1h" }
-normalizeToOptions({ ttl: "1h", tags: ["x"] });  // returned as-is
+normalizeToOptions(undefined); // {}
+normalizeToOptions(null); // {}
+normalizeToOptions(60); // { ttl: 60 }
+normalizeToOptions("1h"); // { ttl: "1h" }
+normalizeToOptions({ ttl: "1h", tags: ["x"] }); // returned as-is
 ```
 
 ## Normalize to Remember Options
@@ -120,9 +120,9 @@ branching.
 ```ts
 import { normalizeToRememberOptions } from "@warlock.js/cache";
 
-normalizeToRememberOptions(60);                          // { ttl: 60 }
-normalizeToRememberOptions("1h");                         // { ttl: "1h" }
-normalizeToRememberOptions({ ttl: "1h", tags: ["x"] });  // returned as-is
+normalizeToRememberOptions(60); // { ttl: 60 }
+normalizeToRememberOptions("1h"); // { ttl: "1h" }
+normalizeToRememberOptions({ ttl: "1h", tags: ["x"] }); // returned as-is
 ```
 
 ## Parse Cache Key
@@ -135,7 +135,7 @@ the same logic every built-in driver applies under the hood.
 ```ts
 import { parseCacheKey } from "@warlock.js/cache";
 
-parseCacheKey("users:1");                // "users.1"
+parseCacheKey("users:1"); // "users.1"
 
 // Objects serialize deterministically into a flat key
 parseCacheKey({ limit: 3, page: 1, search: "John" });
@@ -173,10 +173,10 @@ scoped caches use to merge scope tags + handle tags + per-call tags additively.
 ```ts
 import { mergeTagSets } from "@warlock.js/cache";
 
-mergeTagSets(["a", "b"], ["b", "c"]);   // ["a", "b", "c"]
-mergeTagSets(undefined, ["x"]);          // ["x"]
-mergeTagSets(undefined, undefined);      // undefined
-mergeTagSets([], []);                     // undefined
+mergeTagSets(["a", "b"], ["b", "c"]); // ["a", "b", "c"]
+mergeTagSets(undefined, ["x"]); // ["x"]
+mergeTagSets(undefined, undefined); // undefined
+mergeTagSets([], []); // undefined
 ```
 
 ## Inject Tags
@@ -188,8 +188,8 @@ Tags are appended as-is; pair with `mergeTagSets` if you need de-duplication.
 ```ts
 import { injectTags } from "@warlock.js/cache";
 
-injectTags({ ttl: "1h" }, ["unread"]);   // { ttl: "1h", tags: ["unread"] }
-injectTags({ tags: ["a"] }, ["b"]);       // { tags: ["a", "b"] }
+injectTags({ ttl: "1h" }, ["unread"]); // { ttl: "1h", tags: ["unread"] }
+injectTags({ tags: ["a"] }, ["b"]); // { tags: ["a", "b"] }
 ```
 
 ## Cosine Similarity
@@ -205,13 +205,13 @@ Dimension mismatch (or an empty vector) throws
 ```ts
 import { cosineSimilarity } from "@warlock.js/cache";
 
-cosineSimilarity([1, 0, 0], [1, 0, 0]);  // 1
-cosineSimilarity([1, 0, 0], [0, 1, 0]);  // 0
+cosineSimilarity([1, 0, 0], [1, 0, 0]); // 1
+cosineSimilarity([1, 0, 0], [0, 1, 0]); // 0
 cosineSimilarity([1, 0, 0], [-1, 0, 0]); // -1
-cosineSimilarity([0, 0, 0], [1, 2, 3]);  // 0  — zero-norm by convention
+cosineSimilarity([0, 0, 0], [1, 2, 3]); // 0  — zero-norm by convention
 
-cosineSimilarity([1, 2, 3], [1, 2]);     // throws — dimension mismatch
-cosineSimilarity([], []);                // throws — empty vectors
+cosineSimilarity([1, 2, 3], [1, 2]); // throws — dimension mismatch
+cosineSimilarity([], []); // throws — empty vectors
 ```
 
 You typically don't call this directly —
@@ -237,24 +237,24 @@ rather not eyeball a magic number.
 ```ts
 import { cache, CACHE_FOR } from "@warlock.js/cache";
 
-await cache.set("temp", data, CACHE_FOR.HALF_HOUR);    // 30 minutes
-await cache.set("session", data, CACHE_FOR.ONE_HOUR);  // 1 hour
-await cache.set("daily", data, CACHE_FOR.ONE_DAY);     // 24 hours
-await cache.set("weekly", data, CACHE_FOR.ONE_WEEK);   // 7 days
+await cache.set("temp", data, CACHE_FOR.HALF_HOUR); // 30 minutes
+await cache.set("session", data, CACHE_FOR.ONE_HOUR); // 1 hour
+await cache.set("daily", data, CACHE_FOR.ONE_DAY); // 24 hours
+await cache.set("weekly", data, CACHE_FOR.ONE_WEEK); // 7 days
 ```
 
-| Constant | Value (seconds) | Duration |
-|----------|----------------:|----------|
-| `HALF_HOUR` | 1800 | 30 minutes |
-| `ONE_HOUR` | 3600 | 1 hour |
-| `HALF_DAY` | 43200 | 12 hours |
-| `ONE_DAY` | 86400 | 24 hours |
-| `ONE_WEEK` | 604800 | 7 days |
-| `HALF_MONTH` | 1296000 | 15 days |
-| `ONE_MONTH` | 2592000 | 30 days |
-| `TWO_MONTHS` | 5184000 | 60 days |
-| `SIX_MONTHS` | 15768000 | 180 days |
-| `ONE_YEAR` | 31536000 | 365 days |
+| Constant     | Value (seconds) | Duration   |
+| ------------ | --------------: | ---------- |
+| `HALF_HOUR`  |            1800 | 30 minutes |
+| `ONE_HOUR`   |            3600 | 1 hour     |
+| `HALF_DAY`   |           43200 | 12 hours   |
+| `ONE_DAY`    |           86400 | 24 hours   |
+| `ONE_WEEK`   |          604800 | 7 days     |
+| `HALF_MONTH` |         1296000 | 15 days    |
+| `ONE_MONTH`  |         2592000 | 30 days    |
+| `TWO_MONTHS` |         5184000 | 60 days    |
+| `SIX_MONTHS` |        15768000 | 180 days   |
+| `ONE_YEAR`   |        31536000 | 365 days   |
 
 Since these are plain seconds, the duration-string form (`"30m"`, `"7d"`)
 gets you the same result with less ceremony — use whichever reads better at

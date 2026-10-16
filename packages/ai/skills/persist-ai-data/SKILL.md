@@ -34,6 +34,7 @@ options.snapshotStore ?? ai.config({ defaultSnapshotStore }) ?? undefined
 ```
 
 `defaultStore` (a `CacheDriver`) and `defaultSnapshotStore` (a `SnapshotStore`) are independent — set whichever the consumer needs. When the relevant one is unset:
+
 - **Snapshot consumers** silently skip writes and throw on `resume()`.
 - **Semantic cache / memory** throws at construction.
 
@@ -52,13 +53,13 @@ Every consumer that doesn't supply its own `store` / `snapshotStore` picks this 
 
 ## Picking a driver
 
-| Driver | KV | TTL | Tags | `similar()` | Fits |
-|---|---|---|---|---|---|
-| `memory` / `lru-memory` | ✅ | ✅ | ✅ | ✅ (brute force) | Dev / tests |
-| `file` | ✅ | ✅ | ✅ | ❌ | Single-process persistence |
-| `null` | no-op | no-op | no-op | `[]` | Test isolation |
-| `redis` | ✅ | ✅ | ✅ | (RediSearch, separate phase) | Production KV + future similarity |
-| `pg` | ✅ | ✅ | ✅ | ✅ (pgvector) | Production semantic cache |
+| Driver                  | KV    | TTL   | Tags  | `similar()`                  | Fits                              |
+| ----------------------- | ----- | ----- | ----- | ---------------------------- | --------------------------------- |
+| `memory` / `lru-memory` | ✅    | ✅    | ✅    | ✅ (brute force)             | Dev / tests                       |
+| `file`                  | ✅    | ✅    | ✅    | ❌                           | Single-process persistence        |
+| `null`                  | no-op | no-op | no-op | `[]`                         | Test isolation                    |
+| `redis`                 | ✅    | ✅    | ✅    | (RediSearch, separate phase) | Production KV + future similarity |
+| `pg`                    | ✅    | ✅    | ✅    | ✅ (pgvector)                | Production semantic cache         |
 
 Brute-force memory drivers carry an `O(N)` similarity scan — fine up to a few thousand entries.
 
@@ -96,7 +97,7 @@ The `SnapshotStore` is generic over its snapshot shape — it defaults to `Super
 type WorkflowSnapshot = {
   runId: string;
   workflowName: string;
-  signature: string;             // structural fingerprint
+  signature: string; // structural fingerprint
   version?: string;
   input: unknown;
   state: Record<string, unknown>;
@@ -111,8 +112,8 @@ type SupervisorSnapshot = {
   runId: string;
   supervisorName: string;
   signature: string;
-  input: string | Record<string, unknown>;   // SupervisorInput
-  iteration: number;                          // last *completed* iteration; -1 before any settle
+  input: string | Record<string, unknown>; // SupervisorInput
+  iteration: number; // last *completed* iteration; -1 before any settle
   snapshots: IterationSnapshot[];
   status: "running" | "completed" | "failed" | "cancelled";
   startedAt: string;

@@ -193,7 +193,10 @@ export type FieldOutput<F, Root extends ResourceSchema = ResourceSchema> = F ext
               ? unknown
               : F extends Lazy<infer R>
                 ? FieldOutput<R, Root>
-                : F extends { readonly __type: "arrayOf"; readonly schema: infer Item extends ResourceSchema }
+                : F extends {
+                      readonly __type: "arrayOf";
+                      readonly schema: infer Item extends ResourceSchema;
+                    }
                   ? ResourceOutputOf<Item, Root>[]
                   : F extends new (...args: any[]) => { toJSON(): infer O }
                     ? AnyToUnknown<O>

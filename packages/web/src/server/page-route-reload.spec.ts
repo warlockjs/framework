@@ -52,7 +52,10 @@ describe("pageRoutesNeedReplacement", () => {
 
   it("invalidates before loading but keeps a semantically equal route edit in HMR", async () => {
     const order: string[] = [];
-    const harness = fakeVite({ config: { route: { path: "/settings" } }, default: (): null => null });
+    const harness = fakeVite({
+      config: { route: { path: "/settings" } },
+      default: (): null => null,
+    });
     harness.onFileChange.mockImplementation(() => order.push("invalidate"));
     harness.ssrLoadModule.mockImplementation(async () => {
       order.push("load");
@@ -89,7 +92,13 @@ describe("pageRoutesNeedReplacement", () => {
 
   it.each([
     ["declared path", { config: { route: "/profile" }, default: (): null => null }],
-    ["resolved name", { config: { route: { path: "/settings", name: "account.settings" } }, default: (): null => null }],
+    [
+      "resolved name",
+      {
+        config: { route: { path: "/settings", name: "account.settings" } },
+        default: (): null => null,
+      },
+    ],
   ])("requests replacement for a changed %s", async (_label, pageModule) => {
     const harness = fakeVite(pageModule);
 

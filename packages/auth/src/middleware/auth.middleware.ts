@@ -160,14 +160,16 @@ export function authMiddleware(
   const allowedTypes = resolveAllowedTypes(selectedUserType);
   const legacyTokenFrom =
     typeof legacyTokenFromOrOptions === "string" ? legacyTokenFromOrOptions : undefined;
-  const dualSources = options?.sources?.length ? options.sources.map(tokenFromDescriptor) : undefined;
+  const dualSources = options?.sources?.length
+    ? options.sources.map(tokenFromDescriptor)
+    : undefined;
 
   if (dualSources && options?.source) {
     throw new Error("authMiddleware accepts either `source` or `sources`, not both.");
   }
 
   const dualHeader = dualSources?.includes("header") ?? false;
-  const dualCookies = dualSources?.filter(source => source !== "header") ?? [];
+  const dualCookies = dualSources?.filter((source) => source !== "header") ?? [];
 
   if (dualSources && (dualCookies.length > 1 || dualSources.length - dualCookies.length > 1)) {
     throw new Error("authMiddleware `sources` accepts at most one header and one cookie.");
@@ -271,9 +273,11 @@ export function authMiddleware(
     ? [...(dualHeader ? (["header"] as const) : []), ...dualCookies.map(descriptorSource)]
     : [descriptorSource(tokenFrom)];
   const descriptor: AuthMiddlewareDescriptor = Object.freeze({
-    sources: Object.freeze(descriptorSources.map(source =>
-      typeof source === "string" ? source : Object.freeze({ ...source }),
-    )) as AuthMiddlewareDescriptorSource[],
+    sources: Object.freeze(
+      descriptorSources.map((source) =>
+        typeof source === "string" ? source : Object.freeze({ ...source }),
+      ),
+    ) as AuthMiddlewareDescriptorSource[],
     userTypes: Object.freeze([...allowedTypes]) as string[],
   });
 

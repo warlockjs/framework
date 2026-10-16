@@ -48,16 +48,13 @@ export const userContext = new UserContext();
 ### `run()` — scoped execution
 
 ```ts
-await userContext.run(
-  { userId: "123", role: "admin", tenantId: "acme" },
-  async () => {
-    // Context is available throughout this async scope and any awaited calls inside it.
-    const userId = userContext.get("userId");   // "123"
-    const role = userContext.get("role");       // "admin"
+await userContext.run({ userId: "123", role: "admin", tenantId: "acme" }, async () => {
+  // Context is available throughout this async scope and any awaited calls inside it.
+  const userId = userContext.get("userId"); // "123"
+  const role = userContext.get("role"); // "admin"
 
-    await someAsyncOperation();                  // context propagates through awaits
-  },
-);
+  await someAsyncOperation(); // context propagates through awaits
+});
 ```
 
 Use `run()` when you have a clear scope boundary (a request handler, a job, a CLI command). The context is auto-cleaned when the callback returns.
@@ -72,7 +69,7 @@ function authMiddleware(req, res, next) {
     tenantId: req.headers["x-tenant-id"],
   });
 
-  next();   // context lives for the rest of the request
+  next(); // context lives for the rest of the request
 }
 ```
 
@@ -92,9 +89,9 @@ If there's no current store, `update` creates one with the partial (cast to the 
 ## Reading
 
 ```ts
-const userId = userContext.get("userId");         // TStore[K] | undefined
-const store = userContext.getStore();              // TStore | undefined
-const inside = userContext.hasContext();           // boolean
+const userId = userContext.get("userId"); // TStore[K] | undefined
+const store = userContext.getStore(); // TStore | undefined
+const inside = userContext.hasContext(); // boolean
 ```
 
 `get` is the daily-use accessor. `getStore` returns the whole record. `hasContext` distinguishes "key absent" from "no context at all" (which matters for safety checks at the framework boundary).
@@ -102,7 +99,7 @@ const inside = userContext.hasContext();           // boolean
 ## Writing within a context
 
 ```ts
-userContext.set("role", "admin");                  // sugar for update({ role: "admin" })
+userContext.set("role", "admin"); // sugar for update({ role: "admin" })
 ```
 
 Only call `set` inside an active context. Outside one, it enters a new context with just that key set — usually not what you want.

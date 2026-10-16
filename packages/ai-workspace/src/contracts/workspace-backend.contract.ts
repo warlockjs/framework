@@ -79,8 +79,5 @@ export interface WorkspaceBackend {
   /** Resolve symlinks/`..` to a canonical absolute path (jail enforcement). */
   realpath(absPath: string): Promise<string>;
   /** Run a command and capture its outcome. */
-  exec(
-    command: string,
-    opts?: WorkspaceBackendExecOptions,
-  ): Promise<WorkspaceBackendExecResult>;
+  exec(command: string, opts?: WorkspaceBackendExecOptions): Promise<WorkspaceBackendExecResult>;
 }

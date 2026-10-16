@@ -52,7 +52,12 @@ async function importComposed(
 
   if (setupFile === undefined) return uiModule;
 
-  return composePageModule(uiModule, await import(pathToFileURL(setupFile).href), uiFile, setupFile);
+  return composePageModule(
+    uiModule,
+    await import(pathToFileURL(setupFile).href),
+    uiFile,
+    setupFile,
+  );
 }
 
 /**

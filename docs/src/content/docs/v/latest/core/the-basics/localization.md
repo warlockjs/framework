@@ -145,10 +145,10 @@ The group name becomes the namespace: `t("products.notFound")` resolves `product
 
 ### Reading translations: `t()` vs `trans()`
 
-| Helper                              | Locale it uses                                         | Use when                                                      |
-| ----------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
-| `t(key, placeholders?)`             | the **current request's** locale                       | inside a request (controllers, services, resources)           |
-| `trans(key, placeholders?)`         | the process-global "current locale"                    | outside a request, or when you've set the locale manually     |
+| Helper                              | Locale it uses                                         | Use when                                                       |
+| ----------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
+| `t(key, placeholders?)`             | the **current request's** locale                       | inside a request (controllers, services, resources)            |
+| `trans(key, placeholders?)`         | the process-global "current locale"                    | outside a request, or when you've set the locale manually      |
 | `request.trans(key, placeholders?)` | this request's resolved locale (bound at construction) | internal binding `t()` delegates to; app code should use `t()` |
 
 Always use `t()` in app code. The framework binds `request.trans`/`request.t` to `transFrom.bind(null, localeCode)` at request construction, and the core `t()` helper delegates to the current request's `trans` (falling back to the global `trans` when there is no request). You never pass the locale — the binding carries it.

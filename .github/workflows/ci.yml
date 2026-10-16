@@ -78,6 +78,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Repository formatting
+        run: pnpm run format:check
+
       # A spec no vitest `include` glob reaches passes review and never runs.
       - name: Every spec file is reachable by its package's vitest config
         run: node scripts/check-spec-coverage.mjs

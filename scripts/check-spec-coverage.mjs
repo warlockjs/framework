@@ -143,9 +143,7 @@ function extractBlocks(source, label) {
  * `exclude` wrongly cancel another project's `include` match.
  */
 function findLeafTestBlocks(source) {
-  return extractBlocks(source, "test:").filter(
-    (block) => !/\bprojects\s*:/.test(block),
-  );
+  return extractBlocks(source, "test:").filter((block) => !/\bprojects\s*:/.test(block));
 }
 
 function findConfigFiles(packageDir) {
@@ -160,11 +158,10 @@ function findConfigFiles(packageDir) {
  * tracked files, with paths relative to the package.
  */
 function gitTrackedSpecFiles(packageDir) {
-  const output = execFileSync(
-    "git",
-    ["ls-files", "--", "**/*.spec.ts", "**/*.test.ts"],
-    { cwd: packageDir, encoding: "utf-8" },
-  );
+  const output = execFileSync("git", ["ls-files", "--", "**/*.spec.ts", "**/*.test.ts"], {
+    cwd: packageDir,
+    encoding: "utf-8",
+  });
 
   return output
     .split("\n")
@@ -239,9 +236,7 @@ function findOrphans(packageDir) {
     }
   }
 
-  return trackedFiles.filter(
-    (absolute) => !matched.has(absolute.split(path.sep).join("/")),
-  );
+  return trackedFiles.filter((absolute) => !matched.has(absolute.split(path.sep).join("/")));
 }
 
 function listPackageDirs() {
@@ -268,11 +263,15 @@ function main() {
   }
 
   if (orphansByPackage.size === 0) {
-    console.log("check-spec-coverage: every tracked *.spec.ts / *.test.ts file is reachable by its package's vitest include globs.");
+    console.log(
+      "check-spec-coverage: every tracked *.spec.ts / *.test.ts file is reachable by its package's vitest include globs.",
+    );
     return 0;
   }
 
-  console.error("check-spec-coverage: found spec/test files that no vitest include glob matches — they never run:\n");
+  console.error(
+    "check-spec-coverage: found spec/test files that no vitest include glob matches — they never run:\n",
+  );
 
   for (const [pkg, orphans] of orphansByPackage) {
     console.error(`  ${pkg}:`);
@@ -282,7 +281,9 @@ function main() {
     }
   }
 
-  console.error("\nEither widen that package's vitest.config.ts `include`, or move the file under a path the include already covers.");
+  console.error(
+    "\nEither widen that package's vitest.config.ts `include`, or move the file under a path the include already covers.",
+  );
   return 1;
 }
 

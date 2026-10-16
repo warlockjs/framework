@@ -42,8 +42,8 @@ grouped namespaces, no factory and no config.
    created them for you before writing.
 
    <Aside type="tip" title="Parents come free">
-     The facade auto-creates missing parent directories on write. You
-     never precede a write with a directory call.
+     The facade auto-creates missing parent directories on write. You never precede a write with a
+     directory call.
    </Aside>
 
 3. **Read it back — typed.**
@@ -69,7 +69,7 @@ grouped namespaces, no factory and no config.
    ```ts
    const file = fs.file("./data/config/app.json");
 
-   console.log(file.name);        // → "app.json"
+   console.log(file.name); // → "app.json"
    console.log(await file.size()); // → bytes on disk
    ```
 
@@ -83,9 +83,8 @@ That's the core rhythm: **write, read typed, handle.** Everything else in
 the library is a variation on these three moves.
 
 <Aside type="note" title="Why async?">
-  The `fs` facade is async-only by design — the honest interface for
-  disk IO. If you genuinely need a synchronous call, the low-level
-  primitives (`putFile`, `getFile`, `hashString`, …) are still
+  The `fs` facade is async-only by design — the honest interface for disk IO. If you genuinely need
+  a synchronous call, the low-level primitives (`putFile`, `getFile`, `hashString`, …) are still
   exported as the escape hatch. Reach for the facade first.
 </Aside>
 

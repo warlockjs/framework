@@ -28,6 +28,7 @@ const manifest = await getJsonFileAsync<Manifest>("./manifest.json");
 ```
 
 Behavior:
+
 - All read functions return UTF-8 strings (or parsed JSON in the `JsonFile` variants).
 - Throws if the file doesn't exist (`ENOENT`) or JSON is invalid. Don't try/catch for "file might not be there" — use `pathExists` / `fileExists` below.
 
@@ -41,6 +42,7 @@ await putJsonFileAsync("./dist/manifest.json", { version: "1.0.0" });
 ```
 
 Behavior:
+
 - Parent directories are created recursively — no need to `ensureDirectory` first.
 - JSON variants pretty-print at 2-space indent. For minified output, stringify yourself and use the plain `putFile`.
 - Overwrites existing files. For atomic write semantics (readers never see a half-written file), use the `write-atomically` topic.
@@ -52,9 +54,9 @@ Three variants — pick the strictest one that fits the question you're asking. 
 ```ts
 import { pathExistsAsync, fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
 
-await pathExistsAsync("./anything");      // true if file OR directory
-await fileExistsAsync("./config.toml");   // true ONLY if a regular file
-await directoryExistsAsync("./dist");     // true ONLY if a directory
+await pathExistsAsync("./anything"); // true if file OR directory
+await fileExistsAsync("./config.toml"); // true ONLY if a regular file
+await directoryExistsAsync("./dist"); // true ONLY if a directory
 
 // sync counterparts, same semantics
 import { pathExists, fileExists, directoryExists } from "@warlock.js/fs";
@@ -83,8 +85,8 @@ try {
 ```ts
 import { lastModifiedAsync, statsAsync } from "@warlock.js/fs";
 
-const mtime = await lastModifiedAsync("./bundle.js");      // Date
-const all = await statsAsync("./bundle.js");                // fs.Stats
+const mtime = await lastModifiedAsync("./bundle.js"); // Date
+const all = await statsAsync("./bundle.js"); // fs.Stats
 ```
 
 `lastModified` is sugar around `stat().mtime`. Reach for `stats` when you need size, mode bits, or other fields.

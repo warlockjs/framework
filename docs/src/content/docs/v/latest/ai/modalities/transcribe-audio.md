@@ -31,7 +31,7 @@ const { data, error } = await ai.transcribe({
 });
 
 if (error) console.warn(error.code); // typed AIError
-else console.log(data.text);         // the transcript
+else console.log(data.text); // the transcript
 ```
 
 The two-line shape above is the whole flow: `ai.audioFromFile` (utility) packages the bytes, `ai.transcribe` (the AI verb) does the work. `TranscriptionModelContract` is a peer primitive produced by the adapter's optional `transcribe?()` factory — the same shape as `SpeechModelContract`.
@@ -46,14 +46,14 @@ The verb takes an `AudioInput` — inlined base64 plus an explicit media type. K
 
 ```ts
 type AudioInput = {
-  base64: string;    // base64-encoded audio bytes
+  base64: string; // base64-encoded audio bytes
   mediaType: string; // IANA type, e.g. "audio/ogg", "audio/mpeg"
   filename?: string; // helps providers infer the codec from the extension
 };
 
 // From a file on disk — reads + infers media type (override for extensionless files).
 const fromDisk = await ai.audioFromFile("./meeting.m4a");
-const forced   = await ai.audioFromFile("./blob", { mediaType: "audio/ogg" });
+const forced = await ai.audioFromFile("./blob", { mediaType: "audio/ogg" });
 
 // From bytes you already hold (an upload buffer, a downloaded blob) — no I/O, no AI.
 const fromBytes = ai.audioFromBuffer(uploadBuffer, "audio/ogg", "note.ogg");
@@ -67,12 +67,12 @@ Every AI verb returns the same discriminated envelope. For transcription:
 type TranscriptionResult = {
   type: "transcription";
   data?: {
-    text: string;                      // full transcript
+    text: string; // full transcript
     segments?: TranscriptionSegment[]; // timestamped, in verbose mode
-  };                                   // undefined on failure
-  error?: AIError;                     // undefined on success — NEVER thrown
-  usage: Usage;                        // tokens (gpt-4o-transcribe) + cost when priced
-  report: TranscriptionReport;         // type:"transcription", model, durationSeconds, lineage
+  }; // undefined on failure
+  error?: AIError; // undefined on success — NEVER thrown
+  usage: Usage; // tokens (gpt-4o-transcribe) + cost when priced
+  report: TranscriptionReport; // type:"transcription", model, durationSeconds, lineage
 };
 
 type TranscriptionSegment = { text: string; start?: number; end?: number };
@@ -88,13 +88,13 @@ The options are provider-neutral. Each adapter maps the ones its API supports.
 await ai.transcribe({
   model,
   audio,
-  language: "en",              // BCP-47 hint
-  prompt: "Names: Acme, Zoë",  // priming — spelling / style hints
-  format: "verbose_json",      // response-format override (segments + duration)
-  signal,                      // AbortSignal
-  observe: collector,          // route the report to an Observer
-  sessionId: "ticket-88",      // group into a session for flat cost/trace queries
-  options: { /* provider passthrough */ },
+  language: "en", // BCP-47 hint
+  prompt: "Names: Acme, Zoë", // priming — spelling / style hints
+  format: "verbose_json", // response-format override (segments + duration)
+  signal, // AbortSignal
+  observe: collector, // route the report to an Observer
+  sessionId: "ticket-88", // group into a session for flat cost/trace queries
+  options: {/* provider passthrough */},
 });
 ```
 
@@ -152,11 +152,9 @@ import { MockTranscriptionModel, transcribe } from "@warlock.js/ai";
 
 const AUDIO = { base64: "QUJD", mediaType: "audio/mpeg", filename: "clip.mp3" };
 
-const model = new MockTranscriptionModel(
-  "whisper-1",
-  [{ durationSeconds: 120 }],
-  { perMinute: 0.006 },
-);
+const model = new MockTranscriptionModel("whisper-1", [{ durationSeconds: 120 }], {
+  perMinute: 0.006,
+});
 const { data, usage, report } = await transcribe({ model, audio: AUDIO });
 // data.text → "mock transcript"
 // usage.cost.input → (120 / 60) * 0.006   report.durationSeconds → 120

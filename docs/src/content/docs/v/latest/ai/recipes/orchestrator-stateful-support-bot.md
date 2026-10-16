@@ -79,9 +79,7 @@ const intents = {
     },
     description: "Fetch the order referenced in the message.",
     output: v.object({
-      order: v
-        .object({ id: v.string(), total: v.number(), status: v.string() })
-        .optional(),
+      order: v.object({ id: v.string(), total: v.number(), status: v.string() }).optional(),
     }),
   },
   decide: {
@@ -145,7 +143,7 @@ const supportBot = ai.orchestrator<SupportState>({
 
 ## One turn
 
-Every `execute()` call names the `sessionId` it acts on and re-supplies the prior `history`. The framework owns session *state*, not the raw message log — that stays in your store, and you pass it back each call.
+Every `execute()` call names the `sessionId` it acts on and re-supplies the prior `history`. The framework owns session _state_, not the raw message log — that stays in your store, and you pass it back each call.
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -188,7 +186,7 @@ async function handleMessage(sessionId: string, userMessage: string) {
 }
 ```
 
-`result.report.status` is `"completed"` for a settled turn. The orchestrator adds one non-terminal status, `"awaiting-input"` — the session is paused waiting for the next user turn. Code that branches on `status === "completed"` must treat `"awaiting-input"` as *the session continues*, not a failure:
+`result.report.status` is `"completed"` for a settled turn. The orchestrator adds one non-terminal status, `"awaiting-input"` — the session is paused waiting for the next user turn. Code that branches on `status === "completed"` must treat `"awaiting-input"` as _the session continues_, not a failure:
 
 ```ts
 if (result.report.status === "awaiting-input") {
@@ -198,7 +196,7 @@ if (result.report.status === "awaiting-input") {
 
 ## Three turns, one session
 
-The point of the orchestrator is that `handleMessage` above is the *whole* per-turn surface — call it once per user message against the same `sessionId` and the state accumulates. Here is the same session over three turns. Two things move between turns: the `sessionId` (constant — it names the session) and the `history` array (grows — you load it from your store each call). Everything else — `category`, `order`, `refundEligible` — lives in the checkpoint and rehydrates on its own.
+The point of the orchestrator is that `handleMessage` above is the _whole_ per-turn surface — call it once per user message against the same `sessionId` and the state accumulates. Here is the same session over three turns. Two things move between turns: the `sessionId` (constant — it names the session) and the `history` array (grows — you load it from your store each call). Everything else — `category`, `order`, `refundEligible` — lives in the checkpoint and rehydrates on its own.
 
 ```ts
 const sessionId = `support:${customer.id}`; // stable per customer
@@ -280,7 +278,7 @@ await drainInterruptedSessions();
 
 ## Compaction — bounding history growth
 
-A refund thread can run for dozens of turns. The session *state* stays small (it's the `SupportState` accumulator), but the `history` you replay each turn grows without bound. `summarize` is the post-turn compaction policy that keeps it in check. Re-reading the config block above:
+A refund thread can run for dozens of turns. The session _state_ stays small (it's the `SupportState` accumulator), but the `history` you replay each turn grows without bound. `summarize` is the post-turn compaction policy that keeps it in check. Re-reading the config block above:
 
 ```ts
 summarize: {
@@ -296,20 +294,20 @@ summarize: {
 What each knob does, verified against `SummarizeConfig`:
 
 - **`afterTurns`** is a count-based trigger: compaction runs after a turn settles once `turnIndex >= afterTurns`. Below the threshold nothing fires.
-- **`keep`** is how many of the most-recent messages stay verbatim. The summarizer collapses everything *before* the kept tail into one synthetic `system` memo. With `keep: 6` and a 20-message history, messages `0..13` become one memo and `14..19` survive untouched.
+- **`keep`** is how many of the most-recent messages stay verbatim. The summarizer collapses everything _before_ the kept tail into one synthetic `system` memo. With `keep: 6` and a 20-message history, messages `0..13` become one memo and `14..19` survive untouched.
 - **`summarizer`** is the model that writes the memo — deliberately the cheap model, never your specialists. Omit it and you get a degenerate placeholder memo (`"Summary of N prior message(s)."`), which is only useful as a wiring smoke-test.
 
 The produced value is a `CompactionResult`:
 
 ```ts
 type CompactionResult = {
-  summary: Message;          // the system memo that replaces the range
+  summary: Message; // the system memo that replaces the range
   replacesFromIndex: number; // inclusive start in YOUR history array
-  replacesToIndex: number;   // inclusive end
+  replacesToIndex: number; // inclusive end
 };
 ```
 
-Because the framework never owns your message log, *applying* the compaction is your store's job. With `onCompact` configured, the orchestrator calls it for you after the memo is built — so `result.compaction` is **absent** on that turn (you already handled it). Without `onCompact`, the orchestrator instead surfaces `result.compaction` for you to apply inline. A correct `applyCompaction` splices the inclusive range out and drops the memo in its place:
+Because the framework never owns your message log, _applying_ the compaction is your store's job. With `onCompact` configured, the orchestrator calls it for you after the memo is built — so `result.compaction` is **absent** on that turn (you already handled it). Without `onCompact`, the orchestrator instead surfaces `result.compaction` for you to apply inline. A correct `applyCompaction` splices the inclusive range out and drops the memo in its place:
 
 ```ts
 class MessageStore {
@@ -334,7 +332,7 @@ A summarizer or `onCompact` failure is skip-and-log: the turn still settles, his
 
 ## Tuning the history window
 
-Compaction bounds how big `history` *grows*; `historyWindow` bounds how much of it each consumer actually *sees* per turn. The two are independent — windowing is applied to the dev-supplied `history` on every turn, before any agent runs, and it never mutates your store.
+Compaction bounds how big `history` _grows_; `historyWindow` bounds how much of it each consumer actually _sees_ per turn. The two are independent — windowing is applied to the dev-supplied `history` on every turn, before any agent runs, and it never mutates your store.
 
 There are two role-level windows. The config above only set `agents`; the full shape is:
 
@@ -368,7 +366,7 @@ historyWindow: {
 ```
 
 :::caution[Swapping a number for a callback drifts the signature]
-The drift fingerprint records the *shape* of `historyWindow` per role (`number` vs `callback` vs absent), but **not** the value. Tuning `agents: 20` → `agents: 8` is signature-stable — old sessions keep loading. But changing `agents: 20` → `agents: (messages) => …` flips the role from `"number"` to `"callback"` and drifts the signature, refusing old checkpoints until you recover. Pick number-vs-callback up front; tune the number freely afterward.
+The drift fingerprint records the _shape_ of `historyWindow` per role (`number` vs `callback` vs absent), but **not** the value. Tuning `agents: 20` → `agents: 8` is signature-stable — old sessions keep loading. But changing `agents: 20` → `agents: (messages) => …` flips the role from `"number"` to `"callback"` and drifts the signature, refusing old checkpoints until you recover. Pick number-vs-callback up front; tune the number freely afterward.
 :::
 
 ## Manual compaction outside the auto-trigger
@@ -412,11 +410,11 @@ try {
 :::
 
 :::tip[`version` is metadata — bump it intentionally]
-The drift signature deliberately **excludes** `config.version` (it's recorded on every checkpoint as metadata but never compared). The two move together by hand, not automatically: when you ship a config change that you *intend* to break old sessions on — a new intent, a different route shape, a policy rewrite — bump `version` alongside it. Drift then fails loudly on the structural change, and the matching `version` tag on the persisted checkpoint tells you exactly which definition wrote each row. Bumping `version` on its own (no structural change) is signature-stable and never triggers drift — it's a label, not a trigger. With `iterate: true`, `version` also partitions in-flight run ids (`${sessionId}.${version}.${turnIndex}`), so a version bump cleanly orphans any mid-turn snapshot from the previous definition instead of resuming it under new rules.
+The drift signature deliberately **excludes** `config.version` (it's recorded on every checkpoint as metadata but never compared). The two move together by hand, not automatically: when you ship a config change that you _intend_ to break old sessions on — a new intent, a different route shape, a policy rewrite — bump `version` alongside it. Drift then fails loudly on the structural change, and the matching `version` tag on the persisted checkpoint tells you exactly which definition wrote each row. Bumping `version` on its own (no structural change) is signature-stable and never triggers drift — it's a label, not a trigger. With `iterate: true`, `version` also partitions in-flight run ids (`${sessionId}.${version}.${turnIndex}`), so a version bump cleanly orphans any mid-turn snapshot from the previous definition instead of resuming it under new rules.
 :::
 
 - **History is yours, state is the orchestrator's.** Always pass `history` on every `execute()` call — the framework never persists the raw message log. Keep your message store and the checkpoint store consistent (append the turn's messages only after `execute()` returns clean).
-- **`keepSnapshots` bounds the checkpoint table**, not your message log. After each successful save the pg store prunes to the most recent N turns; `"all"` disables pruning. Compaction (`summarize`) is what bounds *history* growth.
+- **`keepSnapshots` bounds the checkpoint table**, not your message log. After each successful save the pg store prunes to the most recent N turns; `"all"` disables pruning. Compaction (`summarize`) is what bounds _history_ growth.
 - **`AbortSignal.timeout(...)`** on each turn caps a runaway model loop; `maxIterations` caps the in-turn pipeline length. Use both.
 
 ## Related

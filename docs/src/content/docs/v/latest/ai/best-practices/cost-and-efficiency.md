@@ -11,7 +11,7 @@ Cost and quality are not opposites — they trade off badly only when you spend 
 
 ## The running scenario
 
-A multi-turn customer-support bot for a SaaS product. A customer says *"I was charged twice for Pro and now the dashboard won't load,"* the bot triages the message, looks up the order, decides refund eligibility, and writes one customer-facing reply. The conversation continues over several turns in one session. Every recommendation here is about making *that* bot cheaper and faster while the reply the customer reads stays exactly as good.
+A multi-turn customer-support bot for a SaaS product. A customer says _"I was charged twice for Pro and now the dashboard won't load,"_ the bot triages the message, looks up the order, decides refund eligibility, and writes one customer-facing reply. The conversation continues over several turns in one session. Every recommendation here is about making _that_ bot cheaper and faster while the reply the customer reads stays exactly as good.
 
 The whole flow runs on two model tiers from one SDK:
 
@@ -30,12 +30,12 @@ const openai = new OpenAISDK({
 });
 
 const cheap = openai.model({ name: "gpt-4o-mini" }); // routing, classification, lookups
-const strong = openai.model({ name: "gpt-4o" });     // the final customer-facing reply
+const strong = openai.model({ name: "gpt-4o" }); // the final customer-facing reply
 ```
 
 ## Tier the model — cheap for routing, strong only where it changes the answer
 
-The single biggest lever. Routing, classification, intent detection, and field extraction are *easy* tasks where a `gpt-4o-mini`-class model is indistinguishable from a frontier model — and 15–20× cheaper per token. The strong model earns its rate in exactly one place: the final reply the customer reads, where nuance and tone genuinely change the outcome.
+The single biggest lever. Routing, classification, intent detection, and field extraction are _easy_ tasks where a `gpt-4o-mini`-class model is indistinguishable from a frontier model — and 15–20× cheaper per token. The strong model earns its rate in exactly one place: the final reply the customer reads, where nuance and tone genuinely change the outcome.
 
 **Do this — cheap model for the decision, strong model for the prose.** The classifier and lookups run on `cheap`; only the reply-composing agent gets `strong`.
 
@@ -46,7 +46,8 @@ const classifyAgent = ai.agent({
   name: "classify",
   model: cheap, // routing is an easy task — the strong model picks the same intent
   output: v.object({ intent: v.enum(["billing", "tech", "smalltalk"]) }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You triage inbound support messages.")
     .instruction("Pick the single best intent: `billing`, `tech`, or `smalltalk`."),
 });
@@ -55,7 +56,8 @@ const replyAgent = ai.agent({
   name: "reply",
   model: strong, // the only place tone and nuance change what the customer reads
   output: v.object({ reply: v.string() }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a warm, precise support lead writing the final customer reply.")
     .instruction("Be specific about the order and the decision. One short paragraph."),
 });
@@ -72,7 +74,7 @@ const classifyAgent = ai.agent({
 });
 ```
 
-> Tiering is a per-step decision, not a per-bot one. The rule of thumb: if the step's output is a *label, a number, a route, or a tool argument*, it's cheap-tier work. If the step's output is *what the human reads*, it's strong-tier work. Most of a support flow is the former.
+> Tiering is a per-step decision, not a per-bot one. The rule of thumb: if the step's output is a _label, a number, a route, or a tool argument_, it's cheap-tier work. If the step's output is _what the human reads_, it's strong-tier work. Most of a support flow is the former.
 
 ## Prefer a classifier fast-path over a router loop for triage
 
@@ -117,24 +119,24 @@ classifier: {
 },
 ```
 
-**Avoid this — a router loop for a single-specialist message.** *"What's your refund policy?"* is billing, full stop. A router loop spends a routing call to reach that conclusion, runs billing, then spends another routing call to decide it's done — two extra trips that a classifier never makes.
+**Avoid this — a router loop for a single-specialist message.** _"What's your refund policy?"_ is billing, full stop. A router loop spends a routing call to reach that conclusion, runs billing, then spends another routing call to decide it's done — two extra trips that a classifier never makes.
 
 ```ts
 // Anti-pattern: the heaviest triage pattern for the lightest job.
 const triage = ai.supervisor({
   name: "support-triage",
-  router: triageRouter,            // ~2 calls per iteration
+  router: triageRouter, // ~2 calls per iteration
   intents,
   evaluate: (ctx) => (ctx.state.reply ? { satisfied: true } : undefined),
   maxIterations: 6,
 });
 ```
 
-Reserve the router loop for messages that *genuinely* need several specialists in sequence (billing **and** tech **and** a resolver). See the [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/) for the cheap path and the [support-triage recipe](/v/latest/ai/recipes/supervisor-support-triage/) for the full loop — including the cost ladder that tells you which rung your problem is actually on.
+Reserve the router loop for messages that _genuinely_ need several specialists in sequence (billing **and** tech **and** a resolver). See the [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/) for the cheap path and the [support-triage recipe](/v/latest/ai/recipes/supervisor-support-triage/) for the full loop — including the cost ladder that tells you which rung your problem is actually on.
 
 ## Cache the prompt — keep the system prompt and tool schemas stable
 
-Across turns and across trips, the most-repeated tokens in your prompt are the *fixed* parts — the system prompt, the persona, the tool schemas. Providers cache that stable prefix and bill the cached portion at a fraction of the input rate (OpenAI prompt-cache hits, Anthropic `cache_control`). You get the discount for free **as long as the prefix doesn't change byte-for-byte between calls**. The way to lose it is to splice volatile data (a timestamp, a request id, the customer's name) into the *front* of the system prompt — that invalidates the cache on every turn.
+Across turns and across trips, the most-repeated tokens in your prompt are the _fixed_ parts — the system prompt, the persona, the tool schemas. Providers cache that stable prefix and bill the cached portion at a fraction of the input rate (OpenAI prompt-cache hits, Anthropic `cache_control`). You get the discount for free **as long as the prefix doesn't change byte-for-byte between calls**. The way to lose it is to splice volatile data (a timestamp, a request id, the customer's name) into the _front_ of the system prompt — that invalidates the cache on every turn.
 
 **Do this — keep the stable prefix stable, and confirm hits with `Usage.cachedTokens`.** The system prompt and tool set are fixed for the agent's lifetime; per-turn data rides in the user message or `placeholders`, not in the system prompt body.
 
@@ -143,7 +145,8 @@ const supportAgent = ai.agent({
   name: "support",
   model: strong,
   // Stable across every turn → cacheable prefix.
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a warm, precise support lead for Acme Corp.")
     .instruction("Answer the customer's question using the order details provided."),
   tools: [lookupOrder, checkRefund], // stable schemas → cached alongside the prompt
@@ -169,11 +172,11 @@ systemPrompt: ai.systemPrompt()
   .instruction("Answer the customer's question."),
 ```
 
-> `cacheControl.breakpoints` is a *write*-placement hint and only matters on adapters whose `capabilities.promptCaching` is true (Anthropic). The read-side discount — `Usage.cachedTokens` billed at `ModelPricing.cachedInput` — flows automatically on providers that meter cache hits, with no option at all. Either way, the prerequisite is the same: a stable prefix. The breakpoint just tells the provider where the cacheable section ends.
+> `cacheControl.breakpoints` is a _write_-placement hint and only matters on adapters whose `capabilities.promptCaching` is true (Anthropic). The read-side discount — `Usage.cachedTokens` billed at `ModelPricing.cachedInput` — flows automatically on providers that meter cache hits, with no option at all. Either way, the prerequisite is the same: a stable prefix. The breakpoint just tells the provider where the cacheable section ends.
 
 ## Add a semantic cache for FAQ repeats — skip the LLM entirely
 
-Prompt caching makes a call cheaper. A semantic cache skips the call. Support traffic is heavy with near-duplicate questions — *"how do I reset my password,"* *"reset password,"* *"forgot my password"* — and `ai.middleware.semanticCache` answers all three from one stored response when they clear a cosine-similarity threshold. For FAQ-style traffic this commonly eliminates a large share of model calls outright: zero tokens, near-zero latency.
+Prompt caching makes a call cheaper. A semantic cache skips the call. Support traffic is heavy with near-duplicate questions — _"how do I reset my password,"_ _"reset password,"_ _"forgot my password"_ — and `ai.middleware.semanticCache` answers all three from one stored response when they clear a cosine-similarity threshold. For FAQ-style traffic this commonly eliminates a large share of model calls outright: zero tokens, near-zero latency.
 
 **Do this — layer a semantic cache for the FAQ tail.** A hit returns a synthetic response with `usage: { input: 0, output: 0, total: 0 }`, so cost and budget accounting correctly treat it as free.
 
@@ -192,15 +195,15 @@ const faqAgent = ai.agent({
     ai.middleware.semanticCache({
       embedder: openai.embedder({ name: "text-embedding-3-small" }),
       store,
-      threshold: 0.95,            // high enough that only true paraphrases hit
-      ttlMs: 60 * 60 * 1000,      // an hour — long enough to catch a burst of repeats
-      namespace: "support-faq",   // isolate this agent's entries on a shared driver
+      threshold: 0.95, // high enough that only true paraphrases hit
+      ttlMs: 60 * 60 * 1000, // an hour — long enough to catch a burst of repeats
+      namespace: "support-faq", // isolate this agent's entries on a shared driver
     }),
   ],
 });
 ```
 
-**Avoid this — a loose threshold that serves the wrong answer.** Dropping the threshold to catch more hits is how a cache becomes a correctness bug: *"how do I cancel my subscription"* and *"how do I cancel my order"* are close in vector space but want different answers. A cache that confidently serves the wrong one is worse than a cache miss.
+**Avoid this — a loose threshold that serves the wrong answer.** Dropping the threshold to catch more hits is how a cache becomes a correctness bug: _"how do I cancel my subscription"_ and _"how do I cancel my order"_ are close in vector space but want different answers. A cache that confidently serves the wrong one is worse than a cache miss.
 
 ```ts
 // Anti-pattern: a permissive threshold trades correctness for hit rate.
@@ -226,8 +229,8 @@ const supportBot = ai.orchestrator<SupportState>({
   route,
   historyWindow: { agents: 20 }, // each agent sees at most the last 20 messages
   summarize: {
-    afterTurns: 12,              // start compacting once the conversation gets long
-    keep: 6,                     // keep the 6 most recent messages verbatim
+    afterTurns: 12, // start compacting once the conversation gets long
+    keep: 6, // keep the 6 most recent messages verbatim
     onCompact: async (compaction, { sessionId }) => {
       await messageStore.applyCompaction(sessionId, compaction);
     },
@@ -238,11 +241,11 @@ const supportBot = ai.orchestrator<SupportState>({
 
 **Avoid this — resending the full transcript every turn.** With no window and no compaction, the prompt grows without bound: each turn re-bills every prior message, and a long session quietly turns into your most expensive (and slowest) requests — with no improvement in the answer the customer gets.
 
-> `historyWindow` controls per-turn *visibility*; `summarize` controls history *growth*. They are complementary — the window caps what one turn pays, compaction stops the underlying log from getting longer forever. Both are essential on any session that can run past a dozen turns. See the [stateful support bot recipe](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) for the full multi-turn build.
+> `historyWindow` controls per-turn _visibility_; `summarize` controls history _growth_. They are complementary — the window caps what one turn pays, compaction stops the underlying log from getting longer forever. Both are essential on any session that can run past a dozen turns. See the [stateful support bot recipe](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) for the full multi-turn build.
 
 ## Stream the final reply for perceived latency
 
-Cost and *perceived* speed are different problems. Streaming doesn't make a call cheaper — it makes the customer see the first words sooner. For a chatbot, time-to-first-token is the latency the user actually feels; a reply that starts rendering in 200ms feels fast even if it finishes in three seconds.
+Cost and _perceived_ speed are different problems. Streaming doesn't make a call cheaper — it makes the customer see the first words sooner. For a chatbot, time-to-first-token is the latency the user actually feels; a reply that starts rendering in 200ms feels fast even if it finishes in three seconds.
 
 **Do this — stream the customer-facing reply.** Iterate the typed event stream and flush each delta; the final envelope on `stream.result` is identical to what `execute()` would return.
 
@@ -262,7 +265,7 @@ const result = await stream.result; // same { data, usage, report } as execute()
 
 ## Put a budget and SLO contract around every run
 
-Tiering, caching, and bounded context lower the *expected* cost. A budget guardrail caps the *worst* case — the runaway tool loop that quietly burns dollars and seconds before anyone notices. `ai.middleware.budget` enforces a hard ceiling, and its `contract` clause expresses a full service-level objective (cost, latency, tokens) with one reaction when any clause trips.
+Tiering, caching, and bounded context lower the _expected_ cost. A budget guardrail caps the _worst_ case — the runaway tool loop that quietly burns dollars and seconds before anyone notices. `ai.middleware.budget` enforces a hard ceiling, and its `contract` clause expresses a full service-level objective (cost, latency, tokens) with one reaction when any clause trips.
 
 **Do this — declare the SLO as data and react once.** A hard cap aborts on breach; the contract adds wall-clock latency and an `onViolation` policy.
 
@@ -300,19 +303,18 @@ if (result.error instanceof BudgetExceededError) {
 // single scalar total — sum the populated channels, treating undefined as 0.
 const cost = result.usage.cost;
 if (cost) {
-  const totalUSD =
-    cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
+  const totalUSD = cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
   metrics.gauge("ai.turn.cost_usd", totalUSD);
 }
 ```
 
 **Avoid this — shipping a model loop with no ceiling.** An agent with tools and no budget has one failure mode that costs real money: a tool loop that keeps re-asking the model. Without a cap, the first time it happens in production you find out from the invoice, not from an alert.
 
-> Roll a budget out in `warn` mode first: `onExceeded: "warn"` logs once on the first breach and lets the run finish, so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the *next* turn to a cheaper agent. The budget is per-execution, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets and SLO recipe](/v/latest/ai/recipes/cost-budgets-and-slo/).
+> Roll a budget out in `warn` mode first: `onExceeded: "warn"` logs once on the first breach and lets the run finish, so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the _next_ turn to a cheaper agent. The budget is per-execution, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets and SLO recipe](/v/latest/ai/recipes/cost-budgets-and-slo/).
 
 ## Batch the offline work — don't pay interactive latency for bulk jobs
 
-Not every AI task is a live customer turn. Re-classifying a backlog of tickets, generating summaries for a nightly report, back-filling tags — these are *offline* jobs where throughput matters and per-item latency doesn't. `ai.batch` runs any executable over a dataset with bounded concurrency and per-item retry, and rolls the usage up so you get one cost number for the whole job.
+Not every AI task is a live customer turn. Re-classifying a backlog of tickets, generating summaries for a nightly report, back-filling tags — these are _offline_ jobs where throughput matters and per-item latency doesn't. `ai.batch` runs any executable over a dataset with bounded concurrency and per-item retry, and rolls the usage up so you get one cost number for the whole job.
 
 **Do this — run bulk work through `ai.batch` with bounded concurrency.** One failed item never cancels its siblings; the rolled-up `usage` is the job's total cost.
 
@@ -320,7 +322,7 @@ Not every AI task is a live customer turn. Re-classifying a backlog of tickets, 
 const tickets = await ticketRepo.findUntagged(); // an array of inputs
 
 const batchResult = await ai.batch(classifyAgent, tickets, {
-  concurrency: 8,                              // cap parallel calls — respect rate limits
+  concurrency: 8, // cap parallel calls — respect rate limits
   retry: { attempts: 3, backoff: "exponential" },
 });
 
@@ -338,20 +340,20 @@ console.log(`classified ${tickets.length} tickets, ${batchResult.usage.total} to
 
 ## Use a fallback model for resilience — but it's a failover, not a default
 
-`ai.fallbackModel` wraps an ordered list of models and advances to the next only when the current one fails with a *transient* provider error (rate-limit, timeout, 5xx). It's a resilience tool: a provider blip degrades to a backup instead of failing the customer. The trap is treating it as a cost or quality strategy — it changes nothing on the happy path, where the first model always answers.
+`ai.fallbackModel` wraps an ordered list of models and advances to the next only when the current one fails with a _transient_ provider error (rate-limit, timeout, 5xx). It's a resilience tool: a provider blip degrades to a backup instead of failing the customer. The trap is treating it as a cost or quality strategy — it changes nothing on the happy path, where the first model always answers.
 
 **Do this — order it primary-first for failover only.** The first model handles every healthy request; the backup exists for the minutes your primary provider is down.
 
 ```ts
 const resilientModel = ai.fallbackModel([
-  strong,                                          // answers every healthy request
-  openai.model({ name: "gpt-4o-mini" }),           // backup when the primary is unavailable
+  strong, // answers every healthy request
+  openai.model({ name: "gpt-4o-mini" }), // backup when the primary is unavailable
 ]);
 
 const supportAgent = ai.agent({ name: "support", model: resilientModel });
 ```
 
-**Avoid this — leaning on the fallback as your normal model.** The fallback never fires on a healthy primary, so a *quality* problem ("answers are weak") is not a fallback problem — fix the primary model or prompt. And it advances instantly with no backoff, so for rate-limits you usually want a backoff strategy too, not just a second model to immediately hammer.
+**Avoid this — leaning on the fallback as your normal model.** The fallback never fires on a healthy primary, so a _quality_ problem ("answers are weak") is not a fallback problem — fix the primary model or prompt. And it advances instantly with no backoff, so for rate-limits you usually want a backoff strategy too, not just a second model to immediately hammer.
 
 > A non-transient failure (bad API key, oversized prompt, blocked content) fails identically on every downstream model, so `fallbackModel` re-throws it immediately rather than burning budget retrying. It's a failover, full stop — keep it in the resilience column, never the cost or quality column. See the [provider fallback recipe](/v/latest/ai/recipes/cost-provider-fallback/).
 

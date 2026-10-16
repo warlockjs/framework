@@ -13,9 +13,7 @@ import { describe, expect, it } from "vitest";
  */
 describe("generator command hints point at real commands (2091d3ec)", () => {
   const dir = path.dirname(fileURLToPath(import.meta.url));
-  const generatorFiles = readdirSync(dir).filter(
-    (file) => file.endsWith(".generator.ts"),
-  );
+  const generatorFiles = readdirSync(dir).filter((file) => file.endsWith(".generator.ts"));
 
   it("has generator source files to check", () => {
     expect(generatorFiles.length).toBeGreaterThan(0);

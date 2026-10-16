@@ -34,22 +34,22 @@ answered that choice. The stack is the only choice that changes the generated
 app's shape. Everything else below is a flag with a default; a summary of what
 was decided prints after scaffolding, along with how to change each one.
 
-| Flag | Description | Default |
-| --- | --- | --- |
-| `--name=<name>` | Project name (or the first positional arg) | required — prompted with a TTY, otherwise fails naming this flag |
-| `--stack=<api\|web>` | API-only or full-stack web; the structural choice | `api` |
-| `--db=<driver>` / `--no-db` | Database driver (`postgres`, `mongodb`, …), or skip one entirely | `mongodb` |
-| `--features=<list>` | Comma-separated feature keys (e.g. `test,herald`) | none (or `["web"]` when `--stack=web` and `--features` is not given) |
-| `--lint=<oxc\|eslint>` | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier | `eslint` |
-| `--ai=<list>` | Comma-separated AI provider keys (e.g. `openai,anthropic`) | none |
-| `--pm=<manager>` | Package manager (`npm`, `yarn`, `pnpm`, `bun`) | inferred from the invoking agent (`npm_config_user_agent`) or the system |
-| `--agents=<list>` | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets | `claude` |
-| `--git` / `--no-git` | Force-enable or force-disable git initialization | `false` |
-| `--jwt` / `--no-jwt` | Force-enable or force-disable JWT secret generation | `false` |
-| `-y`, `--yes` | Skip every prompt and take defaults for anything unset | `false` |
-| `--interactive`, `--customize` | Restore the full long-form interactive wizard | `false` |
-| `-h`, `--help` | Print usage (every flag + its default) and exit | — |
-| `-v`, `--version` | Print the installed version and exit | — |
+| Flag                           | Description                                                          | Default                                                                  |
+| ------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `--name=<name>`                | Project name (or the first positional arg)                           | required — prompted with a TTY, otherwise fails naming this flag         |
+| `--stack=<api\|web>`           | API-only or full-stack web; the structural choice                    | `api`                                                                    |
+| `--db=<driver>` / `--no-db`    | Database driver (`postgres`, `mongodb`, …), or skip one entirely     | `mongodb`                                                                |
+| `--features=<list>`            | Comma-separated feature keys (e.g. `test,herald`)                    | none (or `["web"]` when `--stack=web` and `--features` is not given)     |
+| `--lint=<oxc\|eslint>`         | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier   | `eslint`                                                                 |
+| `--ai=<list>`                  | Comma-separated AI provider keys (e.g. `openai,anthropic`)           | none                                                                     |
+| `--pm=<manager>`               | Package manager (`npm`, `yarn`, `pnpm`, `bun`)                       | inferred from the invoking agent (`npm_config_user_agent`) or the system |
+| `--agents=<list>`              | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets | `claude`                                                                 |
+| `--git` / `--no-git`           | Force-enable or force-disable git initialization                     | `false`                                                                  |
+| `--jwt` / `--no-jwt`           | Force-enable or force-disable JWT secret generation                  | `false`                                                                  |
+| `-y`, `--yes`                  | Skip every prompt and take defaults for anything unset               | `false`                                                                  |
+| `--interactive`, `--customize` | Restore the full long-form interactive wizard                        | `false`                                                                  |
+| `-h`, `--help`                 | Print usage (every flag + its default) and exit                      | —                                                                        |
+| `-v`, `--version`              | Print the installed version and exit                                 | —                                                                        |
 
 ```bash
 create-warlock my-app --db=postgres --features=test,herald --yes
@@ -158,7 +158,6 @@ This project is licensed under the MIT License.
 The project-ready summary wraps the complete feature list to your terminal width,
 aligning continuation lines under the value while keeping commands indented.
 Terminals narrower than 50 columns get a plain list; piped output uses 80 columns.
-
 
 ### Grouped custom feature selection
 

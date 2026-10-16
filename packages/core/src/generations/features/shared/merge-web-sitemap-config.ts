@@ -2,7 +2,9 @@ import ts from "typescript";
 
 /** What {@link mergeWebSitemapConfig} did, or could not do, to the source it was given. */
 export type WebSitemapMergeResult =
-  { status: "merged"; next: string } | { status: "already-present" } | { status: "unrecognised" };
+  | { status: "merged"; next: string }
+  | { status: "already-present" }
+  | { status: "unrecognised" };
 
 /**
  * Merge a disabled `sitemap` section into `src/config/web.ts` SOURCE TEXT.

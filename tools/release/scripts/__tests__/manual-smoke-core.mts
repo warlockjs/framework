@@ -19,4 +19,13 @@ for (const result of results) {
     if (f.diagnostics.length) failed++;
   }
 }
-console.log("skills", skills.length, "compiled", compiled, "failed", failed, "ms", Date.now() - start);
+console.log(
+  "skills",
+  skills.length,
+  "compiled",
+  compiled,
+  "failed",
+  failed,
+  "ms",
+  Date.now() - start,
+);

@@ -32,7 +32,7 @@ function installedCookiePluginVersion(): string | undefined {
  */
 export function flushPendingCookies(reply: FastifyReply): void {
   const parkedSymbol = Object.getOwnPropertySymbols(reply).find(
-    symbol => symbol.description === "fastify.reply.setCookies",
+    (symbol) => symbol.description === "fastify.reply.setCookies",
   );
 
   if (!parkedSymbol) {

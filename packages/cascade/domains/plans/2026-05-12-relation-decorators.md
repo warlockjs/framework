@@ -63,12 +63,12 @@ Options inline, second arg. No three-arg overloads.
 
 Each decorator infers sensible defaults from the relation name + model name, configurable globally via Cascade config:
 
-| Relation | Default foreign key | Default local key | Default pivot table |
-|---|---|---|---|
-| `@BelongsTo("Organization")` on `organization?` | `organization_id` (snake-cased model + `_id`) | `id` | — |
-| `@HasOne("Profile")` | owning model's snake-name + `_id` on the related (e.g. `user_id`) | `id` | — |
-| `@HasMany("Post")` | owning model's snake-name + `_id` on the related | `id` | — |
-| `@BelongsToMany("Group")` | local: owning `_id`; foreign: related `_id` | `id` on both | alphabetical join of the two model snake-names (e.g. `group_user`) |
+| Relation                                        | Default foreign key                                               | Default local key | Default pivot table                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------ |
+| `@BelongsTo("Organization")` on `organization?` | `organization_id` (snake-cased model + `_id`)                     | `id`              | —                                                                  |
+| `@HasOne("Profile")`                            | owning model's snake-name + `_id` on the related (e.g. `user_id`) | `id`              | —                                                                  |
+| `@HasMany("Post")`                              | owning model's snake-name + `_id` on the related                  | `id`              | —                                                                  |
+| `@BelongsToMany("Group")`                       | local: owning `_id`; foreign: related `_id`                       | `id` on both      | alphabetical join of the two model snake-names (e.g. `group_user`) |
 
 Configurable via `src/config/database.ts`, mirroring the existing `modelOptions` / `migrationOptions` shape — a new top-level `relationOptions` block on `ConnectionOptions`:
 
@@ -105,6 +105,7 @@ Stays on `Model` as `public static relations: Record<string, RelationDefinition>
 ## Migration
 
 No codemod needed since:
+
 - All current uses are in your own `src/app/` + `@warlock.js/create-warlock/templates/`.
 - Pattern is mechanical search-and-replace inside each `static relations = { ... }` block:
   - `name: belongsTo("X", opts)` → `@BelongsTo("X", opts) name?: X;`
@@ -136,9 +137,9 @@ function makeRelationDecorator(type: RelationType) {
     };
 }
 
-export const BelongsTo     = makeRelationDecorator("belongsTo");
-export const HasOne        = makeRelationDecorator("hasOne");
-export const HasMany       = makeRelationDecorator("hasMany");
+export const BelongsTo = makeRelationDecorator("belongsTo");
+export const HasOne = makeRelationDecorator("hasOne");
+export const HasMany = makeRelationDecorator("hasMany");
 export const BelongsToMany = makeRelationDecorator("belongsToMany");
 ```
 

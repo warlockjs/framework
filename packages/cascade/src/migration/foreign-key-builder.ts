@@ -146,5 +146,4 @@ export class ForeignKeyBuilder {
     this.definition.onUpdate = "cascade";
     return this;
   }
-
 }

@@ -7,7 +7,7 @@ sidebar:
 ---
 
 Every write with the [`fs` facade](../guides/the-fs-facade) ends the same way:
-the file contains your bytes. The interesting question is what a *reader*
+the file contains your bytes. The interesting question is what a _reader_
 sees in the middle. That's the whole difference between a plain write and an
 atomic one, and it's a footgun that stays quiet until production is under
 load.
@@ -66,7 +66,7 @@ await fs.files.putJson("./manifest.json", manifest, { atomic: true });
 
 ## When atomic actually matters
 
-Reach for `{ atomic: true }` the moment *someone else* can read the file
+Reach for `{ atomic: true }` the moment _someone else_ can read the file
 while you write it:
 
 - A dev server's **file watcher** re-reads on every change.
@@ -106,7 +106,7 @@ read-modify-write helpers.
 
 `fs.files.edit(path, fn)`, `fs.files.editJson(path, fn)`, and
 `fs.files.mergeJson(path, patch)` are **read-modify-write sugar, not a
-lock**. `{ atomic: true }` makes the *write* half indivisible — a reader
+lock**. `{ atomic: true }` makes the _write_ half indivisible — a reader
 never catches a partial file — but it does nothing to serialize two
 concurrent editors:
 
@@ -122,10 +122,10 @@ wrap the whole thing in a lock — `@warlock.js/cache`'s
 `cache.lock(key, ttl, fn)` is one option.
 
 :::caution[Atomic is not durability]
-A power loss *between* the temp write and the rename leaves the temp file
+A power loss _between_ the temp write and the rename leaves the temp file
 orphaned and the target unchanged (readers still see the old content — good).
 The facade skips a post-rename `fsync` for write speed, so "atomic" means
-crash-*consistent*, not crash-*durable*.
+crash-_consistent_, not crash-_durable_.
 :::
 
 ## A quick decision tree

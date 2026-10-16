@@ -11,7 +11,7 @@ An `ai.agent` is the smallest unit that turns a model into something you can dep
 
 ## Compose the system prompt — persona, then instructions, then placeholders
 
-A plain string `systemPrompt` works, and for a one-shot script it's fine. But the moment a prompt has more than one job — a voice *and* a set of rules *and* a piece of per-call context — a single string forces you to re-paste and re-edit the whole thing every time one part changes. `ai.systemPrompt()` exists so the parts stay separate: one persona block (the voice), ordered instruction blocks (the rules), and `{{placeholder}}` slots filled at call time.
+A plain string `systemPrompt` works, and for a one-shot script it's fine. But the moment a prompt has more than one job — a voice _and_ a set of rules _and_ a piece of per-call context — a single string forces you to re-paste and re-edit the whole thing every time one part changes. `ai.systemPrompt()` exists so the parts stay separate: one persona block (the voice), ordered instruction blocks (the rules), and `{{placeholder}}` slots filled at call time.
 
 **Do this — layer the prompt with `persona()` and `instruction()`.** Each concern is its own block, and placeholders carry per-call values without rebuilding the prompt.
 
@@ -24,7 +24,8 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const support = ai.agent({
   name: "support-agent",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are Mira, a calm, concise customer-support specialist.")
     .instruction("Answer only from the facts provided; if you don't know, say so.")
     .instruction("Respond in {{language|English}}."),
@@ -42,7 +43,8 @@ The builder is immutable — every `.persona()` / `.instruction()` call returns 
 const support = ai.agent({
   name: "support-agent",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: "You are Mira, a support specialist. Answer only from the facts provided. Respond in Arabic.",
+  systemPrompt:
+    "You are Mira, a support specialist. Answer only from the facts provided. Respond in Arabic.",
 });
 ```
 
@@ -85,7 +87,8 @@ const triage = ai.agent({
   model: openai.model({ name: "gpt-4o-mini" }),
   // Baking the schema into the agent's identity — its shape never varies per call.
   output: ticketSchema,
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You classify inbound support tickets.")
     .instruction("Pick the single best category and priority; summarize in one line."),
 });
@@ -112,7 +115,7 @@ const { data } = await triage.execute(rawTicket); // data is a string
 const parsed = JSON.parse(data); // throws on prose, no type, no validation
 ```
 
-> `repair` only fires when `output` (or `responseSchema`) is set — it repairs *validation* failures, not tool loops or provider errors. Keep `maxAttempts` at 1, occasionally 2: one re-ask catches "the model wrapped the JSON in prose" and "it fat-fingered one field"; beyond that you're paying for LLM trips to fight a prompt problem you should fix at the source.
+> `repair` only fires when `output` (or `responseSchema`) is set — it repairs _validation_ failures, not tool loops or provider errors. Keep `maxAttempts` at 1, occasionally 2: one re-ask catches "the model wrapped the JSON in prose" and "it fat-fingered one field"; beyond that you're paying for LLM trips to fight a prompt problem you should fix at the source.
 
 ## Keep `maxTrips` bounded — it's your circuit breaker
 
@@ -132,11 +135,11 @@ const lookup = ai.agent({
 
 **Avoid this — leaving the default on an agent that can loop.** The default exists so nothing runs forever, not as the right value for your agent. An agent that should resolve in three trips but is allowed ten will, when it gets confused, cost you ten trips and the latency of all of them before it gives up.
 
-Every repair attempt also counts against `maxTrips` — it's the belt-and-suspenders cap that bounds both the tool loop *and* the repair loop. Size `maxTrips` with both in mind: `maxTrips` must leave room for the tool round-trips *plus* the repair re-asks you allowed.
+Every repair attempt also counts against `maxTrips` — it's the belt-and-suspenders cap that bounds both the tool loop _and_ the repair loop. Size `maxTrips` with both in mind: `maxTrips` must leave room for the tool round-trips _plus_ the repair re-asks you allowed.
 
 ## Set `temperature` deliberately — low for extraction, higher for copy
 
-Temperature is not a knob you leave at the provider default and forget. It trades determinism for variety, and the right value is entirely a function of the job. Extraction, classification, and routing want the *same* answer every time — that's `temperature: 0` to `0.2`. Marketing copy, brainstorms, and conversational replies want range — that's `0.7` and up. Pass it through `modelOptions` (the agent-level base) and it applies to every call.
+Temperature is not a knob you leave at the provider default and forget. It trades determinism for variety, and the right value is entirely a function of the job. Extraction, classification, and routing want the _same_ answer every time — that's `temperature: 0` to `0.2`. Marketing copy, brainstorms, and conversational replies want range — that's `0.7` and up. Pass it through `modelOptions` (the agent-level base) and it applies to every call.
 
 **Do this — pin temperature low for anything that must be repeatable.** Extraction and classification should be boring and deterministic.
 
@@ -156,7 +159,8 @@ const extractor = ai.agent({
 const copywriter = ai.agent({
   name: "tagline-writer",
   model: openai.model({ name: "gpt-4o" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You write punchy product taglines.")
     .instruction("Give three distinct options, each under eight words."),
   // Range is the point — three taglines should not be three copies.
@@ -187,7 +191,8 @@ const reader = ai.agent({
   name: "invoice-reader",
   model: openai.model({ name: "gpt-4o" }), // auto-infers vision capability
   output: invoiceSchema,
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You read fields out of scanned invoice images.")
     .instruction("Transcribe exactly what the image shows; do not recompute totals."),
 });
@@ -239,7 +244,7 @@ tools: [
 ],
 ```
 
-Reach for `.asTool()` only when you genuinely need a *different* name, description, or input schema per use — a custom argument shape, or the same executable exposed under two distinct tool names. For a plain "use this agent as a tool", the bare array entry is the right call.
+Reach for `.asTool()` only when you genuinely need a _different_ name, description, or input schema per use — a custom argument shape, or the same executable exposed under two distinct tool names. For a plain "use this agent as a tool", the bare array entry is the right call.
 
 > For leaf tools — a database lookup, a weather call — `ai.tool({ name, description, input, execute })` with a `v` input schema is the direct path; only executables (agent / workflow / supervisor) get auto-adapted from the `tools` array. And when a tool only mutates state and the model already knows what to say, mark it `mode: "silent"` so its result never round-trips — the prose the model already streamed is the final reply.
 

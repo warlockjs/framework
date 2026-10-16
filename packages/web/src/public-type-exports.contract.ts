@@ -45,7 +45,6 @@ type _WebConfigExposesSession = Assert<
 // @ts-expect-error a resolver whose user has no `id` is rejected
 type _ResolverWithoutId = SessionResolver<unknown, { name: string }>;
 
-
 type _PageSessionCarriesUserAndModel = Assert<
   PageSession extends { user: unknown; model: unknown } ? true : false
 >;
@@ -55,9 +54,7 @@ type _PageActionContextCarriesActionResponse = Assert<
   Equal<PageActionContext["response"], ActionResponse>
 >;
 type _ActionStateIsExported = Assert<ActionState extends { ok: boolean } ? true : false>;
-type _PageActionNamesFallsBackToString = Assert<
-  Equal<PageActionNames<"unknown.route">, string>
->;
+type _PageActionNamesFallsBackToString = Assert<Equal<PageActionNames<"unknown.route">, string>>;
 
 type _PageLoaderContextExposesSession = Assert<
   Equal<PageLoaderContext<undefined, undefined>["session"], PageSession | undefined>

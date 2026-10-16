@@ -42,7 +42,7 @@ describe("nested object updates write the exact new shape", () => {
 
       expect(operations.$set.nested).toEqual({ a: 1 });
       expect(operations.$unset).toBeUndefined();
-      expect(Object.keys(operations.$set).some(key => key.startsWith("nested."))).toBe(false);
+      expect(Object.keys(operations.$set).some((key) => key.startsWith("nested."))).toBe(false);
     });
 
     it("writes an empty object when the new one is {}", async () => {
@@ -76,7 +76,7 @@ describe("nested object updates write the exact new shape", () => {
       const operations = await save(model);
 
       expect(operations.$set.nested).toEqual({ c: 1 });
-      expect(Object.keys(operations.$set).filter(key => key.startsWith("nested."))).toEqual([]);
+      expect(Object.keys(operations.$set).filter((key) => key.startsWith("nested."))).toEqual([]);
       expect(operations.$unset).toBeUndefined();
     });
 

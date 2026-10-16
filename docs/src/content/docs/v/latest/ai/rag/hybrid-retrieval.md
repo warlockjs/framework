@@ -11,12 +11,7 @@ Dense (vector) retrieval is great at semantics but blind to exact tokens — inv
 `@warlock.js/ai` ships four pure functions for this — `bm25Rank`, `reciprocalRankFusion`, `hybridRank`, and `multiQuery`. They are **standalone barrel exports**, not methods on the [`ai.rag()`](/v/latest/ai/rag/run-rag/) instance (`kb.retrieve()` does dense + optional rerank only). You compose them yourself over whatever candidate set you have, so they work with any vector store. **Zero new dependencies** — all four are dependency-light and operate over the candidates you pass in.
 
 ```ts
-import {
-  bm25Rank,
-  hybridRank,
-  reciprocalRankFusion,
-  multiQuery,
-} from "@warlock.js/ai";
+import { bm25Rank, hybridRank, reciprocalRankFusion, multiQuery } from "@warlock.js/ai";
 ```
 
 :::note
@@ -73,10 +68,10 @@ reciprocalRankFusion([
 
 RRF is the classic fusion for hybrid retrieval because it needs **no score calibration** between the lists — cosine scores and BM25 scores live on different scales, but RRF only looks at rank position. `k` (default `60`, the standard) dampens the contribution of lower ranks. Passing `[]` returns `[]`.
 
-| Param | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `rankedLists` | `ReadonlyArray<ReadonlyArray<string>>` | — | Each inner array is ids in rank order (best first). |
-| `k` | `number` | `60` | Rank-damping constant; higher = flatter contribution curve. |
+| Param         | Type                                   | Default | Notes                                                       |
+| ------------- | -------------------------------------- | ------- | ----------------------------------------------------------- |
+| `rankedLists` | `ReadonlyArray<ReadonlyArray<string>>` | —       | Each inner array is ids in rank order (best first).         |
+| `k`           | `number`                               | `60`    | Rank-damping constant; higher = flatter contribution curve. |
 
 ## `hybridRank` — dense + BM25 in one call
 
@@ -85,9 +80,9 @@ RRF is the classic fusion for hybrid retrieval because it needs **no score calib
 ```ts
 function hybridRank(params: {
   query: string;
-  dense: ReadonlyArray<{ id: string }>;   // vector retriever's result, in rank order
-  candidates: ReadonlyArray<LexicalDoc>;  // text for the lexical pass (usually the over-fetch)
-  k?: number;                             // RRF k, default 60
+  dense: ReadonlyArray<{ id: string }>; // vector retriever's result, in rank order
+  candidates: ReadonlyArray<LexicalDoc>; // text for the lexical pass (usually the over-fetch)
+  k?: number; // RRF k, default 60
 }): RankedItem[];
 ```
 
@@ -99,12 +94,12 @@ const vectorHits = await myVectorStore.search(queryVector, { topK: 20 });
 // 2. fuse dense order with a BM25 pass over the same set
 const fused = hybridRank({
   query: "invoice 8842 refund",
-  dense: vectorHits,                                  // [{ id }, ...] in similarity order
-  candidates: vectorHits.map(h => ({ id: h.id, text: h.text })),
+  dense: vectorHits, // [{ id }, ...] in similarity order
+  candidates: vectorHits.map((h) => ({ id: h.id, text: h.text })),
 });
 
 // 3. take the top results, then load / cite by id
-const topIds = fused.slice(0, 4).map(r => r.id);
+const topIds = fused.slice(0, 4).map((r) => r.id);
 ```
 
 `dense` is the vector retriever's result **in rank order** (only `id` is read); `candidates` supplies the text for the lexical pass — typically the same over-fetched set. Returns the fused ranking, highest score first. Because the lexical pass boosts exact-term matches the vectors buried, a keyword-heavy query that the dense ranking placed mid-list can be lifted to the top after fusion.
@@ -125,7 +120,7 @@ function multiQuery(
 ): Promise<string[]>;
 
 type MultiQueryOptions = {
-  n?: number;               // how many alternative phrasings to request. default 3
+  n?: number; // how many alternative phrasings to request. default 3
   includeOriginal?: boolean; // prepend the original query. default true
 };
 ```
@@ -148,19 +143,19 @@ Run each returned query through your retriever (dense and/or `bm25Rank`), then f
 const queries = await multiQuery(model, userQuery, { n: 3 });
 
 const perQueryRankings = await Promise.all(
-  queries.map(async q => {
+  queries.map(async (q) => {
     const hits = await myVectorStore.search(await embed(q), { topK: 20 });
-    return hits.map(h => h.id); // a ranked id list per query variant
+    return hits.map((h) => h.id); // a ranked id list per query variant
   }),
 );
 
 const fused = reciprocalRankFusion(perQueryRankings);
 ```
 
-| Option | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `n` | `number` | `3` | Number of alternative phrasings requested (and the cap on variants kept). |
-| `includeOriginal` | `boolean` | `true` | Prepend the original query to the returned list. |
+| Option            | Type      | Default | Notes                                                                     |
+| ----------------- | --------- | ------- | ------------------------------------------------------------------------- |
+| `n`               | `number`  | `3`     | Number of alternative phrasings requested (and the cap on variants kept). |
+| `includeOriginal` | `boolean` | `true`  | Prepend the original query to the returned list.                          |
 
 ## When to reach for hybrid
 
@@ -172,7 +167,7 @@ These functions are stateless and side-effect-free, so they slot into a tool's `
 
 ## Related
 
-- [Run RAG](/v/latest/ai/rag/run-rag/) — the `ai.rag()` pipeline; `kb.retrieve()` does dense + optional rerank, and its `ai.rag.keywordReranker` is a separate BM25-lite *reranker* (not `bm25Rank`).
+- [Run RAG](/v/latest/ai/rag/run-rag/) — the `ai.rag()` pipeline; `kb.retrieve()` does dense + optional rerank, and its `ai.rag.keywordReranker` is a separate BM25-lite _reranker_ (not `bm25Rank`).
 - [Embed text](/v/latest/ai/rag/embed-text/) — the `ai.embedder` surface that produces the dense ranking you fuse against.
 - [Define tools](/v/latest/ai/tools/define-tools/) — wrap a hybrid retriever as a tool the agent can call.
 - [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) — the `@warlock.js/cache` drivers that back the vector store you over-fetch from.

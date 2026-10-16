@@ -76,7 +76,8 @@ export type CappablePipeableStream = {
 };
 
 export type PageCacheEntryLimitResult =
-  { tooLarge: false; body: string } | { tooLarge: true; bytes: number };
+  | { tooLarge: false; body: string }
+  | { tooLarge: true; bytes: number };
 
 /**
  * Wraps a React pipeable stream so the live response can be sent from the

@@ -1216,7 +1216,13 @@ export class Response {
    */
   protected keepLongLivedConnectionAlive() {
     if (!this.isHttp11()) {
-      for (const name of ["connection", "keep-alive", "proxy-connection", "upgrade", "transfer-encoding"]) {
+      for (const name of [
+        "connection",
+        "keep-alive",
+        "proxy-connection",
+        "upgrade",
+        "transfer-encoding",
+      ]) {
         this.removeHeader(name);
       }
       return;

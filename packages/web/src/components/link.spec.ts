@@ -638,7 +638,8 @@ describe("Link — prefetch", () => {
 
   async function hover(rendered: { props: RenderedProps }): Promise<void> {
     const onMouseEnter = rendered.props.onMouseEnter as
-      ((event: MouseEvent<HTMLAnchorElement>) => void) | undefined;
+      | ((event: MouseEvent<HTMLAnchorElement>) => void)
+      | undefined;
 
     onMouseEnter?.({} as MouseEvent<HTMLAnchorElement>);
 

@@ -59,8 +59,12 @@ export function oxlintCommandError(
   stdout: string,
   stderr: string,
 ): Error {
-  const status = error.killed ? "timed out or terminated (30s limit)" : `failed (code ${String(error.code ?? "unknown")}${error.signal ? `, signal ${error.signal}` : ""})`;
-  return new Error(`Oxlint could not check changed files: ${status}${outputDetail(stdout, stderr) ? `\n${outputDetail(stdout, stderr)}` : ""}`);
+  const status = error.killed
+    ? "timed out or terminated (30s limit)"
+    : `failed (code ${String(error.code ?? "unknown")}${error.signal ? `, signal ${error.signal}` : ""})`;
+  return new Error(
+    `Oxlint could not check changed files: ${status}${outputDetail(stdout, stderr) ? `\n${outputDetail(stdout, stderr)}` : ""}`,
+  );
 }
 
 export function parseOxlintResults(
@@ -147,10 +151,15 @@ export class OxlintRunner {
   }
 
   public async shutdown(): Promise<void> {
-    await Promise.all([...this.children].map(child => new Promise<void>(resolve => {
-      child.once("close", () => resolve());
-      child.kill();
-    })));
+    await Promise.all(
+      [...this.children].map(
+        (child) =>
+          new Promise<void>((resolve) => {
+            child.once("close", () => resolve());
+            child.kill();
+          }),
+      ),
+    );
     this.children.clear();
   }
 

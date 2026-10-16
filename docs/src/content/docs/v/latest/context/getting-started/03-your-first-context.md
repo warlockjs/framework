@@ -111,13 +111,10 @@ async function loadUserPreferences() {
   return deepWork();
 }
 
-await userContext.run(
-  { userId: "u-123", role: "admin" },
-  async () => {
-    const trail = await loadUserPreferences();
-    console.log(trail);
-  },
-);
+await userContext.run({ userId: "u-123", role: "admin" }, async () => {
+  const trail = await loadUserPreferences();
+  console.log(trail);
+});
 ```
 
 `fetchAuditTrail` never received `userId`, but it read `"u-123"` from the active context. When `run()` returns, the store is gone — the next concurrent call gets its own.

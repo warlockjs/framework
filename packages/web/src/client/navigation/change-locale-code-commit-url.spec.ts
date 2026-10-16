@@ -13,7 +13,15 @@ import type { RefreshRuntime, RefreshablePage } from "./refresh";
  */
 
 function payloadOf(locale: string): HydrationDocumentPayloadSource {
-  return { appData: {}, layoutData: {}, pageData: {}, shared: {}, name: "about", locale, translations: {} };
+  return {
+    appData: {},
+    layoutData: {},
+    pageData: {},
+    shared: {},
+    name: "about",
+    locale,
+    translations: {},
+  };
 }
 
 function stubBrowser(href: string) {

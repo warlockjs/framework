@@ -63,8 +63,8 @@ ai.middleware.budget({
   contract: {
     maxTokens: 40_000,
     maxCostUSD: 0.05,
-    maxLatencyMs: 8_000,        // wall-clock, first execute.before → each trip.after
-    onViolation: "fallback",    // "abort" (default) throws; "fallback" records a signal + continues
+    maxLatencyMs: 8_000, // wall-clock, first execute.before → each trip.after
+    onViolation: "fallback", // "abort" (default) throws; "fallback" records a signal + continues
     fallback: (violation) => routeToCheaperModel(violation.dimension),
   },
 });
@@ -112,6 +112,7 @@ ai.middleware.semanticCache({
 **Driver requirements.** Must support `similar()` — `pg` (with `vector` config), `redis` (with RediSearch), or memory drivers for dev. Without similarity → `CacheUnsupportedError` at first vector op.
 
 **How it works.**
+
 - **Exact-match** — FNV hash over the message list. `store.get(hash)` returns an instant hit.
 - **Vector-match** — embeds the prompt, calls `store.similar(vector, { topK: 1, threshold })`. Driver uses its native ANN index.
 - **Hits** return a synthetic `ModelResponse` with `usage: { input: 0, output: 0, total: 0 }`.
@@ -121,14 +122,14 @@ ai.middleware.semanticCache({
 
 ### Session-scoped by default — `scope` (4.15.0)
 
-A `semanticCache` is normally built once at app boot and shared by every end user, and a hit is returned as the model's answer with **no LLM call in between** — so without isolation, user B's merely-*similar* prompt could be served user A's cached answer, personal context included. `SemanticCacheOptions.scope` (default `"session"`) keys every entry off the run's `AgentExecuteOptions.sessionId` (`"session:<id>"`) and re-checks it as exact equality on read — the key alone never authorizes a hit.
+A `semanticCache` is normally built once at app boot and shared by every end user, and a hit is returned as the model's answer with **no LLM call in between** — so without isolation, user B's merely-_similar_ prompt could be served user A's cached answer, personal context included. `SemanticCacheOptions.scope` (default `"session"`) keys every entry off the run's `AgentExecuteOptions.sessionId` (`"session:<id>"`) and re-checks it as exact equality on read — the key alone never authorizes a hit.
 
 ```ts
 ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" }); // opt back into one shared pool
 ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) }); // custom boundary
 ```
 
-- **`"session"`** (default) — isolated per `sessionId`; a run made *without* a `sessionId` shares one unscoped pool (unchanged behavior for those calls). Thread `sessionId` through `agent.execute()` to get the isolation — composite primitives (supervisor, orchestrator) already forward their own.
+- **`"session"`** (default) — isolated per `sessionId`; a run made _without_ a `sessionId` shares one unscoped pool (unchanged behavior for those calls). Thread `sessionId` through `agent.execute()` to get the isolation — composite primitives (supervisor, orchestrator) already forward their own.
 - **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior. The explicit opt-in for genuinely public Q&A (docs bot, FAQ) where cross-user hit rate is the point and no response can carry a caller's private context.
 - **`(context) => key | undefined`** — derive your own boundary, e.g. per tenant. Returning `undefined` falls back to the unscoped pool.
 

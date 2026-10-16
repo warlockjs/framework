@@ -22,10 +22,20 @@ describe("readModuleConfig — accepted modules", () => {
       page(
         `${component} export const config = { route: "/posts", metadata: metadata }; export default Page;`,
       ),
-    ).toEqual({ route: { path: "/posts" }, hasMiddleware: false, hasDefault: true, hasConfig: true });
+    ).toEqual({
+      route: { path: "/posts" },
+      hasMiddleware: false,
+      hasDefault: true,
+      hasConfig: true,
+    });
     expect(
       page(`${component} export const config = { route: \`/template\` }; export default Page;`),
-    ).toEqual({ route: { path: "/template" }, hasMiddleware: false, hasDefault: true, hasConfig: true });
+    ).toEqual({
+      route: { path: "/template" },
+      hasMiddleware: false,
+      hasDefault: true,
+      hasConfig: true,
+    });
   });
 
   it("does not evaluate helper values and accepts page metadata methods", () => {
@@ -277,7 +287,7 @@ describe("readModuleConfig — action names", () => {
     expect(read.actionNames).toEqual(["remove", "save"]);
   });
 
-  it("reads a single `action` export as \"default\"", () => {
+  it('reads a single `action` export as "default"', () => {
     const read = readModuleConfig(
       "a.page.tsx",
       "export async function action() {}\nexport default function P() { return null; }",
@@ -287,7 +297,11 @@ describe("readModuleConfig — action names", () => {
   });
 
   it("omits actionNames when the page declares none", () => {
-    const read = readModuleConfig("a.page.tsx", "export default function P() { return null; }", "page");
+    const read = readModuleConfig(
+      "a.page.tsx",
+      "export default function P() { return null; }",
+      "page",
+    );
     expect(read.actionNames).toBeUndefined();
   });
 });
@@ -303,7 +317,9 @@ describe("readModuleConfig — guardsUser", () => {
 
   it("is true for a direct requireUser() element of a literal middleware array", () => {
     expect(guarded("export const config = { middleware: [requireUser()] };")).toBe(true);
-    expect(guarded("export const config = { middleware: [audit, requireUser({ userType: 'a' })] };")).toBe(true);
+    expect(
+      guarded("export const config = { middleware: [audit, requireUser({ userType: 'a' })] };"),
+    ).toBe(true);
     expect(guarded("export const config = { middleware: [requireUser()] } as const;")).toBe(true);
     expect(guarded("export const config = { middleware: [requireUser()] };", "layout")).toBe(true);
     expect(guarded("export const config = { middleware: [requireUser()] };", "root")).toBe(true);
@@ -322,8 +338,14 @@ describe("readModuleConfig — guardsUser", () => {
   it.each([
     ["a spread element", "export const config = { middleware: [...shared, audit] };"],
     ["a spread of requireUser()", "export const config = { middleware: [...[requireUser()]] };"],
-    ["an identifier", "const guard = requireUser();\nexport const config = { middleware: [guard] };"],
-    ["an identifier array", "const list = [requireUser()];\nexport const config = { middleware: list };"],
+    [
+      "an identifier",
+      "const guard = requireUser();\nexport const config = { middleware: [guard] };",
+    ],
+    [
+      "an identifier array",
+      "const list = [requireUser()];\nexport const config = { middleware: list };",
+    ],
     ["a conditional", "export const config = { middleware: [cond ? requireUser() : audit] };"],
     ["a wrapper call", "export const config = { middleware: [wrap(requireUser())] };"],
     ["requireGuest()", "export const config = { middleware: [requireGuest()] };"],
@@ -347,14 +369,21 @@ describe("readModuleConfig — guardsUser", () => {
 
     expect(read('import { requireUser } from "./my-guard";').guardsUser).toBeUndefined();
     expect(read('import { requireUser } from "@warlock.js/web";').guardsUser).toBeUndefined();
-    expect(read('import type { requireUser } from "@warlock.js/web/session";').guardsUser).toBeUndefined();
+    expect(
+      read('import type { requireUser } from "@warlock.js/web/session";').guardsUser,
+    ).toBeUndefined();
     expect(read("").guardsUser).toBeUndefined();
   });
 
   it("follows the config owner when a setup companion exists", () => {
-    const primary = readModuleConfig("a.page.tsx", "export default function P() { return null; }", "page", {
-      allowMissingDefault: true,
-    });
+    const primary = readModuleConfig(
+      "a.page.tsx",
+      "export default function P() { return null; }",
+      "page",
+      {
+        allowMissingDefault: true,
+      },
+    );
     const setup = readModuleConfig(
       "a.setup.ts",
       `${imports}export const config = { middleware: [requireUser()] };`,
@@ -362,7 +391,9 @@ describe("readModuleConfig — guardsUser", () => {
       { allowMissingDefault: true },
     );
 
-    expect(mergeModuleConfigReads("a.page.tsx", primary, "a.setup.ts", setup).guardsUser).toBe(true);
+    expect(mergeModuleConfigReads("a.page.tsx", primary, "a.setup.ts", setup).guardsUser).toBe(
+      true,
+    );
 
     const uiConfig = readModuleConfig(
       "b.page.tsx",
@@ -373,7 +404,9 @@ describe("readModuleConfig — guardsUser", () => {
       allowMissingDefault: true,
     });
 
-    expect(mergeModuleConfigReads("b.page.tsx", uiConfig, "b.setup.ts", plainSetup).guardsUser).toBe(true);
+    expect(
+      mergeModuleConfigReads("b.page.tsx", uiConfig, "b.setup.ts", plainSetup).guardsUser,
+    ).toBe(true);
     expect(
       mergeModuleConfigReads("a.page.tsx", primary, "a.setup.ts", plainSetup).guardsUser,
     ).toBeUndefined();

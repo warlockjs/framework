@@ -80,7 +80,9 @@ describe("ConnectorsManager — shutdown error reaches its channel", () => {
 
     const manager = new ConnectorsManager();
 
-    manager.register(new FailingConnector("failing" as ConnectorName, 9000, ConnectorLifecyclePhase.Early));
+    manager.register(
+      new FailingConnector("failing" as ConnectorName, 9000, ConnectorLifecyclePhase.Early),
+    );
 
     await manager.shutdown();
 
@@ -100,7 +102,9 @@ describe("ConnectorsManager — shutdown error reaches its channel", () => {
 
     const manager = new ConnectorsManager();
 
-    manager.register(new FailingConnector("failing" as ConnectorName, 9001, ConnectorLifecyclePhase.Early));
+    manager.register(
+      new FailingConnector("failing" as ConnectorName, 9001, ConnectorLifecyclePhase.Early),
+    );
 
     await manager.shutdown();
 

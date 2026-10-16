@@ -59,7 +59,9 @@ definePolicy("orders.update", (user, order) => order.get("customer_id") === user
 await authorize(user, "orders.update", { resource: order });
 
 // boolean, anywhere
-if (await can(user, "orders.viewCost")) { /* … */ }
+if (await can(user, "orders.viewCost")) {
+  /* … */
+}
 ```
 
 > Register `definePolicy` calls per module, in `src/app/<module>/policies/`, loaded by an `import "./policies";` side-effect in that module's `main.ts` — a policy defined in an unimported module silently never registers.

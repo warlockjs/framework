@@ -95,9 +95,7 @@ describe("BaseCacheDriver logError — never leaks raw error objects/credentials
   it("never calls console.log with the raw error when a handler throws", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    const credentialError = new Error(
-      "connect ECONNREFUSED redis://user:s3cr3t@10.0.0.1:6379",
-    );
+    const credentialError = new Error("connect ECONNREFUSED redis://user:s3cr3t@10.0.0.1:6379");
     driver.on("connected", () => {
       throw credentialError;
     });
@@ -111,9 +109,7 @@ describe("BaseCacheDriver logError — never leaks raw error objects/credentials
     const { log } = await import("@warlock.js/logger");
     const errorSpy = vi.spyOn(log, "error").mockImplementation(() => log as any);
 
-    const credentialError = new Error(
-      "connect ECONNREFUSED redis://user:s3cr3t@10.0.0.1:6379",
-    );
+    const credentialError = new Error("connect ECONNREFUSED redis://user:s3cr3t@10.0.0.1:6379");
     (credentialError as any).code = "ECONNREFUSED";
 
     driver.on("connected", () => {
@@ -149,7 +145,7 @@ describe("BaseCacheDriver — driver-level ttl is honored across set shapes", ()
 
   beforeEach(() => {
     driver = new MemoryCacheDriver();
-    driver.setOptions({ ttl: 1800 });          // 30 minutes
+    driver.setOptions({ ttl: 1800 }); // 30 minutes
     driver.setLoggingState(false);
   });
 
@@ -210,7 +206,7 @@ describe("BaseCacheDriver — no TTL anywhere → permanent entries", () => {
 
   beforeEach(() => {
     driver = new MemoryCacheDriver();
-    driver.setOptions({});                      // no driver-level ttl
+    driver.setOptions({}); // no driver-level ttl
     driver.setLoggingState(false);
   });
 

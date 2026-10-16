@@ -235,19 +235,17 @@ export class GeminiImageModel implements ImageModelContract {
     const blockReason = response.promptFeedback?.blockReason;
 
     if (blockReason) {
-      return new ContentFilterError(
-        `Gemini blocked the prompt for ${this.name}: ${blockReason}`,
-        { reason: blockReason },
-      );
+      return new ContentFilterError(`Gemini blocked the prompt for ${this.name}: ${blockReason}`, {
+        reason: blockReason,
+      });
     }
 
     const finishReason = response.candidates?.[0]?.finishReason;
 
     if (finishReason && FILTERED_FINISH_REASONS.has(finishReason)) {
-      return new ContentFilterError(
-        `Gemini filtered the image for ${this.name}: ${finishReason}`,
-        { reason: finishReason },
-      );
+      return new ContentFilterError(`Gemini filtered the image for ${this.name}: ${finishReason}`, {
+        reason: finishReason,
+      });
     }
 
     const text = collectText(parts);

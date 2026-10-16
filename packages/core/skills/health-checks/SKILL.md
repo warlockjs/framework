@@ -11,10 +11,10 @@ Two endpoints and a drain, so a load balancer never routes to an instance that i
 
 The HTTP connector registers them on the Fastify server during boot (before route scanning), so they exist by the time the server listens:
 
-| Path | Probe | 200 when | 503 when |
-| --- | --- | --- | --- |
-| `/health` | liveness | the process is up | shutdown has begun |
-| `/ready` | readiness | booted **and** not shutting down **and** every check passes | before boot, during shutdown, or any failing check |
+| Path      | Probe     | 200 when                                                    | 503 when                                           |
+| --------- | --------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| `/health` | liveness  | the process is up                                           | shutdown has begun                                 |
+| `/ready`  | readiness | booted **and** not shutting down **and** every check passes | before boot, during shutdown, or any failing check |
 
 **Liveness** answers "should the orchestrator RESTART me?" — it ignores dependency checks (a failing DB doesn't mean restart the pod). **Readiness** answers "should the load balancer ROUTE to me?" — it gates on boot completion, shutdown state, and your registered checks.
 
@@ -31,8 +31,8 @@ import type { HttpConfigurations } from "@warlock.js/core";
 
 const httpConfigurations: HttpConfigurations = {
   health: {
-    enabled: true,          // default; set false to remove both endpoints
-    path: "/health",        // liveness path
+    enabled: true, // default; set false to remove both endpoints
+    path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
   },
 };
@@ -82,7 +82,7 @@ import type { HttpConfigurations } from "@warlock.js/core";
 
 const httpConfigurations: HttpConfigurations = {
   gracefulShutdown: {
-    timeout: 10_000,              // ms to wait for in-flight drain (default 10s)
+    timeout: 10_000, // ms to wait for in-flight drain (default 10s)
     forceCloseConnections: "idle", // close idle keep-alives, let active finish (default)
   },
 };

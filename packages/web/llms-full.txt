@@ -143,7 +143,12 @@ Export a named `ErrorBoundary` from an app, layout, or page module to render a f
 
 ```tsx
 export function ErrorBoundary({ error, status }: { error: unknown; status: number }) {
-  return <main><h1>{status}</h1><p>{String(error)}</p></main>;
+  return (
+    <main>
+      <h1>{status}</h1>
+      <p>{String(error)}</p>
+    </main>
+  );
 }
 ```
 
@@ -487,7 +492,9 @@ the rejected segment.
 Until a catch-all exists, use the terminal wildcard with an explicit `config.route`:
 
 ```tsx
-export const config = { route: { path: "/docs/*", name: "docs.catchAll" } } as const satisfies PageConfig;
+export const config = {
+  route: { path: "/docs/*", name: "docs.catchAll" },
+} as const satisfies PageConfig;
 ```
 
 ## Page-route grammar
@@ -745,7 +752,7 @@ import { listPublishedProductSitemapRows } from "web/product-sitemap-data.server
 
 async function productSitemap() {
   const products = await listPublishedProductSitemapRows();
-  return products.map(product => ({
+  return products.map((product) => ({
     path: `/products/${encodeURIComponent(product.slug)}`,
     lastmod: product.updatedAt,
     images: [{ loc: product.imageUrl }],
@@ -879,7 +886,9 @@ export class Product extends Model {
 
 ```ts title="src/web/product-sitemap-data.server.ts"
 export async function listPublishedProductSitemapRows() {
-  return [{ slug: "anvil", updatedAt: new Date("2026-01-01"), imageUrl: "https://example.com/anvil.jpg" }];
+  return [
+    { slug: "anvil", updatedAt: new Date("2026-01-01"), imageUrl: "https://example.com/anvil.jpg" },
+  ];
 }
 ```
 
@@ -922,7 +931,9 @@ export default function Contact() {
     <Form>
       <input name="email" defaultValue={result?.values?.email} />
       <FieldError name="email" />
-      {result?.formErrors.map(message => <p key={message}>{message}</p>)}
+      {result?.formErrors.map((message) => (
+        <p key={message}>{message}</p>
+      ))}
       <button disabled={pending}>Send</button>
     </Form>
   );
@@ -930,6 +941,7 @@ export default function Contact() {
 ```
 
 ## Rules
+
 - Export `action` OR `actions` (a record), never both; page modules only. Policy goes in `config.action` / `config.actions.<name>` (`validation`, `middleware`), and the key must match an export.
 - Several forms: `actions = { save, remove }`, `<Form action="remove">`. The name travels as the body field `_action`; names match `/^[a-z][a-zA-Z0-9]*$/`; `default` is reserved.
 - Validation runs on the body only (files included); use `request.validated()`. Failure is a 422 `ActionState`, the action does not run.
@@ -988,7 +1000,9 @@ export default function LoginPage() {
       <FieldError name="email" />
       <input name="password" type="password" />
       <FieldError name="password" />
-      {result?.formErrors.map((message) => <p key={message}>{message}</p>)}
+      {result?.formErrors.map((message) => (
+        <p key={message}>{message}</p>
+      ))}
       <button disabled={pending}>Sign in</button>
     </Form>
   );
@@ -1090,10 +1104,12 @@ split the browser-safe constraints into a shared schema.
 ## Observe failures and cancellations
 
 ```tsx
-<Form onSettled={outcome => {
-  if (outcome.type === "failed") setMessage(outcome.reason);
-  if (outcome.type === "dropped") setMessage("Submission cancelled");
-}}>
+<Form
+  onSettled={(outcome) => {
+    if (outcome.type === "failed") setMessage(outcome.reason);
+    if (outcome.type === "dropped") setMessage("Submission cancelled");
+  }}
+>
   <button>Start</button>
   <button data-independent>Cancel</button>
 </Form>
@@ -1140,9 +1156,13 @@ export default function CancelPage() {
   const [message, setMessage] = useState("");
   return (
     <>
-      <Form independent query={{ source: "controls" }} onSettled={(outcome) => {
-        setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
-      }}>
+      <Form
+        independent
+        query={{ source: "controls" }}
+        onSettled={(outcome) => {
+          setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
+        }}
+      >
         <button>Cancel</button>
       </Form>
       <p>{message}</p>
@@ -1171,7 +1191,9 @@ this skill uses both:
 
 ```tsx
 // Either: a named function, with the context typed on the parameter.
-export async function loader({ request }: PageLoaderContext<typeof config.validation, typeof config.route>) {
+export async function loader({
+  request,
+}: PageLoaderContext<typeof config.validation, typeof config.route>) {
   return { id: request.validated().params.id };
 }
 
@@ -1381,16 +1403,16 @@ export default function ProductPage({ data }: PageProps<typeof loader>) {
 
 What each loader value becomes:
 
-| Loader returns                                              | The page reads                                                          |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| a cascade model registered in `ModelResourceRegistry`       | that resource's output (`ResourceOutput<typeof XResource>`)             |
-| a model with no registry entry                              | its serialized `data` type                                              |
-| any value with `toJSON()`                                   | the (awaited) result of `toJSON()`                                      |
-| `Date`, `Map`, `Set`, `RegExp`, `URL`                       | the same native type                                                    |
-| a function-valued key                                       | removed from the type; devalue refuses a function at render, so do not return one |
-| a class instance with private members and no `toJSON()`     | `never` (devalue would throw at render)                                 |
-| a `defer()` key holding a promise                           | `Promise<Serialized<settled value>>`: the key stays a promise for `use()` |
-| plain JSON-ish data                                         | unchanged                                                               |
+| Loader returns                                          | The page reads                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| a cascade model registered in `ModelResourceRegistry`   | that resource's output (`ResourceOutput<typeof XResource>`)                       |
+| a model with no registry entry                          | its serialized `data` type                                                        |
+| any value with `toJSON()`                               | the (awaited) result of `toJSON()`                                                |
+| `Date`, `Map`, `Set`, `RegExp`, `URL`                   | the same native type                                                              |
+| a function-valued key                                   | removed from the type; devalue refuses a function at render, so do not return one |
+| a class instance with private members and no `toJSON()` | `never` (devalue would throw at render)                                           |
+| a `defer()` key holding a promise                       | `Promise<Serialized<settled value>>`: the key stays a promise for `use()`         |
+| plain JSON-ish data                                     | unchanged                                                                         |
 
 A model with `static resource = ProductResource` is registered automatically: `warlock generate.typings` and `warlock dev` write `.warlock/typings/model-resources.d.ts`, so the page types it as the resource's output with no extra code.
 
@@ -1487,16 +1509,16 @@ A loader that **throws** is also terminal: it stops lower loaders, discards its 
 
 Each loader gets its own buffered response, never the live one, so that a level discarded by a short-circuit or a throw cannot leak half-written headers or cookies onto a response it no longer owns. These are all of its public methods. The first five return the buffered response, so they chain; the last three return a short-circuit value that you must `return`.
 
-| Method                                  | What it does                                                                                       |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `header(key, value)`                    | Queue one response header. The value is converted with `String()`                                   |
-| `headers(bag)`                          | Queue every entry of a `Record<string, unknown>` as a header                                        |
-| `setStatusCode(code)`                   | Queue the status code. There is no `status()` method                                                |
-| `cookie(name, value, options?)`         | Queue a `Set-Cookie`. Same arguments as core `response.cookie()`                                    |
-| `clearCookie(name, options?)`           | Queue a cookie deletion. Same arguments as core `response.clearCookie()`                            |
-| `redirect(url, statusCode = 302)`       | Queue the status and `Location`, and return a redirect short-circuit                                |
-| `permanentRedirect(url)`                | `redirect(url, 301)`                                                                                |
-| `notFound(body?)`                       | Queue status 404 and return a not-found short-circuit that renders your `404.page.tsx`              |
+| Method                            | What it does                                                                           |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `header(key, value)`              | Queue one response header. The value is converted with `String()`                      |
+| `headers(bag)`                    | Queue every entry of a `Record<string, unknown>` as a header                           |
+| `setStatusCode(code)`             | Queue the status code. There is no `status()` method                                   |
+| `cookie(name, value, options?)`   | Queue a `Set-Cookie`. Same arguments as core `response.cookie()`                       |
+| `clearCookie(name, options?)`     | Queue a cookie deletion. Same arguments as core `response.clearCookie()`               |
+| `redirect(url, statusCode = 302)` | Queue the status and `Location`, and return a redirect short-circuit                   |
+| `permanentRedirect(url)`          | `redirect(url, 301)`                                                                   |
+| `notFound(body?)`                 | Queue status 404 and return a not-found short-circuit that renders your `404.page.tsx` |
 
 ```ts
 response.header("cache-control", "private, max-age=60");
@@ -1526,9 +1548,14 @@ import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-export const config = { route: { path: "/settings", name: "settings" } } as const satisfies PageConfig;
+export const config = {
+  route: { path: "/settings", name: "settings" },
+} as const satisfies PageConfig;
 
-export async function loader({ request, response }: PageLoaderContext<undefined, typeof config.route>) {
+export async function loader({
+  request,
+  response,
+}: PageLoaderContext<undefined, typeof config.route>) {
   const requested = request.input("theme");
 
   if (requested === "dark" || requested === "light") {
@@ -1772,11 +1799,11 @@ const web: WebConfigurations = {
 export default web;
 ```
 
-| `strategy` | URLs | Locale comes from |
-| --- | --- | --- |
-| `"none"` (**default** when the key is absent) | `/about` for every locale | `?locale=`, then the browser preference cookie, then the legacy server cookie, then a `locale` request header, else `app.localeCode` |
-| `"prefix"` | `/en/about`, `/ar/about`; a bare `/about` answers a 302 to the resolved locale's URL | the path prefix |
-| `"prefix-except-default"` | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about` | the path prefix, else the default locale |
+| `strategy`                                    | URLs                                                                                 | Locale comes from                                                                                                                    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `"none"` (**default** when the key is absent) | `/about` for every locale                                                            | `?locale=`, then the browser preference cookie, then the legacy server cookie, then a `locale` request header, else `app.localeCode` |
+| `"prefix"`                                    | `/en/about`, `/ar/about`; a bare `/about` answers a 302 to the resolved locale's URL | the path prefix                                                                                                                      |
+| `"prefix-except-default"`                     | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about`        | the path prefix, else the default locale                                                                                             |
 
 Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. A multi-site app can override the strategy per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
 
@@ -2189,7 +2216,7 @@ all.
 
 ---
 name: multi-site
-description: 'Configure one @warlock.js/web app to serve several fixed-host and resolver-selected sites from `src/web/$sites/<name>/`: separate roots, `web.sites`, `web.resolveHost`, `resolveCache`, `basePath`, `unknownHost`, and `request.site`. Use for: marketing plus dashboard domains, white-label tenant domains, or tenant admin under a host path. Not this package → API host restrictions and middleware: @warlock.js/core; tenant query scoping: @warlock.js/cascade; per-tenant theme rendering: the `multi-theme` topic.'
+description: "Configure one @warlock.js/web app to serve several fixed-host and resolver-selected sites from `src/web/$sites/<name>/`: separate roots, `web.sites`, `web.resolveHost`, `resolveCache`, `basePath`, `unknownHost`, and `request.site`. Use for: marketing plus dashboard domains, white-label tenant domains, or tenant admin under a host path. Not this package → API host restrictions and middleware: @warlock.js/core; tenant query scoping: @warlock.js/cascade; per-tenant theme rendering: the `multi-theme` topic."
 ---
 
 # One app, multiple sites
@@ -2531,7 +2558,9 @@ import { Link } from "@warlock.js/web";
 // Receives href + onClick from <Link>; it must put them on the element it renders.
 const BrandAnchor = forwardRef<HTMLAnchorElement, AnchorHTMLAttributes<HTMLAnchorElement>>(
   function BrandAnchor({ className, ...props }, ref) {
-    return <a ref={ref} {...props} className={["brand-anchor", className].filter(Boolean).join(" ")} />;
+    return (
+      <a ref={ref} {...props} className={["brand-anchor", className].filter(Boolean).join(" ")} />
+    );
   },
 );
 
@@ -2591,7 +2620,9 @@ export function NavLink({ activeName, section = false, className, ...link }: Nav
   return (
     <Link
       {...link}
-      className={[className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined}
+      className={
+        [className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined
+      }
       aria-current={isActive ? "page" : undefined}
     />
   );
@@ -2640,7 +2671,9 @@ export function ClientNavLink({ className, ...link }: LinkProps) {
   return (
     <Link
       {...link}
-      className={[className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined}
+      className={
+        [className, isActive ? "is-active" : undefined].filter(Boolean).join(" ") || undefined
+      }
       aria-current={isActive ? "page" : undefined}
     />
   );
@@ -2969,7 +3002,11 @@ Wire the resolver once; web never imports auth.
 import type { Auth } from "@warlock.js/auth";
 import { pageSession } from "@warlock.js/auth";
 
-export default { session: pageSession({ project: (user: Auth) => ({ id: user.id, name: user.get<string>("name") }) }) };
+export default {
+  session: pageSession({
+    project: (user: Auth) => ({ id: user.id, name: user.get<string>("name") }),
+  }),
+};
 ```
 
 `project` is required; only its result reaches the browser as the payload's optional `session` key. Type it by augmenting `SessionRegistry { user; model }` in module `"@warlock.js/web"`.
@@ -2979,7 +3016,10 @@ import { useUser } from "@warlock.js/web";
 import { requireGuest, requireUser } from "@warlock.js/web/session";
 
 // account page
-export const accountConfig = { route: "/account", middleware: [requireUser({ loginPath: "/login" })] };
+export const accountConfig = {
+  route: "/account",
+  middleware: [requireUser({ loginPath: "/login" })],
+};
 
 // login page
 export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
@@ -3031,18 +3071,18 @@ The page is typed as guarded only when the generator can prove it from source. T
 
 These do **not** count (the page stays unguarded in the types and `guard` is not emitted):
 
-| Not a guard                                                          | Example                                               |
-| -------------------------------------------------------------------- | ----------------------------------------------------- |
-| a spread into the array                                              | `middleware: [...guards]`                             |
-| `middleware` that is not an array literal (identifier, call)        | `middleware: guards`                                  |
-| a guard behind a conditional                                         | `middleware: [isPrivate ? requireUser() : audit]`     |
-| a wrapper call around it                                             | `middleware: [withAudit(requireUser())]`              |
-| an identifier in the array                                           | `middleware: [guard]`                                 |
-| `requireGuest()`                                                     | `middleware: [requireGuest()]`                        |
-| `config.action.middleware`                                           | only the page's action is guarded                     |
-| a type-only import of `requireUser`, or one from any other module   | `import type { requireUser } ...`                     |
-| a namespace or member call                                           | `session.requireUser()`                               |
-| the loader form `requireUser(ctx)` inside a loader                   | it guards at runtime but is not seen by the generator |
+| Not a guard                                                       | Example                                               |
+| ----------------------------------------------------------------- | ----------------------------------------------------- |
+| a spread into the array                                           | `middleware: [...guards]`                             |
+| `middleware` that is not an array literal (identifier, call)      | `middleware: guards`                                  |
+| a guard behind a conditional                                      | `middleware: [isPrivate ? requireUser() : audit]`     |
+| a wrapper call around it                                          | `middleware: [withAudit(requireUser())]`              |
+| an identifier in the array                                        | `middleware: [guard]`                                 |
+| `requireGuest()`                                                  | `middleware: [requireGuest()]`                        |
+| `config.action.middleware`                                        | only the page's action is guarded                     |
+| a type-only import of `requireUser`, or one from any other module | `import type { requireUser } ...`                     |
+| a namespace or member call                                        | `session.requireUser()`                               |
+| the loader form `requireUser(ctx)` inside a loader                | it guards at runtime but is not seen by the generator |
 
 The not-found page is never guarded. A guard the generator cannot prove still works at runtime; only the types stay loose (`useUser()` returns `null`-able).
 In dev, a file the generator cannot parse reads as unguarded rather than breaking boot.
@@ -3145,10 +3185,10 @@ export default function Placeholder() {
 ```tsx title="src/web/widgets/broken.page.tsx"
 // ❌ still breaks the server render
 import BrowserOnlyWidget from "./browser-only-widget"; // this import runs on the SERVER too,
-                                                         // and if browser-only-widget.tsx touches
-                                                         // `window` at its top level, the server
-                                                         // render throws before ClientOnly ever
-                                                         // gets a chance to hide it.
+// and if browser-only-widget.tsx touches
+// `window` at its top level, the server
+// render throws before ClientOnly ever
+// gets a chance to hide it.
 
 import { ClientOnly } from "@warlock.js/web";
 import Placeholder from "./placeholder";
@@ -3223,7 +3263,7 @@ Each is a `console.error` that cannot be switched off. If you also register `onC
 Work down the list; each item is something that makes the first client render differ from the server render.
 
 1. **Time and randomness in render.** `new Date()`, `Date.now()`, `Math.random()` or an id from either. Take the value from loader data (it is computed once, on the server, and shipped), or compute it after mount.
-2. **Locale and timezone formatting.** `toLocaleString()`, `toLocaleDateString()` and `Intl.*` with no explicit arguments use the *runtime's* locale and timezone, which differ between the server process and the visitor's browser. Pass an explicit `timeZone` and the page's locale (`useLocale()`), or format the string in the loader. Never derive page text from `navigator.language`.
+2. **Locale and timezone formatting.** `toLocaleString()`, `toLocaleDateString()` and `Intl.*` with no explicit arguments use the _runtime's_ locale and timezone, which differ between the server process and the visitor's browser. Pass an explicit `timeZone` and the page's locale (`useLocale()`), or format the string in the loader. Never derive page text from `navigator.language`.
 3. **Browser-only APIs during render.** `window`, `document`, `localStorage`, `matchMedia`, `navigator`, `innerWidth`. A `typeof window !== "undefined"` branch in render is the same bug: the server takes one side and the client's first render the other. Use `<ClientOnly>` or `useIsClient()` (both above), or read the API in `useEffect`.
 4. **`useId` shifting.** `useId()` is hydration-safe, but its values come from position in the tree, so a component that renders on the client's first pass and not on the server (for example behind a `typeof window` check) moves every id after it. Fix the branch, not the id. Do not replace it with `Math.random()`.
 5. **Invalid HTML nesting.** `<div>` or `<ul>` inside `<p>`, `<a>` inside `<a>`, `<tr>` directly inside `<table>`, `<form>` inside `<form>`. The browser's HTML parser repairs the server markup before React sees it, so the DOM React hydrates is not what the server rendered. Compare "View page source" (what the server sent) with the Elements panel (what the parser made).
@@ -3320,7 +3360,9 @@ const cover: ImageDescriptor = {
   formats: ["webp"],
 };
 
-export const config = { route: { path: "/blog/post", name: "blog.post" } } as const satisfies PageConfig;
+export const config = {
+  route: { path: "/blog/post", name: "blog.post" },
+} as const satisfies PageConfig;
 
 export default function PostPage() {
   return (
@@ -3341,14 +3383,14 @@ export default function PostPage() {
 
 ## Props
 
-| Prop | Type | Meaning |
-| --- | --- | --- |
-| `image` | `ImageDescriptor` | Required. The image and its renditions (below). |
-| `alt` | `string` | Required. Pass `""` for a decorative image. In development a call that omits it logs `<Image> is missing "alt" for "<src>"` to the console. |
-| `sizes` | `string` | The `sizes` attribute. Defaults to `"100vw"`; set it whenever the image is narrower than the viewport, or the browser picks an oversized file. |
-| `priority` | `boolean` | `true` sets `loading="eager"` and `fetchPriority="high"`. Default is lazy. Use on the page's single LCP image only. |
-| `loader` | `ImageLoader` | Turns a variant into a URL. Defaults to `warlockImageLoader`. |
-| any `<img>` attribute | | `className`, `style`, `onLoad`, `id`, `data-*`, ... are passed to the `<img>`. `src`, `srcSet`, `width`, `height`, `loading`, `fetchPriority` and `sizes` are not accepted as props; they come from the descriptor and the props above. |
+| Prop                  | Type              | Meaning                                                                                                                                                                                                                                 |
+| --------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `image`               | `ImageDescriptor` | Required. The image and its renditions (below).                                                                                                                                                                                         |
+| `alt`                 | `string`          | Required. Pass `""` for a decorative image. In development a call that omits it logs `<Image> is missing "alt" for "<src>"` to the console.                                                                                             |
+| `sizes`               | `string`          | The `sizes` attribute. Defaults to `"100vw"`; set it whenever the image is narrower than the viewport, or the browser picks an oversized file.                                                                                          |
+| `priority`            | `boolean`         | `true` sets `loading="eager"` and `fetchPriority="high"`. Default is lazy. Use on the page's single LCP image only.                                                                                                                     |
+| `loader`              | `ImageLoader`     | Turns a variant into a URL. Defaults to `warlockImageLoader`.                                                                                                                                                                           |
+| any `<img>` attribute |                   | `className`, `style`, `onLoad`, `id`, `data-*`, ... are passed to the `<img>`. `src`, `srcSet`, `width`, `height`, `loading`, `fetchPriority` and `sizes` are not accepted as props; they come from the descriptor and the props above. |
 
 ## The descriptor
 
@@ -3522,7 +3564,12 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
      return (
        <main>
          <h1>{data.title}</h1>
-         <Image image={data.cover} alt={data.title} sizes="(min-width: 768px) 50vw, 100vw" priority />
+         <Image
+           image={data.cover}
+           alt={data.title}
+           sizes="(min-width: 768px) 50vw, 100vw"
+           priority
+         />
        </main>
      );
    }
@@ -3787,7 +3834,7 @@ Notes:
 
 ---
 name: set-page-metadata
-description: "Set a page's `<head>` with `config.metadata`: title (string, `{ default, template }`, `{ absolute }`), description, keywords, canonical, robots, `openGraph` (siteName, images, article), `twitter`, `image`, `authors`, extra `meta` and `links`, and per-locale `alternates`. Static object vs function of loader data, root/layout/page merge order, and a per-locale recipe with `t()`. Triggers: `config.metadata`, `PageMetadata`, `MetadataInput`, `openGraph`, `og:image`, `twitter:card`, `canonical`, `hreflang`, `alternates`, `UnknownMetadataKeyError`, `DeferredKeyInMetadataError`; \"set the page title\", \"add an og:image\", \"share preview\", \"title template\", \"noindex a page\", \"translate the title\"."
+description: 'Set a page''s `<head>` with `config.metadata`: title (string, `{ default, template }`, `{ absolute }`), description, keywords, canonical, robots, `openGraph` (siteName, images, article), `twitter`, `image`, `authors`, extra `meta` and `links`, and per-locale `alternates`. Static object vs function of loader data, root/layout/page merge order, and a per-locale recipe with `t()`. Triggers: `config.metadata`, `PageMetadata`, `MetadataInput`, `openGraph`, `og:image`, `twitter:card`, `canonical`, `hreflang`, `alternates`, `UnknownMetadataKeyError`, `DeferredKeyInMetadataError`; "set the page title", "add an og:image", "share preview", "title template", "noindex a page", "translate the title".'
 ---
 
 # Warlock — set page metadata
@@ -3816,11 +3863,11 @@ export default function ProductsPage() {
 
 `metadata` is either a plain object or a function that returns one. The function form runs on the server, after the loader, and receives one object:
 
-| Key      | What it is                                                                                           |
-| -------- | ---------------------------------------------------------------------------------------------------- |
-| `data`   | The loader's data, typed exactly as the component sees it (`Serialized` of the loader return)         |
-| `shared` | The sealed, readonly `shared` payload                                                                 |
-| `route`  | The matched page's `{ name, path, params }`                                                           |
+| Key      | What it is                                                                                                      |
+| -------- | --------------------------------------------------------------------------------------------------------------- |
+| `data`   | The loader's data, typed exactly as the component sees it (`Serialized` of the loader return)                   |
+| `shared` | The sealed, readonly `shared` payload                                                                           |
+| `route`  | The matched page's `{ name, path, params }`                                                                     |
 | `child`  | Layout and root callbacks only: the already-resolved metadata of the level below (`{ kind, metadata, child? }`) |
 
 Give the config the loader's type so `data` is typed. `PageConfig<typeof loader>` reads the loader's type, so the loader may be declared after the config:
@@ -3870,21 +3917,21 @@ Rules of the function form:
 
 All fields are optional. An unknown key (`tittle`) is a build error naming the file, line and the closest known key, so a typo cannot silently drop a tag.
 
-| Field         | Type                                                                            | Rendered as                                                                  |
-| ------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `title`       | `string`, `{ default?, template? }` or `{ absolute }`                           | `<title>`                                                                    |
-| `description` | `string`                                                                        | `<meta name="description">`                                                  |
-| `keywords`    | `string` or `string[]` (joined with `, `)                                       | `<meta name="keywords">`                                                     |
-| `robots`      | `string`, e.g. `"noindex,nofollow"`                                             | `<meta name="robots">`                                                       |
-| `canonical`   | `string` (path or absolute URL) or `false`                                      | `<link rel="canonical">`                                                     |
-| `viewport`    | `string` or `false`; default `"width=device-width, initial-scale=1"`            | `<meta name="viewport">`, SSR only; client navigation never rewrites it     |
-| `image`       | `string` or `{ url, width?, height?, alt?, type? }`                             | The share image: fallback for `og:image` and `twitter:image`                 |
-| `authors`     | `string`, or an array of `string` / `{ name, url? }`                            | `<meta name="author">` (names joined), plus `<link rel="author">` per `url`  |
-| `openGraph`   | see below                                                                       | `og:*` and `article:*` tags                                                  |
-| `twitter`     | see below                                                                       | `twitter:*` tags                                                             |
-| `meta`        | array of `{ name, content }`, `{ property, content }` or `{ httpEquiv, content }` | Extra `<meta>` tags                                                          |
-| `links`       | array of `{ rel, href, hreflang?, type?, sizes?, media?, as?, crossOrigin?, title? }` | Extra `<link>` tags                                                          |
-| `alternates`  | `Record<string, string>` keyed by locale code plus optional `"x-default"`       | `<link rel="alternate" hreflang="...">`                                      |
+| Field         | Type                                                                                  | Rendered as                                                                 |
+| ------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `title`       | `string`, `{ default?, template? }` or `{ absolute }`                                 | `<title>`                                                                   |
+| `description` | `string`                                                                              | `<meta name="description">`                                                 |
+| `keywords`    | `string` or `string[]` (joined with `, `)                                             | `<meta name="keywords">`                                                    |
+| `robots`      | `string`, e.g. `"noindex,nofollow"`                                                   | `<meta name="robots">`                                                      |
+| `canonical`   | `string` (path or absolute URL) or `false`                                            | `<link rel="canonical">`                                                    |
+| `viewport`    | `string` or `false`; default `"width=device-width, initial-scale=1"`                  | `<meta name="viewport">`, SSR only; client navigation never rewrites it     |
+| `image`       | `string` or `{ url, width?, height?, alt?, type? }`                                   | The share image: fallback for `og:image` and `twitter:image`                |
+| `authors`     | `string`, or an array of `string` / `{ name, url? }`                                  | `<meta name="author">` (names joined), plus `<link rel="author">` per `url` |
+| `openGraph`   | see below                                                                             | `og:*` and `article:*` tags                                                 |
+| `twitter`     | see below                                                                             | `twitter:*` tags                                                            |
+| `meta`        | array of `{ name, content }`, `{ property, content }` or `{ httpEquiv, content }`     | Extra `<meta>` tags                                                         |
+| `links`       | array of `{ rel, href, hreflang?, type?, sizes?, media?, as?, crossOrigin?, title? }` | Extra `<link>` tags                                                         |
+| `alternates`  | `Record<string, string>` keyed by locale code plus optional `"x-default"`             | `<link rel="alternate" hreflang="...">`                                     |
 
 ### Title
 
@@ -3898,18 +3945,18 @@ A `template` is applied by an ancestor to the title of the level below it, repla
 
 ### `openGraph`
 
-| Key                | Notes                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------- |
-| `title`            | Falls back to the top-level `title`, even when `openGraph` is not set                                    |
-| `description`      | Falls back to the top-level `description`                                                                |
+| Key                | Notes                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `title`            | Falls back to the top-level `title`, even when `openGraph` is not set                                              |
+| `description`      | Falls back to the top-level `description`                                                                          |
 | `type`             | `"website"` (the default whenever any `og:*` tag is emitted), `"article"`, `"product"`, `"profile"`, or any string |
-| `url`              | Falls back to the canonical URL                                                                          |
-| `siteName`         | `og:site_name`                                                                                           |
-| `images`           | Array of `{ url, width?, height?, alt?, type? }`; one `og:image` group each. Wins over `image`           |
-| `image`            | A single URL, kept for compatibility. `images` wins over it                                              |
-| `locale`           | Written as given. Defaults to the request locale (`en-US` becomes `en_US`)                               |
-| `alternateLocales` | `og:locale:alternate`, one tag per entry. Filled from the page's locale alternates when not set          |
-| `article`          | Rendered only when `type` is `"article"`: `publishedTime`, `modifiedTime`, `authors[]`, `section`, `tags[]` |
+| `url`              | Falls back to the canonical URL                                                                                    |
+| `siteName`         | `og:site_name`                                                                                                     |
+| `images`           | Array of `{ url, width?, height?, alt?, type? }`; one `og:image` group each. Wins over `image`                     |
+| `image`            | A single URL, kept for compatibility. `images` wins over it                                                        |
+| `locale`           | Written as given. Defaults to the request locale (`en-US` becomes `en_US`)                                         |
+| `alternateLocales` | `og:locale:alternate`, one tag per entry. Filled from the page's locale alternates when not set                    |
+| `article`          | Rendered only when `type` is `"article"`: `publishedTime`, `modifiedTime`, `authors[]`, `section`, `tags[]`        |
 
 ```tsx
 metadata: ({ data }) => ({
@@ -4271,7 +4318,10 @@ import type { PageConfig, PageLoader } from "@warlock.js/web";
 import { defer } from "@warlock.js/web";
 
 export const loader = (async () =>
-  defer({ product: { name: "Example product" }, reviews: Promise.resolve([{ text: "Great" }]) })) satisfies PageLoader;
+  defer({
+    product: { name: "Example product" },
+    reviews: Promise.resolve([{ text: "Great" }]),
+  })) satisfies PageLoader;
 
 // Wrong — "reviews" is a defer()-ed key:
 const invalidConfig = {
@@ -4419,7 +4469,7 @@ export default function Login() {
   const login = useSubmitForm({
     route: "auth.login",
     beforeSubmit: ({ values }) => Boolean(values.email),
-    onSuccess: async result => console.log(result.data),
+    onSuccess: async (result) => console.log(result.data),
   });
 
   return <Form onSubmit={login.submit}>{/* fields */}</Form>;
@@ -4494,11 +4544,11 @@ export default function Login() {
 
 Read a declared body anywhere with the public types from `@warlock.js/web`:
 
-| Type                            | Is                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------- |
+| Type                              | Is                                                                                                    |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `ApiResponse<Name, Status = 200>` | The declared body for that status, or `unknown` when the route or status is undeclared (never `any`). |
-| `ApiResponses<Name>`            | The whole status-to-body map (empty for an undeclared or `runtimeRoute` name).   |
-| `ApiSuccessResponse<Name>`      | The union of the declared 2xx bodies, or `unknown` when there is none.            |
+| `ApiResponses<Name>`              | The whole status-to-body map (empty for an undeclared or `runtimeRoute` name).                        |
+| `ApiSuccessResponse<Name>`        | The union of the declared 2xx bodies, or `unknown` when there is none.                                |
 
 ```ts
 import type { ApiResponse } from "@warlock.js/web";
@@ -4547,7 +4597,10 @@ declare module "@warlock.js/web" {
       path: "/auth/login";
       params: {};
       method: "POST";
-      response: { 200: { user: { id: string | number; name: string }; token: string }; 400: { error: string } };
+      response: {
+        200: { user: { id: string | number; name: string }; token: string };
+        400: { error: string };
+      };
     };
   }
 }
@@ -4564,11 +4617,11 @@ description: 'Test a Warlock page with Vitest: call a page `loader` and a page `
 
 A page is three plain things, and each is tested at the cheapest level that covers it:
 
-| What | How | Needs a server? |
-| --- | --- | --- |
-| `loader` and `action` | Call the exported function with a small fake context, mock the service it calls | No |
-| The page component | `renderToString` it inside `LocaleProvider` with the `data` the loader would return | No |
-| The whole route (middleware, validation, document) | `testGet` against the real test server | Yes |
+| What                                               | How                                                                                 | Needs a server? |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------- |
+| `loader` and `action`                              | Call the exported function with a small fake context, mock the service it calls     | No              |
+| The page component                                 | `renderToString` it inside `LocaleProvider` with the `data` the loader would return | No              |
+| The whole route (middleware, validation, document) | `testGet` against the real test server                                              | Yes             |
 
 The first two are fast, need no database and no running app. Reach for the third only for what they cannot see.
 
@@ -4599,6 +4652,7 @@ Two consequences for page specs:
   ```
 
   Run it with `vitest run --config vitest.web.config.ts`. If a page imports through the `app/...` or `web/...` path aliases, give this config the same `plugins` as `vite.config.ts`; the specs below use relative imports only.
+
 - **JSX needs the tsconfig.** The generated `tsconfig.json` has `"jsx": "react-jsx"` and `include: ["src", ...]`. A spec outside `src/` is transformed with the classic JSX runtime and fails with `React is not defined`; keep specs under `src/`.
 
 ## The page under test
@@ -5139,7 +5193,7 @@ To switch the active locale without a full reload, call `changeLocaleCode(code)`
 The hydration payload ships a `translations` key holding **only the active locale's keywords** (never the other locales' tables), and `<Scripts />` carries it to the browser. `useTrans()` reads from it before the first client render, so the hydrated text matches the server's. How it gets there depends on where the copy came from:
 
 - **Route `locales.json` (scoped mode, the `localize-pages` topic).** The payload also carries `translationMode: "scoped"`. `LocaleProvider` receives that snapshot and `useTrans()` translates from it; the route JSON is **not** registered into a process-global localization table, so a request or a client navigation cannot inherit another route's keywords.
-- **Module translations (`groupedTranslations`, module `locales.json`; legacy mode).** There is no `translationMode`, so the client installs the payload's keywords into `@mongez/localization`'s global table for the payload's locale (`extend(locale, translations)`) *before* any `register()` hook runs and before the first client render. The same step runs on every client navigation, `refresh()` and `changeLocaleCode()`, so a page does not need its own `register()` to repeat copy the server already sent.
+- **Module translations (`groupedTranslations`, module `locales.json`; legacy mode).** There is no `translationMode`, so the client installs the payload's keywords into `@mongez/localization`'s global table for the payload's locale (`extend(locale, translations)`) _before_ any `register()` hook runs and before the first client render. The same step runs on every client navigation, `refresh()` and `changeLocaleCode()`, so a page does not need its own `register()` to repeat copy the server already sent.
 
 Either way, a component that calls `useTrans()` under `#vessel` renders the same strings on the server and in the browser. Do not read translations from `navigator.language` or a client-only store during render; that is a hydration mismatch (see the `render-client-only` topic).
 
@@ -5253,7 +5307,9 @@ import type { RootConfig } from "@warlock.js/web";
 import type { Middleware } from "@warlock.js/core";
 
 declare module "@warlock.js/core" {
-  interface RequestLocals { startedAt?: number }
+  interface RequestLocals {
+    startedAt?: number;
+  }
 }
 
 const attachRequestContext: Middleware = ({ request }) => {

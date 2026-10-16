@@ -8,7 +8,7 @@ sidebar:
 
 The **container** is a tiny global registry — a single `Map` behind a typed wrapper. Connectors drop runtime singletons into it during boot (the Fastify instance, the Socket.IO server, the database source, the router), and the rest of the framework reads them back out. The `app` object is an ergonomic façade over the handful of keys you'll actually want.
 
-This is lower-level plumbing. Most application code never touches the container directly — you reach for `app.http` or `getSocketServer()` instead. This page exists so that when you *do* need the raw instance (a plugin, a one-off integration, a test harness), you know exactly what's in there, who put it there, and why it's sometimes `undefined`.
+This is lower-level plumbing. Most application code never touches the container directly — you reach for `app.http` or `getSocketServer()` instead. This page exists so that when you _do_ need the raw instance (a plugin, a one-off integration, a test harness), you know exactly what's in there, who put it there, and why it's sometimes `undefined`.
 
 ```ts
 import { container, app } from "@warlock.js/core";
@@ -19,10 +19,10 @@ import { container, app } from "@warlock.js/core";
 ```ts
 import { app } from "@warlock.js/core";
 
-app.http;        // the Fastify instance (when http config exists)
-app.socket;      // the Socket.IO server (when socket config exists)
-app.router;      // the router (always present)
-app.database;    // the cascade DataSource (when database config exists)
+app.http; // the Fastify instance (when http config exists)
+app.socket; // the Socket.IO server (when socket config exists)
+app.router; // the router (always present)
+app.database; // the cascade DataSource (when database config exists)
 ```
 
 `app` is a plain object of getters. Each getter reads one key out of the container the moment you access it. There's no `new`, no class to instantiate — `app.http` is literally `container.tryGet("http.server")` evaluated on demand. `app`'s getters use `tryGet`, not `get`, specifically so that `app.socket` / `app.http` / `app.database` keep returning `undefined` — not throwing — when their config file is absent; see [`get` throws for a missing key](#get-throws-for-a-missing-key--new-in-512) below.
@@ -41,13 +41,13 @@ container.has("socket"); // boolean — is the socket server up?
 
 `container` is a singleton instance with five methods:
 
-| Method                  | What it does                                                    |
-| ----------------------- | ---------------------------------------------------------------- |
-| `container.set(key, v)` | Store a value under `key`.                                       |
-| `container.get(key)`    | Read the value back, or **throw** if `key` isn't registered.     |
-| `container.tryGet(key)` | Read the value back, or `undefined` if `key` isn't registered.   |
-| `container.has(key)`    | `true` if the key has been set.                                  |
-| `container.delete(key)` | Remove the key.                                                  |
+| Method                  | What it does                                                   |
+| ----------------------- | -------------------------------------------------------------- |
+| `container.set(key, v)` | Store a value under `key`.                                     |
+| `container.get(key)`    | Read the value back, or **throw** if `key` isn't registered.   |
+| `container.tryGet(key)` | Read the value back, or `undefined` if `key` isn't registered. |
+| `container.has(key)`    | `true` if the key has been set.                                |
+| `container.delete(key)` | Remove the key.                                                |
 
 ### `get` throws for a missing key — new in 5.12
 
@@ -86,13 +86,13 @@ export type ContainerTypes = {
 };
 ```
 
-| Key                | Type              | Set by                                  | When                          |
-| ------------------ | ----------------- | --------------------------------------- | ----------------------------- |
-| `router`           | `Router`          | the router module itself                | at import (eager — see below) |
-| `"http.server"`    | `FastifyInstance` | `HttpConnector.boot()`                   | boot, only if http config exists |
-| `socket`           | `Server`          | `SocketConnector.boot()`                 | boot, only if socket config exists |
-| `"database.source"`| `DataSource`      | `DatabaseConnector.start()`              | boot, only if database config exists |
-| `"http.baseUrl"`   | `string`          | *(declared in the type, not written)*   | — see Gotchas                 |
+| Key                 | Type              | Set by                                | When                                 |
+| ------------------- | ----------------- | ------------------------------------- | ------------------------------------ |
+| `router`            | `Router`          | the router module itself              | at import (eager — see below)        |
+| `"http.server"`     | `FastifyInstance` | `HttpConnector.boot()`                | boot, only if http config exists     |
+| `socket`            | `Server`          | `SocketConnector.boot()`              | boot, only if socket config exists   |
+| `"database.source"` | `DataSource`      | `DatabaseConnector.start()`           | boot, only if database config exists |
+| `"http.baseUrl"`    | `string`          | _(declared in the type, not written)_ | — see Gotchas                        |
 
 `get` and `set` are also overloaded for arbitrary string keys (`container.get<MyType>("my.custom.key")`), so you can stash your own singletons here too — they just won't get the typed-key treatment.
 
@@ -100,12 +100,12 @@ export type ContainerTypes = {
 
 `app` is the friendly front door. It's a fixed object with four getters, each a thin read of one container key:
 
-| Accessor       | Reads container key  | Present when                          |
-| -------------- | -------------------- | ------------------------------------- |
-| `app.router`   | `router`             | always (router self-registers)        |
-| `app.http`     | `"http.server"`      | `src/config/http.ts` exists           |
-| `app.socket`   | `socket`             | `src/config/socket.ts` exists         |
-| `app.database` | `"database.source"`  | `src/config/database.ts` exists       |
+| Accessor       | Reads container key | Present when                    |
+| -------------- | ------------------- | ------------------------------- |
+| `app.router`   | `router`            | always (router self-registers)  |
+| `app.http`     | `"http.server"`     | `src/config/http.ts` exists     |
+| `app.socket`   | `socket`            | `src/config/socket.ts` exists   |
+| `app.database` | `"database.source"` | `src/config/database.ts` exists |
 
 The presence rule is the important part. **`app.http`, `app.socket`, and `app.database` only return an instance when the matching config file exists.** A connector's `boot()`/`start()` checks `config.get("http")` (or `"socket"`, `"database"`) and returns early if it's absent — so the container key is never set, and the getter returns `undefined`.
 
@@ -113,8 +113,8 @@ The presence rule is the important part. **`app.http`, `app.socket`, and `app.da
 import { app } from "@warlock.js/core";
 
 // In an app with no src/config/socket.ts:
-app.socket;   // undefined — the socket connector no-op'd at boot
-app.router;   // always there
+app.socket; // undefined — the socket connector no-op'd at boot
+app.router; // always there
 
 // Guard before you use the optional ones:
 if (app.socket) {
@@ -145,7 +145,7 @@ flowchart TD
 
 ### Why top-level access returns `undefined`
 
-This is the single most common surprise. A module's **top level runs at import time** — which is *before* `bootstrap()` has run the connectors. So this is a trap:
+This is the single most common surprise. A module's **top level runs at import time** — which is _before_ `bootstrap()` has run the connectors. So this is a trap:
 
 ```ts title="src/app/orders/some-module.ts"
 import { app } from "@warlock.js/core";
@@ -174,17 +174,17 @@ Inside a request handler the container is always fully populated, so `app.http` 
 
 Three layers reach the same instances. Pick the highest one that fits.
 
-| You want…                                              | Use                          | Notes                                                        |
-| ------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------- |
-| The common runtime singletons, ergonomically           | `app.http` / `app.socket` / `app.router` / `app.database` | Returns `undefined` when the config is absent. |
-| A null-safe socket handle                              | `getSocketServer()`          | Returns the `Server` **or `null`** if sockets aren't configured. |
-| The Fastify instance from anywhere                     | `getHttpServer()`            | Returns the module-held server (see caveat below).          |
-| A custom/non-standard key, or `has`/`delete` semantics | `container.get/set/has/delete` | The raw registry. The only layer that can store your own keys. |
+| You want…                                              | Use                                                       | Notes                                                            |
+| ------------------------------------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------- |
+| The common runtime singletons, ergonomically           | `app.http` / `app.socket` / `app.router` / `app.database` | Returns `undefined` when the config is absent.                   |
+| A null-safe socket handle                              | `getSocketServer()`                                       | Returns the `Server` **or `null`** if sockets aren't configured. |
+| The Fastify instance from anywhere                     | `getHttpServer()`                                         | Returns the module-held server (see caveat below).               |
+| A custom/non-standard key, or `has`/`delete` semantics | `container.get/set/has/delete`                            | The raw registry. The only layer that can store your own keys.   |
 
 ```ts
 import { getSocketServer, getHttpServer } from "@warlock.js/core";
 
-const io = getSocketServer();   // Server | null
+const io = getSocketServer(); // Server | null
 if (io) io.emit("notice", "…");
 
 const server = getHttpServer(); // FastifyInstance

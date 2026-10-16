@@ -59,7 +59,7 @@ The continuation trip produces the prose the customer DOES see, narrating the to
 
 The guard runs only when:
 
-1. The streamed text contains either a `{` or a ```` ```json ```` fence opener.
+1. The streamed text contains either a `{` or a ` ```json ` fence opener.
 2. The JSON between that opener and its balanced closer parses cleanly.
 3. The parsed object has both:
    - A `name` (or `tool`) key matching a registered tool's `name`, AND
@@ -145,8 +145,8 @@ Surface this in your turn-completed log so you can dashboard per-model leak rate
 
 ```ts
 const toolsCalled = result.report.children
-  .filter(child => child.type === "tool")
-  .map(child => ({
+  .filter((child) => child.type === "tool")
+  .map((child) => ({
     name: child.name,
     // child.input is the validated tool input; for a recovered call you'd
     // also want the `recoveredFrom` provenance, which lives on the model
@@ -169,8 +169,8 @@ A model with `recovered / total > 0.10` is a strong "drop it from rotation" sign
 
 ## Constraints
 
-- **Named envelope only (v1).** A buffer that *isn't* envelope-shaped (no `name|tool` + `arguments|input` keys) doesn't match — even if it happens to validate against one of your tool schemas. We avoid bare-object matching while tool input schemas can be permissive; a `v.record(v.any())` schema would match every JSON the user asked for.
-- **One pattern.** Right now the guard looks for `{...}` and ```` ```json ... ``` ````. Other markdown wrappers (`<json>` tags, language-tagged fences other than `json`) aren't classified. Expand the recognizer if you ship a workflow that needs it.
+- **Named envelope only (v1).** A buffer that _isn't_ envelope-shaped (no `name|tool` + `arguments|input` keys) doesn't match — even if it happens to validate against one of your tool schemas. We avoid bare-object matching while tool input schemas can be permissive; a `v.record(v.any())` schema would match every JSON the user asked for.
+- **One pattern.** Right now the guard looks for `{...}` and ` ```json ... ``` `. Other markdown wrappers (`<json>` tags, language-tagged fences other than `json`) aren't classified. Expand the recognizer if you ship a workflow that needs it.
 - **Per-trip, not per-stream.** A fresh guard instance per LLM trip — tool-result trips are a new turn; envelope state doesn't carry over.
 
 ---

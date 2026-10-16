@@ -65,7 +65,12 @@ describe("generateRouteTypes page actions", () => {
   it("emits sorted action names on the page entry and nothing when there are none", () => {
     const source = generateRouteTypes({
       pages: [
-        { name: "admin.posts.edit", path: "/admin/posts/:id", method: "GET", actions: ["save", "remove"] },
+        {
+          name: "admin.posts.edit",
+          path: "/admin/posts/:id",
+          method: "GET",
+          actions: ["save", "remove"],
+        },
         { name: "home", path: "/", method: "GET" },
       ],
       apiRoutes: [],
@@ -87,7 +92,12 @@ describe("generateRouteTypes typed responses", () => {
     const source = generateRouteTypes({
       pages: [],
       apiRoutes: [
-        { name: "auth.login", path: "/login", method: "POST", response: { 400: failure, 200: login } },
+        {
+          name: "auth.login",
+          path: "/login",
+          method: "POST",
+          response: { 400: failure, 200: login },
+        },
       ],
     });
 

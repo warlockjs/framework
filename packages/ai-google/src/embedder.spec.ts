@@ -114,8 +114,7 @@ describe("GoogleEmbedder.embed()", () => {
   it("treats an embedding with missing values as an empty vector", async () => {
     const ai = {
       models: {
-        embedContent: async () =>
-          ({ embeddings: [{}] }) as unknown as EmbedContentResponse,
+        embedContent: async () => ({ embeddings: [{}] }) as unknown as EmbedContentResponse,
       },
     } as unknown as GoogleGenAI;
     const embedder = new GoogleEmbedder(ai, { name: "gemini-embedding-001" });

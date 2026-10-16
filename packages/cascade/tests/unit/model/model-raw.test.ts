@@ -22,9 +22,7 @@ describe("raw query surface (S1)", () => {
 
   beforeEach(() => {
     const driver = createMockDriver();
-    queryMock = vi
-      .fn()
-      .mockResolvedValue({ rows: [{ id: 1, total: 5 }], rowCount: 1 });
+    queryMock = vi.fn().mockResolvedValue({ rows: [{ id: 1, total: 5 }], rowCount: 1 });
     // The mock driver helper omits query(); attach it for the raw surface.
     (driver as unknown as { query: typeof queryMock }).query = queryMock;
 
@@ -59,9 +57,7 @@ describe("raw query surface (S1)", () => {
       type Row = { id: number; total: number };
       queryMock.mockResolvedValueOnce({ rows: [{ id: 7, total: 99 }], rowCount: 1 });
 
-      const result: RawQueryResult<Row> = await RawUser.raw<Row>(
-        "SELECT id, total FROM orders",
-      );
+      const result: RawQueryResult<Row> = await RawUser.raw<Row>("SELECT id, total FROM orders");
 
       // Compile-time: result.rows is Row[]. Runtime: shape is preserved.
       const first: Row = result.rows[0];

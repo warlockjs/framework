@@ -5,25 +5,25 @@ description: 'Pick the right `v` factory primitive — string / int / literal / 
 
 # Picking the right primitive
 
-This is the orientation skill — *which* primitive for *which* job. For the chainable methods on each (`.email()`, `.min()`, `.between()`, etc.), load the matching `*-methods.md` reference file in this skill folder.
+This is the orientation skill — _which_ primitive for _which_ job. For the chainable methods on each (`.email()`, `.min()`, `.between()`, etc.), load the matching `*-methods.md` reference file in this skill folder.
 
 ## Strings
 
 ```ts
-v.string()              // type: string — full surface in string-methods.md
-v.email()               // shorthand for v.string().email()
-v.enum(["a", "b"])      // type: "a" | "b" — runs as v.string().oneOf, but the factory overload preserves the literal union
+v.string(); // type: string — full surface in string-methods.md
+v.email(); // shorthand for v.string().email()
+v.enum(["a", "b"]); // type: "a" | "b" — runs as v.string().oneOf, but the factory overload preserves the literal union
 ```
 
 Reach for `v.string()` for any text input. `v.email()` is just sugar — switch back to `v.string().email().min(...)` when you need extra rules.
 
 ## Numbers — pick by what you accept
 
-| Validator | Accepts | When |
-|---|---|---|
-| `v.number()` | any finite number | accepts both integers and floats |
-| `v.int()` | integers only | rejects `1.5` |
-| `v.float()` | finite, non-integer | rejects `1` |
+| Validator     | Accepts                   | When                                                        |
+| ------------- | ------------------------- | ----------------------------------------------------------- |
+| `v.number()`  | any finite number         | accepts both integers and floats                            |
+| `v.int()`     | integers only             | rejects `1.5`                                               |
+| `v.float()`   | finite, non-integer       | rejects `1`                                                 |
 | `v.numeric()` | numeric strings + numbers | form/query inputs that arrive as `"42"` — coerces to number |
 
 All four share the same chain surface (see [`number-methods.md`](./number-methods.md)). Picking is about input acceptance, not chain power.
@@ -31,8 +31,8 @@ All four share the same chain surface (see [`number-methods.md`](./number-method
 ## Booleans & scalars
 
 ```ts
-v.boolean()  // type: boolean — adds .accepted() / .declined() for form-style inputs
-v.scalar()   // type: string | number | boolean — usually a smell pointing at a missing discriminator
+v.boolean(); // type: boolean — adds .accepted() / .declined() for form-style inputs
+v.scalar(); // type: string | number | boolean — usually a smell pointing at a missing discriminator
 ```
 
 Use `v.scalar()` only when the field truly accepts any of the three primitives. If it's "one of N specific values across types", `v.literal(...)` is cleaner.
@@ -40,8 +40,8 @@ Use `v.scalar()` only when the field truly accepts any of the three primitives. 
 ## Dates
 
 ```ts
-v.date()                  // type: Date — normalizes strings/timestamps to Date, rich rule surface
-v.instanceof(Date)        // type: Date — raw instanceof, no normalization, no rules
+v.date(); // type: Date — normalizes strings/timestamps to Date, rich rule surface
+v.instanceof(Date); // type: Date — raw instanceof, no normalization, no rules
 ```
 
 `v.date()` is the right tool 99% of the time — it ships `.min/.max/.before/.after/.weekDay/.minAge/...` and a built-in mutator that parses strings. `v.instanceof(Date)` is the escape hatch when you specifically need strict instance identity with zero coercion.
@@ -49,14 +49,14 @@ v.instanceof(Date)        // type: Date — raw instanceof, no normalization, no
 ## Literals & instances
 
 ```ts
-v.literal("items")                          // type: "items"
-v.literal("draft", "published", "archived") // type: "draft" | "published" | "archived"
-v.literal(1, 2, 3)                          // type: 1 | 2 | 3
-v.literal(true)                             // type: true
+v.literal("items"); // type: "items"
+v.literal("draft", "published", "archived"); // type: "draft" | "published" | "archived"
+v.literal(1, 2, 3); // type: 1 | 2 | 3
+v.literal(true); // type: true
 
-v.instanceof(File)                          // type: File
-v.instanceof(Buffer)                        // type: Buffer
-v.instanceof(MyClass)                       // type: MyClass
+v.instanceof(File); // type: File
+v.instanceof(Buffer); // type: Buffer
+v.instanceof(MyClass); // type: MyClass
 ```
 
 **`v.literal` vs `v.string().oneOf([...])` vs `v.enum([...])`:**
@@ -65,20 +65,20 @@ v.instanceof(MyClass)                       // type: MyClass
 - `v.string().oneOf(["a", "b"])` infers as `string` (loses literal types). Use when broad type is fine.
 - `v.enum(["a", "b"])` runs the same `oneOf` rule at runtime (it builds a `StringValidator().oneOf(...)`), but the `v.enum` factory overload **preserves the literal union** — it infers `"a" | "b"`, not `string`. Pass a TS enum object (`v.enum(Direction)`) and it uses `Object.values`, inferring `Direction[keyof Direction]`.
 
-`**`v.literal("")` — the empty string is a value, not an absence.** `""` is accepted when it is one of the configured literals, and the field is still required to be *present*:
+`**`v.literal("")`— the empty string is a value, not an absence.**`""` is accepted when it is one of the configured literals, and the field is still required to be _present_:
 
 ```ts
 const decorative = v.object({ decorative: v.literal(true), alt: v.literal("") });
 
-await v.validate(decorative, { decorative: true, alt: "" });      // valid
-await v.validate(decorative, { decorative: true, alt: "text" });  // invalid — not the literal
-await v.validate(decorative, { decorative: true });               // invalid — key missing
+await v.validate(decorative, { decorative: true, alt: "" }); // valid
+await v.validate(decorative, { decorative: true, alt: "text" }); // invalid — not the literal
+await v.validate(decorative, { decorative: true }); // invalid — key missing
 ```
 
 That distinction matters wherever "empty" and "absent" mean different things — `alt=""` marks an image as decorative to a screen reader, while a missing `alt` is an authoring mistake. Add `.optional()` only when a missing key really is acceptable; a present value must still match the literal.
 
 :::note[Fixed in 4.9.2]
-Before 4.9.2 `v.literal("")` always failed with *"is required"*, and `.optional()` looked like a workaround while actually disabling the literal check — accepting `""`, `null`, and a missing key alike. `v.literal(0)` and `v.literal(false)` were never affected.
+Before 4.9.2 `v.literal("")` always failed with _"is required"_, and `.optional()` looked like a workaround while actually disabling the literal check — accepting `""`, `null`, and a missing key alike. `v.literal(0)` and `v.literal(false)` were never affected.
 :::
 
 :::note[Fixed again in 5.30]
@@ -90,7 +90,7 @@ Before 4.9.2 `v.literal("")` always failed with *"is required"*, and `.optional(
 ## `v.any` — escape hatch
 
 ```ts
-v.any()  // type: any — skips validation entirely
+v.any(); // type: any — skips validation entirely
 ```
 
 Reach for it when you genuinely don't care about the shape. Usually a smell — search PRs for it and ask whether a real schema would catch a class of bugs.
@@ -112,26 +112,26 @@ v.object({
 - **`v.computed`** runs after sibling validation; callback signature is `(data, context)` — `data` is the validated sibling object. Use for derived values (full name, hash of fields, computed totals). An optional second arg validates the result: `v.computed<string>(cb, v.string().min(3))`.
 - **`v.managed`** runs from `SchemaContext` only — callback signature is `(context)`. Caller-supplied extras passed to `validate(schema, data, { context })` land on `context.context`. Use for framework-injected values — timestamps, current user, request id. The callback is optional (`v.managed()`) for values the framework injects without a generator.
 
-Both are **skipped** when their parent `v.object` generates JSON Schema — they never appear in `properties`, since they're runtime-only and not part of the JSON contract an LLM or external API consumer reads. Calling `.toJsonSchema()` *directly* on a `v.computed` / `v.managed` validator **throws** (it's a programming error — let the parent object skip them).
+Both are **skipped** when their parent `v.object` generates JSON Schema — they never appear in `properties`, since they're runtime-only and not part of the JSON contract an LLM or external API consumer reads. Calling `.toJsonSchema()` _directly_ on a `v.computed` / `v.managed` validator **throws** (it's a programming error — let the parent object skip them).
 
 ## Quick map — "I need to validate…"
 
-| Need | Reach for |
-|---|---|
-| Email | `v.string().email()` or `v.email()` |
-| URL | `v.string().url()` |
-| UUID | `v.string().uuid()` (see [`string-methods.md`](./string-methods.md)) |
-| Number 0–100 | `v.number().between(0, 100)` |
-| Positive integer | `v.int().positive()` |
-| One of N constants | `v.literal(...values)` |
-| One of TS enum values | `v.enum(MyEnum)` |
-| Date in the past | `v.date().past()` |
-| File upload | `v.instanceof(File)` |
-| Class instance (not Date) | `v.instanceof(Ctor)` |
-| Discriminated union | see the `define-structural-shape` topic |
-| Derived value (computed from siblings) | `v.computed<T>(callback)` |
-| Framework-injected value | `v.managed<T>(callback)` |
-| Free-form / pass-through | `v.any()` (only when you've thought about it) |
+| Need                                   | Reach for                                                            |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| Email                                  | `v.string().email()` or `v.email()`                                  |
+| URL                                    | `v.string().url()`                                                   |
+| UUID                                   | `v.string().uuid()` (see [`string-methods.md`](./string-methods.md)) |
+| Number 0–100                           | `v.number().between(0, 100)`                                         |
+| Positive integer                       | `v.int().positive()`                                                 |
+| One of N constants                     | `v.literal(...values)`                                               |
+| One of TS enum values                  | `v.enum(MyEnum)`                                                     |
+| Date in the past                       | `v.date().past()`                                                    |
+| File upload                            | `v.instanceof(File)`                                                 |
+| Class instance (not Date)              | `v.instanceof(Ctor)`                                                 |
+| Discriminated union                    | see the `define-structural-shape` topic                              |
+| Derived value (computed from siblings) | `v.computed<T>(callback)`                                            |
+| Framework-injected value               | `v.managed<T>(callback)`                                             |
+| Free-form / pass-through               | `v.any()` (only when you've thought about it)                        |
 
 ## Method-surface reference
 
@@ -150,4 +150,4 @@ For cross-cutting modifiers (`.optional`/`.nullable`/`.default`/`.catch`/`.in`/`
 - Don't pick `v.scalar` because "it's flexible". Flexibility at this layer usually means a missing discriminator — try `v.literal` or `v.union` first.
 - Don't reach for `v.instanceof(Date)` when `v.date()` works. The latter is purpose-built.
 - Don't use `v.string().oneOf(["a", "b"])` for discriminator fields where you need the literal type — use `v.literal("a", "b")`.
-- Don't expect `v.computed` / `v.managed` to validate input — they ignore input shape entirely. Reach for them only when *producing* a value.
+- Don't expect `v.computed` / `v.managed` to validate input — they ignore input shape entirely. Reach for them only when _producing_ a value.

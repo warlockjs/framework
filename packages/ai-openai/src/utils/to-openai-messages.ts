@@ -183,9 +183,7 @@ function toOpenAIContentPart(part: ContentPart): OpenAI.Chat.Completions.ChatCom
  * Render an image source as a URL: a remote URL passes through, inlined
  * base64 bytes become a `data:` URL. Shared with the Responses adapter.
  */
-export function toImageUrl(
-  source: Extract<ContentPart, { type: "image" }>["source"],
-): string {
+export function toImageUrl(source: Extract<ContentPart, { type: "image" }>["source"]): string {
   return "url" in source ? source.url : `data:${source.mediaType};base64,${source.base64}`;
 }
 

@@ -10,7 +10,7 @@ Some shapes describe themselves. A category has sub-categories. A comment has re
 ```ts
 const categorySchema = v.object({
   name: v.string(),
-  children: v.array(categorySchema),  // ❌ ReferenceError — categorySchema is not defined
+  children: v.array(categorySchema), // ❌ ReferenceError — categorySchema is not defined
 });
 ```
 
@@ -55,9 +55,7 @@ Three pieces make this work:
 const data = {
   name: "Tech",
   children: [
-    { name: "Web", children: [
-      { name: "TypeScript", children: [] },
-    ]},
+    { name: "Web", children: [{ name: "TypeScript", children: [] }] },
     { name: "Mobile", children: [] },
   ],
 };
@@ -78,10 +76,10 @@ This matters in chains like:
 ```ts
 // "children" is required if the inner ObjectValidator is required-by-default,
 // even though the lazy wrapper itself doesn't enforce anything.
-children: v.array(v.lazy(() => categorySchema))   // children must be array, items must validate
+children: v.array(v.lazy(() => categorySchema)); // children must be array, items must validate
 
 // To make the children itself optional:
-children: v.array(v.lazy(() => categorySchema)).optional()
+children: v.array(v.lazy(() => categorySchema)).optional();
 ```
 
 The `.optional()` goes on the OUTER `v.array()`, not on the lazy wrapper.

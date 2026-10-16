@@ -46,12 +46,12 @@ channels: {
 
 ## The `route` contract
 
-| `route()` returns | Meaning |
-| --- | --- |
-| `string` | The address (URL, email, chat id) |
-| `{ id }` | A storage id (database-style channels) |
-| `undefined` | Unroutable for this recipient → `UnresolvableRouteError` |
-| (no `route`) | Falls back to `{ id: notifiable.id }` |
+| `route()` returns | Meaning                                                  |
+| ----------------- | -------------------------------------------------------- |
+| `string`          | The address (URL, email, chat id)                        |
+| `{ id }`          | A storage id (database-style channels)                   |
+| `undefined`       | Unroutable for this recipient → `UnresolvableRouteError` |
+| (no `route`)      | Falls back to `{ id: notifiable.id }`                    |
 
 Throw inside `send` to fail; the dispatcher isolates it as a `failed` event and continues with sibling channels.
 
@@ -63,7 +63,14 @@ A channel that wraps a heavy SDK (Slack, Twilio, FCM) should lazily `import()` i
 import type { WebClient } from "@slack/web-api";
 let Slack: typeof import("@slack/web-api");
 let loaded: boolean | null = null;
-async function loadSlack() { try { Slack = await import("@slack/web-api"); loaded = true; } catch { loaded = false; } }
+async function loadSlack() {
+  try {
+    Slack = await import("@slack/web-api");
+    loaded = true;
+  } catch {
+    loaded = false;
+  }
+}
 loadSlack();
 
 export const slackChannel = (config: { token: string }) =>
@@ -73,7 +80,10 @@ export const slackChannel = (config: { token: string }) =>
     async send({ payload, route }) {
       await loadSlack();
       if (!loaded) throw new Error("Install @slack/web-api to use the slack channel");
-      await new Slack.WebClient(config.token).chat.postMessage({ channel: route as string, text: payload.text });
+      await new Slack.WebClient(config.token).chat.postMessage({
+        channel: route as string,
+        text: payload.text,
+      });
     },
   });
 ```

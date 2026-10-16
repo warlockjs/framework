@@ -79,11 +79,9 @@ describe("Router.replaceRoutesBySourceFiles", () => {
     const newPath = path("new-visible");
 
     await register(owner, () =>
-      router.get(
-        oldPath,
-        ((request: any, response: any) => [request, response]) as any,
-        { name: `${testKey}.visible` },
-      ),
+      router.get(oldPath, ((request: any, response: any) => [request, response]) as any, {
+        name: `${testKey}.visible`,
+      }),
     );
 
     const oldTable = router.list();
@@ -99,11 +97,9 @@ describe("Router.replaceRoutesBySourceFiles", () => {
 
     const replacement = router.replaceRoutesBySourceFiles([owner], async () => {
       await register(owner, () =>
-        router.get(
-          newPath,
-          ((request: any, response: any) => [request, response]) as any,
-          { name: `${testKey}.visible` },
-        ),
+        router.get(newPath, ((request: any, response: any) => [request, response]) as any, {
+          name: `${testKey}.visible`,
+        }),
       );
       signalInstallReached();
       await installGate;

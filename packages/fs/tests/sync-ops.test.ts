@@ -62,7 +62,9 @@ describe("synchronous file operations", () => {
     ensureDirectory(path.join(dir, "sub1"));
     ensureDirectory(path.join(dir, "sub2"));
 
-    const directories = listDirectories(dir).map((entry) => path.basename(entry)).sort();
+    const directories = listDirectories(dir)
+      .map((entry) => path.basename(entry))
+      .sort();
 
     expect(directories).toEqual(["sub1", "sub2"]);
   });

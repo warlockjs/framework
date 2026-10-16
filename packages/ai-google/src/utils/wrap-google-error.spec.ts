@@ -31,9 +31,9 @@ describe("wrapGoogleError", () => {
   });
 
   it("maps a status-less 'unauthenticated' message to ProviderAuthError", () => {
-    expect(
-      wrapGoogleError({ name: "X", message: "request is unauthenticated" }),
-    ).toBeInstanceOf(ProviderAuthError);
+    expect(wrapGoogleError({ name: "X", message: "request is unauthenticated" })).toBeInstanceOf(
+      ProviderAuthError,
+    );
   });
 
   it("maps 429 / RESOURCE_EXHAUSTED to ProviderRateLimitError", () => {
@@ -74,9 +74,7 @@ describe("wrapGoogleError", () => {
     ];
 
     for (const phrase of phrases) {
-      expect(wrapGoogleError(googleError(400, phrase))).toBeInstanceOf(
-        ContextLengthExceededError,
-      );
+      expect(wrapGoogleError(googleError(400, phrase))).toBeInstanceOf(ContextLengthExceededError);
     }
   });
 

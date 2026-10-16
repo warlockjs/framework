@@ -107,7 +107,10 @@ function changedFiles(base) {
     encoding: "utf8",
   });
 
-  return output.split("\n").map((line) => line.trim()).filter(Boolean);
+  return output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 /** Add every package that depends, directly or not, on one already selected. */

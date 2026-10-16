@@ -15,9 +15,10 @@ export type LoaderFunction = (...args: any[]) => unknown;
  * raw `Promise` must never reach `Serialized` itself, which would map its
  * methods away.
  */
-type SerializedDeferredValue<V> = V extends PromiseLike<unknown>
-  ? Promise<Serialized<Awaited<V>, "devalue">>
-  : Serialized<V, "devalue">;
+type SerializedDeferredValue<V> =
+  V extends PromiseLike<unknown>
+    ? Promise<Serialized<Awaited<V>, "devalue">>
+    : Serialized<V, "devalue">;
 
 /**
  * What survives `serializeLoaderData` + devalue for a loader's return value:
@@ -26,11 +27,12 @@ type SerializedDeferredValue<V> = V extends PromiseLike<unknown>
  * (see {@link SerializedDeferredValue}). `void` passes through unchanged (the
  * page reads `undefined`).
  */
-type SerializedLoaderReturn<T> = T extends DeferredResult<infer TData>
-  ? { -readonly [K in keyof TData]: SerializedDeferredValue<TData[K]> }
-  : [T] extends [void]
-    ? T
-    : Serialized<T, "devalue">;
+type SerializedLoaderReturn<T> =
+  T extends DeferredResult<infer TData>
+    ? { -readonly [K in keyof TData]: SerializedDeferredValue<TData[K]> }
+    : [T] extends [void]
+      ? T
+      : Serialized<T, "devalue">;
 
 /**
  * What a page, layout or app component reads from its loader: the loader's

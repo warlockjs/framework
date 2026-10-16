@@ -10,13 +10,13 @@ sidebar:
 
 ## Adapter overview
 
-| Adapter | Status | Talks to | Best for |
-| --- | --- | --- | --- |
-| [`@warlock.js/ai-openai`](/v/latest/ai/providers/openai/) | Shipped | OpenAI + any OpenAI-compatible gateway | Default first choice. Works against OpenAI directly or via OpenRouter / Together.ai / Azure / local gateways. |
-| [`@warlock.js/ai-anthropic`](/v/latest/ai/providers/anthropic/) | Shipped | Anthropic Claude API directly | Native Claude Opus / Sonnet / Haiku via the Messages API. |
-| [`@warlock.js/ai-bedrock`](/v/latest/ai/providers/bedrock/) | Shipped | AWS Bedrock | When AWS pricing / compliance / data residency matters more than provider choice. Converse API + Titan embeddings. |
-| [`@warlock.js/ai-google`](/v/latest/ai/providers/google/) | Shipped | Google Gemini directly | Gemini-specific features (long context, native multimodal), via `@google/genai`. |
-| [`@warlock.js/ai-ollama`](/v/latest/ai/providers/ollama/) | Shipped | Local Ollama runtime | Local models for dev, on-prem deployments, or air-gapped systems. |
+| Adapter                                                         | Status  | Talks to                               | Best for                                                                                                           |
+| --------------------------------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| [`@warlock.js/ai-openai`](/v/latest/ai/providers/openai/)       | Shipped | OpenAI + any OpenAI-compatible gateway | Default first choice. Works against OpenAI directly or via OpenRouter / Together.ai / Azure / local gateways.      |
+| [`@warlock.js/ai-anthropic`](/v/latest/ai/providers/anthropic/) | Shipped | Anthropic Claude API directly          | Native Claude Opus / Sonnet / Haiku via the Messages API.                                                          |
+| [`@warlock.js/ai-bedrock`](/v/latest/ai/providers/bedrock/)     | Shipped | AWS Bedrock                            | When AWS pricing / compliance / data residency matters more than provider choice. Converse API + Titan embeddings. |
+| [`@warlock.js/ai-google`](/v/latest/ai/providers/google/)       | Shipped | Google Gemini directly                 | Gemini-specific features (long context, native multimodal), via `@google/genai`.                                   |
+| [`@warlock.js/ai-ollama`](/v/latest/ai/providers/ollama/)       | Shipped | Local Ollama runtime                   | Local models for dev, on-prem deployments, or air-gapped systems.                                                  |
 
 All five first-party adapters ship and share the same `SDKAdapterContract`. You can also reach 100+ models through OpenRouter with the OpenAI adapter (`OpenAISDK({ baseURL: "https://openrouter.ai/api/v1" })`) when you want one key for many providers. `ai-openrouter` is intentionally deferred in favor of that path.
 
@@ -35,9 +35,9 @@ Every adapter implements the same `SDKAdapterContract`:
 
 ```ts
 interface SDKAdapterContract {
-  model(config): ModelContract;         // the provider label lives on ModelContract.provider
+  model(config): ModelContract; // the provider label lives on ModelContract.provider
   count(text, model?): Promise<number>; // token counting
-  embedder?(config): EmbedderContract;  // optional — not every provider supports embeddings
+  embedder?(config): EmbedderContract; // optional — not every provider supports embeddings
 }
 ```
 
@@ -57,12 +57,12 @@ Every `ModelContract` declares what it supports — six optional flags today (ab
 
 ```ts
 type ModelCapabilities = {
-  structuredOutput?: boolean;   // native response_format: json_schema?
-  vision?: boolean;             // can accept image attachments?
-  reasoning?: boolean;          // exposes extended-thinking / reasoning?
-  promptCaching?: boolean;      // honors cache-control breakpoints + reports cached tokens?
-  audio?: boolean;              // can accept audio attachments?
-  pdf?: boolean;                // can accept PDF / document attachments?
+  structuredOutput?: boolean; // native response_format: json_schema?
+  vision?: boolean; // can accept image attachments?
+  reasoning?: boolean; // exposes extended-thinking / reasoning?
+  promptCaching?: boolean; // honors cache-control breakpoints + reports cached tokens?
+  audio?: boolean; // can accept audio attachments?
+  pdf?: boolean; // can accept PDF / document attachments?
 };
 ```
 
@@ -103,20 +103,19 @@ Reports label per-agent provider correctly. Pricing applies per SDK instance. Co
 
 ## Native input-token preflight
 
-
-| Model transport | Native `countTokens` | Provider option key |
-| --- | --- | --- |
-| Anthropic Messages | Yes | `anthropic` |
-| OpenAI Responses | Yes | `openai` |
-| OpenAI Chat Completions | Absent | `openai` |
-| Bedrock Converse | Yes, where supported by the model/region | `bedrock` |
-| Google Vertex | Yes, including system instructions and tools | `google` |
-| Google Developer API | Contents only; system/tools requests explicitly fail | `google` |
-| Ollama chat | Absent | `ollama` |
-| xAI Chat | Absent | `openai` |
-| Groq Chat | Absent | `openai` |
-| DeepSeek Chat | Absent | `openai` |
-| Mistral Chat | Absent | `openai` |
+| Model transport         | Native `countTokens`                                 | Provider option key |
+| ----------------------- | ---------------------------------------------------- | ------------------- |
+| Anthropic Messages      | Yes                                                  | `anthropic`         |
+| OpenAI Responses        | Yes                                                  | `openai`            |
+| OpenAI Chat Completions | Absent                                               | `openai`            |
+| Bedrock Converse        | Yes, where supported by the model/region             | `bedrock`           |
+| Google Vertex           | Yes, including system instructions and tools         | `google`            |
+| Google Developer API    | Contents only; system/tools requests explicitly fail | `google`            |
+| Ollama chat             | Absent                                               | `ollama`            |
+| xAI Chat                | Absent                                               | `openai`            |
+| Groq Chat               | Absent                                               | `openai`            |
+| DeepSeek Chat           | Absent                                               | `openai`            |
+| Mistral Chat            | Absent                                               | `openai`            |
 
 All adapters ignore unrelated provider keys. Native counts make network calls;
 check `model.countTokens` before using them. Offline `sdk.count(text)` estimates

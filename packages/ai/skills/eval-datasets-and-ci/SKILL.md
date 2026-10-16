@@ -17,11 +17,11 @@ import { ai } from "@warlock.js/ai";
 const ds = ai.dataset({
   name: "support",
   cases: [{ name: "greeting", input: "hi", expected: "Hello" }], // inline entries
-  fromFile: "./eval/support.jsonl",  // JSONL read ONCE, synchronously, at construction
+  fromFile: "./eval/support.jsonl", // JSONL read ONCE, synchronously, at construction
 });
 
-ds.name;   // "support"
-ds.cases;  // DatasetEntry[] (inline first, then file entries appended)
+ds.name; // "support"
+ds.cases; // DatasetEntry[] (inline first, then file entries appended)
 ```
 
 - A `DatasetEntry` is an `EvalCase` plus optional `tags?: string[]` for filtering / sharding.
@@ -40,7 +40,7 @@ Both return a **fresh dataset sharing nothing mutable**. `shard(index, total)` i
 
 ```ts
 const report = await myAgent.eval({
-  cases: ds,                       // a DatasetContract OR a raw EvalCase[]
+  cases: ds, // a DatasetContract OR a raw EvalCase[]
   scorers: [ai.eval.contains()],
 });
 
@@ -59,8 +59,8 @@ const baseline = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8")
 const report = await myAgent.eval({
   cases: ds,
   scorers: [ai.eval.exact()],
-  baseline,         // a prior EvalReport to diff against
-  tolerance: 0.05,  // max allowed per-case score DROP before it regresses. default 0 (any drop)
+  baseline, // a prior EvalReport to diff against
+  tolerance: 0.05, // max allowed per-case score DROP before it regresses. default 0 (any drop)
 });
 
 if (report.regression && !report.regression.passed) {
@@ -96,7 +96,8 @@ const restored = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8")
 ## Typical CI shard job
 
 ```ts
-const shard = ai.dataset({ name: "support", fromFile: "./eval/support.jsonl" })
+const shard = ai
+  .dataset({ name: "support", fromFile: "./eval/support.jsonl" })
   .shard(Number(process.env.SHARD_INDEX), Number(process.env.SHARD_TOTAL));
 
 const report = await agent.eval({

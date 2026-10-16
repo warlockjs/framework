@@ -24,7 +24,7 @@ async function processIfChanged(input: string, run: () => Promise<void>) {
   const digest = await fs.hash.file(input);
 
   // Only work when the recorded digest doesn't match the current content.
-  if (await fs.files.exists(sentinel) && await fs.files.checksumMatches(sentinel, digest)) {
+  if ((await fs.files.exists(sentinel)) && (await fs.files.checksumMatches(sentinel, digest))) {
     return;
   }
 
@@ -37,7 +37,7 @@ async function processIfChanged(input: string, run: () => Promise<void>) {
 it's the read-and-compare half of the gate in one call.
 
 :::caution[Write the sentinel last]
-Record the digest *after* the work succeeds. Update it first and a crash
+Record the digest _after_ the work succeeds. Update it first and a crash
 mid-run leaves the sentinel claiming "done" when it isn't. Doing it last means
 a crash re-processes on the next run — so your step must be idempotent.
 :::

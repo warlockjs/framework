@@ -17,8 +17,8 @@ await traceContext.run(traceStore, async () =>
   userContext.run(userStore, async () =>
     tenantContext.run(tenantStore, async () => {
       await handleRequest();
-    })
-  )
+    }),
+  ),
 );
 ```
 
@@ -69,10 +69,10 @@ This keeps the boundary code generic. Add a `metrics` context, implement its `bu
 
 ```ts
 contextManager
-  .register("trace", traceContext)        // outermost
+  .register("trace", traceContext) // outermost
   .register("request", requestContext)
   .register("database", databaseContext)
-  .register("tenant", tenantContext);     // innermost
+  .register("tenant", tenantContext); // innermost
 ```
 
 This matters if one context's `buildStore` needs to read another. If `tenantContext.buildStore` calls the database, register `database` before `tenant`. The rule: dependencies go first.

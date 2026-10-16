@@ -173,48 +173,46 @@ type SerializedObject<T, W extends SerializedWire, D extends unknown[]> = W exte
  * type UserPayload = Serialized<User>; // resource output or serialized data
  * type PageData = Serialized<LoaderReturn, "devalue">;
  */
-export type Serialized<
-  T,
-  W extends SerializedWire = "json",
-  D extends unknown[] = [],
-> = IsAny<T> extends true
-  ? any
-  : unknown extends T
-    ? unknown
-    : D["length"] extends MaxSerializedDepth
+export type Serialized<T, W extends SerializedWire = "json", D extends unknown[] = []> =
+  IsAny<T> extends true
+    ? any
+    : unknown extends T
       ? unknown
-      : T extends Primitive
-        ? T
-        : T extends Binary
+      : D["length"] extends MaxSerializedDepth
+        ? unknown
+        : T extends Primitive
           ? T
-          : W extends "devalue"
-            ? T extends DevalueNative
-              ? T
-              : // Page data awaits promises nested in plain objects and arrays, then
-                // serializes the settled value, so the page receives that value.
-                T extends PromiseLike<infer V>
-                ? Serialized<V, W, D>
-                : SerializedStructure<T, W, D>
-            : T extends Map<infer K, infer V>
-              ? Record<Extract<K, PropertyKey>, Serialized<V, W, D>>
-              : SerializedStructure<T, W, D>;
+          : T extends Binary
+            ? T
+            : W extends "devalue"
+              ? T extends DevalueNative
+                ? T
+                : // Page data awaits promises nested in plain objects and arrays, then
+                  // serializes the settled value, so the page receives that value.
+                  T extends PromiseLike<infer V>
+                  ? Serialized<V, W, D>
+                  : SerializedStructure<T, W, D>
+              : T extends Map<infer K, infer V>
+                ? Record<Extract<K, PropertyKey>, Serialized<V, W, D>>
+                : SerializedStructure<T, W, D>;
 
-type SerializedStructure<T, W extends SerializedWire, D extends unknown[]> = T extends Model<any>
-  ? SerializedModel<T, W, D>
-  : T extends { toJSON(...args: any[]): infer R }
-    ? Serialized<Awaited<R>, W, [...D, 0]>
-    : T extends readonly unknown[]
-      ? { -readonly [K in keyof T]: Serialized<T[K], W, D> }
-      : T extends Iterable<infer I>
-        ? Serialized<I, W, D>[]
-        : T extends (...args: any[]) => any
-          ? never
-          : T extends OpaqueBuiltin
-            ? W extends "json"
-              ? {}
-              : never
-            : HasNonPublicMembers<T> extends true
+type SerializedStructure<T, W extends SerializedWire, D extends unknown[]> =
+  T extends Model<any>
+    ? SerializedModel<T, W, D>
+    : T extends { toJSON(...args: any[]): infer R }
+      ? Serialized<Awaited<R>, W, [...D, 0]>
+      : T extends readonly unknown[]
+        ? { -readonly [K in keyof T]: Serialized<T[K], W, D> }
+        : T extends Iterable<infer I>
+          ? Serialized<I, W, D>[]
+          : T extends (...args: any[]) => any
+            ? never
+            : T extends OpaqueBuiltin
               ? W extends "json"
-                ? SerializedObject<T, W, D>
+                ? {}
                 : never
-              : SerializedObject<T, W, D>;
+              : HasNonPublicMembers<T> extends true
+                ? W extends "json"
+                  ? SerializedObject<T, W, D>
+                  : never
+                : SerializedObject<T, W, D>;

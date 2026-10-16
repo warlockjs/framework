@@ -68,12 +68,12 @@ A raw `dataSource.driver.queryBuilder(table)` has no model context. If someone c
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Eager-load in `get()` or in a higher-level wrapper? | **In `get()`.** That's where models become available; eager-load needs them. |
-| 2 | Order vs user's `fetchedCallback`? | **Eager first, then user.** User sees loaded models; matches mental model. |
-| 3 | Throw or skip when `modelClass` missing? | **Skip silently.** Raw driver-level usage doesn't have a relations map. |
-| 4 | Also fix MongoDB driver in this plan? | **Yes.** Same bug surface. |
+| #   | Question                                            | Recommendation                                                               |
+| --- | --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | Eager-load in `get()` or in a higher-level wrapper? | **In `get()`.** That's where models become available; eager-load needs them. |
+| 2   | Order vs user's `fetchedCallback`?                  | **Eager first, then user.** User sees loaded models; matches mental model.   |
+| 3   | Throw or skip when `modelClass` missing?            | **Skip silently.** Raw driver-level usage doesn't have a relations map.      |
+| 4   | Also fix MongoDB driver in this plan?               | **Yes.** Same bug surface.                                                   |
 
 ## Verification
 
@@ -89,6 +89,7 @@ Eager-loading invocation moved from the `buildQuery`-installed `onFetched` callb
 **Why it matters.** Previously, only builders constructed via `Model.query()` / `buildQuery` had the loader hook installed. Any other path — `Model.newQueryBuilder()` direct, custom subclassed builders via `static builder`, raw driver-level usage — made `with()` a silent no-op.
 
 **Implementation:**
+
 - `applyEagerLoading(records)` lives on `PostgresQueryBuilder` and runs after `attachJoinedRelations` and before the user's `fetchedCallback`. The user therefore sees fully-loaded models in their onFetched hook.
 - Skipped silently when `modelClass` is absent (raw driver-level `queryBuilder()` usage has no relations map).
 - `buildQuery`'s onFetched callback now just emits the model-level `fetched` event — the loader duplication was deleted.

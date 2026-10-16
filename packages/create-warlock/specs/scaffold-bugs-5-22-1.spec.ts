@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,9 +82,7 @@ describe("scaffold bugs (5.22.1)", () => {
   it("bug 3: mongodb keeps DB_AUTH and 27017 in both files", () => {
     const appPath = path.join(root, "web");
 
-    new App(makeApplication(appPath, "mongodb"))
-      .use("warlock")
-      .configureDatabaseEnv("mongodb");
+    new App(makeApplication(appPath, "mongodb")).use("warlock").configureDatabaseEnv("mongodb");
 
     for (const file of [".env", ".env.example"]) {
       const env = readFileSync(path.join(appPath, file), "utf8");
@@ -101,9 +92,8 @@ describe("scaffold bugs (5.22.1)", () => {
   });
 
   it("bug 4: gen.* scripts use the registered `warlock generate.<x>` form", () => {
-    const scripts = JSON.parse(
-      readFileSync(path.join(templateDir, "package.json"), "utf8"),
-    ).scripts as Record<string, string>;
+    const scripts = JSON.parse(readFileSync(path.join(templateDir, "package.json"), "utf8"))
+      .scripts as Record<string, string>;
 
     expect(scripts["gen.s"]).toBe("warlock generate.service");
     expect(scripts["gen.m"]).toBe("warlock generate.model");
@@ -164,7 +154,9 @@ describe("scaffold bugs (5.22.1)", () => {
 
         new App(makeApplication(appPath)).use("warlock");
 
-        expect(readFileSync(path.join(appPath, "pnpm-workspace.yaml"), "utf8")).toBe(templateYaml());
+        expect(readFileSync(path.join(appPath, "pnpm-workspace.yaml"), "utf8")).toBe(
+          templateYaml(),
+        );
         expect(readPackageJson(appPath).pnpm).toBeUndefined();
       },
     );
@@ -183,17 +175,30 @@ describe("scaffold bugs (5.22.1)", () => {
 
     it("approves sharp where each version reads it when the image feature is selected", () => {
       for (const [version, check] of [
-        ["9.15.9", (appPath: string) => expect(readPackageJson(appPath).pnpm.onlyBuiltDependencies).toEqual(["esbuild", "sharp"])],
-        ["10.20.0", (appPath: string) => {
-          const yaml = readFileSync(path.join(appPath, "pnpm-workspace.yaml"), "utf8");
-          expect(yaml).toMatch(/^  sharp: true$/m);
-          expect(yaml).toMatch(/^  - sharp$/m);
-        }],
-        ["11.28.6", (appPath: string) => {
-          const yaml = readFileSync(path.join(appPath, "pnpm-workspace.yaml"), "utf8");
-          expect(yaml).toMatch(/^  sharp: true$/m);
-          expect(yaml).not.toMatch(/onlyBuiltDependencies/);
-        }],
+        [
+          "9.15.9",
+          (appPath: string) =>
+            expect(readPackageJson(appPath).pnpm.onlyBuiltDependencies).toEqual([
+              "esbuild",
+              "sharp",
+            ]),
+        ],
+        [
+          "10.20.0",
+          (appPath: string) => {
+            const yaml = readFileSync(path.join(appPath, "pnpm-workspace.yaml"), "utf8");
+            expect(yaml).toMatch(/^  sharp: true$/m);
+            expect(yaml).toMatch(/^  - sharp$/m);
+          },
+        ],
+        [
+          "11.28.6",
+          (appPath: string) => {
+            const yaml = readFileSync(path.join(appPath, "pnpm-workspace.yaml"), "utf8");
+            expect(yaml).toMatch(/^  sharp: true$/m);
+            expect(yaml).not.toMatch(/onlyBuiltDependencies/);
+          },
+        ],
       ] as const) {
         pnpmVersion = version;
         const appPath = path.join(root, `image-${version}`);

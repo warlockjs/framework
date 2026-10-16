@@ -22,6 +22,7 @@ name: string;
 ```
 
 Example:
+
 ```ts
 const driver = cache.driver("redis");
 console.log(driver.name); // "redis"
@@ -42,10 +43,11 @@ set(
 ```
 
 Examples:
+
 ```ts
 // Positional TTL
-await cache.set("product.123", product, 3600);        // seconds
-await cache.set("product.123", product, "1h");        // duration string
+await cache.set("product.123", product, 3600); // seconds
+await cache.set("product.123", product, "1h"); // duration string
 
 // Rich options
 await cache.set("product.123", product, {
@@ -66,6 +68,7 @@ get<T = any>(key: string | GenericObject): Promise<T | null>;
 ```
 
 Example:
+
 ```ts
 const product = await cache.get("product.123");
 if (product === null) {
@@ -82,6 +85,7 @@ has(key: string | GenericObject): Promise<boolean>;
 ```
 
 Example:
+
 ```ts
 const exists = await cache.has("rate-limit.user.456");
 ```
@@ -95,6 +99,7 @@ remove(key: string | GenericObject): Promise<void>;
 ```
 
 Example:
+
 ```ts
 await cache.remove("product.123");
 ```
@@ -108,6 +113,7 @@ flush(): Promise<void>;
 ```
 
 Example:
+
 ```ts
 await cache.flush();
 ```
@@ -121,6 +127,7 @@ removeNamespace(namespace: string): Promise<any>;
 ```
 
 Example:
+
 ```ts
 // Removes all keys like "product.123", "product.456", etc.
 await cache.removeNamespace("product");
@@ -139,6 +146,7 @@ remember<T = any>(
 ```
 
 Example:
+
 ```ts
 const user = await cache.remember("user.789", "1h", async () => {
   return await database.users.find(789);
@@ -156,6 +164,7 @@ pull<T = any>(key: string | GenericObject): Promise<T | null>;
 ```
 
 Example:
+
 ```ts
 const order = await cache.pull("order-session.abc123");
 ```
@@ -169,6 +178,7 @@ forever<T = any>(key: string | GenericObject, value: T): Promise<T>;
 ```
 
 Example:
+
 ```ts
 await cache.forever("config.app", { version: "1.0.0" });
 ```
@@ -182,6 +192,7 @@ increment(key: string | GenericObject, value?: number): Promise<number>;
 ```
 
 Example:
+
 ```ts
 const count = await cache.increment("product.views.123", 1);
 ```
@@ -195,6 +206,7 @@ decrement(key: string | GenericObject, value?: number): Promise<number>;
 ```
 
 Example:
+
 ```ts
 const stock = await cache.decrement("inventory.widget", 5);
 ```
@@ -212,6 +224,7 @@ update<T = any>(
 ```
 
 Example:
+
 ```ts
 await cache.update<User>("user.1", (current) => ({
   ...(current ?? defaultUser),
@@ -234,6 +247,7 @@ merge<T extends Record<string, any> = Record<string, any>>(
 ```
 
 Example:
+
 ```ts
 await cache.merge<User>("user.1", { name: "Jane" });
 ```
@@ -249,6 +263,7 @@ list<T = any>(key: string | GenericObject): CacheListAccessor<T>;
 ```
 
 Example:
+
 ```ts
 const recent = cache.list<Event>("recent.events");
 await recent.push(event);
@@ -266,12 +281,9 @@ many(keys: (string | GenericObject)[]): Promise<any[]>;
 ```
 
 Example:
+
 ```ts
-const [user, product, order] = await cache.many([
-  "user.123",
-  "product.456",
-  "order.789",
-]);
+const [user, product, order] = await cache.many(["user.123", "product.456", "order.789"]);
 ```
 
 ## setMany(items, ttl?)
@@ -283,11 +295,15 @@ setMany(items: Record<string, any>, ttl?: CacheTtl): Promise<void>;
 ```
 
 Example:
+
 ```ts
-await cache.setMany({
-  "user.123": { id: 123, name: "Alice" },
-  "user.456": { id: 456, name: "Bob" },
-}, "1h");
+await cache.setMany(
+  {
+    "user.123": { id: 123, name: "Alice" },
+    "user.456": { id: 456, name: "Bob" },
+  },
+  "1h",
+);
 ```
 
 ## tags(tags)
@@ -299,10 +315,11 @@ tags(tags: string[]): TaggedCacheDriver;
 ```
 
 Example:
+
 ```ts
 const tagged = cache.tags(["products", "featured"]);
 await tagged.set("item.1", product1);
-await tagged.invalidate();   // drops every key tagged "products" or "featured"
+await tagged.invalidate(); // drops every key tagged "products" or "featured"
 ```
 
 ## similar(vector, options)
@@ -317,6 +334,7 @@ similar<T = any>(
 ```
 
 Example:
+
 ```ts
 const hits = await cache.similar(await embed(query), {
   topK: 5,
@@ -336,11 +354,13 @@ parseKey(key: string | GenericObject): string;
 ```
 
 Key parsing rules:
+
 - String keys: strip `{}"[]`, replace `:` and `,` with `.`
 - Object keys: JSON stringify then apply string rules
 - Global prefix is prepended if configured
 
 Example:
+
 ```ts
 const parsed = cache.parseKey({ namespace: "product", id: 123 });
 // "app.namespace.product.id.123"
@@ -449,10 +469,7 @@ export interface CacheDriver<ClientType, Options> {
   tags(tags: string[]): TaggedCacheDriver;
 
   // Similarity
-  similar<T = any>(
-    vector: number[],
-    options: CacheSimilarOptions,
-  ): Promise<CacheSimilarHit<T>[]>;
+  similar<T = any>(vector: number[], options: CacheSimilarOptions): Promise<CacheSimilarHit<T>[]>;
 
   // Infrastructure
   parseKey(key: string | GenericObject): string;
@@ -477,8 +494,8 @@ Returned by conditional writes (`onConflict: "create"` or `"update"`):
 
 ```ts
 type CacheSetResult<T = any> = {
-  wasSet: boolean;       // did the write take effect?
-  existing: T | null;    // prior value, populated on "create" rejections
+  wasSet: boolean; // did the write take effect?
+  existing: T | null; // prior value, populated on "create" rejections
 };
 ```
 
@@ -490,15 +507,15 @@ Used by `similar()`:
 
 ```ts
 type CacheSimilarOptions = {
-  topK: number;          // required — max hits returned
-  threshold?: number;    // [0, 1]; hits scoring strictly below are dropped
-  tags?: string[];       // narrow candidate pool by tag (union)
+  topK: number; // required — max hits returned
+  threshold?: number; // [0, 1]; hits scoring strictly below are dropped
+  tags?: string[]; // narrow candidate pool by tag (union)
 };
 
 type CacheSimilarHit<T = unknown> = {
-  key: string;           // post-parseKey normalized key
-  value: T;              // deep-cloned stored value
-  score: number;         // cosine similarity [0, 1]
+  key: string; // post-parseKey normalized key
+  value: T; // deep-cloned stored value
+  score: number; // cosine similarity [0, 1]
 };
 ```
 
@@ -602,10 +619,18 @@ export class MyCacheDriver
     return this;
   }
 
-  public async get(key: CacheKey) { /* ... */ }
-  public async remove(key: CacheKey) { /* ... */ }
-  public async flush() { /* ... */ }
-  public async removeNamespace(namespace: string) { /* ... */ }
+  public async get(key: CacheKey) {
+    /* ... */
+  }
+  public async remove(key: CacheKey) {
+    /* ... */
+  }
+  public async flush() {
+    /* ... */
+  }
+  public async removeNamespace(namespace: string) {
+    /* ... */
+  }
 }
 ```
 

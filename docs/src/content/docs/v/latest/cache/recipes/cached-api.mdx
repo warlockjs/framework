@@ -20,25 +20,22 @@ import { cached } from "@warlock.js/cache";
 
 const getExchangeRates = cached(
   (base: string) => api.fetchRates(base),
-  "rates",     // key prefix → getExchangeRates("USD") caches under "rates.USD"
-  "10m",       // TTL on miss
+  "rates", // key prefix → getExchangeRates("USD") caches under "rates.USD"
+  "10m", // TTL on miss
 );
 
-const usd = await getExchangeRates("USD");   // fetches, caches
-const usd2 = await getExchangeRates("USD");  // cache hit — no network
+const usd = await getExchangeRates("USD"); // fetches, caches
+const usd2 = await getExchangeRates("USD"); // cache hit — no network
 ```
 
 Need tags (for bulk invalidation) or a custom key? Use the options form:
 
 ```ts
-const searchProducts = cached(
-  (filters: ProductFilters) => api.searchProducts(filters),
-  {
-    key: (filters) => `products.search.${filters.category}.${filters.sort}`,
-    ttl: "15m",
-    tags: ["products"],
-  },
-);
+const searchProducts = cached((filters: ProductFilters) => api.searchProducts(filters), {
+  key: (filters) => `products.search.${filters.category}.${filters.sort}`,
+  ttl: "15m",
+  tags: ["products"],
+});
 ```
 
 ## Invalidating
@@ -47,7 +44,7 @@ const searchProducts = cached(
 you can drop one entry by its arguments:
 
 ```ts
-await getExchangeRates.invalidate("USD");   // drops "rates.USD"
+await getExchangeRates.invalidate("USD"); // drops "rates.USD"
 ```
 
 Or, if you tagged the writes, wipe the whole group at once:
@@ -68,10 +65,8 @@ in the stale window, and only blocks once the entry is fully expired:
 import { cache } from "@warlock.js/cache";
 
 async function getRates(base: string) {
-  return cache.swr(
-    `rates.${base}`,
-    { freshTtl: "1m", staleTtl: "1h", tags: ["rates"] },
-    () => api.fetchRates(base),
+  return cache.swr(`rates.${base}`, { freshTtl: "1m", staleTtl: "1h", tags: ["rates"] }, () =>
+    api.fetchRates(base),
   );
 }
 ```
@@ -93,10 +88,11 @@ restart, route just these writes to a durable driver — no change to your
 default:
 
 ```ts
-const getRates = cached(
-  (base: string) => api.fetchRates(base),
-  { key: (base) => `rates.${base}`, ttl: "10m", driver: "redis" },
-);
+const getRates = cached((base: string) => api.fetchRates(base), {
+  key: (base) => `rates.${base}`,
+  ttl: "10m",
+  driver: "redis",
+});
 ```
 
 ## Related Documentation

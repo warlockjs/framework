@@ -22,9 +22,9 @@
 
 ```ts
 const config = v.object({
-  retries: v.int().min(0).catch(3),                  // bad number → 3
+  retries: v.int().min(0).catch(3), // bad number → 3
   region: v.string().in(["us", "eu", "ap"]).catch("us"),
-  features: v.array(v.string()).catch([]),           // null/wrong shape → empty array
+  features: v.array(v.string()).catch([]), // null/wrong shape → empty array
 });
 
 // Even with garbage input:
@@ -35,12 +35,12 @@ const r = await validate(config, { retries: "not-a-number", region: null, featur
 
 ## The complementary picture
 
-| Method | Fires when | Output if no input | Output if invalid input |
-|---|---|---|---|
-| `.optional()` | absent | key omitted | (rules run — fails) |
-| `.default(x)` | absent | `x` (rules then run on `x`) | (rules run — fails) |
-| `.catch(x)` | invalid | (no rescue — required check fails) | `x` |
-| `.optional().default(x).catch(y)` | absent: `x`, invalid: `y` | `x` | `y` |
+| Method                            | Fires when                | Output if no input                 | Output if invalid input |
+| --------------------------------- | ------------------------- | ---------------------------------- | ----------------------- |
+| `.optional()`                     | absent                    | key omitted                        | (rules run — fails)     |
+| `.default(x)`                     | absent                    | `x` (rules then run on `x`)        | (rules run — fails)     |
+| `.catch(x)`                       | invalid                   | (no rescue — required check fails) | `x`                     |
+| `.optional().default(x).catch(y)` | absent: `x`, invalid: `y` | `x`                                | `y`                     |
 
 Each handles a different failure mode. They compose.
 
@@ -159,7 +159,7 @@ await validate(schema, { user: 123 });
 // console.warn fires; data.user === "anonymous"
 
 // 7. Combined with default
-v.string().optional().default("x").catch("y")
+v.string().optional().default("x").catch("y");
 // absent → "x" (default fires, no validation failure)
 // invalid → "y" (catch fires)
 
@@ -171,14 +171,14 @@ await validate(list, [1, "bad", 3]);
 
 ## Decisions to lock with Hasan
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Fallback receives errors + original input, or just errors? | **Both.** `(errors, input) => fallback`. Users often want to log the input alongside the errors. Cheap addition. |
-| 2 | Catch rescues `.required()` failure too? | **Yes.** A missing required field IS a validation failure; catch should rescue it just like type-mismatch. Otherwise users have to also add `.optional().default(x)` to handle the absent case, which is verbose. |
-| 3 | Does the catch suppress errors entirely (`errors: []`) or hide them but expose via a side channel? | **Suppress entirely on the public result.** Users who want to log the swallowed errors do it inside the callback variant. Mixing isValid=true with errors[] in the result confuses consumers. |
-| 4 | Composition with `.default()` — order matters? | **No — composition order is irrelevant.** `.default()` runs at the very start of the pipeline (handles absent input); `.catch()` runs at the very end (handles failed input). Either chain order produces the same behaviour. |
-| 5 | Per-rule catch (catch only `.email()` failure but not `.required()`)? | **No, v1.** Niche complexity. Users who need this can split into two sub-fields or write a `.refine()` that returns the fallback explicitly. |
-| 6 | `.catch()` brand on the return type for `Infer<>`? | **Yes, bundle with the type-system plan.** Same brand mechanism as `{ hasDefault: true }`. |
+| #   | Question                                                                                           | Recommendation                                                                                                                                                                                                                |
+| --- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Fallback receives errors + original input, or just errors?                                         | **Both.** `(errors, input) => fallback`. Users often want to log the input alongside the errors. Cheap addition.                                                                                                              |
+| 2   | Catch rescues `.required()` failure too?                                                           | **Yes.** A missing required field IS a validation failure; catch should rescue it just like type-mismatch. Otherwise users have to also add `.optional().default(x)` to handle the absent case, which is verbose.             |
+| 3   | Does the catch suppress errors entirely (`errors: []`) or hide them but expose via a side channel? | **Suppress entirely on the public result.** Users who want to log the swallowed errors do it inside the callback variant. Mixing isValid=true with errors[] in the result confuses consumers.                                 |
+| 4   | Composition with `.default()` — order matters?                                                     | **No — composition order is irrelevant.** `.default()` runs at the very start of the pipeline (handles absent input); `.catch()` runs at the very end (handles failed input). Either chain order produces the same behaviour. |
+| 5   | Per-rule catch (catch only `.email()` failure but not `.required()`)?                              | **No, v1.** Niche complexity. Users who need this can split into two sub-fields or write a `.refine()` that returns the fallback explicitly.                                                                                  |
+| 6   | `.catch()` brand on the return type for `Infer<>`?                                                 | **Yes, bundle with the type-system plan.** Same brand mechanism as `{ hasDefault: true }`.                                                                                                                                    |
 
 ## Risks
 
@@ -206,6 +206,7 @@ Landed in commit `fdc5ce6`.
 **Type inference.** `{ hasCatch: true }` brand makes the key optional in `Infer.Input` (caller may omit, catch rescues) and required in `Infer.Output` (catch ensures a value). Same effect as `{ hasDefault: true }`.
 
 **Decisions locked.** All six decisions adopted as-recommended:
+
 - Callback receives `(errors, originalInput)`
 - Catch rescues required-failure too
 - Errors suppressed entirely on the public result (callback variant is the only side-channel)

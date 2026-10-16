@@ -21,12 +21,9 @@ export const BASE_PNPM_BUILD_APPROVALS: readonly string[] = ["esbuild"];
  *
  * An unknown version gets the current layout, `allowBuilds`.
  */
-export type PnpmBuildApprovalLayout =
-  "packageJson" | "onlyBuiltDependencies" | "allowBuilds";
+export type PnpmBuildApprovalLayout = "packageJson" | "onlyBuiltDependencies" | "allowBuilds";
 
-export function pnpmBuildApprovalLayout(
-  version: string | undefined,
-): PnpmBuildApprovalLayout {
+export function pnpmBuildApprovalLayout(version: string | undefined): PnpmBuildApprovalLayout {
   const match = /^(\d+)\.(\d+)\./.exec(version?.trim() ?? "");
 
   if (!match) return "allowBuilds";
@@ -44,24 +41,19 @@ export function pnpmBuildApprovalLayout(
  * Add packages to a block-style `onlyBuiltDependencies:` list, creating it when
  * absent. A flow list or an alias is left alone rather than rewritten.
  */
-export function mergeOnlyBuiltDependencies(
-  yaml: string,
-  packages: readonly string[],
-): string {
+export function mergeOnlyBuiltDependencies(yaml: string, packages: readonly string[]): string {
   if (packages.length === 0) return yaml;
 
   const block = /^onlyBuiltDependencies:\s*(?:#.*)?(?:\r?\n|$)/m.exec(yaml);
 
   if (!block) {
     if (
-      /^(?:onlyBuiltDependencies|"onlyBuiltDependencies"|'onlyBuiltDependencies')\s*:/m.test(
-        yaml,
-      )
+      /^(?:onlyBuiltDependencies|"onlyBuiltDependencies"|'onlyBuiltDependencies')\s*:/m.test(yaml)
     ) {
       return yaml;
     }
 
-    const items = packages.map(name => `  - ${name}`).join("\n");
+    const items = packages.map((name) => `  - ${name}`).join("\n");
 
     return `${yaml.replace(/\s*$/, "")}\n\n# pnpm 10.5-10.25 read install-script approvals from this list.\nonlyBuiltDependencies:\n${items}\n`;
   }
@@ -72,16 +64,14 @@ export function mergeOnlyBuiltDependencies(
   const end = nextTopLevel ? start + nextTopLevel.index : yaml.length;
   const list = yaml.slice(start, end);
   const listed = new Set(
-    [...list.matchAll(/^\s*-\s*["']?([^"'\s#]+)["']?/gm)].map(
-      entry => entry[1],
-    ),
+    [...list.matchAll(/^\s*-\s*["']?([^"'\s#]+)["']?/gm)].map((entry) => entry[1]),
   );
-  const missing = packages.filter(name => !listed.has(name));
+  const missing = packages.filter((name) => !listed.has(name));
 
   if (missing.length === 0) return yaml;
 
   const indentation = /^([ \t]*)-/m.exec(list)?.[1] ?? "  ";
-  const additions = missing.map(name => `${indentation}- ${name}\n`).join("");
+  const additions = missing.map((name) => `${indentation}- ${name}\n`).join("");
 
   return `${yaml.slice(0, start)}${additions}${list}${yaml.slice(end)}`;
 }
@@ -98,10 +88,7 @@ export function mergePackageJsonBuildApprovals(
   const current = Array.isArray(pnpm.onlyBuiltDependencies)
     ? (pnpm.onlyBuiltDependencies as string[])
     : [];
-  const merged = [
-    ...current,
-    ...packages.filter(name => !current.includes(name)),
-  ];
+  const merged = [...current, ...packages.filter((name) => !current.includes(name))];
 
   return { ...packageJson, pnpm: { ...pnpm, onlyBuiltDependencies: merged } };
 }
@@ -111,14 +98,8 @@ const FEATURE_BUILD_APPROVALS: Readonly<Record<string, readonly string[]>> = {
   image: ["sharp"],
 };
 
-export function requiredPnpmBuildApprovals(
-  features: readonly string[],
-): readonly string[] {
-  return [
-    ...new Set(
-      features.flatMap(feature => FEATURE_BUILD_APPROVALS[feature] ?? []),
-    ),
-  ];
+export function requiredPnpmBuildApprovals(features: readonly string[]): readonly string[] {
+  return [...new Set(features.flatMap((feature) => FEATURE_BUILD_APPROVALS[feature] ?? []))];
 }
 
 /**
@@ -126,10 +107,7 @@ export function requiredPnpmBuildApprovals(
  * (pnpm 10.26+, 11, 12).
  * Existing `false` values are user decisions and are never overridden.
  */
-export function mergePnpmBuildApprovals(
-  yaml: string,
-  packages: readonly string[],
-): string {
+export function mergePnpmBuildApprovals(yaml: string, packages: readonly string[]): string {
   let result = yaml;
   for (const packageName of packages) {
     result = mergeOneApproval(result, packageName);
@@ -147,8 +125,7 @@ function mergeOneApproval(yaml: string, packageName: string): string {
   if (!block) {
     // Flow mappings are deliberately not rewritten. A hand parser must never
     // turn a decided flow entry into a duplicate block key.
-    if (/^(?:allowBuilds|"allowBuilds"|'allowBuilds')\s*:/m.test(yaml))
-      return yaml;
+    if (/^(?:allowBuilds|"allowBuilds"|'allowBuilds')\s*:/m.test(yaml)) return yaml;
     return `${yaml.replace(/\s*$/, "")}\nallowBuilds:\n  ${packageName}: true\n`;
   }
 
@@ -158,10 +135,7 @@ function mergeOneApproval(yaml: string, packageName: string): string {
   const end = nextTopLevel ? start + nextTopLevel.index : yaml.length;
   const mapping = yaml.slice(start, end);
   const key = quotedKey(escaped);
-  const entry = new RegExp(
-    `^(\\s*)${key}\\s*:\\s*([^#\\r\\n]*)(.*)$`,
-    "m",
-  ).exec(mapping);
+  const entry = new RegExp(`^(\\s*)${key}\\s*:\\s*([^#\\r\\n]*)(.*)$`, "m").exec(mapping);
 
   if (entry) {
     const value = entry[2]!.trim();

@@ -6,19 +6,17 @@ const CONTINUE = "@continue";
 const SELECT_ALL = "@all";
 
 /** Edit one short feature group at a time, preserving terminal paging. */
-export async function askFeatures(
-  initialValues: string[] = [],
-): Promise<string[] | symbol> {
+export async function askFeatures(initialValues: string[] = []): Promise<string[] | symbol> {
   const groups = getFeatureGroups();
   const selected = new Set(initialValues);
   let lastGroup: string | undefined;
 
   while (true) {
     const options = [
-      ...groups.map(group => ({
+      ...groups.map((group) => ({
         value: group.label,
-        label: `${group.label} (${group.options.filter(option => selected.has(option.value)).length}/${group.options.length})`,
-        hint: group.options.map(option => option.label).join(", "),
+        label: `${group.label} (${group.options.filter((option) => selected.has(option.value)).length}/${group.options.length})`,
+        hint: group.options.map((option) => option.label).join(", "),
       })),
       { value: CONTINUE, label: `Continue (${selected.size} selected)` },
     ];
@@ -33,9 +31,9 @@ export async function askFeatures(
     if (groupName === CONTINUE) return [...selected];
 
     lastGroup = groupName;
-    const group = groups.find(candidate => candidate.label === groupName)!;
+    const group = groups.find((candidate) => candidate.label === groupName)!;
     const previouslySelected = new Set(
-      group.options.filter(option => selected.has(option.value)).map(option => option.value),
+      group.options.filter((option) => selected.has(option.value)).map((option) => option.value),
     );
     const groupOptions = [
       {
@@ -49,8 +47,8 @@ export async function askFeatures(
       message: group.label,
       options: fitOptionsToWidth(groupOptions),
       initialValues: group.options
-        .filter(option => selected.has(option.value))
-        .map(option => option.value),
+        .filter((option) => selected.has(option.value))
+        .map((option) => option.value),
       required: false,
       maxItems: multiselectMaxItems(groupOptions.length),
     });

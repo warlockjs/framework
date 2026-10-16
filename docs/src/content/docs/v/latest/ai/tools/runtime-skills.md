@@ -16,7 +16,8 @@ import { ai } from "@warlock.js/ai";
 const agent = ai.agent({
   model: openai.model({ name: "gpt-4o" }),
   systemPrompt: "You are a build assistant.",
-  skills: {                                   // a SkillsConfig OR an ai.skills(...) instance
+  skills: {
+    // a SkillsConfig OR an ai.skills(...) instance
     name: "build-skills",
     sources: [{ type: "directory", path: "./agent-skills" }],
   },
@@ -29,13 +30,13 @@ When `skills` is set the agent owns the runtime flow at execute time: it **prepe
 
 ```ts
 const lib = ai.skills({
-  name: "build-skills",                                       // surfaced in analytics + the catalog block
-  sources: [{ type: "directory", path: "./agent-skills" }],   // >= 1; later source wins on name clash
-  inject: { select: "semantic", topK: 2, embedder },          // body-injection policy (see below)
-  maxLoadsPerRun: 4,                                          // cap on loadSkill calls per run. default 5
-  scope: { tags: ["frontend"] },                              // only skills whose tags intersect are catalogued
-  review: { approve, store },                                 // Phase 2 — absent ⇒ saveSkill is NOT exposed
-  analytics: (event) => track(event),                         // optional efficacy sink (errors swallowed)
+  name: "build-skills", // surfaced in analytics + the catalog block
+  sources: [{ type: "directory", path: "./agent-skills" }], // >= 1; later source wins on name clash
+  inject: { select: "semantic", topK: 2, embedder }, // body-injection policy (see below)
+  maxLoadsPerRun: 4, // cap on loadSkill calls per run. default 5
+  scope: { tags: ["frontend"] }, // only skills whose tags intersect are catalogued
+  review: { approve, store }, // Phase 2 — absent ⇒ saveSkill is NOT exposed
+  analytics: (event) => track(event), // optional efficacy sink (errors swallowed)
 });
 ```
 
@@ -76,11 +77,11 @@ The agent registers one `loadSkill` tool per run, closing over a per-run counter
 
 ```ts
 type SkillRecord = {
-  name: string;        // stable slug — the SKILL.md folder name (or store key)
+  name: string; // stable slug — the SKILL.md folder name (or store key)
   description: string; // single-line description — the catalog line
-  version: number;     // monotonic; a promotion bumps this. defaults to 1
-  body: string;        // the full SKILL.md body, loaded on demand
-  tags?: string[];     // role / context tags for scope filtering
+  version: number; // monotonic; a promotion bumps this. defaults to 1
+  body: string; // the full SKILL.md body, loaded on demand
+  tags?: string[]; // role / context tags for scope filtering
   type: "authored" | "promoted" | "candidate";
   metadata?: Record<string, unknown>;
 };
@@ -96,7 +97,13 @@ Ships with the package; backs tests and small/ephemeral libraries with zero exte
 import { ai, MockSkillsStore } from "@warlock.js/ai";
 
 const store = new MockSkillsStore([
-  { name: "scaffold-form", description: "Scaffold a react-form", version: 1, body: "...", type: "authored" },
+  {
+    name: "scaffold-form",
+    description: "Scaffold a react-form",
+    version: 1,
+    body: "...",
+    type: "authored",
+  },
 ]);
 
 const lib = ai.skills({ name: "build", sources: [{ type: "store", store }] });
@@ -117,7 +124,7 @@ const lib = ai.skills({
   name: "self-improving",
   sources: [{ type: "store", store }],
   review: {
-    store,                                          // where promoted skills are written
+    store, // where promoted skills are written
     approve: async (candidate) => {
       // a policy fn, a validator agent, or a human callback — all reduce to this Promise
       return { approve: candidate.body.length > 50, reason: "too thin" };
@@ -132,7 +139,7 @@ const lib = ai.skills({
 
 - Reach for skills when an agent has **many** possible procedures but only needs a few per run — a catalog plus on-demand loading keeps every run's context small while the full library stays reachable.
 - Use [`ai.systemPrompt`](/v/latest/ai/prompts/write-system-prompts/) instead for the always-on persona and instructions — that's the fixed framing, not a pullable catalog.
-- Use [`ai.memory`](/v/latest/ai/reliability/persist-ai-data/) for accumulated factual recall across runs; use [`ai.rag`](/v/latest/ai/rag/run-rag/) for grounding answers in a document corpus. Skills are *procedures the model loads*, not *facts it recalls* or *documents it cites*.
+- Use [`ai.memory`](/v/latest/ai/reliability/persist-ai-data/) for accumulated factual recall across runs; use [`ai.rag`](/v/latest/ai/rag/run-rag/) for grounding answers in a document corpus. Skills are _procedures the model loads_, not _facts it recalls_ or _documents it cites_.
 
 ## Related
 

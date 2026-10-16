@@ -164,7 +164,9 @@ describe("buildOpenApiDocument — paths and operations", () => {
       "head",
     ]);
     expect(opAt(document, "/ping", "patch").operationId).toBe("ping.patch");
-    expect(new Set(Object.values(pathItem(document, "/ping")).map((op) => op.operationId)).size).toBe(7);
+    expect(
+      new Set(Object.values(pathItem(document, "/ping")).map((op) => op.operationId)).size,
+    ).toBe(7);
   });
 
   it("keeps a route name as operationId and slugs unnamed routes", () => {
@@ -207,7 +209,11 @@ describe("buildOpenApiDocument — paths and operations", () => {
       "/a",
       "get",
     );
-    const fromHandler = operation([route("GET", "/b", { description: "handler text" })], "/b", "get");
+    const fromHandler = operation(
+      [route("GET", "/b", { description: "handler text" })],
+      "/b",
+      "get",
+    );
 
     expect(fromRoute.summary).toBe("List");
     expect(fromRoute.description).toBe("route text");
@@ -305,7 +311,8 @@ describe("buildOpenApiDocument — request schemas", () => {
       { name: "id", in: "path", required: true, schema: { type: "integer" } },
     ]);
     expect(
-      (jsonSchemaOf(defined(op.requestBody, "request body").content) as { properties: object }).properties,
+      (jsonSchemaOf(defined(op.requestBody, "request body").content) as { properties: object })
+        .properties,
     ).toEqual({ name: { type: "string" } });
   });
 
@@ -451,7 +458,9 @@ describe("buildOpenApiDocument — request schemas", () => {
   });
 
   it("warns about a custom validate middleware", () => {
-    const { warnings } = build([route("POST", "/a", { validation: { validate: () => undefined } })]);
+    const { warnings } = build([
+      route("POST", "/a", { validation: { validate: () => undefined } }),
+    ]);
 
     expect(warnings).toEqual([
       "POST /a: validation.validate is custom middleware and is not documented.",
@@ -557,9 +566,7 @@ describe("buildOpenApiDocument — responses from responseSchema", () => {
       properties: { user: ref },
       required: ["user"],
     });
-    expect(
-      jsonSchemaOf(responseOf(opAt(document, "/users", "get"), "200").content),
-    ).toEqual({
+    expect(jsonSchemaOf(responseOf(opAt(document, "/users", "get"), "200").content)).toEqual({
       type: "object",
       properties: { users: { type: "array", items: ref } },
       required: ["users"],
@@ -598,7 +605,9 @@ describe("buildOpenApiDocument — responses from responseSchema", () => {
           },
         }),
       ],
-      { resolveResourceName: (resource) => (resource === UserResource ? "UserResource" : undefined) },
+      {
+        resolveResourceName: (resource) => (resource === UserResource ? "UserResource" : undefined),
+      },
     );
     const nullableUser = {
       oneOf: [{ $ref: "#/components/schemas/UserResource" }, { type: "null" }],
@@ -860,7 +869,12 @@ describe("buildOpenApiDocument — automatic 422 and 401", () => {
     expect(operation([route("POST", "/a")], "/a", "post").responses).not.toHaveProperty("422");
 
     const declared = operation(
-      [route("POST", "/b", { validation, responseSchema: { 422: { body: { custom: "string" } } } })],
+      [
+        route("POST", "/b", {
+          validation,
+          responseSchema: { 422: { body: { custom: "string" } } },
+        }),
+      ],
       "/b",
       "post",
     );
@@ -941,8 +955,18 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
 
   it("gives a second, different cookie its own scheme", () => {
     const { document } = build([
-      route("GET", "/a", {}, { middleware: guard({ sources: [{ cookie: "one" }], userTypes: [] }) }),
-      route("GET", "/b", {}, { middleware: guard({ sources: [{ cookie: "two" }], userTypes: [] }) }),
+      route(
+        "GET",
+        "/a",
+        {},
+        { middleware: guard({ sources: [{ cookie: "one" }], userTypes: [] }) },
+      ),
+      route(
+        "GET",
+        "/b",
+        {},
+        { middleware: guard({ sources: [{ cookie: "two" }], userTypes: [] }) },
+      ),
     ]);
 
     expect(opAt(document, "/b", "get").security).toEqual([{ cookieAuth_two: [] }]);

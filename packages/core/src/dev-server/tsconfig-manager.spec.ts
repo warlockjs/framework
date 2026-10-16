@@ -46,10 +46,17 @@ describe("TSConfigManager.init follows `extends` (C2:B3)", () => {
     writeFileSync(
       nodePath.join(root, "tsconfig.base.json"),
       JSON.stringify({
-        compilerOptions: { experimentalDecorators: true, baseUrl: ".", paths: { "app/*": ["./src/app/*"] } },
+        compilerOptions: {
+          experimentalDecorators: true,
+          baseUrl: ".",
+          paths: { "app/*": ["./src/app/*"] },
+        },
       }),
     );
-    writeFileSync(nodePath.join(root, "tsconfig.json"), JSON.stringify({ extends: "./tsconfig.base.json" }));
+    writeFileSync(
+      nodePath.join(root, "tsconfig.json"),
+      JSON.stringify({ extends: "./tsconfig.base.json" }),
+    );
 
     try {
       process.chdir(root);

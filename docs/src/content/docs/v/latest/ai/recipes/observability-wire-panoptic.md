@@ -30,11 +30,7 @@ The store satisfies both `TraceStoreContract` (queryable) and `ExporterContract`
 ```ts
 import { ai, ProviderRateLimitError } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
-import {
-  panoptic,
-  createInMemoryTraceStore,
-  consoleExporter,
-} from "@warlock.js/ai-panoptic";
+import { panoptic, createInMemoryTraceStore, consoleExporter } from "@warlock.js/ai-panoptic";
 import { v, type Infer } from "@warlock.js/seal";
 
 const openai = new OpenAISDK({
@@ -109,9 +105,7 @@ const recentFailures = store.query({
 });
 
 for (const trace of recentFailures) {
-  console.log(
-    `${trace.traceId} — ${trace.root.error?.type}: ${trace.root.error?.message}`,
-  );
+  console.log(`${trace.traceId} — ${trace.root.error?.type}: ${trace.root.error?.message}`);
 
   // Walk the tree to find WHICH child span actually failed.
   for (const child of trace.root.children) {
@@ -153,7 +147,7 @@ await observe.shutdown(); // flush + release every registered exporter
 `attach` works identically on an agent, a workflow, or a supervisor — Panoptic subscribes to `agent.completed`, `workflow.completed`, and `supervisor.completed` by default and silently ignores the names a given target doesn't emit.
 
 ```ts
-observe.attach(myWorkflow);   // workflow.completed
+observe.attach(myWorkflow); // workflow.completed
 observe.attach(mySupervisor); // supervisor.completed
 ```
 
@@ -161,7 +155,7 @@ The orchestrator is the one exception: its events carry no result, so you feed i
 
 ## Production notes
 
-- **Observability faults never crash the run.** The collector wraps every exporter call in `Promise.allSettled`, and the event handler additionally swallows the `collect` rejection — a broken sink degrades to *missing telemetry*, never a failed agent run.
+- **Observability faults never crash the run.** The collector wraps every exporter call in `Promise.allSettled`, and the event handler additionally swallows the `collect` rejection — a broken sink degrades to _missing telemetry_, never a failed agent run.
 - **Bound the store in a long-lived process.** `createInMemoryTraceStore({ capacity: N })` evicts the oldest trace FIFO once the cap is exceeded; the default is unbounded, which leaks memory in a server. The store is intentionally index-free — `get`/`add` are O(1), `query`/`aggregate` are O(n) scans — so treat it as dev/test or modest-volume runtime retention, and export to a real datastore beyond that.
 - **`completedEvents` narrows the surface.** Pass `panoptic({ exporters, completedEvents: ["agent.completed"] })` to attach to agents only and skip workflow/supervisor noise.
 - **`attach` vs `middleware`.** If your app already composes cross-cutting concerns through the agent middleware pipeline, use `panoptic().middleware()` in the agent's `middleware` array instead of `attach` — same collector, different feed path. Pass a distinct `middlewareName` to register two Panoptic middlewares on one agent.

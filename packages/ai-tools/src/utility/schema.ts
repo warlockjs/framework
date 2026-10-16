@@ -74,9 +74,7 @@ export function optionalNumberField(): FieldValidator<number | undefined> {
     }
 
     return {
-      issues: [
-        { message: `"${key}" must be a finite number when provided`, path: [key] },
-      ],
+      issues: [{ message: `"${key}" must be a finite number when provided`, path: [key] }],
     };
   };
 }
@@ -87,9 +85,7 @@ export function optionalNumberField(): FieldValidator<number | undefined> {
  *
  * @param allowed - The closed set of permitted string literals.
  */
-export function literalField<T extends string>(
-  allowed: readonly T[],
-): FieldValidator<T> {
+export function literalField<T extends string>(allowed: readonly T[]): FieldValidator<T> {
   return (value, key) => {
     if (typeof value === "string" && (allowed as readonly string[]).includes(value)) {
       return { value: value as T };
@@ -128,9 +124,7 @@ type ObjectShape<T> = {
  *   expression: stringField(),
  * });
  */
-export function objectSchema<T extends object>(
-  shape: ObjectShape<T>,
-): StandardSchemaV1<T> {
+export function objectSchema<T extends object>(shape: ObjectShape<T>): StandardSchemaV1<T> {
   return {
     "~standard": {
       version: 1,

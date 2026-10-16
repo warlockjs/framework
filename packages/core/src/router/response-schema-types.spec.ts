@@ -59,9 +59,7 @@ describe("describeResponseSchemaTypes", () => {
       resolver(),
     );
 
-    expect(described?.["200"]).toBe(
-      `{ "x-total": ${cast("int")}; "we\\"ird": ${cast("string")} }`,
-    );
+    expect(described?.["200"]).toBe(`{ "x-total": ${cast("int")}; "we\\"ird": ${cast("string")} }`);
   });
 
   it("serializes nullable(Resource) as the resource type or null, also nested and in arrays", () => {
@@ -139,7 +137,10 @@ describe("describeResponseSchemaTypes", () => {
 describe("buildResourceMap", () => {
   it("prefers a non-index file over a barrel re-export", () => {
     const map = buildResourceMap([
-      { file: resolve(appRoot, "src/app/users/resources/index.ts"), namespace: { userResource: UserResource } },
+      {
+        file: resolve(appRoot, "src/app/users/resources/index.ts"),
+        namespace: { userResource: UserResource },
+      },
       { file: userFile, namespace: { userResource: UserResource } },
     ]);
 
@@ -160,7 +161,10 @@ describe("buildResourceMap", () => {
 
   it("ranks a default in a real file ahead of a named export in a barrel", () => {
     const map = buildResourceMap([
-      { file: resolve(appRoot, "src/app/posts/resources/index.ts"), namespace: { postResource: PostResource } },
+      {
+        file: resolve(appRoot, "src/app/posts/resources/index.ts"),
+        namespace: { postResource: PostResource },
+      },
       { file: postFile, namespace: { default: PostResource } },
     ]);
 

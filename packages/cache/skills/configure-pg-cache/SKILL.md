@@ -39,8 +39,8 @@ cache.setCacheConfigurations({
   options: {
     pg: {
       client: pool,
-      table: "warlock_cache",     // optional, default
-      ttl: "1h",                  // optional default
+      table: "warlock_cache", // optional, default
+      ttl: "1h", // optional default
       globalPrefix: "prod-app",
     },
   },

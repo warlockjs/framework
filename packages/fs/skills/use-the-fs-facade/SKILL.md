@@ -16,7 +16,7 @@ type Pkg = { version: string; [key: string]: unknown };
 declare const userId: string;
 declare const action: string;
 
-await fs.files.put("cache/data.json", "{}", { atomic: true });     // temp+rename; creates parents
+await fs.files.put("cache/data.json", "{}", { atomic: true }); // temp+rename; creates parents
 const cfg = await fs.files.getJson("config.json", { default: {} }); // no throw when missing
 await fs.files.editJson<Pkg>("package.json", (p) => ({ ...p, version: "4.7.0" }));
 await fs.files.appendJsonLine("logs/audit.ndjson", { userId, action }); // one JSON record per line
@@ -37,6 +37,7 @@ Info + housekeeping: `exists`, `isEmpty`, `size`, `stats` (→ `{ path, name, si
 `fs.hash.string(content)` / `fs.hash.buffer(bytes)` are **sync** (pure, in-memory — no `await`); `fs.hash.file(path)` / `fs.hash.dir(path)` are **async** (read from disk). Defaults to SHA-256. (Handles also expose `file.hash()` / `directory.hash()`.)
 
 ### The JSON family — pick the right one
+
 - `getJson` — read (+ optional `schema` validation, + `default` when missing).
 - `putJson` — overwrite the whole document.
 - `mergeJson(path, partial, { deep? })` — **patch an object** (shallow spread; `deep:true` recurses). `__proto__`/`constructor`/`prototype` keys are dropped from both sides at every depth (not merged) — so a caller-supplied `partial` (e.g. a PATCH request body) can't prototype-pollute the merged object or the file written back to disk. The rest of the payload merges as normal.
@@ -45,6 +46,7 @@ Info + housekeeping: `exists`, `isEmpty`, `size`, `stats` (→ `{ path, name, si
 - `appendJsonLine(path, value)` — **NDJSON**: one JSON record per line (a log/journal), NOT one JSON document; never parses or merges.
 
 ### Schema-validated reads (`getJson({ schema })`)
+
 `schema` is any [Standard Schema](https://standardschema.dev) validator — `@warlock.js/seal` (every seal validator qualifies), zod, valibot. fs calls the schema's own `~standard.validate`, so there's **no dependency** on any validator. A failed read throws `JsonSchemaValidationError`.
 
 ```ts
@@ -58,7 +60,9 @@ const cfg = await fs.files.getJson("config.json", { schema: v.object({ port: v.n
 `ensure`, `remove` (recursive), `empty` (clear contents, keep the dir), `exists`, `isEmpty`, `count`, `copy`, `move` (EXDEV-safe), `stats`, `size` (recursive byte sum), `list` / `listFiles` / `listDirs` (add `{ recursive: true }`), `walk(path, { recursive?, followSymlinks? })` (constant-memory async iterator of `{ path, name, type }`), `hash` (stable directory fingerprint).
 
 ```ts
-for await (const entry of fs.dirs.walk("src")) { /* { path, name, type: "file"|"directory" } */ }
+for await (const entry of fs.dirs.walk("src")) {
+  /* { path, name, type: "file"|"directory" } */
+}
 const tsFiles = await fs.dirs.listFiles("src", { recursive: true });
 ```
 
@@ -68,31 +72,35 @@ The constructor does **zero IO**. Path helpers are pure `node:path`; `copy`/`mov
 
 ```ts
 const pkg = fs.file("package.json");
-pkg.name;        // "package.json"
-pkg.extension;   // ".json"
-pkg.basename;    // "package"
-pkg.parent();    // Directory handle
+pkg.name; // "package.json"
+pkg.extension; // ".json"
+pkg.basename; // "package"
+pkg.parent(); // Directory handle
 await pkg.editJson<Pkg>((p) => ({ ...p, version: "4.7.0" }));
 
 const src = fs.dir("src");
-for (const f of await src.listFiles({ recursive: true })) {   // File[]
-  if (f.extension === ".ts") await f.appendJsonLine({ /* … */ });
+for (const f of await src.listFiles({ recursive: true })) {
+  // File[]
+  if (f.extension === ".ts") await f.appendJsonLine({/* … */});
 }
-const moved = await fs.file("a.txt").moveTo(fs.dir("archive"));  // new File handle
+const moved = await fs.file("a.txt").moveTo(fs.dir("archive")); // new File handle
 ```
 
 `Directory.file(...segments)` / `.dir(...segments)` build child handles; `listFiles`/`listDirs` return `File[]` / `Directory[]`.
 
 ## Facade vs primitives — when to use which
+
 - **Facade (`fs.*`)** — async app/runtime code; read-modify-write; JSON patching; recursive listing/walking; you want an OO handle. One import, ergonomic verbs.
 - **Bare primitives (`getFile`/`putFile`/…)** — synchronous CLI tools / codegen / one-shot scripts (no `Async`), or when you want the smallest possible call. See the `read-and-write-files` topic / the `manage-directories` topic.
 
 ## Gotchas
+
 - **Async-only facade.** There is no `fs.filesSync`; for sync use the bare primitives.
-- **`edit`/`mergeJson` are sugar, not a lock.** Concurrent edits race (last-write-wins); `atomic` only makes the *write* atomic, not the read+write pair. No file locking.
+- **`edit`/`mergeJson` are sugar, not a lock.** Concurrent edits race (last-write-wins); `atomic` only makes the _write_ atomic, not the read+write pair. No file locking.
 - **`get()` reads the whole file.** For large text use `readLines`; for large-file digests `hash` already streams.
 - **Still no glob / watch / chmod** — see the `overview` topic. Use `walk` + filter instead of glob.
 
 ## See also
+
 - The `overview` topic — the package front door + the `*Async`/bare convention.
 - The `write-atomically` topic — `put({ atomic })` delegates to this.

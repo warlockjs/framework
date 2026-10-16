@@ -19,32 +19,35 @@ describe("queueConnector", () => {
     expect(connector.shouldRestart(["src/config/app.ts"])).toBe(false);
   });
 
-  it.skipIf(!redisAvailable)("reads the `queue` config key, starts workers, and closes them on shutdown", async () => {
-    let processed = 0;
-    const job = defineJob({
-      name: "spec.connector",
-      async handle() {
-        processed++;
-      },
-    });
+  it.skipIf(!redisAvailable)(
+    "reads the `queue` config key, starts workers, and closes them on shutdown",
+    async () => {
+      let processed = 0;
+      const job = defineJob({
+        name: "spec.connector",
+        async handle() {
+          processed++;
+        },
+      });
 
-    setConfig("queue", testQueueConfig());
-    const connector = queueConnector();
+      setConfig("queue", testQueueConfig());
+      const connector = queueConnector();
 
-    await connector.boot();
-    await connector.start();
+      await connector.boot();
+      await connector.start();
 
-    expect(connector.isActive()).toBe(true);
-    expect(runningWorkers()).toEqual(["default"]);
+      expect(connector.isActive()).toBe(true);
+      expect(runningWorkers()).toEqual(["default"]);
 
-    await job.dispatch({});
-    await waitFor(() => processed === 1);
+      await job.dispatch({});
+      await waitFor(() => processed === 1);
 
-    await connector.shutdown();
+      await connector.shutdown();
 
-    expect(connector.isActive()).toBe(false);
-    expect(runningWorkers()).toEqual([]);
-  });
+      expect(connector.isActive()).toBe(false);
+      expect(runningWorkers()).toEqual([]);
+    },
+  );
 
   it("does not start workers when workers.enabled is false", async () => {
     defineJob({ name: "spec.connector.disabled", handle: () => undefined });

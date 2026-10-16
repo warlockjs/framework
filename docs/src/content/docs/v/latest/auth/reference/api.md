@@ -23,7 +23,9 @@ import { Auth } from "@warlock.js/auth";
 
 @RegisterModel()
 export class User extends Auth<typeof userSchema> {
-  public get userType() { return "user"; }
+  public get userType() {
+    return "user";
+  }
 }
 ```
 
@@ -66,6 +68,7 @@ Durable authority for one refresh-token lineage: `family_id`, `user_id`,
 applications use `authService.revokeTokenFamily` rather than mutating it.
 
 Source: `@warlock.js/auth/src/models/auth-token-family/auth-token-family.model.ts`.
+
 ### `authMigrations`
 
 ```ts
@@ -178,7 +181,10 @@ Source: `@warlock.js/auth/src/services/generate-jwt-secret.ts`.
 function authMiddleware(): Middleware;
 function authMiddleware(options: AuthMiddlewareOptions): Middleware;
 function authMiddleware(userType: string | string[], options?: AuthMiddlewareOptions): Middleware;
-function authMiddleware(userType: string | string[], tokenFrom?: "header" | `cookie:${string}`): Middleware;
+function authMiddleware(
+  userType: string | string[],
+  tokenFrom?: "header" | `cookie:${string}`,
+): Middleware;
 ```
 
 No-argument middleware uses `auth.defaultUserType` (or the sole configured user
@@ -190,6 +196,7 @@ still resolved. `redirect` applies only to page routes; APIs keep `401`.
 `refresh` is reserved for the 5.19 automatic-renewal coordinator. Its final
 runtime behavior must be reconciled with the shipped implementation before this
 reference is published. Legacy string overloads remain supported.
+
 ## Commands
 
 ### `registerJWTSecretGeneratorCommand`

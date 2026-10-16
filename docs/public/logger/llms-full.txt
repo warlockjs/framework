@@ -24,6 +24,7 @@ captureAnyUnhandledRejection();
 ```
 
 Registers:
+
 - `process.on("unhandledRejection", reason => log.error("app", "unhandledRejection", reason))` — logged; the process is kept alive.
 - `process.on("uncaughtException", error => log.fatal("app", "uncaughtException", error))` — logged, then `process.exit(1)` (by default).
 
@@ -31,7 +32,7 @@ The split is intentional: an `uncaughtException` leaves the process in an undefi
 
 ## Why it exits (and why that matters)
 
-Registering *any* `uncaughtException` listener **suppresses** Node's default "print the stack + exit non-zero." A listener that only logs therefore turns an unrecoverable crash into a silent `exit 0` — which is exactly how a config file that throws at boot can look like "the server started, then just stopped," with no error printed. So the handler restores the contract:
+Registering _any_ `uncaughtException` listener **suppresses** Node's default "print the stack + exit non-zero." A listener that only logs therefore turns an unrecoverable crash into a silent `exit 0` — which is exactly how a config file that throws at boot can look like "the server started, then just stopped," with no error printed. So the handler restores the contract:
 
 - **Exits non-zero** after logging (`process.exit(1)`), following a best-effort, time-bounded `log.flush()` so buffered `FileLog` / `SentryLog` entries drain first. Opt out with `captureAnyUnhandledRejection({ exitOnUncaughtException: false })` where the process is expected to recover on its own (a dev server reloading via HMR).
 - **Falls back to `console.error`** when no terminal channel is configured yet — the early-boot window, before `log.configure(...)`, where `log.fatal` has nowhere visible to go. When a `ConsoleLog` is present it already prints the entry, so the fallback is skipped (no double output).
@@ -43,16 +44,11 @@ Registering *any* `uncaughtException` listener **suppresses** Node's default "pr
 **Once**, at startup, **after** channels are registered. Typical place: immediately after your `log.configure({...})` call.
 
 ```ts title="src/index.ts"
-import {
-  log,
-  ConsoleLog,
-  FileLog,
-  captureAnyUnhandledRejection,
-} from "@warlock.js/logger";
+import { log, ConsoleLog, FileLog, captureAnyUnhandledRejection } from "@warlock.js/logger";
 
 log.configure({
   channels: [new ConsoleLog(), new FileLog({ levels: ["error"] })],
-  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],   // ← important; see below
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"], // ← important; see below
 });
 
 captureAnyUnhandledRejection();
@@ -62,7 +58,7 @@ captureAnyUnhandledRejection();
 
 The `uncaughtException` handler runs a best-effort, time-bounded `log.flush()` **before** its own `process.exit(1)`, so buffered `FileLog` / `SentryLog` entries drain even though `process.exit()` skips `beforeExit`. You don't need `autoFlushOn: ["beforeExit"]` for the fatal entry to survive — the handler already drains.
 
-`"beforeExit"` in `autoFlushOn` is still worth setting for the *other* exit routes (a natural drain when the event loop empties on its own). For signal-driven shutdown (`SIGINT` / `SIGTERM`), include those signals in `autoFlushOn`. See the `flush-logs-on-shutdown` topic.
+`"beforeExit"` in `autoFlushOn` is still worth setting for the _other_ exit routes (a natural drain when the event loop empties on its own). For signal-driven shutdown (`SIGINT` / `SIGTERM`), include those signals in `autoFlushOn`. See the `flush-logs-on-shutdown` topic.
 
 ## Idempotency — don't call it twice
 
@@ -87,7 +83,9 @@ import type { LoggingData } from "@warlock.js/logger";
 class Capture extends LogChannel {
   public name = "capture";
   public received: LoggingData[] = [];
-  public log(data: LoggingData) { this.received.push({ ...data }); }
+  public log(data: LoggingData) {
+    this.received.push({ ...data });
+  }
 }
 
 it("routes unhandled rejections to the logger", async () => {
@@ -112,6 +110,7 @@ Testing the **`uncaughtException`** path additionally trips `process.exit(1)`, s
 ## Module + action the capture uses
 
 Both listeners log with:
+
 - `module: "app"`
 - `action: "unhandledRejection"` (at `error`) or `action: "uncaughtException"` (at `fatal`)
 - `message`: the rejection reason / exception (keep it as the raw `Error` object — file channels capture the stack).
@@ -132,10 +131,10 @@ The logger is a singleton. Do all setup in one place, as early in the app entry 
 
 ## The three channel-registration methods
 
-| Method | Semantics |
-|---|---|
-| `log.addChannel(channel)` | **Appends.** Safe to call multiple times. |
-| `log.setChannels([...])` | **Replaces** the full list. |
+| Method                                                       | Semantics                                                                                                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `log.addChannel(channel)`                                    | **Appends.** Safe to call multiple times.                                                                                      |
+| `log.setChannels([...])`                                     | **Replaces** the full list.                                                                                                    |
 | `log.configure({ channels, autoFlushOn, redact, minLevel })` | **Replaces** channels if provided; installs auto-flush if provided; sets redact / minLevel if provided. All four are optional. |
 
 All three return `this` — chainable.
@@ -154,7 +153,7 @@ if (process.env.NODE_ENV === "production") {
     autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
   });
 } else if (process.env.NODE_ENV === "test") {
-  log.setChannels([]);   // silence logger during tests
+  log.setChannels([]); // silence logger during tests
 } else {
   log.setChannels([new ConsoleLog()]);
 }
@@ -163,7 +162,7 @@ if (process.env.NODE_ENV === "production") {
 Import it once at the top of `src/index.ts`:
 
 ```ts title="src/index.ts"
-import "./logger";                     // side-effect: configures singleton
+import "./logger"; // side-effect: configures singleton
 import { log } from "@warlock.js/logger";
 
 log.info("app", "start", "Server listening on :3000");
@@ -210,10 +209,7 @@ Every `new Logger()` gets a unique `id` (string, prefixed `"logger-"`).
 
 ```ts
 log.configure({
-  channels: [
-    new ConsoleLog({ showContext: true }),
-    new FileLog({ chunk: "daily" }),
-  ],
+  channels: [new ConsoleLog({ showContext: true }), new FileLog({ chunk: "daily" })],
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
   redact: { paths: ["context.password", "context.headers.authorization"] },
   minLevel: process.env.LOG_LEVEL === "debug" ? "debug" : "info",
@@ -270,7 +266,7 @@ For the common "drop everything below X" case, skip the per-channel `levels` arr
 log.setMinLevel("info");
 // debug entries are dropped before fan-out — no channel ever sees them.
 
-log.configure({ minLevel: "warn" });   // shorthand inside configure()
+log.configure({ minLevel: "warn" }); // shorthand inside configure()
 ```
 
 Severity ordering: `debug < info ≈ success < warn < error < fatal`. `success` is treated as informational severity — `setMinLevel("warn")` drops it. `fatal` is strictly above `error`, so `setMinLevel("fatal")` admits only fatal entries (handy for "page me only on fatal" routing).
@@ -278,7 +274,7 @@ Severity ordering: `debug < info ≈ success < warn < error < fatal`. `success` 
 Pass `undefined` to clear:
 
 ```ts
-log.setMinLevel(undefined);   // accept everything again
+log.setMinLevel(undefined); // accept everything again
 ```
 
 This runs **before** the channel loop — cheaper than per-channel `levels` filters when you want a uniform floor. Per-channel `levels` and `filter` still run on top for channels that need a tighter or differently-shaped rule.
@@ -356,7 +352,7 @@ The `minLevel` check is the fastest of the three (single comparison before fan-o
 
 ---
 name: flush-logs-on-shutdown
-description: 'Drain buffered channels before exit — log.flushSync() or log.configure({autoFlushOn: [''SIGINT'', ''SIGTERM'', ''beforeExit'']}) installs handlers that re-raise the signal. Triggers: `log.flush`, `log.flushSync`, `autoFlushOn`, `enableAutoFlush`, `disableAutoFlush`, `SIGINT`, `SIGTERM`, `beforeExit`; "drain logs before exit", "await log.flush() before process.exit", "drain async or network channels on shutdown", "wire SIGTERM for container shutdown", "my logs never showed after a crash", "graceful shutdown logging"; typical import `import { log, FileLog } from "@warlock.js/logger"`. Skip: error capture — the `capture-unhandled-errors` topic; custom sinks — the `write-custom-log-channel` topic; competing `pino.final`, `winston.end`; native `process.on(''exit'')`.'
+description: 'Drain buffered channels before exit — log.flushSync() or log.configure({autoFlushOn: [''SIGINT'', ''SIGTERM'', ''beforeExit'']}) installs handlers that re-raise the signal. Triggers: `log.flush`, `log.flushSync`, `onChannelError`, `log.flush({ timeout })`, `autoFlushOn`, `enableAutoFlush`, `disableAutoFlush`, `SIGINT`, `SIGTERM`, `beforeExit`; "drain logs before exit", "await log.flush() before process.exit", "drain async or network channels on shutdown", "wire SIGTERM for container shutdown", "my logs never showed after a crash", "graceful shutdown logging"; typical import `import { log, FileLog } from "@warlock.js/logger"`. Skip: error capture — the `capture-unhandled-errors` topic; custom sinks — the `write-custom-log-channel` topic; competing `pino.final`, `winston.end`; native `process.on(''exit'')`.'
 ---
 
 # Lifecycle — flushing buffered channels before exit
@@ -376,14 +372,15 @@ log.configure({
 
 ### What each event does
 
-| Event | Behavior |
-|---|---|
+| Event                                                    | Behavior                                                                                                  |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `SIGINT` / `SIGTERM` / `SIGHUP` / `SIGBREAK` / `SIGUSR2` | Flush → remove this handler → re-raise the signal so Node's default exit code runs (e.g. 130 for SIGINT). |
-| `beforeExit` | Flush in place. Node continues its natural exit. |
+| `beforeExit`                                             | Flush in place. Node continues its natural exit.                                                          |
 
 ### Default recommendation
 
 `["SIGINT", "SIGTERM", "beforeExit"]` covers:
+
 - Local `Ctrl+C` (SIGINT)
 - Container orchestrators (`docker stop`, Kubernetes sending SIGTERM)
 - Natural exit (Node finished all work)
@@ -402,7 +399,7 @@ Use this when you need async work (close an HTTP server, drain a queue) **before
 async function gracefulShutdown() {
   await httpServer.close();
   await queue.drain();
-  log.flushSync();          // still sync — guarantees disk write before exit
+  log.flushSync(); // still sync — guarantees disk write before exit
   process.exit(0);
 }
 
@@ -419,22 +416,22 @@ process.once("SIGTERM", gracefulShutdown);
 ```ts
 async function gracefulShutdown() {
   await httpServer.close();
-  await log.flush();        // awaits every channel's async flush() to completion
+  await log.flush({ timeout: 3000 }); // bounded drain of every channel
   process.exit(0);
 }
 
 process.once("SIGTERM", gracefulShutdown);
 ```
 
-`log.flush()` fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped.
+`log.flush()` drains every channel concurrently: each waits for its own async deliveries still in flight (level methods are fire-and-forget and never return a promise; entries logged during the flush are awaited too), then runs its `flush()`. A hung network delivery can't hold up the file channel, and one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. It is bounded: `log.flush({ timeout })` resolves after `timeout` ms (default 5000) and reports each channel still draining to `onChannelError`.
 
-| | `flushSync()` | `flush()` |
-|---|---|---|
-| I/O | synchronous — blocks the loop | asynchronous — awaited |
-| Safe in a re-raising signal handler | yes | no — the signal exits before the promise settles |
-| Used by `autoFlushOn` | yes | no |
-| Reach for it when | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
-| `FileLog` / `JSONFileLog` | ✓ | ✓ (async write) |
+|                                     | `flushSync()`                         | `flush()`                                                    |
+| ----------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
+| I/O                                 | synchronous — blocks the loop         | asynchronous — awaited                                       |
+| Safe in a re-raising signal handler | yes                                   | no — the signal exits before the promise settles             |
+| Used by `autoFlushOn`               | yes                                   | no                                                           |
+| Reach for it when                   | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
+| `FileLog` / `JSONFileLog`           | ✓                                     | ✓ (async write)                                              |
 
 `autoFlushOn` always uses `flushSync()` — signal re-raising can't wait on a promise. If a channel needs async delivery on shutdown, drive `await log.flush()` from your own handler and leave that signal out of `autoFlushOn`.
 
@@ -455,7 +452,7 @@ log.flushSync();
 
 ## Unhandled errors
 
-The `uncaughtException` path in `captureAnyUnhandledRejection()` (the `capture-unhandled-errors` topic) already runs a best-effort, time-bounded `log.flush()` before its own `process.exit(1)`, so the fatal entry drains without extra wiring (and `process.exit()` skips `beforeExit`, so a `beforeExit` handler would not fire on that path anyway). Still set `autoFlushOn` for the *other* shutdown routes — `"SIGINT"` / `"SIGTERM"` and a natural `"beforeExit"` — so those don't lose the last buffered batch.
+The `uncaughtException` path in `captureAnyUnhandledRejection()` (the `capture-unhandled-errors` topic) already runs a best-effort, time-bounded `log.flush()` before its own `process.exit(1)`, so the fatal entry drains without extra wiring (and `process.exit()` skips `beforeExit`, so a `beforeExit` handler would not fire on that path anyway). Still set `autoFlushOn` for the _other_ shutdown routes — `"SIGINT"` / `"SIGTERM"` and a natural `"beforeExit"` — so those don't lose the last buffered batch.
 
 ```ts
 log.configure({
@@ -471,6 +468,24 @@ captureAnyUnhandledRejection();
 - **Don't `await` inside a signal handler you wrote yourself and then call `flushSync`** — if an async step rejects, you skip the flush. Wrap in `try { await x } finally { log.flushSync(); process.exit(1); }`.
 - **Don't call `process.exit()` inside `autoFlushOn` handlers** — signal handlers here already re-raise the signal. Forcing an exit breaks exit codes.
 - **Don't rely on the 5-second flush interval for shutdown safety.** It's a throughput optimization, not a durability guarantee.
+
+## Observe channel failures and drain explicitly
+
+```ts
+import { log } from "@warlock.js/logger";
+
+log.onChannelError((error, channel) => {
+  // Do not call this logger from its own failure handler.
+  console.error("Log delivery failed", channel.name, error);
+});
+log.info("app", "shutdown", "Draining logs");
+await log.flush({ timeout: 3_000 });
+```
+
+Level methods return the logger synchronously. `flush()` waits for async
+channel work within its timeout, reports failures through `onChannelError`, and
+resolves so shutdown can continue. Timeout does not cancel a channel's network
+operation; its driver owns cancellation.
 
 
 ## logger-basics  `@warlock.js/logger/logger-basics/SKILL.md`
@@ -514,26 +529,23 @@ The 11 things that are true in every logger use:
 import { log, ConsoleLog, FileLog } from "@warlock.js/logger";
 
 log.configure({
-  channels: [
-    new ConsoleLog(),
-    new FileLog({ chunk: "daily", storagePath: "./storage/logs" }),
-  ],
+  channels: [new ConsoleLog(), new FileLog({ chunk: "daily", storagePath: "./storage/logs" })],
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
 });
 
-await log.info("users", "register", "New user created");
-await log.error("payments", "charge", new Error("Card declined"));
+log.info("users", "register", "New user created");
+log.error("payments", "charge", new Error("Card declined"));
 ```
 
 ## The six levels
 
 ```ts
-log.debug("module", "action", "verbose detail");      // dev-only diagnostics
-log.info("module", "action", "neutral event");        // user-visible event
-log.warn("module", "action", "something off");         // recoverable concern
-log.error("module", "action", error);                 // handled failure, app continues
-log.success("module", "action", "operation done");    // explicit success
-log.fatal("module", "action", error);                 // unrecoverable, app is going down
+log.debug("module", "action", "verbose detail"); // dev-only diagnostics
+log.info("module", "action", "neutral event"); // user-visible event
+log.warn("module", "action", "something off"); // recoverable concern
+log.error("module", "action", error); // handled failure, app continues
+log.success("module", "action", "operation done"); // explicit success
+log.fatal("module", "action", error); // unrecoverable, app is going down
 ```
 
 `fatal` is purely informational — it does NOT auto-flush or exit. The caller decides whether to `await log.flush()` and `process.exit(...)`. See the `capture-unhandled-errors` topic for the `uncaughtException` → `fatal` routing.
@@ -542,17 +554,17 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Picking a channel — what each built-in does, when to use which | the `pick-log-channel` topic |
-| Startup — registering channels, environment-based setup, the `configure` method | the `configure-logger` topic |
-| Filtering log output (`levels`, `filter`, per-channel routing, `minLevel`) | the `filter-log-entries` topic |
-| Graceful shutdown — `flushSync`, `autoFlushOn`, signal behavior | the `flush-logs-on-shutdown` topic |
-| Extending `LogChannel` to build a custom sink (Slack, database, HTTP) | the `write-custom-log-channel` topic |
-| Routing Node's `unhandledRejection` / `uncaughtException` through the logger | the `capture-unhandled-errors` topic |
-| `log.assert(...)` and `log.timer(...)` shorthand helpers | the `use-log-helpers` topic |
-| Redacting secrets — logger floor + additive channel paths | the `redact-sensitive-log-fields` topic |
-| Tests that assert on log output, or code under test that logs | the `test-logging-code` topic |
+| If the task is about…                                                           | Load                                    |
+| ------------------------------------------------------------------------------- | --------------------------------------- |
+| Picking a channel — what each built-in does, when to use which                  | the `pick-log-channel` topic            |
+| Startup — registering channels, environment-based setup, the `configure` method | the `configure-logger` topic            |
+| Filtering log output (`levels`, `filter`, per-channel routing, `minLevel`)      | the `filter-log-entries` topic          |
+| Graceful shutdown — `flushSync`, `autoFlushOn`, signal behavior                 | the `flush-logs-on-shutdown` topic      |
+| Extending `LogChannel` to build a custom sink (Slack, database, HTTP)           | the `write-custom-log-channel` topic    |
+| Routing Node's `unhandledRejection` / `uncaughtException` through the logger    | the `capture-unhandled-errors` topic    |
+| `log.assert(...)` and `log.timer(...)` shorthand helpers                        | the `use-log-helpers` topic             |
+| Redacting secrets — logger floor + additive channel paths                       | the `redact-sensitive-log-fields` topic |
+| Tests that assert on log output, or code under test that logs                   | the `test-logging-code` topic           |
 
 ## Things NOT to do
 
@@ -560,7 +572,7 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 - Don't set `extension` on `JSONFileLog` — it's hardcoded to `"json"` and your value is silently ignored.
 - Don't register multiple `FileLog` instances with the same `name` in the same `storagePath` — the lookup via `log.channel("file")` returns only one, and they'll fight over the same file.
 - Don't mix `autoFlushOn: ["SIGINT"]` with your own `process.on("SIGINT", ...)` handler — both fire, and ours re-raises mid-way through your async work.
-- Don't `await log.info(...)` expecting the write to be on disk — `FileLog` buffers. Call `log.flushSync()` (or rely on `autoFlushOn`) before the process exits.
+- Don't `await log.info(...)` — level methods return the logger synchronously (fire-and-forget, since 5.30.0), so there is nothing to wait for. The write is not on disk yet either: `FileLog` buffers. Call `await log.flush()` / `log.flushSync()` (or rely on `autoFlushOn`) before the process exits.
 - Don't call `captureAnyUnhandledRejection()` more than once — it re-registers listeners every call and your rejections get logged N times.
 - Don't shadow the import in local code: `for (const log of logEntries) { ... }` will hide the singleton inside that block. Rename loop variables (`entry`, `record`) when working with logger imports.
 
@@ -601,52 +613,63 @@ Eleven task skills cover everything. Load the one that matches your job — most
 ### Foundations
 
 #### `logger-basics`
+
 Start here. The `log` singleton, the six levels (`debug` / `info` / `warn` / `error` / `success` / `fatal`), how fan-out works, the `module / action / message / context` shape every entry carries.
 
 #### `configure-logger`
+
 Wire channels at boot — `log.addChannel`, `log.setChannels`, `log.configure({ channels, autoFlushOn, redact, minLevel })`. Branch on `NODE_ENV`, replace the channel list, isolate a library's logger from the host singleton.
 
 ### Channels
 
 #### `pick-log-channel`
+
 Pick one of the four built-ins: `ConsoleLog` (terminal, colored), `FileLog` (plain `.log` on disk with rotation), `JSONFileLog` (structured JSON for aggregators — Datadog, Loki, ELK), `SentryLog` (errors + breadcrumbs to Sentry; `@sentry/node` is an optional peer).
 
 #### `ship-logs-to-sentry`
+
 The `SentryLog` channel in depth — event-vs-breadcrumb level mapping, dual init modes (reuse an existing client or pass `options`), draining via `Sentry.flush(timeout)`, behavior when the optional peer isn't installed.
 
 #### `write-custom-log-channel`
+
 Extend `LogChannel<Options>` for sinks the built-ins don't cover — Slack, HTTP endpoint, in-memory buffer, database. The lazy `init()` lifecycle (`setTimeout(0)`), the `terminal: true/false` ANSI-stripping behavior, and the difference between `flush()` (async, network) and `flushSync()` (sync, files) are subtle — read this skill before subclassing.
 
 ### Production concerns
 
 #### `redact-sensitive-log-fields`
+
 Strip secrets before they reach a sink. Logger-wide `setRedact({ paths, censor })` is the security floor; per-channel `redact` configs add paths (never remove). Dotted-glob paths (`*`, `**`); censor as string or function `(value, path) => any`.
 
 #### `filter-log-entries`
+
 Drop entries before they cost anything. Logger-wide `setMinLevel("info")` is the fast path; per-channel `levels` array + `filter` predicate for fine control.
 
 #### `flush-logs-on-shutdown`
+
 Buffered channels need explicit drain. `log.flushSync()` (sync) for file channels — also wired by `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])`. `await log.flush()` (async) for network/async channels like `SentryLog` — the only path that can await an HTTPS round-trip on a graceful shutdown.
 
 #### `capture-unhandled-errors`
+
 `captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`, process kept alive) and `uncaughtException` (→ `log.fatal("app", ...)` then `process.exit(1)` — restoring the non-zero exit the listener would otherwise suppress, so a fatal crash never becomes a silent `exit 0`; opt out with `{ exitOnUncaughtException: false }`). It flushes before exiting and falls back to `console.error` when no terminal channel is set. One call at startup.
 
 ### Ergonomics + testing
 
 #### `use-log-helpers`
+
 Two shortcuts every `Logger` exposes: `log.assert(condition, module, action, message, context?)` logs an error only when the condition is falsy (free on the happy path); `log.timer(module, action)` returns an end-function that emits `info` with a measured `durationMs`.
 
 #### `test-logging-code`
+
 Silence the logger globally in tests via `log.setChannels([])` in `setupFiles`. Assert specific entries with a capturing `LogChannel` subclass — it proves an entry was actually delivered through the pipeline (filters, redaction), not merely that a method was called, and it isolates cleanly by swapping `log.channels`.
 
 ## Built-in channels at a glance
 
-| Channel | Sink | `terminal` | Buffered |
-| --- | --- | --- | --- |
-| `ConsoleLog` | `process.stdout` | `true` (colors kept) | no |
-| `FileLog` | `.log` files | `false` (ANSI stripped) | yes (5s timer or 100-entry buffer) |
-| `JSONFileLog` | `.json` files | `false` (ANSI stripped) | yes (same buffering) |
-| `SentryLog` | Sentry events + breadcrumbs | `false` | via the Sentry SDK's own transport (`@sentry/node` is an optional peer) |
+| Channel       | Sink                        | `terminal`              | Buffered                                                                |
+| ------------- | --------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `ConsoleLog`  | `process.stdout`            | `true` (colors kept)    | no                                                                      |
+| `FileLog`     | `.log` files                | `false` (ANSI stripped) | yes (5s timer or 100-entry buffer)                                      |
+| `JSONFileLog` | `.json` files               | `false` (ANSI stripped) | yes (same buffering)                                                    |
+| `SentryLog`   | Sentry events + breadcrumbs | `false`                 | via the Sentry SDK's own transport (`@sentry/node` is an optional peer) |
 
 `terminal: true` is the flag that decides whether the channel sees raw colored messages or stripped plain text. Custom channels: pick `true` if you write to a terminal, `false` for anything else.
 
@@ -676,12 +699,12 @@ Four built-in channels (`SentryLog` needs the optional `@sentry/node` peer). A c
 
 ## The decision
 
-| Need | Pick |
-|---|---|
-| Local dev, colored output in the terminal | `ConsoleLog` |
-| Plain text `.log` files on disk — humans read them | `FileLog` |
+| Need                                                                              | Pick          |
+| --------------------------------------------------------------------------------- | ------------- |
+| Local dev, colored output in the terminal                                         | `ConsoleLog`  |
+| Plain text `.log` files on disk — humans read them                                | `FileLog`     |
 | Structured `.json` files — a log aggregator (Loki / Datadog / Elastic) reads them | `JSONFileLog` |
-| Errors & warnings into Sentry (events + breadcrumbs) | `SentryLog` |
+| Errors & warnings into Sentry (events + breadcrumbs)                              | `SentryLog`   |
 
 Most production setups use **two** channels: `ConsoleLog` + one file channel. Dev uses `ConsoleLog` only.
 
@@ -699,6 +722,7 @@ new ConsoleLog();
 ```
 
 Properties:
+
 - `name = "console"`, `terminal = true`
 - Accepts `ConsoleLogConfig` — `levels`, `filter`, `dateFormat`, `showContext`, `contextDepth`
 - If `message` is an object, a second `console.log(message)` is issued so Node's inspector can expand it
@@ -725,14 +749,14 @@ Plain text. Buffers in memory, flushes to disk periodically.
 import { FileLog } from "@warlock.js/logger";
 
 new FileLog({
-  storagePath: "./storage/logs",  // default: process.cwd() + "/storage/logs"
-  name: "app",                    // default: "app"
-  extension: "log",               // default: "log"
-  chunk: "daily",                 // "single" (default) | "daily" | "hourly"
-  rotate: true,                   // default: true
-  maxFileSize: 10 * 1024 * 1024,  // default: 10MB — triggers rotation
-  maxMessagesToWrite: 100,        // default: 100 — flush threshold
-  groupBy: ["level", "module"],   // optional subdirectory nesting
+  storagePath: "./storage/logs", // default: process.cwd() + "/storage/logs"
+  name: "app", // default: "app"
+  extension: "log", // default: "log"
+  chunk: "daily", // "single" (default) | "daily" | "hourly"
+  rotate: true, // default: true
+  maxFileSize: 10 * 1024 * 1024, // default: 10MB — triggers rotation
+  maxMessagesToWrite: 100, // default: 100 — flush threshold
+  groupBy: ["level", "module"], // optional subdirectory nesting
 });
 ```
 
@@ -758,16 +782,14 @@ Subclass of `FileLog` — same buffering, chunking, rotation, grouping. Output i
       "date": "15-03-2024 10:22:03",
       "module": "payments",
       "action": "charge",
-      "stack": [
-        "Error: Card declined",
-        "    at chargeCard (/app/src/payments.ts:42:11)"
-      ]
+      "stack": ["Error: Card declined", "    at chargeCard (/app/src/payments.ts:42:11)"]
     }
   ]
 }
 ```
 
 Differences from `FileLog`:
+
 - `name = "fileJson"` (**not** `"json"` — use this exact string for `log.channel("fileJson")`)
 - `extension` is always `"json"` — the option is silently ignored
 - Error `stack` is stored as `string[]` (split on newlines) — easy to query in aggregators
@@ -794,8 +816,8 @@ Every channel constructor accepts at minimum:
 
 ```ts
 type BasicLogConfigurations = {
-  levels?: LogLevel[];                       // whitelist — omit or [] to allow all
-  filter?: (data: LoggingData) => boolean;   // custom predicate
+  levels?: LogLevel[]; // whitelist — omit or [] to allow all
+  filter?: (data: LoggingData) => boolean; // custom predicate
   dateFormat?: { date?: string; time?: string }; // Day.js format strings
   context?: (data) => Promise<Record<string, any>>; // reserved — not yet read
 };
@@ -806,10 +828,10 @@ Concrete file channels extend this with their storage/chunk/rotate/groupBy optio
 ## Picking a channel by name at runtime
 
 ```ts
-log.channel("console");   // → ConsoleLog | undefined
-log.channel("file");      // → FileLog | undefined
-log.channel("fileJson");  // ← note the name — NOT "json"
-log.channel("sentry");    // → SentryLog | undefined
+log.channel("console"); // → ConsoleLog | undefined
+log.channel("file"); // → FileLog | undefined
+log.channel("fileJson"); // ← note the name — NOT "json"
+log.channel("sentry"); // → SentryLog | undefined
 ```
 
 If two channels share a `name`, only one is reachable this way — the search returns the first match.
@@ -826,7 +848,7 @@ If two channels share a `name`, only one is reachable this way — the search re
 
 ---
 name: redact-sensitive-log-fields
-description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
+description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`, `maskEmail`, `maskEmailsInText`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
 ---
 
 # Redaction — keeping secrets out of logs
@@ -851,15 +873,15 @@ import { DEFAULT_REDACT_KEYS } from "@warlock.js/logger";
 
 log.configure({
   redact: {
-    keys: ["internalRef"],   // union with the built-in set
-    defaultKeys: false,      // opt out of the built-in set entirely
+    keys: ["internalRef"], // union with the built-in set
+    defaultKeys: false, // opt out of the built-in set entirely
   },
 });
 ```
 
 `defaultKeys: false` is an escape hatch, not a tuning knob — it restores the pre-4.15.0 behavior where a `password` in `context` reaches every sink in cleartext. Prefer adding a function `censor` if you only need to keep a prefix.
 
-**A channel cannot turn the default set off** (it can only add keys, or turn it back *on* if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears *your* paths, not the default denylist.
+**A channel cannot turn the default set off** (it can only add keys, or turn it back _on_ if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears _your_ paths, not the default denylist.
 
 Not reachable by any layer: secrets interpolated into a `message` string (`` `token=${t}` ``), `Map`/`Set`/`Buffer` contents, and getter-backed or non-enumerable properties.
 
@@ -880,18 +902,14 @@ import { log } from "@warlock.js/logger";
 
 log.configure({
   redact: {
-    paths: [
-      "context.password",
-      "context.*.token",
-      "context.headers.authorization",
-    ],
-    censor: "[REDACTED]",  // default — string or function
+    paths: ["context.password", "context.*.token", "context.headers.authorization"],
+    censor: "[REDACTED]", // default — string or function
   },
 });
 
 // runtime equivalent:
 log.setRedact({ paths: ["context.password"] });
-log.setRedact(undefined);  // clear your paths (the default denylist stays on)
+log.setRedact(undefined); // clear your paths (the default denylist stays on)
 ```
 
 Every channel sees the redacted entry. Cheap: applied **once** before fan-out; channels share the redacted clone unless they add their own paths.
@@ -933,13 +951,13 @@ type LoggingData = {
 };
 ```
 
-| Pattern | Matches |
-| --- | --- |
-| `context.password` | exactly `data.context.password` |
-| `context.*.token` | `data.context.<any>.token` (one segment in between) |
-| `**.password` | `data.context.password`, `data.context.user.password`, … any depth |
-| `message.apiKey` | when message is an object, `data.message.apiKey` |
-| `context.users.*.token` | array element redaction (`*` matches indices too) |
+| Pattern                 | Matches                                                            |
+| ----------------------- | ------------------------------------------------------------------ |
+| `context.password`      | exactly `data.context.password`                                    |
+| `context.*.token`       | `data.context.<any>.token` (one segment in between)                |
+| `**.password`           | `data.context.password`, `data.context.user.password`, … any depth |
+| `message.apiKey`        | when message is an object, `data.message.apiKey`                   |
+| `context.users.*.token` | array element redaction (`*` matches indices too)                  |
 
 Wildcards:
 
@@ -980,6 +998,20 @@ If `message` is a plain object, paths under `message.*` work as expected. If `me
 - Each path is matched independently; cost grows linearly with `paths.length`.
 
 For most apps with `<10` redact paths and shallow context, the cost is below 100µs per entry. If you're logging millions of entries per second through paths like `**.something`, profile before scaling up — `**` is the only pattern that recurses through every key.
+
+## Email addresses inside strings
+
+```ts
+import { log, maskEmail, maskEmailsInText } from "@warlock.js/logger";
+
+log.info("mail", "send", `Sending to ${maskEmail("member@example.com")}`);
+log.debug("cache", "key", maskEmailsInText("profile:member@example.com"));
+```
+
+Key-based redaction cannot mask a substring inside a message or cache key.
+`maskEmail()` keeps the first code point and domain (`m***@example.com`);
+`maskEmailsInText()` handles text and bounds its scan at 16,384 characters,
+replacing the remaining suffix with a truncation marker.
 
 
 ## ship-logs-to-sentry  `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`
@@ -1036,14 +1068,14 @@ With neither `client` nor `options`, the channel reuses whatever global Sentry c
 
 This is the quota-control decision. Only `eventLevels` create Sentry **events** (which consume your error quota); every other level becomes a **breadcrumb** that rides along with the next event for free.
 
-| Logger level | Default | Sentry call |
-|---|---|---|
-| `fatal` | event | `captureException` for an `Error` message, else `captureMessage(…, "fatal")` |
-| `error` | event | `captureException` for an `Error` message, else `captureMessage(…, "error")` |
-| `warn` | event | `captureMessage(…, "warning")` |
-| `success` | breadcrumb | `addBreadcrumb({ level: "info" })` |
-| `info` | breadcrumb | `addBreadcrumb({ level: "info" })` |
-| `debug` | breadcrumb | `addBreadcrumb({ level: "debug" })` |
+| Logger level | Default    | Sentry call                                                                  |
+| ------------ | ---------- | ---------------------------------------------------------------------------- |
+| `fatal`      | event      | `captureException` for an `Error` message, else `captureMessage(…, "fatal")` |
+| `error`      | event      | `captureException` for an `Error` message, else `captureMessage(…, "error")` |
+| `warn`       | event      | `captureMessage(…, "warning")`                                               |
+| `success`    | breadcrumb | `addBreadcrumb({ level: "info" })`                                           |
+| `info`       | breadcrumb | `addBreadcrumb({ level: "info" })`                                           |
+| `debug`      | breadcrumb | `addBreadcrumb({ level: "debug" })`                                          |
 
 - **Errors keep their stack.** A `message` that is an `Error` goes through `captureException`, so Sentry parses the real stack and groups correctly — never pre-stringify the error.
 - **`module` / `action` become tags** and the entry's `context` becomes a structured Sentry context, both scoped to that single event via `withScope`.
@@ -1068,14 +1100,14 @@ Sentry sends events asynchronously over the network, so a synchronous flush can'
 ```ts
 async function shutdown() {
   await httpServer.close();
-  await log.flush();   // SentryLog.flush() → Sentry.flush(flushTimeout)
+  await log.flush(); // SentryLog.flush() → Sentry.flush(flushTimeout)
   process.exit(0);
 }
 
 process.once("SIGTERM", shutdown);
 ```
 
-`flushTimeout` (default `2000` ms) bounds the wait so an unreachable Sentry can't hang shutdown. `autoFlushOn` uses the **synchronous** `flushSync()`, which does *not* drain Sentry — wire `await log.flush()` yourself. See the `flush-logs-on-shutdown` topic.
+`flushTimeout` (default `2000` ms) bounds the wait so an unreachable Sentry can't hang shutdown. `autoFlushOn` uses the **synchronous** `flushSync()`, which does _not_ drain Sentry — wire `await log.flush()` yourself. See the `flush-logs-on-shutdown` topic.
 
 ## If `@sentry/node` isn't installed
 
@@ -1083,17 +1115,17 @@ The channel never crashes your app: the dynamic import failure is swallowed, the
 
 ## Config reference
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `client` | Sentry namespace / forwarder | — | Reuse an already-initialized Sentry instance. |
-| `options` | `SentryInitOptions` | — | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`) — used when the channel owns Sentry. |
-| `eventLevels` | `LogLevel[]` | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
-| `flushTimeout` | `number` | `2000` | Ms `flush()` waits for the transport to drain. |
-| `levels`, `filter`, `dateFormat`, `redact` | — | — | Inherited from `BasicLogConfigurations`. |
+| Option                                     | Type                         | Default                      | Description                                                                                       |
+| ------------------------------------------ | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| `client`                                   | Sentry namespace / forwarder | —                            | Reuse an already-initialized Sentry instance.                                                     |
+| `options`                                  | `SentryInitOptions`          | —                            | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`) — used when the channel owns Sentry. |
+| `eventLevels`                              | `LogLevel[]`                 | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs.                                               |
+| `flushTimeout`                             | `number`                     | `2000`                       | Ms `flush()` waits for the transport to drain.                                                    |
+| `levels`, `filter`, `dateFormat`, `redact` | —                            | —                            | Inherited from `BasicLogConfigurations`.                                                          |
 
 ## Don't do
 
-- **Don't double-init Sentry.** Pass *either* `client` *or* `options`, not both. The channel guards against double-init, but a single owner of `Sentry.init` is cleaner.
+- **Don't double-init Sentry.** Pass _either_ `client` _or_ `options`, not both. The channel guards against double-init, but a single owner of `Sentry.init` is cleaner.
 - **Don't send every level as an event.** `eventLevels` with `info`/`debug`/`success` will flood your Sentry quota — keep them as breadcrumbs.
 - **Don't rely on `autoFlushOn` for Sentry.** It's synchronous; a network channel needs `await log.flush()`.
 
@@ -1149,7 +1181,9 @@ class CapturingChannel extends LogChannel {
   public name = "capture";
   public terminal = false;
   public received: LoggingData[] = [];
-  public log(data: LoggingData) { this.received.push({ ...data }); }
+  public log(data: LoggingData) {
+    this.received.push({ ...data });
+  }
 }
 ```
 
@@ -1208,7 +1242,7 @@ No cleanup needed — the local `Logger` is garbage-collected.
 
 ## Why not spy on `log.info`?
 
-`log` is a plain `Logger` instance (`export const log = new Logger()`) and every level method lives on the prototype, so `vi.spyOn(log, "info")` *does* technically work. Prefer the capturing channel anyway:
+`log` is a plain `Logger` instance (`export const log = new Logger()`) and every level method lives on the prototype, so `vi.spyOn(log, "info")` _does_ technically work. Prefer the capturing channel anyway:
 
 - A spy on `log.info` proves the method was **called**, not that an entry was **delivered** — it skips the whole pipeline (`minLevel` floor, redaction, per-channel `levels` / `filter`). A capturing channel asserts on the entry your code under test actually produced after all of that ran.
 - The `log` singleton is shared global state. A spy you forget to `mockRestore()` leaks into the next test; swapping `log.channels` and restoring it in `afterEach` is the same amount of code and isolates cleanly.
@@ -1378,6 +1412,7 @@ export class NullChannel extends LogChannel {
 ```
 
 Then:
+
 ```ts
 log.addChannel(new NullChannel());
 ```
@@ -1386,16 +1421,16 @@ That's a working channel. `LogChannel` provides the scaffolding; you only need t
 
 ## What `LogChannel` gives you
 
-| Thing | Who provides it |
-|---|---|
-| `name`, `description`, `terminal` | You (fields on your subclass) |
-| `log(data)` | **You must implement** — abstract |
-| `flushSync()` | You (optional sync drain — only if you buffer) |
-| `flush()` | You (optional async drain — only if you buffer over async I/O) |
-| `init()` | You (optional async hook — see below) |
-| `shouldBeLogged(data)` | `LogChannel` — combines `levels` + `filter` |
-| `config<K>(key)` | `LogChannel` — merges user config with `defaultConfigurations` |
-| `getDateAndTimeFormat()` | `LogChannel` — returns resolved `dateFormat` |
+| Thing                             | Who provides it                                                |
+| --------------------------------- | -------------------------------------------------------------- |
+| `name`, `description`, `terminal` | You (fields on your subclass)                                  |
+| `log(data)`                       | **You must implement** — abstract                              |
+| `flushSync()`                     | You (optional sync drain — only if you buffer)                 |
+| `flush()`                         | You (optional async drain — only if you buffer over async I/O) |
+| `init()`                          | You (optional async hook — see below)                          |
+| `shouldBeLogged(data)`            | `LogChannel` — combines `levels` + `filter`                    |
+| `config<K>(key)`                  | `LogChannel` — merges user config with `defaultConfigurations` |
+| `getDateAndTimeFormat()`          | `LogChannel` — returns resolved `dateFormat`                   |
 
 ## Complete example — SlackLog
 
@@ -1413,7 +1448,7 @@ export class SlackLog extends LogChannel<SlackConfig> {
   public description = "Posts errors + warnings to a Slack webhook";
 
   public async log(data: LoggingData) {
-    if (!this.shouldBeLogged(data)) return;   // ← inherit levels + filter
+    if (!this.shouldBeLogged(data)) return; // ← inherit levels + filter
 
     await fetch(this.config("webhookUrl"), {
       method: "POST",
@@ -1444,9 +1479,7 @@ log.setChannels([
 Override `protected async init()` for one-time setup — open a socket, connect to a DB, prepare a write stream. Runs automatically after construction (inside a `setTimeout(0)`); `isInitialized` flips to `true` once resolved.
 
 ```ts
-export class DatabaseLog extends LogChannel<
-  BasicLogConfigurations & { connectionString: string }
-> {
+export class DatabaseLog extends LogChannel<BasicLogConfigurations & { connectionString: string }> {
   public name = "database";
   private client!: SomeDbClient;
 
@@ -1482,7 +1515,9 @@ export class BatchHttpLog extends LogChannel<BasicLogConfigurations & { url: str
     // so a follow-up async drain can recover it next boot.
   }
 
-  private async drain() { /* async post to this.config("url") */ }
+  private async drain() {
+    /* async post to this.config("url") */
+  }
 }
 ```
 
@@ -1502,7 +1537,7 @@ export class BatchHttpLog extends LogChannel<BasicLogConfigurations & { url: str
   }
 
   public async flush() {
-    await this.drain();   // awaited by log.flush() on shutdown
+    await this.drain(); // awaited by log.flush() on shutdown
   }
 
   private async drain() {
@@ -1534,7 +1569,7 @@ class MinimalSlack implements LogContract {
 
   public async log(data: LoggingData) {
     if (data.type !== "error") return;
-    await fetch(process.env.SLACK_WEBHOOK!, { /* ... */ });
+    await fetch(process.env.SLACK_WEBHOOK!, {/* ... */});
   }
 }
 ```
@@ -1544,6 +1579,6 @@ Prefer extending `LogChannel` unless you have a concrete reason not to — the l
 ## Don't do
 
 - Don't mutate `data` inside `log()`. Later channels see the mutation if the logger passes the same reference.
-- Don't throw synchronously from `log()`. The logger fires it without awaiting; an unhandled rejection takes down the process (unless `captureAnyUnhandledRejection` is wired up — and then it's embarrassing to be the cause).
+- Don't rely on throwing from `log()` to surface a failure. The logger isolates each channel: a sync throw or a rejected promise from `log()` goes to the logger's `onChannelError` handler (default: one stderr line), never to the caller, the other channels or `unhandledRejection`. Return the promise from an async `log()` so `await log.flush()` can wait for the delivery.
 - Don't block the event loop. `log()` may be sync or async; if your work takes >100ms, make it async and return the promise.
 - Don't forget `shouldBeLogged(data)` at the top of `log()` — or your channel silently ignores `levels` / `filter` config.

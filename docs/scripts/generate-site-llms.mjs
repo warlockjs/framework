@@ -190,9 +190,7 @@ for (const pkg of PACKAGES) {
   );
 
   if (hasFull) {
-    fullParts.push(
-      `\n\n${"=".repeat(80)}\n# ${scopedName}\n${"=".repeat(80)}\n\n${full}`,
-    );
+    fullParts.push(`\n\n${"=".repeat(80)}\n# ${scopedName}\n${"=".repeat(80)}\n\n${full}`);
   }
 }
 

@@ -25,18 +25,18 @@ Listeners are async-aware — the model's persistence awaits the listener before
 
 The events fire in this order. The **gerund** form (`saving`, `creating`) is the "before" hook — there is no `beforeSave` alias.
 
-| Event | Fires |
-| --- | --- |
-| `saving` | Before validation, on every `save()` (both insert and update paths) |
-| `validating` / `validated` | Around schema validation |
-| `creating` | Before a new record is inserted (first save) |
-| `updating` | Before an existing record's update is written |
-| `saved` | After a successful write (any branch — insert or update) |
-| `created` | After a new record is inserted |
-| `updated` | After an existing record's update is written |
-| `deleting` / `deleted` | Before / after the delete strategy runs |
-| `restoring` / `restored` | Before / after a soft-deleted or trashed record is restored |
-| `fetching` / `fetched` / `hydrating` | Around reads / instance hydration |
+| Event                                | Fires                                                               |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| `saving`                             | Before validation, on every `save()` (both insert and update paths) |
+| `validating` / `validated`           | Around schema validation                                            |
+| `creating`                           | Before a new record is inserted (first save)                        |
+| `updating`                           | Before an existing record's update is written                       |
+| `saved`                              | After a successful write (any branch — insert or update)            |
+| `created`                            | After a new record is inserted                                      |
+| `updated`                            | After an existing record's update is written                        |
+| `deleting` / `deleted`               | Before / after the delete strategy runs                             |
+| `restoring` / `restored`             | Before / after a soft-deleted or trashed record is restored         |
+| `fetching` / `fetched` / `hydrating` | Around reads / instance hydration                                   |
 
 `saving` fires for both inserts and updates; `creating` / `updating` narrow to the branch. So `saved` always fires; exactly one of `created` / `updated` follows.
 
@@ -115,7 +115,7 @@ Model.on("updated", async (instance) => {
 });
 ```
 
-Use `updated` (not `saved`) when you only want change diffs — `getDirtyColumnsWithValues()` is still populated in the post-write events because the tracker resets *after* they fire.
+Use `updated` (not `saved`) when you only want change diffs — `getDirtyColumnsWithValues()` is still populated in the post-write events because the tracker resets _after_ they fire.
 
 ### Cache invalidation
 

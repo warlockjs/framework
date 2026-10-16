@@ -107,9 +107,7 @@ describe("Application startup validators (D7)", () => {
   it("refuses a validator registered after runStartupValidators already ran", async () => {
     await Application.runStartupValidators();
 
-    expect(() => Application.onValidateBoot(() => {})).toThrow(
-      /startup validators already ran/,
-    );
+    expect(() => Application.onValidateBoot(() => {})).toThrow(/startup validators already ran/);
   });
 
   it("regression: a rejecting ORDINARY boot listener still cannot break boot (existing behaviour, pinned against D7)", async () => {

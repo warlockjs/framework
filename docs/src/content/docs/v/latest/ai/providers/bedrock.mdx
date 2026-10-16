@@ -18,21 +18,9 @@ AWS SDK call.
 ## Install
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm install @warlock.js/ai @warlock.js/ai-bedrock
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-bedrock
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-bedrock
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm install @warlock.js/ai @warlock.js/ai-bedrock ```</TabItem>
+  <TabItem label="yarn">```bash pnpm add @warlock.js/ai @warlock.js/ai-bedrock ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm add @warlock.js/ai @warlock.js/ai-bedrock ```</TabItem>
 </Tabs>
 
 ## Construct
@@ -111,8 +99,7 @@ const { vector } = await embedder.embed("Hello world");
 const { vectors } = await embedder.embedMany(["doc 1", "doc 2"]);
 ```
 
-Titan v2 supports output truncation — pass `dimensions` (256 / 512 /
-1024) and the adapter forwards it:
+Titan v2 supports output truncation — pass `dimensions` (256 / 512 / 1024) and the adapter forwards it:
 
 ```ts
 bedrock.embedder({ name: "amazon.titan-embed-text-v2:0", dimensions: 256 });

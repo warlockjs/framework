@@ -74,7 +74,7 @@ const github = ai.mcp({
   args: ["-y", "@modelcontextprotocol/server-github"],
   env: {
     GITHUB_TOKEN: process.env.GITHUB_TOKEN!, // deliberately opt this server into its token
-    PATH: "/opt/mcp-tools/bin",              // overrides inherited PATH for this child
+    PATH: "/opt/mcp-tools/bin", // overrides inherited PATH for this child
   },
 });
 ```
@@ -86,14 +86,14 @@ unrelated secrets to the server. Omit `env` when the server needs no configurati
 
 ```ts
 ai.mcp(server, {
-  namePrefix: "github.",                        // prepended to every remote tool name
+  namePrefix: "github.", // prepended to every remote tool name
   filter: (name) => name.startsWith("issues_"), // only adapt tools whose name passes
-  timeoutMs: 30_000,                            // per tools/call deadline (default 30s)
+  timeoutMs: 30_000, // per tools/call deadline (default 30s)
 });
 ```
 
 - **`namePrefix`** is the collision mitigation — there is **no runtime tool-name collision guard** (the agent resolves a tool by first name match), so the author owns uniqueness. Prefix remote tools to keep them distinct from local ones.
-- **`filter`** receives each tool's *unprefixed* name; return `false` to drop it.
+- **`filter`** receives each tool's _unprefixed_ name; return `false` to drop it.
 
 ### What `tools()` does
 
@@ -126,10 +126,10 @@ try {
 `ai.mcp.serve(source, options)` turns a local set of `ToolContract`s into a Model Context Protocol server — so Cursor, Claude Desktop, or any MCP client can call your Warlock tools / agent over the wire.
 
 ```ts
-const server = ai.mcp.serve(
-  [ai.tools.calculator(), ai.tools.dateTime()],
-  { name: "warlock-utils", transport: { type: "stdio" } },
-);
+const server = ai.mcp.serve([ai.tools.calculator(), ai.tools.dateTime()], {
+  name: "warlock-utils",
+  transport: { type: "stdio" },
+});
 
 await server.start();
 // ...later, on teardown:
@@ -152,10 +152,10 @@ The tools are snapshotted at construction (`source.tools()` is called once), so 
 
 ```ts
 ai.mcp.serve(source, {
-  name: "warlock-utils",          // advertised in the initialize response (required)
-  version: "1.0.0",               // default: the package version
-  transport: { type: "stdio" },   // default: stdio
-  schemaTarget: "draft-2020-12",  // JSON-Schema dialect for each tool's inputSchema
+  name: "warlock-utils", // advertised in the initialize response (required)
+  version: "1.0.0", // default: the package version
+  transport: { type: "stdio" }, // default: stdio
+  schemaTarget: "draft-2020-12", // JSON-Schema dialect for each tool's inputSchema
 });
 ```
 

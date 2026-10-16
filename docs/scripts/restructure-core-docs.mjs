@@ -107,10 +107,7 @@ async function exists(p) {
 
 function setSidebarPosition(content, order) {
   if (/^sidebar_position:/m.test(content)) {
-    return content.replace(
-      /^sidebar_position:\s*\d+/m,
-      `sidebar_position: ${order}`,
-    );
+    return content.replace(/^sidebar_position:\s*\d+/m, `sidebar_position: ${order}`);
   }
   // Insert right after the opening `---` of the frontmatter.
   return content.replace(/^---\r?\n/, `---\nsidebar_position: ${order}\n`);

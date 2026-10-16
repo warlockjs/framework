@@ -14,27 +14,28 @@ type LegacyNamedSubmitTarget = HasGeneratedApiRoutes extends true
   ? never
   : { route: string; path?: never; method?: string; params?: Record<string, RouteParamValue> };
 type TypedNamedSubmitTarget = HasGeneratedApiRoutes extends true
-  ? | {
-        [Name in SubmittableApiRouteName]: {} extends ApiRouteParams<Name>
-          ? {
-              route: Name;
-              path?: never;
-              method?: ApiRouteMethodInput<Name>;
-              params?: ApiRouteParams<Name>;
-            }
-          : {
-              route: Name;
-              path?: never;
-              method?: ApiRouteMethodInput<Name>;
-              params: ApiRouteParams<Name>;
-            };
-      }[SubmittableApiRouteName]
-    | {
-        route: RuntimeRouteName;
-        path?: never;
-        method?: string;
-        params?: Record<string, RouteParamValue>;
-      }
+  ?
+      | {
+          [Name in SubmittableApiRouteName]: {} extends ApiRouteParams<Name>
+            ? {
+                route: Name;
+                path?: never;
+                method?: ApiRouteMethodInput<Name>;
+                params?: ApiRouteParams<Name>;
+              }
+            : {
+                route: Name;
+                path?: never;
+                method?: ApiRouteMethodInput<Name>;
+                params: ApiRouteParams<Name>;
+              };
+        }[SubmittableApiRouteName]
+      | {
+          route: RuntimeRouteName;
+          path?: never;
+          method?: string;
+          params?: Record<string, RouteParamValue>;
+        }
   : never;
 type PathSubmitTarget = {
   path: string;

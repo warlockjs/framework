@@ -15,15 +15,7 @@
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import {
-  lstat,
-  mkdir,
-  mkdtemp,
-  readFile,
-  realpath,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
@@ -91,9 +83,7 @@ async function runGate({ registry, version, port, chrome }) {
     );
   }
 
-  state.tempRoot = await mkdtemp(
-    path.join(os.tmpdir(), `warlock-starter-gate-${version}-`),
-  );
+  state.tempRoot = await mkdtemp(path.join(os.tmpdir(), `warlock-starter-gate-${version}-`));
   state.appRoot = path.join(state.tempRoot, "app");
   report.tempRoot = state.tempRoot;
   assertOutsideCheckout(state.tempRoot);
@@ -113,9 +103,7 @@ async function runGate({ registry, version, port, chrome }) {
   }
 
   console.log(`CANDIDATE registry=${registry} version=${version} port=${port}`);
-  console.log(
-    "PROFILE features=react,web,tailwind,shadcn jwt=false database=none pm=npm",
-  );
+  console.log("PROFILE features=react,web,tailwind,shadcn jwt=false database=none pm=npm");
   console.log(`APP external=${state.appRoot} checkout=${checkout}`);
 
   const tsxCli = requireFromCheckout.resolve("tsx/cli");
@@ -155,17 +143,10 @@ async function runGate({ registry, version, port, chrome }) {
     }
   }
   const packageNames = [...new Set(family)].sort();
-  if (
-    !packageNames.includes("@warlock.js/core") ||
-    !packageNames.includes("@warlock.js/web")
-  ) {
+  if (!packageNames.includes("@warlock.js/core") || !packageNames.includes("@warlock.js/web")) {
     throw new Error(`SCAFFOLD_FAMILY_INCOMPLETE: ${packageNames.join(", ")}`);
   }
-  await writeFile(
-    manifestFile,
-    JSON.stringify(manifest, null, 2) + "\n",
-    "utf8",
-  );
+  await writeFile(manifestFile, JSON.stringify(manifest, null, 2) + "\n", "utf8");
 
   // Both targets were created by this gate beneath its unique temp root.
   await rm(path.join(state.appRoot, "node_modules"), {
@@ -174,14 +155,7 @@ async function runGate({ registry, version, port, chrome }) {
   });
   await rm(path.join(state.appRoot, "package-lock.json"), { force: true });
   await runNpm(
-    [
-      "install",
-      "--save-exact",
-      "--prefer-online",
-      "--no-audit",
-      "--no-fund",
-      "--legacy-peer-deps",
-    ],
+    ["install", "--save-exact", "--prefer-online", "--no-audit", "--no-fund", "--legacy-peer-deps"],
     {
       cwd: state.appRoot,
       env,
@@ -190,25 +164,17 @@ async function runGate({ registry, version, port, chrome }) {
     },
   );
 
-  const installed = await verifyCandidateInstall(
-    packageNames,
-    version,
-    registry,
-  );
+  const installed = await verifyCandidateInstall(packageNames, version, registry);
   report.packages = installed;
-  report.checks.exactFamilyManifest = packageNames.every(name =>
-    [manifest.dependencies?.[name], manifest.devDependencies?.[name]].includes(
-      version,
-    ),
+  report.checks.exactFamilyManifest = packageNames.every((name) =>
+    [manifest.dependencies?.[name], manifest.devDependencies?.[name]].includes(version),
   );
-  report.checks.exactFamilyInstalled = installed.every(
-    item => item.version === version,
-  );
+  report.checks.exactFamilyInstalled = installed.every((item) => item.version === version);
   report.checks.registryProvenance = installed.every(
-    item => item.registryOrigin === new URL(registry).origin,
+    (item) => item.registryOrigin === new URL(registry).origin,
   );
   report.checks.noWorkspaceLinks = installed.every(
-    item => item.symlink === false && item.insideApp === true,
+    (item) => item.symlink === false && item.insideApp === true,
   );
   for (const item of installed) {
     console.log(
@@ -240,8 +206,7 @@ async function runGate({ registry, version, port, chrome }) {
   report.browser = browser;
   report.checks.hydrationPayloadPresent = browser.hydrationPayloadPresent;
   report.checks.contactSubmittedByHydratedReact =
-    browser.successText ===
-      "Thanks, Candidate Gate. Your message has been received." &&
+    browser.successText === "Thanks, Candidate Gate. Your message has been received." &&
     browser.contactStatus === 200 &&
     browser.documentRequestsDuringSubmit === 0 &&
     browser.urlAfterSubmit === `${baseUrl}/`;
@@ -251,43 +216,25 @@ async function runGate({ registry, version, port, chrome }) {
 }
 
 async function installedWarlockBin() {
-  const coreRoot = path.join(
-    state.appRoot,
-    "node_modules",
-    "@warlock.js",
-    "core",
-  );
-  const coreManifest = JSON.parse(
-    await readFile(path.join(coreRoot, "package.json"), "utf8"),
-  );
+  const coreRoot = path.join(state.appRoot, "node_modules", "@warlock.js", "core");
+  const coreManifest = JSON.parse(await readFile(path.join(coreRoot, "package.json"), "utf8"));
   const binTarget =
-    typeof coreManifest.bin === "string"
-      ? coreManifest.bin
-      : coreManifest.bin?.warlock;
+    typeof coreManifest.bin === "string" ? coreManifest.bin : coreManifest.bin?.warlock;
   if (typeof binTarget !== "string")
     throw new Error("WARLOCK_BIN_MISSING: @warlock.js/core has no warlock bin");
   const warlockBin = path.resolve(coreRoot, binTarget);
   assertInside(coreRoot, warlockBin, "warlock bin");
-  if (!existsSync(warlockBin))
-    throw new Error(`WARLOCK_BIN_MISSING: ${warlockBin}`);
+  if (!existsSync(warlockBin)) throw new Error(`WARLOCK_BIN_MISSING: ${warlockBin}`);
   return warlockBin;
 }
 
 async function verifyCandidateInstall(packageNames, expectedVersion, registry) {
-  const lock = JSON.parse(
-    await readFile(path.join(state.appRoot, "package-lock.json"), "utf8"),
-  );
+  const lock = JSON.parse(await readFile(path.join(state.appRoot, "package-lock.json"), "utf8"));
   const results = [];
   for (const name of packageNames) {
-    const installPath = path.join(
-      state.appRoot,
-      "node_modules",
-      ...name.split("/"),
-    );
+    const installPath = path.join(state.appRoot, "node_modules", ...name.split("/"));
     const stat = await lstat(installPath);
-    const manifest = JSON.parse(
-      await readFile(path.join(installPath, "package.json"), "utf8"),
-    );
+    const manifest = JSON.parse(await readFile(path.join(installPath, "package.json"), "utf8"));
     const resolved = lock.packages?.[`node_modules/${name}`]?.resolved;
     if (manifest.name !== name || manifest.version !== expectedVersion) {
       throw new Error(
@@ -298,9 +245,7 @@ async function verifyCandidateInstall(packageNames, expectedVersion, registry) {
     try {
       registryOrigin = new URL(resolved).origin;
     } catch {
-      throw new Error(
-        `REGISTRY_PROVENANCE_MISSING: ${name} resolved=${JSON.stringify(resolved)}`,
-      );
+      throw new Error(`REGISTRY_PROVENANCE_MISSING: ${name} resolved=${JSON.stringify(resolved)}`);
     }
     results.push({
       package: name,
@@ -311,7 +256,7 @@ async function verifyCandidateInstall(packageNames, expectedVersion, registry) {
       insideApp: isInside(state.appRoot, await realpath(installPath)),
     });
   }
-  if (results.some(item => item.registryOrigin !== new URL(registry).origin)) {
+  if (results.some((item) => item.registryOrigin !== new URL(registry).origin)) {
     throw new Error(
       "REGISTRY_PROVENANCE_MISMATCH: one or more @warlock.js packages came from another origin",
     );
@@ -355,32 +300,28 @@ async function driveChrome({ chrome, baseUrl, profile }) {
     });
     cdp.on(
       "Runtime.consoleAPICalled",
-      event => {
+      (event) => {
         if (event.type === "error")
-          consoleErrors.push(
-            event.args.map(arg => arg.value ?? arg.description).join(" "),
-          );
+          consoleErrors.push(event.args.map((arg) => arg.value ?? arg.description).join(" "));
       },
       sessionId,
     );
     cdp.on(
       "Runtime.exceptionThrown",
-      event =>
-        exceptions.push(event.exceptionDetails?.text ?? "browser exception"),
+      (event) => exceptions.push(event.exceptionDetails?.text ?? "browser exception"),
       sessionId,
     );
     cdp.on(
       "Network.requestWillBeSent",
-      event => {
+      (event) => {
         if (event.type === "Document") documentRequests.push(event.request.url);
       },
       sessionId,
     );
     cdp.on(
       "Network.responseReceived",
-      event => {
-        if (event.response.url === `${baseUrl}/api/contact`)
-          contactStatus = event.response.status;
+      (event) => {
+        if (event.response.url === `${baseUrl}/api/contact`) contactStatus = event.response.status;
       },
       sessionId,
     );
@@ -450,8 +391,7 @@ async function driveChrome({ chrome, baseUrl, profile }) {
       fieldsReset: measured.fieldsReset,
       contactStatus,
       urlAfterSubmit: measured.url,
-      documentRequestsDuringSubmit:
-        documentRequests.length - documentsBeforeSubmit,
+      documentRequestsDuringSubmit: documentRequests.length - documentsBeforeSubmit,
       consoleErrors,
       exceptions,
     };
@@ -470,17 +410,15 @@ class Cdp {
     this.nextId = 1;
     this.pending = new Map();
     this.listeners = [];
-    socket.addEventListener("message", event => this.receive(event.data));
+    socket.addEventListener("message", (event) => this.receive(event.data));
   }
   static async connect(url) {
     const socket = new WebSocket(url);
     await new Promise((resolve, reject) => {
       socket.addEventListener("open", resolve, { once: true });
-      socket.addEventListener(
-        "error",
-        () => reject(new Error("CHROME_CDP_CONNECT_FAILED")),
-        { once: true },
-      );
+      socket.addEventListener("error", () => reject(new Error("CHROME_CDP_CONNECT_FAILED")), {
+        once: true,
+      });
     });
     return new Cdp(socket);
   }
@@ -521,8 +459,7 @@ class Cdp {
   }
   close() {
     this.socket.close();
-    for (const pending of this.pending.values())
-      pending.reject(new Error("CDP connection closed"));
+    for (const pending of this.pending.values()) pending.reject(new Error("CDP connection closed"));
     this.pending.clear();
   }
 }
@@ -534,9 +471,7 @@ async function evaluate(cdp, sessionId, expression) {
     sessionId,
   );
   if (result.exceptionDetails)
-    throw new Error(
-      `BROWSER_EVALUATION_FAILED: ${result.exceptionDetails.text}`,
-    );
+    throw new Error(`BROWSER_EVALUATION_FAILED: ${result.exceptionDetails.text}`);
   return result.result.value;
 }
 
@@ -563,40 +498,28 @@ function parseArgs(argv) {
     const equal = arg.indexOf("=");
     const key = (equal < 0 ? arg : arg.slice(0, equal)).replace(/^--/, "");
     let value = equal < 0 ? undefined : arg.slice(equal + 1);
-    if (
-      ["registry", "version", "port", "chrome"].includes(key) &&
-      value === undefined
-    )
+    if (["registry", "version", "port", "chrome"].includes(key) && value === undefined)
       value = argv[++index];
     if (key === "help" || key === "h") parsed.help = true;
     else if (key === "keep-temp") parsed.keepTemp = true;
-    else if (["registry", "version", "port", "chrome"].includes(key))
-      parsed[key] = value;
+    else if (["registry", "version", "port", "chrome"].includes(key)) parsed[key] = value;
     else throw new Error(`UNKNOWN_ARGUMENT: ${arg}`);
   }
   return parsed;
 }
 
 function validateOptions(parsed) {
-  const missing = ["registry", "version", "port", "chrome"].filter(
-    key => !parsed[key],
-  );
+  const missing = ["registry", "version", "port", "chrome"].filter((key) => !parsed[key]);
   if (missing.length)
-    throw new Error(
-      `MISSING_ARGUMENTS: ${missing.map(key => `--${key}`).join(", ")}`,
-    );
+    throw new Error(`MISSING_ARGUMENTS: ${missing.map((key) => `--${key}`).join(", ")}`);
   let url;
   try {
     url = new URL(parsed.registry);
   } catch {
-    throw new Error(
-      "INVALID_REGISTRY: --registry must be an http(s) loopback origin",
-    );
+    throw new Error("INVALID_REGISTRY: --registry must be an http(s) loopback origin");
   }
   const loopback =
-    url.hostname === "localhost" ||
-    url.hostname === "127.0.0.1" ||
-    url.hostname === "[::1]";
+    url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
   if (
     !loopback ||
     !["http:", "https:"].includes(url.protocol) ||
@@ -610,21 +533,11 @@ function validateOptions(parsed) {
       "INVALID_REGISTRY: --registry must be a credential-free http(s) loopback origin without path/query/hash",
     );
   }
-  if (
-    !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
-      parsed.version,
-    )
-  ) {
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(parsed.version)) {
     throw new Error("INVALID_VERSION: --version must be explicit semver");
   }
-  if (
-    !/^\d+$/.test(parsed.port) ||
-    Number(parsed.port) < 1 ||
-    Number(parsed.port) > 65535
-  ) {
-    throw new Error(
-      "INVALID_PORT: --port must be an integer from 1 through 65535",
-    );
+  if (!/^\d+$/.test(parsed.port) || Number(parsed.port) < 1 || Number(parsed.port) > 65535) {
+    throw new Error("INVALID_PORT: --port must be an integer from 1 through 65535");
   }
   const chrome = path.resolve(parsed.chrome);
   if (!existsSync(chrome)) throw new Error(`CHROME_NOT_FOUND: ${chrome}`);
@@ -677,11 +590,11 @@ function runCommand(command, args, { cwd, env, timeoutMs, label }) {
       timedOut = true;
       await terminateTree(child).catch(() => undefined);
     }, timeoutMs);
-    child.once("error", error => {
+    child.once("error", (error) => {
       clearTimeout(timer);
       reject(new Error(`${label} spawn failed: ${formatError(error)}`));
     });
-    child.once("close", code => {
+    child.once("close", (code) => {
       clearTimeout(timer);
       if (code === 0 && !timedOut) resolve(lines.join("\n"));
       else
@@ -696,11 +609,7 @@ function runCommand(command, args, { cwd, env, timeoutMs, label }) {
 
 function runNpm(args, settings) {
   return process.platform === "win32"
-    ? runCommand(
-        process.env.ComSpec ?? "cmd.exe",
-        ["/d", "/s", "/c", "npm.cmd", ...args],
-        settings,
-      )
+    ? runCommand(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", "npm.cmd", ...args], settings)
     : runCommand("npm", args, settings);
 }
 
@@ -711,22 +620,17 @@ async function stopOwned(key) {
   await terminateTree(child);
   const deadline = Date.now() + 10_000;
   while (processAlive(child.pid) && Date.now() < deadline) await delay(100);
-  if (processAlive(child.pid))
-    throw new Error(`OWNED_PROCESS_SURVIVED: ${key} pid=${child.pid}`);
+  if (processAlive(child.pid)) throw new Error(`OWNED_PROCESS_SURVIVED: ${key} pid=${child.pid}`);
 }
 
 async function terminateTree(child) {
   if (!child?.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    await new Promise(resolve => {
-      const killer = spawn(
-        "taskkill.exe",
-        ["/pid", String(child.pid), "/t", "/f"],
-        {
-          stdio: "ignore",
-          windowsHide: true,
-        },
-      );
+    await new Promise((resolve) => {
+      const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
       killer.once("error", resolve);
       killer.once("close", resolve);
     });
@@ -770,8 +674,7 @@ async function waitForJson(url, child, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null)
-      throw new Error(`CHROME_EXITED_EARLY: code=${child.exitCode}`);
+    if (child.exitCode !== null) throw new Error(`CHROME_EXITED_EARLY: code=${child.exitCode}`);
     try {
       const response = await fetch(url);
       if (response.ok) return response.json();
@@ -788,9 +691,7 @@ async function assertPortFree(port, label) {
   try {
     await bindAndClose(port);
   } catch (error) {
-    throw new Error(
-      `${label.toUpperCase()}_PORT_UNAVAILABLE: ${port}; ${formatError(error)}`,
-    );
+    throw new Error(`${label.toUpperCase()}_PORT_UNAVAILABLE: ${port}; ${formatError(error)}`);
   }
 }
 
@@ -805,9 +706,8 @@ function bindAndClose(port) {
     probe.once("error", reject);
     probe.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
       const address = probe.address();
-      const selected =
-        typeof address === "object" && address ? address.port : port;
-      probe.close(error => (error ? reject(error) : resolve(selected)));
+      const selected = typeof address === "object" && address ? address.port : port;
+      probe.close((error) => (error ? reject(error) : resolve(selected)));
     });
   });
 }
@@ -816,7 +716,7 @@ function capture(stream, sink) {
   if (!stream) return;
   let remainder = "";
   stream.setEncoding("utf8");
-  stream.on("data", chunk => {
+  stream.on("data", (chunk) => {
     remainder += chunk;
     const lines = remainder.split(/\r?\n/);
     remainder = lines.pop() ?? "";
@@ -833,9 +733,7 @@ function assertOutsideCheckout(candidate) {
 
 function assertInside(parent, candidate, label) {
   if (!isInside(parent, candidate))
-    throw new Error(
-      `UNSAFE_${label.toUpperCase().replace(/\W+/g, "_")}: ${candidate}`,
-    );
+    throw new Error(`UNSAFE_${label.toUpperCase().replace(/\W+/g, "_")}: ${candidate}`);
 }
 
 function isInside(parent, candidate) {
@@ -864,13 +762,11 @@ function printTail(label, lines) {
 }
 
 function formatError(error) {
-  return error instanceof Error
-    ? `${error.name}: ${error.message}`
-    : String(error);
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 let passed = false;
@@ -908,9 +804,7 @@ if (options.keepTemp && state.tempRoot) {
     console.log(`TEMP removed=${state.tempRoot}`);
   } catch (error) {
     passed = false;
-    console.log(
-      `TEMP cleanup-failed=${state.tempRoot} error=${formatError(error)}`,
-    );
+    console.log(`TEMP cleanup-failed=${state.tempRoot} error=${formatError(error)}`);
   }
 }
 

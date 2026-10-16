@@ -87,7 +87,7 @@ ai.tool({
   input: v.object({ preferences: v.array(v.string()).optional() }),
   execute: async (patch, ctx) => {
     ctx.artifacts.stateUpdate = patch;
-    return { ok: true };  // model never sees this
+    return { ok: true }; // model never sees this
   },
 });
 ```
@@ -109,7 +109,7 @@ ai.tool({
 
     // Side-channel — never reaches the LLM.
     ctx.artifacts.blocks ??= [];
-    ctx.artifacts.blocks.push({ type: "items", itemIds: items.map(i => i.id) });
+    ctx.artifacts.blocks.push({ type: "items", itemIds: items.map((i) => i.id) });
 
     // LLM-visible — what the agent reasons over.
     return { total: items.length };

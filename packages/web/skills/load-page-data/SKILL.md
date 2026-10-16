@@ -12,7 +12,9 @@ this skill uses both:
 
 ```tsx
 // Either: a named function, with the context typed on the parameter.
-export async function loader({ request }: PageLoaderContext<typeof config.validation, typeof config.route>) {
+export async function loader({
+  request,
+}: PageLoaderContext<typeof config.validation, typeof config.route>) {
   return { id: request.validated().params.id };
 }
 
@@ -222,16 +224,16 @@ export default function ProductPage({ data }: PageProps<typeof loader>) {
 
 What each loader value becomes:
 
-| Loader returns                                              | The page reads                                                          |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| a cascade model registered in `ModelResourceRegistry`       | that resource's output (`ResourceOutput<typeof XResource>`)             |
-| a model with no registry entry                              | its serialized `data` type                                              |
-| any value with `toJSON()`                                   | the (awaited) result of `toJSON()`                                      |
-| `Date`, `Map`, `Set`, `RegExp`, `URL`                       | the same native type                                                    |
-| a function-valued key                                       | removed from the type; devalue refuses a function at render, so do not return one |
-| a class instance with private members and no `toJSON()`     | `never` (devalue would throw at render)                                 |
-| a `defer()` key holding a promise                           | `Promise<Serialized<settled value>>`: the key stays a promise for `use()` |
-| plain JSON-ish data                                         | unchanged                                                               |
+| Loader returns                                          | The page reads                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| a cascade model registered in `ModelResourceRegistry`   | that resource's output (`ResourceOutput<typeof XResource>`)                       |
+| a model with no registry entry                          | its serialized `data` type                                                        |
+| any value with `toJSON()`                               | the (awaited) result of `toJSON()`                                                |
+| `Date`, `Map`, `Set`, `RegExp`, `URL`                   | the same native type                                                              |
+| a function-valued key                                   | removed from the type; devalue refuses a function at render, so do not return one |
+| a class instance with private members and no `toJSON()` | `never` (devalue would throw at render)                                           |
+| a `defer()` key holding a promise                       | `Promise<Serialized<settled value>>`: the key stays a promise for `use()`         |
+| plain JSON-ish data                                     | unchanged                                                                         |
 
 A model with `static resource = ProductResource` is registered automatically: `warlock generate.typings` and `warlock dev` write `.warlock/typings/model-resources.d.ts`, so the page types it as the resource's output with no extra code.
 
@@ -328,16 +330,16 @@ A loader that **throws** is also terminal: it stops lower loaders, discards its 
 
 Each loader gets its own buffered response, never the live one, so that a level discarded by a short-circuit or a throw cannot leak half-written headers or cookies onto a response it no longer owns. These are all of its public methods. The first five return the buffered response, so they chain; the last three return a short-circuit value that you must `return`.
 
-| Method                                  | What it does                                                                                       |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `header(key, value)`                    | Queue one response header. The value is converted with `String()`                                   |
-| `headers(bag)`                          | Queue every entry of a `Record<string, unknown>` as a header                                        |
-| `setStatusCode(code)`                   | Queue the status code. There is no `status()` method                                                |
-| `cookie(name, value, options?)`         | Queue a `Set-Cookie`. Same arguments as core `response.cookie()`                                    |
-| `clearCookie(name, options?)`           | Queue a cookie deletion. Same arguments as core `response.clearCookie()`                            |
-| `redirect(url, statusCode = 302)`       | Queue the status and `Location`, and return a redirect short-circuit                                |
-| `permanentRedirect(url)`                | `redirect(url, 301)`                                                                                |
-| `notFound(body?)`                       | Queue status 404 and return a not-found short-circuit that renders your `404.page.tsx`              |
+| Method                            | What it does                                                                           |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `header(key, value)`              | Queue one response header. The value is converted with `String()`                      |
+| `headers(bag)`                    | Queue every entry of a `Record<string, unknown>` as a header                           |
+| `setStatusCode(code)`             | Queue the status code. There is no `status()` method                                   |
+| `cookie(name, value, options?)`   | Queue a `Set-Cookie`. Same arguments as core `response.cookie()`                       |
+| `clearCookie(name, options?)`     | Queue a cookie deletion. Same arguments as core `response.clearCookie()`               |
+| `redirect(url, statusCode = 302)` | Queue the status and `Location`, and return a redirect short-circuit                   |
+| `permanentRedirect(url)`          | `redirect(url, 301)`                                                                   |
+| `notFound(body?)`                 | Queue status 404 and return a not-found short-circuit that renders your `404.page.tsx` |
 
 ```ts
 response.header("cache-control", "private, max-age=60");
@@ -367,9 +369,14 @@ import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-export const config = { route: { path: "/settings", name: "settings" } } as const satisfies PageConfig;
+export const config = {
+  route: { path: "/settings", name: "settings" },
+} as const satisfies PageConfig;
 
-export async function loader({ request, response }: PageLoaderContext<undefined, typeof config.route>) {
+export async function loader({
+  request,
+  response,
+}: PageLoaderContext<undefined, typeof config.route>) {
   const requested = request.input("theme");
 
   if (requested === "dark" || requested === "light") {

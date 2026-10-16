@@ -11,8 +11,7 @@ import {
 import { withTempDir } from "./helpers";
 
 // Known empty-input digests (no bytes hashed).
-const EMPTY_SHA256 =
-  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+const EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 const EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
 
 describe("hash — empty + boundary inputs", () => {

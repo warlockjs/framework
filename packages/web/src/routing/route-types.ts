@@ -106,7 +106,8 @@ export type ApiRouteMethod<Name extends RegisteredApiRouteName> = ApiMethod<Name
 
 /** Either conventional spelling of this route's generated canonical verb. */
 export type ApiRouteMethodInput<Name extends RegisteredApiRouteName> =
-  Uppercase<ApiMethod<Name>> | Lowercase<ApiMethod<Name>>;
+  | Uppercase<ApiMethod<Name>>
+  | Lowercase<ApiMethod<Name>>;
 
 /** Generated API names with a concrete browser request method. */
 export type SubmittableApiRouteName = {

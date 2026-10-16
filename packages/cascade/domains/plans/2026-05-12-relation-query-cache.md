@@ -64,13 +64,13 @@ ALS is magic — wires the cache through async boundaries without ceremony. Expl
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Opt-in via `.cached()` or auto-on within a context? | **`.cached()` opt-in.** Avoids surprise staleness. |
-| 2 | AsyncLocalStorage or explicit context object? | **ALS.** Better DX; explicit context can come later if anyone wants strict scoping. |
-| 3 | Clone or freeze cached records? | **Clone.** Correctness over memory. |
-| 4 | Include constraint hash in key? | **Yes.** Same relation, different filter — different cache entries. |
-| 5 | Invalidate on writes within the same request? | **No.** Per-request cache is short-lived; if you mutate then read with cached, you opted into that. |
+| #   | Question                                            | Recommendation                                                                                      |
+| --- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | Opt-in via `.cached()` or auto-on within a context? | **`.cached()` opt-in.** Avoids surprise staleness.                                                  |
+| 2   | AsyncLocalStorage or explicit context object?       | **ALS.** Better DX; explicit context can come later if anyone wants strict scoping.                 |
+| 3   | Clone or freeze cached records?                     | **Clone.** Correctness over memory.                                                                 |
+| 4   | Include constraint hash in key?                     | **Yes.** Same relation, different filter — different cache entries.                                 |
+| 5   | Invalidate on writes within the same request?       | **No.** Per-request cache is short-lived; if you mutate then read with cached, you opted into that. |
 
 ## Verification
 

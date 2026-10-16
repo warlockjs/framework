@@ -41,7 +41,9 @@ export async function processJob(job: Job): Promise<unknown> {
   const queueContext = getQueueContext();
 
   try {
-    return captured !== undefined && queueContext ? await queueContext.restore(captured, run) : await run();
+    return captured !== undefined && queueContext
+      ? await queueContext.restore(captured, run)
+      : await run();
   } catch (error) {
     if (error instanceof UnrecoverableJobError) {
       throw new UnrecoverableError(error.message);

@@ -31,14 +31,14 @@ const myRule: SchemaRule = {
 
 The fields:
 
-| Field                 | Required | Purpose                                                                                                                |
-| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `name`                | yes      | Unique identifier. Used in the translation key (`validation.<name>`) and shown in errors.                              |
-| `validate`            | yes      | The check itself. Returns a `RuleResult` — `VALID_RULE` or `invalidRule(this, context)`.                              |
-| `defaultErrorMessage` | no       | Falls back when no translation is available. Tokens like `:input` are substituted by the framework's i18n layer.       |
-| `errorMessage`        | no       | A non-translatable override. The user can pass one at call site too.                                                   |
-| `requiresValue`       | no       | If `true`, the rule skips when the value is `undefined`. Defaults to `false`. Most rules want this `true`.             |
-| `sortOrder`           | no       | Order in the rule pipeline. Lower runs first. Defaults to insertion order.                                             |
+| Field                 | Required | Purpose                                                                                                          |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `name`                | yes      | Unique identifier. Used in the translation key (`validation.<name>`) and shown in errors.                        |
+| `validate`            | yes      | The check itself. Returns a `RuleResult` — `VALID_RULE` or `invalidRule(this, context)`.                         |
+| `defaultErrorMessage` | no       | Falls back when no translation is available. Tokens like `:input` are substituted by the framework's i18n layer. |
+| `errorMessage`        | no       | A non-translatable override. The user can pass one at call site too.                                             |
+| `requiresValue`       | no       | If `true`, the rule skips when the value is `undefined`. Defaults to `false`. Most rules want this `true`.       |
+| `sortOrder`           | no       | Order in the rule pipeline. Lower runs first. Defaults to insertion order.                                       |
 
 Helpers from `@warlock.js/seal`:
 
@@ -66,8 +66,7 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const urlSafeSlugRule: SchemaRule = {
   name: "urlSafeSlug",
   requiresValue: true,
-  defaultErrorMessage:
-    "The :input must contain only lowercase letters, digits, and hyphens",
+  defaultErrorMessage: "The :input must contain only lowercase letters, digits, and hyphens",
   validate(value, context) {
     if (typeof value === "string" && SLUG_PATTERN.test(value)) {
       return Promise.resolve(VALID_RULE);
@@ -230,11 +229,7 @@ export const phoneNumberPlugin: SealPlugin = {
   name: "phoneNumber",
   install() {
     Object.assign(StringValidator.prototype, {
-      phoneNumber(
-        this: StringValidator,
-        countryCode: string = "US",
-        errorMessage?: string,
-      ) {
+      phoneNumber(this: StringValidator, countryCode: string = "US", errorMessage?: string) {
         return this.addRule(phoneNumberRule, errorMessage, { countryCode });
       },
     });

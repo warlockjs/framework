@@ -251,11 +251,13 @@ describe("applyDocumentMetadata", () => {
       openGraph: { images: [{ url: "https://app.test/a.png" }, { url: "https://app.test/b.png" }] },
     });
     expect(describeHead(elements).filter((tag) => tag.includes("og:image "))).toEqual([
-      "meta property=og:image content=https://app.test/a.png data-warlock-metadata=meta[property=\"og:image\"]#0",
-      "meta property=og:image content=https://app.test/b.png data-warlock-metadata=meta[property=\"og:image\"]#1",
+      'meta property=og:image content=https://app.test/a.png data-warlock-metadata=meta[property="og:image"]#0',
+      'meta property=og:image content=https://app.test/b.png data-warlock-metadata=meta[property="og:image"]#1',
     ]);
 
-    applyDocumentMetadata(documentNode, { openGraph: { images: [{ url: "https://app.test/c.png" }] } });
+    applyDocumentMetadata(documentNode, {
+      openGraph: { images: [{ url: "https://app.test/c.png" }] },
+    });
 
     const images = elements.filter((element) => element.attributes.property === "og:image");
 
@@ -266,7 +268,9 @@ describe("applyDocumentMetadata", () => {
   it("navigation: og:locale:alternate tags are removed when the next page has none", () => {
     const { documentNode, elements } = fakeHead([]);
 
-    applyDocumentMetadata(documentNode, { openGraph: { locale: "en", alternateLocales: ["ar", "fr"] } });
+    applyDocumentMetadata(documentNode, {
+      openGraph: { locale: "en", alternateLocales: ["ar", "fr"] },
+    });
     expect(
       elements.filter((element) => element.attributes.property === "og:locale:alternate"),
     ).toHaveLength(2);

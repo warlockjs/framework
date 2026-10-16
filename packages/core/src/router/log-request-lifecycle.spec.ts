@@ -47,7 +47,13 @@ describe("disabled — no tracing dispatch, log lines unaffected", () => {
 
     await logRequestLifecycle(
       fakePorts(),
-      { module: "route", action: "GET /things/:id", requestId: "req-1", statusCode: () => 200, request: fakeRequest },
+      {
+        module: "route",
+        action: "GET /things/:id",
+        requestId: "req-1",
+        statusCode: () => 200,
+        request: fakeRequest,
+      },
       async () => "ok",
     );
 
@@ -67,7 +73,13 @@ describe("enabled — onRequestStart before the run, onRequestEnd after with sta
 
     await logRequestLifecycle(
       fakePorts(),
-      { module: "route", action: "GET /things/:id", requestId: "req-1", statusCode: () => 200, request: fakeRequest },
+      {
+        module: "route",
+        action: "GET /things/:id",
+        requestId: "req-1",
+        statusCode: () => 200,
+        request: fakeRequest,
+      },
       async () => "ok",
     );
 
@@ -113,7 +125,13 @@ describe("error handler path — onRequestEnd receives the error and the status"
 
     await logRequestLifecycle(
       fakePorts(),
-      { module: "route", action: "GET /x", requestId: "req-1", statusCode: () => 500, request: fakeRequest },
+      {
+        module: "route",
+        action: "GET /x",
+        requestId: "req-1",
+        statusCode: () => 500,
+        request: fakeRequest,
+      },
       async () => "handled",
     );
 

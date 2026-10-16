@@ -27,21 +27,21 @@ describe("Factory", () => {
 
   describe("validate function", () => {
     it("should validate value against schema", async () => {
-        const schema = v.string().required();
-        // validate(schema, data) -- correct order?
-        // validate.ts signature: validate(schema, data, options)
-        const result = await validate(schema, "test");
-        
-        expect(result.isValid).toBe(true);
-        expect(result.data).toBe("test");
+      const schema = v.string().required();
+      // validate(schema, data) -- correct order?
+      // validate.ts signature: validate(schema, data, options)
+      const result = await validate(schema, "test");
+
+      expect(result.isValid).toBe(true);
+      expect(result.data).toBe("test");
     });
 
     it("should return invalid result when validation fails", async () => {
-        const schema = v.string().required();
-        const result = await validate(schema, "");
-        
-        expect(result.isValid).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
+      const schema = v.string().required();
+      const result = await validate(schema, "");
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
     });
   });
 });

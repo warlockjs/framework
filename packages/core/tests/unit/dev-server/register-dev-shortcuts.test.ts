@@ -33,7 +33,7 @@ const printed = () => output.join("\n");
 
 /** The shortcut registered under `key`, or undefined. */
 function armed(key: string): DevServerShortcut | undefined {
-  return register.mock.calls.map(([shortcut]) => shortcut).find(shortcut => shortcut.key === key);
+  return register.mock.calls.map(([shortcut]) => shortcut).find((shortcut) => shortcut.key === key);
 }
 
 describe("registerDevShortcuts", () => {
@@ -53,12 +53,7 @@ describe("registerDevShortcuts", () => {
   it("arms the standing shortcuts and prints the hint", () => {
     registerDevShortcuts(devServer);
 
-    expect(register.mock.calls.map(([shortcut]) => shortcut.key)).toEqual([
-      "r",
-      "c",
-      "q",
-      "h",
-    ]);
+    expect(register.mock.calls.map(([shortcut]) => shortcut.key)).toEqual(["r", "c", "q", "h"]);
     expect(printed()).toContain("for shortcuts");
   });
 

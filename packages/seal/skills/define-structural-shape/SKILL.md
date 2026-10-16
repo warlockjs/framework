@@ -14,20 +14,20 @@ v.object({
   email: v.string().email(),
   age: v.int().min(13).optional(),
   role: v.literal("admin", "user", "guest"),
-})
+});
 ```
 
 - **Required by default.** `.optional()` to opt out — the `{ isOptional: true }` brand makes the key optional in `Infer<>`.
 - **Unknown keys policy.** By default extra keys are silently dropped from `data`. Toggle with `.allowUnknown()` (forward as-is), `.stripUnknown()` (explicit drop), or `.allow(...keys)` (whitelist specific extras). See [`object-methods.md`](./object-methods.md).
 - **Schema composition.** `.extend(schema)`, `.merge(other)`, `.pick(...keys)`, `.without(...keys)`, `.partial(...keys)`, `.requiredFields(...keys)` — all in [`object-methods.md`](./object-methods.md).
-- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`) attach to fields *inside* a `v.object`. Without a parent, sibling resolution silently passes.
+- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`) attach to fields _inside_ a `v.object`. Without a parent, sibling resolution silently passes.
 
 ## `v.array` — homogeneous lists
 
 ```ts
-v.array(v.string())          // type: string[]
-v.array(userSchema)          // type: User[]
-v.array(v.array(v.int()))    // type: number[][] — recursive inference
+v.array(v.string()); // type: string[]
+v.array(userSchema); // type: User[]
+v.array(v.array(v.int())); // type: number[][] — recursive inference
 ```
 
 The inner validator runs against each element; failure on any element fails the array. Method surface (`.min`, `.max`, `.unique`, `.sorted`, `.flip`, …) in [`array-methods.md`](./array-methods.md).
@@ -35,9 +35,9 @@ The inner validator runs against each element; failure on any element fails the 
 ## `v.record` — homogeneous values, dynamic keys
 
 ```ts
-v.record(v.int())                          // type: Record<string, number>
-v.record(v.object({ count: v.int() }))     // type: Record<string, { count: number }>
-v.record()                                 // type: Record<string, any>
+v.record(v.int()); // type: Record<string, number>
+v.record(v.object({ count: v.int() })); // type: Record<string, { count: number }>
+v.record(); // type: Record<string, any>
 ```
 
 Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. If keys are also constrained (e.g. only `"draft" | "published"`), use `v.object` with literal keys instead — the constraint lives in the type.
@@ -45,8 +45,8 @@ Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but
 ## `v.tuple` — positional types
 
 ```ts
-v.tuple([v.string(), v.int(), v.boolean()])  // type: [string, number, boolean]
-v.tuple([v.literal("ok"), v.string()])       // type: ["ok", string]
+v.tuple([v.string(), v.int(), v.boolean()]); // type: [string, number, boolean]
+v.tuple([v.literal("ok"), v.string()]); // type: ["ok", string]
 ```
 
 Each position has its own validator; the array length must match the tuple length. Pair with `v.literal` at position 0 for result-tuple patterns (`["ok", data]` vs `["error", message]`).
@@ -54,7 +54,7 @@ Each position has its own validator; the array length must match the tuple lengt
 ## `v.union` — one of N validators (untagged)
 
 ```ts
-v.union([v.string(), v.int()])  // type: string | number
+v.union([v.string(), v.int()]); // type: string | number
 ```
 
 The first type-matching validator wins, picked via each branch's `matchesType()`. Use for unions of **scalar** types (string vs number, etc.) where `matchesType` is enough to disambiguate. For object-vs-object unions, reach for `v.discriminatedUnion` instead — `matchesType` can't distinguish two object branches and you'll get errors from the wrong branch.
@@ -63,8 +63,8 @@ The first type-matching validator wins, picked via each branch's `matchesType()`
 
 ```ts
 const email = v.object({ type: v.literal("email"), email: v.string().email() });
-const sms   = v.object({ type: v.literal("sms"),   phone: v.string() });
-const push  = v.object({ type: v.literal("push"),  deviceId: v.string() });
+const sms = v.object({ type: v.literal("sms"), phone: v.string() });
+const push = v.object({ type: v.literal("push"), deviceId: v.string() });
 
 const notif = v.discriminatedUnion("type", [email, sms, push]);
 
@@ -115,20 +115,20 @@ Use for: trees (categories, file systems), threaded data (comment chains), mutua
 
 ## Quick map
 
-| Want | Reach for |
-| --- | --- |
-| Fixed-shape record | `v.object({...})` |
-| Dynamic keys, same value shape | `v.record(valueSchema)` |
-| List of items | `v.array(itemSchema)` |
-| Position-typed array | `v.tuple([a, b, c])` |
-| One of N scalar types | `v.union([...])` |
-| One of N object shapes with a tag field | `v.discriminatedUnion(key, [...])` |
-| Self-referencing or forward reference | `v.lazy(() => schema)` |
-| One of N constants | `v.literal(...values)` (not structural — see the `pick-seal-primitive` topic) |
+| Want                                    | Reach for                                                                     |
+| --------------------------------------- | ----------------------------------------------------------------------------- |
+| Fixed-shape record                      | `v.object({...})`                                                             |
+| Dynamic keys, same value shape          | `v.record(valueSchema)`                                                       |
+| List of items                           | `v.array(itemSchema)`                                                         |
+| Position-typed array                    | `v.tuple([a, b, c])`                                                          |
+| One of N scalar types                   | `v.union([...])`                                                              |
+| One of N object shapes with a tag field | `v.discriminatedUnion(key, [...])`                                            |
+| Self-referencing or forward reference   | `v.lazy(() => schema)`                                                        |
+| One of N constants                      | `v.literal(...values)` (not structural — see the `pick-seal-primitive` topic) |
 
 ## A note on cascade Models
 
-`@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing a `v.object({...})` works directly — the factory return widens to fit the Model's invariant generic without breaking type checking. If TS complains *"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"*, that's the variance trap and the answer isn't to widen the schema — it's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema. See the `bridge-standard-schema` topic.
+`@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing a `v.object({...})` works directly — the factory return widens to fit the Model's invariant generic without breaking type checking. If TS complains _"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"_, that's the variance trap and the answer isn't to widen the schema — it's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema. See the `bridge-standard-schema` topic.
 
 ## Method-surface reference
 

@@ -34,18 +34,10 @@ vi.mock("../src/helpers/package-manager", () => ({
 const initializeGitRepository = vi.fn(async () => true);
 
 vi.mock("../src/helpers/project-builder-helpers", () => ({
-  initializeGitRepository: (...args: unknown[]) =>
-    initializeGitRepository(...args),
+  initializeGitRepository: (...args: unknown[]) => initializeGitRepository(...args),
 }));
 
-import {
-  App,
-  app,
-  file,
-  FileManager,
-  jsonFile,
-  JsonFileManager,
-} from "../src/helpers/app";
+import { App, app, file, FileManager, jsonFile, JsonFileManager } from "../src/helpers/app";
 
 let workdir: string;
 
@@ -95,12 +87,7 @@ describe("App.install", () => {
 
     instance.install();
 
-    expect(runCommand).toHaveBeenCalledWith(
-      "yarn",
-      ["install"],
-      workdir,
-      installEnv,
-    );
+    expect(runCommand).toHaveBeenCalledWith("yarn", ["install"], workdir, installEnv);
   });
 
   it("follows the active package manager", () => {
@@ -109,12 +96,7 @@ describe("App.install", () => {
 
     instance.install();
 
-    expect(runCommand).toHaveBeenCalledWith(
-      "pnpm",
-      ["install"],
-      workdir,
-      installEnv,
-    );
+    expect(runCommand).toHaveBeenCalledWith("pnpm", ["install"], workdir, installEnv);
   });
 });
 
@@ -124,11 +106,7 @@ describe("App.exec", () => {
 
     await instance.exec("npx warlock --warm-cache");
 
-    expect(executeCommand).toHaveBeenCalledWith(
-      "npx",
-      ["warlock", "--warm-cache"],
-      workdir,
-    );
+    expect(executeCommand).toHaveBeenCalledWith("npx", ["warlock", "--warm-cache"], workdir);
   });
 
   it("passes a single-token command with an empty args array", async () => {
@@ -169,14 +147,7 @@ describe("App.installFeatures", () => {
     expect(executeCommand).toHaveBeenCalledTimes(1);
     const [bin, args] = executeCommand.mock.calls[0];
     expect(bin).toBe("npx");
-    expect(args).toEqual([
-      "warlock",
-      "add",
-      "postgres",
-      "test",
-      "openai",
-      "--no-install",
-    ]);
+    expect(args).toEqual(["warlock", "add", "postgres", "test", "openai", "--no-install"]);
     // --no-install MUST be the final token (the CLI parser would otherwise
     // swallow the first feature as the flag's value).
     expect(args[args.length - 1]).toBe("--no-install");
@@ -201,9 +172,7 @@ describe("App.pinViteResolution", () => {
   }
 
   function readScaffoldPackageJson() {
-    return JSON.parse(
-      readFileSync(path.join(workdir, "package.json"), "utf-8"),
-    );
+    return JSON.parse(readFileSync(path.join(workdir, "package.json"), "utf-8"));
   }
 
   it("pins vite for yarn AND npm/pnpm when a web-feature scaffold has both vite and vitest", () => {
@@ -236,10 +205,7 @@ describe("App.pinViteResolution", () => {
   });
 
   it("reads vite out of dependencies too, not only devDependencies", () => {
-    writeScaffoldPackageJson(
-      { vitest: "^4.0.6" },
-      { dependencies: { vite: "^7.3.5" } },
-    );
+    writeScaffoldPackageJson({ vitest: "^4.0.6" }, { dependencies: { vite: "^7.3.5" } });
 
     expect(makeApp(workdir).pinViteResolution()).toBe(true);
     expect(readScaffoldPackageJson().resolutions.vite).toBe("^7.3.5");
@@ -309,10 +275,7 @@ describe("App file / json managers", () => {
   });
 
   it("caches a JsonFileManager per resolved path", () => {
-    writeFileSync(
-      path.join(workdir, "data.json"),
-      JSON.stringify({ name: "x" }),
-    );
+    writeFileSync(path.join(workdir, "data.json"), JSON.stringify({ name: "x" }));
     const instance = makeApp(workdir);
 
     const first = instance.json("data.json");

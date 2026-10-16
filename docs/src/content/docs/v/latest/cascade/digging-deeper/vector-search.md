@@ -6,7 +6,7 @@ sidebar:
   label: "Vector search"
 ---
 
-Semantic search asks *"what's like this?"* instead of *"what equals this?"* It works by turning text (or images, audio, anything you can embed) into numeric vectors and querying by **distance** — closest vectors are most similar. Cascade gives you the column type, the index, and the query method. Generating embeddings is your AI provider's job.
+Semantic search asks _"what's like this?"_ instead of _"what equals this?"_ It works by turning text (or images, audio, anything you can embed) into numeric vectors and querying by **distance** — closest vectors are most similar. Cascade gives you the column type, the index, and the query method. Generating embeddings is your AI provider's job.
 
 This guide walks the full path: declare a vector column with its index, generate embeddings, query with `.similarTo()`, and combine with regular filters. By the end you have semantic search running on your own data.
 
@@ -66,9 +66,7 @@ Cascade stores embeddings; it doesn't generate them. That's the AI provider's jo
 
 ```ts
 // pseudo-code — your real call goes through your AI module
-const embedding: number[] = await aiProvider.embed(
-  "how do I refund an order?",
-);
+const embedding: number[] = await aiProvider.embed("how do I refund an order?");
 
 await Vector.create({
   content_id: order.id,
@@ -97,17 +95,17 @@ What `.similarTo(column, embedding, alias?)` does, mechanically:
 - **Adds an ORDER BY on the same expression** — this is what lets the database use the vector index instead of scoring every row. If you `.orderBy()` on the alias afterwards, you break index usage. Don't.
 - **Cosine similarity returns 0 to 1**; higher means more similar. Euclidean gets transformed into the same 0-to-1 score by Cascade, so the same threshold logic applies regardless of metric.
 
-`.limit()` is essentially required — vector search is built around *"top-K nearest"*. Without a limit you'll get every row in the table, sorted by distance. Pick a `limit` that fits your usage: 5 for a top-N recommendation, 50 for a candidate set you'll re-rank in the app.
+`.limit()` is essentially required — vector search is built around _"top-K nearest"_. Without a limit you'll get every row in the table, sorted by distance. Pick a `limit` that fits your usage: 5 for a top-N recommendation, 50 for a candidate set you'll re-rank in the app.
 
 ## Step 4 — Combine with regular filters
 
-The cheapest vector query narrows the candidate set with regular filters *before* the similarity scan kicks in:
+The cheapest vector query narrows the candidate set with regular filters _before_ the similarity scan kicks in:
 
 ```ts
 // Narrow first, then rank
 const matches = await Vector.query()
-  .where("organization_id", orgId)      // filter — uses regular index
-  .where("content_type", "summary")     // filter — uses regular index
+  .where("organization_id", orgId) // filter — uses regular index
+  .where("content_type", "summary") // filter — uses regular index
   .similarTo("embedding", queryEmbedding)
   .limit(10)
   .get();
@@ -119,7 +117,7 @@ Treat filters as the cheap gate, `.similarTo()` as the expensive ranker. Always 
 
 ## Score thresholds
 
-Sometimes you want *"things similar enough"* instead of *"top K"*. Cascade doesn't currently expose a query-level score filter — the recommended pattern is to over-fetch and filter in app code:
+Sometimes you want _"things similar enough"_ instead of _"top K"_. Cascade doesn't currently expose a query-level score filter — the recommended pattern is to over-fetch and filter in app code:
 
 ```ts
 const candidates = await Vector.query()
@@ -128,7 +126,7 @@ const candidates = await Vector.query()
   .limit(50)
   .get<VectorRow & { score: number }>();
 
-const close = candidates.filter(r => r.score > 0.75);
+const close = candidates.filter((r) => r.score > 0.75);
 ```
 
 Pick a `limit` larger than your worst-case useful result count; trim by score in JS. The cost is the extra rows transferred over the wire, which is cheap compared to a second round-trip.
@@ -149,18 +147,18 @@ async function semanticSearch(query: string, orgId: string) {
     .get<{ content_id: string; score: number }>();
 
   // 2. Filter by score threshold (app-level)
-  const relevant = hits.filter(h => h.score > 0.70);
+  const relevant = hits.filter((h) => h.score > 0.7);
   if (relevant.length === 0) return [];
 
   // 3. Hydrate the actual source records
   const summaries = await Summary.whereIn(
     "id",
-    relevant.map(h => h.content_id),
+    relevant.map((h) => h.content_id),
   ).get();
 
   // 4. Re-attach scores so the caller can sort/render them
-  const scoreById = new Map(relevant.map(h => [h.content_id, h.score]));
-  return summaries.map(s => ({
+  const scoreById = new Map(relevant.map((h) => [h.content_id, h.score]));
+  return summaries.map((s) => ({
     summary: s,
     score: scoreById.get(s.id) ?? 0,
   }));

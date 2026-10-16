@@ -1,17 +1,20 @@
 ---
-description: "Message bus over RabbitMQ (Kafka planned): publish, subscribe, and request-response between services. Exports `connectToBroker`, `herald`, `heraldChannel`, `Broker`, `defineEvent`, `defineConsumer`, `EventMessage`, `EventConsumer`, `Consumable`, `brokerRegistry`. Use for: \"publish an event to RabbitMQ\", \"subscribe to a channel\", \"ack or nack a message\", \"request and reply over the bus\", \"cross-service messaging\". Not this package: durable retried background jobs on Redis → @warlock.js/queue; cron/recurring work → @warlock.js/scheduler."
+description: 'Message bus over RabbitMQ (Kafka planned): publish, subscribe, and request-response between services. Exports `connectToBroker`, `herald`, `heraldChannel`, `Broker`, `defineEvent`, `defineConsumer`, `EventMessage`, `EventConsumer`, `Consumable`, `brokerRegistry`. Use for: "publish an event to RabbitMQ", "subscribe to a channel", "ack or nack a message", "request and reply over the bus", "cross-service messaging". Not this package: durable retried background jobs on Redis → @warlock.js/queue; cron/recurring work → @warlock.js/scheduler.'
 ---
+
 # @warlock.js/herald
 
 Herald is the broker-agnostic message bus. `connectToBroker(config)` boots a broker once; `herald()` returns it (`herald("name")` for a named one); `.channel(name)` is the queue/topic you publish into and subscribe from. Channels are typed with generics and can validate with a seal schema. Server-only.
 
 ## The 80% path
+
 1. Orient with `herald-basics.md` (the map and foundations).
 2. Connect at startup, then publish: `publish-message.md`.
 3. Consume with `subscribe` handlers or consumer classes: `consume-message.md`.
 4. Need a reply? `request-and-respond.md`.
 
 ## Conventions and pitfalls
+
 - Call `connectToBroker` once before any publish or subscribe.
 - Smart auto-ack is the default: a clean return acks, a throw nacks with requeue. `autoAck: true` loses messages on a crash; avoid it.
 - Use `ctx.reject()` / `ctx.retry(ms)` only for a non-default outcome.

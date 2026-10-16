@@ -9,11 +9,11 @@ description: 'Manager-led multi-agent teams with ai.team({...}) — transparent 
 
 The mapping:
 
-| team field | becomes supervisor field |
-| --- | --- |
-| `manager` | `route` (deterministic `{ route }`) XOR `router` (an agent / `RouterEntry`) |
-| `members` | `intents` |
-| `gate` | `evaluate` |
+| team field | becomes supervisor field                                                    |
+| ---------- | --------------------------------------------------------------------------- |
+| `manager`  | `route` (deterministic `{ route }`) XOR `router` (an agent / `RouterEntry`) |
+| `members`  | `intents`                                                                   |
+| `gate`     | `evaluate`                                                                  |
 
 Everything else passes through 1:1 — the sole exception is the report/result `type`, which is stamped `"team"` (see [Pass-throughs](#pass-throughs-verbatim-supervisor-semantics)).
 
@@ -26,11 +26,11 @@ import { v } from "@warlock.js/seal";
 const codeTeam = ai.team({
   name: "code-team",
   goal: "Ship a tested module that passes review.",
-  manager: techLeadRouter,                 // an agent / RouterEntry → router; or { route } → deterministic
-  members: { builder, reviewer, fixer },   // role-name → agent | workflow
-  gate: "quality",                         // "quality" | "verify" | (ctx) => EvaluateResult
+  manager: techLeadRouter, // an agent / RouterEntry → router; or { route } → deterministic
+  members: { builder, reviewer, fixer }, // role-name → agent | workflow
+  gate: "quality", // "quality" | "verify" | (ctx) => EvaluateResult
   output: v.object({ code: v.string() }),
-  maxIterations: 6,                        // default 10 (supervisor's)
+  maxIterations: 6, // default 10 (supervisor's)
 });
 
 const { data, report } = await codeTeam.execute("Build a debounce<T> utility.");
@@ -42,10 +42,12 @@ A `member` is an `AgentContract` or a `WorkflowInstance` (the `TeamMemberValue` 
 
 ```ts
 // LLM-driven manager: an agent (or RouterEntry) → becomes SupervisorConfig.router
-manager: techLeadRouter
+manager: techLeadRouter;
 
 // Deterministic manager: { route } → becomes SupervisorConfig.route
-manager: { route: (ctx) => (ctx.iteration === 0 ? "builder" : "reviewer") }
+manager: {
+  route: (ctx) => (ctx.iteration === 0 ? "builder" : "reviewer");
+}
 ```
 
 Exactly one form is forwarded — mutually exclusive, mirroring the supervisor's own `router` XOR `route` rule. A malformed manager surfaces the existing `SupervisorFailedError` downstream.
@@ -70,7 +72,7 @@ Identical shape but keyed on the tester's pass/fail slice `state.passed` (defaul
 gate: (ctx) => {
   if (ctx.state.score >= 0.9) return { satisfied: true };
   return { reassignTo: "fixer", feedback: ctx.state.review };
-}
+};
 ```
 
 Supplying a `TeamGateFn` instead of a string opts out of the sugar entirely while keeping the rest of `team()`'s wiring — it forwards straight to `SupervisorConfig.evaluate` with zero wrapping.
@@ -86,7 +88,7 @@ ai.team({
   members: { author, critic, patcher },
   gate: "quality",
   roles: { reviewer: "critic", fixer: "patcher" }, // map gate roles → your member keys
-  gateKey: "ok",                                    // state slice the gate reads
+  gateKey: "ok", // state slice the gate reads
 });
 ```
 

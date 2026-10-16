@@ -51,7 +51,9 @@ describe("routesCheck", () => {
    */
   it("passes quietly when the app declares no route modules at all", async () => {
     const { routesCheck } = await import("../../../../src/cli/commands/doctor/checks/routes.check");
-    const result = await routesCheck.run(makeContext({ routeModules: 0, appRoutes: 0, totalRoutes: 0 }));
+    const result = await routesCheck.run(
+      makeContext({ routeModules: 0, appRoutes: 0, totalRoutes: 0 }),
+    );
 
     expect(result?.status).toBe("ok");
     expect(result?.detail).toContain("no route modules found");
@@ -60,7 +62,9 @@ describe("routesCheck", () => {
   /** Route modules that load cleanly and register nothing IS a failure: every request 404s. */
   it("fails when route modules loaded but registered nothing", async () => {
     const { routesCheck } = await import("../../../../src/cli/commands/doctor/checks/routes.check");
-    const result = await routesCheck.run(makeContext({ routeModules: 3, appRoutes: 0, totalRoutes: 0 }));
+    const result = await routesCheck.run(
+      makeContext({ routeModules: 3, appRoutes: 0, totalRoutes: 0 }),
+    );
 
     expect(result?.status).toBe("fail");
     expect(result?.detail).toContain("registered 0 routes");
@@ -78,7 +82,9 @@ describe("routesCheck", () => {
 
   it("passes and splits the count between app modules and connectors", async () => {
     const { routesCheck } = await import("../../../../src/cli/commands/doctor/checks/routes.check");
-    const result = await routesCheck.run(makeContext({ routeModules: 3, appRoutes: 40, totalRoutes: 42 }));
+    const result = await routesCheck.run(
+      makeContext({ routeModules: 3, appRoutes: 40, totalRoutes: 42 }),
+    );
 
     expect(result?.status).toBe("ok");
     expect(result?.detail).toContain("42 registered");
@@ -120,9 +126,8 @@ describe("connectorsCheck", () => {
    * so it is the configured list that carries information.
    */
   it("names the connectors the app configured, against the built-in count", async () => {
-    const { connectorsCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/connectors.check"
-    );
+    const { connectorsCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/connectors.check");
     const result = await connectorsCheck.run(
       makeContext({
         connectors: {
@@ -141,9 +146,8 @@ describe("connectorsCheck", () => {
   });
 
   it("says so plainly when the app configured none of its own", async () => {
-    const { connectorsCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/connectors.check"
-    );
+    const { connectorsCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/connectors.check");
     const result = await connectorsCheck.run(makeContext());
 
     expect(result?.status).toBe("ok");
@@ -152,9 +156,8 @@ describe("connectorsCheck", () => {
 
   /** A connector whose boot() threw is a failure, named with its message. */
   it("fails and names every connector whose boot threw", async () => {
-    const { connectorsCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/connectors.check"
-    );
+    const { connectorsCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/connectors.check");
     const result = await connectorsCheck.run(
       makeContext({
         connectors: {
@@ -173,9 +176,8 @@ describe("connectorsCheck", () => {
 
   /** A refused connectors config would crash the next real boot — that is a fail, not a note. */
   it("fails when warlock.config.ts > connectors was refused outright", async () => {
-    const { connectorsCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/connectors.check"
-    );
+    const { connectorsCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/connectors.check");
     const result = await connectorsCheck.run(
       makeContext({
         connectors: {
@@ -184,7 +186,7 @@ describe("connectorsCheck", () => {
           booted: [],
           skipped: [],
           failures: [],
-          registrationError: "duplicate name \"http\"",
+          registrationError: 'duplicate name "http"',
         },
       }),
     );
@@ -207,7 +209,10 @@ describe("healthCheck", () => {
    * else the suite had registered — these passed alone and failed in the full run.
    * All three are pinned here so the assertion is about the check, not the order.
    */
-  function mockHealthEnv(health: unknown, options: { hasServer?: boolean; routes?: unknown[] } = {}) {
+  function mockHealthEnv(
+    health: unknown,
+    options: { hasServer?: boolean; routes?: unknown[] } = {},
+  ) {
     vi.doMock("../../../../src/config/config-getter", () => ({
       config: {
         get: (key: string) => (key === "http.health" ? health : key === "http" ? {} : undefined),
@@ -309,9 +314,8 @@ describe("optionalPeersCheck", () => {
   it("stays silent when the project configures no optional-peer features", async () => {
     mockProject(undefined, () => "/resolved");
 
-    const { optionalPeersCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/optional-peers.check"
-    );
+    const { optionalPeersCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/optional-peers.check");
 
     expect(await optionalPeersCheck.run(makeContext())).toBeUndefined();
   });
@@ -319,9 +323,8 @@ describe("optionalPeersCheck", () => {
   it("passes when the driver the project selected is installed", async () => {
     mockProject("mongodb", () => "/resolved");
 
-    const { optionalPeersCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/optional-peers.check"
-    );
+    const { optionalPeersCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/optional-peers.check");
     const result = await optionalPeersCheck.run(makeContext());
 
     expect(result?.status).toBe("ok");
@@ -334,9 +337,8 @@ describe("optionalPeersCheck", () => {
       return "/resolved";
     });
 
-    const { optionalPeersCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/optional-peers.check"
-    );
+    const { optionalPeersCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/optional-peers.check");
     const result = await optionalPeersCheck.run(makeContext());
 
     expect(result?.status).toBe("fail");
@@ -352,9 +354,8 @@ describe("handlerSignatureCheck", () => {
       describePositionalHandlerSuspect: () => "",
     }));
 
-    const { handlerSignatureCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/handler-signature.check"
-    );
+    const { handlerSignatureCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/handler-signature.check");
     const result = await handlerSignatureCheck.run(makeContext());
 
     expect(result?.status).toBe("ok");
@@ -371,9 +372,8 @@ describe("handlerSignatureCheck", () => {
         `Handler "${suspect.handlerName}" (${suspect.method} ${suspect.path}) fix it`,
     }));
 
-    const { handlerSignatureCheck } = await import(
-      "../../../../src/cli/commands/doctor/checks/handler-signature.check"
-    );
+    const { handlerSignatureCheck } =
+      await import("../../../../src/cli/commands/doctor/checks/handler-signature.check");
     const result = await handlerSignatureCheck.run(makeContext());
 
     // A heuristic must not fail a build.

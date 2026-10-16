@@ -20,7 +20,7 @@ await fs.files.putJson("./dist/manifest.json", manifest, { atomic: true });
 ```
 
 Same call you already know, same auto-created parent directories — the only
-difference is *how* the bytes land.
+difference is _how_ the bytes land.
 
 :::note[Buffers are always atomic]
 When the content is a `Buffer` rather than a string, `put` routes through the
@@ -39,7 +39,7 @@ So the guarantee is precise, and worth stating plainly:
 - **Readers never see a partial file.** Before the rename they read the old
   content; after it they read the new. There is no in-between.
 - **A crash leaves the target intact.** If the process dies mid-write, the
-  half-written bytes are in the *temp* file — the real file is untouched, so
+  half-written bytes are in the _temp_ file — the real file is untouched, so
   the next run can still read the last good version.
 
 ## When to reach for it
@@ -57,7 +57,7 @@ Three everyday cases cover almost all real use:
 
 ## What it doesn't protect against
 
-Atomic is about *visibility*, not *coordination* or *durability*. Know the edges:
+Atomic is about _visibility_, not _coordination_ or _durability_. Know the edges:
 
 - **No read-modify-write safety.** Two atomic writes to the same path both
   succeed and serialize at the rename — last writer wins. If each writer must

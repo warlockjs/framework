@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-vi.mock("../router/router", () => ({ router: { withSourceFile: (_f: string, run: () => unknown) => run() } }));
-vi.mock("../dev-server/model-module-registry", () => ({ getDevelopmentModelModuleRegistry: () => ({ publish: () => undefined }) }));
+vi.mock("../router/router", () => ({
+  router: { withSourceFile: (_f: string, run: () => unknown) => run() },
+}));
+vi.mock("../dev-server/model-module-registry", () => ({
+  getDevelopmentModelModuleRegistry: () => ({ publish: () => undefined }),
+}));
 
 import { importAppModule, setAppModuleImporter } from "./app-module-importer";
 
@@ -41,7 +45,10 @@ describe("ModuleLoader wiring", () => {
     setAppModuleImporter(hook);
 
     const loader = new ModuleLoader({ getFilesByType: () => [] } as never);
-    const file = { absolutePath: "/app/src/app/users/user.model.ts", relativePath: "src/app/users/user.model.ts" };
+    const file = {
+      absolutePath: "/app/src/app/users/user.model.ts",
+      relativePath: "src/app/users/user.model.ts",
+    };
 
     await loader.loadModule(file as never, "other");
 

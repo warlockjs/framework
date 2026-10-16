@@ -13,7 +13,8 @@ export type SaveSkillInput = {
 
 /** Result the `saveSkill` tool feeds back to the model. */
 export type SaveSkillResult =
-  { saved: true; name: string; status: "candidate" } | { error: string };
+  | { saved: true; name: string; status: "candidate" }
+  | { error: string };
 
 /**
  * Hand-built Standard Schema for the `saveSkill` input — dependency-free,

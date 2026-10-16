@@ -18,10 +18,8 @@ cache.setCacheConfigurations({
 await cache.init();
 
 // First call computes and stores; the next 999 within the hour are ~1ms reads.
-const product = await cache.remember(
-  `products.${productId}`,
-  "1h",
-  () => db.products.findById(productId),
+const product = await cache.remember(`products.${productId}`, "1h", () =>
+  db.products.findById(productId),
 );
 ```
 

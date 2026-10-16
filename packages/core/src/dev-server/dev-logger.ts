@@ -128,7 +128,8 @@ export type ReloadPhaseTimings = {
 };
 
 export function devLogTimings(timings: ReloadPhaseTimings) {
-  const phase = (label: string, ms: number) => `${colors.dim(label)} ${colors.dim(`${Math.round(ms)}ms`)}`;
+  const phase = (label: string, ms: number) =>
+    `${colors.dim(label)} ${colors.dim(`${Math.round(ms)}ms`)}`;
   const line = [
     phase("watcher", timings.watcherSettleMs),
     phase("debounce", timings.debounceWaitMs),

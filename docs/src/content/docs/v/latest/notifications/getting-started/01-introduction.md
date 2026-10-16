@@ -39,12 +39,12 @@ That's the entire surface for the common case. Everything else — preferences, 
 
 ## When to reach for it
 
-| Use notifications | Use something else |
-| --- | --- |
-| Telling a user something across one+ channels | A single transactional email with no in-app trace — `sendMail` directly is fine |
-| You want an in-app notification center (unread counts, mark-read) | Pure server-to-server events — use `@warlock.js/herald` |
-| The same event renders differently on mail vs in-app vs push | A one-off log line — use `@warlock.js/logger` |
-| Users can mute channels / you need per-user rate limits | Fire-and-forget with no preferences — still fine here, gates are optional |
+| Use notifications                                                 | Use something else                                                              |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Telling a user something across one+ channels                     | A single transactional email with no in-app trace — `sendMail` directly is fine |
+| You want an in-app notification center (unread counts, mark-read) | Pure server-to-server events — use `@warlock.js/herald`                         |
+| The same event renders differently on mail vs in-app vs push      | A one-off log line — use `@warlock.js/logger`                                   |
+| Users can mute channels / you need per-user rate limits           | Fire-and-forget with no preferences — still fine here, gates are optional       |
 
 ## vs hand-rolled `sendMail` + DB inserts
 

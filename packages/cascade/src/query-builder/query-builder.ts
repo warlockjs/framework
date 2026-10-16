@@ -571,25 +571,45 @@ export class QueryBuilder<T = unknown> {
 
   /** Starts with a prefix (the value is literal text, `%` / `_` / `\` included). */
   public whereStartsWith(field: string, value: string | number): this {
-    this.addOperation("whereLike", { field, pattern: `${value}%`, value: String(value), mode: "startsWith" });
+    this.addOperation("whereLike", {
+      field,
+      pattern: `${value}%`,
+      value: String(value),
+      mode: "startsWith",
+    });
     return this;
   }
 
   /** Does NOT start with a prefix. */
   public whereNotStartsWith(field: string, value: string | number): this {
-    this.addOperation("whereNotLike", { field, pattern: `${value}%`, value: String(value), mode: "startsWith" });
+    this.addOperation("whereNotLike", {
+      field,
+      pattern: `${value}%`,
+      value: String(value),
+      mode: "startsWith",
+    });
     return this;
   }
 
   /** Ends with a suffix (the value is literal text, `%` / `_` / `\` included). */
   public whereEndsWith(field: string, value: string | number): this {
-    this.addOperation("whereLike", { field, pattern: `%${value}`, value: String(value), mode: "endsWith" });
+    this.addOperation("whereLike", {
+      field,
+      pattern: `%${value}`,
+      value: String(value),
+      mode: "endsWith",
+    });
     return this;
   }
 
   /** Does NOT end with a suffix. */
   public whereNotEndsWith(field: string, value: string | number): this {
-    this.addOperation("whereNotLike", { field, pattern: `%${value}`, value: String(value), mode: "endsWith" });
+    this.addOperation("whereNotLike", {
+      field,
+      pattern: `%${value}`,
+      value: String(value),
+      mode: "endsWith",
+    });
     return this;
   }
 
@@ -1288,7 +1308,9 @@ export class QueryBuilder<T = unknown> {
     aggregate: "sum" | "avg" | "min" | "max" | "count" | "first" | "last",
     alias: string,
   ): this {
-    return this.selectRaw({ [alias]: `${aggregate.toUpperCase()}(${field === "*" ? field : this.quoteColumn(field)})` });
+    return this.selectRaw({
+      [alias]: `${aggregate.toUpperCase()}(${field === "*" ? field : this.quoteColumn(field)})`,
+    });
   }
 
   /** Existence check as a projected boolean field. */
@@ -1355,12 +1377,16 @@ export class QueryBuilder<T = unknown> {
 
   /** String concatenation as a projected field. */
   public selectConcat(fields: Array<string | RawExpression>, alias: string): this {
-    return this.selectRaw({ [alias]: fields.map((field) => this.quoteOperand(field)).join(" || ") });
+    return this.selectRaw({
+      [alias]: fields.map((field) => this.quoteOperand(field)).join(" || "),
+    });
   }
 
   /** COALESCE (first non-null) as a projected field. */
   public selectCoalesce(fields: Array<string | RawExpression>, alias: string): this {
-    return this.selectRaw({ [alias]: `COALESCE(${fields.map((field) => this.quoteOperand(field)).join(", ")})` });
+    return this.selectRaw({
+      [alias]: `COALESCE(${fields.map((field) => this.quoteOperand(field)).join(", ")})`,
+    });
   }
 
   /** Window function expression. */

@@ -24,15 +24,13 @@ export function toBedrockToolConfig(
   }
 
   return {
-    tools: tools.map(
-      (tool): Tool => ({
-        toolSpec: {
-          name: tool.name,
-          description: tool.description,
-          inputSchema: { json: toJsonSchema(tool.input) } as ToolInputSchema,
-        },
-      }),
-    ),
+    tools: tools.map((tool): Tool => ({
+      toolSpec: {
+        name: tool.name,
+        description: tool.description,
+        inputSchema: { json: toJsonSchema(tool.input) } as ToolInputSchema,
+      },
+    })),
   };
 }
 

@@ -21,7 +21,10 @@ describe("flushPendingCookies", () => {
     const response = await app.inject({ method: "GET", url: "/" });
 
     expect(response.body).toBe("streamed");
-    expect(response.headers["set-cookie"]).toEqual(["ab_bucket=b; Path=/; SameSite=Lax", "session=abc; Path=/; SameSite=Lax"]);
+    expect(response.headers["set-cookie"]).toEqual([
+      "ab_bucket=b; Path=/; SameSite=Lax",
+      "session=abc; Path=/; SameSite=Lax",
+    ]);
 
     await app.close();
   });
@@ -50,7 +53,9 @@ describe("flushPendingCookies fail-loud", () => {
   it("throws, naming the plugin version, when setCookie exists but the parked symbol is gone", async () => {
     const reply = { setCookie: () => undefined } as never;
 
-    expect(() => flushPendingCookies(reply)).toThrow(/@fastify\/cookie.*internal cookie storage changed/);
+    expect(() => flushPendingCookies(reply)).toThrow(
+      /@fastify\/cookie.*internal cookie storage changed/,
+    );
     expect(() => flushPendingCookies(reply)).toThrow(/@fastify\/cookie@\d+\./);
   });
 

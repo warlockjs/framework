@@ -26,11 +26,7 @@ const HOSTNAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?
  * `www.` is kept on purpose; it is an alias only when a site lists it.
  */
 export function normalizeHost(raw: string): string {
-  return raw
-    .trim()
-    .toLowerCase()
-    .replace(/:\d+$/, "")
-    .replace(/\.$/, "");
+  return raw.trim().toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
 }
 
 /** Pure structural validation of `web.sites`; never throws and touches no filesystem. */
@@ -139,7 +135,7 @@ export function validateSitesConfig({
     errors.push({
       code: "DYNAMIC_SITE_WITHOUT_RESOLVER",
       site: dynamicSites[0],
-      message: `Dynamic site(s) ${dynamicSites.map(name => `"${name}"`).join(", ")} require web.resolveHost, which is not set.`,
+      message: `Dynamic site(s) ${dynamicSites.map((name) => `"${name}"`).join(", ")} require web.resolveHost, which is not set.`,
     });
   }
 

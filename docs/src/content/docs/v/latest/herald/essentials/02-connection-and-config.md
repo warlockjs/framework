@@ -24,23 +24,23 @@ await connectToBroker({
 
 All RabbitMQ-side options:
 
-| Option | Type | Default | What it does |
-| --- | --- | --- | --- |
-| `driver` | `"rabbitmq"` | required | Driver discriminator. `"kafka"` throws "not yet implemented". |
-| `host` | `string` | `"localhost"` | RabbitMQ host. |
-| `port` | `number` | `5672` | AMQP port. |
-| `username` | `string` | `"guest"` | RabbitMQ user. |
-| `password` | `string` | `"guest"` | RabbitMQ password. |
-| `vhost` | `string` | `"/"` | RabbitMQ virtual host. URL-encoded for you. |
-| `uri` | `string` | unset | If set, takes precedence over host / port / username / password / vhost. Use for `amqps://` URLs from managed providers. |
-| `heartbeat` | `number` | `60` | AMQP heartbeat interval in seconds. |
-| `connectionTimeout` | `number` | unset | Connection timeout in ms. |
-| `prefetch` | `number` | unset | Per-AMQP-channel prefetch (concurrency cap). Subscribers can override per call. |
-| `reconnect` | `boolean` | `true` | Auto-reconnect after connection close. |
-| `reconnectDelay` | `number` | `5000` | Delay between reconnect attempts, in ms. |
-| `name` | `string` | `"default"` | Broker name in the registry. |
-| `isDefault` | `boolean` | `true` | Whether `herald()` (no name) resolves to this broker. |
-| `clientOptions` | `RabbitMQClientOptions` | unset | Pass-through to amqplib — frame size, locale, TLS socket options. |
+| Option              | Type                    | Default       | What it does                                                                                                             |
+| ------------------- | ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `driver`            | `"rabbitmq"`            | required      | Driver discriminator. `"kafka"` throws "not yet implemented".                                                            |
+| `host`              | `string`                | `"localhost"` | RabbitMQ host.                                                                                                           |
+| `port`              | `number`                | `5672`        | AMQP port.                                                                                                               |
+| `username`          | `string`                | `"guest"`     | RabbitMQ user.                                                                                                           |
+| `password`          | `string`                | `"guest"`     | RabbitMQ password.                                                                                                       |
+| `vhost`             | `string`                | `"/"`         | RabbitMQ virtual host. URL-encoded for you.                                                                              |
+| `uri`               | `string`                | unset         | If set, takes precedence over host / port / username / password / vhost. Use for `amqps://` URLs from managed providers. |
+| `heartbeat`         | `number`                | `60`          | AMQP heartbeat interval in seconds.                                                                                      |
+| `connectionTimeout` | `number`                | unset         | Connection timeout in ms.                                                                                                |
+| `prefetch`          | `number`                | unset         | Per-AMQP-channel prefetch (concurrency cap). Subscribers can override per call.                                          |
+| `reconnect`         | `boolean`               | `true`        | Auto-reconnect after connection close.                                                                                   |
+| `reconnectDelay`    | `number`                | `5000`        | Delay between reconnect attempts, in ms.                                                                                 |
+| `name`              | `string`                | `"default"`   | Broker name in the registry.                                                                                             |
+| `isDefault`         | `boolean`               | `true`        | Whether `herald()` (no name) resolves to this broker.                                                                    |
+| `clientOptions`     | `RabbitMQClientOptions` | unset         | Pass-through to amqplib — frame size, locale, TLS socket options.                                                        |
 
 ## URI vs host/port
 
@@ -101,10 +101,10 @@ await connectToBroker({
 });
 
 // Default broker — resolves to "notifications"
-herald().channel("emails").publish({ /* ... */ });
+herald().channel("emails").publish({/* ... */});
 
 // Named broker
-herald("analytics").channel("events").publish({ /* ... */ });
+herald("analytics").channel("events").publish({/* ... */});
 ```
 
 `isDefault: true` on the first registration is implicit (the first broker registered becomes the default if none has been declared yet). Set `isDefault: false` on a broker that should never be the default — useful when you want to force code to be explicit about which broker it uses.
@@ -118,12 +118,12 @@ Treat `connectToBroker` as bootstrap code, full stop. Don't call it inside an HT
 ```ts
 // ❌ Don't do this
 app.post("/users", async (req, res) => {
-  await connectToBroker({ /* ... */ });   // re-connects every request
+  await connectToBroker({/* ... */}); // re-connects every request
   await herald().channel("user.created").publish(req.body);
 });
 
 // ✅ Connect once at boot
-await connectToBroker({ /* ... */ });
+await connectToBroker({/* ... */});
 
 app.post("/users", async (req, res) => {
   await herald().channel("user.created").publish(req.body);
@@ -172,7 +172,7 @@ brokerRegistry.on("disconnected", (broker) => {
 Or directly on the broker's driver:
 
 ```ts
-const broker = await connectToBroker({ /* ... */ });
+const broker = await connectToBroker({/* ... */});
 
 broker.driver.on("reconnecting", (attempt) => {
   console.log(`Reconnect attempt #${attempt}`);
@@ -192,8 +192,8 @@ import { brokerRegistry } from "@warlock.js/herald";
 
 async function shutdown() {
   for (const broker of brokerRegistry.getAll()) {
-    await broker.stopConsuming();   // cancel all consumer tags
-    await broker.disconnect();      // close AMQP channel + connection
+    await broker.stopConsuming(); // cancel all consumer tags
+    await broker.disconnect(); // close AMQP channel + connection
   }
   process.exit(0);
 }

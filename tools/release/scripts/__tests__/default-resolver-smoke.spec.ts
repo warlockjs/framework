@@ -38,11 +38,7 @@ import { defaultResolveNpmCliPath as zeroEditResolveNpmCliPath } from "../zero-e
 
 /** Asserts a resolver's return value is an absolute path that exists on disk, naming the resolver in every failure. */
 function assertResolvesToRealFile(resolverName: string, resolved: string): void {
-  assert.equal(
-    typeof resolved,
-    "string",
-    `${resolverName}() must return a string path`,
-  );
+  assert.equal(typeof resolved, "string", `${resolverName}() must return a string path`);
   assert.ok(
     path.isAbsolute(resolved),
     `${resolverName}() resolved to a non-absolute path: ${resolved}`,

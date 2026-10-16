@@ -13,21 +13,21 @@ description: 'Wrap a flaky operation with `retry(fn, options)` — now provided 
 import { retry } from "@mongez/reinforcements";
 
 const user = await retry(() => fetchUser(id), {
-  attempts: 4,            // TOTAL tries (initial + retries) — default 3
-  delay: 200,             // base ms between attempts
+  attempts: 4, // TOTAL tries (initial + retries) — default 3
+  delay: 200, // base ms between attempts
   backoff: "exponential", // 200, 400, 800 ms
 });
 ```
 
 ## What changed from the old core `retry`
 
-| Old (`@warlock.js/core`)       | New (`@mongez/reinforcements`)                            |
-| ------------------------------ | -------------------------------------------------------- |
-| `count` = **extra** attempts   | `attempts` = **total** attempts (`count + 1`)            |
-| fixed `delay` only             | `delay` + `backoff` (`"linear" \| "exponential" \| fn`)  |
-| —                              | `maxDelay`, `jitter` (`"full" \| "equal"`), `signal`     |
-| `shouldRetry(error, attempt)`  | `shouldRetry(error, attempt)` (kept) + `onError` observe |
-| —                              | `retryable(fn, options)` to pre-bind a reusable wrapper  |
+| Old (`@warlock.js/core`)      | New (`@mongez/reinforcements`)                           |
+| ----------------------------- | -------------------------------------------------------- |
+| `count` = **extra** attempts  | `attempts` = **total** attempts (`count + 1`)            |
+| fixed `delay` only            | `delay` + `backoff` (`"linear" \| "exponential" \| fn`)  |
+| —                             | `maxDelay`, `jitter` (`"full" \| "equal"`), `signal`     |
+| `shouldRetry(error, attempt)` | `shouldRetry(error, attempt)` (kept) + `onError` observe |
+| —                             | `retryable(fn, options)` to pre-bind a reusable wrapper  |
 
 Migration: `count: 3` → `attempts: 4`.
 
@@ -56,8 +56,8 @@ await retry(() => fetch(url), {
   attempts: 6,
   delay: 100,
   backoff: "exponential",
-  maxDelay: 2_000,   // never wait more than 2s as backoff grows
-  jitter: "full",    // randomise each delay to avoid thundering herd
+  maxDelay: 2_000, // never wait more than 2s as backoff grows
+  jitter: "full", // randomise each delay to avoid thundering herd
 });
 ```
 

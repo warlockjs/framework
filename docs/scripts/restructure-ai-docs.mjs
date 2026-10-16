@@ -183,7 +183,9 @@ function rewriteOrder(text, order, eol) {
   } else {
     block = `${block}${eol}sidebar:${eol}  order: ${order}`;
   }
-  return text.slice(0, fm.index) + `---${eol}${block}${eol}---` + text.slice(fm.index + fm[0].length);
+  return (
+    text.slice(0, fm.index) + `---${eol}${block}${eol}---` + text.slice(fm.index + fm[0].length)
+  );
 }
 
 let renumbered = 0;
@@ -317,5 +319,7 @@ for (const dir of RETIRED_DIRS) {
   }
 }
 
-console.log(`moved ${movedCount} file(s), renumbered ${renumbered}, links rewritten ${linksRewritten} across ${edits.length} file(s)`);
+console.log(
+  `moved ${movedCount} file(s), renumbered ${renumbered}, links rewritten ${linksRewritten} across ${edits.length} file(s)`,
+);
 console.log("retired dirs removed:", RETIRED_DIRS.join(", "));

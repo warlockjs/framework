@@ -7,17 +7,7 @@
  * rejected instead of silently running commands past the allowlist. Inside
  * quotes they are ordinary literal bytes and pass through as argument data.
  */
-const UNQUOTED_METACHARACTERS = new Set([
-  ";",
-  "&",
-  "|",
-  "<",
-  ">",
-  "`",
-  "$",
-  "(",
-  ")",
-]);
+const UNQUOTED_METACHARACTERS = new Set([";", "&", "|", "<", ">", "`", "$", "(", ")"]);
 
 /**
  * Tokenize a command line into an argv array WITHOUT any shell semantics.

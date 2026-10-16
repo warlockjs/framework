@@ -372,10 +372,11 @@ class Ops implements WorkspaceOps {
     const occurrences = countOccurrences(current, input.oldString);
 
     if (occurrences === 0) {
-      throw new WorkspaceEditError(
-        `The text to replace was not found in "${input.path}".`,
-        { type: "not-found", path: relativePath || input.path, matches: 0 },
-      );
+      throw new WorkspaceEditError(`The text to replace was not found in "${input.path}".`, {
+        type: "not-found",
+        path: relativePath || input.path,
+        matches: 0,
+      });
     }
 
     if (occurrences > 1 && !input.replaceAll) {
@@ -629,9 +630,6 @@ function replaceFirst(haystack: string, needle: string, replacement: string): st
  * const ops = createOps(localBackend, { cwd: "/srv/api", shell: { allow: ["npm"] } });
  * const { content, hash } = await ops.readFile("src/index.ts");
  */
-export function createOps(
-  backend: WorkspaceBackend,
-  policy: WorkspacePolicy,
-): WorkspaceOps {
+export function createOps(backend: WorkspaceBackend, policy: WorkspacePolicy): WorkspaceOps {
   return new Ops(backend, policy);
 }

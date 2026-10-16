@@ -27,26 +27,26 @@ scheduler.addJob(
 scheduler.start();
 ```
 
-Read `retry(5, 1000, 2)` as: *try up to five more times after the first
+Read `retry(5, 1000, 2)` as: _try up to five more times after the first
 attempt; wait 1 second before the first retry; double the wait each
-time after that.*
+time after that._
 
 ## What the timeline looks like
 
 The third argument turns on **exponential backoff** — each wait is
 `delay × multiplier^(attempt - 1)`:
 
-| Attempt | Wait before it |
-| ------- | -------------- |
-| 1 (initial) | — |
-| 2 | 1 000 ms |
-| 3 | 2 000 ms |
-| 4 | 4 000 ms |
-| 5 | 8 000 ms |
-| 6 | 16 000 ms |
+| Attempt     | Wait before it |
+| ----------- | -------------- |
+| 1 (initial) | —              |
+| 2           | 1 000 ms       |
+| 3           | 2 000 ms       |
+| 4           | 4 000 ms       |
+| 5           | 8 000 ms       |
+| 6           | 16 000 ms      |
 
 If any attempt succeeds, the rest are skipped. Backoff matters when the
-failure is *load-related* (a rate limit, an overwhelmed downstream):
+failure is _load-related_ (a rate limit, an overwhelmed downstream):
 hammering it again immediately just earns another rejection, so you back
 off and give it room to recover.
 

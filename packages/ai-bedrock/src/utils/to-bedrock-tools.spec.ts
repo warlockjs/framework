@@ -2,7 +2,10 @@ import type { ToolConfig } from "@warlock.js/ai";
 import { describe, expect, it } from "vitest";
 import { toBedrockToolConfig } from "./to-bedrock-tools";
 
-function schemaTool(name: string, jsonSchema: Record<string, unknown>): ToolConfig<unknown, unknown> {
+function schemaTool(
+  name: string,
+  jsonSchema: Record<string, unknown>,
+): ToolConfig<unknown, unknown> {
   return {
     name,
     description: `${name} tool`,

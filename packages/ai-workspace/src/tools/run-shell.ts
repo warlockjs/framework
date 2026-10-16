@@ -1,10 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { tool, type ToolContract } from "@warlock.js/ai";
-import type {
-  RunShellInput,
-  RunShellResult,
-  WorkspaceOps,
-} from "../contracts";
+import type { RunShellInput, RunShellResult, WorkspaceOps } from "../contracts";
 
 /** The default tool name `run_shell` is exposed to the LLM under. */
 const DEFAULT_RUN_SHELL_TOOL_NAME = "run_shell";

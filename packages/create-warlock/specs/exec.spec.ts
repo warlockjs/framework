@@ -11,8 +11,7 @@ const spawnFn = vi.fn();
 
 vi.mock("cross-spawn", () => {
   const fn = (...args: unknown[]) => spawnFn(...args);
-  (fn as unknown as { sync: typeof spawnSync }).sync = (...args: unknown[]) =>
-    spawnSync(...args);
+  (fn as unknown as { sync: typeof spawnSync }).sync = (...args: unknown[]) => spawnSync(...args);
 
   return { default: fn };
 });
@@ -220,9 +219,7 @@ describe("runCommand (async with abort handle)", () => {
     child.emit("error", { toString: () => "opaque-runCommand-failure" });
 
     await expect(install).resolves.toBe(false);
-    expect(String(logError.mock.calls[0][0])).toContain(
-      "opaque-runCommand-failure",
-    );
+    expect(String(logError.mock.calls[0][0])).toContain("opaque-runCommand-failure");
   });
 
   it("install resolves false when spawn itself throws synchronously", async () => {

@@ -56,17 +56,18 @@ If someone reassigns `user.posts = newPosts`, the warning helps catch unintended
 
 ## Decisions to lock
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| 1 | Drop direct property access entirely? | **No.** Keep as façade — preserve DX. |
-| 2 | Warn on setter invocation? | **Dev-only.** Production stays silent. |
-| 3 | Use `Object.defineProperty` or a Proxy? | **defineProperty.** Per-property is enough; Proxy adds overhead and complicates serialisation. |
+| #   | Question                                | Recommendation                                                                                 |
+| --- | --------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1   | Drop direct property access entirely?   | **No.** Keep as façade — preserve DX.                                                          |
+| 2   | Warn on setter invocation?              | **Dev-only.** Production stays silent.                                                         |
+| 3   | Use `Object.defineProperty` or a Proxy? | **defineProperty.** Per-property is enough; Proxy adds overhead and complicates serialisation. |
 
 ## Summary
 
 Direct property access and the `loadedRelations` Map are now backed by the same storage via a `defineProperty` getter/setter façade — `user.posts` reads from `loadedRelations.get("posts")`, and `user.posts = newPosts` writes back to the Map. No more drift possible.
 
 **Implementation:**
+
 - New exported `attachLoadedRelation(model, name, value)` helper in `relation-loader.ts`. Installs the property as a getter/setter pointing at the Map.
 - `getter` reads `loadedRelations.get(name)`.
 - `setter` writes `loadedRelations.set(name, next)`.

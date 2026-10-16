@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Application } from "../application";
 import { ConnectorsManager } from "./connectors-manager";
 
-vi.mock("@warlock.js/logger", async importOriginal => ({
+vi.mock("@warlock.js/logger", async (importOriginal) => ({
   ...(await importOriginal<any>()),
   log: { info: vi.fn(), warn: vi.fn(), success: vi.fn(), error: vi.fn(), flush: vi.fn() },
 }));

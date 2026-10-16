@@ -102,7 +102,9 @@ export function resolveBuildConfig(): ResolvedBuildConfig {
 
   return {
     ...merged,
-    routeRegistrationTimeoutMs: resolveRouteRegistrationTimeoutMs(merged.routeRegistrationTimeoutMs),
+    routeRegistrationTimeoutMs: resolveRouteRegistrationTimeoutMs(
+      merged.routeRegistrationTimeoutMs,
+    ),
     entryPath: path.resolve(merged.outdir, merged.outFile),
   };
 }
@@ -113,7 +115,8 @@ const ROUTE_REGISTRATION_TIMEOUT_ENV = "WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS";
 function resolveRouteRegistrationTimeoutMs(configured: unknown): number {
   const environment = process.env[ROUTE_REGISTRATION_TIMEOUT_ENV];
   const value = environment === undefined ? configured : environment;
-  const source = environment === undefined ? "build.routeRegistrationTimeoutMs" : ROUTE_REGISTRATION_TIMEOUT_ENV;
+  const source =
+    environment === undefined ? "build.routeRegistrationTimeoutMs" : ROUTE_REGISTRATION_TIMEOUT_ENV;
 
   if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
   if (typeof value === "string" && value.trim() !== "") {

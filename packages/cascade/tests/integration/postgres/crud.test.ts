@@ -88,10 +88,9 @@ describe("Postgres integration — model CRUD", () => {
     expect(refreshed!.get("age")).toBe(26);
     expect(refreshed!.get("name")).toBe("Carol");
 
-    const rows = await harness.query<{ age: number }>(
-      `SELECT age FROM "${TABLE}" WHERE id = $1`,
-      [user.id],
-    );
+    const rows = await harness.query<{ age: number }>(`SELECT age FROM "${TABLE}" WHERE id = $1`, [
+      user.id,
+    ]);
 
     expect(rows.rows[0].age).toBe(26);
   });

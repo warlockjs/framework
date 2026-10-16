@@ -11,25 +11,25 @@ The `Scheduler` extends Node's `EventEmitter` with a fully-typed surface. Wire l
 
 ```ts
 type SchedulerEvents = {
-  "job:start":         [jobName: string];
-  "job:complete":      [jobName: string, result: JobResult];
-  "job:error":         [jobName: string, error: unknown];
-  "job:skip":          [jobName: string, reason: string];
+  "job:start": [jobName: string];
+  "job:complete": [jobName: string, result: JobResult];
+  "job:error": [jobName: string, error: unknown];
+  "job:skip": [jobName: string, reason: string];
   "scheduler:started": [];
   "scheduler:stopped": [];
-  "scheduler:tick":    [timestamp: Date];
+  "scheduler:tick": [timestamp: Date];
 };
 ```
 
-| Event                | When it fires                                                                          |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| `scheduler:started`  | Once, after `.start()` enters the tick loop                                            |
-| `scheduler:stopped`  | When `.stop()` halts the loop. Not emitted if `.stop()` was a no-op (never started)    |
-| `scheduler:tick`     | Every tick — once per `runEvery()` interval (default 1 s). Keep handlers lightweight.  |
-| `job:start`          | Just before a job's callback is first invoked (NOT once per retry)                     |
-| `job:complete`       | When a job finishes successfully (possibly after retries)                              |
-| `job:error`          | When a job exhausts all retries and the final attempt still throws                     |
-| `job:skip`           | When a tick finds the job already running (see retry-and-overlap for when this occurs) |
+| Event               | When it fires                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `scheduler:started` | Once, after `.start()` enters the tick loop                                            |
+| `scheduler:stopped` | When `.stop()` halts the loop. Not emitted if `.stop()` was a no-op (never started)    |
+| `scheduler:tick`    | Every tick — once per `runEvery()` interval (default 1 s). Keep handlers lightweight.  |
+| `job:start`         | Just before a job's callback is first invoked (NOT once per retry)                     |
+| `job:complete`      | When a job finishes successfully (possibly after retries)                              |
+| `job:error`         | When a job exhausts all retries and the final attempt still throws                     |
+| `job:skip`          | When a tick finds the job already running (see retry-and-overlap for when this occurs) |
 
 **Contract for retries.** `job:start` and `job:complete`/`job:error` fire **once per fire**, not once per retry attempt. The retry count surfaces inside the `JobResult` passed to `job:complete`, or as `result.retries === maxRetries` on the failure path.
 
@@ -38,9 +38,9 @@ type SchedulerEvents = {
 ```ts
 type JobResult = {
   success: boolean;
-  duration: number;    // milliseconds, end-to-end including retry waits
-  error?: unknown;     // present when success === false
-  retries?: number;    // attempts that failed before the final outcome
+  duration: number; // milliseconds, end-to-end including retry waits
+  error?: unknown; // present when success === false
+  retries?: number; // attempts that failed before the final outcome
 };
 ```
 
@@ -52,12 +52,12 @@ type JobResult = {
 import type { JobResult } from "@warlock.js/scheduler";
 import { scheduler } from "@warlock.js/scheduler";
 
-scheduler.on("job:start",    name           => log.debug({ name }, "job start"));
+scheduler.on("job:start", (name) => log.debug({ name }, "job start"));
 scheduler.on("job:complete", (name, result: JobResult) => {
   log.info({ name, duration: result.duration, retries: result.retries }, "job complete");
 });
-scheduler.on("job:error",    (name, error)  => log.error({ name, error }, "job failed"));
-scheduler.on("job:skip",     (name, reason) => log.warn({ name, reason }, "job skipped"));
+scheduler.on("job:error", (name, error) => log.error({ name, error }, "job failed"));
+scheduler.on("job:skip", (name, reason) => log.warn({ name, reason }, "job skipped"));
 ```
 
 `.on()`, `.once()`, `.off()` are all type-narrowed via `SchedulerEvents`.
@@ -69,6 +69,7 @@ scheduler.on("job:skip",     (name, reason) => log.warn({ name, reason }, "job s
 Prepares every registered job (computes initial `nextRun`) and enters the tick loop. Emits `scheduler:started`.
 
 Throws if:
+
 - already running (`"Scheduler is already running."`)
 - zero jobs registered (`"Cannot start scheduler with no jobs."`)
 
@@ -104,7 +105,7 @@ import { logger } from "./logger";
 import { metrics } from "./metrics";
 import { alerts } from "./alerts";
 
-scheduler.on("job:start", name => metrics.increment(`job.start.${name}`));
+scheduler.on("job:start", (name) => metrics.increment(`job.start.${name}`));
 
 scheduler.on("job:complete", (name, result) => {
   metrics.increment(`job.success.${name}`);
@@ -131,20 +132,20 @@ scheduler.start();
 ## Inspection at runtime
 
 ```ts
-scheduler.isRunning;             // boolean
-scheduler.jobCount;              // number of registered jobs
-scheduler.list();                // readonly Job[]
-scheduler.getJob("name");        // Job | undefined
+scheduler.isRunning; // boolean
+scheduler.jobCount; // number of registered jobs
+scheduler.list(); // readonly Job[]
+scheduler.getJob("name"); // Job | undefined
 ```
 
 And on each `Job`:
 
 ```ts
-job.nextRun;                     // Dayjs | null
-job.lastRun;                     // Dayjs | null — success OR failure
-job.isRunning;                   // boolean
-job.intervals;                   // readonly schedule config
-job.cronExpression;              // string | null
+job.nextRun; // Dayjs | null
+job.lastRun; // Dayjs | null — success OR failure
+job.isRunning; // boolean
+job.intervals; // readonly schedule config
+job.cronExpression; // string | null
 ```
 
 ## See also

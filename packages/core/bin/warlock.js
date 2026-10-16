@@ -121,14 +121,12 @@ async function bootFromSource() {
   // a leaf module whose only import is `node:url`, so it needs no extension
   // probing to load, which is precisely the thing we don't have yet.
   const { ownResolve } = await import(
-    pathToFileURL(
-      path.join(binDir, "..", "src", "dev-server", "loader", "own-resolver.ts"),
-    ).href
+    pathToFileURL(path.join(binDir, "..", "src", "dev-server", "loader", "own-resolver.ts")).href
   );
 
   let pathsMatcher = null;
   if (tsconfig) {
-    pathsMatcher = specifier => resolvePathAlias(tsconfig, specifier);
+    pathsMatcher = (specifier) => resolvePathAlias(tsconfig, specifier);
   }
 
   /**

@@ -17,7 +17,6 @@ function firstCall<T>(calls: readonly T[]): T {
   return call;
 }
 
-
 type AnyCommand = ConverseCommand | ConverseStreamCommand;
 
 function makeFakeClient(options: {
@@ -174,11 +173,16 @@ describe("BedrockModel.complete()", () => {
       converse: {
         ...baseConverse,
         stopReason: "tool_use",
-        output: { message: { role: "assistant", content: [
-          { reasoningContent: { reasoningText: { text: "considering", signature: "sig_1" } } },
-          { reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } },
-          { toolUse: { toolUseId: "tu_1", name: "lookup", input: { q: "weather" } } },
-        ] } },
+        output: {
+          message: {
+            role: "assistant",
+            content: [
+              { reasoningContent: { reasoningText: { text: "considering", signature: "sig_1" } } },
+              { reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } },
+              { toolUse: { toolUseId: "tu_1", name: "lookup", input: { q: "weather" } } },
+            ],
+          },
+        },
       },
     });
     const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
@@ -186,10 +190,12 @@ describe("BedrockModel.complete()", () => {
     const response = await model.complete([{ role: "user", content: "hi" }]);
 
     expect(response.toolCalls?.[0]?.providerMetadata).toEqual({
-      bedrock: { reasoningBlocks: [
-        { type: "reasoning", text: "considering", signature: "sig_1" },
-        { type: "redacted", data: "AQID" },
-      ] },
+      bedrock: {
+        reasoningBlocks: [
+          { type: "reasoning", text: "considering", signature: "sig_1" },
+          { type: "redacted", data: "AQID" },
+        ],
+      },
     });
   });
 
@@ -303,7 +309,8 @@ describe("BedrockModel.complete()", () => {
       // no totalTokens: that absence is what this test drives
       converse: {
         ...baseConverse,
-        usage: { inputTokens: 7, outputTokens: 5 } as TokenUsage },
+        usage: { inputTokens: 7, outputTokens: 5 } as TokenUsage,
+      },
     });
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
@@ -316,8 +323,10 @@ describe("BedrockModel.complete()", () => {
 
   it("treats partial usage fields as zero", async () => {
     const { client } = makeFakeClient({
-      converse: { ...baseConverse, // no inputTokens either: partial usage is the case under test
-        usage: { outputTokens: 4 } as TokenUsage },
+      converse: {
+        ...baseConverse, // no inputTokens either: partial usage is the case under test
+        usage: { outputTokens: 4 } as TokenUsage,
+      },
     });
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
@@ -534,10 +543,25 @@ describe("BedrockModel.stream()", () => {
     const { client } = makeFakeClient({
       streamEvents: [
         { contentBlockStart: { start: { reasoningContent: {} }, contentBlockIndex: 0 } },
-        { contentBlockDelta: { delta: { reasoningContent: { text: "considering" } }, contentBlockIndex: 0 } },
-        { contentBlockDelta: { delta: { reasoningContent: { signature: "sig_1" } }, contentBlockIndex: 0 } },
+        {
+          contentBlockDelta: {
+            delta: { reasoningContent: { text: "considering" } },
+            contentBlockIndex: 0,
+          },
+        },
+        {
+          contentBlockDelta: {
+            delta: { reasoningContent: { signature: "sig_1" } },
+            contentBlockIndex: 0,
+          },
+        },
         { contentBlockStop: { contentBlockIndex: 0 } },
-        { contentBlockStart: { start: { toolUse: { toolUseId: "tu_1", name: "lookup" } }, contentBlockIndex: 1 } },
+        {
+          contentBlockStart: {
+            start: { toolUse: { toolUseId: "tu_1", name: "lookup" } },
+            contentBlockIndex: 1,
+          },
+        },
         { contentBlockDelta: { delta: { toolUse: { input: "{}" } }, contentBlockIndex: 1 } },
         { contentBlockStop: { contentBlockIndex: 1 } },
         { messageStop: { stopReason: "tool_use" } },
@@ -555,9 +579,9 @@ describe("BedrockModel.stream()", () => {
       name: "lookup",
       input: {},
       providerMetadata: {
-        bedrock: { reasoningBlocks: [
-          { type: "reasoning", text: "considering", signature: "sig_1" },
-        ] },
+        bedrock: {
+          reasoningBlocks: [{ type: "reasoning", text: "considering", signature: "sig_1" }],
+        },
       },
     });
   });
@@ -1106,19 +1130,23 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
     const { client } = makeFakeClient({ converse: baseConverse });
     const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
 
-    await expect(model.complete([{ role: "user", content: "hi" }], {
-      maxTokens: 2048,
-      reasoning: { maxTokens: 2048 },
-    })).rejects.toThrow("maxTokens (2048) must be greater than thinking budget (2048)");
+    await expect(
+      model.complete([{ role: "user", content: "hi" }], {
+        maxTokens: 2048,
+        reasoning: { maxTokens: 2048 },
+      }),
+    ).rejects.toThrow("maxTokens (2048) must be greater than thinking budget (2048)");
   });
 
   it("throws when the thinking budget is below Bedrock's minimum", async () => {
     const { client } = makeFakeClient({ converse: baseConverse });
     const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
 
-    await expect(model.complete([{ role: "user", content: "hi" }], {
-      reasoning: { maxTokens: 1023 },
-    })).rejects.toThrow("thinking budget (1023) must be at least 1024");
+    await expect(
+      model.complete([{ role: "user", content: "hi" }], {
+        reasoning: { maxTokens: 1023 },
+      }),
+    ).rejects.toThrow("thinking budget (1023) must be at least 1024");
   });
 
   it("leaves the request unchanged when thinking is explicitly off", async () => {

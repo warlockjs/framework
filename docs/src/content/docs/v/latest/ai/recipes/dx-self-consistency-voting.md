@@ -43,7 +43,8 @@ const solver = ai.agent({
   model: openai.model({ name: "gpt-4o-mini" }),
   output: answerSchema,
   modelOptions: { temperature: 0.8 }, // diversity across samples is the point
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You solve math word problems carefully.")
     .instruction("Show brief reasoning, then give the final numeric answer."),
 });

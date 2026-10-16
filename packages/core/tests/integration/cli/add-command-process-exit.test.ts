@@ -90,7 +90,11 @@ beforeEach(async () => {
   // this fixture does not need a `src/` tree at all.
   await writeFile(
     path.join(fixtureDir, "package.json"),
-    JSON.stringify({ name: "add-exit-fixture", version: "1.0.0", dependencies: {}, devDependencies: {} }, null, 2),
+    JSON.stringify(
+      { name: "add-exit-fixture", version: "1.0.0", dependencies: {}, devDependencies: {} },
+      null,
+      2,
+    ),
   );
 });
 
@@ -102,36 +106,39 @@ describe("warlock add <feature> --no-install completes and the CLI exits 0 on it
   it(
     "completes the add and the child process terminates 0 without being killed, within the timeout bound",
     async () => {
-      const exitInfo = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; timedOut: boolean; stdout: string }>(
-        (resolve) => {
-          const child = spawn(process.execPath, [WARLOCK_BIN, "add", "image", "--no-install"], {
-            cwd: fixtureDir,
-            // Exactly the shape the release gate spawns with — `stdin` ignored,
-            // so nothing is ever waiting on input, and the defect was that
-            // something ELSE still kept the loop open regardless.
-            stdio: ["ignore", "pipe", "pipe"],
-          });
+      const exitInfo = await new Promise<{
+        code: number | null;
+        signal: NodeJS.Signals | null;
+        timedOut: boolean;
+        stdout: string;
+      }>((resolve) => {
+        const child = spawn(process.execPath, [WARLOCK_BIN, "add", "image", "--no-install"], {
+          cwd: fixtureDir,
+          // Exactly the shape the release gate spawns with — `stdin` ignored,
+          // so nothing is ever waiting on input, and the defect was that
+          // something ELSE still kept the loop open regardless.
+          stdio: ["ignore", "pipe", "pipe"],
+        });
 
-          let stdout = "";
-          child.stdout.on("data", (chunk) => (stdout += chunk.toString()));
-          child.stderr.on("data", (chunk) => (stdout += chunk.toString()));
+        let stdout = "";
+        child.stdout.on("data", (chunk) => (stdout += chunk.toString()));
+        child.stderr.on("data", (chunk) => (stdout += chunk.toString()));
 
-          let settled = false;
-          const timer = setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            child.kill("SIGKILL");
-            resolve({ code: null, signal: null, timedOut: true, stdout });
-          }, CHILD_TIMEOUT_MS);
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          child.kill("SIGKILL");
+          resolve({ code: null, signal: null, timedOut: true, stdout });
+        }, CHILD_TIMEOUT_MS);
 
-          child.once("exit", (code, signal) => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            resolve({ code, signal, timedOut: false, stdout });
-          });
-        },
-      );
+        child.once("exit", (code, signal) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve({ code, signal, timedOut: false, stdout });
+        });
+      });
 
       // The defect's whole shape: the work finishes and prints success, and
       // ONLY THEN does the process fail to exit. Assert both halves —

@@ -43,9 +43,7 @@ describe("getAppPath", () => {
     const resolved = getAppPath("fresh-app");
 
     expect(resolved).toBe(path.resolve(process.cwd(), "fresh-app"));
-    expect(directoryExists).toHaveBeenCalledWith(
-      path.resolve(process.cwd(), "fresh-app"),
-    );
+    expect(directoryExists).toHaveBeenCalledWith(path.resolve(process.cwd(), "fresh-app"));
     expect(exitSpy).not.toHaveBeenCalled();
   });
 

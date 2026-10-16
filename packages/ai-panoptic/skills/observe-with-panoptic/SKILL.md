@@ -17,9 +17,9 @@ import "@warlock.js/ai-panoptic"; // side-effect wiring — do this once at boot
 
 ai.config({
   panoptic: {
-    exporters: [consoleExporter()],   // optional; a store-shaped exporter also feeds the dashboard
-    observeAll: true,                 // observe every flow by default
-    dashboard: true,                  // optional local viewer — see use-local-dashboard
+    exporters: [consoleExporter()], // optional; a store-shaped exporter also feeds the dashboard
+    observeAll: true, // observe every flow by default
+    dashboard: true, // optional local viewer — see use-local-dashboard
   },
 });
 ```
@@ -30,13 +30,13 @@ ai.config({
 
 Once a collector is registered, which flows actually route to it is controlled by core's `observe` seam:
 
-| Setting | Effect |
-|---|---|
-| `observeAll: true` (config) | Every `ai.agent` / `ai.workflow` / `ai.supervisor` / `ai.team` that left `observe` unset routes its completed report to the registered observers. |
-| `observe: true` (per-flow) | Force-observe **this** flow even when `observeAll` is off → the globally registered observers. |
-| `observe: false` (per-flow) | Opt **this** flow out entirely, even when `observeAll` is on. |
+| Setting                          | Effect                                                                                                                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observeAll: true` (config)      | Every `ai.agent` / `ai.workflow` / `ai.supervisor` / `ai.team` that left `observe` unset routes its completed report to the registered observers.                                       |
+| `observe: true` (per-flow)       | Force-observe **this** flow even when `observeAll` is off → the globally registered observers.                                                                                          |
+| `observe: false` (per-flow)      | Opt **this** flow out entirely, even when `observeAll` is on.                                                                                                                           |
 | `observe: <Observer>` (per-flow) | A **flow-local** collector — only this flow's report, routed only to it (the global observers are skipped). A panoptic flow-local collector implements `Observer`, so pass it directly. |
-| (unset, `observeAll: false`) | Not observed — opt-in default, identical to legacy behavior. |
+| (unset, `observeAll: false`)     | Not observed — opt-in default, identical to legacy behavior.                                                                                                                            |
 
 ```ts
 ai.agent({ model, observe: true });                       // always traced
@@ -64,11 +64,11 @@ const observe = panoptic({
 
 ## Three feed paths
 
-| Path | Use when | API |
-|---|---|---|
-| **Events** | You want every run captured automatically and the primitive emits a `*.completed` event (agent / workflow / supervisor). | `observe.attach(target)` |
-| **Middleware** | The app already composes cross-cutting concerns through the agent middleware pipeline. | `panoptic().middleware()` |
-| **Direct** | The primitive carries no result-bearing event (the orchestrator), or you captured a report out of band. | `observe.collect(report)` |
+| Path           | Use when                                                                                                                 | API                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------- |
+| **Events**     | You want every run captured automatically and the primitive emits a `*.completed` event (agent / workflow / supervisor). | `observe.attach(target)`  |
+| **Middleware** | The app already composes cross-cutting concerns through the agent middleware pipeline.                                   | `panoptic().middleware()` |
+| **Direct**     | The primitive carries no result-bearing event (the orchestrator), or you captured a report out of band.                  | `observe.collect(report)` |
 
 ### 1. Attach to the event stream
 
@@ -96,7 +96,7 @@ panoptic({ exporters, completedEvents: ["agent.completed"] }); // agents only
 ### 2. Wire it as agent middleware
 
 ```ts
-const observe = panoptic({ exporters: [langfuseExporter({ /* ... */ })] });
+const observe = panoptic({ exporters: [langfuseExporter({/* ... */})] });
 
 const agent = ai.agent({
   model,
@@ -128,12 +128,12 @@ An observability fault never escapes onto the AI run's hot path:
 - The collector wraps every exporter invocation in `Promise.allSettled`, so a throwing exporter can't crash the run or block its siblings.
 - The event handler and the middleware additionally swallow the `collect` rejection, so even a collector-level fault stays contained.
 
-A broken backend degrades to *missing telemetry*, never a failed agent run.
+A broken backend degrades to _missing telemetry_, never a failed agent run.
 
 ## Lifecycle
 
 ```ts
-await observe.flush();    // drain buffered exporters (between batches / checkpoints)
+await observe.flush(); // drain buffered exporters (between batches / checkpoints)
 await observe.shutdown(); // flush + release every exporter (process teardown)
 ```
 
@@ -146,7 +146,7 @@ The in-memory trace store doubles as an `ExporterContract`, so the simplest way 
 ```ts
 import { panoptic, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
 
-const store = createInMemoryTraceStore();        // an ExporterContract + queryable store
+const store = createInMemoryTraceStore(); // an ExporterContract + queryable store
 const observe = panoptic({ exporters: [store, consoleExporter()] });
 
 // store now receives every trace — query/aggregate it later:

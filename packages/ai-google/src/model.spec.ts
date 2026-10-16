@@ -10,7 +10,6 @@ function firstCall<T>(calls: readonly T[]): T {
   return call;
 }
 
-
 function makeFakeAI(options: {
   response?: Partial<GenerateContentResponse>;
   streamChunks?: Array<Partial<GenerateContentResponse>>;

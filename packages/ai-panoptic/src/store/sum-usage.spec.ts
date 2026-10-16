@@ -52,7 +52,12 @@ describe("sumUsage", () => {
   });
 
   it("preserves a priced contributor when merging with an unpriced one", () => {
-    const priced: Usage = { input: 100, output: 50, total: 150, cost: { input: 0.01, output: 0.03 } };
+    const priced: Usage = {
+      input: 100,
+      output: 50,
+      total: 150,
+      cost: { input: 0.01, output: 0.03 },
+    };
     const unpriced: Usage = { input: 40, output: 10, total: 50 };
 
     const sum = sumUsage(priced, unpriced);

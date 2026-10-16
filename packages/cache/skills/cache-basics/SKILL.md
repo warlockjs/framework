@@ -68,15 +68,15 @@ await cache.init();
 ```ts
 // Set + get
 await cache.set("user.1", user, "1h");
-const cached = await cache.get<User>("user.1");       // User | null
+const cached = await cache.get<User>("user.1"); // User | null
 
 // Presence + read-and-delete
-const exists = await cache.has("user.1");             // boolean
-const taken = await cache.pull<User>("user.1");        // returns then removes
+const exists = await cache.has("user.1"); // boolean
+const taken = await cache.pull<User>("user.1"); // returns then removes
 
 // Remove + flush
 await cache.remove("user.1");
-await cache.flush();                                   // wipe everything (current driver)
+await cache.flush(); // wipe everything (current driver)
 
 // Many at once — array positionally aligned with the keys (null for misses)
 const [u1, u2, u3] = await cache.many(["user.1", "user.2", "user.3"]);
@@ -86,9 +86,9 @@ const [u1, u2, u3] = await cache.many(["user.1", "user.2", "user.3"]);
 await cache.forever("config.version", "1.2.3");
 
 // Counters
-await cache.increment("post.42.views");                // +1, returns new value
-await cache.increment("post.42.views", 10);            // +10
-await cache.decrement("inventory.sku-x");              // -1
+await cache.increment("post.42.views"); // +1, returns new value
+await cache.increment("post.42.views", 10); // +10
+await cache.decrement("inventory.sku-x"); // -1
 
 // Memoize an expensive function
 const user = await cache.remember("user.1", "1h", async () => db.users.find(1));
@@ -96,23 +96,23 @@ const user = await cache.remember("user.1", "1h", async () => db.users.find(1));
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Choosing a driver, configuring it, or understanding what each one does best | The `pick-cache-driver` topic |
-| The `set` options object (`ttl`, `expiresAt`, `tags`, `onConflict`, `driver`, `vector`) | The `configure-set-options` topic |
-| Memoization with `remember()`, counters, negative caching, per-tenant scoping, TTL constants | The `apply-cache-patterns` topic |
-| Scoped handles via `cache.namespace(prefix, options?)` | The `use-cache-namespace` topic |
-| Tag-based invalidation — `cache.tags([...]).invalidate()` | The `use-cache-tags` topic |
-| Stale-while-revalidate — `cache.swr(...)` | The `use-swr` topic |
-| Wrapping a function with `cached()` — HOF memoization with `.invalidate()` | The `use-cached-hof` topic |
-| Distributed locks — `cache.lock(key, ttl, fn)` with auto-release | The `use-cache-lock` topic |
-| Queues, recent-N buffers, `push`/`shift`/`trim` — the list sub-API | The `use-cache-list` topic |
-| Atomic read-modify-write via `update()` and `merge()` | The `use-cache-update-merge` topic |
-| Similarity retrieval — `set({ vector })` + `cache.similar(...)` | The `use-cache-similarity` topic |
-| Postgres driver setup (KV-only or with pgvector) | The `configure-pg-cache` topic |
-| `cache.metrics()` aggregate snapshot + event bus for per-event reactions | The `observe-cache` topic |
-| Error classes (`CacheConfigurationError`, `CacheUnsupportedError`, etc.) | The `handle-cache-errors` topic |
-| Tests that touch cache code paths — `MockCacheDriver`, `MemoryCacheDriver` | The `test-cache-code` topic |
+| If the task is about…                                                                        | Load                               |
+| -------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Choosing a driver, configuring it, or understanding what each one does best                  | The `pick-cache-driver` topic      |
+| The `set` options object (`ttl`, `expiresAt`, `tags`, `onConflict`, `driver`, `vector`)      | The `configure-set-options` topic  |
+| Memoization with `remember()`, counters, negative caching, per-tenant scoping, TTL constants | The `apply-cache-patterns` topic   |
+| Scoped handles via `cache.namespace(prefix, options?)`                                       | The `use-cache-namespace` topic    |
+| Tag-based invalidation — `cache.tags([...]).invalidate()`                                    | The `use-cache-tags` topic         |
+| Stale-while-revalidate — `cache.swr(...)`                                                    | The `use-swr` topic                |
+| Wrapping a function with `cached()` — HOF memoization with `.invalidate()`                   | The `use-cached-hof` topic         |
+| Distributed locks — `cache.lock(key, ttl, fn)` with auto-release                             | The `use-cache-lock` topic         |
+| Queues, recent-N buffers, `push`/`shift`/`trim` — the list sub-API                           | The `use-cache-list` topic         |
+| Atomic read-modify-write via `update()` and `merge()`                                        | The `use-cache-update-merge` topic |
+| Similarity retrieval — `set({ vector })` + `cache.similar(...)`                              | The `use-cache-similarity` topic   |
+| Postgres driver setup (KV-only or with pgvector)                                             | The `configure-pg-cache` topic     |
+| `cache.metrics()` aggregate snapshot + event bus for per-event reactions                     | The `observe-cache` topic          |
+| Error classes (`CacheConfigurationError`, `CacheUnsupportedError`, etc.)                     | The `handle-cache-errors` topic    |
+| Tests that touch cache code paths — `MockCacheDriver`, `MemoryCacheDriver`                   | The `test-cache-code` topic        |
 
 ## Things NOT to do
 

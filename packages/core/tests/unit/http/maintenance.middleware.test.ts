@@ -15,8 +15,7 @@ const configStore: Record<string, unknown> = {};
 
 vi.mock("@mongez/config", () => ({
   default: {
-    get: (key: string, fallback?: unknown) =>
-      key in configStore ? configStore[key] : fallback,
+    get: (key: string, fallback?: unknown) => (key in configStore ? configStore[key] : fallback),
   },
 }));
 
@@ -49,9 +48,8 @@ describe("maintenanceMiddleware", () => {
     for (const key of Object.keys(configStore)) {
       delete configStore[key];
     }
-    ({ maintenanceMiddleware } = await import(
-      "../../../src/http/middleware/maintenance.middleware"
-    ));
+    ({ maintenanceMiddleware } =
+      await import("../../../src/http/middleware/maintenance.middleware"));
   });
 
   afterEach(() => {
@@ -101,9 +99,7 @@ describe("maintenanceMiddleware", () => {
     const middleware = maintenanceMiddleware({ allowlist: ["/admin/*"] });
     const response = makeResponse();
 
-    const result = middleware(
-      makeCtx({ request: makeRequest("/admin/users?page=2"), response }),
-    );
+    const result = middleware(makeCtx({ request: makeRequest("/admin/users?page=2"), response }));
 
     expect(result).toBeUndefined();
     expect(response.serviceUnavailable).not.toHaveBeenCalled();

@@ -25,7 +25,7 @@ import { Notification } from "app/notifications/models/notification/notification
 
 const config: NotificationConfig = {
   channels: {
-    mail:     mailChannel({ from: "no-reply@store.com" }),
+    mail: mailChannel({ from: "no-reply@store.com" }),
     database: inApp.configure({ model: Notification }),
   },
 };
@@ -40,17 +40,17 @@ The `database` channel is returned by `inApp.configure({ model | repository })` 
 ```ts
 const config: NotificationConfig = {
   channels: {
-    mail:     mailChannel({ from }),
+    mail: mailChannel({ from }),
     database: inApp.configure({ model: Notification }),
 
     // custom channels
-    discord:  discordChannel(),            // defineChannel + declare module
+    discord: discordChannel(), // defineChannel + declare module
   },
 
   // optional gates — both app-owned; package ships no defaults
-  preferences: userPreferences,            // drops channels recipient muted
-  rateLimit,                               // drops channels over budget
-  queue: heraldQueue(),                    // backs `.queue()` (needs @warlock.js/herald)
+  preferences: userPreferences, // drops channels recipient muted
+  rateLimit, // drops channels over budget
+  queue: heraldQueue(), // backs `.queue()` (needs @warlock.js/herald)
 };
 
 export default config;
@@ -124,7 +124,7 @@ Dropped channels fire a `skipped` event with reason `"rate-limit"`. `force` does
 ```ts
 import { getNotificationConfig } from "@warlock.js/notifications";
 
-const cfg = getNotificationConfig();   // throws NotificationsNotConfiguredError if unset
+const cfg = getNotificationConfig(); // throws NotificationsNotConfiguredError if unset
 ```
 
 ## Tests
@@ -200,12 +200,12 @@ Now `notify.discord(user, { content: "🎉" })` works, and `discord:` is a valid
 
 ## `route` resolution
 
-| What `route` returns | Effect |
-|---|---|
-| `string` | Used directly as the address (`"user@example.com"`, webhook URL). |
-| `{ id: Id }` | The recipient's storage id — for database/internal channels. |
-| `undefined` | Dispatcher falls back to `{ id: notifiable.id }`. |
-| `route` omitted | Same as returning `undefined` — `{ id }` fallback. |
+| What `route` returns | Effect                                                            |
+| -------------------- | ----------------------------------------------------------------- |
+| `string`             | Used directly as the address (`"user@example.com"`, webhook URL). |
+| `{ id: Id }`         | The recipient's storage id — for database/internal channels.      |
+| `undefined`          | Dispatcher falls back to `{ id: notifiable.id }`.                 |
+| `route` omitted      | Same as returning `undefined` — `{ id }` fallback.                |
 
 For raw-target ad-hoc sends (`notify.discord("https://hooks.../foo", payload)`), the raw string wins over `route()`.
 
@@ -233,7 +233,9 @@ import type { WebClient } from "@slack/web-api";
 let Slack: typeof import("@slack/web-api");
 let isModuleExists: boolean | null = null;
 
-async function loadSlack() { /* try/catch await import; set flag */ }
+async function loadSlack() {
+  /* try/catch await import; set flag */
+}
 loadSlack();
 
 export const slackChannel = (config: { token: string }) =>
@@ -282,11 +284,11 @@ defineNotification<Data>({
 
 Returns `{ send, queue, only }`:
 
-| Method | Signature | What it does |
-|---|---|---|
-| `.send` | `(to, data, options?)` | Render + dispatch synchronously. |
-| `.queue` | `(to, data, options?)` | Render + enqueue. Throws if no queue dispatcher is configured. |
-| `.only(...channels)` | returns `{send, queue, only}` | Restrict dispatch to a subset of channels. |
+| Method               | Signature                     | What it does                                                   |
+| -------------------- | ----------------------------- | -------------------------------------------------------------- |
+| `.send`              | `(to, data, options?)`        | Render + dispatch synchronously.                               |
+| `.queue`             | `(to, data, options?)`        | Render + enqueue. Throws if no queue dispatcher is configured. |
+| `.only(...channels)` | returns `{send, queue, only}` | Restrict dispatch to a subset of channels.                     |
 
 `to` accepts a `Notifiable` OR a `Notifiable[]`. Fan-out emits one render+dispatch per recipient with per-recipient + per-channel `Promise.allSettled` (one failure does not abort the others).
 
@@ -308,9 +310,7 @@ await welcome.send(user, { name: "Hasan" });
 export const orderShipped = defineNotification<{ order: Order }>({
   type: "order.shipped",
   via: (_data, to) =>
-    to.get("telegram_chat_id")
-      ? ["database", "telegram"]
-      : ["database", "mail"],
+    to.get("telegram_chat_id") ? ["database", "telegram"] : ["database", "mail"],
   database: ({ order }) => ({ title: `Order #${order.number} shipped` }),
   mail: ({ order }, to) => ({
     subject: `Order #${order.number} shipped`,
@@ -323,16 +323,15 @@ export const orderShipped = defineNotification<{ order: Order }>({
 ## The renderer's 3rd arg — `RenderContext`
 
 ```ts
-mail: ({ campaignId }, to, { locale = "en", meta }) => ({
+mail: (({ campaignId }, to, { locale = "en", meta }) => ({
   subject: subjectsByLocale[locale],
-  html:    htmlByLocale[locale],
+  html: htmlByLocale[locale],
 }),
-
-// usage:
-await marketing.queue(user, payload, {
-  locale: user.get("locale"),
-  meta:   { campaignId, source: "blast" },
-});
+  // usage:
+  await marketing.queue(user, payload, {
+    locale: user.get("locale"),
+    meta: { campaignId, source: "blast" },
+  }));
 ```
 
 `ctx` carries `locale` + `meta` from `SendOptions`. `meta` flows through to every observability event too.
@@ -343,7 +342,7 @@ The `database` renderer may OMIT `type` — the dispatcher injects `def.type` au
 
 ```ts
 defineNotification({
-  type: "order.shipped",   // ← single source of truth
+  type: "order.shipped", // ← single source of truth
   via: ["database"],
   database: () => ({ title: "Shipped" }), // type omitted; dispatcher injects "order.shipped"
 });
@@ -373,14 +372,14 @@ await orderShipped.queue(user, { order }, { delay: "10m" });
 
 ## SendOptions
 
-| Field | Effect |
-|---|---|
-| `delay` | Reserved — `"10m"` / `"3d"` / `600` (seconds). NOT honored yet: both `.send()` and the current `.queue()` worker dispatch immediately; delay-aware delivery is a follow-up. |
-| `locale` | Passed to renderers via `RenderContext.locale`. |
-| `meta` | Passed to renderers + included in every observability event. |
-| `idempotencyKey` | Injected into the database payload (dedupe via unique index). |
-| `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
-| `type` | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating. |
+| Field            | Effect                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `delay`          | Reserved — `"10m"` / `"3d"` / `600` (seconds). NOT honored yet: both `.send()` and the current `.queue()` worker dispatch immediately; delay-aware delivery is a follow-up. |
+| `locale`         | Passed to renderers via `RenderContext.locale`.                                                                                                                             |
+| `meta`           | Passed to renderers + included in every observability event.                                                                                                                |
+| `idempotencyKey` | Injected into the database payload (dedupe via unique index).                                                                                                               |
+| `force`          | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`.                                                                                                                 |
+| `type`           | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating.                                                                                                      |
 
 ## Failure isolation
 
@@ -409,7 +408,7 @@ Multi-channel notifications for Warlock.js. **Define once, fire anywhere.**
 
 You have an event (`order.shipped`, `comment.mentioned`, `password.changed`) and one or more recipients. You want to address them through any combination of channels (mail, in-app, push, ...) with one render. That's what this package is.
 
-It is NOT a queue, a template engine, a transport library, or an analytics pipeline — it orchestrates *over* the transports cascade / core / herald / bridges already provide.
+It is NOT a queue, a template engine, a transport library, or an analytics pipeline — it orchestrates _over_ the transports cascade / core / herald / bridges already provide.
 
 ## Server-only package
 
@@ -432,7 +431,7 @@ import { Notification } from "app/notifications/models/notification/notification
 
 const config: NotificationConfig = {
   channels: {
-    mail:     mailChannel({ from: "no-reply@store.com" }),
+    mail: mailChannel({ from: "no-reply@store.com" }),
     database: inApp.configure({ model: Notification }),
   },
 };
@@ -465,7 +464,7 @@ await orderShipped.send(user, { orderId: order.id, number: order.number });
 await notify.mail(user, { subject: "Welcome", html: "<p>Hi!</p>" });
 
 const unread = await inApp.listUnread(user);
-const badge  = await inApp.countUnread(user);
+const badge = await inApp.countUnread(user);
 await inApp.markAsRead(user, "ntf_123");
 ```
 
@@ -475,15 +474,15 @@ await inApp.markAsRead(user, "ntf_123");
 
 ## Phase 1 vs Phase 2
 
-| Channel | Phase | How |
-|---|---|---|
-| `mail` | 1 ✅ | core `sendMail` |
-| `database` | 1 ✅ | cascade repo (recipient-scoped reads) |
-| `whatsapp` | 2 | bridges `MessageProvider` |
-| `telegram` | 2 | bridges `MessageProvider` |
-| `slack` | 2 | bridges `MessageProvider` |
-| `push` | 2 | bridges `PushProvider` |
-| your own | 1 ✅ | `defineChannel` + 3-line `declare module` |
+| Channel    | Phase | How                                       |
+| ---------- | ----- | ----------------------------------------- |
+| `mail`     | 1 ✅  | core `sendMail`                           |
+| `database` | 1 ✅  | cascade repo (recipient-scoped reads)     |
+| `whatsapp` | 2     | bridges `MessageProvider`                 |
+| `telegram` | 2     | bridges `MessageProvider`                 |
+| `slack`    | 2     | bridges `MessageProvider`                 |
+| `push`     | 2     | bridges `PushProvider`                    |
+| your own   | 1 ✅  | `defineChannel` + 3-line `declare module` |
 
 ## See also
 
@@ -512,27 +511,31 @@ import { notifications } from "@warlock.js/notifications";
 
 // latency + delivery, keyed by recipient
 notifications.on("sent", ({ channel, notifiable, durationMs, options }) =>
-  metrics.timing(`notif.${channel}.sent`, durationMs, { userId: notifiable?.id, ...options.meta }));
+  metrics.timing(`notif.${channel}.sent`, durationMs, { userId: notifiable?.id, ...options.meta }),
+);
 
 notifications.on("failed", ({ channel, notifiable, error }) =>
-  log.error(`notif.${channel}`, error, { userId: notifiable?.id }));
+  log.error(`notif.${channel}`, error, { userId: notifiable?.id }),
+);
 
 notifications.on("skipped", ({ channel, reason }) =>
-  metrics.inc(`notif.${channel}.skipped.${reason}`));
+  metrics.inc(`notif.${channel}.skipped.${reason}`),
+);
 
 // pair `sending` → terminal by dispatchId — open a span / arm a hung-send watchdog
 notifications.on("sending", ({ dispatchId, channel, notifiable }) =>
-  tracer.open(dispatchId, { channel, userId: notifiable?.id }));
+  tracer.open(dispatchId, { channel, userId: notifiable?.id }),
+);
 ```
 
 ## Events
 
-| Event | Fires when | Payload |
-|---|---|---|
-| `sending` | Gates passed; about to hit the transport (sync) / enqueue (queue) | `{ dispatchId, channel, notifiable?, payload, options }` |
-| `sent` | Channel dispatched OR job enqueued | `{ dispatchId, channel, notifiable?, payload, options, durationMs }` |
-| `failed` | `channel.send` (or `queue.dispatch`) threw | `{ dispatchId, channel, notifiable?, payload, error, options, durationMs }` |
-| `skipped` | A pre-send gate dropped this channel | `{ dispatchId, channel, notifiable?, reason, options }` — `reason: "preference" \| "rate-limit"` |
+| Event     | Fires when                                                        | Payload                                                                                          |
+| --------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `sending` | Gates passed; about to hit the transport (sync) / enqueue (queue) | `{ dispatchId, channel, notifiable?, payload, options }`                                         |
+| `sent`    | Channel dispatched OR job enqueued                                | `{ dispatchId, channel, notifiable?, payload, options, durationMs }`                             |
+| `failed`  | `channel.send` (or `queue.dispatch`) threw                        | `{ dispatchId, channel, notifiable?, payload, error, options, durationMs }`                      |
+| `skipped` | A pre-send gate dropped this channel                              | `{ dispatchId, channel, notifiable?, reason, options }` — `reason: "preference" \| "rate-limit"` |
 
 `notifiable` is the recipient **model** (undefined only for raw-target ad-hoc sends like `notify.mail("x@y.com", …)`) — read `notifiable?.id` / `notifiable?.get(...)` to key your metrics or logs.
 
@@ -716,7 +719,7 @@ Pass a string instead of a model to use the string as the route directly:
 
 ```ts
 await notify.mail("guest@example.com", { subject: "Receipt", html: "<p>…</p>" });
-await notify.whatsapp("+201234567890", { body: "Promo: 20% off!" });  // Phase 2
+await notify.whatsapp("+201234567890", { body: "Promo: 20% off!" }); // Phase 2
 ```
 
 When the recipient isn't a model, `PreferenceProvider` and `RateLimiter` are skipped — there's no `Notifiable` to consult.
@@ -758,14 +761,14 @@ await notify.slack(staff, { text: "Deploy starting" });
 
 ## SendOptions (3rd arg)
 
-| Field | Effect |
-|---|---|
-| `delay` | Reserved for `.queue` paths; not used by `notify.<channel>` (sync). |
-| `locale` | Forwarded to the channel's `send({ options })`. |
-| `meta` | Forwarded to the channel + included in every observability event. |
-| `idempotencyKey` | Injected into the database payload (dedupe). |
-| `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
-| `type` | Notification type for gating (ad-hoc only). |
+| Field            | Effect                                                              |
+| ---------------- | ------------------------------------------------------------------- |
+| `delay`          | Reserved for `.queue` paths; not used by `notify.<channel>` (sync). |
+| `locale`         | Forwarded to the channel's `send({ options })`.                     |
+| `meta`           | Forwarded to the channel + included in every observability event.   |
+| `idempotencyKey` | Injected into the database payload (dedupe).                        |
+| `force`          | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`.         |
+| `type`           | Notification type for gating (ad-hoc only).                         |
 
 ## Failure surfaces
 
@@ -864,7 +867,9 @@ abstract class DatabaseNotification extends Model implements NotificationContrac
 class BaseNotificationsRepository extends RepositoryManager {
   // constructor resolves the model's columnMap → builds `filterBy` +
   // createFor / markRead / markUnread / deleteFor from it.
-  public createFor(recipientId, input, tenantId?)   { /* one insert, starts unread */ }
+  public createFor(recipientId, input, tenantId?) {
+    /* one insert, starts unread */
+  }
 }
 ```
 
@@ -877,9 +882,9 @@ class BaseNotificationsRepository extends RepositoryManager {
 ```ts
 export type NotificationColumnMap = {
   recipient?: string; // recipient FK. Default "user_id"
-  tenant?: string;    // multi-tenant scope, written from the recipient. Omit → single-tenant
-  readAt?: string;    // read-timestamp column
-  isRead?: string;    // read-flag column (indexed)
+  tenant?: string; // multi-tenant scope, written from the recipient. Omit → single-tenant
+  readAt?: string; // read-timestamp column
+  isRead?: string; // read-flag column (indexed)
 };
 ```
 
@@ -981,12 +986,12 @@ export default Migration.create(Notification, notificationColumns(Notification))
 `notificationColumns(Notification)` reads the model's `columnMap` and returns the
 matching columns:
 
-| columnMap | Columns |
-|---|---|
-| _(none / default)_ | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
-| `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only |
-| `{ isRead: "is_read" }` | swaps `read_at` for `is_read` (indexed boolean) |
-| `{ isRead: "is_read", readAt: "read_at" }` | both read-state columns |
+| columnMap                                          | Columns                                                                     |
+| -------------------------------------------------- | --------------------------------------------------------------------------- |
+| _(none / default)_                                 | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
+| `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only                                        |
+| `{ isRead: "is_read" }`                            | swaps `read_at` for `is_read` (indexed boolean)                             |
+| `{ isRead: "is_read", readAt: "read_at" }`         | both read-state columns                                                     |
 
 The recipient / tenant / read-state column NAMES come from `columnMap`; `type` /
 `title` / `body` / `payload` / `idempotency_key` are fixed. `id` / `createdAt` /
@@ -999,7 +1004,10 @@ are `bigint`, `integer`, or strings, pass `idType`; it is applied to every
 identifier column the factory creates:
 
 ```ts
-export default Migration.create(Notification, notificationColumns(Notification, { idType: "bigint" }));
+export default Migration.create(
+  Notification,
+  notificationColumns(Notification, { idType: "bigint" }),
+);
 ```
 
 ## With extras — spread + extend

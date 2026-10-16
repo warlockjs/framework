@@ -1418,42 +1418,42 @@ export class PostgresDriver implements DriverContract {
     // Run the callback INSIDE the async context (not enter-after-await) so every
     // query it starts — even without the client passed — uses the transaction.
     await databaseTransactionContext.run({ session: tx.context, afterCommit: [] }, async () => {
-    try {
-      // Execute callback
-      result = await fn(ctx);
+      try {
+        // Execute callback
+        result = await fn(ctx);
 
-      // Auto-commit on success
-      commitStarted = true;
-      await tx.commit();
+        // Auto-commit on success
+        commitStarted = true;
+        await tx.commit();
 
-      // Read the queue while still inside the transaction context
-      committedCallbacks = databaseTransactionContext.takeAfterCommit();
-    } catch (error) {
-      if (commitStarted) {
-        // COMMIT itself failed: the original error propagates unchanged and
-        // no ROLLBACK is issued after it.
-        log.error(
-          `database.postgress`,
-          "transaction",
-          "Transaction COMMIT failed; client discarded, no rollback issued",
-        );
-      } else {
-        // Auto-rollback on any error (including explicit rollback). A failing
-        // ROLLBACK is logged, never thrown: the callback's error is the one
-        // the caller needs, and rollback() has already discarded the client.
-        try {
-          await tx.rollback();
+        // Read the queue while still inside the transaction context
+        committedCallbacks = databaseTransactionContext.takeAfterCommit();
+      } catch (error) {
+        if (commitStarted) {
+          // COMMIT itself failed: the original error propagates unchanged and
+          // no ROLLBACK is issued after it.
           log.error(
             `database.postgress`,
             "transaction",
-            "Transaction operation failed, rolled back everything",
+            "Transaction COMMIT failed; client discarded, no rollback issued",
           );
-        } catch (rollbackError) {
-          log.error(`database.postgress`, "transaction", rollbackError);
+        } else {
+          // Auto-rollback on any error (including explicit rollback). A failing
+          // ROLLBACK is logged, never thrown: the callback's error is the one
+          // the caller needs, and rollback() has already discarded the client.
+          try {
+            await tx.rollback();
+            log.error(
+              `database.postgress`,
+              "transaction",
+              "Transaction operation failed, rolled back everything",
+            );
+          } catch (rollbackError) {
+            log.error(`database.postgress`, "transaction", rollbackError);
+          }
         }
+        throw error;
       }
-      throw error;
-    }
     });
 
     // Committed and outside the transaction context: run afterCommit() hooks
@@ -1723,7 +1723,8 @@ export class PostgresDriver implements DriverContract {
 
     // Bound values can hold password hashes and tokens, so only their
     // count and types are logged.
-    const paramsString = this.config.logging && params.length > 0 ? ` | ${describeParams(params)}` : "";
+    const paramsString =
+      this.config.logging && params.length > 0 ? ` | ${describeParams(params)}` : "";
 
     try {
       let result;

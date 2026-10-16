@@ -41,10 +41,7 @@ function cacheKey(prefix: string, user: Auth, tenant?: string): string {
  * source of truth) and is logged, never denied. A loader failure propagates —
  * so the DECISION fails closed in {@link check}.
  */
-async function cached(
-  key: string,
-  loader: () => Promise<string[]>,
-): Promise<string[]> {
+async function cached(key: string, loader: () => Promise<string[]>): Promise<string[]> {
   try {
     const hit = await cache.get<string[]>(key);
 

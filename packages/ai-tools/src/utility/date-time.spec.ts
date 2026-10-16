@@ -45,10 +45,7 @@ describe("dateTimeTool", () => {
     });
 
     it("applies the constructor defaultTimeZone when a call omits timeZone", async () => {
-      const tool = dateTimeTool(
-        { defaultTimeZone: "UTC" },
-        { clock: () => FIXED_NOW_MS },
-      );
+      const tool = dateTimeTool({ defaultTimeZone: "UTC" }, { clock: () => FIXED_NOW_MS });
       const { data, error } = await tool.invoke({ op: "now", format: "time" });
 
       expect(error).toBeUndefined();

@@ -118,10 +118,7 @@ export function inferBelongsToForeignKey(
  * inferHasForeignKey("User")    // "user_id"     — used as posts.user_id
  * inferHasForeignKey("AIModel") // "ai_model_id" — used as ai_trips.ai_model_id
  */
-export function inferHasForeignKey(
-  selfModelName: string,
-  options?: KeyConventionOptions,
-): string {
+export function inferHasForeignKey(selfModelName: string, options?: KeyConventionOptions): string {
   return keyName(selfModelName, options);
 }
 

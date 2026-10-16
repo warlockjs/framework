@@ -19,7 +19,10 @@ delete process.env.BASE_URL;
 /** @typedef {{ label: string, slug: string, sections?: Section[] }} PackageTopicSpec */
 /** @typedef {{ label: string, link?: string, collapsed?: boolean, items?: { autogenerate: { directory: string } }[] }} TopicItem */
 
-function pkgTopic(/** @type {PackageTopicSpec} */ { label, slug, sections = [] }, /** @type {string} */ version) {
+function pkgTopic(
+  /** @type {PackageTopicSpec} */ { label, slug, sections = [] },
+  /** @type {string} */ version,
+) {
   /** @type {TopicItem[]} */ const items = [{ label: "Overview", link: `/v/${version}/${slug}/` }];
 
   for (const section of sections) {
@@ -497,18 +500,20 @@ function buildTopics(/** @type {string} */ version) {
       ? topicsForVersion
       : JSON.parse(JSON.stringify(topicsForVersion).replaceAll("v/latest", `v/${version}`));
 
-  return versionedTopics.map((/** @type {{ link: string, label: string, items: unknown[] }} */ topic) => ({
-    ...topic,
-    items:
-      version === "latest" && topic.label === "Core"
-        ? [
-            topic.items[0],
-            { label: "Upgrade to v5", link: "/v/latest/core/upgrade-to-v5/" },
-            ...topic.items.slice(1),
-          ]
-        : topic.items,
-    id: `${version}-${topic.link.split("/").filter(Boolean).at(-1)}`,
-  }));
+  return versionedTopics.map(
+    (/** @type {{ link: string, label: string, items: unknown[] }} */ topic) => ({
+      ...topic,
+      items:
+        version === "latest" && topic.label === "Core"
+          ? [
+              topic.items[0],
+              { label: "Upgrade to v5", link: "/v/latest/core/upgrade-to-v5/" },
+              ...topic.items.slice(1),
+            ]
+          : topic.items,
+      id: `${version}-${topic.link.split("/").filter(Boolean).at(-1)}`,
+    }),
+  );
 }
 
 // Global pages that don't belong to any package topic (landing, packages

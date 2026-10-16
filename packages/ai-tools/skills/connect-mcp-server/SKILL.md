@@ -47,20 +47,21 @@ The `server` argument is discriminated by `type`:
 
 ```ts
 ai.mcp(server, {
-  namePrefix: "github.",                       // prepended to every remote tool name
-  filter: (name) => name.startsWith("issues_"),// only adapt tools whose name passes
-  timeoutMs: 30_000,                           // per tools/call deadline (default 30s)
+  namePrefix: "github.", // prepended to every remote tool name
+  filter: (name) => name.startsWith("issues_"), // only adapt tools whose name passes
+  timeoutMs: 30_000, // per tools/call deadline (default 30s)
 });
 ```
 
 - **`namePrefix`** is the collision mitigation — there is **no runtime tool-name collision guard** (the agent resolves a tool by first name match), so the author owns uniqueness. Prefix remote tools to keep them distinct from local ones.
-- **`filter`** receives each tool's *unprefixed* name; return `false` to drop it.
+- **`filter`** receives each tool's _unprefixed_ name; return `false` to drop it.
 
 ## What `tools()` does
 
 `client.tools()` is lazy and cached: the **first** call runs the `initialize` handshake, sends `notifications/initialized`, then `tools/list`, and maps each descriptor into a `ToolContract`. Repeat calls return the cached array without re-handshaking.
 
 For each remote tool:
+
 1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (Ajv-backed — `ajv` is an optional peer needed only for the client);
 2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
 3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.

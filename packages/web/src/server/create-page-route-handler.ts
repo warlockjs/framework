@@ -327,9 +327,10 @@ async function answerActionOutcome(options: {
     }
 
     // Post/redirect/get: a 301/302 answer to a POST becomes a 303.
-    const statusCode = shortCircuit.statusCode === 301 || shortCircuit.statusCode === 302
-      ? 303
-      : shortCircuit.statusCode;
+    const statusCode =
+      shortCircuit.statusCode === 301 || shortCircuit.statusCode === 302
+        ? 303
+        : shortCircuit.statusCode;
 
     response.header("Location", url);
     await response.html("", statusCode);
@@ -443,7 +444,8 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     // A same-origin base-path crossing can select a different site's root.
     // The hydrated client compares this marker with its bootstrap site before
     // it tries to compose a tree from another site's registry.
-    if (wantsData && request.site !== undefined) response.header("x-warlock-site", request.site.key);
+    if (wantsData && request.site !== undefined)
+      response.header("x-warlock-site", request.site.key);
 
     // Always-on Origin/Referer check for an action POST, before any module
     // loads or middleware runs (design 2.7).
@@ -599,7 +601,7 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
               pathname: requestPathname,
               routeName: name,
               routePath: entry.path,
-          }),
+            }),
         });
 
         if (tracingEnabled) {
@@ -609,7 +611,9 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
             startedAt: cacheStartedAt,
             attrs: {
               status: outcome.served ? "hit" : (outcome.cacheHeaderValue ?? "miss"),
-              ...(outcome.served || outcome.cacheKey === undefined ? {} : { key: outcome.cacheKey }),
+              ...(outcome.served || outcome.cacheKey === undefined
+                ? {}
+                : { key: outcome.cacheKey }),
             },
           });
         }

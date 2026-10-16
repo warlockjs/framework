@@ -32,7 +32,9 @@ describe("Serialized with a generated ModelResourceRegistry", () => {
   });
 
   it("resolves the models inside arrays and objects", () => {
-    expectTypeOf<Serialized<{ users: FixtureUser[] }>["users"][number]["name"]>().toEqualTypeOf<string>();
+    expectTypeOf<
+      Serialized<{ users: FixtureUser[] }>["users"][number]["name"]
+    >().toEqualTypeOf<string>();
   });
 
   it("keeps the raw fields out of the output", () => {

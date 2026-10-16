@@ -74,12 +74,7 @@ export type {
 
 // Panoptic subscriber (the one-call entry point)
 export { createPanopticMiddleware, panoptic } from "./panoptic";
-export type {
-  CompletedEventPayload,
-  Panoptic,
-  PanopticOptions,
-  PanopticTarget,
-} from "./panoptic";
+export type { CompletedEventPayload, Panoptic, PanopticOptions, PanopticTarget } from "./panoptic";
 
 // Evaluate — grade a trace's captured system prompt via the dashboard's
 // "Evaluate system prompt" drawer action (config-gated; see DashboardOptions.evaluate).

@@ -4,10 +4,7 @@ import { MemoryCacheDriver } from "./drivers/memory-cache-driver";
 import { MockCacheDriver } from "./drivers/mock-cache-driver";
 import type { DriverClass } from "./types";
 
-async function makeCache(
-  driverClass: DriverClass = MemoryCacheDriver,
-  name = "memory",
-) {
+async function makeCache(driverClass: DriverClass = MemoryCacheDriver, name = "memory") {
   const manager = new CacheManager();
   manager.setCacheConfigurations({
     default: name as any,
@@ -34,11 +31,7 @@ describe("cache.swr — basic flow", () => {
   it("blocks and fetches on miss, then writes the entry", async () => {
     const fetcher = vi.fn(async () => "fresh");
 
-    const value = await cache.swr(
-      "key",
-      { freshTtl: 60, staleTtl: 600 },
-      fetcher,
-    );
+    const value = await cache.swr("key", { freshTtl: 60, staleTtl: 600 }, fetcher);
 
     expect(value).toBe("fresh");
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -56,21 +49,17 @@ describe("cache.swr — basic flow", () => {
   });
 
   it("rejects when staleTtl <= freshTtl", async () => {
-    await expect(
-      cache.swr("key", { freshTtl: 60, staleTtl: 60 }, async () => "x"),
-    ).rejects.toThrow(/staleTtl/);
+    await expect(cache.swr("key", { freshTtl: 60, staleTtl: 60 }, async () => "x")).rejects.toThrow(
+      /staleTtl/,
+    );
 
-    await expect(
-      cache.swr("key", { freshTtl: 60, staleTtl: 30 }, async () => "x"),
-    ).rejects.toThrow(/staleTtl/);
+    await expect(cache.swr("key", { freshTtl: 60, staleTtl: 30 }, async () => "x")).rejects.toThrow(
+      /staleTtl/,
+    );
   });
 
   it("accepts duration strings for both ttls", async () => {
-    const value = await cache.swr(
-      "key",
-      { freshTtl: "30s", staleTtl: "5m" },
-      async () => "v",
-    );
+    const value = await cache.swr("key", { freshTtl: "30s", staleTtl: "5m" }, async () => "v");
     expect(value).toBe("v");
   });
 });
@@ -219,11 +208,10 @@ describe("cache.swr — tags", () => {
   });
 
   it("attaches tags on the first miss-fetch", async () => {
-    await cache.swr(
-      "user.42",
-      { freshTtl: 60, staleTtl: 600, tags: ["users"] },
-      async () => ({ id: 42, name: "Alice" }),
-    );
+    await cache.swr("user.42", { freshTtl: 60, staleTtl: 600, tags: ["users"] }, async () => ({
+      id: 42,
+      name: "Alice",
+    }));
 
     const tagged = (await cache.currentDriver!.tagMembers!("cache:tags:users")) as string[];
     expect(tagged).toContain("user.42");
@@ -255,14 +243,12 @@ describe("cache.swr — through ScopedCache", () => {
   it("merges scope tags additively with per-call tags", async () => {
     const feed = cache.namespace("feed.42", { tags: ["user.42"] });
 
-    await feed.swr(
-      "home",
-      { freshTtl: 60, staleTtl: 600, tags: ["computed"] },
-      async () => "data",
-    );
+    await feed.swr("home", { freshTtl: 60, staleTtl: 600, tags: ["computed"] }, async () => "data");
 
     const userTagged = (await cache.currentDriver!.tagMembers!("cache:tags:user.42")) as string[];
-    const computedTagged = (await cache.currentDriver!.tagMembers!("cache:tags:computed")) as string[];
+    const computedTagged = (await cache.currentDriver!.tagMembers!(
+      "cache:tags:computed",
+    )) as string[];
     expect(userTagged).toContain("feed.42.home");
     expect(computedTagged).toContain("feed.42.home");
   });

@@ -6,15 +6,27 @@ describe("default data source (K4 B4)", () => {
   afterEach(() => dataSourceRegistry.clear());
 
   it("keeps the first source as default when later ones do not claim it", () => {
-    dataSourceRegistry.register({ name: "primary", driver: createMockDriver() }, { explicitDefault: false });
-    dataSourceRegistry.register({ name: "analytics", driver: createMockDriver() }, { explicitDefault: false });
-    dataSourceRegistry.register({ name: "logs", driver: createMockDriver() }, { explicitDefault: false });
+    dataSourceRegistry.register(
+      { name: "primary", driver: createMockDriver() },
+      { explicitDefault: false },
+    );
+    dataSourceRegistry.register(
+      { name: "analytics", driver: createMockDriver() },
+      { explicitDefault: false },
+    );
+    dataSourceRegistry.register(
+      { name: "logs", driver: createMockDriver() },
+      { explicitDefault: false },
+    );
 
     expect(dataSourceRegistry.get().name).toBe("primary");
   });
 
   it("lets a later source explicitly claim the default over the implicit one", () => {
-    dataSourceRegistry.register({ name: "primary", driver: createMockDriver() }, { explicitDefault: false });
+    dataSourceRegistry.register(
+      { name: "primary", driver: createMockDriver() },
+      { explicitDefault: false },
+    );
     dataSourceRegistry.register({ name: "logs", driver: createMockDriver(), isDefault: true });
 
     expect(dataSourceRegistry.get().name).toBe("logs");

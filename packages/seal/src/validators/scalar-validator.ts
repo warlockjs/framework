@@ -181,11 +181,7 @@ export class ScalarValidator extends PrimitiveValidator {
     }
 
     return {
-      oneOf: [
-        { type: "string" },
-        { type: "number" },
-        { type: "boolean" },
-      ],
+      oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }],
     };
   }
 }

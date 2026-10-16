@@ -11,6 +11,8 @@ describe("uuidV5", () => {
   it("is stable per name and differs between names", () => {
     expect(uuidV5("Shop API")).toBe(uuidV5("Shop API"));
     expect(uuidV5("Shop API")).not.toBe(uuidV5("Blog API"));
-    expect(uuidV5("Shop API")).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(uuidV5("Shop API")).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
   });
 });

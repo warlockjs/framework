@@ -22,7 +22,9 @@ import type { WorkflowInstance } from "../workflow/workflow.contract";
  * per-entry overrides belong to `supervisor()`.
  */
 export type TeamMemberValue =
-  AgentContract<unknown> | WorkflowInstance<unknown, unknown> | IntentCallback;
+  | AgentContract<unknown>
+  | WorkflowInstance<unknown, unknown>
+  | IntentCallback;
 
 /**
  * The built-in quality-gate strategies. Each desugars to a concrete

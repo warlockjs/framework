@@ -20,7 +20,7 @@ await UserRole.assign(user, "viewer", "tenant-2"); // viewer in tenant-2 — sam
 await UserRole.revoke(user, "editor", "tenant-1"); // auto-flushes too
 ```
 
-The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to *global* roles only, never the union across tenants.
+The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to _global_ roles only, never the union across tenants.
 
 ### When you still need `access.flush`
 
@@ -68,4 +68,7 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 
 - The `configure-access` topic — choosing the resolver.
 - The `implement-resolver` topic — non-table role storage.
+
+```
+
 ```

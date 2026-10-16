@@ -20,9 +20,9 @@ const activeUsers = await User.where("status", "active").get();
 ### Operators
 
 ```ts
-const adults     = await User.where("age", ">", 18).get();
-const recent     = await User.where("created_at", ">=", lastWeek).get();
-const nonAdmins  = await User.where("role", "!=", "admin").get();
+const adults = await User.where("age", ">", 18).get();
+const recent = await User.where("created_at", ">=", lastWeek).get();
+const nonAdmins = await User.where("role", "!=", "admin").get();
 ```
 
 3-argument form. Common operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `notIn`, `like`, `between`. Same syntax across MongoDB and Postgres.
@@ -30,10 +30,7 @@ const nonAdmins  = await User.where("role", "!=", "admin").get();
 ### Compound conditions
 
 ```ts
-const activeAdmins = await User
-  .where("status", "active")
-  .where("role", "admin")
-  .get();
+const activeAdmins = await User.where("status", "active").where("role", "admin").get();
 ```
 
 Chained `.where()` calls combine with `AND`.
@@ -58,7 +55,7 @@ await User.first({ email, password }); // throws UnsafeFilterError if password i
 
 ```ts
 query.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }); // object form — MongoDB
-query.whereRaw("age > ?", [30]);                             // string form — SQL, real bindings
+query.whereRaw("age > ?", [30]); // string form — SQL, real bindings
 ```
 
 The **object form** is checked like any other filter value, plus it rejects the server-side-JavaScript operators `$where`, `$function` and `$accumulator` anywhere in the expression (throws `UnsafeRawExpressionError`); `$expr` and the other aggregation operators keep working. The **string form on the MongoDB driver throws `UnsafeRawExpressionError`** — a string used to compile to `{ $where: "<js>" }`, executing arbitrary JavaScript inside `mongod` per scanned document; there is no safe way to parameterize that, so it's rejected outright. Use the object form instead. SQL drivers keep string mode with real `?` bindings (unchanged).
@@ -68,15 +65,15 @@ The **object form** is checked like any other filter value, plus it rejects the 
 ### By ID
 
 ```ts
-const user = await User.find(id);  // User | null
+const user = await User.find(id); // User | null
 ```
 
 ### First match
 
 ```ts
-const anyUser    = await User.first();                              // first user, any
-const firstAdmin = await User.first({ role: "admin" });             // first admin
-const filtered   = await User.where("status", "active").first();    // chain into .first()
+const anyUser = await User.first(); // first user, any
+const firstAdmin = await User.first({ role: "admin" }); // first admin
+const filtered = await User.where("status", "active").first(); // chain into .first()
 ```
 
 `.first()` with no args returns the very first record (driver-dependent default order). With a filter object, the first match by equality. Chain off `.where()` when you need operators.
@@ -94,10 +91,7 @@ Throws when nothing matches — useful when you KNOW it should exist and want th
 ## Order and paginate
 
 ```ts
-const newest = await User
-  .where("status", "active")
-  .orderBy("created_at", "desc")
-  .get();
+const newest = await User.where("status", "active").orderBy("created_at", "desc").get();
 ```
 
 `.orderBy(field, "asc" | "desc")` sorts. Default direction is `"asc"`. Chain multiple `.orderBy()` for tiebreakers.
@@ -116,11 +110,11 @@ rows[0].name; // typed as UserSchema, not a User instance
 ## Count and existence
 
 ```ts
-const total       = await User.count();
+const total = await User.count();
 const activeCount = await User.count({ status: "active" });
-const adminCount  = await User.where("role", "admin").count();
+const adminCount = await User.where("role", "admin").count();
 
-const hasAdmin    = await User.where("role", "admin").exists();      // boolean, short-circuits
+const hasAdmin = await User.where("role", "admin").exists(); // boolean, short-circuits
 const noneBlocked = await User.where("status", "blocked").notExists();
 ```
 
@@ -129,7 +123,7 @@ const noneBlocked = await User.where("status", "blocked").notExists();
 ## Get many — `.all(filter?)`
 
 ```ts
-const allUsers    = await User.all();
+const allUsers = await User.all();
 const activeUsers = await User.all({ status: "active" });
 ```
 
@@ -141,19 +135,19 @@ const activeUsers = await User.all({ status: "active" });
 
 Cascade's query builder has around 60 methods. Reach for these as the need arises:
 
-| Reach for | When |
-| --- | --- |
-| `.whereIn(field, values)` / `.whereNotIn(field, values)` | Match against / exclude a list |
-| `.whereNull(field)` / `.whereNotNull(field)` | Nullability checks |
-| `.whereBetween(field, [a, b])` | Inclusive range |
-| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch` | Pattern matching — see below for literal-vs-regex semantics |
-| `.whereHas(relation, callback)` | Filter by conditions on a related model |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)` | Aggregates — the `aggregate-data` topic |
-| `.distinct(field)` / `.pluck(field)` | Single-field reads (distinct values, flat list) |
-| `.chunk(size, callback)` | Stream a large table in batches |
-| `.cursorPaginate({ limit, cursor })` | Cursor pagination — the `paginate-results` topic |
-| `.similarTo(column, embedding)` | Vector similarity — the `search-by-vector` topic |
+| Reach for                                                                              | When                                                        |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `.whereIn(field, values)` / `.whereNotIn(field, values)`                               | Match against / exclude a list                              |
+| `.whereNull(field)` / `.whereNotNull(field)`                                           | Nullability checks                                          |
+| `.whereBetween(field, [a, b])`                                                         | Inclusive range                                             |
+| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers                                                |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`  | Pattern matching — see below for literal-vs-regex semantics |
+| `.whereHas(relation, callback)`                                                        | Filter by conditions on a related model                     |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                          | Aggregates — the `aggregate-data` topic                     |
+| `.distinct(field)` / `.pluck(field)`                                                   | Single-field reads (distinct values, flat list)             |
+| `.chunk(size, callback)`                                                               | Stream a large table in batches                             |
+| `.cursorPaginate({ limit, cursor })`                                                   | Cursor pagination — the `paginate-results` topic            |
+| `.similarTo(column, embedding)`                                                        | Vector similarity — the `search-by-vector` topic            |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 

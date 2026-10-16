@@ -133,15 +133,15 @@ router.restfulResource("/users", new UsersRestful());
 
 This registers:
 
-| Path        | Verb     | Method        |
-| ----------- | -------- | ------------- |
-| `/users`    | `GET`    | `list()`      |
-| `/users/:id`| `GET`    | `get()`       |
-| `/users`    | `POST`   | `create()`    |
-| `/users/:id`| `PUT`    | `update()`    |
-| `/users/:id`| `PATCH`  | `patch()`     |
-| `/users/:id`| `DELETE` | `delete()`    |
-| `/users`    | `DELETE` | `bulkDelete()`|
+| Path         | Verb     | Method         |
+| ------------ | -------- | -------------- |
+| `/users`     | `GET`    | `list()`       |
+| `/users/:id` | `GET`    | `get()`        |
+| `/users`     | `POST`   | `create()`     |
+| `/users/:id` | `PUT`    | `update()`     |
+| `/users/:id` | `PATCH`  | `patch()`      |
+| `/users/:id` | `DELETE` | `delete()`     |
+| `/users`     | `DELETE` | `bulkDelete()` |
 
 `bulkDelete` expects an array of ids in the `id` field; it 400s otherwise. All actions except `bulkDelete` only register when the corresponding method is defined on the class — `Restful` provides them all by default.
 
@@ -176,11 +176,11 @@ router.restfulResource("/users", new UsersRestful(), {
 
 Override any of these `protected async` methods:
 
-| Hook                            | When                                      |
-| ------------------------------- | ----------------------------------------- |
-| `beforeCreate(request, response, model)` | New model instance, before `create`       |
-| `onCreate(request, response, record)`    | After successful `create`                 |
-| `beforeUpdate(request, response, record, old?)` | Before `update`                    |
+| Hook                                            | When                                |
+| ----------------------------------------------- | ----------------------------------- |
+| `beforeCreate(request, response, model)`        | New model instance, before `create` |
+| `onCreate(request, response, record)`           | After successful `create`           |
+| `beforeUpdate(request, response, record, old?)` | Before `update`                     |
 | `onUpdate(request, response, record, old)`      | After successful `update`           |
 | `beforePatch(request, response, record, old?)`  | Before `patch`                      |
 | `onPatch(request, response, record, old)`       | After successful `patch`            |

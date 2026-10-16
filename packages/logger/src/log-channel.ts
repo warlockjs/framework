@@ -1,9 +1,4 @@
-import type {
-  BasicLogConfigurations,
-  LogContract,
-  LoggingData,
-  RedactConfig,
-} from "./types";
+import type { BasicLogConfigurations, LogContract, LoggingData, RedactConfig } from "./types";
 
 export abstract class LogChannel<
   Options extends BasicLogConfigurations = BasicLogConfigurations,
@@ -64,9 +59,7 @@ export abstract class LogChannel<
    * Get config value
    */
   protected config<K extends keyof Options>(key: K): Options[K] {
-    return (
-      this.channelConfigurations[key] ?? (this.defaultConfigurations ?? {})[key]
-    );
+    return this.channelConfigurations[key] ?? (this.defaultConfigurations ?? {})[key];
   }
 
   /**
@@ -88,8 +81,7 @@ export abstract class LogChannel<
     // check for debug mode
     const allowedLevels = this.config("levels");
 
-    if (allowedLevels?.length && !allowedLevels.includes(data.type))
-      return false;
+    if (allowedLevels?.length && !allowedLevels.includes(data.type)) return false;
 
     const filter = this.config("filter");
 

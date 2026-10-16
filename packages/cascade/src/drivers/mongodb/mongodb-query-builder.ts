@@ -1501,7 +1501,9 @@ export class MongoQueryBuilder<T = unknown>
   public cursor(after?: unknown, before?: unknown): this {
     void after;
     void before;
-    throw new Error("cursor() is not supported by the MongoDB driver; use where() with limit() instead.");
+    throw new Error(
+      "cursor() is not supported by the MongoDB driver; use where() with limit() instead.",
+    );
   }
 
   // ============================================================================

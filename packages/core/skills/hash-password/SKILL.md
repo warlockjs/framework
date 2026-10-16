@@ -31,7 +31,7 @@ import type { EncryptionConfigurations } from "@warlock.js/core";
 
 const encryptionConfig: EncryptionConfigurations = {
   password: {
-    salt: 12,    // bcrypt rounds — 10–12 is the standard band
+    salt: 12, // bcrypt rounds — 10–12 is the standard band
   },
   // ...other crypto config (key/hmacKey for encrypt/decrypt — see encrypt-data skill)
 };
@@ -117,7 +117,7 @@ await user.save({ password: await hashPassword(newPassword) });
 If the model uses `useHashedPassword()`, you can skip the explicit `hashPassword` call:
 
 ```ts
-await user.save({ password: newPassword });  // transformer hashes on save
+await user.save({ password: newPassword }); // transformer hashes on save
 ```
 
 The transformer detects that the field is changing and re-hashes.

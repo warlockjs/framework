@@ -12,14 +12,14 @@ Dedicated accessor for ordered collections — queues, recent-N buffers, sliding
 ```ts
 const recent = cache.list<Event>("recent-events");
 
-await recent.push(event);                    // append to tail — returns new length
-await recent.unshift(priorityEvent);          // prepend to head — returns new length
-const tail = await recent.pop();              // remove + return tail
-const head = await recent.shift();            // remove + return head
-const first10 = await recent.slice(0, 10);    // view — does not mutate
+await recent.push(event); // append to tail — returns new length
+await recent.unshift(priorityEvent); // prepend to head — returns new length
+const tail = await recent.pop(); // remove + return tail
+const head = await recent.shift(); // remove + return head
+const first10 = await recent.slice(0, 10); // view — does not mutate
 const all = await recent.all();
 const count = await recent.length();
-await recent.trim(0, 99);                     // keep only indices 0..99 inclusive
+await recent.trim(0, 99); // keep only indices 0..99 inclusive
 await recent.clear();
 ```
 
@@ -31,8 +31,8 @@ The generic flows through every method. Pass the element type at the accessor ca
 type Event = { type: string; at: number };
 const queue = cache.list<Event>("jobs:queue");
 
-await queue.push({ type: "import", at: Date.now() });   // ✓
-await queue.push("not an event" as never);              // ✗ at the caller
+await queue.push({ type: "import", at: Date.now() }); // ✓
+await queue.push("not an event" as never); // ✗ at the caller
 ```
 
 ## Current performance characteristics
@@ -54,7 +54,7 @@ When a list becomes empty (e.g. after successive `pop()` / `shift()` / `trim(0, 
 ```ts
 await recent.push("a");
 await recent.pop();
-await cache.get("recent-events");   // null, not []
+await cache.get("recent-events"); // null, not []
 ```
 
 ## Typical recipes
@@ -62,18 +62,18 @@ await cache.get("recent-events");   // null, not []
 ```ts
 // Recent-N audit log
 const audit = cache.list<AuditEntry>("audit:recent");
-await audit.unshift(entry);          // newest at head
-await audit.trim(0, 999);             // keep most-recent 1000
+await audit.unshift(entry); // newest at head
+await audit.trim(0, 999); // keep most-recent 1000
 
 // Lightweight job queue (single-node)
 const queue = cache.list<Job>("jobs:pending");
 await queue.push(job);
-const next = await queue.shift();     // FIFO
+const next = await queue.shift(); // FIFO
 
 // Stack
 const stack = cache.list<Frame>("stack");
 await stack.push(frame);
-const top = await stack.pop();        // LIFO
+const top = await stack.pop(); // LIFO
 ```
 
 ## What lists are NOT for

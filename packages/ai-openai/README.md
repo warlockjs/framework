@@ -68,9 +68,9 @@ openai.embedder({ name: "text-embedding-3-large", dimensions: 256 });
 
 `OpenAIModel` declares:
 
-| Capability         | Default                                                                |
-| ------------------ | ---------------------------------------------------------------------- |
-| `structuredOutput` | `true` — schemas forwarded as `response_format: json_schema, strict`   |
+| Capability         | Default                                                                 |
+| ------------------ | ----------------------------------------------------------------------- |
+| `structuredOutput` | `true` — schemas forwarded as `response_format: json_schema, strict`    |
 | `vision`           | Auto-inferred from model name; pass `vision: true \| false` to override |
 
 Vision auto-inference matches model name prefixes: `gpt-4o`, `gpt-4-turbo`, `gpt-4.1`, `o1`, `o3`, `chatgpt-4o`. Unknown models default to `vision: false` so unsupported requests fail with a clear capability error rather than an opaque OpenAI 400.

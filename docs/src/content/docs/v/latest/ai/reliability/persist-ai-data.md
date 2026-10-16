@@ -71,9 +71,9 @@ import { ai } from "@warlock.js/ai";
 import { cache } from "@warlock.js/cache";
 
 ai.config({
-  defaultSnapshotStore: ai.snapshot.redis({ client: redisClient }),    // workflow/supervisor/orchestrator resume
+  defaultSnapshotStore: ai.snapshot.redis({ client: redisClient }), // workflow/supervisor/orchestrator resume
   defaultCheckpointStore: ai.checkpoint.redis({ client: redisClient }), // orchestrator session state
-  defaultStore: cache.driver("pg", { client: pgPool }),                 // semanticCache + memory vector store
+  defaultStore: cache.driver("pg", { client: pgPool }), // semanticCache + memory vector store
 });
 ```
 
@@ -83,21 +83,21 @@ Every consumer that doesn't supply its own store picks the matching default up. 
 
 Each store factory ships three tiers, mirroring the cache drivers:
 
-| Tier | Constructor | Durability | Fits |
-| --- | --- | --- | --- |
-| `memory` | `ai.snapshot.memory()` / `ai.checkpoint.memory()` | Process-local `Map`, volatile | Dev / tests / single-process |
-| `redis` | `ai.snapshot.redis({ client })` / `ai.checkpoint.redis({ client })` | Durable, cross-process | Production |
-| `pg` | `ai.snapshot.pg({ client })` / `ai.checkpoint.pg({ client })` | Durable, cross-process | Production |
+| Tier     | Constructor                                                         | Durability                    | Fits                         |
+| -------- | ------------------------------------------------------------------- | ----------------------------- | ---------------------------- |
+| `memory` | `ai.snapshot.memory()` / `ai.checkpoint.memory()`                   | Process-local `Map`, volatile | Dev / tests / single-process |
+| `redis`  | `ai.snapshot.redis({ client })` / `ai.checkpoint.redis({ client })` | Durable, cross-process        | Production                   |
+| `pg`     | `ai.snapshot.pg({ client })` / `ai.checkpoint.pg({ client })`       | Durable, cross-process        | Production                   |
 
 You pass your own `pg` / `redis` client in — `@warlock.js/ai` takes no peer dependency on either; the same pool can back both the cache and these stores. **Schema is never auto-migrated** — each store exposes `.schema()`, a DDL string you run through your own migration tool.
 
 For the semantic-cache and memory vector store, pick a `@warlock.js/cache` driver instead:
 
-| Driver | `similar()` | Fits |
-| --- | --- | --- |
-| `memory` / `lru-memory` | yes (brute force, O(N)) | Dev / tests |
-| `pg` | yes (pgvector) | Production semantic cache / memory |
-| `redis` | RediSearch (separate phase) | Production KV |
+| Driver                  | `similar()`                 | Fits                               |
+| ----------------------- | --------------------------- | ---------------------------------- |
+| `memory` / `lru-memory` | yes (brute force, O(N))     | Dev / tests                        |
+| `pg`                    | yes (pgvector)              | Production semantic cache / memory |
+| `redis`                 | RediSearch (separate phase) | Production KV                      |
 
 ## Snapshot resume — workflow and supervisor
 
@@ -126,7 +126,7 @@ const sup = ai.supervisor({
 type WorkflowSnapshot = {
   runId: string;
   workflowName: string;
-  signature: string;             // structural fingerprint
+  signature: string; // structural fingerprint
   version?: string;
   input: unknown;
   state: Record<string, unknown>;
@@ -211,7 +211,7 @@ if (snapshot) {
   snapshot.steps.newName = snapshot.steps.oldName;
   delete snapshot.steps.oldName;
   snapshot.signature = wf.signature;
-  await store.save(snapshot);   // key is derived from snapshot.runId
+  await store.save(snapshot); // key is derived from snapshot.runId
   await wf.resume("ticket-123");
 }
 ```
@@ -247,10 +247,11 @@ The orchestrator adds a second store — a `CheckpointStore` for cross-turn **se
 ```ts
 const supportBot = ai.orchestrator({
   name: "refund-support",
-  intents, route,
+  intents,
+  route,
   iterate: true,
-  checkpointStore: ai.checkpoint.pg({ client: pgPool }),   // session state, one row per turn
-  snapshotStore: ai.snapshot.pg({ client: pgPool }),       // mid-turn supervisor run
+  checkpointStore: ai.checkpoint.pg({ client: pgPool }), // session state, one row per turn
+  snapshotStore: ai.snapshot.pg({ client: pgPool }), // mid-turn supervisor run
 });
 ```
 

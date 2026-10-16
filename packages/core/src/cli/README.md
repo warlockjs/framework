@@ -4,20 +4,20 @@ Command-line interface system. Parses CLI arguments, discovers commands from the
 
 ## Key Files
 
-| File                        | Purpose                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| `cli-command.ts`            | `CliCommand` base class — defines command name, options, handler                                 |
-| `cli-commands.manager.ts`   | `CliCommandsManager` — registers, resolves, and runs commands; includes fuzzy matching for typos |
-| `cli-commands.utils.ts`     | Utility functions for CLI output formatting                                                      |
-| `parse-cli-args.ts`         | Parses raw `process.argv` into structured command + flags                                        |
-| `commands-loader.ts`        | Discovers and loads commands from framework + project                                            |
-| `framework-cli-commands.ts` | Registers all built-in framework commands                                                        |
-| `migration-renames.ts`      | Mechanical request-surface rename list for the v5 migration CLI                                  |
-| `start.ts`                  | Entry point that kicks off CLI processing                                                        |
-| `string-similarity.ts`      | Fuzzy string matching for "did you mean?" suggestions                                            |
-| `types.ts`                  | CLI-related TypeScript types                                                                     |
-| `commands/`                 | Built-in command implementations (migrate, seed, generate, etc.)                                 |
-| `commands/routes.command.ts` | Defines `routesCommand` (`warlock routes`) and `routesDiffCommand` (`warlock routes:diff`)      |
+| File                                    | Purpose                                                                                                                                                                                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cli-command.ts`                        | `CliCommand` base class — defines command name, options, handler                                                                                                                                                                                   |
+| `cli-commands.manager.ts`               | `CliCommandsManager` — registers, resolves, and runs commands; includes fuzzy matching for typos                                                                                                                                                   |
+| `cli-commands.utils.ts`                 | Utility functions for CLI output formatting                                                                                                                                                                                                        |
+| `parse-cli-args.ts`                     | Parses raw `process.argv` into structured command + flags                                                                                                                                                                                          |
+| `commands-loader.ts`                    | Discovers and loads commands from framework + project                                                                                                                                                                                              |
+| `framework-cli-commands.ts`             | Registers all built-in framework commands                                                                                                                                                                                                          |
+| `migration-renames.ts`                  | Mechanical request-surface rename list for the v5 migration CLI                                                                                                                                                                                    |
+| `start.ts`                              | Entry point that kicks off CLI processing                                                                                                                                                                                                          |
+| `string-similarity.ts`                  | Fuzzy string matching for "did you mean?" suggestions                                                                                                                                                                                              |
+| `types.ts`                              | CLI-related TypeScript types                                                                                                                                                                                                                       |
+| `commands/`                             | Built-in command implementations (migrate, seed, generate, etc.)                                                                                                                                                                                   |
+| `commands/routes.command.ts`            | Defines `routesCommand` (`warlock routes`) and `routesDiffCommand` (`warlock routes:diff`)                                                                                                                                                         |
 | `commands/routes/routes-diff.action.ts` | `routesDiffCommandAction()` — compares live page routes against the last `warlock build`'s `page-routes.manifest.json` snapshot in `resolveBuildConfig().outdir`; boots diagnostically via `bootForDiagnostics()`, throws (non-zero exit) on drift |
 
 ## Key Exports

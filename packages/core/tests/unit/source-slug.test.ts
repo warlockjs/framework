@@ -3,15 +3,11 @@ import { sourceSlug } from "../../src/dev-server/loader/source-slug";
 
 describe("sourceSlug", () => {
   it("uses the last three path segments without extension", () => {
-    expect(sourceSlug("D:/proj/src/app/vectors/utils/locales.ts")).toBe(
-      "vectors-utils-locales",
-    );
+    expect(sourceSlug("D:/proj/src/app/vectors/utils/locales.ts")).toBe("vectors-utils-locales");
   });
 
   it("normalizes Windows backslashes", () => {
-    expect(sourceSlug("D:\\proj\\src\\app\\users\\user.model.ts")).toBe(
-      "app-users-user-model",
-    );
+    expect(sourceSlug("D:\\proj\\src\\app\\users\\user.model.ts")).toBe("app-users-user-model");
   });
 
   it("strips .ts/.tsx/.js/.mjs/.cts extensions (last 3 segments)", () => {

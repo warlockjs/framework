@@ -33,22 +33,24 @@ If a rule fails, transformers don't run. If a leaf validator's chain failed and 
 
 ```ts
 // trim BEFORE length check — use a mutator
-v.string().addMutator(s => s.trim()).min(3)
+v.string()
+  .addMutator((s) => s.trim())
+  .min(3);
 // "  Hi  " → mutator trims → "Hi" → fails min(3)
 
 // trim only the OUTPUT — use a transformer (.trim() on string is a transformer)
-v.string().min(3).trim()
+v.string().min(3).trim();
 // "  Hi  " → rules see "  Hi  " (length 6, passes) → trim → result.data = "Hi"
 ```
 
-The number family ships a built-in numeric-string mutator behind **`.coerce()`** (5.9+): `v.int().coerce()` parses a numeric-shaped string to a number *before* the type rule runs, so `"3"` passes while `v.int()` stays strict by default. See [Coerce query params](../recipes/coerce-query-params.md).
+The number family ships a built-in numeric-string mutator behind **`.coerce()`** (5.9+): `v.int().coerce()` parses a numeric-shaped string to a number _before_ the type rule runs, so `"3"` passes while `v.int()` stays strict by default. See [Coerce query params](../recipes/coerce-query-params.md).
 
 ## `.optional()` / `.required()` / `.present()`
 
 ```ts
-v.string()             // required by default inside v.object
-v.string().optional()  // type: string | undefined — caller may omit
-v.string().present()   // must exist (key present), may be "" or null
+v.string(); // required by default inside v.object
+v.string().optional(); // type: string | undefined — caller may omit
+v.string().present(); // must exist (key present), may be "" or null
 ```
 
 **Required is the default inside `v.object`.** Skip `.required()` — the inferred type already shows what's required (no `?`) vs optional (`?`). The canonical seal style relies on `.optional()` standing out.
@@ -72,34 +74,34 @@ Conditional variants (run inside `v.object` only — sibling resolution needs a 
 ## `.nullable()` / `.nullish()`
 
 ```ts
-v.string().nullable()  // type: string | null
-v.string().nullish()   // sugar for .optional().nullable()
+v.string().nullable(); // type: string | null
+v.string().nullish(); // sugar for .optional().nullable()
 ```
 
-Independent of optional — a field can be required *and* nullable (must be present, but `null` is a valid value). The `{ isNullable: true }` brand widens both `Infer.Input` and `Infer.Output` with `| null`.
+Independent of optional — a field can be required _and_ nullable (must be present, but `null` is a valid value). The `{ isNullable: true }` brand widens both `Infer.Input` and `Infer.Output` with `| null`.
 
 ## `.default(value | callback)`
 
 ```ts
-v.string().default("guest")
-v.int().default(0)
-v.date().default(() => new Date())   // lazy — fresh on each validation
-v.array(v.string()).default([])
+v.string().default("guest");
+v.int().default(0);
+v.date().default(() => new Date()); // lazy — fresh on each validation
+v.array(v.string()).default([]);
 ```
 
 If the input is `undefined` (or the key absent), the default fires and rules run against it. Pass a callback for fresh-per-validation values.
 
-**Defaults still run through rules.** `v.string().min(3).default("a")` fails because `"a"` is shorter than 3. The default is a fallback for *absent* input, not for *invalid* input.
+**Defaults still run through rules.** `v.string().min(3).default("a")` fails because `"a"` is shorter than 3. The default is a fallback for _absent_ input, not for _invalid_ input.
 
 ```ts
-v.date().defaultNow()   // sugar for .default(() => new Date())
+v.date().defaultNow(); // sugar for .default(() => new Date())
 ```
 
 The `{ hasDefault: true }` brand makes the key optional in `Infer.Input` (caller doesn't have to send it) and required in `Infer.Output` (`result.data` always has it).
 
 ## `.catch(fallback)`
 
-Rescues *failed* validation by substituting a fallback. The complement to `.default()`:
+Rescues _failed_ validation by substituting a fallback. The complement to `.default()`:
 
 - `.default(x)` fires when input is **absent**.
 - `.catch(y)` fires when input is **present but invalid**.
@@ -117,10 +119,12 @@ await validate(config, { retries: "five", region: null });
 The fallback can be a value or a callback `(errors, originalInput) => fallback` — the callback variant is the only side-channel for the swallowed errors. Log/alert before substituting:
 
 ```ts
-v.string().uuid().catch((errors, input) => {
-  log.warn(`bad uuid: ${JSON.stringify(input)}`, { errors });
-  return ANONYMOUS_USER_ID;
-});
+v.string()
+  .uuid()
+  .catch((errors, input) => {
+    log.warn(`bad uuid: ${JSON.stringify(input)}`, { errors });
+    return ANONYMOUS_USER_ID;
+  });
 ```
 
 **Leaf-only in v1.** `.catch()` is honoured for **leaf validators** (string, number, boolean, date, …) and for fields inside containers. It's a **no-op on container validators themselves** (`v.object`, `v.array`, `v.record`, `v.tuple`, `v.discriminatedUnion`). To rescue a whole-container failure, wrap the `validate()` call in your own try/catch.
@@ -131,13 +135,13 @@ v.string().uuid().catch((errors, input) => {
 
 Three failure modes, three different rescue mechanisms:
 
-| Input state | Rescued by | What appears in `result.data` |
-| --- | --- | --- |
-| Field absent | `.default(x)` | `x` |
-| Field absent, no default | `.optional()` | Key **omitted entirely** |
-| Field present and invalid | `.catch(y)` | `y` |
-| Field is `null` | `.nullable()` | `null` |
-| Field present, empty (`""`, `[]`, `{}`) | (none needed) | Preserved as-is |
+| Input state                             | Rescued by    | What appears in `result.data` |
+| --------------------------------------- | ------------- | ----------------------------- |
+| Field absent                            | `.default(x)` | `x`                           |
+| Field absent, no default                | `.optional()` | Key **omitted entirely**      |
+| Field present and invalid               | `.catch(y)`   | `y`                           |
+| Field is `null`                         | `.nullable()` | `null`                        |
+| Field present, empty (`""`, `[]`, `{}`) | (none needed) | Preserved as-is               |
 
 The "absent vs present-empty" distinction matters when you persist the result. A Mongo document with `tags: []` and one with no `tags` key respond differently to `$exists` queries. Seal preserves the distinction faithfully — absent stays absent, empty stays empty.
 
@@ -146,10 +150,11 @@ const schema = v.object({
   tags: v.array(v.string()).optional(),
 });
 
-(await validate(schema, {})).data
-// → {} — `tags` key is NOT present
+(await validate(schema, {}))
+  .data
+  // → {} — `tags` key is NOT present
 
-(await validate(schema, { tags: [] })).data
+  (await validate(schema, { tags: [] })).data;
 // → { tags: [] } — present-empty preserved
 ```
 
@@ -160,12 +165,12 @@ The [optional fields recipe](../recipes/optional-fields.md) has the full truth t
 Available on every primitive (`v.string`, `v.number`, `v.int`, `v.float`, `v.boolean`, `v.scalar`):
 
 ```ts
-v.string().in(["admin", "user", "guest"])   // value must match one
-v.string().oneOf(["a", "b"])                // alias for .in
-v.string().notIn(["banned", "blocked"])     // value must NOT match
-v.string().forbids(["banned"])              // alias for .notIn
-v.number().allowsOnly([1, 2, 3])            // strict allowlist
-v.string().enum(MyTSEnum)                   // accepts a TS enum via Object.values
+v.string().in(["admin", "user", "guest"]); // value must match one
+v.string().oneOf(["a", "b"]); // alias for .in
+v.string().notIn(["banned", "blocked"]); // value must NOT match
+v.string().forbids(["banned"]); // alias for .notIn
+v.number().allowsOnly([1, 2, 3]); // strict allowlist
+v.string().enum(MyTSEnum); // accepts a TS enum via Object.values
 ```
 
 For literal-typed narrowing, use `v.literal(...)` — `oneOf` keeps the broader primitive type.
@@ -179,14 +184,14 @@ v.object({
 });
 ```
 
-`.omit()` keeps the field in *validation* but drops it from `result.data` and from `Infer<>`. Use for confirmation/checksum fields that exist only for cross-field rules.
+`.omit()` keeps the field in _validation_ but drops it from `result.data` and from `Infer<>`. Use for confirmation/checksum fields that exist only for cross-field rules.
 
 ## `.label("Display Name")` — field display name
 
 ```ts
 v.object({
   email_address: v.string().label("Email Address"),
-})
+});
 // Error: "The Email Address is required" instead of "The email_address is required"
 ```
 

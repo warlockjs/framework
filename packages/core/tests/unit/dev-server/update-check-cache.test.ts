@@ -18,8 +18,12 @@ vi.mock("../../../src/utils/paths", () => ({
   warlockPath: (...parts: string[]) => ["/project/.warlock", ...parts].join("/"),
 }));
 
-const { CACHE_TTL_MS, clearCachedLatestVersion, readCachedLatestVersion, writeCachedLatestVersion } =
-  await import("../../../src/dev-server/update-check-cache");
+const {
+  CACHE_TTL_MS,
+  clearCachedLatestVersion,
+  readCachedLatestVersion,
+  writeCachedLatestVersion,
+} = await import("../../../src/dev-server/update-check-cache");
 
 const NOW = 1_800_000_000_000;
 
@@ -59,8 +63,10 @@ describe("update-check cache", () => {
       ["malformed json", () => getJsonFileAsync.mockRejectedValue(new SyntaxError("bad json"))],
       ["a missing timestamp", () => getJsonFileAsync.mockResolvedValue({ latest: "4.9.0" })],
       ["a missing version", () => getJsonFileAsync.mockResolvedValue({ checkedAt: NOW })],
-      ["a non-string version", () =>
-        getJsonFileAsync.mockResolvedValue({ checkedAt: NOW, latest: 49 })],
+      [
+        "a non-string version",
+        () => getJsonFileAsync.mockResolvedValue({ checkedAt: NOW, latest: 49 }),
+      ],
       ["a non-object payload", () => getJsonFileAsync.mockResolvedValue("nope")],
     ])("survives %s", async (_label, arrange) => {
       arrange();

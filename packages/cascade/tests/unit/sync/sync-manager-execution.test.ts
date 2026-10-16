@@ -46,7 +46,7 @@ describe("SyncManager — execution", () => {
 describe("PostgresDriver — sync instructions", () => {
   const driver = () => new PostgresDriver({} as any) as any;
 
-  it("translates a positional $set to a jsonb array rewrite, not a \"tags.$\" column", () => {
+  it('translates a positional $set to a jsonb array rewrite, not a "tags.$" column', () => {
     const { sql, params } = driver().buildSyncStatement(instruction("posts", 5));
 
     expect(sql).not.toContain('"tags.$"');

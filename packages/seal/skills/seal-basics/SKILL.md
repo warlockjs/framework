@@ -5,7 +5,7 @@ description: "Start here for @warlock.js/seal schemas, validation, parsing, and 
 
 # Validate with seal
 
-Schema-first validation. Single entry point: the `v` factory. Every validator chains, composes, and infers. Schemas double as runtime validators *and* type-level shapes via `Infer<typeof schema>`, and ship `~standard` so any Standard-Schema-aware consumer accepts them directly.
+Schema-first validation. Single entry point: the `v` factory. Every validator chains, composes, and infers. Schemas double as runtime validators _and_ type-level shapes via `Infer<typeof schema>`, and ship `~standard` so any Standard-Schema-aware consumer accepts them directly.
 
 > This skill is the seal **map** — read it first, then load the specific skill for the task.
 
@@ -33,9 +33,9 @@ type User = Infer<typeof userSchema>;
 
 const result = await validate(userSchema, input);
 if (result.isValid) {
-  result.data;      // typed, post-transformer
+  result.data; // typed, post-transformer
 } else {
-  result.errors;    // [{ type, error, input }, ...]
+  result.errors; // [{ type, error, input }, ...]
 }
 ```
 
@@ -91,13 +91,13 @@ const schema = v.object({
   status: v.enum(Status).optional().default(Status.ACTIVE),
 });
 
-type In  = Infer.Input<typeof schema>;
+type In = Infer.Input<typeof schema>;
 // { email?: string; status?: Status }     ← caller may omit both
 
 type Out = Infer.Output<typeof schema>;
 // { email?: string; status: Status }      ← default fired for status
 
-type Default = Infer<typeof schema>;       // alias for Infer.Input
+type Default = Infer<typeof schema>; // alias for Infer.Input
 ```
 
 Both flavours widen with `| null` when `.nullable()` is set.
@@ -109,15 +109,15 @@ Both flavours widen with `| null` when `.nullable()` is set.
 
 ## Pick a skill
 
-| If the task is about… | Load |
-| --- | --- |
-| Picking the right primitive (`v.string` vs `v.scalar`, `v.literal` vs `v.enum`, `v.date` vs `v.instanceof(Date)`) | The `pick-seal-primitive` topic |
-| Building object / array / record / tuple / union schemas, discriminated unions, recursive schemas | The `define-structural-shape` topic |
-| Modifiers — `.required` / `.optional` / `.nullable` / `.default` / `.catch` / `.omit`, transformer vs mutator pipelines, membership rules | The `compose-seal-modifiers` topic |
-| Reading `ValidationResult`, branching on `error.type`, error message customization, translation | The `handle-seal-errors` topic |
-| Generating JSON Schema for OpenAI strict / OpenAPI / draft-07 | The `generate-json-schema` topic |
-| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, object input/output class parameters and primitive factory intersections, `Result<unknown>` errors | The `bridge-standard-schema` topic |
-| Authoring custom seal plugins to add validator methods | The `extend-seal-with-plugins` topic |
+| If the task is about…                                                                                                                                         | Load                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Picking the right primitive (`v.string` vs `v.scalar`, `v.literal` vs `v.enum`, `v.date` vs `v.instanceof(Date)`)                                             | The `pick-seal-primitive` topic      |
+| Building object / array / record / tuple / union schemas, discriminated unions, recursive schemas                                                             | The `define-structural-shape` topic  |
+| Modifiers — `.required` / `.optional` / `.nullable` / `.default` / `.catch` / `.omit`, transformer vs mutator pipelines, membership rules                     | The `compose-seal-modifiers` topic   |
+| Reading `ValidationResult`, branching on `error.type`, error message customization, translation                                                               | The `handle-seal-errors` topic       |
+| Generating JSON Schema for OpenAI strict / OpenAPI / draft-07                                                                                                 | The `generate-json-schema` topic     |
+| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, object input/output class parameters and primitive factory intersections, `Result<unknown>` errors | The `bridge-standard-schema` topic   |
+| Authoring custom seal plugins to add validator methods                                                                                                        | The `extend-seal-with-plugins` topic |
 
 ## Things NOT to do
 

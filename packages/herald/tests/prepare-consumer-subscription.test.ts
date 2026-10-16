@@ -129,9 +129,7 @@ describe("prepareConsumerSubscription", () => {
       }
     }
 
-    const callback = prepareConsumerSubscription(
-      CoercingConsumer as unknown as EventConsumerClass,
-    );
+    const callback = prepareConsumerSubscription(CoercingConsumer as unknown as EventConsumerClass);
 
     await callback(createMessage({ payload: { value: 1 } }), createContext());
 

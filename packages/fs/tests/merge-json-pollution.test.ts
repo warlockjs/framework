@@ -54,7 +54,10 @@ describe("mergeJson — prototype pollution", () => {
     });
 
     await fs.files.putJson(at("shallow.json"), { a: 1 });
-    await fs.files.mergeJson(at("shallow.json"), JSON.parse('{"__proto__":{"isAdmin":true},"a":2}'));
+    await fs.files.mergeJson(
+      at("shallow.json"),
+      JSON.parse('{"__proto__":{"isAdmin":true},"a":2}'),
+    );
 
     for (const file of ["deep.json", "shallow.json"]) {
       expect(await fs.files.get(at(file))).not.toContain("__proto__");
@@ -92,9 +95,13 @@ describe("mergeJson — prototype pollution", () => {
   it("strips a dangerous key inside an array element", async () => {
     await fs.files.putJson(at("c.json"), { items: [] });
 
-    await fs.files.mergeJson(at("c.json"), JSON.parse('{"items":[{"__proto__":{"isAdmin":true}}]}'), {
-      deep: true,
-    });
+    await fs.files.mergeJson(
+      at("c.json"),
+      JSON.parse('{"items":[{"__proto__":{"isAdmin":true}}]}'),
+      {
+        deep: true,
+      },
+    );
 
     expect(({} as any).isAdmin).toBeUndefined();
     expect(await fs.files.get(at("c.json"))).not.toContain("__proto__");

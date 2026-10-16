@@ -13,7 +13,7 @@ Everything below is grounded in the real `ai.memory` surface — two v1 tiers, *
 
 ## Separate working scratch from semantic recall
 
-The two tiers exist because they answer different questions. **Working** memory is "what happened earlier in *this* run" — volatile, unscored, recalled by recency. **Semantic** memory is "what do we know about this user across *all* runs" — durable, embedded, recalled by meaning. Picking the wrong tier is the most common memory mistake: it either makes durable facts evaporate, or fills a permanent vector index with throwaway turn-by-turn chatter.
+The two tiers exist because they answer different questions. **Working** memory is "what happened earlier in _this_ run" — volatile, unscored, recalled by recency. **Semantic** memory is "what do we know about this user across _all_ runs" — durable, embedded, recalled by meaning. Picking the wrong tier is the most common memory mistake: it either makes durable facts evaporate, or fills a permanent vector index with throwaway turn-by-turn chatter.
 
 **Do this — route by lifetime.** A within-run note goes to `working`; a fact that must survive the session goes to `semantic`.
 
@@ -48,7 +48,7 @@ await mem.remember({ text: "User is allergic to shellfish.", tier: "semantic" })
 
 ## Remember durable facts and preferences, not raw transcripts
 
-The instinct is to remember the conversation. Don't. A raw transcript is the lowest-signal, highest-token thing you can store: it embeds badly (a whole turn is a blurry vector), it recalls poorly (the query rarely matches the phrasing), and it costs you on every recall. What you actually want back later is the *fact the turn established*, distilled to one line.
+The instinct is to remember the conversation. Don't. A raw transcript is the lowest-signal, highest-token thing you can store: it embeds badly (a whole turn is a blurry vector), it recalls poorly (the query rarely matches the phrasing), and it costs you on every recall. What you actually want back later is the _fact the turn established_, distilled to one line.
 
 **Do this — store the distilled fact.** One claim per memory, phrased the way you'd want to read it back.
 
@@ -72,7 +72,7 @@ await mem.remember({
 });
 ```
 
-When an orchestrator writes turns back for you, that write is the *settled outcome* (input plus the model's answer), and it is opt-in via `rememberTier` — so the durable accumulation is a deliberate choice, not a default that quietly fills your index:
+When an orchestrator writes turns back for you, that write is the _settled outcome_ (input plus the model's answer), and it is opt-in via `rememberTier` — so the durable accumulation is a deliberate choice, not a default that quietly fills your index:
 
 ```ts
 const assistant = ai.orchestrator({
@@ -137,7 +137,7 @@ const hits = await mem.recall("any dietary restrictions?", { scope: `user:${bobI
 
 Omitting `scope` is **not** a wildcard — an unscoped recall only ever sees unscoped entries, never a scoped one. `ai.orchestrator({ memory })` derives this automatically from the turn's `sessionId` (`memory.scope`, default `"session"` — see [Architecture — Memory](/v/latest/ai/architecture-concepts/memory/)), so wiring memory into an orchestrator is isolated out of the box; reach for `scope` explicitly only when you call `remember` / `recall` directly, outside an orchestrator turn.
 
-**`namespace` is a complementary, coarser tool** — it physically partitions keys in the underlying `@warlock.js/cache` driver, which is useful for routing different users/tenants to different stores or purging one tenant's data independently of the rest. `scope` is the finer, per-call boundary and the one that keeps one *shared* store's reads honest; use `namespace` on top of it, not instead of it, when you need physical separation:
+**`namespace` is a complementary, coarser tool** — it physically partitions keys in the underlying `@warlock.js/cache` driver, which is useful for routing different users/tenants to different stores or purging one tenant's data independently of the rest. `scope` is the finer, per-call boundary and the one that keeps one _shared_ store's reads honest; use `namespace` on top of it, not instead of it, when you need physical separation:
 
 ```ts
 function memoryForUser(userId: string) {
@@ -189,7 +189,7 @@ await mem.clear("working");
 
 `clear(tier?)` with no argument wipes every tier; with a `tier` it scopes to one — `clear("working")` is the routine session-teardown call, leaving semantic recall intact.
 
-**Avoid this — letting the durable tiers grow unbounded.** Because **decay / forgetting is still deferred**, nothing evicts a stale semantic (or episodic/procedural) memory for you today. A fact you stored a year ago still embeds, still matches, still costs tokens when it surfaces. Until decay ships, *you* own retention on the durable tiers: store fewer, higher-signal facts; overwrite a changing fact in place via a stable `id` rather than appending a new contradictory one; and periodically prune what no longer holds. The **working** tier is the one exception — it's size-bounded (`working: { maxItems }`, default `1000`, FIFO eviction) precisely because it has no durable backing store and no cap was a memory-exhaustion path for a long-lived shared process; see [Architecture — Memory](/v/latest/ai/architecture-concepts/memory/) for the eviction policy.
+**Avoid this — letting the durable tiers grow unbounded.** Because **decay / forgetting is still deferred**, nothing evicts a stale semantic (or episodic/procedural) memory for you today. A fact you stored a year ago still embeds, still matches, still costs tokens when it surfaces. Until decay ships, _you_ own retention on the durable tiers: store fewer, higher-signal facts; overwrite a changing fact in place via a stable `id` rather than appending a new contradictory one; and periodically prune what no longer holds. The **working** tier is the one exception — it's size-bounded (`working: { maxItems }`, default `1000`, FIFO eviction) precisely because it has no durable backing store and no cap was a memory-exhaustion path for a long-lived shared process; see [Architecture — Memory](/v/latest/ai/architecture-concepts/memory/) for the eviction policy.
 
 > **On the deferred tiers.** `MemoryTier` is intentionally closed to `"working" | "semantic"` in v1 — episodic ("what happened in past runs"), procedural ("how to do a recurring task"), and decay land in **4.4** as a non-breaking widening. Don't simulate episodic memory by dumping transcripts into semantic; that recreates exactly the noise this page warns against. Wait for the real tier.
 

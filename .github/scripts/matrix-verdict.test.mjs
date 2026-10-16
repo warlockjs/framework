@@ -81,7 +81,11 @@ test("a dependency job reporting failure fails the verdict even with green files
 });
 
 test("no expected rows at all -> failure, never a vacuous success", () => {
-  const { overall, problems } = computeVerdict({ expected: [], results: [], needsResults: okNeeds });
+  const { overall, problems } = computeVerdict({
+    expected: [],
+    results: [],
+    needsResults: okNeeds,
+  });
   assert.equal(overall, "failure");
   assert.ok(problems.some((p) => p.includes("no expected rows were planned")));
 });

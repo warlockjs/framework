@@ -52,8 +52,8 @@ Four endpoints, one base. Add a field to `userSchema` and it flows everywhere it
 Keep only some fields, or drop some fields. Inverses of each other. Both preserve the original's config (`allowUnknown`, etc.).
 
 ```ts
-userSchema.pick("email", "password");   // ObjectValidator<{ email; password }>
-userSchema.without("id", "password");   // ObjectValidator<{ name; email; role }>
+userSchema.pick("email", "password"); // ObjectValidator<{ email; password }>
+userSchema.without("id", "password"); // ObjectValidator<{ name; email; role }>
 ```
 
 ### `.partial(...keys?)` / `.requiredFields(...keys?)`
@@ -61,14 +61,14 @@ userSchema.without("id", "password");   // ObjectValidator<{ name; email; role }
 Flip fields to optional, or back to required. Pass specific keys, or none to apply to every field.
 
 ```ts
-userSchema.partial();                 // every field optional
-userSchema.partial("password");       // only password optional
-userSchema.partial().requiredFields("id", "email");  // all optional except id + email
+userSchema.partial(); // every field optional
+userSchema.partial("password"); // only password optional
+userSchema.partial().requiredFields("id", "email"); // all optional except id + email
 ```
 
 ### `.extend(schemaOrValidator)` — add fields, keep your config
 
-`.extend` bolts extra fields onto a clone and **keeps the original's configuration**. Handy for reusable field bundles like timestamps. If you pass another `ObjectValidator`, only its *schema* is used — its config is ignored.
+`.extend` bolts extra fields onto a clone and **keeps the original's configuration**. Handy for reusable field bundles like timestamps. If you pass another `ObjectValidator`, only its _schema_ is used — its config is ignored.
 
 ```ts
 const timestamps = v.object({
@@ -83,7 +83,7 @@ const userWithAudit = userSchema.extend(timestamps);
 
 ### `.merge(otherValidator)` — combine fields and config
 
-`.merge` is `.extend`'s heavier sibling: it merges both the schema **and** the configuration, with the *other* validator's config winning. Rules, mutators, transformers, and attribute display names from both are appended.
+`.merge` is `.extend`'s heavier sibling: it merges both the schema **and** the configuration, with the _other_ validator's config winning. Rules, mutators, transformers, and attribute display names from both are appended.
 
 ```ts
 const base = v.object({ name: v.string() }).allowUnknown();
@@ -94,7 +94,7 @@ const merged = base.merge(audit);
 // config: stripUnknown() from audit wins over base's allowUnknown()
 ```
 
-**`.extend` vs `.merge` in one line:** reach for `.extend` when you only want the *fields* from the other shape; reach for `.merge` when you also want its *behaviour*.
+**`.extend` vs `.merge` in one line:** reach for `.extend` when you only want the _fields_ from the other shape; reach for `.merge` when you also want its _behaviour_.
 
 ## Reusable field validators
 

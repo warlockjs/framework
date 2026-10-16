@@ -126,6 +126,6 @@ export function validateSitesAtBoot(config: {
   if (errors.length === 0) return;
 
   throw new Error(
-    `Invalid web.sites configuration:\n${errors.map(error => `- [${error.code}] ${error.message}`).join("\n")}`,
+    `Invalid web.sites configuration:\n${errors.map((error) => `- [${error.code}] ${error.message}`).join("\n")}`,
   );
 }

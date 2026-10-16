@@ -126,7 +126,7 @@ describe("afterCommit()", () => {
 
     await driver.transaction(async () => {
       afterCommit(async () => {
-        await new Promise(resolve => setTimeout(resolve, 5));
+        await new Promise((resolve) => setTimeout(resolve, 5));
         order.push(1);
       });
       afterCommit(() => {

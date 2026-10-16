@@ -166,7 +166,11 @@ async function writeHistory(name: string, result: UseCaseResult<any>) {
   const listKey = `use-case:history:${name}:list`;
 
   // Store a projection only: `output` and `ctx` (tokens, payloads) never reach the cache.
-  const projection = { ...result, output: undefined, ctx: undefined } as unknown as UseCaseResult<any>;
+  const projection = {
+    ...result,
+    output: undefined,
+    ctx: undefined,
+  } as unknown as UseCaseResult<any>;
 
   await cache.set(key, projection, ttl);
 

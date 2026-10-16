@@ -95,10 +95,7 @@ export class FileCacheDriver
    * name. Dots are left untouched — see {@link keyDirectory}.
    */
   protected encodeKeySegment(parsedKey: string): string {
-    return parsedKey
-      .replace(/%/g, "%25")
-      .replace(/\//g, "%2F")
-      .replace(/\\/g, "%5C");
+    return parsedKey.replace(/%/g, "%25").replace(/\//g, "%2F").replace(/\\/g, "%5C");
   }
 
   /**
@@ -109,10 +106,7 @@ export class FileCacheDriver
    * ones (see {@link keyDirectory}'s doc comment).
    */
   protected decodeKeySegment(encoded: string): string {
-    return encoded
-      .replace(/%2F/g, "/")
-      .replace(/%5C/g, "\\")
-      .replace(/%25/g, "%");
+    return encoded.replace(/%2F/g, "/").replace(/%5C/g, "\\").replace(/%25/g, "%");
   }
 
   /**
@@ -125,14 +119,8 @@ export class FileCacheDriver
     const resolved = path.resolve(base, segment);
     const relative = path.relative(base, resolved);
 
-    if (
-      relative === ".." ||
-      relative.startsWith(`..${path.sep}`) ||
-      path.isAbsolute(relative)
-    ) {
-      throw new CacheError(
-        `Cache key resolves outside the cache directory: "${segment}"`,
-      );
+    if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new CacheError(`Cache key resolves outside the cache directory: "${segment}"`);
     }
 
     return resolved;
@@ -207,7 +195,8 @@ export class FileCacheDriver
 
     this.log("caching", parsedKey);
 
-    const existing = onConflict === "upsert" || onConflict === "create" ? null : await this.get(key);
+    const existing =
+      onConflict === "upsert" || onConflict === "create" ? null : await this.get(key);
     const exists = existing !== null;
 
     if (onConflict === "update" && !exists) {
@@ -286,7 +275,9 @@ export class FileCacheDriver
         }
 
         const expired =
-          current?.expiresAt !== undefined && current.expiresAt !== null && current.expiresAt <= Date.now();
+          current?.expiresAt !== undefined &&
+          current.expiresAt !== null &&
+          current.expiresAt <= Date.now();
 
         if (current && !expired) {
           return { existing: current.data ?? null };

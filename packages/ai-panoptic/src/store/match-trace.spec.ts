@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { Trace } from "../contracts/trace.type";
 import { matchTrace } from "./match-trace";
 
-function trace(overrides: { traceId?: string; sessionId?: string; status?: ReportStatus; startedAt?: string } = {}): Trace {
+function trace(
+  overrides: {
+    traceId?: string;
+    sessionId?: string;
+    status?: ReportStatus;
+    startedAt?: string;
+  } = {},
+): Trace {
   const startedAt = overrides.startedAt ?? "2026-06-18T10:00:00.000Z";
 
   return {
@@ -48,8 +55,12 @@ describe("matchTrace", () => {
   it("filters by single status and status array", () => {
     expect(matchTrace(trace({ status: "failed" }), { status: "failed" })).toBe(true);
     expect(matchTrace(trace({ status: "failed" }), { status: "completed" })).toBe(false);
-    expect(matchTrace(trace({ status: "cancelled" }), { status: ["failed", "cancelled"] })).toBe(true);
-    expect(matchTrace(trace({ status: "completed" }), { status: ["failed", "cancelled"] })).toBe(false);
+    expect(matchTrace(trace({ status: "cancelled" }), { status: ["failed", "cancelled"] })).toBe(
+      true,
+    );
+    expect(matchTrace(trace({ status: "completed" }), { status: ["failed", "cancelled"] })).toBe(
+      false,
+    );
   });
 
   it("filters by inclusive time window with string or Date bounds", () => {
@@ -63,7 +74,11 @@ describe("matchTrace", () => {
   });
 
   it("ANDs all declared fields", () => {
-    const target = trace({ sessionId: "s1", status: "completed", startedAt: "2026-06-18T12:00:00.000Z" });
+    const target = trace({
+      sessionId: "s1",
+      status: "completed",
+      startedAt: "2026-06-18T12:00:00.000Z",
+    });
 
     expect(matchTrace(target, { sessionId: "s1", status: "completed" })).toBe(true);
     expect(matchTrace(target, { sessionId: "s1", status: "failed" })).toBe(false);

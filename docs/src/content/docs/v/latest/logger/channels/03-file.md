@@ -50,11 +50,11 @@ Error: Card declined
 
 The `chunk` option controls how entries split across files.
 
-| Value | Description | Example filename |
-| --- | --- | --- |
-| `"single"` | One file for all entries (default) | `app.log` |
-| `"daily"` | One file per calendar day | `15-03-2024.log` |
-| `"hourly"` | One file per hour | `15-03-2024-10-00-00-am.log` |
+| Value      | Description                        | Example filename             |
+| ---------- | ---------------------------------- | ---------------------------- |
+| `"single"` | One file for all entries (default) | `app.log`                    |
+| `"daily"`  | One file per calendar day          | `15-03-2024.log`             |
+| `"hourly"` | One file per hour                  | `15-03-2024-10-00-00-am.log` |
 
 ```ts
 // One file per day — good balance of granularity and file count

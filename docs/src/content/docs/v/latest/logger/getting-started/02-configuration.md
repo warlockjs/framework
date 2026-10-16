@@ -30,21 +30,19 @@ Replaces every existing channel with the supplied array. Use it for a clean slat
 ```ts
 import { log, FileLog } from "@warlock.js/logger";
 
-log.setChannels([
-  new FileLog({ storagePath: "./logs", chunk: "daily" }),
-]);
+log.setChannels([new FileLog({ storagePath: "./logs", chunk: "daily" })]);
 ```
 
 ### `configure({ channels, autoFlushOn, minLevel, redact })` — object-style setup
 
 Accepts an options object. Every field is optional — pass only what you want to change.
 
-| Field | Effect |
-| --- | --- |
-| `channels` | Replaces the channel list (same as `setChannels`). |
-| `autoFlushOn` | Installs process-level auto-flush handlers — see [Shutdown & flushing](../advanced/03-shutdown-and-flushing/). |
-| `minLevel` | Sets the logger-wide severity floor. Entries below this rank are dropped before fan-out. |
-| `redact` | Sets the logger-wide redaction floor — see [Redaction](../advanced/01-redaction/). A built-in secret-key denylist applies even if you never set this field. |
+| Field         | Effect                                                                                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `channels`    | Replaces the channel list (same as `setChannels`).                                                                                                          |
+| `autoFlushOn` | Installs process-level auto-flush handlers — see [Shutdown & flushing](../advanced/03-shutdown-and-flushing/).                                              |
+| `minLevel`    | Sets the logger-wide severity floor. Entries below this rank are dropped before fan-out.                                                                    |
+| `redact`      | Sets the logger-wide redaction floor — see [Redaction](../advanced/01-redaction/). A built-in secret-key denylist applies even if you never set this field. |
 
 ```ts
 import { log, ConsoleLog, FileLog } from "@warlock.js/logger";
@@ -126,17 +124,17 @@ Severity ranking: `debug < info ≈ success < warn < error < fatal`. Setting `mi
 
 `log.channel(name)` returns a previously registered channel instance, or `undefined` when no channel with that name is found.
 
-| Channel | `name` |
-| --- | --- |
-| `ConsoleLog` | `"console"` |
-| `FileLog` | `"file"` |
+| Channel       | `name`       |
+| ------------- | ------------ |
+| `ConsoleLog`  | `"console"`  |
+| `FileLog`     | `"file"`     |
 | `JSONFileLog` | `"fileJson"` |
 
 ```ts
 import { log } from "@warlock.js/logger";
 
 const consoleChannel = log.channel("console"); // ConsoleLog | undefined
-const fileChannel = log.channel("file");       // FileLog | undefined
+const fileChannel = log.channel("file"); // FileLog | undefined
 ```
 
 :::note

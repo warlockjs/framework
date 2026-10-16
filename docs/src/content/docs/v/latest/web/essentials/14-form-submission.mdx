@@ -15,7 +15,7 @@ export default function CreateOrder() {
   const createOrder = useSubmitForm({
     route: "orders.create",
     params: { customerId: "42" },
-    onSuccess: result => console.log(result.data),
+    onSuccess: (result) => console.log(result.data),
   });
 
   return <Form onSubmit={createOrder.submit}>{/* controls */}</Form>;
@@ -71,11 +71,11 @@ export default function Login() {
 
 `login.data` has the same type, or `null` until a request succeeds. With several declared 2xx statuses the body is the union of them. Read a declared body anywhere with the public types from `@warlock.js/web`:
 
-| Type                                | What it is                                                                                              |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `ApiResponse<Name, Status = 200>`   | The declared body for that status, or `unknown` when the route or the status is not declared (never `any`). |
-| `ApiResponses<Name>`                | The whole status-to-body map. Empty for an undeclared route or a `runtimeRoute` name.                   |
-| `ApiSuccessResponse<Name>`          | The union of the declared 2xx bodies, or `unknown` when there is none.                                  |
+| Type                              | What it is                                                                                                  |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `ApiResponse<Name, Status = 200>` | The declared body for that status, or `unknown` when the route or the status is not declared (never `any`). |
+| `ApiResponses<Name>`              | The whole status-to-body map. Empty for an undeclared route or a `runtimeRoute` name.                       |
+| `ApiSuccessResponse<Name>`        | The union of the declared 2xx bodies, or `unknown` when there is none.                                      |
 
 ```ts
 import type { ApiResponse } from "@warlock.js/web";

@@ -129,10 +129,10 @@ Class-form builders include `createTable()` / `createTableIfNotExists()`, `dropT
 `this.foreignId(name)` (5.8+) derives the column's type from `migrationDefaults.primaryKey` so a foreign-key column always matches the type of the `id` it points at, instead of hardcoding one:
 
 | `migrationDefaults.primaryKey` | `foreignId` produces |
-| --- | --- |
-| `uuid` | `uuid` column |
-| `bigInt` | `bigInteger` column |
-| anything else (default) | `integer` column |
+| ------------------------------ | -------------------- |
+| `uuid`                         | `uuid` column        |
+| `bigInt`                       | `bigInteger` column  |
+| anything else (default)        | `integer` column     |
 
 ```ts
 import { Migration } from "@warlock.js/cascade";

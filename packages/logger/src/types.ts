@@ -32,9 +32,7 @@ export type DebugMode = "daily" | "monthly" | "yearly" | "hourly";
  * (e.g. `"[REDACTED]"`) or a function that receives the original value plus
  * the dotted path it sits at and returns whatever should replace it.
  */
-export type RedactCensor =
-  | string
-  | ((value: any, path: string) => any);
+export type RedactCensor = string | ((value: any, path: string) => any);
 
 /**
  * Strip sensitive fields from log entries before they reach a channel.

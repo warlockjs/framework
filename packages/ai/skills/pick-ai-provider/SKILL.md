@@ -9,13 +9,13 @@ description: 'Choose an AI provider adapter — @warlock.js/ai-openai (shipped, 
 
 ## Available adapters
 
-| Package | Status | Notes |
-| --- | --- | --- |
-| `@warlock.js/ai-openai` | ✅ Shipped | OpenAI + any OpenAI-compatible gateway (OpenRouter, Together.ai, etc.) |
-| `@warlock.js/ai-anthropic` | ✅ Shipped | Native Claude API (Opus / Sonnet / Haiku) |
-| `@warlock.js/ai-bedrock` | ✅ Shipped | AWS Bedrock — Converse API + Titan embeddings |
-| `@warlock.js/ai-google` | ✅ Shipped | Gemini direct via `@google/genai`, native batch embeddings |
-| `@warlock.js/ai-ollama` | ✅ Shipped | Local models via the official `ollama` client |
+| Package                    | Status     | Notes                                                                  |
+| -------------------------- | ---------- | ---------------------------------------------------------------------- |
+| `@warlock.js/ai-openai`    | ✅ Shipped | OpenAI + any OpenAI-compatible gateway (OpenRouter, Together.ai, etc.) |
+| `@warlock.js/ai-anthropic` | ✅ Shipped | Native Claude API (Opus / Sonnet / Haiku)                              |
+| `@warlock.js/ai-bedrock`   | ✅ Shipped | AWS Bedrock — Converse API + Titan embeddings                          |
+| `@warlock.js/ai-google`    | ✅ Shipped | Gemini direct via `@google/genai`, native batch embeddings             |
+| `@warlock.js/ai-ollama`    | ✅ Shipped | Local models via the official `ollama` client                          |
 
 All five first-party adapters share the same `SDKAdapterContract`, so switching providers is a one-line change at the model construction site. `ai-openrouter` is intentionally deferred — use `ai-openai` with a `baseURL` pointed at OpenRouter.
 
@@ -32,9 +32,9 @@ All five first-party adapters share the same `SDKAdapterContract`, so switching 
 
 ```ts
 interface SDKAdapterContract {
-  model(config): ModelContract;            // chat completions / tool calls / structured output
-  count(text, model?): Promise<number>;    // token counting
-  embedder?(config): EmbedderContract;     // optional — not every provider supports embeddings
+  model(config): ModelContract; // chat completions / tool calls / structured output
+  count(text, model?): Promise<number>; // token counting
+  embedder?(config): EmbedderContract; // optional — not every provider supports embeddings
 }
 ```
 
@@ -48,12 +48,12 @@ The `ModelContract.capabilities` field declares what the model supports — all 
 
 ```ts
 type ModelCapabilities = {
-  structuredOutput?: boolean;   // native response_format: json_schema support?
-  vision?: boolean;             // can accept image attachments?
-  reasoning?: boolean;          // forwards ModelCallOptions.reasoning (effort / thinking budget)?
-  promptCaching?: boolean;      // honors cacheControl breakpoints + reports cache token channels?
-  audio?: boolean;              // can accept audio ContentPart input?
-  pdf?: boolean;                // can accept PDF / document ContentPart input?
+  structuredOutput?: boolean; // native response_format: json_schema support?
+  vision?: boolean; // can accept image attachments?
+  reasoning?: boolean; // forwards ModelCallOptions.reasoning (effort / thinking budget)?
+  promptCaching?: boolean; // honors cacheControl breakpoints + reports cache token channels?
+  audio?: boolean; // can accept audio ContentPart input?
+  pdf?: boolean; // can accept PDF / document ContentPart input?
 };
 ```
 
@@ -69,7 +69,7 @@ const openai = new OpenAISDK({
   apiKey: process.env.OPENAI_API_KEY!,
   pricing: {
     "gpt-4o-mini": { input: 0.15, output: 0.6, cachedInput: 0.075 },
-    "gpt-4o":      { input: 5.0,  output: 15.0 },
+    "gpt-4o": { input: 5.0, output: 15.0 },
   },
 });
 
@@ -82,7 +82,7 @@ const agent = ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) });
 const openrouter = new OpenAISDK({
   apiKey: process.env.OPENROUTER_API_KEY!,
   baseURL: "https://openrouter.ai/api/v1",
-  provider: "openrouter",   // labels reports correctly
+  provider: "openrouter", // labels reports correctly
 });
 
 const agent = ai.agent({ model: openrouter.model({ name: "anthropic/claude-3.5-sonnet" }) });
@@ -98,9 +98,9 @@ const openai = new OpenAISDK({ apiKey });
 // Override capabilities for a custom or fine-tuned model
 const customModel = openai.model({
   name: "my-org/custom-gpt-4-finetuned",
-  vision: true,                    // override capabilities.vision
+  vision: true, // override capabilities.vision
   structuredOutput: true,
-  pricing: { input: 1.0, output: 3.0 },   // per-model pricing (wins over SDK registry)
+  pricing: { input: 1.0, output: 3.0 }, // per-model pricing (wins over SDK registry)
 });
 ```
 
@@ -110,11 +110,11 @@ const customModel = openai.model({
 
 ```ts
 type ModelPricing = {
-  input: number;            // required — USD / 1M input tokens
-  output: number;           // required — USD / 1M output tokens
-  cachedInput?: number;     // prompt-cache READ rate; falls back to `input`
-  cachedOutput?: number;    // cache-WRITE rate (Anthropic premium); falls back to `output`
-  reasoning?: number;       // reasoning/thinking-token rate; falls back to `output`
+  input: number; // required — USD / 1M input tokens
+  output: number; // required — USD / 1M output tokens
+  cachedInput?: number; // prompt-cache READ rate; falls back to `input`
+  cachedOutput?: number; // cache-WRITE rate (Anthropic premium); falls back to `output`
+  reasoning?: number; // reasoning/thinking-token rate; falls back to `output`
 };
 ```
 
@@ -123,7 +123,7 @@ Configure it and every report carries `Usage.cost` — a per-channel breakdown c
 ```ts
 const { usage } = await ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) }).execute("hi");
 
-usage.cost;          // { input, output, cachedInput?, cachedOutput? }  — USD per channel
+usage.cost; // { input, output, cachedInput?, cachedOutput? }  — USD per channel
 // single scalar total: sum the populated fields, treating undefined as 0.
 ```
 
@@ -133,11 +133,11 @@ usage.cost;          // { input, output, cachedInput?, cachedOutput? }  — USD 
 
 Beyond `input` / `output` / `total`, `Usage` carries optional sub-channels (undefined when the provider doesn't meter them):
 
-| Channel | Meaning | Provider source |
-|---|---|---|
-| `cachedTokens` | subset of `input` served from prompt cache (READ hit) | OpenAI `prompt_tokens_details.cached_tokens`, Anthropic `cache_read_input_tokens` |
-| `cacheWriteTokens` | input tokens WRITTEN to the cache this call | Anthropic `cache_creation_input_tokens` (OpenAI does not write-bill) |
-| `reasoningTokens` | subset of `output` for internal reasoning/thinking | OpenAI `completion_tokens_details.reasoning_tokens`, Anthropic extended-thinking |
+| Channel            | Meaning                                               | Provider source                                                                   |
+| ------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `cachedTokens`     | subset of `input` served from prompt cache (READ hit) | OpenAI `prompt_tokens_details.cached_tokens`, Anthropic `cache_read_input_tokens` |
+| `cacheWriteTokens` | input tokens WRITTEN to the cache this call           | Anthropic `cache_creation_input_tokens` (OpenAI does not write-bill)              |
+| `reasoningTokens`  | subset of `output` for internal reasoning/thinking    | OpenAI `completion_tokens_details.reasoning_tokens`, Anthropic extended-thinking  |
 
 ### Driving cache + reasoning per call
 
@@ -145,8 +145,8 @@ Beyond `input` / `output` / `total`, `Usage` carries optional sub-channels (unde
 
 ```ts
 await model.complete(messages, {
-  reasoning: { effort: "high", maxTokens: 8_000 },  // effort → OpenAI reasoning_effort; maxTokens → Anthropic thinking budget
-  cacheControl: { breakpoints: 1 },                 // WRITE breakpoint → Anthropic cache_control markers
+  reasoning: { effort: "high", maxTokens: 8_000 }, // effort → OpenAI reasoning_effort; maxTokens → Anthropic thinking budget
+  cacheControl: { breakpoints: 1 }, // WRITE breakpoint → Anthropic cache_control markers
 });
 ```
 
@@ -168,14 +168,14 @@ See the `embed-text` topic.
 Pattern: one SDK instance per provider, mix at the call site:
 
 ```ts
-const openai     = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const openrouter = new OpenAISDK({
   apiKey: process.env.OPENROUTER_API_KEY!,
   baseURL: "https://openrouter.ai/api/v1",
   provider: "openrouter",
 });
 
-const fastAgent  = ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) });
+const fastAgent = ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) });
 const claudeAgent = ai.agent({ model: openrouter.model({ name: "anthropic/claude-3.5-sonnet" }) });
 ```
 
@@ -208,20 +208,19 @@ requests fail explicitly. Chat Completions and Ollama omit the method.
 fields use `providerOptions.<format>.body`; the Google body maps to generation
 config. See each provider skill for protected fields and count limitations.
 
-
-| Model transport | Native `countTokens` | Provider option key |
-| --- | --- | --- |
-| Anthropic Messages | Yes | `anthropic` |
-| OpenAI Responses | Yes | `openai` |
-| OpenAI Chat Completions | Absent | `openai` |
-| Bedrock Converse | Yes, where supported by the model/region | `bedrock` |
-| Google Vertex | Yes, including system instructions and tools | `google` |
-| Google Developer API | Contents only; system/tools requests explicitly fail | `google` |
-| Ollama chat | Absent | `ollama` |
-| xAI Chat | Absent | `openai` |
-| Groq Chat | Absent | `openai` |
-| DeepSeek Chat | Absent | `openai` |
-| Mistral Chat | Absent | `openai` |
+| Model transport         | Native `countTokens`                                 | Provider option key |
+| ----------------------- | ---------------------------------------------------- | ------------------- |
+| Anthropic Messages      | Yes                                                  | `anthropic`         |
+| OpenAI Responses        | Yes                                                  | `openai`            |
+| OpenAI Chat Completions | Absent                                               | `openai`            |
+| Bedrock Converse        | Yes, where supported by the model/region             | `bedrock`           |
+| Google Vertex           | Yes, including system instructions and tools         | `google`            |
+| Google Developer API    | Contents only; system/tools requests explicitly fail | `google`            |
+| Ollama chat             | Absent                                               | `ollama`            |
+| xAI Chat                | Absent                                               | `openai`            |
+| Groq Chat               | Absent                                               | `openai`            |
+| DeepSeek Chat           | Absent                                               | `openai`            |
+| Mistral Chat            | Absent                                               | `openai`            |
 
 All adapters ignore unrelated provider keys. Native counts make network calls;
 check `model.countTokens` before using them. Offline `sdk.count(text)` estimates

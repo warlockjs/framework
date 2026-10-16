@@ -14,7 +14,7 @@ import { ai } from "@warlock.js/ai";
 ai.systemPrompt("You are support for {{product}}.", { name: "support" });
 
 // Resolve back — latest version, or a version / pinned tag.
-ai.prompts.get("support");                 // → the SystemPromptContract
+ai.prompts.get("support"); // → the SystemPromptContract
 ai.prompts.resolve("support", undefined, { product: "Warlock" }); // → final string
 ```
 
@@ -32,7 +32,7 @@ const base = ai.systemPrompt("You are support.", {
   required: ["product"],
 });
 
-base.meta();                          // → { name: "support", version: "1", description, required }
+base.meta(); // → { name: "support", version: "1", description, required }
 const v2 = base.meta({ version: "2" }); // new builder, shallow-merged meta; original untouched
 ```
 
@@ -45,17 +45,17 @@ const v2 = base.meta({ version: "2" }); // new builder, shallow-merged meta; ori
 ## Register / resolve — `register` / `get` / `resolve` / `has` / `list` / `versions`
 
 ```ts
-const registry = ai.prompts;              // or prompts() for an isolated one
+const registry = ai.prompts; // or prompts() for an isolated one
 
 registry.register(ai.systemPrompt("You are support.", { name: "support" }));
-registry.versions("support");             // ["1"] — version derived as next integer
+registry.versions("support"); // ["1"] — version derived as next integer
 
-registry.get("support");                  // latest SystemPromptContract
-registry.get("support@1");                // inline name@selector
+registry.get("support"); // latest SystemPromptContract
+registry.get("support@1"); // inline name@selector
 registry.resolve("support", "1", { product: "Warlock" }); // pick version + render in one call
 
-registry.has("support");                  // boolean
-registry.list();                          // every registered name, first-seen order
+registry.has("support"); // boolean
+registry.list(); // every registered name, first-seen order
 ```
 
 - **Version selection** — `get(name)` / `resolve(name)` return the **latest** by insertion order; pass a version label, a pinned tag, or fold it into the first arg as `name@selector` (`get("support@1")`, `resolve("support@production")`).
@@ -86,11 +86,11 @@ A `PromptTemplateVersion`'s `template` is a raw string (wrapped into one instruc
 ## `tag()` — pin a moving label to a version
 
 ```ts
-ai.prompts.tag("agent", "production", "2");   // pin "production" → version 2
+ai.prompts.tag("agent", "production", "2"); // pin "production" → version 2
 
-ai.prompts.get("agent", "production");        // resolves through the tag
+ai.prompts.get("agent", "production"); // resolves through the tag
 ai.prompts.resolve("agent", "production");
-ai.prompts.get("agent@production");           // inline form
+ai.prompts.get("agent@production"); // inline form
 ```
 
 Re-pinning an existing tag moves it. An unknown name / version throws `InvalidRequestError`. Tags survive `export` / `import`.
@@ -100,19 +100,20 @@ Re-pinning an existing tag moves it. An unknown name / version throws `InvalidRe
 ```ts
 const report = await ai.prompts.validate("support", {
   placeholders: { product: "Warlock" }, // values you intend to supply
-  declare: ["language"],                  // extra keys to treat as known
-  judge: judgeModel,                      // optional — turns on the LLM-as-judge pass
-  criteria: [                             // optional — YOUR rules, replaces the built-in rubric
+  declare: ["language"], // extra keys to treat as known
+  judge: judgeModel, // optional — turns on the LLM-as-judge pass
+  criteria: [
+    // optional — YOUR rules, replaces the built-in rubric
     "Addresses the user by {{name}}",
     "Never gives medical advice",
     "Stays under 200 words",
   ],
 });
 
-report.ok;       // true iff no required placeholder is missing (DETERMINISTIC verdict alone)
-report.missing;  // placeholder keys referenced with no default, unsupplied, undeclared
-report.score;    // 0..1 — present ONLY when a judge ran and produced a usable verdict
-report.issues;   // advisory judge reasons / a degrade note — present only when a judge was supplied
+report.ok; // true iff no required placeholder is missing (DETERMINISTIC verdict alone)
+report.missing; // placeholder keys referenced with no default, unsupplied, undeclared
+report.score; // 0..1 — present ONLY when a judge ran and produced a usable verdict
+report.issues; // advisory judge reasons / a degrade note — present only when a judge was supplied
 ```
 
 - **Always** runs the deterministic check: every `{{key}}` with no inline default that is neither supplied (`placeholders`), declared (`declare`), nor in the prompt's `meta.required` lands in `missing`; `ok` is `true` iff `missing` is empty.
@@ -128,10 +129,10 @@ report.issues;   // advisory judge reasons / a degrade note — present only whe
 ```ts
 const diff = ai.prompts.diff("agent", "1", "2");
 
-diff.identical;  // true when both versions have identical blocks in identical order
-diff.added;      // blocks in `to` not at the same position in `from`
-diff.removed;    // blocks in `from` not at the same position in `to`
-diff.changed;    // [{ from, to }] — same position, type/text changed
+diff.identical; // true when both versions have identical blocks in identical order
+diff.added; // blocks in `to` not at the same position in `from`
+diff.removed; // blocks in `from` not at the same position in `to`
+diff.changed; // [{ from, to }] — same position, type/text changed
 ```
 
 Blocks are matched **positionally**. Unknown name / version → `InvalidRequestError`.
@@ -139,8 +140,8 @@ Blocks are matched **positionally**. Unknown name / version → `InvalidRequestE
 ## `export()` / `import()` — portable JSON round-trip
 
 ```ts
-const snapshot = ai.prompts.export();   // ExportedRegistry — every name, version, pinned tag, description/required
-otherRegistry.import(snapshot);          // rehydrate (same duplicate / idempotency rule; tags restored)
+const snapshot = ai.prompts.export(); // ExportedRegistry — every name, version, pinned tag, description/required
+otherRegistry.import(snapshot); // rehydrate (same duplicate / idempotency rule; tags restored)
 ```
 
 Each version flattens to `{ type, text }` blocks so the registry round-trips without live builder instances — commit a snapshot, ship it, restore it elsewhere.
@@ -152,10 +153,11 @@ Each version flattens to `{ type, text }` blocks so the registry round-trips wit
 ```ts
 ai.systemPrompt("Always answer in {{language|English}}.", { name: "global", version: "1" });
 
-const supportPrompt = ai.systemPrompt("You are support for {{product}}.")
-  .merge("global", { fromVersion: "1" });  // fold the registered prompt by name
+const supportPrompt = ai
+  .systemPrompt("You are support for {{product}}.")
+  .merge("global", { fromVersion: "1" }); // fold the registered prompt by name
 
-supportPrompt.meta()?.composedFrom;        // ["…", "global@1"] — deterministic provenance
+supportPrompt.meta()?.composedFrom; // ["…", "global@1"] — deterministic provenance
 ```
 
 `merge` accepts three source forms: a pre-built block, another `SystemPromptContract`, or a **registered name** resolved from `ai.prompts` (latest version unless `options.fromVersion` selects another — an unknown name / version throws `InvalidRequestError`).
@@ -167,15 +169,15 @@ supportPrompt.meta()?.composedFrom;        // ["…", "global@1"] — determinis
 ```ts
 // (a) Resolve a globally-registered prompt from ai.prompts by name.
 ai.systemPrompt("You are support.", { name: "support" });
-const sp = ai.prompt("support");          // → SystemPromptContract (latest)
-const v1 = ai.prompt("support", "1");     // → a specific version / pinned tag
+const sp = ai.prompt("support"); // → SystemPromptContract (latest)
+const v1 = ai.prompt("support", "1"); // → a specific version / pinned tag
 
 // (b) Build an ISOLATED legacy-shaped registry (PromptRegistryContract).
 const reg = ai.prompt({
   prompts: [{ name: "summarizer", versions: [{ version: "1", template: "Summarize: {{text}}" }] }],
 });
 const resolved = reg.resolve("summarizer", { placeholders: { text } });
-resolved.toSystemPrompt();                 // drop-in for ai.agent({ systemPrompt })
+resolved.toSystemPrompt(); // drop-in for ai.agent({ systemPrompt })
 ```
 
 **⚠ Migration.** Before unification, `ai.prompt(...)` only built a standalone, self-contained registry with its **own private** storage. It now:

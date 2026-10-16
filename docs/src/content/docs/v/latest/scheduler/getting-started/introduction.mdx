@@ -23,7 +23,7 @@ scheduler.addJob(
     await db.deleteExpiredTokens();
   })
     .daily()
-    .at("03:00")
+    .at("03:00"),
 );
 
 scheduler.start();
@@ -125,11 +125,11 @@ process.on("SIGTERM", async () => {
 
 ## What's Next
 
-| Topic | Description |
-|---|---|
-| [Defining Jobs](../essentials/defining-jobs.mdx) | Full fluent API reference — every timing method |
-| [Retry & Backoff](../guides/retry-backoff.mdx) | Automatic retries with optional exponential backoff |
-| [Overlap Prevention](../guides/overlap-prevention.mdx) | Skip a run if the previous one is still going |
-| [Timezone](../guides/timezone.mdx) | Per-job timezone support with IANA strings |
-| [Events](../guides/events.mdx) | Observe the full job lifecycle |
-| [Configuration](../essentials/configuration.mdx) | Tick interval, parallel execution, concurrency |
+| Topic                                                  | Description                                         |
+| ------------------------------------------------------ | --------------------------------------------------- |
+| [Defining Jobs](../essentials/defining-jobs.mdx)       | Full fluent API reference — every timing method     |
+| [Retry & Backoff](../guides/retry-backoff.mdx)         | Automatic retries with optional exponential backoff |
+| [Overlap Prevention](../guides/overlap-prevention.mdx) | Skip a run if the previous one is still going       |
+| [Timezone](../guides/timezone.mdx)                     | Per-job timezone support with IANA strings          |
+| [Events](../guides/events.mdx)                         | Observe the full job lifecycle                      |
+| [Configuration](../essentials/configuration.mdx)       | Tick interval, parallel execution, concurrency      |

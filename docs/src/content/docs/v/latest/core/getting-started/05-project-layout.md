@@ -41,18 +41,18 @@ package.json
 
 ## What goes where
 
-| Folder           | What lives there                                            | Naming                              | Example                              |
-| ---------------- | ----------------------------------------------------------- | ----------------------------------- | ------------------------------------ |
-| `controllers/`   | HTTP request handlers — thin                                | `<action>.controller.ts`            | `list-products.controller.ts`        |
-| `services/`      | Business logic, stateless functions                         | `<action>.service.ts`               | `create-product.service.ts`          |
-| `models/`        | Cascade models + their migrations                           | `<entity>.model.ts` in `<entity>/`  | `models/product/product.model.ts`    |
-| `repositories/`  | `RepositoryManager` subclasses                              | `<entity>.repository.ts`            | `products.repository.ts`             |
-| `resources/`     | `Resource` subclasses — model → wire mapping                | `<entity>.resource.ts`              | `product.resource.ts`                |
-| `schema/`        | seal schemas — value + inferred `<Name>Schema` type from one file | `<action>.schema.ts`                | `create-product.schema.ts`           |
-| `events/`        | Listener registrations — **any** `.ts(x)` file inside is auto-loaded | `<topic>.event.ts` (convention)     | `audit.event.ts`                     |
-| `types/`         | Module-internal TypeScript types                            | `<name>.type.ts`                    | `cart-state.type.ts`                 |
-| `utils/`         | Module-private helpers                                      | `<name>.ts`                         | `format-price.ts`                    |
-| `seeds/`         | Seed data (CLI: `warlock seed`)                             | `<entity>.seed.ts`                  | `products.seed.ts`                   |
+| Folder          | What lives there                                                     | Naming                             | Example                           |
+| --------------- | -------------------------------------------------------------------- | ---------------------------------- | --------------------------------- |
+| `controllers/`  | HTTP request handlers — thin                                         | `<action>.controller.ts`           | `list-products.controller.ts`     |
+| `services/`     | Business logic, stateless functions                                  | `<action>.service.ts`              | `create-product.service.ts`       |
+| `models/`       | Cascade models + their migrations                                    | `<entity>.model.ts` in `<entity>/` | `models/product/product.model.ts` |
+| `repositories/` | `RepositoryManager` subclasses                                       | `<entity>.repository.ts`           | `products.repository.ts`          |
+| `resources/`    | `Resource` subclasses — model → wire mapping                         | `<entity>.resource.ts`             | `product.resource.ts`             |
+| `schema/`       | seal schemas — value + inferred `<Name>Schema` type from one file    | `<action>.schema.ts`               | `create-product.schema.ts`        |
+| `events/`       | Listener registrations — **any** `.ts(x)` file inside is auto-loaded | `<topic>.event.ts` (convention)    | `audit.event.ts`                  |
+| `types/`        | Module-internal TypeScript types                                     | `<name>.type.ts`                   | `cart-state.type.ts`              |
+| `utils/`        | Module-private helpers                                               | `<name>.ts`                        | `format-price.ts`                 |
+| `seeds/`        | Seed data (CLI: `warlock seed`)                                      | `<entity>.seed.ts`                 | `products.seed.ts`                |
 
 A few of these are framework-magic:
 

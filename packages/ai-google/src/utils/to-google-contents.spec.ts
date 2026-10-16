@@ -1,8 +1,4 @@
-import {
-  InvalidRequestError,
-  type Message,
-  type ModelToolCallRequest,
-} from "@warlock.js/ai";
+import { InvalidRequestError, type Message, type ModelToolCallRequest } from "@warlock.js/ai";
 import { describe, expect, it } from "vitest";
 import { toGoogleContents } from "./to-google-contents";
 
@@ -66,9 +62,7 @@ describe("toGoogleContents", () => {
 
   it("wraps a JSON scalar / 'null' tool result under a result key", () => {
     const numeric = toGoogleContents([{ role: "tool", toolCallId: "tc_1", content: "42" }]);
-    const literalNull = toGoogleContents([
-      { role: "tool", toolCallId: "tc_2", content: "null" },
-    ]);
+    const literalNull = toGoogleContents([{ role: "tool", toolCallId: "tc_2", content: "null" }]);
 
     expect(numeric.contents[0].parts).toEqual([
       { functionResponse: { name: "tc_1", response: { result: "42" } } },
@@ -221,10 +215,7 @@ describe("toGoogleContents", () => {
     expect(toGoogleContents(messages).contents).toEqual([
       {
         role: "user",
-        parts: [
-          { text: "what is this" },
-          { inlineData: { mimeType: "image/png", data: "aGk=" } },
-        ],
+        parts: [{ text: "what is this" }, { inlineData: { mimeType: "image/png", data: "aGk=" } }],
       },
     ]);
   });
@@ -289,11 +280,6 @@ describe("toGoogleContents", () => {
     const { systemInstruction, contents } = toGoogleContents(messages);
 
     expect(systemInstruction).toBe("sys");
-    expect(contents.map((content) => content.role)).toEqual([
-      "user",
-      "model",
-      "user",
-      "user",
-    ]);
+    expect(contents.map((content) => content.role)).toEqual(["user", "model", "user", "user"]);
   });
 });

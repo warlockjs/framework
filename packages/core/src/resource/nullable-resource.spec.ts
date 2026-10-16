@@ -71,9 +71,10 @@ describe("nullable resource field in defineResource", () => {
       schema: { body: "string", post: nullable(PostResource) },
     });
 
-    expect(
-      new CommentResource({ body: "hi", post: { id: 1, author: null } }).toJSON(),
-    ).toEqual({ body: "hi", post: { id: 1, author: null } });
+    expect(new CommentResource({ body: "hi", post: { id: 1, author: null } }).toJSON()).toEqual({
+      body: "hi",
+      post: { id: 1, author: null },
+    });
     expect(new CommentResource({ body: "hi" }).toJSON()).toEqual({ body: "hi", post: null });
   });
 
@@ -151,12 +152,20 @@ describe("[Resource] list field in defineResource", () => {
   it("works inside an arrayOf item schema", () => {
     const Wrapper = defineResource({
       schema: {
-        rows: { __type: "arrayOf", schema: { id: new ResourceFieldBuilder("number"), tags: [TagResource] } },
+        rows: {
+          __type: "arrayOf",
+          schema: { id: new ResourceFieldBuilder("number"), tags: [TagResource] },
+        },
       },
     });
 
     expect(
-      new Wrapper({ rows: [{ id: 1, tags: [{ id: 1, label: "a" }] }, { id: 2, tags: [] }] }).toJSON(),
+      new Wrapper({
+        rows: [
+          { id: 1, tags: [{ id: 1, label: "a" }] },
+          { id: 2, tags: [] },
+        ],
+      }).toJSON(),
     ).toEqual({
       rows: [
         { id: 1, tags: [{ id: 1, label: "a" }] },

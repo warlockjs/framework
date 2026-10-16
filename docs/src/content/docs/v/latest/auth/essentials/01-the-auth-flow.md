@@ -22,7 +22,8 @@ This is the picture before the parts. Every other essentials and guides page zoo
 
 ```ts
 const user = await User.create({
-  email, name,
+  email,
+  name,
   password: await hashPassword(plaintext),
 });
 
@@ -34,11 +35,7 @@ const tokens = await authService.createTokenPair(user, { userAgent, ip });
 ### 2. Log in
 
 ```ts
-const result = await authService.login(
-  User,
-  { email, password },
-  { userAgent, ip },
-);
+const result = await authService.login(User, { email, password }, { userAgent, ip });
 
 // result: { user, tokens: { accessToken, refreshToken } }  — or null on failure
 ```
@@ -127,10 +124,10 @@ Full list: `login.attempt`, `login.success`, `login.failed`, `logout`, `logout.a
 
 Every token is a row. Both tables share the `user_id` + `user_type` pair so the same token table serves every user type in your app.
 
-| Table | Written on | Read on | Deleted on |
-| --- | --- | --- | --- |
-| `access_tokens` | `generateAccessToken` | `authMiddleware` (existence check) | logout, `removeAllAccessTokens`, `revokeAllTokens` |
-| `refresh_tokens` | `createRefreshToken` | `refreshTokens` (signature + validity check) | `cleanupExpiredTokens` (hard delete on expiry); soft-revoke via `revoked_at` on logout / rotation |
+| Table            | Written on            | Read on                                      | Deleted on                                                                                        |
+| ---------------- | --------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `access_tokens`  | `generateAccessToken` | `authMiddleware` (existence check)           | logout, `removeAllAccessTokens`, `revokeAllTokens`                                                |
+| `refresh_tokens` | `createRefreshToken`  | `refreshTokens` (signature + validity check) | `cleanupExpiredTokens` (hard delete on expiry); soft-revoke via `revoked_at` on logout / rotation |
 
 JWT verification stays stateless (the signature is enough to know the payload is genuine). The DB row gives you the revocation list — you can kill a token without changing the signing secret.
 

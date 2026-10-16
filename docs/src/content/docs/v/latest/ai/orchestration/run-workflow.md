@@ -14,7 +14,7 @@ sidebar:
 import { ai } from "@warlock.js/ai";
 import { v } from "@warlock.js/seal";
 
-ai.config({ defaultSnapshotStore: ai.snapshot.memory() });   // for resume; see Persist AI data
+ai.config({ defaultSnapshotStore: ai.snapshot.memory() }); // for resume; see Persist AI data
 
 type CatalogInput = { url: string };
 type CatalogOutput = { id: string };
@@ -91,9 +91,9 @@ See [Handle errors](/v/latest/ai/reliability/handle-errors/).
 ```ts
 type WorkflowResult<TOutput> = {
   type: "workflow";
-  data?: TOutput;            // from workflow.output.extract
-  report: WorkflowReport;    // runId, signature, status, timings, per-step snapshots
-  usage: Usage;              // aggregated across all agent calls
+  data?: TOutput; // from workflow.output.extract
+  report: WorkflowReport; // runId, signature, status, timings, per-step snapshots
+  usage: Usage; // aggregated across all agent calls
   error?: AIError;
 };
 ```
@@ -106,18 +106,18 @@ type WorkflowResult<TOutput> = {
 skip? → before? → (run | agent | parallel) → output.extract (+ schema) → after? → nextStep?
 ```
 
-| Phase | Purpose |
-| --- | --- |
-| `skip` | Return `true` to skip the step. Output becomes `undefined`. |
-| `before` | Pre-work — fetch, set state, validate. |
-| `run` | Core non-agent work. |
-| `agent` | Agent to execute. `input(ctx)` builds the prompt. |
-| `input` | Required when `agent` is set. |
-| `output` | `{ extract, schema? }` — extract the step's output. |
-| `after` | Post-work — save, notify. |
-| `nextStep` | Step-level routing on success. |
-| `onFailure` | Step-level recovery after retries exhaust. |
-| `onCancel` | Cleanup if cancelled in flight. |
+| Phase       | Purpose                                                     |
+| ----------- | ----------------------------------------------------------- |
+| `skip`      | Return `true` to skip the step. Output becomes `undefined`. |
+| `before`    | Pre-work — fetch, set state, validate.                      |
+| `run`       | Core non-agent work.                                        |
+| `agent`     | Agent to execute. `input(ctx)` builds the prompt.           |
+| `input`     | Required when `agent` is set.                               |
+| `output`    | `{ extract, schema? }` — extract the step's output.         |
+| `after`     | Post-work — save, notify.                                   |
+| `nextStep`  | Step-level routing on success.                              |
+| `onFailure` | Step-level recovery after retries exhaust.                  |
+| `onCancel`  | Cleanup if cancelled in flight.                             |
 
 Errors in `before` / `run` / `agent` / `after` / `output` are retryable. Errors in `nextStep` / `onFailure` terminate the workflow with `RoutingError` — those are programmer errors, not transient failures.
 
@@ -125,11 +125,11 @@ Errors in `before` / `run` / `agent` / `after` / `output` are retryable. Errors 
 
 ```ts
 type WorkflowContext<TInput, TState, TContext> = {
-  readonly input: TInput;                         // frozen — durable cause
-  readonly context: TContext;                     // frozen — per-execution
-  readonly steps: Record<string, StepSnapshot>;   // frozen snapshots of completed steps
-  state: TState;                                  // mutable shared state
-  readonly agentResult?: AgentResult<unknown>;    // set when current step has an agent
+  readonly input: TInput; // frozen — durable cause
+  readonly context: TContext; // frozen — per-execution
+  readonly steps: Record<string, StepSnapshot>; // frozen snapshots of completed steps
+  state: TState; // mutable shared state
+  readonly agentResult?: AgentResult<unknown>; // set when current step has an agent
   readonly runId: string;
   readonly signal?: AbortSignal;
   readonly startedAt: Date;
@@ -138,8 +138,8 @@ type WorkflowContext<TInput, TState, TContext> = {
 
 `input`, `context`, `steps` are deep-frozen. `state` is mutable during a step and frozen into `steps[name].state` on completion.
 
-- **`input`** — *what* to process. Persisted in the snapshot, replayed verbatim on `resume()`.
-- **`context`** — *who's running it.* Tenancy, user, locale, traceId. **Never persisted.** Callers pass fresh on every `execute()` and `resume()`.
+- **`input`** — _what_ to process. Persisted in the snapshot, replayed verbatim on `resume()`.
+- **`context`** — _who's running it._ Tenancy, user, locale, traceId. **Never persisted.** Callers pass fresh on every `execute()` and `resume()`.
 
 **Resume invariant.** Persistence-scoping fields in `context` (e.g. `organizationId`) MUST match across resume calls. The framework can't fingerprint context — mixing scopes silently corrupts data.
 
@@ -219,8 +219,8 @@ Between-step cancellation is guaranteed. Mid-step is best-effort. `status: "canc
 ## Persistence and resume
 
 ```ts
-await wf.execute({ input, runId: "ticket-123" });   // fresh run
-await wf.resume("ticket-123");                       // after crash
+await wf.execute({ input, runId: "ticket-123" }); // fresh run
+await wf.resume("ticket-123"); // after crash
 ```
 
 See [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) for snapshot stores, drift detection, and recovery patterns.

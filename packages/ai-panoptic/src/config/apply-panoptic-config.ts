@@ -71,8 +71,7 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
     if (store === undefined && config.dashboard) {
       if (config.cache !== undefined) {
         const onError =
-          config.onError ??
-          ((error: unknown) => log.error("ai-panoptic", "cacheStore", error));
+          config.onError ?? ((error: unknown) => log.error("ai-panoptic", "cacheStore", error));
 
         cacheStore = createCacheTraceStore(config.cache, { onError });
         store = cacheStore;
@@ -98,8 +97,7 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
       // Hydrate the cache mirror (if any) before serving, so a restart
       // surfaces previously-persisted traces immediately. A bare in-memory
       // store resolves the readyGate instantly.
-      const readyGate =
-        cacheStore !== undefined ? cacheStore.ready() : Promise.resolve();
+      const readyGate = cacheStore !== undefined ? cacheStore.ready() : Promise.resolve();
 
       void readyGate
         .catch(() => {
@@ -182,8 +180,7 @@ function startDashboard(
   store: TraceStoreContract,
   dashboardConfig: boolean | DashboardOptions,
 ): Promise<DashboardHandle> {
-  const options: DashboardOptions =
-    typeof dashboardConfig === "object" ? dashboardConfig : {};
+  const options: DashboardOptions = typeof dashboardConfig === "object" ? dashboardConfig : {};
 
   return dashboard(store, options);
 }

@@ -83,10 +83,10 @@ const source = app.database;
 const same = container.get("database.source");
 ```
 
-| Access                              | Returns                          | Notes                                                                 |
-| ----------------------------------- | -------------------------------- | --------------------------------------------------------------------- |
-| `app.database`                      | `DataSource`                     | Getter that reads the container. Present only if the config file exists. |
-| `container.get("database.source")`  | `DataSource`                     | The same value the `app.database` getter reads.                       |
+| Access                             | Returns      | Notes                                                                    |
+| ---------------------------------- | ------------ | ------------------------------------------------------------------------ |
+| `app.database`                     | `DataSource` | Getter that reads the container. Present only if the config file exists. |
+| `container.get("database.source")` | `DataSource` | The same value the `app.database` getter reads.                          |
 
 `app.database` is a getter over the container, so it reflects whatever the connector set. If there's no database config, the key was never set and you get back `undefined` — guard accordingly.
 

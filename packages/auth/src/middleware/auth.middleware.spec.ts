@@ -1325,7 +1325,7 @@ describe("authMiddleware — cookie auth sets decodedAccessToken (cache-floor pr
   });
 });
 
-describe("authMiddleware — descriptor tag (Symbol.for(\"warlock.auth\"))", () => {
+describe('authMiddleware — descriptor tag (Symbol.for("warlock.auth"))', () => {
   const read = (middleware: object) =>
     (middleware as Record<symbol, unknown>)[Symbol.for("warlock.auth")];
 
@@ -1334,7 +1334,9 @@ describe("authMiddleware — descriptor tag (Symbol.for(\"warlock.auth\"))", () 
   });
 
   it("describes the default header source with the configured default user type", () => {
-    configKey.mockImplementation((key: string) => (key === "auth.defaultUserType" ? "user" : undefined));
+    configKey.mockImplementation((key: string) =>
+      key === "auth.defaultUserType" ? "user" : undefined,
+    );
 
     expect(read(authMiddleware())).toEqual({ sources: ["header"], userTypes: ["user"] });
   });
@@ -1352,15 +1354,16 @@ describe("authMiddleware — descriptor tag (Symbol.for(\"warlock.auth\"))", () 
 
   it("describes dual sources, header first", () => {
     const dual = authMiddleware([], {
-      sources: [
-        { source: "cookie", key: "access" },
-        { source: "header" },
-      ],
+      sources: [{ source: "cookie", key: "access" }, { source: "header" }],
     });
 
     expect(read(dual)).toEqual({ sources: ["header", { cookie: "access" }], userTypes: [] });
     expect(
-      read(authMiddleware([], { sources: [{ source: "header" }, { source: "cookie", key: "access" }] })),
+      read(
+        authMiddleware([], {
+          sources: [{ source: "header" }, { source: "cookie", key: "access" }],
+        }),
+      ),
     ).toEqual({ sources: ["header", { cookie: "access" }], userTypes: [] });
   });
 
@@ -1382,7 +1385,9 @@ describe("authMiddleware — descriptor tag (Symbol.for(\"warlock.auth\"))", () 
     expect(Object.isFrozen(descriptor.userTypes)).toBe(true);
     expect(Object.keys(middleware)).toEqual([]);
     expect(Object.getOwnPropertySymbols(middleware)).toContain(AUTH_MIDDLEWARE_DESCRIPTOR);
-    expect(Object.getOwnPropertyDescriptor(middleware, AUTH_MIDDLEWARE_DESCRIPTOR)?.enumerable).toBe(false);
+    expect(
+      Object.getOwnPropertyDescriptor(middleware, AUTH_MIDDLEWARE_DESCRIPTOR)?.enumerable,
+    ).toBe(false);
     expect(Object.getOwnPropertySymbols({ ...middleware })).toEqual([]);
     expect(JSON.stringify({ middleware })).toBe("{}");
     expect(JSON.stringify(descriptor)).toBe(

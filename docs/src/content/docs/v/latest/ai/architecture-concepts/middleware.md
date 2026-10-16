@@ -63,8 +63,9 @@ Pre / post content checks.
 
 ```ts
 ai.middleware.guardrail({
-  inputCheck: async (text) => text.match(/\bSSN\b/) ? { ok: false, reason: "pii" } : { ok: true },
-  outputCheck: async (text) => text.length > 10_000 ? { ok: false, reason: "too-long" } : { ok: true },
+  inputCheck: async (text) => (text.match(/\bSSN\b/) ? { ok: false, reason: "pii" } : { ok: true }),
+  outputCheck: async (text) =>
+    text.length > 10_000 ? { ok: false, reason: "too-long" } : { ok: true },
 });
 ```
 
@@ -102,13 +103,13 @@ Middleware sees `ctx.state` — a fresh `Map<string, unknown>` per `execute()` c
 
 ## Where middleware does and doesn't apply
 
-| Place | Middleware effect |
-| --- | --- |
-| `ai.agent({ middleware: [...] })` | Wraps every `agent.execute()`. |
-| Workflow step with `agent: myAgent` | The agent's own middleware fires normally inside the step. |
-| `workflow.asTool()` called from an agent | The calling agent's `tool`-level middleware wraps the workflow. |
-| `ai.supervisor({ middleware: [...] })` | Fires the `supervisor` hook map once around the whole `supervisor.execute()` run — the supervisor-level peer of `execute`. The same middleware objects work here and on agents. |
-| Step-level / workflow-level middleware | Does NOT exist. Use agent-level middleware on the agents inside the workflow. |
+| Place                                    | Middleware effect                                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai.agent({ middleware: [...] })`        | Wraps every `agent.execute()`.                                                                                                                                                  |
+| Workflow step with `agent: myAgent`      | The agent's own middleware fires normally inside the step.                                                                                                                      |
+| `workflow.asTool()` called from an agent | The calling agent's `tool`-level middleware wraps the workflow.                                                                                                                 |
+| `ai.supervisor({ middleware: [...] })`   | Fires the `supervisor` hook map once around the whole `supervisor.execute()` run — the supervisor-level peer of `execute`. The same middleware objects work here and on agents. |
+| Step-level / workflow-level middleware   | Does NOT exist. Use agent-level middleware on the agents inside the workflow.                                                                                                   |
 
 ## Custom middleware — when to write your own
 

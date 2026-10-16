@@ -2,7 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { container, requestContext as coreRequestContext, RouteRegistry, type Router } from "@warlock.js/core";
+import {
+  container,
+  requestContext as coreRequestContext,
+  RouteRegistry,
+  type Router,
+} from "@warlock.js/core";
 import { href, registerSiteRoutes, resetRouteTable } from "../routing/route-table";
 import { connectCurrentSite, siteUrl } from "../routing/site-url";
 import type { SitesConfig } from "../sites/site-config.types";
@@ -362,7 +367,13 @@ describe.each<Mode>(["dev", "prod"])("multi-site dispatch (%s)", (mode) => {
 describe("multi-site shadow guard", () => {
   it("rejects one boot error for a page hidden by an application route with renamed params", () => {
     const dispatch = createSiteDispatch({ sites: { landing: { hosts: ["a.test"] } } });
-    dispatch.add("landing", "GET", "/products/:id", vi.fn() as never, "src/web/$sites/landing/product.page.tsx");
+    dispatch.add(
+      "landing",
+      "GET",
+      "/products/:id",
+      vi.fn() as never,
+      "src/web/$sites/landing/product.page.tsx",
+    );
     const router = {
       list: () => [{ isPage: false, method: "GET", path: "/products/:slug" }],
       get: vi.fn(),

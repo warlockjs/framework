@@ -1,6 +1,6 @@
 ---
 name: upgrade-from-5-29
-description: 'Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, fresh rate-limit counters, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade.'
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, fresh rate-limit counters, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29

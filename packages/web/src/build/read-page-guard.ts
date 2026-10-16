@@ -40,7 +40,9 @@ export function readPageGuard(input: {
   appFile?: string;
 }): "user" | undefined {
   const candidates: Array<[string, GuardedModuleKind]> = [
-    ...(input.appFile === undefined ? [] : [[input.appFile, "root"] as [string, GuardedModuleKind]]),
+    ...(input.appFile === undefined
+      ? []
+      : [[input.appFile, "root"] as [string, GuardedModuleKind]]),
     ...input.layouts.map((layout): [string, GuardedModuleKind] => [layout, "layout"]),
     [input.pageFile, "page"],
   ];

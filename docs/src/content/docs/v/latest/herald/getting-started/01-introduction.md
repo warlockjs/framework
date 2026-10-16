@@ -42,13 +42,13 @@ That's the entire surface for fire-and-forget messaging. Everything below is dep
 
 ## When to reach for it
 
-| Use herald | Use something else |
-| --- | --- |
+| Use herald                                                                         | Use something else                                               |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Decoupling services — service A emits, service B reacts, neither imports the other | A single process — use a plain `EventEmitter` or a function call |
-| Backpressure matters — a slow consumer shouldn't crash the producer | Fire-and-forget logging — append to a log file or stdout |
-| Work must survive a crash — orders, payments, emails | Optional cache writes — they can be lost without consequence |
-| Fan-out work to N workers — N consumers in the same `group` split the load | One-shot scripts — just do the work inline |
-| Cross-language messaging — Python writes, Node reads, both speak AMQP | Two TypeScript modules in the same repo — import directly |
+| Backpressure matters — a slow consumer shouldn't crash the producer                | Fire-and-forget logging — append to a log file or stdout         |
+| Work must survive a crash — orders, payments, emails                               | Optional cache writes — they can be lost without consequence     |
+| Fan-out work to N workers — N consumers in the same `group` split the load         | One-shot scripts — just do the work inline                       |
+| Cross-language messaging — Python writes, Node reads, both speak AMQP              | Two TypeScript modules in the same repo — import directly        |
 
 ## Herald vs raw amqplib
 

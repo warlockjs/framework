@@ -20,12 +20,12 @@ Like [`warlock routes`](./routes.md), it loads your route modules in an isolated
 
 ## Options
 
-| Option            | Default                                       | Description                                                                                                                                   |
-| ----------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--out, -o`       | `storage/openapi/openapi.json`                | Output file, relative to the project root. Missing folders are created.                                                                        |
-| `--title`         | `name` in `package.json` (else `Warlock API`) | `info.title`. `info.version` is the `package.json` `version` (else `0.0.0`) and `info.description` its `description`.                          |
-| `--server`        | `http://<host>:<port>` from the `http` config | `servers[0].url`. A wildcard bind address (`0.0.0.0`, `::`) is written as `localhost`.                                                        |
-| `--include-pages` | off                                           | Also document page (SSR) routes. Each one is a `200` with a `text/html` body.                                                                  |
+| Option            | Default                                       | Description                                                                                                           |
+| ----------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `--out, -o`       | `storage/openapi/openapi.json`                | Output file, relative to the project root. Missing folders are created.                                               |
+| `--title`         | `name` in `package.json` (else `Warlock API`) | `info.title`. `info.version` is the `package.json` `version` (else `0.0.0`) and `info.description` its `description`. |
+| `--server`        | `http://<host>:<port>` from the `http` config | `servers[0].url`. A wildcard bind address (`0.0.0.0`, `::`) is written as `localhost`.                                |
+| `--include-pages` | off                                           | Also document page (SSR) routes. Each one is a `200` with a `text/html` body.                                         |
 
 ```bash
 warlock generate.openapi --out docs/openapi.json --title "Shop API" --server https://api.shop.test
@@ -78,18 +78,18 @@ The grammar of a `responseSchema` body — cast strings with suffixes, a resourc
 
 ## What is documented
 
-| Part                  | Where it comes from                                                                                                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Paths                 | Every registered route. `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head).                                                  |
-| `operationId`         | The route `name` (`name.<verb>` when an `all` route expands), otherwise `<verb>_<path_slug>` such as `get_users_id`. A duplicate is renamed with a warning.                                       |
-| Tags                  | The first static path segment: `/users/:id` is tagged `users`.                                                                                                                                   |
-| Summary, description  | The route `label` is the summary. The route or handler `description` is the description, followed by a line about the required user types and, for cookie auth on unsafe verbs, the same-origin CSRF rule. |
-| Path parameters       | `validation.params` gives typed ones. A path segment with no schema is a required `string`.                                                                                                       |
-| Request body, query   | `validation.schema`, converted with the Seal schema's JSON Schema output. It becomes the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request. |
-| Responses             | `handler.responseSchema`, one response per declared status code. A route with no 2xx declared gets a `200` with the description "Successful response".                                            |
-| `422`                 | Added when the route has `validation.schema`. Its body follows `validation.response` (`errors`, `inputKey`, `inputError` and `status`; core's default status is 422) and is stored once as `ValidationFailed`. A route with only `validation.params` gets none. |
-| `401`                 | Added when the route is guarded, with the conventional `{ error: string }` body, stored once as `Unauthorized`. A status you declare yourself is kept.                                            |
-| Security schemes      | From `authMiddleware()`, see below.                                                                                                                                                              |
+| Part                 | Where it comes from                                                                                                                                                                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paths                | Every registered route. `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head).                                                                                                                |
+| `operationId`        | The route `name` (`name.<verb>` when an `all` route expands), otherwise `<verb>_<path_slug>` such as `get_users_id`. A duplicate is renamed with a warning.                                                                                                     |
+| Tags                 | The first static path segment: `/users/:id` is tagged `users`.                                                                                                                                                                                                  |
+| Summary, description | The route `label` is the summary. The route or handler `description` is the description, followed by a line about the required user types and, for cookie auth on unsafe verbs, the same-origin CSRF rule.                                                      |
+| Path parameters      | `validation.params` gives typed ones. A path segment with no schema is a required `string`.                                                                                                                                                                     |
+| Request body, query  | `validation.schema`, converted with the Seal schema's JSON Schema output. It becomes the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request.                            |
+| Responses            | `handler.responseSchema`, one response per declared status code. A route with no 2xx declared gets a `200` with the description "Successful response".                                                                                                          |
+| `422`                | Added when the route has `validation.schema`. Its body follows `validation.response` (`errors`, `inputKey`, `inputError` and `status`; core's default status is 422) and is stored once as `ValidationFailed`. A route with only `validation.params` gets none. |
+| `401`                | Added when the route is guarded, with the conventional `{ error: string }` body, stored once as `Unauthorized`. A status you declare yourself is kept.                                                                                                          |
+| Security schemes     | From `authMiddleware()`, see below.                                                                                                                                                                                                                             |
 
 ### Responses
 
@@ -122,10 +122,10 @@ The grammar of a `responseSchema` body — cast strings with suffixes, a resourc
 
 `authMiddleware()` from `@warlock.js/auth` tags the middleware it returns with a descriptor under `Symbol.for("warlock.auth")`: `{ sources, userTypes }`. Core reads it without importing the auth package and emits only the schemes a route actually uses:
 
-| Credential source        | Scheme in `components.securitySchemes`                        |
-| ------------------------ | ------------------------------------------------------------- |
-| the `Authorization` header | `bearerAuth` — HTTP bearer                                   |
-| a cookie                 | `cookieAuth` — an API key in that cookie (a second, different cookie gets its own `cookieAuth_<name>` scheme) |
+| Credential source          | Scheme in `components.securitySchemes`                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| the `Authorization` header | `bearerAuth` — HTTP bearer                                                                                    |
+| a cookie                   | `cookieAuth` — an API key in that cookie (a second, different cookie gets its own `cookieAuth_<name>` scheme) |
 
 A guard that accepts the header and a cookie is an OR: one security requirement for each. Allowed user types appear in the operation description. Middleware that has no descriptor is ordinary middleware and adds no security entry.
 

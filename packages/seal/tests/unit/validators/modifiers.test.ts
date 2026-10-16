@@ -195,11 +195,14 @@ describe("cross-cutting modifiers", () => {
       let seenInput: unknown;
       let seenErrorCount = 0;
 
-      const validator = v.int().min(0).catch((errors, input) => {
-        seenInput = input;
-        seenErrorCount = errors.length;
-        return -1;
-      });
+      const validator = v
+        .int()
+        .min(0)
+        .catch((errors, input) => {
+          seenInput = input;
+          seenErrorCount = errors.length;
+          return -1;
+        });
 
       const result = await validate(validator, "bad");
       expect(result.data).toBe(-1);

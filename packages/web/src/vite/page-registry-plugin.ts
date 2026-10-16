@@ -132,7 +132,12 @@ function siteOwningFile(
   });
 }
 
-function siteRootFile(appRoot: string, srcDir: string | undefined, sites: SitesConfig, site: string): string {
+function siteRootFile(
+  appRoot: string,
+  srcDir: string | undefined,
+  sites: SitesConfig,
+  site: string,
+): string {
   return path.join(appRoot, srcDir ?? "src", "web", siteFolder(site), "root.tsx");
 }
 
@@ -167,11 +172,15 @@ function readClientStrictMode(
   if (!fs.existsSync(rootFile) || !fs.statSync(rootFile).isFile()) return false;
   const setupCandidate = pageSetupFileFor(rootFile);
   const configFile =
-    setupCandidate !== undefined && fs.existsSync(setupCandidate) && fs.statSync(setupCandidate).isFile()
+    setupCandidate !== undefined &&
+    fs.existsSync(setupCandidate) &&
+    fs.statSync(setupCandidate).isFile()
       ? setupCandidate
       : rootFile;
 
-  return readModuleConfig(configFile, fs.readFileSync(configFile, "utf-8"), "root").strictMode === true;
+  return (
+    readModuleConfig(configFile, fs.readFileSync(configFile, "utf-8"), "root").strictMode === true
+  );
 }
 
 /**
@@ -543,7 +552,8 @@ export function clientPageRegistry(options: ClientPageRegistryPluginOptions = {}
       if (id !== RESOLVED_CLIENT_PAGE_REGISTRY_ID && site === undefined) return undefined;
 
       const discovered = discoverPages({ appRoot, srcDir: options.srcDir, sites: options.sites });
-      const pages = site === undefined ? discovered : discovered.filter((page) => page.site === site);
+      const pages =
+        site === undefined ? discovered : discovered.filter((page) => page.site === site);
       // Read the SAME way the server installers will (design note §Config):
       // `web.localeRouting.strategy`, `app.localeCodes`, `app.localeCode` —
       // via `resolveLocaleRouting`, the one function both sides call, so a

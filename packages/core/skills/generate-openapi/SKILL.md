@@ -16,12 +16,12 @@ Routes are read in the same isolated registration child process `warlock build` 
 
 ## Options
 
-| Option            | Default                                        | Meaning                                                      |
-| ----------------- | ---------------------------------------------- | ------------------------------------------------------------ |
-| `--out`, `-o`     | `storage/openapi/openapi.json`                 | Output file, relative to the project root. Parent folders are created. |
-| `--title`         | `name` in `package.json` (else `Warlock API`)  | `info.title`. `info.version` is the `package.json` version (else `0.0.0`); `info.description` is its `description`. |
-| `--server`        | `http://<host>:<port>` from the `http` config  | `servers[0].url`. A wildcard host (`0.0.0.0`, `::`) becomes `localhost`. |
-| `--include-pages` | off                                            | Also document page (SSR) routes; each is a `200` with `text/html`. |
+| Option            | Default                                       | Meaning                                                                                                             |
+| ----------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--out`, `-o`     | `storage/openapi/openapi.json`                | Output file, relative to the project root. Parent folders are created.                                              |
+| `--title`         | `name` in `package.json` (else `Warlock API`) | `info.title`. `info.version` is the `package.json` version (else `0.0.0`); `info.description` is its `description`. |
+| `--server`        | `http://<host>:<port>` from the `http` config | `servers[0].url`. A wildcard host (`0.0.0.0`, `::`) becomes `localhost`.                                            |
+| `--include-pages` | off                                           | Also document page (SSR) routes; each is a `200` with `text/html`.                                                  |
 
 ```bash
 npx warlock generate.openapi --out docs/openapi.json --title "Shop API" --server https://api.shop.test
@@ -29,18 +29,18 @@ npx warlock generate.openapi --out docs/openapi.json --title "Shop API" --server
 
 ## What is documented
 
-| Part                    | Source                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| Paths                   | `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head). |
-| `operationId`           | The route `name` (`name.<verb>` when an `all` route expands), else `<verb>_<path_slug>`. Duplicates are renamed with a warning. |
-| Tag                     | The first static path segment (`/users/:id` is tagged `users`).                                  |
-| Summary / description   | The route `label`; the route or handler `description`, plus a line about required user types and the cookie CSRF rule when the route is guarded. |
-| Path parameters         | `validation.params` gives typed ones; a path segment with no schema is a required `string`.       |
-| Request body / query    | `validation.schema`, converted with the Seal schema's JSON Schema output. It is the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request. |
-| Responses               | `handler.responseSchema`, one response per declared status (see below). A route with no 2xx declared gets a `200` description only. |
-| `422`                   | Added when the route has `validation.schema`, shaped by `validation.response` (`errors`, `inputKey`, `inputError`, `status`; `Response.failedSchema` defaults to 422). Stored once as `components.schemas.ValidationFailed`. A route with only `validation.params` gets none. |
-| `401`                   | Added when the route is guarded, as `{ error: string }` (`components.schemas.Unauthorized`). A status you declare yourself is kept. |
-| Security                | `authMiddleware()` tags the middleware it returns with a `Symbol.for("warlock.auth")` descriptor (`{ sources, userTypes }`); core reads it without importing auth. A header source is `bearerAuth` (HTTP bearer), a cookie source is `cookieAuth` (API key in that cookie); header plus cookie is an OR. Only the schemes a route uses are emitted. Middleware without a descriptor adds nothing. |
+| Part                  | Source                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paths                 | `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head).                                                                                                                                                                                                                                                                          |
+| `operationId`         | The route `name` (`name.<verb>` when an `all` route expands), else `<verb>_<path_slug>`. Duplicates are renamed with a warning.                                                                                                                                                                                                                                                                   |
+| Tag                   | The first static path segment (`/users/:id` is tagged `users`).                                                                                                                                                                                                                                                                                                                                   |
+| Summary / description | The route `label`; the route or handler `description`, plus a line about required user types and the cookie CSRF rule when the route is guarded.                                                                                                                                                                                                                                                  |
+| Path parameters       | `validation.params` gives typed ones; a path segment with no schema is a required `string`.                                                                                                                                                                                                                                                                                                       |
+| Request body / query  | `validation.schema`, converted with the Seal schema's JSON Schema output. It is the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request.                                                                                                                                                                   |
+| Responses             | `handler.responseSchema`, one response per declared status (see below). A route with no 2xx declared gets a `200` description only.                                                                                                                                                                                                                                                               |
+| `422`                 | Added when the route has `validation.schema`, shaped by `validation.response` (`errors`, `inputKey`, `inputError`, `status`; `Response.failedSchema` defaults to 422). Stored once as `components.schemas.ValidationFailed`. A route with only `validation.params` gets none.                                                                                                                     |
+| `401`                 | Added when the route is guarded, as `{ error: string }` (`components.schemas.Unauthorized`). A status you declare yourself is kept.                                                                                                                                                                                                                                                               |
+| Security              | `authMiddleware()` tags the middleware it returns with a `Symbol.for("warlock.auth")` descriptor (`{ sources, userTypes }`); core reads it without importing auth. A header source is `bearerAuth` (HTTP bearer), a cookie source is `cookieAuth` (API key in that cookie); header plus cookie is an OR. Only the schemes a route uses are emitted. Middleware without a descriptor adds nothing. |
 
 ### Responses from `responseSchema`
 
@@ -103,12 +103,12 @@ npx warlock generate.postman
 # Postman collection written to <root>/storage/postman/collection.json (3 folders, 17 requests). Import it in Postman and set the {{token}} variable.
 ```
 
-| Option            | Default                                   | Meaning                                                            |
-| ----------------- | ----------------------------------------- | ------------------------------------------------------------------ |
-| `--out`, `-o`     | `storage/postman/collection.json`         | Output file, relative to the project root.                          |
-| `--title`         | `name` in `package.json`                  | Collection name; the collection id is a stable hash of it.          |
-| `--server`        | `http://<host>:<port>` from the `http` config | Value of the `{{baseUrl}}` variable.                              |
-| `--include-pages` | off                                       | Also include page (SSR) routes.                                     |
+| Option            | Default                                       | Meaning                                                    |
+| ----------------- | --------------------------------------------- | ---------------------------------------------------------- |
+| `--out`, `-o`     | `storage/postman/collection.json`             | Output file, relative to the project root.                 |
+| `--title`         | `name` in `package.json`                      | Collection name; the collection id is a stable hash of it. |
+| `--server`        | `http://<host>:<port>` from the `http` config | Value of the `{{baseUrl}}` variable.                       |
+| `--include-pages` | off                                           | Also include page (SSR) routes.                            |
 
 What the collection contains:
 

@@ -29,14 +29,14 @@ Summary: 5 ok, 1 warn, 0 fail
 
 Six checks run in a fixed order — runtime-surface first, release hygiene last:
 
-| Check             | Status meaning                                                                                                   |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `routes`          | Reports the number of registered routes. **`warn`** when zero (a route module probably failed to load silently). |
-| `config`          | The required top-level config sections (`app`, `http`) are present. A missing one is a **`fail`**.                |
-| `connectors`      | Lists the registered connectors and which are currently active. Informational — passes as long as it can enumerate. |
+| Check             | Status meaning                                                                                                                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes`          | Reports the number of registered routes. **`warn`** when zero (a route module probably failed to load silently).                                                                                                            |
+| `config`          | The required top-level config sections (`app`, `http`) are present. A missing one is a **`fail`**.                                                                                                                          |
+| `connectors`      | Lists the registered connectors and which are currently active. Informational — passes as long as it can enumerate.                                                                                                         |
 | `optional-peers`  | Probes the optional peer deps core knows how to use (`sharp`, `nodemailer`, `socket.io`, the AWS SDK family, `redis`, the DB drivers). Missing ones are a **`warn`** — that feature is simply unavailable, never a failure. |
-| `health`          | The built-in `/health` (liveness) and `/ready` (readiness) endpoints will be exposed. **`warn`** when disabled via `http.health.enabled = false`. |
-| `release-hygiene` | The project `package.json` version matches the top `## x.y.z` heading in `CHANGELOG.md`. A mismatch is a **`fail`**; a missing/unparseable changelog is a **`warn`**. |
+| `health`          | The built-in `/health` (liveness) and `/ready` (readiness) endpoints will be exposed. **`warn`** when disabled via `http.health.enabled = false`.                                                                           |
+| `release-hygiene` | The project `package.json` version matches the top `## x.y.z` heading in `CHANGELOG.md`. A mismatch is a **`fail`**; a missing/unparseable changelog is a **`warn`**.                                                       |
 
 ## Statuses and exit code
 
@@ -54,7 +54,7 @@ warlock doctor || exit 1   # fail the pipeline on any fail-status check
 
 ## What it does NOT do
 
-`doctor` deliberately bootstraps your app code (so routes and connectors are registered for introspection) **but starts no connectors** — it never opens a database, cache, or socket connection. The `connectors` check therefore reports the registered set and which are *already* active without forcing any up. Every check is read-only: it may introspect the router, connectors, config, and `package.json`, but never writes.
+`doctor` deliberately bootstraps your app code (so routes and connectors are registered for introspection) **but starts no connectors** — it never opens a database, cache, or socket connection. The `connectors` check therefore reports the registered set and which are _already_ active without forcing any up. Every check is read-only: it may introspect the router, connectors, config, and `package.json`, but never writes.
 
 ## How a check is shaped
 
@@ -64,9 +64,9 @@ Each check is a small, self-contained probe. Internally a check is a `{ name, ru
 type CheckStatus = "ok" | "warn" | "fail";
 
 type CheckResult = {
-  name: string;     // stable check name, e.g. "routes"
+  name: string; // stable check name, e.g. "routes"
   status: CheckStatus;
-  detail: string;   // one-line, user-facing explanation
+  detail: string; // one-line, user-facing explanation
 };
 ```
 
@@ -78,7 +78,7 @@ The default set, the runner, and the formatter live inside `@warlock.js/core`'s 
 
 - **Warnings don't fail the command.** A missing optional peer or disabled health endpoint is a `warn` and keeps a zero exit. Only `fail`-status checks set exit `1`.
 - **`release-hygiene` reads the project root.** It compares `package.json` and `CHANGELOG.md` at the project root — the same version↔changelog invariant the release-hygiene unit guard enforces, surfaced as a pre-release check.
-- **No connectors are started.** Don't expect `doctor` to verify a live DB connection — it reports what's *registered*, not what connects. For runtime liveness use the `/health` / `/ready` endpoints.
+- **No connectors are started.** Don't expect `doctor` to verify a live DB connection — it reports what's _registered_, not what connects. For runtime liveness use the `/health` / `/ready` endpoints.
 
 ## Going further
 

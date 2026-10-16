@@ -24,4 +24,10 @@
  * }
  */
 export type FinishReason =
-  "stop" | "tool_calls" | "length" | "context_exceeded" | "pause_turn" | "refusal" | "error";
+  | "stop"
+  | "tool_calls"
+  | "length"
+  | "context_exceeded"
+  | "pause_turn"
+  | "refusal"
+  | "error";

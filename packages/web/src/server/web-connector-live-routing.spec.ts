@@ -251,7 +251,10 @@ describe("WebConnector live page routing", () => {
 
   it("atomically replaces routes, then invalidates the client registry for a route edit", async () => {
     const files = fixture();
-    const vite = fakeVite({ config: { route: { path: "/profile", name: "profile" } }, default: (): null => null });
+    const vite = fakeVite({
+      config: { route: { path: "/profile", name: "profile" } },
+      default: (): null => null,
+    });
     const next = page(files.pageFile, {
       declaredPath: "/profile",
       path: "/admin/profile",

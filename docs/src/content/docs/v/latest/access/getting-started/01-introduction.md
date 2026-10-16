@@ -10,7 +10,7 @@ sidebar:
 
 ## The mental model in one paragraph
 
-The package owns the **engine** — wildcard matching, caching, ABAC policies, fail-closed decisions. You hand it **one adapter**, a *resolver*, that reads a user's roles and the permissions they grant from however your app stores them — a fixed catalog in code, or the DB-backed tables `npx warlock add access` ejects. Then `can(user, "orders.update")` and `gate("orders.update")` just work. The two ideas inside are **permissions** (RBAC grants) and **policies** (ABAC conditions) — which is exactly why it's called `access`, not either half.
+The package owns the **engine** — wildcard matching, caching, ABAC policies, fail-closed decisions. You hand it **one adapter**, a _resolver_, that reads a user's roles and the permissions they grant from however your app stores them — a fixed catalog in code, or the DB-backed tables `npx warlock add access` ejects. Then `can(user, "orders.update")` and `gate("orders.update")` just work. The two ideas inside are **permissions** (RBAC grants) and **policies** (ABAC conditions) — which is exactly why it's called `access`, not either half.
 
 ## When to reach for it
 

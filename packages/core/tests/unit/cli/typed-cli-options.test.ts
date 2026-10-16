@@ -60,7 +60,9 @@ describe("parseCliArgs — declared boolean options (#21)", () => {
     expect(parseCliArgs(argv("migrate", "--rollback=true"), migrateSchema).options.rollback).toBe(
       true,
     );
-    expect(parseCliArgs(argv("migrate", "--rollback=1"), migrateSchema).options.rollback).toBe(true);
+    expect(parseCliArgs(argv("migrate", "--rollback=1"), migrateSchema).options.rollback).toBe(
+      true,
+    );
     expect(parseCliArgs(argv("migrate", "--rollback=yes"), migrateSchema).options.rollback).toBe(
       true,
     );

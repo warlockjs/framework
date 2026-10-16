@@ -94,7 +94,18 @@ function fixture(overrides: Partial<LocalRegistryGateDependencies> = {}) {
     now: () => new Date("2026-09-02T12:00:00.000Z"),
     ...overrides,
   };
-  return { dependencies, events, commands, handoffs, writes, count, ownershipHandles, ownedRegistry, deadPorts, startRequests };
+  return {
+    dependencies,
+    events,
+    commands,
+    handoffs,
+    writes,
+    count,
+    ownershipHandles,
+    ownedRegistry,
+    deadPorts,
+    startRequests,
+  };
 }
 
 describe("local registry unit sequencing controls (not the real-registry acceptance proof)", () => {
@@ -102,7 +113,11 @@ describe("local registry unit sequencing controls (not the real-registry accepta
     const control = fixture();
     await assert.rejects(
       runLocalRegistryPreGate(
-        { ...INPUT, expectedFamilyNames: WARLOCK_FAMILY_PACKAGE_NAMES.slice(1), artifacts: ARTIFACTS.slice(1) },
+        {
+          ...INPUT,
+          expectedFamilyNames: WARLOCK_FAMILY_PACKAGE_NAMES.slice(1),
+          artifacts: ARTIFACTS.slice(1),
+        },
         control.dependencies,
       ),
       new RegExp(`exactly the ${WARLOCK_FAMILY_PACKAGE_NAMES.length}-package`),
@@ -118,7 +133,10 @@ describe("local registry unit sequencing controls (not the real-registry accepta
       { ...INPUT, expectedFamilyNames: order, artifacts },
       control.dependencies,
     );
-    assert.deepEqual(handoff.artifacts.map(({ name }) => name), order);
+    assert.deepEqual(
+      handoff.artifacts.map(({ name }) => name),
+      order,
+    );
   });
 
   it("rejects a start seam that cannot prove its claimed port belongs to its returned server", async () => {
@@ -193,9 +211,10 @@ describe("local registry unit sequencing controls (not the real-registry accepta
       },
     });
     const inherited = Object.fromEntries(
-      ["npm_config_registry", "NPM_CONFIG_CACHE", "NODE_AUTH_TOKEN", "HTTPS_PROXY"].map(
-        (key) => [key, process.env[key]],
-      ),
+      ["npm_config_registry", "NPM_CONFIG_CACHE", "NODE_AUTH_TOKEN", "HTTPS_PROXY"].map((key) => [
+        key,
+        process.env[key],
+      ]),
     );
     Object.assign(process.env, {
       npm_config_registry: "https://evil.invalid/",
@@ -218,15 +237,27 @@ describe("local registry unit sequencing controls (not the real-registry accepta
     assert.equal(generatorContext.browserOracleAdapterPath, BROWSER_ORACLE);
     assert.deepEqual(control.handoffs, [handoff]);
     assert.equal(Object.isFrozen(handoff), true);
-    assert.deepEqual(control.count, { stopped: 1, exited: 1, dead: 1, ready: 1, workspaces: 1, hashes: ARTIFACTS.length * 2 });
+    assert.deepEqual(control.count, {
+      stopped: 1,
+      exited: 1,
+      dead: 1,
+      ready: 1,
+      workspaces: 1,
+      hashes: ARTIFACTS.length * 2,
+    });
     assert.equal(control.ownershipHandles.size, 1);
     assert.equal([...control.ownershipHandles][0], control.ownedRegistry);
-    assert.deepEqual(control.startRequests, [{ configPath: join(WORKSPACE, "verdaccio.yaml"), host: "127.0.0.1", cwd: WORKSPACE }]);
+    assert.deepEqual(control.startRequests, [
+      { configPath: join(WORKSPACE, "verdaccio.yaml"), host: "127.0.0.1", cwd: WORKSPACE },
+    ]);
     assert.equal("port" in control.startRequests[0], false);
     assert.deepEqual(control.deadPorts, [control.ownedRegistry.port]);
     const config = control.writes.get(join(WORKSPACE, "verdaccio.yaml")) ?? "";
     assert.match(config, /npmjs:\n    url: https:\/\/registry\.npmjs\.org\//);
-    assert.doesNotMatch(config.slice(config.indexOf("'@warlock.js/*'"), config.indexOf("'@*/*'")), /proxy:/);
+    assert.doesNotMatch(
+      config.slice(config.indexOf("'@warlock.js/*'"), config.indexOf("'@*/*'")),
+      /proxy:/,
+    );
     assert.match(config.slice(config.indexOf("'@*/*'")), /proxy: npmjs/);
     for (const command of control.commands) {
       assert.equal(command.command, process.execPath);
@@ -246,30 +277,47 @@ describe("local registry unit sequencing controls (not the real-registry accepta
       assert.equal(command.env.NODE_AUTH_TOKEN, undefined);
       assert.equal(command.env.HTTPS_PROXY, undefined);
     }
-    assert.ok(control.events.indexOf("registry-ready") < control.events.indexOf("generator-gate-started"));
-    assert.ok(control.events.indexOf("registry-server-proved-closed") < control.events.indexOf("port-proved-dead"));
-    assert.ok(control.events.lastIndexOf("artifact-reverified") < control.events.indexOf("handoff-emitted"));
+    assert.ok(
+      control.events.indexOf("registry-ready") < control.events.indexOf("generator-gate-started"),
+    );
+    assert.ok(
+      control.events.indexOf("registry-server-proved-closed") <
+        control.events.indexOf("port-proved-dead"),
+    );
+    assert.ok(
+      control.events.lastIndexOf("artifact-reverified") < control.events.indexOf("handoff-emitted"),
+    );
   });
 
   it("keeps a broken generator red and still proves process and port death", async () => {
     let publications = 0;
     const control = fixture({
-      runZeroEditGeneratorGate: async () => { throw new Error("generated app does not boot"); },
+      runZeroEditGeneratorGate: async () => {
+        throw new Error("generated app does not boot");
+      },
       emitHandoff: async () => void ++publications,
     });
     await assert.rejects(runLocalRegistryPreGate(INPUT, control.dependencies), /does not boot/);
     assert.equal(publications, 0);
     assert.equal(control.count.exited, 1);
     assert.equal(control.count.dead, 1);
-    assert.ok(control.commands.filter(({ args }) => args[1] === "publish").every(({ args }) => args.includes("http://127.0.0.1:48731/")));
+    assert.ok(
+      control.commands
+        .filter(({ args }) => args[1] === "publish")
+        .every(({ args }) => args.includes("http://127.0.0.1:48731/")),
+    );
   });
 
   it("re-hashes after generator/cleanup and rejects changed bytes before handoff", async () => {
     let hashes = 0;
     const control = fixture({
-      sha256File: async () => (++hashes <= WARLOCK_FAMILY_PACKAGE_NAMES.length ? HASH : CHANGED_HASH),
+      sha256File: async () =>
+        ++hashes <= WARLOCK_FAMILY_PACKAGE_NAMES.length ? HASH : CHANGED_HASH,
     });
-    await assert.rejects(runLocalRegistryPreGate(INPUT, control.dependencies), /changed after local rehearsal/);
+    await assert.rejects(
+      runLocalRegistryPreGate(INPUT, control.dependencies),
+      /changed after local rehearsal/,
+    );
     assert.equal(control.handoffs.length, 0);
     assert.equal(control.count.exited, 1);
     assert.equal(control.count.dead, 1);
@@ -284,12 +332,19 @@ it(
     const generatorPath = process.env.WARLOCK_ZERO_EDIT_GENERATOR_GATE;
     assert.ok(manifestPath, "WARLOCK_GATE_MANIFEST is required");
     assert.ok(generatorPath, "WARLOCK_ZERO_EDIT_GENERATOR_GATE is required");
-    const input = JSON.parse(await readFile(resolve(manifestPath), "utf8")) as LocalRegistryGateInput;
+    const input = JSON.parse(
+      await readFile(resolve(manifestPath), "utf8"),
+    ) as LocalRegistryGateInput;
     const generator = (await import(pathToFileURL(resolve(generatorPath)).href)) as {
       runZeroEditGeneratorGate?: (context: GeneratorGateContext) => Promise<void>;
     };
     assert.equal(typeof generator.runZeroEditGeneratorGate, "function");
-    const handoff = await runLocalRegistryPreGate(input, { runZeroEditGeneratorGate: generator.runZeroEditGeneratorGate! });
-    assert.deepEqual(new Set(handoff.artifacts.map(({ name }) => name)), new Set(WARLOCK_FAMILY_PACKAGE_NAMES));
+    const handoff = await runLocalRegistryPreGate(input, {
+      runZeroEditGeneratorGate: generator.runZeroEditGeneratorGate!,
+    });
+    assert.deepEqual(
+      new Set(handoff.artifacts.map(({ name }) => name)),
+      new Set(WARLOCK_FAMILY_PACKAGE_NAMES),
+    );
   },
 );

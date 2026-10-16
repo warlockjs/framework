@@ -115,7 +115,10 @@ describe("enabled — middleware and validation phases fire in order", () => {
     // Covered end-to-end via the shared `buildTracingContext` unit specs in
     // `tracing/tracing-dispatcher.spec.ts`; this pins that the SAME request
     // exposes a non-empty `traceId` by the time middleware phases can fire.
-    const { request } = createRequestWithRoute({ middleware: [], handler: (async () => {}) as never });
+    const { request } = createRequestWithRoute({
+      middleware: [],
+      handler: (async () => {}) as never,
+    });
 
     expect(request.traceId).toBeTruthy();
     expect(request.traceId).toBe(request.id);

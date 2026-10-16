@@ -68,7 +68,13 @@ export class CronParser {
       );
     }
 
-    const [minute, hour, dayOfMonth, month, dayOfWeek] = parts as [string, string, string, string, string];
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = parts as [
+      string,
+      string,
+      string,
+      string,
+      string,
+    ];
 
     this._isDayOfMonthRestricted = dayOfMonth.trim() !== "*";
     this._isDayOfWeekRestricted = dayOfWeek.trim() !== "*";
@@ -145,9 +151,7 @@ export class CronParser {
       return date;
     }
 
-    throw new Error(
-      `Could not find next run time for cron expression: ${this._expression}`,
-    );
+    throw new Error(`Could not find next run time for cron expression: ${this._expression}`);
   }
 
   /**
@@ -205,7 +209,9 @@ export class CronParser {
 
     const smallestDay = this._fields.daysOfMonth[0];
     if (smallestDay === undefined) {
-      throw new Error(`Invalid cron expression: "${this._expression}". Day-of-month has no values.`);
+      throw new Error(
+        `Invalid cron expression: "${this._expression}". Day-of-month has no values.`,
+      );
     }
 
     const reachable = this._fields.months.some(
@@ -279,9 +285,7 @@ export class CronParser {
         }
 
         if (rangeStart < min || rangeEnd > max || rangeStart > rangeEnd) {
-          throw new Error(
-            `Range out of bounds in cron field: "${field}" (valid: ${min}-${max})`,
-          );
+          throw new Error(`Range out of bounds in cron field: "${field}" (valid: ${min}-${max})`);
         }
       } else {
         // Single value
@@ -292,9 +296,7 @@ export class CronParser {
         }
 
         if (value < min || value > max) {
-          throw new Error(
-            `Value out of bounds in cron field: "${field}" (valid: ${min}-${max})`,
-          );
+          throw new Error(`Value out of bounds in cron field: "${field}" (valid: ${min}-${max})`);
         }
 
         rangeStart = value;

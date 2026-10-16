@@ -50,14 +50,26 @@ const CORPUS: Array<{ label: string; address: string; expected: boolean }> = [
   { label: "172.16.0.0/12 private (low)", address: "172.16.0.0", expected: true },
   { label: "172.16.0.0/12 private", address: "172.20.1.1", expected: true },
   { label: "172.16.0.0/12 private (high)", address: "172.31.255.255", expected: true },
-  { label: "172.15.255.255 public boundary below 172.16/12", address: "172.15.255.255", expected: false },
+  {
+    label: "172.15.255.255 public boundary below 172.16/12",
+    address: "172.15.255.255",
+    expected: false,
+  },
   { label: "172.32.0.0 public boundary above 172.16/12", address: "172.32.0.0", expected: false },
 
   { label: "192.168.0.0/16 private (low)", address: "192.168.0.0", expected: true },
   { label: "192.168.0.0/16 private", address: "192.168.1.1", expected: true },
   { label: "192.168.0.0/16 private (high)", address: "192.168.255.255", expected: true },
-  { label: "192.167.255.255 public boundary below 192.168/16", address: "192.167.255.255", expected: false },
-  { label: "192.169.0.0 public boundary above 192.168/16", address: "192.169.0.0", expected: false },
+  {
+    label: "192.167.255.255 public boundary below 192.168/16",
+    address: "192.167.255.255",
+    expected: false,
+  },
+  {
+    label: "192.169.0.0 public boundary above 192.168/16",
+    address: "192.169.0.0",
+    expected: false,
+  },
 
   // --- IPv4 loopback ---
   { label: "127.0.0.0/8 loopback (low)", address: "127.0.0.1", expected: true },
@@ -67,7 +79,11 @@ const CORPUS: Array<{ label: string; address: string; expected: boolean }> = [
   { label: "100.64.0.0/10 CGNAT (low)", address: "100.64.0.0", expected: true },
   { label: "100.64.0.0/10 CGNAT", address: "100.100.0.1", expected: true },
   { label: "100.64.0.0/10 CGNAT (high)", address: "100.127.255.255", expected: true },
-  { label: "100.63.255.255 public boundary below CGNAT", address: "100.63.255.255", expected: false },
+  {
+    label: "100.63.255.255 public boundary below CGNAT",
+    address: "100.63.255.255",
+    expected: false,
+  },
   { label: "100.128.0.0 public boundary above CGNAT", address: "100.128.0.0", expected: false },
 
   // --- IPv4 link-local / metadata ---
@@ -77,7 +93,11 @@ const CORPUS: Array<{ label: string; address: string; expected: boolean }> = [
 
   // --- IPv4 IETF/test ranges ---
   { label: "192.0.0.0/24 IETF protocol assignments", address: "192.0.0.1", expected: true },
-  { label: "192.0.2.0/24 test-net-1 (falls in 192.0.0.0/24 check)", address: "192.0.2.1", expected: true },
+  {
+    label: "192.0.2.0/24 test-net-1 (falls in 192.0.0.0/24 check)",
+    address: "192.0.2.1",
+    expected: true,
+  },
   { label: "198.18.0.0/15 benchmarking (low)", address: "198.18.0.1", expected: true },
   { label: "198.18.0.0/15 benchmarking (high)", address: "198.19.255.255", expected: true },
   { label: "198.51.100.0/24 test-net-2", address: "198.51.100.1", expected: true },
@@ -91,13 +111,21 @@ const CORPUS: Array<{ label: string; address: string; expected: boolean }> = [
   // --- IPv4 public addresses (well-known) ---
   { label: "8.8.8.8 public DNS", address: "8.8.8.8", expected: false },
   { label: "1.1.1.1 public DNS", address: "1.1.1.1", expected: false },
-  { label: "223.255.255.255 public boundary below multicast", address: "223.255.255.255", expected: false },
+  {
+    label: "223.255.255.255 public boundary below multicast",
+    address: "223.255.255.255",
+    expected: false,
+  },
 
   // --- non-IP string: node's `isIP` returns family 0, so both classifiers
   // return `false` without reaching the internal (unreachable in practice)
   // "unparseable → fail closed" branch, which only guards a parse failure
   // AFTER `isIP` has already confirmed family 4 ---
-  { label: "malformed octet overflow (not a valid IP per node:net isIP)", address: "999.999.999.999", expected: false },
+  {
+    label: "malformed octet overflow (not a valid IP per node:net isIP)",
+    address: "999.999.999.999",
+    expected: false,
+  },
 
   // --- IPv6 loopback / unspecified ---
   { label: "::1 loopback", address: "::1", expected: true },
@@ -113,12 +141,24 @@ const CORPUS: Array<{ label: string; address: string; expected: boolean }> = [
 
   // --- IPv6 v4-mapped ---
   { label: "::ffff:10.0.0.1 v4-mapped private", address: "::ffff:10.0.0.1", expected: true },
-  { label: "::ffff:169.254.169.254 v4-mapped metadata", address: "::ffff:169.254.169.254", expected: true },
+  {
+    label: "::ffff:169.254.169.254 v4-mapped metadata",
+    address: "::ffff:169.254.169.254",
+    expected: true,
+  },
   { label: "::ffff:8.8.8.8 v4-mapped public", address: "::ffff:8.8.8.8", expected: false },
 
   // --- IPv6 public ---
-  { label: "2001:4860:4860::8888 public (Google DNS)", address: "2001:4860:4860::8888", expected: false },
-  { label: "2606:4700:4700::1111 public (Cloudflare DNS)", address: "2606:4700:4700::1111", expected: false },
+  {
+    label: "2001:4860:4860::8888 public (Google DNS)",
+    address: "2001:4860:4860::8888",
+    expected: false,
+  },
+  {
+    label: "2606:4700:4700::1111 public (Cloudflare DNS)",
+    address: "2606:4700:4700::1111",
+    expected: false,
+  },
 ];
 
 describe("SSRF classifier drift guard (canon b880975c)", () => {
@@ -135,10 +175,7 @@ describe("SSRF classifier drift guard (canon b880975c)", () => {
 
     if (drift.length > 0) {
       const details = drift
-        .map(
-          (d) =>
-            `  "${d.address}" (${d.label}): core=${d.core} vs ai=${d.ai}`,
-        )
+        .map((d) => `  "${d.address}" (${d.label}): core=${d.core} vs ai=${d.ai}`)
         .join("\n");
       throw new Error(
         `SSRF classifier drift detected between core and ai (canon b880975c) — ` +

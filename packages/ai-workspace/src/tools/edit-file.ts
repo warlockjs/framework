@@ -1,10 +1,5 @@
 import { tool, type ToolContract } from "@warlock.js/ai";
-import {
-  objectSchema,
-  optionalBooleanField,
-  optionalStringField,
-  stringField,
-} from "./schema";
+import { objectSchema, optionalBooleanField, optionalStringField, stringField } from "./schema";
 import type { EditFileInput, EditFileResult, WorkspaceOps } from "../contracts";
 
 /** Default tool name exposed to the LLM. */

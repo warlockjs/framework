@@ -8,18 +8,20 @@ function recorder() {
     new Proxy(
       {},
       {
-        get: (_t, method: string) => (...args: any[]) => {
-          log.push([
-            method,
-            ...args.map((arg) => {
-              if (typeof arg !== "function") return arg;
-              const nested: any[] = [];
-              arg(make(nested));
-              return nested;
-            }),
-          ]);
-          return make(log);
-        },
+        get:
+          (_t, method: string) =>
+          (...args: any[]) => {
+            log.push([
+              method,
+              ...args.map((arg) => {
+                if (typeof arg !== "function") return arg;
+                const nested: any[] = [];
+                arg(make(nested));
+                return nested;
+              }),
+            ]);
+            return make(log);
+          },
       },
     );
 
@@ -74,9 +76,9 @@ describe("FilterApplicator value handling", () => {
   });
 
   it("rejects invalid dates and integers with a 400 instead of a 500", () => {
-    expect(() => run({ created: "date" }, { created: "nope" }, { dateFormat: "DD-MM-YYYY" })).toThrow(
-      expect.objectContaining({ name: "BadRequestError" }),
-    );
+    expect(() =>
+      run({ created: "date" }, { created: "nope" }, { dateFormat: "DD-MM-YYYY" }),
+    ).toThrow(expect.objectContaining({ name: "BadRequestError" }));
     expect(() => run({ x: "int" }, { x: "abc" })).toThrow(
       expect.objectContaining({ name: "BadRequestError" }),
     );

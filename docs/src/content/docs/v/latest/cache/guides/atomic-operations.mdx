@@ -11,7 +11,7 @@ Without atomic operations, concurrent requests silently lose data:
 
 ```ts
 // ❌ RACE CONDITION
-const views = await cache.get("page.views") || 0;
+const views = (await cache.get("page.views")) || 0;
 await cache.set("page.views", views + 1);
 
 // Two requests firing at once:
@@ -24,12 +24,12 @@ await cache.set("page.views", views + 1);
 
 Four tools, pick by shape of the data:
 
-| Operation | Use for | Redis primitive |
-|-----------|---------|-----------------|
-| `increment` / `decrement` | Numeric counters | `INCRBY` / `DECRBY` |
-| `update` / `merge` | Object/structured values | Chain lock (WATCH/MULTI in v2.1) |
-| `set({ onConflict: "create" })` | Distributed locks, idempotency keys | `SET … NX` |
-| `set({ onConflict: "update" })` | Update-only writes | `SET … XX` |
+| Operation                       | Use for                             | Redis primitive                  |
+| ------------------------------- | ----------------------------------- | -------------------------------- |
+| `increment` / `decrement`       | Numeric counters                    | `INCRBY` / `DECRBY`              |
+| `update` / `merge`              | Object/structured values            | Chain lock (WATCH/MULTI in v2.1) |
+| `set({ onConflict: "create" })` | Distributed locks, idempotency keys | `SET … NX`                       |
+| `set({ onConflict: "update" })` | Update-only writes                  | `SET … XX`                       |
 
 ## Increment and decrement
 
@@ -38,11 +38,7 @@ Four tools, pick by shape of the data:
 ```ts
 import { cache } from "@warlock.js/cache";
 
-async function checkRateLimit(
-  ip: string,
-  limit: number = 100,
-  windowSeconds: number = 60,
-) {
+async function checkRateLimit(ip: string, limit: number = 100, windowSeconds: number = 60) {
   const key = `rate-limit.api.${ip}`;
 
   // Atomically increment request count
@@ -130,7 +126,7 @@ async function withLock<T>(key: string, ttl: string, work: () => Promise<T>) {
   // stuck locks ("which worker is holding this lock?").
   const acquired = await cache.set(key, process.pid, {
     onConflict: "create",
-    ttl,   // safety net: auto-release if we crash without remove()
+    ttl, // safety net: auto-release if we crash without remove()
   });
 
   if (!acquired.wasSet) {
@@ -161,7 +157,7 @@ async function processPayment(paymentId: string, amount: number) {
   // `wasSet` is false and we bail out.
   const claimed = await cache.set(`payment.processed.${paymentId}`, 1, {
     onConflict: "create",
-    ttl: "1d",   // keep the idempotency record for a day
+    ttl: "1d", // keep the idempotency record for a day
   });
 
   if (!claimed.wasSet) {
@@ -181,7 +177,7 @@ Same shape as the idempotency-key example, but for a long-running job. Prevents 
 async function processJob(jobId: string) {
   const claimed = await cache.set(`job.processing.${jobId}`, process.pid, {
     onConflict: "create",
-    ttl: "1h",     // if we crash, lock releases after an hour
+    ttl: "1h", // if we crash, lock releases after an hour
   });
 
   if (!claimed.wasSet) {
@@ -248,12 +244,12 @@ async function rateLimitDistributed(ip: string, limit: number = 100) {
 
 ## Which drivers are atomic across servers
 
-| Driver | `increment` / `decrement` | `pull` | `update` / `merge` |
-| --- | --- | --- | --- |
-| `redis` | Cross-server (`INCRBY`, keeps TTL) | Cross-server (`GETDEL`) | Cross-server (Lua compare-and-set, bounded retries) |
-| `pg` | Cross-server (one upsert, keeps expiry) | Cross-server (`DELETE … RETURNING`) | Cross-server (compare-and-set, bounded retries) |
-| `memory` / `memoryExtended` / `lru` / `mock` | One process | One process | One process (serialized per key) |
-| `file` | One process (serialized per key) | One process (serialized per key) | Not supported (throws) |
+| Driver                                       | `increment` / `decrement`               | `pull`                              | `update` / `merge`                                  |
+| -------------------------------------------- | --------------------------------------- | ----------------------------------- | --------------------------------------------------- |
+| `redis`                                      | Cross-server (`INCRBY`, keeps TTL)      | Cross-server (`GETDEL`)             | Cross-server (Lua compare-and-set, bounded retries) |
+| `pg`                                         | Cross-server (one upsert, keeps expiry) | Cross-server (`DELETE … RETURNING`) | Cross-server (compare-and-set, bounded retries)     |
+| `memory` / `memoryExtended` / `lru` / `mock` | One process                             | One process                         | One process (serialized per key)                    |
+| `file`                                       | One process (serialized per key)        | One process (serialized per key)    | Not supported (throws)                              |
 
 Under contention, `update()` callbacks on `redis` and `pg` can run more than once, so keep them free of side effects. `pull()` hands a one-time value to exactly one caller on `redis` and `pg`. With several servers, use one of those two; `memory` is per-process.
 

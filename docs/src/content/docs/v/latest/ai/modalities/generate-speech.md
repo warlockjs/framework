@@ -49,14 +49,14 @@ Every AI verb returns the same discriminated envelope. For speech:
 type SpeechResult = {
   type: "speech";
   data?: { audio: GeneratedAudio }; // undefined on failure
-  error?: AIError;                  // undefined on success — NEVER thrown
-  usage: Usage;                     // tokens (gpt-4o-mini-tts) + cost when priced
-  report: SpeechReport;             // type:"speech", model, characters, lineage
+  error?: AIError; // undefined on success — NEVER thrown
+  usage: Usage; // tokens (gpt-4o-mini-tts) + cost when priced
+  report: SpeechReport; // type:"speech", model, characters, lineage
 };
 
 type GeneratedAudio = {
   type: "base64";
-  base64: string;    // base64-encoded audio bytes
+  base64: string; // base64-encoded audio bytes
   mediaType: string; // IANA type, e.g. "audio/mpeg", "audio/wav"
 };
 ```
@@ -71,14 +71,14 @@ The options are provider-neutral. Each adapter maps the ones its API supports an
 await ai.speech({
   model,
   text: "Welcome aboard. Let's get you set up.",
-  voice: "verse",              // voice id/name; overrides the model's default
-  format: "wav",               // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
-  speed: 1.25,                 // playback multiplier (OpenAI 0.25–4.0)
-  instructions: "calm, warm",  // tone/delivery steering (gpt-4o-mini-tts only)
-  signal,                      // AbortSignal
-  observe: collector,          // route the report to an Observer
-  sessionId: "onboarding-42",  // group into a session for flat cost/trace queries
-  options: { /* provider passthrough */ },
+  voice: "verse", // voice id/name; overrides the model's default
+  format: "wav", // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
+  speed: 1.25, // playback multiplier (OpenAI 0.25–4.0)
+  instructions: "calm, warm", // tone/delivery steering (gpt-4o-mini-tts only)
+  signal, // AbortSignal
+  observe: collector, // route the report to an Observer
+  sessionId: "onboarding-42", // group into a session for flat cost/trace queries
+  options: {/* provider passthrough */},
 });
 ```
 

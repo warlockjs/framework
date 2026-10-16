@@ -28,7 +28,7 @@ const attacks: Record<string, any> = {
   "constructor array-of-objects": { "constructor[0][isAdmin]": "true" },
   "second segment": { "a[__proto__][isAdmin]": "true" },
   "second segment indexed": { "a[0][__proto__]": "true", "a[0][constructor]": "true" },
-  "deep": { "a[b][__proto__][isAdmin]": "true" },
+  deep: { "a[b][__proto__][isAdmin]": "true" },
 };
 
 describe("prototype pollution in request parsing", () => {

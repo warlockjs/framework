@@ -22,10 +22,7 @@ import { scheduler, job } from "@warlock.js/scheduler";
 const isProduction = process.env.NODE_ENV === "production";
 
 scheduler.addJob(
-  job("poll-exchange-rates", fetchRates).every(
-    isProduction ? 1 : 30,
-    "minute",
-  ), // every minute in prod, every 30 in dev
+  job("poll-exchange-rates", fetchRates).every(isProduction ? 1 : 30, "minute"), // every minute in prod, every 30 in dev
 );
 
 scheduler.start();
@@ -48,9 +45,7 @@ scheduler.addJob(job("cleanup", cleanupTempFiles).daily().at("02:00"));
 
 // Production only — never email real customers from a laptop.
 if (process.env.NODE_ENV === "production") {
-  scheduler.addJob(
-    job("customer-digest", sendCustomerDigest).daily().at("07:00"),
-  );
+  scheduler.addJob(job("customer-digest", sendCustomerDigest).daily().at("07:00"));
 }
 
 scheduler.start();
@@ -68,10 +63,7 @@ type Env = "development" | "staging" | "production";
 
 const env = (process.env.NODE_ENV as Env) ?? "development";
 
-const schedules: Record<
-  string,
-  { fn: () => Promise<void>; cron: Record<Env, string | null> }
-> = {
+const schedules: Record<string, { fn: () => Promise<void>; cron: Record<Env, string | null> }> = {
   "poll-rates": {
     fn: fetchRates,
     cron: {
@@ -124,6 +116,6 @@ scheduler-level knobs.
 
 Because there is nothing the framework could add that beats a plain
 `if`. Environment detection, config precedence, secret gating — those
-belong to *your* app's config layer, not the scheduler's. The scheduler
+belong to _your_ app's config layer, not the scheduler's. The scheduler
 stays a small, predictable primitive and composes with whatever you
 already use to tell dev from prod.

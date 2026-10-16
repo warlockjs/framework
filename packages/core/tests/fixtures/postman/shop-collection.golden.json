@@ -31,12 +31,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
             },
             "description": "Creates a user.\n\nRequires an authenticated user of type: admin."
           },
@@ -63,12 +59,8 @@
                 },
                 "url": {
                   "raw": "{{baseUrl}}/users",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "users"
-                  ]
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users"]
                 }
               },
               "status": "Created",
@@ -105,12 +97,8 @@
                 },
                 "url": {
                   "raw": "{{baseUrl}}/users",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "users"
-                  ]
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users"]
                 }
               },
               "status": "Unauthorized",
@@ -147,12 +135,8 @@
                 },
                 "url": {
                   "raw": "{{baseUrl}}/users",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "users"
-                  ]
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users"]
                 }
               },
               "status": "Unprocessable Entity",
@@ -176,13 +160,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users/:id?page=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users",
-                ":id"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ":id"],
               "variable": [
                 {
                   "key": "id",
@@ -212,13 +191,8 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/users/:id?page=",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "users",
-                    ":id"
-                  ],
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", ":id"],
                   "variable": [
                     {
                       "key": "id",
@@ -259,13 +233,8 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/users/:id?page=",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "users",
-                    ":id"
-                  ],
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", ":id"],
                   "variable": [
                     {
                       "key": "id",
@@ -311,12 +280,8 @@
         ],
         "url": {
           "raw": "{{baseUrl}}/health",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "health"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
         },
         "auth": {
           "type": "noauth"
@@ -337,12 +302,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "health"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
             }
           },
           "status": "OK",
@@ -385,12 +346,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/avatars",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "avatars"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["avatars"]
             }
           },
           "response": [
@@ -417,12 +374,8 @@
                 },
                 "url": {
                   "raw": "{{baseUrl}}/avatars",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "avatars"
-                  ]
+                  "host": ["{{baseUrl}}"],
+                  "path": ["avatars"]
                 }
               },
               "status": "No Content",
@@ -442,12 +395,8 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/me",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "me"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["me"]
         },
         "auth": {
           "type": "noauth"
@@ -462,12 +411,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/me",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "me"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["me"]
             }
           },
           "status": "OK",

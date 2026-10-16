@@ -7,17 +7,17 @@ The cache event system provides comprehensive observability into every cache ope
 
 ## Available Events
 
-| Event | When Fired | Event Data |
-|-------|-----------|------------|
-| `hit` | Value retrieved from cache | `{ key, value, driver }` |
-| `miss` | Value not found or expired | `{ key, driver }` |
-| `set` | Value stored in cache | `{ key, value, ttl, driver }` |
-| `removed` | Key removed from cache | `{ key, driver }` |
-| `flushed` | Entire cache cleared | `{ driver }` |
-| `expired` | Key expired (TTL reached) | `{ key, driver }` |
-| `connected` | Driver connected | `{ driver }` |
-| `disconnected` | Driver disconnected | `{ driver }` |
-| `error` | Error occurred | `{ error, driver, key? }` |
+| Event          | When Fired                 | Event Data                    |
+| -------------- | -------------------------- | ----------------------------- |
+| `hit`          | Value retrieved from cache | `{ key, value, driver }`      |
+| `miss`         | Value not found or expired | `{ key, driver }`             |
+| `set`          | Value stored in cache      | `{ key, value, ttl, driver }` |
+| `removed`      | Key removed from cache     | `{ key, driver }`             |
+| `flushed`      | Entire cache cleared       | `{ driver }`                  |
+| `expired`      | Key expired (TTL reached)  | `{ key, driver }`             |
+| `connected`    | Driver connected           | `{ driver }`                  |
+| `disconnected` | Driver disconnected        | `{ driver }`                  |
+| `error`        | Error occurred             | `{ error, driver, key? }`     |
 
 ## Monitoring and Metrics
 
@@ -44,7 +44,7 @@ cache.on("miss", ({ key }) => {
 // Log metrics periodically
 setInterval(() => {
   const total = hitCount + missCount;
-  const hitRate = total > 0 ? (hitCount / total * 100).toFixed(2) : 0;
+  const hitRate = total > 0 ? ((hitCount / total) * 100).toFixed(2) : 0;
   console.log(`Hit rate: ${hitRate}% (${hitCount} hits, ${missCount} misses)`);
 }, 60000);
 ```
@@ -89,7 +89,7 @@ const metrics = {
   productHits: 0,
   productMisses: 0,
   cartHits: 0,
-  cartMisses: 0
+  cartMisses: 0,
 };
 
 cache.on("hit", ({ key }) => {
@@ -107,7 +107,9 @@ setInterval(() => {
   console.log("Product Cache:", {
     hits: metrics.productHits,
     misses: metrics.productMisses,
-    hitRate: (metrics.productHits / (metrics.productHits + metrics.productMisses) * 100).toFixed(2) + "%"
+    hitRate:
+      ((metrics.productHits / (metrics.productHits + metrics.productMisses)) * 100).toFixed(2) +
+      "%",
   });
 }, 60000);
 ```
@@ -120,9 +122,9 @@ import { cache } from "@warlock.js/cache";
 cache.on("error", ({ error, driver, key }) => {
   console.error(`Cache error on ${driver}:`, {
     key,
-    error: error.message
+    error: error.message,
   });
-  
+
   // Send to error tracking service
   errorTracker.report(error, { driver, key });
 });
@@ -206,7 +208,7 @@ class CacheMonitor {
     hits: 0,
     misses: 0,
     sets: 0,
-    errors: 0
+    errors: 0,
   };
 
   constructor() {
@@ -223,8 +225,8 @@ class CacheMonitor {
       misses: this.stats.misses,
       sets: this.stats.sets,
       errors: this.stats.errors,
-      hitRate: total > 0 ? (this.stats.hits / total * 100).toFixed(2) + "%" : "0%",
-      totalRequests: total
+      hitRate: total > 0 ? ((this.stats.hits / total) * 100).toFixed(2) + "%" : "0%",
+      totalRequests: total,
     };
   }
 
@@ -279,4 +281,3 @@ cache.on("error", (data: CacheEventData) => {
 - **Performance issues?** Ensure event handlers are fast — consider using a message queue for heavy operations
 
 See [Best Practices](/v/latest/cache/best-practices/) for more monitoring patterns.
-

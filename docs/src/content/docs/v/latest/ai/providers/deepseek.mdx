@@ -22,21 +22,9 @@ workflow, and supervisor already speaks.
 ## Install
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm install @warlock.js/ai @warlock.js/ai-deepseek
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-deepseek
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm add @warlock.js/ai @warlock.js/ai-deepseek
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm install @warlock.js/ai @warlock.js/ai-deepseek ```</TabItem>
+  <TabItem label="yarn">```bash pnpm add @warlock.js/ai @warlock.js/ai-deepseek ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm add @warlock.js/ai @warlock.js/ai-deepseek ```</TabItem>
 </Tabs>
 
 ## Construct
@@ -103,12 +91,12 @@ supervisor.
 
 ## Models
 
-| Model | Notes |
-| --- | --- |
-| `deepseek-chat` | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
-| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default. |
-| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default. |
+| Model               | Notes                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
+| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**.        |
+| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                                    |
+| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                                   |
 
 DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names
 retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are
@@ -120,12 +108,12 @@ id the upstream serves.
 The wrapper injects DeepSeek's own inference so the right flags are set even
 though the model names aren't OpenAI names:
 
-| Flag | Default |
-| --- | --- |
-| `reasoning` | Inferred from the model name — `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
-| `vision` | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026). |
-| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode. |
-| `promptCaching` | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI. |
+| Flag               | Default                                                                                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reasoning`        | Inferred from the model name — `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
+| `vision`           | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026).                                                                                         |
+| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode.                                                                                   |
+| `promptCaching`    | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI.                                                                                 |
 
 An explicit value always wins over the injected inference:
 

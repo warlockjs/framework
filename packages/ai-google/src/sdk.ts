@@ -46,7 +46,10 @@ import { GoogleModel } from "./model";
  * (`models/gemini-1.5-flash-001`).
  */
 function usesGeminiImageTransport(name: string): boolean {
-  return name.toLowerCase().replace(/^models\//, "").startsWith("gemini-");
+  return name
+    .toLowerCase()
+    .replace(/^models\//, "")
+    .startsWith("gemini-");
 }
 
 /**

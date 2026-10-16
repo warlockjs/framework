@@ -9,7 +9,7 @@
 **Decision:** [`decisions.md` #10](./decisions.md)
 **Originating plan:** `plans/2026-05-22-operations-api-and-cli.md` (delete on full ship)
 
-Answers *how the migration CLI surface is organised, where each piece lives, and why* — not how to use it (that's the guide and the skill).
+Answers _how the migration CLI surface is organised, where each piece lives, and why_ — not how to use it (that's the guide and the skill).
 
 ## The shape
 
@@ -49,7 +49,7 @@ The seven public exports cluster into two roles:
 
 The Operations API has two consumers today:
 
-1. **Warlock-core's CLI actions** (`@warlock.js/core/src/database/*-action.ts`). They handle warlock-specific glue — file discovery (`getFilesFromDirectory(srcPath("app"), ...)`), config-registered migrations (`warlockConfigManager.get("database")?.migrations`), `filesOrchestrator.load` for TS files in the dev-server pipeline. Once registration is done, they hand off to the Ops API for actual execution. The drop-tables action also keeps direct registry access for the *introspection* phase (listing tables + per-table row counts before a destructive confirm) — the Ops API surfaces actions, not reads.
+1. **Warlock-core's CLI actions** (`@warlock.js/core/src/database/*-action.ts`). They handle warlock-specific glue — file discovery (`getFilesFromDirectory(srcPath("app"), ...)`), config-registered migrations (`warlockConfigManager.get("database")?.migrations`), `filesOrchestrator.load` for TS files in the dev-server pipeline. Once registration is done, they hand off to the Ops API for actual execution. The drop-tables action also keeps direct registry access for the _introspection_ phase (listing tables + per-table row counts before a destructive confirm) — the Ops API surfaces actions, not reads.
 2. **Cascade's standalone `cascade` binary** (`@warlock.js/cascade/src/cli*`). Scope is narrower — migration ops only, no `db:create` / `db:drop-tables` (those need project context to know which DB to act on; cascade-standalone has no config file naming the DB). Config is env-only. Migration files are discovered by glob (`./migrations/**/*.{ts,js,mjs,cjs}` from cwd) and loaded via plain `await import()`.
 
 The two share zero state at runtime — each starts its own Node process, registers its own DataSource, calls into the same Operations API. Bug-for-bug identical behavior is verified end-to-end against the live `ai` PostgreSQL DB (36 migrations).
@@ -60,17 +60,17 @@ No `cascade.config.{ts,js}`. Two reasons settled it: (1) the cascade CLI's knob 
 
 What the CLI reads:
 
-| Env var | Maps to | Aliases |
-|---|---|---|
-| `DATABASE_URL` | Driver `connectionString` / `uri` | `DB_URL` |
-| `DB_DIALECT` | Driver selection (`postgres` / `mongodb`) | `DB_DRIVER` |
-| `DB_HOST` | Driver host | — |
-| `DB_PORT` | Driver port | — |
-| `DB_NAME` | Driver database | — |
-| `DB_USER` | Driver user | `DB_USERNAME` |
-| `DB_PASSWORD` | Driver password | — |
-| `CASCADE_PRIMARY_KEY` | `DataSource.migrationDefaults.primaryKey` (`uuid` / `int` / `bigInt`) | — |
-| `CASCADE_UUID_STRATEGY` | `DataSource.migrationDefaults.uuidStrategy` (`v4` / `v7`) | — |
+| Env var                 | Maps to                                                               | Aliases       |
+| ----------------------- | --------------------------------------------------------------------- | ------------- |
+| `DATABASE_URL`          | Driver `connectionString` / `uri`                                     | `DB_URL`      |
+| `DB_DIALECT`            | Driver selection (`postgres` / `mongodb`)                             | `DB_DRIVER`   |
+| `DB_HOST`               | Driver host                                                           | —             |
+| `DB_PORT`               | Driver port                                                           | —             |
+| `DB_NAME`               | Driver database                                                       | —             |
+| `DB_USER`               | Driver user                                                           | `DB_USERNAME` |
+| `DB_PASSWORD`           | Driver password                                                       | —             |
+| `CASCADE_PRIMARY_KEY`   | `DataSource.migrationDefaults.primaryKey` (`uuid` / `int` / `bigInt`) | —             |
+| `CASCADE_UUID_STRATEGY` | `DataSource.migrationDefaults.uuidStrategy` (`v4` / `v7`)             | —             |
 
 Aliases let an existing warlock project's `.env` (which uses `DB_URL` / `DB_DRIVER` / `DB_USERNAME`) work with the cascade binary unchanged. `.env` is auto-loaded via `@mongez/dotenv`'s `loadEnv()` at CLI start, wrapped in try/catch so missing `.env` is a no-op rather than a crash.
 

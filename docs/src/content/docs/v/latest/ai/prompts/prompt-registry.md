@@ -26,9 +26,9 @@ const support = ai.systemPrompt("You are senior support for {{product}}.", {
   required: ["product"],
 });
 
-ai.prompts.has("support");        // true
-ai.prompts.list();                // ["support"]
-ai.prompts.versions("support");   // ["1"]
+ai.prompts.has("support"); // true
+ai.prompts.list(); // ["support"]
+ai.prompts.versions("support"); // ["1"]
 ```
 
 `version` defaults to the next integer for that name when omitted, so a second named build of `support` lands at `support@2`. Registering a `name@version` that already exists throws `InvalidRequestError` — **unless** the content is byte-identical (idempotent re-registration is allowed, a silent overwrite is not).
@@ -36,11 +36,14 @@ ai.prompts.versions("support");   // ["1"]
 You can also register an existing builder explicitly, or bulk-register many versions of one name with `define`:
 
 ```ts
-ai.prompts.register(support);     // explicit; returns the manager for chaining
+ai.prompts.register(support); // explicit; returns the manager for chaining
 
 ai.prompts.define("triage", [
   { version: "1", template: "Classify: {{ticket}}" },
-  { version: "2", template: [ai.persona("You are a triage router."), ai.instruction("Classify: {{ticket}}")] },
+  {
+    version: "2",
+    template: [ai.persona("You are a triage router."), ai.instruction("Classify: {{ticket}}")],
+  },
 ]);
 ```
 
@@ -53,9 +56,9 @@ A `define` entry's `template` is a raw string (wrapped into one instruction bloc
 `get(name, versionOrTag?)` returns the registered `SystemPrompt` builder; `resolve(name, versionOrTag?, placeholders?)` renders it to its final string in one call. With no selector, both pick the **latest** version (highest insertion order — derived from an internal counter, never `Date.now()`, so it's deterministic across same-tick registrations).
 
 ```ts
-ai.prompts.get("support");                    // latest builder
-ai.prompts.get("support", "1");               // a specific version
-ai.prompts.get("support@1");                  // inline name@version form
+ai.prompts.get("support"); // latest builder
+ai.prompts.get("support", "1"); // a specific version
+ai.prompts.get("support@1"); // inline name@version form
 
 ai.prompts.resolve("support", undefined, { product: "Warlock" });
 // "You are senior support for Warlock."
@@ -95,8 +98,8 @@ const report = await ai.prompts.validate("support", {
   placeholders: { product: "Warlock" },
 });
 
-report.ok;       // true — every required placeholder is accounted for
-report.missing;  // []
+report.ok; // true — every required placeholder is accounted for
+report.missing; // []
 ```
 
 When `options.judge` is a model, it **also** runs a Nova-safe LLM-as-judge quality pass over a clarity / role / output-format rubric. The judge is advisory: it returns a `score` (0–1) and `issues`, **never throws**, and degrades to an `issues` note (leaving `score` undefined) on any failure — so a flaky judge can never flip `ok`.
@@ -107,9 +110,9 @@ const report = await ai.prompts.validate("support", {
   judge: openai.model({ name: "gpt-4o-mini" }),
 });
 
-report.ok;      // deterministic verdict — unaffected by the judge
-report.score;   // 0..1 quality, or undefined if the judge degraded
-report.issues;  // advisory findings
+report.ok; // deterministic verdict — unaffected by the judge
+report.score; // 0..1 quality, or undefined if the judge degraded
+report.issues; // advisory findings
 ```
 
 ### Validate against your own criteria
@@ -145,7 +148,7 @@ await ai.prompts.validate("support", { judge, judgeCache: myCacheDriver });
 ```ts
 const delta = ai.prompts.diff("support", "1", "2");
 delta.identical; // false
-delta.changed;   // [{ from: { type, text }, to: { type, text } }, ...]
+delta.changed; // [{ from: { type, text }, to: { type, text } }, ...]
 ```
 
 ## `export` / `import` — portable snapshots
@@ -153,8 +156,8 @@ delta.changed;   // [{ from: { type, text }, to: { type, text } }, ...]
 `export()` serializes the whole registry to a portable JSON snapshot — every name, its versions (flattened to `{ type, text }` blocks), pinned tags, and carried `description` / `required` metadata. `import(snapshot)` rehydrates it (same duplicate / idempotency rule), restoring pinned tags. Use it to seed a worker, ship a prompt pack, or round-trip prompts through version control.
 
 ```ts
-const snapshot = ai.prompts.export();     // { prompts: [{ name, versions: [...] }, ...] }
-freshManager.import(snapshot);            // same names, versions, tags
+const snapshot = ai.prompts.export(); // { prompts: [{ name, versions: [...] }, ...] }
+freshManager.import(snapshot); // same names, versions, tags
 ```
 
 ## Isolated registries
@@ -184,5 +187,5 @@ Pair `validate()` with [`agent.eval`](/v/latest/ai/testing/evaluation-and-datase
 
 - [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) — the `SystemPrompt` builder, `.meta()` identity, and registry-aware `.merge()`.
 - [Refine prompts](/v/latest/ai/prompts/refine-prompts/) — `systemPrompt().refined({ model, criteria, store })`, the prompt compiler; register its output as a next version to `diff` original vs refined.
-- [Evaluation and datasets](/v/latest/ai/testing/evaluation-and-datasets/) — grade the *behaviour* a prompt produces, not just the text.
+- [Evaluation and datasets](/v/latest/ai/testing/evaluation-and-datasets/) — grade the _behaviour_ a prompt produces, not just the text.
 - [Run agent](/v/latest/ai/agents/run-agent/) — where a resolved prompt is consumed.

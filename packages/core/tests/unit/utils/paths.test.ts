@@ -72,9 +72,7 @@ describe("directory helpers", () => {
 
 describe("uploadsPath", () => {
   it("defaults to storage/uploads when no config override is set", () => {
-    expect(uploadsPath("avatar.png")).toBe(
-      path.resolve(root, "storage", "uploads", "avatar.png"),
-    );
+    expect(uploadsPath("avatar.png")).toBe(path.resolve(root, "storage", "uploads", "avatar.png"));
   });
 
   it("resolves against a configured string root", () => {

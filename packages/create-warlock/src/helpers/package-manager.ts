@@ -20,9 +20,7 @@ export const ALLOWED_PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const;
 export type AllowedPackageManager = (typeof ALLOWED_PACKAGE_MANAGERS)[number];
 
 /** Whether `value` is one of the allow-listed package managers. */
-export function isValidPackageManager(
-  value: string,
-): value is AllowedPackageManager {
+export function isValidPackageManager(value: string): value is AllowedPackageManager {
   return (ALLOWED_PACKAGE_MANAGERS as readonly string[]).includes(value);
 }
 
@@ -67,9 +65,7 @@ async function checkManager(manager: string): Promise<boolean> {
  * without reaching either probe, so `--pm=bun` passed the spelling check and
  * then could never appear among the options that would honour it.
  */
-const PROBED_PACKAGE_MANAGERS = ALLOWED_PACKAGE_MANAGERS.filter(
-  manager => manager !== "npm",
-);
+const PROBED_PACKAGE_MANAGERS = ALLOWED_PACKAGE_MANAGERS.filter((manager) => manager !== "npm");
 
 const PREFERRED_PACKAGE_MANAGERS = ["pnpm", "yarn", "npm"] as const;
 
@@ -77,9 +73,7 @@ const PREFERRED_PACKAGE_MANAGERS = ["pnpm", "yarn", "npm"] as const;
  * A running non-npm manager is already usable. Every fallback must be present
  * in the detector's installed set, so both sync and async paths agree.
  */
-function preferredPackageManager(
-  isAvailable: (manager: AllowedPackageManager) => boolean,
-): string {
+function preferredPackageManager(isAvailable: (manager: AllowedPackageManager) => boolean): string {
   const runningPm = detectPackageManager()?.name;
   if (runningPm && runningPm !== "npm" && isValidPackageManager(runningPm)) {
     return runningPm;
@@ -97,9 +91,7 @@ export async function detectPackageManagers() {
   const managers = ["npm", ...available];
 
   cachedSystemManagers = managers;
-  cachedPreferredManager = preferredPackageManager(manager =>
-    managers.includes(manager),
-  );
+  cachedPreferredManager = preferredPackageManager((manager) => managers.includes(manager));
 }
 
 /**
@@ -118,9 +110,7 @@ export function getSystemPackageManagers(): string[] {
  */
 export function getPreferredPackageManager(): string {
   if (cachedPreferredManager) return cachedPreferredManager;
-  return preferredPackageManager(
-    manager => manager === "npm" || isInstalled(manager),
-  );
+  return preferredPackageManager((manager) => manager === "npm" || isInstalled(manager));
 }
 
 export function setPackageManager(packageManager: string) {

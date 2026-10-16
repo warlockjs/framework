@@ -85,7 +85,11 @@ describe("consoleExporter", () => {
 
     await exporter.export(
       makeTrace(
-        makeSpan({ name: "market-research", input: "Research the market", output: "Demand is steady" }),
+        makeSpan({
+          name: "market-research",
+          input: "Research the market",
+          output: "Demand is steady",
+        }),
       ),
     );
 

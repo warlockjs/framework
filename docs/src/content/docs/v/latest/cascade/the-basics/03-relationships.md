@@ -5,7 +5,7 @@ sidebar:
   label: "Relationships"
 ---
 
-Querying one model is half the story. Real apps have models that *point at each other* — every post has an author, every author has many posts, every comment belongs somewhere. Cascade lets you declare those connections on the model class, load them efficiently, and query through them with the same vocabulary you already know.
+Querying one model is half the story. Real apps have models that _point at each other_ — every post has an author, every author has many posts, every comment belongs somewhere. Cascade lets you declare those connections on the model class, load them efficiently, and query through them with the same vocabulary you already know.
 
 This page introduces three models, walks the four relation types, shows the two ways to load related data, and surfaces the mental model that explains why `user.organization` looks like a property but isn't a column.
 
@@ -32,7 +32,7 @@ flowchart LR
     Comment -- belongsTo --> User
 ```
 
-Three models, four relations to declare. Cascade uses **TypeScript decorators on typed properties** for relations — the decorator names the relation type, the property name *is* the relation name, and the property's type tells TypeScript what to expect when the relation loads.
+Three models, four relations to declare. Cascade uses **TypeScript decorators on typed properties** for relations — the decorator names the relation type, the property name _is_ the relation name, and the property's type tells TypeScript what to expect when the relation loads.
 
 ```ts
 // src/app/posts/models/post/post.model.ts
@@ -117,11 +117,11 @@ The shape that matters across all three:
 
 Every relation decorator accepts the related model in one of **three forms**, and the choice has consequences:
 
-| Form | Type-safe | Cycle-safe | When to reach for it |
-| ---- | --------- | ---------- | -------------------- |
-| `"Post"` (string) | ❌ | ✅ | Cross-package refs, or when the related class can't be imported at all |
-| `Post` (direct class) | ✅ | ❌ | Cleanest — use when there's no import cycle between the two model files |
-| `lazy(() => Post)` | ✅ | ✅ | The canonical answer for **circular imports** (User↔Organization, Post↔Comment) |
+| Form                  | Type-safe | Cycle-safe | When to reach for it                                                            |
+| --------------------- | --------- | ---------- | ------------------------------------------------------------------------------- |
+| `"Post"` (string)     | ❌        | ✅         | Cross-package refs, or when the related class can't be imported at all          |
+| `Post` (direct class) | ✅        | ❌         | Cleanest — use when there's no import cycle between the two model files         |
+| `lazy(() => Post)`    | ✅        | ✅         | The canonical answer for **circular imports** (User↔Organization, Post↔Comment) |
 
 The `lazy()` form ships from `@mongez/reinforcements` and defers reading the class binding until query time — that sidesteps the ESM partial-load gotcha that breaks direct class refs when two modules import each other. Most real apps have at least one such cycle (a user is the author of posts, a post belongs to a user) so `lazy(() => Model)` is the form you'll see most often. Reach for the direct class when you can; reach for the string when you must.
 
@@ -138,7 +138,7 @@ The relation that owns the foreign key. `Post.author_id` points at `User.id`, so
 public author?: User;
 ```
 
-When you don't pass a foreign key, Cascade infers one. **For `@BelongsTo`, the default FK is the *property name* in snake_case + `_id`** — so an `author` property looks for `author_id` on this model. That's why the bare form works above: Post's schema has `author_id`, the property is named `author`, the default lines up.
+When you don't pass a foreign key, Cascade infers one. **For `@BelongsTo`, the default FK is the _property name_ in snake_case + `_id`** — so an `author` property looks for `author_id` on this model. That's why the bare form works above: Post's schema has `author_id`, the property is named `author`, the default lines up.
 
 When the column isn't named after the property — or you want to be explicit — pass it as the second argument:
 
@@ -165,9 +165,9 @@ The inverse of `@BelongsTo`. `User` has many `Post`s, so on the `User` side:
 public posts?: Post[];
 ```
 
-**For `@HasMany` (and `@HasOne`), the default FK is *this model's* class name in snake_case + `_id`** — so `User`'s `@HasMany(Post)` looks for `user_id` on Post. The asymmetry from `@BelongsTo` is real: `@BelongsTo` defaults are named after the *property*, `@HasMany`/`@HasOne` after *this* model. One side of the relationship is named for the role, the other for the entity.
+**For `@HasMany` (and `@HasOne`), the default FK is _this model's_ class name in snake_case + `_id`** — so `User`'s `@HasMany(Post)` looks for `user_id` on Post. The asymmetry from `@BelongsTo` is real: `@BelongsTo` defaults are named after the _property_, `@HasMany`/`@HasOne` after _this_ model. One side of the relationship is named for the role, the other for the entity.
 
-In our example, Post's FK is `author_id` (matching its `author` belongsTo), not `user_id` — which is why `@HasMany(lazy(() => Post), "author_id")` above passes the FK explicitly. The bare form would look for `user_id` and silently return nothing. As a rule: when the property name on the *other* side matches *this* model's name, the bare form works. When it doesn't, pass the FK.
+In our example, Post's FK is `author_id` (matching its `author` belongsTo), not `user_id` — which is why `@HasMany(lazy(() => Post), "author_id")` above passes the FK explicitly. The bare form would look for `user_id` and silently return nothing. As a rule: when the property name on the _other_ side matches _this_ model's name, the bare form works. When it doesn't, pass the FK.
 
 Pass it as a string for the bare case, or as `{ foreignKey, localKey }` when you need more control (`localKey` defaults to this model's `static primaryKey ?? "id"`).
 
@@ -212,12 +212,12 @@ public roles?: Role[];
 `@BelongsToMany` relations come with **pivot operations** for managing membership. They all hang off `model.pivot(relation)`:
 
 ```ts
-await user.pivot("roles").attach([adminId, editorId]);              // add (skip existing)
+await user.pivot("roles").attach([adminId, editorId]); // add (skip existing)
 await user.pivot("roles").attach([adminId], { addedBy: currentUserId }); // + pivot columns
-await user.pivot("roles").detach([editorId]);                       // remove subset
-await user.pivot("roles").detach();                                 // remove all
-await user.pivot("roles").sync([adminId]);                          // replace the whole set
-await user.pivot("roles").toggle([adminId]);                        // flip each
+await user.pivot("roles").detach([editorId]); // remove subset
+await user.pivot("roles").detach(); // remove all
+await user.pivot("roles").sync([adminId]); // replace the whole set
+await user.pivot("roles").toggle([adminId]); // flip each
 ```
 
 `model.pivot(relation)` returns the pivot-operations object for that `@BelongsToMany` relation. The `.pivot("roles")` qualifier is deliberate — it keeps `model.pivot("roles").sync(...)` (set-replace on the join table) unambiguous against `Model.sync(...)`, which is the unrelated [denormalization-embed feature](../digging-deeper/sync.md). Passing a non-`@BelongsToMany` relation throws.
@@ -230,21 +230,21 @@ Before we load anything, take a minute on this — it's the single most useful c
 
 A Cascade model instance has **four distinct places state can live**, and they have different APIs because they have different jobs:
 
-| Layer | API | Lives where | Notes |
-| ----- | --- | ----------- | ----- |
-| **Schema columns** (persisted state) | `user.get("field")` / `.set()` / `.merge()` / `.unset()` | Internal data store, dirty-tracked | Mutations fire validation, events; dot-notation supported |
-| **Universal ID convenience** | `user.id`, `user.uuid` | Built-in getters on `Model` | Ubiquitous, read-only, type-stable |
-| **Developer-defined accessors** | `public get organizationId()` (you write the getter) | Manual on the class | Opt-in shortcut; still routes through `.get()` |
-| **Loaded relations** | `user.posts`, `post.author` | Class instance properties, *not* in schema data | Hydrated instances, only present after `.with()` or `.load()` |
+| Layer                                | API                                                      | Lives where                                     | Notes                                                         |
+| ------------------------------------ | -------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+| **Schema columns** (persisted state) | `user.get("field")` / `.set()` / `.merge()` / `.unset()` | Internal data store, dirty-tracked              | Mutations fire validation, events; dot-notation supported     |
+| **Universal ID convenience**         | `user.id`, `user.uuid`                                   | Built-in getters on `Model`                     | Ubiquitous, read-only, type-stable                            |
+| **Developer-defined accessors**      | `public get organizationId()` (you write the getter)     | Manual on the class                             | Opt-in shortcut; still routes through `.get()`                |
+| **Loaded relations**                 | `user.posts`, `post.author`                              | Class instance properties, _not_ in schema data | Hydrated instances, only present after `.with()` or `.load()` |
 
 The key thing: **schema columns and loaded relations look similar but behave differently.**
 
 ```ts
-user.get("name");      // column — lives in the model's tracked data
-user.posts;            // a different model entirely, attached as a property
+user.get("name"); // column — lives in the model's tracked data
+user.posts; // a different model entirely, attached as a property
 ```
 
-`user.posts` isn't a column on the user. It's an array of fully hydrated `Post` instances that Cascade stapled onto the user object after running a separate query. Set `user.posts = []` and nothing persists — it's not part of the user's data. Mutate `user.set("name", "x")` and dirty tracking kicks in — because `name` *is* part of the user's data.
+`user.posts` isn't a column on the user. It's an array of fully hydrated `Post` instances that Cascade stapled onto the user object after running a separate query. Set `user.posts = []` and nothing persists — it's not part of the user's data. Mutate `user.set("name", "x")` and dirty tracking kicks in — because `name` _is_ part of the user's data.
 
 That separation is why Cascade resists the urge to expose every schema field as a property accessor. Property assignments are invisible to grep, side-effect-free in JS, and would erase the distinction between "I changed a column" (write-back semantics) and "I attached related data" (no write-back). The current API surfaces the difference so the difference stays visible.
 
@@ -263,8 +263,8 @@ user.posts; // Post[]
 
 ```ts
 const user = await User.query().with("posts", "organization").find(id);
-user.posts;         // Post[]
-user.organization;  // Organization
+user.posts; // Post[]
+user.organization; // Organization
 ```
 
 Pass each relation name as a separate argument.
@@ -280,7 +280,7 @@ Dot-notation walks down the relation graph. Cascade loads each level efficiently
 
 ### Constraints on the related query
 
-Sometimes you don't want *every* related record — you want *some* of them. Pass a callback that receives the related query builder:
+Sometimes you don't want _every_ related record — you want _some_ of them. Pass a callback that receives the related query builder:
 
 ```ts
 const user = await User.query()
@@ -298,7 +298,7 @@ For multiple relations with different constraints, use the object form:
 const user = await User.query()
   .with({
     posts: (q) => q.where("status", "published"),
-    organization: true,                          // no constraint
+    organization: true, // no constraint
     roles: (q) => q.orderBy("priority"),
   })
   .find(id);
@@ -319,14 +319,14 @@ post.author; // User model instance — pulled in via JOIN
 
 ### When to reach for which
 
-| Situation | Use |
-| --------- | --- |
-| `hasMany` relations | `.with()` — JOINing would multiply the row count |
-| `belongsToMany` relations | `.with()` — same reason |
-| `belongsTo` or `hasOne`, want a round-trip optimization | `.joinWith()` |
-| Loading nested relations (`posts.comments.author`) | `.with()` with dot-notation |
-| You need a constraint callback on the related query | `.with(rel, cb)` — `.joinWith()` doesn't take constraint callbacks |
-| You're not sure | Start with `.with()`. Measure if it matters. |
+| Situation                                               | Use                                                                |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `hasMany` relations                                     | `.with()` — JOINing would multiply the row count                   |
+| `belongsToMany` relations                               | `.with()` — same reason                                            |
+| `belongsTo` or `hasOne`, want a round-trip optimization | `.joinWith()`                                                      |
+| Loading nested relations (`posts.comments.author`)      | `.with()` with dot-notation                                        |
+| You need a constraint callback on the related query     | `.with(rel, cb)` — `.joinWith()` doesn't take constraint callbacks |
+| You're not sure                                         | Start with `.with()`. Measure if it matters.                       |
 
 ### Lazy loading after fetch — `.load()`
 
@@ -347,15 +347,15 @@ Useful sparingly — if you know up front you'll need the relation, prefer `.wit
 A few short ones worth knowing:
 
 ```ts
-user.isLoaded("posts");        // boolean — has it been loaded?
-user.getRelation("posts");     // safe accessor for the loaded relation (or undefined)
+user.isLoaded("posts"); // boolean — has it been loaded?
+user.getRelation("posts"); // safe accessor for the loaded relation (or undefined)
 ```
 
 These exist for the times when you can't trust your code path — middleware, conditional branches, debugging output. Most of the time, `user.posts` is exactly the property you want.
 
 ## Querying through relations
 
-The query builder has methods that work *because* relations are declared. You can filter parents by what their children look like.
+The query builder has methods that work _because_ relations are declared. You can filter parents by what their children look like.
 
 ### `.has()` — "rows with at least one related record"
 
@@ -373,7 +373,7 @@ const prolificUsers = await User.query().has("posts", ">=", 5).get();
 
 ### `.whereHas()` — "rows where the related records match conditions"
 
-When `.has()` isn't enough — you don't just want "users with posts," you want "users with *published* posts":
+When `.has()` isn't enough — you don't just want "users with posts," you want "users with _published_ posts":
 
 ```ts
 const users = await User.query()
@@ -383,7 +383,7 @@ const users = await User.query()
   .get();
 ```
 
-The callback gives you the query builder on the *related* model. Use the full query vocabulary inside.
+The callback gives you the query builder on the _related_ model. Use the full query vocabulary inside.
 
 ### `.doesntHave()` / `.whereDoesntHave()`
 
@@ -399,7 +399,7 @@ const drafters = await User.query()
 
 ### `.withCount()` — count without loading
 
-Sometimes you want *how many* related records each row has, not the records themselves:
+Sometimes you want _how many_ related records each row has, not the records themselves:
 
 ```ts
 const users = await User.query().withCount("posts").get();

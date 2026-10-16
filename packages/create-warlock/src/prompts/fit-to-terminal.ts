@@ -33,10 +33,7 @@ const MIN_HINT_WIDTH = 12;
  * How many options a multiselect may show at once in a terminal `rows` lines
  * tall. clack scrolls the rest.
  */
-export function multiselectMaxItems(
-  optionCount: number,
-  rows = process.stdout.rows,
-): number {
+export function multiselectMaxItems(optionCount: number, rows = process.stdout.rows): number {
   const height = rows && rows > 0 ? rows : FALLBACK_ROWS;
   const fit = Math.max(MIN_VISIBLE_OPTIONS, height - PROMPT_CHROME_LINES);
 
@@ -53,11 +50,10 @@ export function fitOptionsToWidth<Option extends ListOption>(
 ): Option[] {
   const width = (columns && columns > 0 ? columns : FALLBACK_COLUMNS) - 1;
 
-  return options.map(option => {
+  return options.map((option) => {
     if (!option.hint) return option;
 
-    const room =
-      width - ROW_PREFIX_WIDTH - option.label.length - HINT_BRACKETS_WIDTH;
+    const room = width - ROW_PREFIX_WIDTH - option.label.length - HINT_BRACKETS_WIDTH;
 
     if (option.hint.length <= room) return option;
 

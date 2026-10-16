@@ -18,13 +18,13 @@ authService.setAuthCookie(response, tokens.accessToken); // or return tokens as 
 
 ## Install
 
-| Method | Command | Installs |
-| --- | --- | --- |
-| Google | `warlock add auth-google` | `jose` |
-| Apple, LinkedIn | `warlock add auth-google` (or `npm install jose`). There is no separate `auth-apple` or `auth-linkedin` feature yet. | `jose` |
-| GitHub, Discord, Facebook, X | nothing. These use plain OAuth 2 over `fetch`. | nothing |
-| Passkeys | `warlock add auth-passkeys` | `@simplewebauthn/server` (add `@simplewebauthn/browser` to your client bundle) |
-| Phone code | `warlock add notifications` + your own `sms`/`whatsapp` channel | nothing else — auth ships no SMS/WhatsApp driver |
+| Method                       | Command                                                                                                              | Installs                                                                       |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Google                       | `warlock add auth-google`                                                                                            | `jose`                                                                         |
+| Apple, LinkedIn              | `warlock add auth-google` (or `npm install jose`). There is no separate `auth-apple` or `auth-linkedin` feature yet. | `jose`                                                                         |
+| GitHub, Discord, Facebook, X | nothing. These use plain OAuth 2 over `fetch`.                                                                       | nothing                                                                        |
+| Passkeys                     | `warlock add auth-passkeys`                                                                                          | `@simplewebauthn/server` (add `@simplewebauthn/browser` to your client bundle) |
+| Phone code                   | `warlock add notifications` + your own `sms`/`whatsapp` channel                                                      | nothing else — auth ships no SMS/WhatsApp driver                               |
 
 Each SDK is an optional peer, loaded with `import()` only when that method
 runs. A missing SDK throws `AuthProviderSdkMissingError` (500) naming the
@@ -148,13 +148,13 @@ for (const provider of ["github", "discord", "linkedin", "facebook", "x"]) {
 }
 ```
 
-| Provider | Protocol | Where the email comes from |
-| --- | --- | --- |
-| GitHub | OAuth 2 + PKCE | `/user/emails`, because `/user.email` is `null` unless the user made it public. Only an address that is both **primary and verified** is used. Otherwise the profile has no email. |
-| Discord | OAuth 2 + PKCE | `/users/@me`. The email counts as verified only when Discord's `verified` flag is `true`. |
-| LinkedIn | OpenID Connect + PKCE | The id_token, checked with `jose` against LinkedIn's JWKS (signature, issuer, audience, expiry, nonce). `email_verified` must be the boolean `true`. |
-| Facebook | OAuth 2 | Graph `/me?fields=id,name,email,picture`. Facebook returns only confirmed addresses, so an email that is present counts as verified. Without the `email` permission, the profile has no email. |
-| X | OAuth 2 + PKCE, with HTTP Basic client auth at the token endpoint | **None.** `/2/users/me` never returns an email. |
+| Provider | Protocol                                                          | Where the email comes from                                                                                                                                                                     |
+| -------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub   | OAuth 2 + PKCE                                                    | `/user/emails`, because `/user.email` is `null` unless the user made it public. Only an address that is both **primary and verified** is used. Otherwise the profile has no email.             |
+| Discord  | OAuth 2 + PKCE                                                    | `/users/@me`. The email counts as verified only when Discord's `verified` flag is `true`.                                                                                                      |
+| LinkedIn | OpenID Connect + PKCE                                             | The id_token, checked with `jose` against LinkedIn's JWKS (signature, issuer, audience, expiry, nonce). `email_verified` must be the boolean `true`.                                           |
+| Facebook | OAuth 2                                                           | Graph `/me?fields=id,name,email,picture`. Facebook returns only confirmed addresses, so an email that is present counts as verified. Without the `email` permission, the profile has no email. |
+| X        | OAuth 2 + PKCE, with HTTP Basic client auth at the token endpoint | **None.** `/2/users/me` never returns an email.                                                                                                                                                |
 
 A profile with no verified email can log in only through an existing
 `provider_accounts` link. Otherwise it is rejected with
@@ -259,16 +259,23 @@ Browser side, with `@simplewebauthn/browser`:
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
 const post = (url: string, body?: unknown) =>
-  fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-    .then((r) => r.json());
+  fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  }).then((r) => r.json());
 
 // register
 const regOptions = await post("/auth/passkeys/register/options");
-await post("/auth/passkeys/register", { credential: await startRegistration({ optionsJSON: regOptions }) });
+await post("/auth/passkeys/register", {
+  credential: await startRegistration({ optionsJSON: regOptions }),
+});
 
 // log in
 const authOptions = await post("/auth/passkeys/login/options");
-await post("/auth/passkeys/login", { credential: await startAuthentication({ optionsJSON: authOptions }) });
+await post("/auth/passkeys/login", {
+  credential: await startAuthentication({ optionsJSON: authOptions }),
+});
 ```
 
 - Challenges live in `one_time_tokens` as SHA-256 hashes, expire after 5
@@ -289,7 +296,12 @@ otp: { channel: "sms" /* or "whatsapp" */, phoneField: "phone", expiresIn: "5m",
 ```
 
 ```ts title="src/app/users/routes.ts"
-import { otpRequestThrottleMiddleware, otpVerifyThrottleMiddleware, requestOtp, verifyOtp } from "@warlock.js/auth";
+import {
+  otpRequestThrottleMiddleware,
+  otpVerifyThrottleMiddleware,
+  requestOtp,
+  verifyOtp,
+} from "@warlock.js/auth";
 
 router.post(
   "/auth/otp/request",

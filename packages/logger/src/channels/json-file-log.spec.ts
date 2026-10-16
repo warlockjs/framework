@@ -45,9 +45,7 @@ async function waitForInit(channel?: JSONFileLog) {
     return;
   }
 
-  await waitForCondition(
-    () => (channel as unknown as { isInitialized: boolean }).isInitialized,
-  );
+  await waitForCondition(() => (channel as unknown as { isInitialized: boolean }).isInitialized);
 }
 
 async function waitForFile(filePath: string) {
@@ -96,10 +94,7 @@ describe("JSONFileLog", () => {
     // still exists here (we remove it last), so every `init()` succeeds and
     // flips `isInitialized`.
     await waitForCondition(() =>
-      channels.every(
-        (channel) =>
-          (channel as unknown as { isInitialized: boolean }).isInitialized,
-      ),
+      channels.every((channel) => (channel as unknown as { isInitialized: boolean }).isInitialized),
     );
 
     for (const channel of channels) {
@@ -305,7 +300,10 @@ describe("JSONFileLog", () => {
 
       await waitForCondition(() => {
         try {
-          return JSON.parse(fs.readFileSync(channel.filePath, "utf-8")).messages?.[0]?.content === "recovered";
+          return (
+            JSON.parse(fs.readFileSync(channel.filePath, "utf-8")).messages?.[0]?.content ===
+            "recovered"
+          );
         } catch {
           return false;
         }

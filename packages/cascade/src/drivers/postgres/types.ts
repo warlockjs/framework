@@ -101,7 +101,10 @@ export type PostgresQueryResult<T = Record<string, unknown>> = {
  * PostgreSQL transaction isolation levels.
  */
 export type PostgresIsolationLevel =
-  "read uncommitted" | "read committed" | "repeatable read" | "serializable";
+  | "read uncommitted"
+  | "read committed"
+  | "repeatable read"
+  | "serializable";
 
 /**
  * PostgreSQL transaction options.
@@ -126,7 +129,15 @@ export type PostgresTransactionOptions = {
 export type PostgresOperation = {
   /** Operation stage (select, where, join, etc.) */
   readonly stage:
-    "select" | "from" | "join" | "where" | "groupBy" | "having" | "orderBy" | "limit" | "offset";
+    | "select"
+    | "from"
+    | "join"
+    | "where"
+    | "groupBy"
+    | "having"
+    | "orderBy"
+    | "limit"
+    | "offset";
   /** Operation type/name */
   readonly type: string;
   /** Operation payload/data */

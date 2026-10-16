@@ -49,9 +49,7 @@ async function waitForInit(channel?: FileLog) {
     return;
   }
 
-  await waitForCondition(
-    () => (channel as unknown as { isInitialized: boolean }).isInitialized,
-  );
+  await waitForCondition(() => (channel as unknown as { isInitialized: boolean }).isInitialized);
 }
 
 function dataFor(overrides: Partial<LoggingData> = {}): LoggingData {
@@ -96,10 +94,7 @@ describe("FileLog", () => {
     // still exists here (we remove it last), so every `init()` succeeds and
     // flips `isInitialized`.
     await waitForCondition(() =>
-      channels.every(
-        (channel) =>
-          (channel as unknown as { isInitialized: boolean }).isInitialized,
-      ),
+      channels.every((channel) => (channel as unknown as { isInitialized: boolean }).isInitialized),
     );
 
     for (const channel of channels) {
@@ -200,7 +195,9 @@ describe("FileLog", () => {
 
       await waitForInit(channel);
 
-      await channel.log(dataFor({ type: "warn", module: "billing", action: "charge", message: "oops" }));
+      await channel.log(
+        dataFor({ type: "warn", module: "billing", action: "charge", message: "oops" }),
+      );
       channel.flushSync();
 
       const contents = fs.readFileSync(channel.filePath, "utf-8");
@@ -437,7 +434,11 @@ describe("FileLog", () => {
       await channel.log(dataFor({ module: "payments", message: "paid" }));
       channel.flushSync();
 
-      const filePath = path.join(storagePath, "payments", `${channel.fileName}.${channel.extension}`);
+      const filePath = path.join(
+        storagePath,
+        "payments",
+        `${channel.fileName}.${channel.extension}`,
+      );
 
       expect(fs.existsSync(filePath)).toBe(true);
     });
@@ -453,12 +454,14 @@ describe("FileLog", () => {
 
       await waitForInit(channel);
 
-      await channel.log(dataFor({
-        type: "error",
-        module: "billing",
-        action: "charge",
-        message: "x",
-      }));
+      await channel.log(
+        dataFor({
+          type: "error",
+          module: "billing",
+          action: "charge",
+          message: "x",
+        }),
+      );
 
       channel.flushSync();
 
@@ -564,7 +567,9 @@ describe("FileLog", () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
 
       const filesInStorage = fs.readdirSync(storagePath);
-      const rotatedFiles = filesInStorage.filter((file) => file !== `${channel.fileName}.${channel.extension}`);
+      const rotatedFiles = filesInStorage.filter(
+        (file) => file !== `${channel.fileName}.${channel.extension}`,
+      );
 
       expect(rotatedFiles.length).toBeGreaterThan(0);
     });

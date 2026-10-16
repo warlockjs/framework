@@ -12,11 +12,11 @@
 
 The `ttl` parameter (positional 3rd arg of `set`, or the `ttl` key inside the options object, or global driver config) accepts three shapes:
 
-| Shape | Example | Meaning |
-| --- | --- | --- |
-| `number` | `3600` | Seconds (preserves today's semantics) |
-| `string` | `"1h"`, `"30m"`, `"7d"` | Human-readable, parsed to seconds |
-| *(options object)* | see §2 | Only valid at the call site, not in global config |
+| Shape              | Example                 | Meaning                                           |
+| ------------------ | ----------------------- | ------------------------------------------------- |
+| `number`           | `3600`                  | Seconds (preserves today's semantics)             |
+| `string`           | `"1h"`, `"30m"`, `"7d"` | Human-readable, parsed to seconds                 |
+| _(options object)_ | see §2                  | Only valid at the call site, not in global config |
 
 Global driver config accepts **only the first two shapes** (number or string). The options-object shape is per-call.
 
@@ -30,12 +30,12 @@ Global driver config accepts **only the first two shapes** (number or string). T
 
 ```ts
 cache.set("user:1", user, {
-  ttl: "1h",                     // number | string
-  expiresAt: Date | number,      // absolute — mutually exclusive with ttl
-  tags: ["users", "active"],     // inline tags (no cache.tags([...]).set)
+  ttl: "1h", // number | string
+  expiresAt: Date | number, // absolute — mutually exclusive with ttl
+  tags: ["users", "active"], // inline tags (no cache.tags([...]).set)
   onConflict: "create" | "update" | "upsert",
-  namespace: "tenant-42",        // per-call namespace override
-  driver: "redis",               // per-call driver override
+  namespace: "tenant-42", // per-call namespace override
+  driver: "redis", // per-call driver override
   serializer: "json" | "msgpack" | CustomSerializer,
 });
 ```
@@ -74,11 +74,12 @@ cache.list<Event>("recent-events").pop();
 cache.list<Event>("recent-events").shift();
 cache.list<Event>("recent-events").slice(0, 10);
 cache.list<Event>("recent-events").length();
-cache.list<Event>("recent-events").trim(0, 99);  // keep only indices 0–99
+cache.list<Event>("recent-events").trim(0, 99); // keep only indices 0–99
 cache.list<Event>("recent-events").clear();
 ```
 
 **Driver mapping:**
+
 - Redis: native `LPUSH` / `RPUSH` / `LPOP` / `RPOP` / `LRANGE` / `LLEN` / `LTRIM`.
 - Memory / file: read-mutate-write. O(n). Document the perf asymmetry.
 
@@ -96,10 +97,11 @@ cache.update<User>("user:1", (current) => {
   return { ...current, name: "Jane" };
 });
 
-cache.merge<User>("user:1", { name: "Jane" });  // shallow only
+cache.merge<User>("user:1", { name: "Jane" }); // shallow only
 ```
 
 **Rules:**
+
 - `update(key, fn)` — read, apply, write. `fn` receives `current | null`; returning `null` removes the entry.
 - `merge(key, partial)` — shallow merge. If key missing → treat as empty object. Preserves existing TTL.
 - Optional `{ ttl }` second arg to reset TTL on write.
@@ -107,6 +109,7 @@ cache.merge<User>("user:1", { name: "Jane" });  // shallow only
 - **No JSONPath updates** (`update("user:1", "profile.name", "Jane")`). Rejected — too hard to type, too easy to misuse.
 
 **Concurrency:**
+
 - Redis: `WATCH` + `MULTI` for optimistic concurrency. Retry on conflict (bounded, e.g. 3 attempts, then throw `CacheConcurrencyError`).
 - Memory / LRU: in-process `locks` map (same as `remember`).
 - File: per-key file lock via `@mongez/fs` or similar. **Open question** — do we accept the dependency bump or ship update as Redis/memory-only in v1?
@@ -120,8 +123,8 @@ cache.setCacheConfigurations({
   default: "redis",
   drivers: { redis: RedisCacheDriver, memory: MemoryCacheDriver },
   options: {
-    redis: { url: "...", ttl: "7d" },       // string OK
-    memory: { ttl: 3600 },                   // number OK
+    redis: { url: "...", ttl: "7d" }, // string OK
+    memory: { ttl: 3600 }, // number OK
   },
 });
 ```

@@ -14,18 +14,18 @@ The `database` channel persists notifications and powers the in-app notification
 import { inApp } from "@warlock.js/notifications";
 
 await inApp.list(user, { type: "order.shipped" }); // all — optional filter + paging (page / limit)
-await inApp.listUnread(user);                        // unread only
-await inApp.countUnread(user);                       // cached — backs the badge
-await inApp.find(user, "ntf_123");                   // one — for a detail view
+await inApp.listUnread(user); // unread only
+await inApp.countUnread(user); // cached — backs the badge
+await inApp.find(user, "ntf_123"); // one — for a detail view
 
-await inApp.markAsRead(user, "ntf_123");             // one
-await inApp.markAsRead(user);                        // all unread for this user
+await inApp.markAsRead(user, "ntf_123"); // one
+await inApp.markAsRead(user); // all unread for this user
 await inApp.markAsUnread(user, "ntf_123");
-await inApp.dismiss(user, "ntf_123");                // delete one
-await inApp.dismiss(user);                           // clear all for this user
+await inApp.dismiss(user, "ntf_123"); // delete one
+await inApp.dismiss(user); // clear all for this user
 ```
 
-Every method forces the recipient id into the query. `markAsRead(user, id)` with an `id` belonging to a *different* user matches zero rows — **IDOR-safe by construction**, not by a guard you might forget. All methods accept a cascade model or a raw id.
+Every method forces the recipient id into the query. `markAsRead(user, id)` with an `id` belonging to a _different_ user matches zero rows — **IDOR-safe by construction**, not by a guard you might forget. All methods accept a cascade model or a raw id.
 
 ### The write side is IDOR-safe too (since 4.15.0)
 
@@ -66,9 +66,9 @@ export class Notification extends DatabaseNotification {
 ```ts
 type NotificationColumnMap = {
   recipient?: string; // recipient FK. Default "user_id"
-  tenant?: string;    // multi-tenant scope, written from the recipient. Omit → single-tenant
-  readAt?: string;    // read-timestamp column
-  isRead?: string;    // read-flag column (indexed)
+  tenant?: string; // multi-tenant scope, written from the recipient. Omit → single-tenant
+  readAt?: string; // read-timestamp column
+  isRead?: string; // read-flag column (indexed)
 };
 ```
 
@@ -76,7 +76,7 @@ Which read-state keys are **present** chooses the representation:
 
 - `readAt` only → unread is `read_at IS NULL`; marking read stamps it.
 - `isRead` only → unread is `is_read = false`; no timestamp.
-- both → `is_read` is the indexed filter flag, `read_at` records *when*.
+- both → `is_read` is the indexed filter flag, `read_at` records _when_.
 
 Declare neither and you get the `readAt`-only default. For multi-tenant, add `tenant: "organization_id"` — the `database` channel reads that column off the recipient and writes it on every row, no custom channel needed.
 

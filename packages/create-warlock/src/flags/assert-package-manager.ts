@@ -9,9 +9,7 @@ import {
  * Is `--pm` spelled like a package manager we support? Availability validation
  * calls this first, so an unknown executable is rejected before installation.
  */
-export function assertPackageManagerAllowed(
-  requested: string | undefined,
-): void {
+export function assertPackageManagerAllowed(requested: string | undefined): void {
   if (!requested) return;
 
   if (!isValidPackageManager(requested)) {
@@ -34,15 +32,11 @@ export function assertPackageManagerAllowed(
  * MUST be called after package-manager detection has completed, since
  * detection is what {@link getSystemPackageManagers} reports.
  */
-export function assertPackageManagerAvailable(
-  requested: string | undefined,
-): void {
+export function assertPackageManagerAvailable(requested: string | undefined): void {
   if (requested === undefined) return;
 
   if (!requested.trim()) {
-    cancel(
-      "The --pm flag requires a package manager value (npm, yarn, pnpm, or bun).",
-    );
+    cancel("The --pm flag requires a package manager value (npm, yarn, pnpm, or bun).");
     process.exit(1);
   }
 

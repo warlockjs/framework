@@ -15,19 +15,15 @@ import type { StandardSchemaV1 } from "./types";
  * // Failure → { issues: [{ message: "...", path: [{ key: "..." }] }] }
  * ```
  */
-export function mapToStandardResult(
-  result: ValidationResult,
-): StandardSchemaV1.Result<unknown> {
+export function mapToStandardResult(result: ValidationResult): StandardSchemaV1.Result<unknown> {
   if (result.isValid) {
     return { value: result.data };
   }
 
   return {
-    issues: result.errors.map(e => ({
+    issues: result.errors.map((e) => ({
       message: e.error,
-      path: e.input
-        ? e.input.split(".").map(key => ({ key }))
-        : undefined,
+      path: e.input ? e.input.split(".").map((key) => ({ key })) : undefined,
     })),
   };
 }

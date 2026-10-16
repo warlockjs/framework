@@ -12,9 +12,7 @@ import { wrapOpenAIError } from "./utils";
 
 const LOG_MODULE = "ai.openai";
 
-type EmbeddingsResponse = Awaited<
-  ReturnType<OpenAI["embeddings"]["create"]>
->;
+type EmbeddingsResponse = Awaited<ReturnType<OpenAI["embeddings"]["create"]>>;
 
 /**
  * OpenAI-backed implementation of `EmbedderContract`.

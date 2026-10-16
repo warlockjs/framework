@@ -181,8 +181,7 @@ class MockBackend implements WorkspaceBackend {
 
       const remainder = key.slice(prefix.length);
       const nextSlash = remainder.indexOf("/");
-      const childName =
-        nextSlash === -1 ? remainder : remainder.slice(0, nextSlash);
+      const childName = nextSlash === -1 ? remainder : remainder.slice(0, nextSlash);
 
       if (childName.length > 0) {
         children.add(`${prefix}${childName}`);

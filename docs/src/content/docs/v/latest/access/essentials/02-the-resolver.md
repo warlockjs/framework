@@ -20,7 +20,7 @@ export interface AccessResolver {
 
 Two methods that return plain string arrays, plus an optional `resolveTenant`. That's the whole thing the package can't know — your schema — and it's the only thing you supply. The engine does everything else: wildcard matching, caching, policies, fail-closed.
 
-> **Thick engine, thin adapter.** The resolver only *fetches*. Never cache inside it — the engine caches per `(user, tenant)` for you, and a second cache layer would serve stale grants.
+> **Thick engine, thin adapter.** The resolver only _fetches_. Never cache inside it — the engine caches per `(user, tenant)` for you, and a second cache layer would serve stale grants.
 
 ## The two starting points
 

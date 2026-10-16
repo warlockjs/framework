@@ -102,9 +102,7 @@ const WIN32_UNSAFE_ARGUMENT = /["%\r\n]/;
  * The caller must spawn with `windowsVerbatimArguments: true` so Node does
  * not re-quote the already-quoted command line.
  */
-function toWin32CmdInvocation(
-  argv: string[],
-): { file: string; args: string[] } | null {
+function toWin32CmdInvocation(argv: string[]): { file: string; args: string[] } | null {
   if (argv.some((element) => WIN32_UNSAFE_ARGUMENT.test(element))) {
     return null;
   }

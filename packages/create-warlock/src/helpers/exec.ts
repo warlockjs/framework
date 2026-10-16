@@ -64,7 +64,7 @@ export function takeLastCommandOutput(): CommandResult | undefined {
 export function tail(text: string, lines = 12): string {
   return text
     .split(/\r?\n/)
-    .filter(line => line.trim().length > 0)
+    .filter((line) => line.trim().length > 0)
     .slice(-lines)
     .join("\n");
 }
@@ -91,11 +91,11 @@ export default async function exec(command: string, options: any = {}) {
 function collectOutput(child: ChildProcess) {
   const chunks = { stdout: "", stderr: "" };
 
-  child.stdout?.on("data", data => {
+  child.stdout?.on("data", (data) => {
     chunks.stdout += String(data);
   });
 
-  child.stderr?.on("data", data => {
+  child.stderr?.on("data", (data) => {
     chunks.stderr += String(data);
   });
 
@@ -137,7 +137,7 @@ export function runCapturedCommand(
   cwd: string,
   options: RunOptions = {},
 ): Promise<CommandResult> {
-  return new Promise<CommandResult>(resolve => {
+  return new Promise<CommandResult>((resolve) => {
     const command = [cmd, ...args].join(" ");
 
     const settle = (result: Partial<CommandResult>): void =>
@@ -168,7 +168,7 @@ export function runCapturedCommand(
 
     const output = collectOutput(child);
 
-    child.on("error", error => {
+    child.on("error", (error) => {
       logSpawnError(error);
 
       settle({
@@ -197,15 +197,10 @@ export function runCapturedCommand(
  * the exit code and the captured output so a failing install can be reported
  * with the command, its status and its stderr instead of a shrug.
  */
-export function runCommand(
-  cmd: string,
-  args: string[],
-  cwd: string,
-  options: RunOptions = {},
-) {
+export function runCommand(cmd: string, args: string[], cwd: string, options: RunOptions = {}) {
   let child: ChildProcess;
 
-  const result = new Promise<CommandResult>(resolve => {
+  const result = new Promise<CommandResult>((resolve) => {
     const command = [cmd, ...args].join(" ");
 
     const settle = (partial: Partial<CommandResult>): void =>
@@ -229,7 +224,7 @@ export function runCommand(
 
       const output = collectOutput(child);
 
-      child.on("error", error => {
+      child.on("error", (error) => {
         logSpawnError(error);
 
         settle({
@@ -259,5 +254,5 @@ export function runCommand(
     }
   };
 
-  return { abort, install: result.then(outcome => outcome.ok), result };
+  return { abort, install: result.then((outcome) => outcome.ok), result };
 }

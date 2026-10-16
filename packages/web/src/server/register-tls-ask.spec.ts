@@ -7,7 +7,10 @@ describe("registerTlsAsk", () => {
     let registered:
       | {
           path: string;
-          handler: (context: { request: { query: Record<string, unknown> }; response: { send: ReturnType<typeof vi.fn> } }) => Promise<void>;
+          handler: (context: {
+            request: { query: Record<string, unknown> };
+            response: { send: ReturnType<typeof vi.fn> };
+          }) => Promise<void>;
           options: unknown;
         }
       | undefined;

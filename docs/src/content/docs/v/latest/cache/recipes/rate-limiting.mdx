@@ -14,20 +14,16 @@ increment-and-set in one call.
 ```ts
 import { cache } from "@warlock.js/cache";
 
-const LIMIT = 100;          // requests…
-const WINDOW = "1m";        // …per window
+const LIMIT = 100; // requests…
+const WINDOW = "1m"; // …per window
 
 async function checkRateLimit(clientId: string): Promise<boolean> {
   const key = `ratelimit.${clientId}`;
 
   // Atomically read → increment → write, refreshing the window each hit.
-  const count = await cache.update<number>(
-    key,
-    (current) => (current ?? 0) + 1,
-    { ttl: WINDOW },
-  );
+  const count = await cache.update<number>(key, (current) => (current ?? 0) + 1, { ttl: WINDOW });
 
-  return count <= LIMIT;   // false → over the limit, reject
+  return count <= LIMIT; // false → over the limit, reject
 }
 ```
 
@@ -71,7 +67,7 @@ which maps to Redis `INCRBY` and is atomic cluster-wide:
 async function checkRateLimitDistributed(clientId: string): Promise<boolean> {
   const key = `ratelimit.${clientId}.${Math.floor(Date.now() / 60_000)}`;
 
-  const count = await cache.increment(key);   // native INCRBY on redis
+  const count = await cache.increment(key); // native INCRBY on redis
 
   return count <= LIMIT;
 }

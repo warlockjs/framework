@@ -27,17 +27,17 @@ The parent `ObjectValidator` then writes the empty container into the validated 
 
 ```ts
 if (childResult.data !== undefined && !validator.isOmitted()) {
-    validatedData[key] = childResult.data;
+  validatedData[key] = childResult.data;
 }
 ```
 
 ### Symptoms
 
-| Site | Concrete impact |
-|---|---|
-| [`faq.model.ts`](../../../src/app/faqs/models/faq/faq.model.ts) | Every Faq created without an explicit `embedding` writes `embedding: []` into the document. Future "find faqs with no embedding" queries (`{ embedding: { $exists: false } }`) miss them. |
-| Same model, `metadata` | Adds `metadata: {}` to every record. Wastes space; defeats `$exists` filters. |
-| Cross-package | Any cascade model with optional collection fields has the same write bloat. AI Standard-Schema interop (`provider.completions.json()`) returns spurious empty containers in the structured output, masking "field intentionally omitted". |
+| Site                                                            | Concrete impact                                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`faq.model.ts`](../../../src/app/faqs/models/faq/faq.model.ts) | Every Faq created without an explicit `embedding` writes `embedding: []` into the document. Future "find faqs with no embedding" queries (`{ embedding: { $exists: false } }`) miss them.                                                 |
+| Same model, `metadata`                                          | Adds `metadata: {}` to every record. Wastes space; defeats `$exists` filters.                                                                                                                                                             |
+| Cross-package                                                   | Any cascade model with optional collection fields has the same write bloat. AI Standard-Schema interop (`provider.completions.json()`) returns spurious empty containers in the structured output, masking "field intentionally omitted". |
 
 ### Why this is wrong (vs. lenient-by-design)
 
@@ -109,39 +109,39 @@ public async validate(data: any, context: SchemaContext): Promise<ValidationResu
 
 For **each** of `v.record(v.string())`, `v.array(v.number())`, `v.tuple([v.string(), v.int()])`, parented by an `v.object({ field: <validator> })`:
 
-| # | Field config | Input payload | Expected validated output | Notes |
-|---|---|---|---|---|
-| 1 | `.optional()` | `{}` (field absent) | `{}` (field absent) | The bug. |
-| 2 | `.optional()` | `{ field: undefined }` | `{}` | Explicit undefined, same as absent. |
-| 3 | `.optional()` | `{ field: <empty container> }` | `{ field: <empty container> }` | Caller explicitly cleared — preserve. |
-| 4 | `.optional()` | `{ field: <valid items> }` | `{ field: <valid items> }` | Happy path. |
-| 5 | `.optional().default(<value>)` | `{}` | `{ field: <value> }` | Default applies. Currently broken. |
-| 6 | `.optional().default(<value>)` | `{ field: <other> }` | `{ field: <other> }` | Caller wins over default. |
-| 7 | `.required()` | `{}` | error: required | Required fires. |
-| 8 | `.required()` | `{ field: <empty container> }` | `{ field: <empty container> }` | Empty isn't "missing" — present and valid. |
-| 9 | `.required()` | `{ field: <valid items> }` | `{ field: <valid items> }` | Happy path. |
-| 10 | `.nullable()` | `{ field: null }` | `{ field: null }` | Honoured. |
-| 11 | (no nullable) | `{ field: null }` | error: type | Currently?? Verify. |
-| 12 | `.optional()`, item validator `v.string()` | `{ field: [123] }` (array case) | error: item type | Inner validation still runs on present input. |
+| #   | Field config                               | Input payload                   | Expected validated output      | Notes                                         |
+| --- | ------------------------------------------ | ------------------------------- | ------------------------------ | --------------------------------------------- |
+| 1   | `.optional()`                              | `{}` (field absent)             | `{}` (field absent)            | The bug.                                      |
+| 2   | `.optional()`                              | `{ field: undefined }`          | `{}`                           | Explicit undefined, same as absent.           |
+| 3   | `.optional()`                              | `{ field: <empty container> }`  | `{ field: <empty container> }` | Caller explicitly cleared — preserve.         |
+| 4   | `.optional()`                              | `{ field: <valid items> }`      | `{ field: <valid items> }`     | Happy path.                                   |
+| 5   | `.optional().default(<value>)`             | `{}`                            | `{ field: <value> }`           | Default applies. Currently broken.            |
+| 6   | `.optional().default(<value>)`             | `{ field: <other> }`            | `{ field: <other> }`           | Caller wins over default.                     |
+| 7   | `.required()`                              | `{}`                            | error: required                | Required fires.                               |
+| 8   | `.required()`                              | `{ field: <empty container> }`  | `{ field: <empty container> }` | Empty isn't "missing" — present and valid.    |
+| 9   | `.required()`                              | `{ field: <valid items> }`      | `{ field: <valid items> }`     | Happy path.                                   |
+| 10  | `.nullable()`                              | `{ field: null }`               | `{ field: null }`              | Honoured.                                     |
+| 11  | (no nullable)                              | `{ field: null }`               | error: type                    | Currently?? Verify.                           |
+| 12  | `.optional()`, item validator `v.string()` | `{ field: [123] }` (array case) | error: item type               | Inner validation still runs on present input. |
 
 Tuple-specific extras:
 
-| # | Field config | Input | Expected |
-|---|---|---|---|
-| 13 | `.optional()` | `{}` | `{}` (no length check on absent) |
-| 14 | `.optional()` | `{ field: [a] }` (need 2) | error: length |
-| 15 | `.required()` | `{ field: [] }` | error: length (empty != correct length) |
+| #   | Field config  | Input                     | Expected                                |
+| --- | ------------- | ------------------------- | --------------------------------------- |
+| 13  | `.optional()` | `{}`                      | `{}` (no length check on absent)        |
+| 14  | `.optional()` | `{ field: [a] }` (need 2) | error: length                           |
+| 15  | `.required()` | `{ field: [] }`           | error: length (empty != correct length) |
 
 ## Decisions to lock with Hasan
 
-| # | Question | Recommendation | Reasoning |
-|---|---|---|---|
-| 1 | Absent optional collection → `undefined` or `{}` / `[]`? | **`undefined`** | Consistency with every other validator; downstream parent decides via existing `!== undefined` check. Lenient empty-as-default is what `.default({})` is for — and that path is broken today, so this fix unlocks it. |
-| 2 | Present-but-empty collection → preserve as `{}` / `[]` (test row #3, #8)? | **Preserve** | "I explicitly set this to empty" ≠ "I didn't set this". Round-tripping is a strict requirement for any framework consumed by serializers/diff tools. |
-| 3 | Bump as breaking change in seal changelog? | **Yes — `BREAKING:` note** | Behaviour change observable to anyone parsing validator output. Risk: low (the prior behaviour was almost certainly being worked around or unnoticed); benefit: high (silent corruption gone). Pair with an entry in the seal CHANGELOG. |
-| 4 | Should we also fix `.default()` in the same patch, or split? | **Same patch** | They share one root cause — the override bypassing `super.validate`'s `getDefaultValue` plumbing. Splitting doubles the audit work and risks landing the optional-fix without verifying defaults. |
-| 5 | Run Mongo migration for existing Faq docs that have `embedding: []` / `metadata: {}` already persisted? | **Defer to a separate plan** | This is a data cleanup, not a seal concern. File under `domains/cascade/plans/` or `domains/app/plans/` once we know how many docs are affected. |
-| 6 | Document the parent-child contract (child returns `undefined` ⇒ parent omits) in `seal` design? | **Yes — add a short `design/contracts.md` after the fix lands** | This is the kind of invariant that, if not written down, will get re-broken. One-pager describing the convention, with the three validators cited as conformant examples. |
+| #   | Question                                                                                                | Recommendation                                                  | Reasoning                                                                                                                                                                                                                                |
+| --- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Absent optional collection → `undefined` or `{}` / `[]`?                                                | **`undefined`**                                                 | Consistency with every other validator; downstream parent decides via existing `!== undefined` check. Lenient empty-as-default is what `.default({})` is for — and that path is broken today, so this fix unlocks it.                    |
+| 2   | Present-but-empty collection → preserve as `{}` / `[]` (test row #3, #8)?                               | **Preserve**                                                    | "I explicitly set this to empty" ≠ "I didn't set this". Round-tripping is a strict requirement for any framework consumed by serializers/diff tools.                                                                                     |
+| 3   | Bump as breaking change in seal changelog?                                                              | **Yes — `BREAKING:` note**                                      | Behaviour change observable to anyone parsing validator output. Risk: low (the prior behaviour was almost certainly being worked around or unnoticed); benefit: high (silent corruption gone). Pair with an entry in the seal CHANGELOG. |
+| 4   | Should we also fix `.default()` in the same patch, or split?                                            | **Same patch**                                                  | They share one root cause — the override bypassing `super.validate`'s `getDefaultValue` plumbing. Splitting doubles the audit work and risks landing the optional-fix without verifying defaults.                                        |
+| 5   | Run Mongo migration for existing Faq docs that have `embedding: []` / `metadata: {}` already persisted? | **Defer to a separate plan**                                    | This is a data cleanup, not a seal concern. File under `domains/cascade/plans/` or `domains/app/plans/` once we know how many docs are affected.                                                                                         |
+| 6   | Document the parent-child contract (child returns `undefined` ⇒ parent omits) in `seal` design?         | **Yes — add a short `design/contracts.md` after the fix lands** | This is the kind of invariant that, if not written down, will get re-broken. One-pager describing the convention, with the three validators cited as conformant examples.                                                                |
 
 ## Risks
 

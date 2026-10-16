@@ -33,7 +33,7 @@ await fs.files.putJson("./build/manifest.json", { version: "1.0.0" });
 const manifest = await fs.files.getJson<{ version: string }>("./build/manifest.json");
 
 // Read → transform → write, atomically, in one call.
-await fs.files.editJson("./build/manifest.json", m => ({ ...m, built: Date.now() }));
+await fs.files.editJson("./build/manifest.json", (m) => ({ ...m, built: Date.now() }));
 
 // Walk the whole tree (recursive by default), files and folders alike.
 for await (const entry of fs.dirs.walk("./build")) {
@@ -80,20 +80,18 @@ That's the entire vocabulary: nouns (`files`, `dirs`) and verbs
 </CardGrid>
 
 <Aside type="note" title="Standalone — no @warlock.js/core required">
-`@warlock.js/fs` runs in any Node project. It has zero runtime
-dependencies beyond built-in `node:fs` and `node:crypto` — including the
-schema-validated `getJson`, which accepts any [Standard Schema](https://standardschema.dev)
-validator (seal, Zod, Valibot) you already have on hand. Inside a Warlock app
-it's already on the dependency graph; everywhere else it's a plain
-`pnpm add` away.
+  `@warlock.js/fs` runs in any Node project. It has zero runtime dependencies beyond built-in
+  `node:fs` and `node:crypto` — including the schema-validated `getJson`, which accepts any
+  [Standard Schema](https://standardschema.dev) validator (seal, Zod, Valibot) you already have on
+  hand. Inside a Warlock app it's already on the dependency graph; everywhere else it's a plain
+  `pnpm add` away.
 </Aside>
 
 <Aside type="tip" title="Sync? Reach for the primitives">
-The `fs` facade is **async-only** — every method returns a Promise. When you
-need a synchronous call (a config loader at startup, a build script), drop down
-to the bare primitives the facade delegates to: `getFile`, `putFile`,
-`ensureDirectory`, `hashString`, and friends. They're the low-level layer —
-see the [API reference](./reference/api) for the full list.
+  The `fs` facade is **async-only** — every method returns a Promise. When you need a synchronous
+  call (a config loader at startup, a build script), drop down to the bare primitives the facade
+  delegates to: `getFile`, `putFile`, `ensureDirectory`, `hashString`, and friends. They're the
+  low-level layer — see the [API reference](./reference/api) for the full list.
 </Aside>
 
 ## Where to start

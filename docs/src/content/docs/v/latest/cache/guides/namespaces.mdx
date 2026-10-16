@@ -36,10 +36,10 @@ await cache.removeNamespace(`chats.${id}`);
 ```ts
 const chat = cache.namespace(`chats.${id}`, { ttl: "30d" });
 
-await chat.set("messages.10", msg);          // → chats.<id>.messages.10, 30d TTL
+await chat.set("messages.10", msg); // → chats.<id>.messages.10, 30d TTL
 await chat.get("messages.10");
 await chat.remove("draft");
-await chat.clear();                           // sugar for removeNamespace
+await chat.clear(); // sugar for removeNamespace
 ```
 
 The scope stores nothing of its own — it's a thin view over `cache` that prepends the prefix and forwards every call. You can grab as many as you like; they share the same underlying driver and connection.
@@ -50,8 +50,8 @@ Pass an options object as the second argument to set defaults that flow through 
 
 ```ts
 const chat = cache.namespace(`chats.${id}`, {
-  ttl: "30d",                 // default TTL for every set/remember/setMany
-  tags: [`user.${userId}`],   // tags auto-attached to every write
+  ttl: "30d", // default TTL for every set/remember/setMany
+  tags: [`user.${userId}`], // tags auto-attached to every write
 });
 
 await chat.set("messages.10", msg);
@@ -63,8 +63,8 @@ await chat.set("messages.10", msg);
 **Per-call options always win over scope defaults.** Tags merge additively — scope tags + per-call tags, deduped. `expiresAt` skips the scope default since it's an absolute timestamp.
 
 ```ts
-await chat.set("draft", d, { ttl: "1h" });           // 1h, not 30d
-await chat.set("ad", a, { tags: ["sponsored"] });    // user.<id> + sponsored
+await chat.set("draft", d, { ttl: "1h" }); // 1h, not 30d
+await chat.set("ad", a, { tags: ["sponsored"] }); // user.<id> + sponsored
 ```
 
 ### Nested scopes
@@ -73,10 +73,10 @@ Scopes compose. The child inherits the parent's defaults; child values override 
 
 ```ts
 const chat = cache.namespace(`chats.${id}`, { ttl: "30d" });
-const messages = chat.namespace("messages");                 // inherits 30d
-const typing = chat.namespace("typing", { ttl: "5s" });      // overrides
+const messages = chat.namespace("messages"); // inherits 30d
+const typing = chat.namespace("typing", { ttl: "5s" }); // overrides
 
-await messages.set("10", msg);    // chats.<id>.messages.10, 30d
+await messages.set("10", msg); // chats.<id>.messages.10, 30d
 await typing.set("user.42", true); // chats.<id>.typing.user.42, 5s
 ```
 
@@ -85,7 +85,7 @@ await typing.set("user.42", true); // chats.<id>.typing.user.42, 5s
 `scope.clear()` is sugar for `cache.removeNamespace(scope.prefix)` — wipes everything under the scope's prefix without touching siblings:
 
 ```ts
-await chat.clear();                  // removes chats.<id>.*
+await chat.clear(); // removes chats.<id>.*
 await cache.get(`chats.${otherId}`); // ← untouched
 ```
 
@@ -108,6 +108,7 @@ await feed.tags(["unread"]).invalidate();
 ### When scopes win over inline prefixes
 
 Use `cache.namespace()` when:
+
 - You touch the same prefix more than two or three times.
 - You want a single TTL or tag policy across a logical boundary (one chat, one tenant, one user).
 - You want `.clear()` to read like the intent ("clear this chat") rather than `removeNamespace(...)` boilerplate.
@@ -160,11 +161,11 @@ class UserService {
   async updateUser(id: number, data: any) {
     // Update in database
     await db.users.update(id, data);
-    
+
     // Invalidate all user-related cache
     await cache.removeNamespace(`users.${id}`);
     // This removes: users.1, users.1.posts, users.1.settings, etc.
-    
+
     // Also invalidate the users list if it exists
     await cache.remove("users.list");
   }
@@ -236,12 +237,12 @@ await cache.removeNamespace("users");
 
 Both namespaces and [cache tags](/v/latest/cache/tags/) help organize cache, but they serve different purposes:
 
-| Feature | Namespaces | Cache Tags |
-|---------|------------|------------|
-| **Purpose** | Hierarchical organization | Logical grouping |
-| **Structure** | Based on key prefix (`users.1`) | Independent labels (`["user", "posts"]`) |
+| Feature          | Namespaces                                   | Cache Tags                                     |
+| ---------------- | -------------------------------------------- | ---------------------------------------------- |
+| **Purpose**      | Hierarchical organization                    | Logical grouping                               |
+| **Structure**    | Based on key prefix (`users.1`)              | Independent labels (`["user", "posts"]`)       |
 | **Invalidation** | `removeNamespace()` removes keys with prefix | `invalidate()` removes keys with matching tags |
-| **Use Case** | Organize by resource hierarchy | Group unrelated keys by concept |
+| **Use Case**     | Organize by resource hierarchy               | Group unrelated keys by concept                |
 
 ### When to Use Namespaces
 
@@ -297,6 +298,7 @@ Both help organize keys, but serve different purposes:
 - **Namespaces**: Organizes keys within your application (e.g., `users.1`, `users.2`)
 
 Use both together:
+
 ```ts
 // With globalPrefix: "myapp"
 // Key "users.1" becomes "myapp.users.1"
@@ -308,4 +310,3 @@ await cache.set("users.1", userData);
 - [Cache Manager](/v/latest/cache/cache-manager/) - Basic operations and driver management
 - [Cache Tags](/v/latest/cache/tags/) - Alternative grouping method with tags
 - [Cache Keys Best Practices](/v/latest/cache/cache-manager/#cache-keys) - Key naming conventions
-

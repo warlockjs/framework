@@ -1,13 +1,5 @@
-import {
-  ContentFilterError,
-  ProviderError,
-  ProviderRateLimitError,
-} from "@warlock.js/ai";
-import type {
-  GenerateImagesParameters,
-  GenerateImagesResponse,
-  GoogleGenAI,
-} from "@google/genai";
+import { ContentFilterError, ProviderError, ProviderRateLimitError } from "@warlock.js/ai";
+import type { GenerateImagesParameters, GenerateImagesResponse, GoogleGenAI } from "@google/genai";
 import { describe, expect, it } from "vitest";
 import { GoogleImageModel } from "./image";
 import { GoogleSDK } from "./sdk";

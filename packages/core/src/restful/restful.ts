@@ -464,7 +464,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
       log.warn(
         "restful",
         "validation",
-        this.constructor.name + " has no validation schema: " + action + " persists unvalidated request input. Define a validation schema to persist only validated fields.",
+        this.constructor.name +
+          " has no validation schema: " +
+          action +
+          " persists unvalidated request input. Define a validation schema to persist only validated fields.",
       );
     }
 

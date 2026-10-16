@@ -27,8 +27,8 @@ type UserPayload = { userId: number; email: string };
 
 const channel = herald().channel<UserPayload>("user.created");
 
-await channel.publish({ userId: 1, email: "test@example.com" });   // ✅ typed
-await channel.publish({ userId: "1" } as never);                    // ❌ compile error
+await channel.publish({ userId: 1, email: "test@example.com" }); // ✅ typed
+await channel.publish({ userId: "1" } as never); // ❌ compile error
 ```
 
 Share the payload type between producer and consumer via a common `types/` file.
@@ -45,7 +45,7 @@ const userSchema = v.object({
 
 const channel = herald().channel("user.created", { schema: userSchema });
 
-await channel.publish({ userId: 1, email: "invalid" });   // Throws — fails .email()
+await channel.publish({ userId: 1, email: "invalid" }); // Throws — fails .email()
 ```
 
 The schema runs `validate()` before the message hits the broker. Invalid payloads never leave the producer. See the `seal-basics` topic of the `warlock-js-seal` skill.
@@ -54,10 +54,10 @@ The schema runs `validate()` before the message hits the broker. Invalid payload
 
 ```ts
 await channel.publish(payload, {
-  priority: 5,           // 0-9, higher = served first
-  expiration: 60_000,    // ms — message expires if not consumed (RabbitMQ uses `expiration`, not `ttl`)
-  delay: 5_000,          // ms — delayed delivery (requires RabbitMQ delay plugin)
-  persistent: true,      // survive broker restart (default true)
+  priority: 5, // 0-9, higher = served first
+  expiration: 60_000, // ms — message expires if not consumed (RabbitMQ uses `expiration`, not `ttl`)
+  delay: 5_000, // ms — delayed delivery (requires RabbitMQ delay plugin)
+  persistent: true, // survive broker restart (default true)
   correlationId: "uuid", // for tracking across services
   headers: {
     tenantId: "42",
@@ -71,14 +71,17 @@ The headers field is free-form — consumers read `message.metadata.headers?.ten
 ## Batch publishing
 
 ```ts
-await channel.publishBatch([
-  { userId: 1, email: "a@example.com" },
-  { userId: 2, email: "b@example.com" },
-  { userId: 3, email: "c@example.com" },
-], {
-  // Options apply to every message in the batch
-  persistent: true,
-});
+await channel.publishBatch(
+  [
+    { userId: 1, email: "a@example.com" },
+    { userId: 2, email: "b@example.com" },
+    { userId: 3, email: "c@example.com" },
+  ],
+  {
+    // Options apply to every message in the batch
+    persistent: true,
+  },
+);
 ```
 
 Under the hood `publishBatch` iterates and calls `.publish()` per message — there's no AMQP-level batching today. It's an ergonomic shape for "emit these N items" (bulk import, fanout to many recipients), not a throughput optimization. The same `options` apply to every message.
@@ -128,7 +131,7 @@ export default {
 ```ts
 // The use case opts in — channel name defaults to the use case name.
 export const createUserUseCase = useCase({
-  name: "users.create",      // → publishes to channel "users.create"
+  name: "users.create", // → publishes to channel "users.create"
   schema: createUserSchema,
   handler: async (data) => User.create(data),
   broadcast: true,

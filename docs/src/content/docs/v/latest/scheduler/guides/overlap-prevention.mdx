@@ -19,7 +19,7 @@ scheduler.addJob(
     await queue.processAllPendingItems();
   })
     .everyMinutes(5)
-    .preventOverlap()   // skip the 5-min tick if a previous run is still going
+    .preventOverlap(), // skip the 5-min tick if a previous run is still going
 );
 
 scheduler.start();
@@ -34,14 +34,12 @@ A common shape — startup recovery + normal scheduling on the same callback:
 ```ts
 import { scheduler, job } from "@warlock.js/scheduler";
 
-const queueJob = job("process-queue", processQueueOnce)
-  .everyMinutes(5)
-  .preventOverlap();
+const queueJob = job("process-queue", processQueueOnce).everyMinutes(5).preventOverlap();
 
 scheduler.addJob(queueJob);
 
 // Boot-time sweep — kick the job off immediately, don't wait for the first tick.
-queueJob.run().catch(error => log.error({ error }, "boot sweep failed"));
+queueJob.run().catch((error) => log.error({ error }, "boot sweep failed"));
 
 scheduler.start();
 ```
@@ -111,19 +109,17 @@ import { scheduler, job } from "@warlock.js/scheduler";
 
 scheduler.addJob(job("nightly-report", buildReport).daily().at("02:00").onOneServer());
 
-scheduler.addJob(
-  job("sync", sync).everyMinutes(5).onOneServer({ lockTtl: "10m", key: "sync-v2" }),
-);
+scheduler.addJob(job("sync", sync).everyMinutes(5).onOneServer({ lockTtl: "10m", key: "sync-v2" }));
 ```
 
 For every tick, the servers race to create a cache entry keyed `scheduler.<key ?? name>.<scheduledTickEpochMs>`. The server that creates it runs the job; the others skip that tick and emit `job:skip`.
 
 That entry is a **claim**, not a lock: it is create-only, has a TTL, and is never released. Because it is never released, a server whose timer fires late — after the winner already finished — still loses, so a tick never runs twice.
 
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `lockTtl` | `min(interval, 1h)`, 60s floor (1h for cron jobs) | How long the claim lives |
-| `key` | the job name | Stable key shared by every server |
+| Option    | Default                                           | Purpose                           |
+| --------- | ------------------------------------------------- | --------------------------------- |
+| `lockTtl` | `min(interval, 1h)`, 60s floor (1h for cron jobs) | How long the claim lives          |
+| `key`     | the job name                                      | Stable key shared by every server |
 
 ### Requirements
 

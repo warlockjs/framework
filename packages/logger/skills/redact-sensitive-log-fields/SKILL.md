@@ -25,15 +25,15 @@ import { DEFAULT_REDACT_KEYS } from "@warlock.js/logger";
 
 log.configure({
   redact: {
-    keys: ["internalRef"],   // union with the built-in set
-    defaultKeys: false,      // opt out of the built-in set entirely
+    keys: ["internalRef"], // union with the built-in set
+    defaultKeys: false, // opt out of the built-in set entirely
   },
 });
 ```
 
 `defaultKeys: false` is an escape hatch, not a tuning knob — it restores the pre-4.15.0 behavior where a `password` in `context` reaches every sink in cleartext. Prefer adding a function `censor` if you only need to keep a prefix.
 
-**A channel cannot turn the default set off** (it can only add keys, or turn it back *on* if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears *your* paths, not the default denylist.
+**A channel cannot turn the default set off** (it can only add keys, or turn it back _on_ if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears _your_ paths, not the default denylist.
 
 Not reachable by any layer: secrets interpolated into a `message` string (`` `token=${t}` ``), `Map`/`Set`/`Buffer` contents, and getter-backed or non-enumerable properties.
 
@@ -54,18 +54,14 @@ import { log } from "@warlock.js/logger";
 
 log.configure({
   redact: {
-    paths: [
-      "context.password",
-      "context.*.token",
-      "context.headers.authorization",
-    ],
-    censor: "[REDACTED]",  // default — string or function
+    paths: ["context.password", "context.*.token", "context.headers.authorization"],
+    censor: "[REDACTED]", // default — string or function
   },
 });
 
 // runtime equivalent:
 log.setRedact({ paths: ["context.password"] });
-log.setRedact(undefined);  // clear your paths (the default denylist stays on)
+log.setRedact(undefined); // clear your paths (the default denylist stays on)
 ```
 
 Every channel sees the redacted entry. Cheap: applied **once** before fan-out; channels share the redacted clone unless they add their own paths.
@@ -107,13 +103,13 @@ type LoggingData = {
 };
 ```
 
-| Pattern | Matches |
-| --- | --- |
-| `context.password` | exactly `data.context.password` |
-| `context.*.token` | `data.context.<any>.token` (one segment in between) |
-| `**.password` | `data.context.password`, `data.context.user.password`, … any depth |
-| `message.apiKey` | when message is an object, `data.message.apiKey` |
-| `context.users.*.token` | array element redaction (`*` matches indices too) |
+| Pattern                 | Matches                                                            |
+| ----------------------- | ------------------------------------------------------------------ |
+| `context.password`      | exactly `data.context.password`                                    |
+| `context.*.token`       | `data.context.<any>.token` (one segment in between)                |
+| `**.password`           | `data.context.password`, `data.context.user.password`, … any depth |
+| `message.apiKey`        | when message is an object, `data.message.apiKey`                   |
+| `context.users.*.token` | array element redaction (`*` matches indices too)                  |
 
 Wildcards:
 

@@ -10,11 +10,7 @@ A **connector** is a long-lived subsystem owned by the framework: database, HTTP
 ## The shape
 
 ```ts title="src/connectors/queue-connector.ts"
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 
 export class QueueConnector extends BaseConnector {
   public readonly name: ConnectorName = "queue";
@@ -40,14 +36,14 @@ That's the connector class. The file's home is `src/connectors/<name>.ts` by con
 
 ## `BaseConnector` — required surface
 
-| Member          | Type                          | Notes                                                                                |
-| --------------- | ----------------------------- | ------------------------------------------------------------------------------------ |
-| `name`          | `ConnectorName`               | Unique. Used in preload lists (`preload.connectors: ["queue"]`).                     |
-| `priority`      | `number`                      | Lower starts first. See built-in `ConnectorPriority` enum for the existing ordering. |
-| `lifecyclePhase`| `ConnectorLifecyclePhase`     | `Early` (default) or `Late`. See phase semantics below.                              |
-| `watchedFiles`  | `string[]` (protected)        | Relative paths; touching any triggers a restart in dev.                              |
-| `start()`       | `() => Promise<void>`         | The work that brings the subsystem online. Set `this.active = true` on success.     |
-| `shutdown()`    | `() => Promise<void>`         | Inverse — close connections, drain queues. Set `this.active = false`.                |
+| Member           | Type                      | Notes                                                                                |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------------------ |
+| `name`           | `ConnectorName`           | Unique. Used in preload lists (`preload.connectors: ["queue"]`).                     |
+| `priority`       | `number`                  | Lower starts first. See built-in `ConnectorPriority` enum for the existing ordering. |
+| `lifecyclePhase` | `ConnectorLifecyclePhase` | `Early` (default) or `Late`. See phase semantics below.                              |
+| `watchedFiles`   | `string[]` (protected)    | Relative paths; touching any triggers a restart in dev.                              |
+| `start()`        | `() => Promise<void>`     | The work that brings the subsystem online. Set `this.active = true` on success.      |
+| `shutdown()`     | `() => Promise<void>`     | Inverse — close connections, drain queues. Set `this.active = false`.                |
 
 Optional overrides:
 
@@ -61,19 +57,19 @@ Optional overrides:
 
 Lower number = earlier. The built-in ordering, from `ConnectorPriority` in `@warlock.js/core/src/connectors/types.ts`:
 
-| Connector     | Priority | Phase   |
-| ------------- | -------- | ------- |
-| `logger`      | 0        | Early   |
-| `mailer`      | 1        | Early   |
-| `database`    | 2        | Early   |
-| `communicator`| 3        | Early   |
-| `cache`       | 4        | Early   |
-| `http`        | 5        | **Late**|
-| `storage`     | 6        | Early   |
-| `socket`      | 7        | **Late**|
-| `notifications`| 8       | Early   |
-| `access`      | 9        | Early   |
-| `ai`          | 10       | Early   |
+| Connector       | Priority | Phase    |
+| --------------- | -------- | -------- |
+| `logger`        | 0        | Early    |
+| `mailer`        | 1        | Early    |
+| `database`      | 2        | Early    |
+| `communicator`  | 3        | Early    |
+| `cache`         | 4        | Early    |
+| `http`          | 5        | **Late** |
+| `storage`       | 6        | Early    |
+| `socket`        | 7        | **Late** |
+| `notifications` | 8        | Early    |
+| `access`        | 9        | Early    |
+| `ai`            | 10       | Early    |
 
 Pick a number that places your connector where it belongs. If your queue needs the database, set `priority > 2` (e.g. `11`). If you replace the cache, set `< 4` to win.
 
@@ -85,7 +81,7 @@ Negative priorities are fine for "start before everything" — the project's `sr
 
 `ConnectorLifecyclePhase` exists because **HTTP and socket need user code loaded first**: they scan the router (which user `routes.ts` files populate) and the container (which app `main.ts` files mutate). So the framework boots in two passes:
 
-1. **Early phase** runs before user code imports — for things user code needs *at import time* (database/cache so models work, logger so app modules can `log.info`).
+1. **Early phase** runs before user code imports — for things user code needs _at import time_ (database/cache so models work, logger so app modules can `log.info`).
 2. **Late phase** runs after user code imports — for things that consume registrations user code just made (HTTP reads the router, socket reads HTTP's instance).
 
 If your connector is a self-contained service (queue client, scheduler), `Early` is correct. If it depends on app-level registrations, `Late`. Default is `Early` — don't change it without a reason.
@@ -161,11 +157,7 @@ The manager swallows errors from individual `shutdown()`s (logs and continues) �
 ### Queue worker (depends on DB)
 
 ```ts title="src/connectors/queue-worker-connector.ts"
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 import { startWorker, stopWorker } from "app/queue/services/worker.service";
 
 export class QueueWorkerConnector extends BaseConnector {
@@ -191,11 +183,7 @@ export class QueueWorkerConnector extends BaseConnector {
 ### Scheduler (Late — wants the router up first)
 
 ```ts
-import {
-  BaseConnector,
-  ConnectorLifecyclePhase,
-  type ConnectorName,
-} from "@warlock.js/core";
+import { BaseConnector, ConnectorLifecyclePhase, type ConnectorName } from "@warlock.js/core";
 
 export class SchedulerConnector extends BaseConnector {
   public readonly name: ConnectorName = "scheduler";
@@ -231,7 +219,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
 - **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container`, not through imports. Use `container.tryGet("http.server")` when the other connector is genuinely optional (e.g. socket falls back to its own raw server when HTTP isn't configured); use `container.get("http.server")` when its absence would be a bug — it throws a named `ContainerKeyMissingError` instead of handing back `undefined`.
 - **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
-- **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
+- **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does _not_ mean the framework reloads that file first — that's the file orchestrator's job.
 
 ## See also
 

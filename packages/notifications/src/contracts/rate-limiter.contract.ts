@@ -15,9 +15,5 @@ import type { ChannelName, Notifiable } from "../types";
  * package reserves the slot but ships no default implementation.
  */
 export interface RateLimiter {
-  allow(
-    notifiable: Notifiable,
-    channel: ChannelName,
-    type: string,
-  ): Promise<boolean> | boolean;
+  allow(notifiable: Notifiable, channel: ChannelName, type: string): Promise<boolean> | boolean;
 }

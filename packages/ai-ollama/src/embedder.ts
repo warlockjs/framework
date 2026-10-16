@@ -44,11 +44,7 @@ export class OllamaEmbedder implements EmbedderContract {
   private readonly configuredDimensions: number | undefined;
   private readonly logger: Logger = log;
 
-  public constructor(
-    client: Ollama,
-    config: OllamaEmbedderConfig,
-    provider: string = "ollama",
-  ) {
+  public constructor(client: Ollama, config: OllamaEmbedderConfig, provider: string = "ollama") {
     this.client = client;
     this.name = config.name;
     this.provider = provider;

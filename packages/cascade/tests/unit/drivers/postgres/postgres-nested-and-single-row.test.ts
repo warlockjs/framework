@@ -50,7 +50,7 @@ describe("postgres single-row update targeting", () => {
     return driver;
   };
 
-  it("model update by id hits WHERE \"id\" = $n, never ctid", async () => {
+  it('model update by id hits WHERE "id" = $n, never ctid', async () => {
     const driver = makeDriver();
     await driver.update("users", { id: 5 }, { $set: { name: "x" } });
     const [sql, params] = (driver as any).query.mock.calls[0];

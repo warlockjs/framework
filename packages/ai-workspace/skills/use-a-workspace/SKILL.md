@@ -22,21 +22,21 @@ const ws = ai.workspace({
 
 ## A policy jail, NOT OS isolation
 
-This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an *allowed* process does once it runs. Real isolation (container / microVM) is a later phase.
+This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an _allowed_ process does once it runs. Real isolation (container / microVM) is a later phase.
 
 ## The policy surface
 
-| Field | What it does |
-|---|---|
-| `cwd` | **Absolute** jail root. Every path resolves against it and must stay inside. |
-| `allowPaths` | Extra readable roots outside `cwd`. |
-| `denyPaths` | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents. |
-| `shell.allow` / `shell.deny` | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
-| `shell.inheritEnv` | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`. |
-| `shell.env` | Explicit env vars injected into every spawned process (override inherited on collision). |
-| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary). |
-| `read.defaultLines` / `read.maxBytes` | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling). |
-| `backend` | `"local"` (default — real disk) or `"mock"` (in-memory, for tests). |
+| Field                                      | What it does                                                                                                                                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                                      | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                     |
+| `allowPaths`                               | Extra readable roots outside `cwd`.                                                                                                                                                                              |
+| `denyPaths`                                | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                 |
+| `shell.allow` / `shell.deny`               | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
+| `shell.inheritEnv`                         | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                  |
+| `shell.env`                                | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                         |
+| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                      |
+| `read.defaultLines` / `read.maxBytes`      | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                               |
+| `backend`                                  | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                              |
 
 > **The most common gotcha:** `run_shell` fails to find `node`/`npm` because the env is empty. Add `shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] }`.
 
@@ -45,9 +45,9 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 Commands are tokenized (via `tokenizeCommand`) into an argv and spawned with **no shell semantics** — no pipes, redirection, chaining, backticks, or variable expansion. `npm test && rm -rf /` or `` `curl evil` `` doesn't chain or substitute; it's rejected outright rather than executed piecemeal:
 
 ```ts
-await ws.exec("npm test");                    // OK — ["npm", "test"]
-await ws.exec('node -e "console.log(1)"');     // OK — quotes respected, one argv element
-await ws.exec("npm test; curl http://evil");   // rejected — unquoted `;` is a metacharacter
+await ws.exec("npm test"); // OK — ["npm", "test"]
+await ws.exec('node -e "console.log(1)"'); // OK — quotes respected, one argv element
+await ws.exec("npm test; curl http://evil"); // rejected — unquoted `;` is a metacharacter
 ```
 
 - **Quoting is respected**; **unquoted** shell metacharacters — `;` `&` `|` `<` `>` `` ` `` `$` `(` `)` and newlines — are rejected as a `WorkspacePolicyError` `type: "denied-command"` before anything spawns. The `shell.allow`/`shell.deny` basename check runs against the tokenized argv's first element, not a raw string prefix, so a disguised leading token can't slip past the gate.
@@ -62,10 +62,10 @@ await ws.exec("npm test; curl http://evil");   // rejected — unquoted `;` is a
 Each tool is a `ToolContract` ready for `ai.agent({ tools })`. The seven LLM-visible tool names are `read_file`, `edit_file`, `write_file`, `run_shell`, `run_tests`, `grep`, `glob`.
 
 ```ts
-ws.tools.all();                              // all seven, canonical order
-ws.tools.pick("readFile", "grep", "glob");   // a least-privilege subset
-ws.tools.readFile({ name: "open" });          // one tool, optionally renamed
-ws.tools.runTests({ command: "vitest run" });  // override the test base command
+ws.tools.all(); // all seven, canonical order
+ws.tools.pick("readFile", "grep", "glob"); // a least-privilege subset
+ws.tools.readFile({ name: "open" }); // one tool, optionally renamed
+ws.tools.runTests({ command: "vitest run" }); // override the test base command
 ```
 
 ### Human-facing — direct methods
@@ -73,7 +73,10 @@ ws.tools.runTests({ command: "vitest run" });  // override the test base command
 The same policy seam, callable from code (no LLM):
 
 ```ts
-const { content, hash, totalLines, endLine, truncated, bytesCapped } = await ws.readFile("src/index.ts", { offset: 1, limit: 200 });
+const { content, hash, totalLines, endLine, truncated, bytesCapped } = await ws.readFile(
+  "src/index.ts",
+  { offset: 1, limit: 200 },
+);
 await ws.writeFile("src/new.ts", "export const x = 1;\n");
 await ws.editFile({ path: "src/index.ts", oldString: "old", newString: "new", expectHash: hash });
 const { exitCode, stdout, stderr, timedOut, cancelled, truncated } = await ws.exec("npm test");
@@ -150,7 +153,7 @@ try {
 ## Composition — `readonly()` and `scope()`
 
 ```ts
-const ro = ws.readonly();         // vends only read/grep/glob; mutating direct methods reject
+const ro = ws.readonly(); // vends only read/grep/glob; mutating direct methods reject
 const api = ws.scope("packages/api"); // a sub-jailed workspace rooted at the subdir
 ```
 

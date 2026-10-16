@@ -19,8 +19,7 @@ const preflightMock = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../src/http/port-preflight", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../src/http/port-preflight")>();
+  const actual = await importOriginal<typeof import("../../../src/http/port-preflight")>();
 
   return {
     ...actual,
@@ -69,12 +68,10 @@ describe("HttpConnector.start — port preflight ordering", () => {
       callOrder.push("preflight");
     });
 
-    const listenSpy = vi
-      .spyOn(server, "listen")
-      .mockImplementation(async () => {
-        callOrder.push("listen");
-        return `http://${host}:${port}`;
-      });
+    const listenSpy = vi.spyOn(server, "listen").mockImplementation(async () => {
+      callOrder.push("listen");
+      return `http://${host}:${port}`;
+    });
 
     const connector = new TestHttpConnector();
     connector.setHttp(server);
@@ -118,12 +115,8 @@ describe("HttpConnector.start — port preflight ordering", () => {
 
     // fatal/flush/exit must have run in that order — flushing before the fatal
     // log has landed would drop it, and exiting before the flush would too.
-    expect(fatalSpy.mock.invocationCallOrder[0]).toBeLessThan(
-      flushSpy.mock.invocationCallOrder[0],
-    );
-    expect(flushSpy.mock.invocationCallOrder[0]).toBeLessThan(
-      exitSpy.mock.invocationCallOrder[0],
-    );
+    expect(fatalSpy.mock.invocationCallOrder[0]).toBeLessThan(flushSpy.mock.invocationCallOrder[0]);
+    expect(flushSpy.mock.invocationCallOrder[0]).toBeLessThan(exitSpy.mock.invocationCallOrder[0]);
   });
 
   it("writes the error to stderr when no terminal channel would print it", async () => {

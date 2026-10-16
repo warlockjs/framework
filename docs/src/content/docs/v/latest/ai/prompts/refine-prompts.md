@@ -15,7 +15,10 @@ import { ai } from "@warlock.js/ai";
 
 const support = ai
   .systemPrompt(
-    [ai.persona("You are a friendly AI assistant."), ai.instruction("Help {{name}} with orders. Never discuss refunds over 500.")],
+    [
+      ai.persona("You are a friendly AI assistant."),
+      ai.instruction("Help {{name}} with orders. Never discuss refunds over 500."),
+    ],
     { name: "support" },
   )
   .refined({ model: refinerModel, store: myCacheDriver });
@@ -53,32 +56,32 @@ const anotherTake = await support.refine({ fresh: true }); // skip the pin, comp
 ```ts
 const compiled = await support.refinePrompt();
 
-compiled.meta()?.refinedFrom;   // "support@1"
-compiled.meta()?.refinerModel;  // "anthropic:claude-sonnet-4-5"
-compiled.meta()?.required;      // carried from the source — the contract is preserved
+compiled.meta()?.refinedFrom; // "support@1"
+compiled.meta()?.refinerModel; // "anthropic:claude-sonnet-4-5"
+compiled.meta()?.required; // carried from the source — the contract is preserved
 compiled.resolve({ name: "Hasan" }); // placeholders still work
 ```
 
 It returns a plain `SystemPrompt` (one instruction block holding the refined template) that composes with everything: hand it to an agent, `.merge()` it, `validate({ criteria })` it. It **never auto-registers** — registry versions stay human-intentional. Register it deliberately to unlock the review flow:
 
 ```ts
-compiled.meta({ name: "support" });      // registers as support@2
-ai.prompts.diff("support", "1", "2");    // original vs refined, block by block
+compiled.meta({ name: "support" }); // registers as support@2
+ai.prompts.diff("support", "1", "2"); // original vs refined, block by block
 ```
 
 ## Options
 
-| Option | Role |
-| --- | --- |
-| `model` | The refiner `ModelContract` (required). Runs as a one-shot `"prompt-refiner"` agent, so its usage/cost surface through the standard report machinery. |
-| `criteria` | Your rules for the rewrite, on top of the built-in recipe — a string or list, same shape as [`validate({ criteria })`](/v/latest/ai/prompts/prompt-registry/#validate-against-your-own-criteria). *Validate grades against criteria; refined rewrites against them.* Folded into the pin key. |
-| `store` | A structural `{ get, set }` (any `@warlock.js/cache` `CacheDriver` satisfies it — the package stays an optional peer). Share a redis/pg driver so one process pays each compilation and the fleet reads the pin. Omitted ⇒ the pin lives on the instance for the process lifetime. |
+| Option     | Role                                                                                                                                                                                                                                                                                          |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`    | The refiner `ModelContract` (required). Runs as a one-shot `"prompt-refiner"` agent, so its usage/cost surface through the standard report machinery.                                                                                                                                         |
+| `criteria` | Your rules for the rewrite, on top of the built-in recipe — a string or list, same shape as [`validate({ criteria })`](/v/latest/ai/prompts/prompt-registry/#validate-against-your-own-criteria). _Validate grades against criteria; refined rewrites against them._ Folded into the pin key. |
+| `store`    | A structural `{ get, set }` (any `@warlock.js/cache` `CacheDriver` satisfies it — the package stays an optional peer). Share a redis/pg driver so one process pays each compilation and the fleet reads the pin. Omitted ⇒ the pin lives on the instance for the process lifetime.            |
 
 A pinned value that fails the parity check (corrupt or tampered store) is treated as a miss and recompiled — a poisoned store entry can't smuggle a placeholder-breaking prompt in.
 
 ## Where the lazy compile applies
 
-The lazy hook rides the **agent path** — `ai.agent` execute/stream and everything built on it (supervisor member agents, planner steps, eval, `spawnSubAgent`, `serve`). Prompts that are resolved synchronously **at factory time** — `ai.planner({ systemPrompt })` / `ai.router({ systemPrompt })` prefixes, a supervisor's own `systemPrompt` / `goal`, and `ai.prompts.resolve()` — read whatever is pinned *at that moment*, so either warm the pin first (`await refined.refine()`) or pass the already-compiled `await refined.refinePrompt()` instead.
+The lazy hook rides the **agent path** — `ai.agent` execute/stream and everything built on it (supervisor member agents, planner steps, eval, `spawnSubAgent`, `serve`). Prompts that are resolved synchronously **at factory time** — `ai.planner({ systemPrompt })` / `ai.router({ systemPrompt })` prefixes, a supervisor's own `systemPrompt` / `goal`, and `ai.prompts.resolve()` — read whatever is pinned _at that moment_, so either warm the pin first (`await refined.refine()`) or pass the already-compiled `await refined.refinePrompt()` instead.
 
 ## Editing a refined prompt
 

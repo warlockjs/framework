@@ -75,9 +75,9 @@ describe("computePageCacheKey — query bounds", () => {
   const base = { host: "a.test", path: "/p", locale: "en", variant: "html" } as const;
 
   it("ignores tracking params by default", () => {
-    expect(computePageCacheKey({ ...base, query: { utm_source: "x", fbclid: "1", page: "2" } })).toBe(
-      computePageCacheKey({ ...base, query: { page: "2" } }),
-    );
+    expect(
+      computePageCacheKey({ ...base, query: { utm_source: "x", fbclid: "1", page: "2" } }),
+    ).toBe(computePageCacheKey({ ...base, query: { page: "2" } }));
   });
 
   it("keeps only allowlisted keys when an allowlist is set", () => {

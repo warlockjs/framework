@@ -3,7 +3,7 @@ title: "Recipe — Autonomous task runner"
 description: Hand ai.planner a goal plus a toolbox of agents and tools, let it generate an ordered plan, run it step-by-step, and read the executed steps and report.
 ---
 
-You run a content ops team. A request lands as a single English sentence — *"Draft a launch announcement for our new pricing tiers and make sure the numbers are right"* — and the work behind it is always the same shape but never the same steps: pull the current pricing, sanity-check the figures, draft the copy. You do not want to hand-wire a fixed workflow for every variant of "research, verify, write". You want to describe the *capabilities* you have and let the model decide the order.
+You run a content ops team. A request lands as a single English sentence — _"Draft a launch announcement for our new pricing tiers and make sure the numbers are right"_ — and the work behind it is always the same shape but never the same steps: pull the current pricing, sanity-check the figures, draft the copy. You do not want to hand-wire a fixed workflow for every variant of "research, verify, write". You want to describe the _capabilities_ you have and let the model decide the order.
 
 That is exactly what `ai.planner` is for. You register a toolbox of capabilities (each one an agent, a tool, a workflow — anything that satisfies the executable contract), hand the planner a goal, and it asks an LLM for an ordered plan over those capabilities, then executes that plan step-by-step through each capability's own `execute()`. You get back the generated plan, a per-step forensic record, and the rolled-up usage — one unified envelope.
 
@@ -42,7 +42,8 @@ const verifierAgent = ai.agent({
   name: "figure-verifier",
   description: "Cross-check that quoted prices and percentages are internally consistent.",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a meticulous numbers checker.")
     .instruction("Flag any price, discount, or percentage that does not add up. Be terse."),
   maxTrips: 2,
@@ -53,7 +54,8 @@ const writerAgent = ai.agent({
   name: "announcement-writer",
   description: "Draft customer-facing launch copy from verified pricing notes.",
   model: openai.model({ name: "gpt-4o" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a product marketing writer.")
     .instruction("Write a concise, upbeat launch announcement. No placeholder text."),
   maxTrips: 2,
@@ -100,7 +102,9 @@ const { data, error, usage, report } = await taskRunner.execute(
 
 if (error) {
   console.error(`planner failed: ${error.code} — ${error.message}`);
-  console.error(`got through ${report.executedSteps.filter((s) => s.status === "completed").length} step(s)`);
+  console.error(
+    `got through ${report.executedSteps.filter((s) => s.status === "completed").length} step(s)`,
+  );
   return;
 }
 
@@ -132,7 +136,7 @@ Each step's output is prefixed onto the next step's input as a compact "Context 
 
 ## Inspect the plan
 
-Everything the planner decided and did lives on `result.report`. Two fields carry it: `report.plan` — the verbatim LLM output *before* any step ran — and `report.executedSteps` — one `PlannerStepSnapshot` per step the planner attempted, in execution order.
+Everything the planner decided and did lives on `result.report`. Two fields carry it: `report.plan` — the verbatim LLM output _before_ any step ran — and `report.executedSteps` — one `PlannerStepSnapshot` per step the planner attempted, in execution order.
 
 `report.plan` is a `PlannerPlan`: an ordered `steps` array plus an optional one-line `summary`. Each `PlannerStep` carries the `capability` it dispatches, the resolved `input` string, an optional `reason`, and the advisory `id` / `dependsOn` note the LLM may emit (recorded for forensics, never used to reorder — see the production notes).
 
@@ -148,7 +152,7 @@ for (const step of report.plan?.steps ?? []) {
 }
 ```
 
-`report.executedSteps` is the run-time counterpart — what *actually* happened to each step. Every snapshot carries its 0-based `index`, the `step` it ran, a terminal `status` of `"completed"`, `"failed"`, or `"skipped"`, the captured `output` (present only when completed), the typed `error` (present only when failed), timing (`startedAt` / `endedAt` / `duration`), the step's own `usage`, and the dispatched capability's full `childReport` tree.
+`report.executedSteps` is the run-time counterpart — what _actually_ happened to each step. Every snapshot carries its 0-based `index`, the `step` it ran, a terminal `status` of `"completed"`, `"failed"`, or `"skipped"`, the captured `output` (present only when completed), the typed `error` (present only when failed), timing (`startedAt` / `endedAt` / `duration`), the step's own `usage`, and the dispatched capability's full `childReport` tree.
 
 ```ts
 for (const snapshot of report.executedSteps) {
@@ -172,7 +176,7 @@ const skipped = report.executedSteps.filter((s) => s.status === "skipped").lengt
 console.log(`completed ${completed}, failed ${failed}, skipped ${skipped}`);
 ```
 
-A `skipped` snapshot is a real record — it carries the `step` the planner *would* have run, a zero `duration`, and an empty `usage`, but no `output` and no `childReport`. That is how the report stays a faithful description of the whole intended plan even when the run stopped early (see below).
+A `skipped` snapshot is a real record — it carries the `step` the planner _would_ have run, a zero `duration`, and an empty `usage`, but no `output` and no `childReport`. That is how the report stays a faithful description of the whole intended plan even when the run stopped early (see below).
 
 ## Reading the report
 
@@ -197,11 +201,14 @@ if (result.error) {
 
   // Steps after `failed` are present with status "skipped" — none of them ran.
   const skipped = result.report.executedSteps.filter((s) => s.status === "skipped");
-  console.error(`${skipped.length} step(s) skipped:`, skipped.map((s) => s.step.capability));
+  console.error(
+    `${skipped.length} step(s) skipped:`,
+    skipped.map((s) => s.step.capability),
+  );
 }
 ```
 
-The run can also fail *before any step runs*, when the generated plan itself is unusable. The planner constrains generation with a plan schema built from the live capability names, but it still guards the result and surfaces a `PlannerPlanInvalidError` (code `PLANNER_PLAN_INVALID`, category `schema`) on `result.error` in three cases:
+The run can also fail _before any step runs_, when the generated plan itself is unusable. The planner constrains generation with a plan schema built from the live capability names, but it still guards the result and surfaces a `PlannerPlanInvalidError` (code `PLANNER_PLAN_INVALID`, category `schema`) on `result.error` in three cases:
 
 - **Empty plan** — the LLM returned no `steps` (or an empty `steps` array). There is nothing to execute.
 - **Unknown capability** — a step references a `capability` name that was never registered on the planner. The planner refuses to dispatch a handle it cannot resolve.
@@ -222,14 +229,18 @@ if (result.error instanceof PlannerPlanInvalidError) {
 
 ## The `maxSteps` cap
 
-`maxSteps` is a hard ceiling on how many steps the planner will actually *dispatch*, not a hint to the LLM. It defaults to `10` and must be `>= 1` (a smaller value throws a `PlannerFailedError` tagged `authoring: true` at construction). When the generated plan is longer than the cap, the planner runs steps `0 … maxSteps - 1` and records every step at index `maxSteps` and beyond as `skipped` — they appear in `report.executedSteps` with the `step` the LLM proposed but are never executed and never billed.
+`maxSteps` is a hard ceiling on how many steps the planner will actually _dispatch_, not a hint to the LLM. It defaults to `10` and must be `>= 1` (a smaller value throws a `PlannerFailedError` tagged `authoring: true` at construction). When the generated plan is longer than the cap, the planner runs steps `0 … maxSteps - 1` and records every step at index `maxSteps` and beyond as `skipped` — they appear in `report.executedSteps` with the `step` the LLM proposed but are never executed and never billed.
 
 ```ts
 const boundedRunner = ai.planner({
   name: "bounded-runner",
   model: openai.model({ name: "gpt-4o" }),
   capabilities: [
-    { name: "fetch_pricing", description: "Fetch the current pricing tiers.", executable: fetchPricingTool },
+    {
+      name: "fetch_pricing",
+      description: "Fetch the current pricing tiers.",
+      executable: fetchPricingTool,
+    },
     { name: "verify_figures", description: "Cross-check the figures.", executable: verifierAgent },
     { name: "write_announcement", description: "Draft the copy.", executable: writerAgent },
   ],

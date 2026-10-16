@@ -116,9 +116,7 @@ describe("normalizePageModule", () => {
     );
     expect(() => {
       normalizePageModule(page({ metadata: { tittle: "Products" } }), "page", "typo.page.tsx");
-    }).not.toThrow(
-      "It looks like you spread `child` — spread `child.metadata` instead",
-    );
+    }).not.toThrow("It looks like you spread `child` — spread `child.metadata` instead");
   });
 
   it("keeps function metadata lazy and validates its result when invoked", () => {
@@ -286,9 +284,9 @@ describe("normalizePageModule page actions", () => {
     expect(() =>
       normalizePageModule({ ...page(), actions: { save: 1 } }, "page", "a.page.tsx"),
     ).toThrow("must be a function");
-    expect(() =>
-      normalizePageModule({ ...page(), action: "nope" }, "page", "a.page.tsx"),
-    ).toThrow("action export must be a function");
+    expect(() => normalizePageModule({ ...page(), action: "nope" }, "page", "a.page.tsx")).toThrow(
+      "action export must be a function",
+    );
   });
 
   it("validates config.action and config.actions shape", () => {
@@ -310,9 +308,9 @@ describe("normalizePageModule page actions", () => {
         "a.page.tsx",
       ),
     ).toThrow("config.action.validation");
-    expect(() =>
-      normalizePageModule(page({ action: {} }), "page", "a.page.tsx"),
-    ).toThrow("requires an action export");
+    expect(() => normalizePageModule(page({ action: {} }), "page", "a.page.tsx")).toThrow(
+      "requires an action export",
+    );
   });
 
   it("refuses config.actions keys that do not match the exports", () => {

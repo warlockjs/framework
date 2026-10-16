@@ -22,7 +22,9 @@ describe("SSR module-fetch timeout", () => {
   it("names the module, elapsed time, and overload remedy", async () => {
     await expect(
       withSsrFetchTimeout("/src/web/slow.page.tsx", () => new Promise(() => undefined), 10),
-    ).rejects.toThrow(/\/src\/web\/slow\.page\.tsx.*\d+ms.*host is likely overloaded.*WARLOCK_SSR_FETCH_TIMEOUT_MS/);
+    ).rejects.toThrow(
+      /\/src\/web\/slow\.page\.tsx.*\d+ms.*host is likely overloaded.*WARLOCK_SSR_FETCH_TIMEOUT_MS/,
+    );
   });
 
   it("lets the environment override the connector option", () => {

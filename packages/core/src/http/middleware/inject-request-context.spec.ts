@@ -59,8 +59,10 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   // Run the callback directly: the request contexts are not under test here.
   vi.spyOn(contextManager, "buildStores").mockReturnValue({} as never);
-  vi.spyOn(contextManager, "runAll").mockImplementation(((_store: unknown, callback: () => unknown) =>
-    callback()) as never);
+  vi.spyOn(contextManager, "runAll").mockImplementation(((
+    _store: unknown,
+    callback: () => unknown,
+  ) => callback()) as never);
 });
 
 afterEach(() => {
@@ -156,7 +158,9 @@ describe("http.errorMapper", () => {
     const { logs, response } = await run(new DomainNotFound("No such workspace"));
 
     expect(response.setStatusCode).toHaveBeenCalledWith(404);
-    expect(response.send).toHaveBeenCalledWith(expect.objectContaining({ error: "No such workspace" }));
+    expect(response.send).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "No such workspace" }),
+    );
     expect(warnLevel(logs)).toEqual([["DomainNotFound: No such workspace (404)", "warn"]]);
     expect(errorLevel(logs)).toHaveLength(0);
   });

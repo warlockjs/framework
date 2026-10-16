@@ -216,7 +216,7 @@ import { $agg } from "@warlock.js/cascade";
 const byStatus = await ordersRepository.groupBy(
   "status",
   { count: $agg.count(), total: $agg.sum("total") },
-  { paidAfter: "2026-01-01" },   // a filterBy key
+  { paidAfter: "2026-01-01" }, // a filterBy key
 );
 
 // one summary row over the whole filtered set (null when empty)
@@ -226,7 +226,7 @@ const summary = await ordersRepository.aggregate(
 );
 ```
 
-`fields` accepts a string, a `string[]`, or a column map; `aggregates` is a map of result alias → aggregate expression. Because filters are applied first, you never have to re-implement `filterBy` logic for a stats endpoint — the same inputs scope the count *and* the sums.
+`fields` accepts a string, a `string[]`, or a column map; `aggregates` is a map of result alias → aggregate expression. Because filters are applied first, you never have to re-implement `filterBy` logic for a stats endpoint — the same inputs scope the count _and_ the sums.
 
 ### Chunking
 

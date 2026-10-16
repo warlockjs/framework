@@ -167,7 +167,11 @@ export function createLevelBuffer(): LevelBuffer {
 export type BufferedResponse = {
   header(key: string, value: unknown): BufferedResponse;
   headers(bag: Record<string, unknown>): BufferedResponse;
-  cookie(name: string, value: Parameters<Response["cookie"]>[1], options?: Parameters<Response["cookie"]>[2]): BufferedResponse;
+  cookie(
+    name: string,
+    value: Parameters<Response["cookie"]>[1],
+    options?: Parameters<Response["cookie"]>[2],
+  ): BufferedResponse;
   clearCookie(name: string, options?: Parameters<Response["clearCookie"]>[1]): BufferedResponse;
   setStatusCode(statusCode: number): BufferedResponse;
   redirect(url: string, statusCode?: number): LoaderShortCircuitSignal;

@@ -10,7 +10,9 @@ import { createTestModelClass } from "../../utils/test-helpers";
  * (finding 5e47bdb3): an integer id written into a uuid column throws at
  * insert. This gate fails if `foreignId` stops tracking the configured PK type.
  */
-function foreignIdColumnType(primaryKey: "uuid" | "int" | "bigInt" | undefined): string | undefined {
+function foreignIdColumnType(
+  primaryKey: "uuid" | "int" | "bigInt" | undefined,
+): string | undefined {
   const model = createTestModelClass("ForeignIdTest", { table: "foreign_id_test" });
   const MigrationClass = Migration.create(model as any, {});
   const migration = new MigrationClass() as any;
@@ -19,7 +21,9 @@ function foreignIdColumnType(primaryKey: "uuid" | "int" | "bigInt" | undefined):
   migration._migrationDefaults = primaryKey === undefined ? undefined : { primaryKey };
   migration.foreignId("user_id");
 
-  const columns = (migration.pendingOperations as { type: string; payload: { name: string; type: string } }[])
+  const columns = (
+    migration.pendingOperations as { type: string; payload: { name: string; type: string } }[]
+  )
     .filter((op) => op.type === "addColumn")
     .map((op) => op.payload);
 

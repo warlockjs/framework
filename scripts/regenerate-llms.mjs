@@ -6,14 +6,19 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 export function regenerateLlms(packagesRoot, run = spawnSync) {
   const generated = [];
-  for (const entry of readdirSync(packagesRoot, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const entry of readdirSync(packagesRoot, { withFileTypes: true }).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  )) {
     if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
     const root = path.join(packagesRoot, entry.name);
     const script = path.join(root, "scripts/generate-llms.mjs");
     if (!existsSync(script)) continue;
     const result = run(process.execPath, [script], { cwd: root, stdio: "inherit" });
     if (result.error || result.status !== 0) {
-      throw new Error(`Could not regenerate ${entry.name} reference files (exit ${result.status}).`, { cause: result.error });
+      throw new Error(
+        `Could not regenerate ${entry.name} reference files (exit ${result.status}).`,
+        { cause: result.error },
+      );
     }
     generated.push(entry.name);
   }

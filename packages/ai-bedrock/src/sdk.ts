@@ -6,11 +6,7 @@ import type {
   SDKAdapterContract,
 } from "@warlock.js/ai";
 import { approximateTokenCount } from "@warlock.js/ai";
-import type {
-  BedrockEmbedderConfig,
-  BedrockModelConfig,
-  BedrockSDKConfig,
-} from "./config.type";
+import type { BedrockEmbedderConfig, BedrockModelConfig, BedrockSDKConfig } from "./config.type";
 import { BedrockEmbedder } from "./embedder";
 import { BedrockModel } from "./model";
 

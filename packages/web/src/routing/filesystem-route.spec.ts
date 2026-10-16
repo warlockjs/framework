@@ -345,7 +345,9 @@ describe("filesystem route derivation — a directory that owns a layout prefix 
 describe("filesystem route derivation — a site folder never reaches the URL", () => {
   it("drops $sites/<key> from the path and the name", () => {
     expect(deriveFilesystemRoutePath({ pageFile: "$sites/landing/index.page.tsx" })).toBe("/");
-    expect(deriveFilesystemRoutePath({ pageFile: "$sites/tenant/listings/[id].page.tsx" })).toBe("/listings/:id");
+    expect(deriveFilesystemRoutePath({ pageFile: "$sites/tenant/listings/[id].page.tsx" })).toBe(
+      "/listings/:id",
+    );
     expect(deriveFilesystemRouteName("$sites/tenant/listings/[id].page.tsx")).toBe("listings.id");
     expect(deriveFilesystemRouteName("$sites/landing/index.page.tsx")).toBe("index");
   });

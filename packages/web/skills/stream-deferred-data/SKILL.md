@@ -200,7 +200,10 @@ import type { PageConfig, PageLoader } from "@warlock.js/web";
 import { defer } from "@warlock.js/web";
 
 export const loader = (async () =>
-  defer({ product: { name: "Example product" }, reviews: Promise.resolve([{ text: "Great" }]) })) satisfies PageLoader;
+  defer({
+    product: { name: "Example product" },
+    reviews: Promise.resolve([{ text: "Great" }]),
+  })) satisfies PageLoader;
 
 // Wrong — "reviews" is a defer()-ed key:
 const invalidConfig = {

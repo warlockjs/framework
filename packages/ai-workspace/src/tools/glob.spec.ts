@@ -77,10 +77,7 @@ async function walk(backend: WorkspaceBackend, dir: string): Promise<string[]> {
  * loud. `escape` forces the op to reject with a {@link WorkspacePolicyError}
  * for the jail-violation surface test.
  */
-function seededOps(
-  files: Record<string, string>,
-  opts: { escape?: boolean } = {},
-): WorkspaceOps {
+function seededOps(files: Record<string, string>, opts: { escape?: boolean } = {}): WorkspaceOps {
   const backend = createMockBackend(
     Object.fromEntries(
       Object.entries(files).map(([path, content]) => [`${ROOT}/${path}`, content]),

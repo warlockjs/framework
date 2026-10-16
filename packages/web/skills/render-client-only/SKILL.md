@@ -72,10 +72,10 @@ export default function Placeholder() {
 ```tsx title="src/web/widgets/broken.page.tsx"
 // ❌ still breaks the server render
 import BrowserOnlyWidget from "./browser-only-widget"; // this import runs on the SERVER too,
-                                                         // and if browser-only-widget.tsx touches
-                                                         // `window` at its top level, the server
-                                                         // render throws before ClientOnly ever
-                                                         // gets a chance to hide it.
+// and if browser-only-widget.tsx touches
+// `window` at its top level, the server
+// render throws before ClientOnly ever
+// gets a chance to hide it.
 
 import { ClientOnly } from "@warlock.js/web";
 import Placeholder from "./placeholder";
@@ -150,7 +150,7 @@ Each is a `console.error` that cannot be switched off. If you also register `onC
 Work down the list; each item is something that makes the first client render differ from the server render.
 
 1. **Time and randomness in render.** `new Date()`, `Date.now()`, `Math.random()` or an id from either. Take the value from loader data (it is computed once, on the server, and shipped), or compute it after mount.
-2. **Locale and timezone formatting.** `toLocaleString()`, `toLocaleDateString()` and `Intl.*` with no explicit arguments use the *runtime's* locale and timezone, which differ between the server process and the visitor's browser. Pass an explicit `timeZone` and the page's locale (`useLocale()`), or format the string in the loader. Never derive page text from `navigator.language`.
+2. **Locale and timezone formatting.** `toLocaleString()`, `toLocaleDateString()` and `Intl.*` with no explicit arguments use the _runtime's_ locale and timezone, which differ between the server process and the visitor's browser. Pass an explicit `timeZone` and the page's locale (`useLocale()`), or format the string in the loader. Never derive page text from `navigator.language`.
 3. **Browser-only APIs during render.** `window`, `document`, `localStorage`, `matchMedia`, `navigator`, `innerWidth`. A `typeof window !== "undefined"` branch in render is the same bug: the server takes one side and the client's first render the other. Use `<ClientOnly>` or `useIsClient()` (both above), or read the API in `useEffect`.
 4. **`useId` shifting.** `useId()` is hydration-safe, but its values come from position in the tree, so a component that renders on the client's first pass and not on the server (for example behind a `typeof window` check) moves every id after it. Fix the branch, not the id. Do not replace it with `Math.random()`.
 5. **Invalid HTML nesting.** `<div>` or `<ul>` inside `<p>`, `<a>` inside `<a>`, `<tr>` directly inside `<table>`, `<form>` inside `<form>`. The browser's HTML parser repairs the server markup before React sees it, so the DOM React hydrates is not what the server rendered. Compare "View page source" (what the server sent) with the Elements panel (what the parser made).

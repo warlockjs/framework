@@ -30,7 +30,11 @@ export async function createMigrationFile(
   const isCreate = !(options.add || options.drop || options.rename);
   const existingDir = path.join(appPath(), moduleName, "models", entity.kebab, "migrations");
 
-  if (isCreate && existsSync(existingDir) && readdirSync(existingDir).some((file) => file.endsWith(".migration.ts"))) {
+  if (
+    isCreate &&
+    existsSync(existingDir) &&
+    readdirSync(existingDir).some((file) => file.endsWith(".migration.ts"))
+  ) {
     return undefined;
   }
 
@@ -128,9 +132,7 @@ export async function generateMigration(data: CommandActionData) {
   );
 
   if (!existsSync(modelFilePath)) {
-    console.log(
-      colors.red(`Error: Model not found at ${path.relative(appPath(), modelFilePath)}`),
-    );
+    console.log(colors.red(`Error: Model not found at ${path.relative(appPath(), modelFilePath)}`));
     console.log(colors.gray("Generate the model first: warlock gen.model " + modelPath));
     process.exit(1);
   }

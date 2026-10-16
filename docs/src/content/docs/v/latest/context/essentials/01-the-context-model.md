@@ -94,9 +94,9 @@ The package exposes two ways to set a store:
 Three accessors with three jobs:
 
 ```ts
-userContext.get("userId");      // TStore["userId"] | undefined — one key
-userContext.getStore();         // TStore | undefined — the whole record
-userContext.hasContext();       // boolean — am I inside a run() / enter()?
+userContext.get("userId"); // TStore["userId"] | undefined — one key
+userContext.getStore(); // TStore | undefined — the whole record
+userContext.hasContext(); // boolean — am I inside a run() / enter()?
 ```
 
 `get` is the daily-driver: one key, typed return. `getStore` is for when you want to pass the whole record somewhere. `hasContext` distinguishes "no value for this key" from "no context at all" — useful in framework code that wants to fall back when called outside the request lifecycle.
@@ -104,8 +104,8 @@ userContext.hasContext();       // boolean — am I inside a run() / enter()?
 ## Writing: `set`, `update`
 
 ```ts
-userContext.set("role", "admin");           // one key
-userContext.update({ role: "admin" });      // partial merge
+userContext.set("role", "admin"); // one key
+userContext.update({ role: "admin" }); // partial merge
 ```
 
 `set(key, value)` is sugar for `update({ [key]: value })`. Both mutate the current store in place using `Object.assign`. Both should be called inside an active context — if no store exists, `update` will `enter()` a new one with just the partial, which is rarely what you want.

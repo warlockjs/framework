@@ -323,7 +323,8 @@ export class RelationLoader<TModel extends Model = Model> {
   ): Promise<void> {
     const RelatedModel = this.resolveModelClass(definition.model);
     const localKey = definition.localKey ?? this.modelClass.primaryKey ?? "id";
-    const foreignKey = definition.foreignKey ?? inferHasForeignKey(this.modelClass.name, this.relationDefaults);
+    const foreignKey =
+      definition.foreignKey ?? inferHasForeignKey(this.modelClass.name, this.relationDefaults);
 
     // Collect all local key values
     const localKeyValues = this.collectKeyValues(localKey);
@@ -368,7 +369,8 @@ export class RelationLoader<TModel extends Model = Model> {
   ): Promise<void> {
     const RelatedModel = this.resolveModelClass(definition.model);
     const localKey = definition.localKey ?? this.modelClass.primaryKey ?? "id";
-    const foreignKey = definition.foreignKey ?? inferHasForeignKey(this.modelClass.name, this.relationDefaults);
+    const foreignKey =
+      definition.foreignKey ?? inferHasForeignKey(this.modelClass.name, this.relationDefaults);
 
     // Collect all local key values
     const localKeyValues = this.collectKeyValues(localKey);
@@ -418,7 +420,8 @@ export class RelationLoader<TModel extends Model = Model> {
     constraint?: RelationConstraintCallback,
   ): Promise<void> {
     const RelatedModel = this.resolveModelClass(definition.model);
-    const foreignKey = definition.foreignKey ?? inferBelongsToForeignKey(name, this.relationDefaults);
+    const foreignKey =
+      definition.foreignKey ?? inferBelongsToForeignKey(name, this.relationDefaults);
     const ownerKey = definition.localKey ?? RelatedModel.primaryKey ?? "id";
 
     // Collect all foreign key values from the models
@@ -607,9 +610,7 @@ export class RelationLoader<TModel extends Model = Model> {
    * @returns The model class constructor
    * @throws Error if the model is not found in the registry
    */
-  private resolveModelClass(
-    model: string | ChildModel<Model> | Lazy<unknown>,
-  ): ChildModel<Model> {
+  private resolveModelClass(model: string | ChildModel<Model> | Lazy<unknown>): ChildModel<Model> {
     if (typeof model === "function") return model;
     if (isLazy(model)) return model.resolve() as ChildModel<Model>;
 

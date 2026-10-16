@@ -2,7 +2,7 @@ import { createConnection } from "node:net";
 
 /** Probe the configured test service without a Redis client or reconnect loop. */
 export function pingRedis(host: string, port: number, timeout = 1000): Promise<boolean> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const socket = createConnection({ host, port });
     let received = "";
     let settled = false;
@@ -17,7 +17,7 @@ export function pingRedis(host: string, port: number, timeout = 1000): Promise<b
     socket.once("error", () => finish(false));
     socket.once("end", () => finish(false));
     socket.once("connect", () => socket.write("*1\r\n$4\r\nPING\r\n"));
-    socket.on("data", chunk => {
+    socket.on("data", (chunk) => {
       received += chunk.toString();
       if (received.includes("\r\n")) finish(received === "+PONG\r\n");
     });

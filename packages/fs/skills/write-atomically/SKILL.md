@@ -27,7 +27,7 @@ import { atomicWriteAsync, atomicWriteJsonAsync } from "@warlock.js/fs";
 declare const configString: string;
 
 await atomicWriteAsync("./config.toml", configString);
-await atomicWriteAsync("./binary.bin", Buffer.from([0x01, 0x02]));   // accepts string OR Buffer
+await atomicWriteAsync("./binary.bin", Buffer.from([0x01, 0x02])); // accepts string OR Buffer
 
 // JSON sugar — pretty-prints at 2-space indent
 await atomicWriteJsonAsync("./manifest.json", { version: "1.0.0", files: ["a.ts", "b.ts"] });

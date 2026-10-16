@@ -44,15 +44,7 @@ if (!pkg) {
 }
 
 const SOURCE_ROOT = path.join(PROJECT_ROOT, "domains", pkg, "docs");
-const DEST_ROOT = path.join(
-  DOCS_ROOT,
-  "src",
-  "content",
-  "docs",
-  "v",
-  "latest",
-  pkg,
-);
+const DEST_ROOT = path.join(DOCS_ROOT, "src", "content", "docs", "v", "latest", pkg);
 
 function yamlEscape(value) {
   const v = value.replace(/^["'](.*)["']$/, "$1").trim();
@@ -79,10 +71,7 @@ function transform(content) {
   }
 
   // Convert Docusaurus theme imports to Starlight equivalents.
-  body = body.replace(
-    /^import\s+Tabs\s+from\s+["']@theme\/Tabs["'];?[ \t]*\r?\n/m,
-    "",
-  );
+  body = body.replace(/^import\s+Tabs\s+from\s+["']@theme\/Tabs["'];?[ \t]*\r?\n/m, "");
   body = body.replace(
     /^import\s+TabItem\s+from\s+["']@theme\/TabItem["'];?[ \t]*\r?\n/m,
     'import { Tabs, TabItem } from "@astrojs/starlight/components";\n',
@@ -109,13 +98,10 @@ function transform(content) {
     if (labMatch) lines.push(`  label: ${yamlEscape(labMatch[1].trim())}`);
   }
 
-  body = body.replace(
-    /\[([^\]]+)\]\(([^)]*@warlock\.js\/[^)]+)\)/g,
-    (_match, text) => {
-      const clean = text.replace(/^`(.*)`$/, "$1");
-      return `\`${clean}\``;
-    },
-  );
+  body = body.replace(/\[([^\]]+)\]\(([^)]*@warlock\.js\/[^)]+)\)/g, (_match, text) => {
+    const clean = text.replace(/^`(.*)`$/, "$1");
+    return `\`${clean}\``;
+  });
 
   // Strip Docusaurus heading-ID syntax (`## Heading {#anchor}`).
   body = body.replace(/^(#{1,6}\s+.+?)\s*\{#[a-z0-9-]+\}\s*$/gm, "$1");

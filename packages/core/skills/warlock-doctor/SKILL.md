@@ -26,19 +26,19 @@ Summary: 5 ok, 1 warn, 0 fail
 
 The default set is `defaultDoctorChecks` (in registration order — runtime-surface checks first, release hygiene last):
 
-| Check | `ok` | `warn` | `fail` |
-| --- | --- | --- | --- |
-| `routes` | ≥ 1 route registered | 0 routes (a route module likely failed to load) | — |
-| `config` | required sections (`app`, `http`) present | — | a required section is missing |
-| `connectors` | manager enumerable; reports registered + active set | — | (only if the probe itself throws) |
-| `optional-peers` | every known optional peer installed | a peer is missing → its feature is unavailable | — |
-| `jwt-secret` | `auth.userType` configured and a JWT signing secret set | — | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
-| `health` | `/health` + `/ready` will be exposed | `http.health.enabled = false` (probes off) | — |
-| `release-hygiene` | `package.json` version matches the top `## x.y.z` CHANGELOG heading | no `CHANGELOG.md`, or no parseable heading | version ≠ top heading |
+| Check             | `ok`                                                                | `warn`                                          | `fail`                                                                                                     |
+| ----------------- | ------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `routes`          | ≥ 1 route registered                                                | 0 routes (a route module likely failed to load) | —                                                                                                          |
+| `config`          | required sections (`app`, `http`) present                           | —                                               | a required section is missing                                                                              |
+| `connectors`      | manager enumerable; reports registered + active set                 | —                                               | (only if the probe itself throws)                                                                          |
+| `optional-peers`  | every known optional peer installed                                 | a peer is missing → its feature is unavailable  | —                                                                                                          |
+| `jwt-secret`      | `auth.userType` configured and a JWT signing secret set             | —                                               | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
+| `health`          | `/health` + `/ready` will be exposed                                | `http.health.enabled = false` (probes off)      | —                                                                                                          |
+| `release-hygiene` | `package.json` version matches the top `## x.y.z` CHANGELOG heading | no `CHANGELOG.md`, or no parseable heading      | version ≠ top heading                                                                                      |
 
 `jwt-secret` is the pre-flight form of the silent first-login 500: when `auth.userType` is set but no signing secret is, every login and token operation fails with a generic 500 at runtime — `doctor` turns that into a `fail` before you ship. It resolves the secret from both the current key (`auth.accessToken.secret`) and the legacy `auth.jwt.secret`, so a project on the older-but-supported shape doesn't trip it. When `auth.userType` isn't configured at all (no auth), the check emits **no line** — it's skipped, not a pass — so it never nags a project that isn't doing auth.
 
-Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what *your* project has installed, not core's own deps.
+Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what _your_ project has installed, not core's own deps.
 
 ## Exit code
 
@@ -55,21 +55,21 @@ any fail    → exit 1   (so CI / a release script can gate on it)
 type CheckStatus = "ok" | "warn" | "fail";
 
 type CheckResult = {
-  name: string;     // stable check name, e.g. "routes"
+  name: string; // stable check name, e.g. "routes"
   status: CheckStatus;
-  detail: string;   // one-line, user-facing explanation
+  detail: string; // one-line, user-facing explanation
 };
 
 type DoctorCheck = {
   name: string;
-  run: () => CheckResult | Promise<CheckResult>;   // MUST be read-only
+  run: () => CheckResult | Promise<CheckResult>; // MUST be read-only
 };
 
 type DoctorReport = {
-  results: CheckResult[];                 // in registration order
-  summary: Record<CheckStatus, number>;   // counts per status
-  hasFailures: boolean;                   // true iff any fail
-  exitCode: 0 | 1;                        // 1 when hasFailures, else 0
+  results: CheckResult[]; // in registration order
+  summary: Record<CheckStatus, number>; // counts per status
+  hasFailures: boolean; // true iff any fail
+  exitCode: 0 | 1; // 1 when hasFailures, else 0
 };
 ```
 
@@ -91,7 +91,7 @@ import {
 const migrationsCheck: DoctorCheck = {
   name: "migrations",
   async run() {
-    const pending = await countPendingMigrations();   // your read-only probe
+    const pending = await countPendingMigrations(); // your read-only probe
 
     return pending === 0
       ? { name: "migrations", status: "ok", detail: "no pending migrations" }
@@ -101,8 +101,8 @@ const migrationsCheck: DoctorCheck = {
 
 const report = await runChecks([...defaultDoctorChecks, migrationsCheck]);
 
-printReport(report);                  // colored, to stdout
-const lines = formatReportLines(report);   // plain strings — snapshot-friendly
+printReport(report); // colored, to stdout
+const lines = formatReportLines(report); // plain strings — snapshot-friendly
 
 if (report.hasFailures) process.exit(report.exitCode);
 ```
@@ -125,7 +125,7 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 ## Gotchas
 
-- **`doctor` starts no connectors.** It intentionally does not open DB / cache / socket connections — the `connectors` check reports the *registered* set and which are already active, without forcing any up. Don't expect it to detect a down database.
+- **`doctor` starts no connectors.** It intentionally does not open DB / cache / socket connections — the `connectors` check reports the _registered_ set and which are already active, without forcing any up. Don't expect it to detect a down database.
 - **Optional-peers resolves from the project, not core.** A peer installed only inside core's own `node_modules` still reports as missing — the probe uses `process.cwd()`.
 - **Warnings don't fail the command.** Only a `fail` flips the exit code. Missing optional peers and disabled health endpoints are deliberate-choice `warn`s.
 - **Custom checks must stay read-only.** `run()` runs against a booted-but-not-connected app; mutating state or opening a connection breaks the contract and can hang the command.

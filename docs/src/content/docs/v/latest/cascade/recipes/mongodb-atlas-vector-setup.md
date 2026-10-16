@@ -109,10 +109,8 @@ db.knowledge_chunks.createSearchIndex({
   name: "embedding_index",
   type: "vectorSearch",
   definition: {
-    fields: [
-      { type: "vector", path: "embedding", numDimensions: 1536, similarity: "cosine" }
-    ]
-  }
+    fields: [{ type: "vector", path: "embedding", numDimensions: 1536, similarity: "cosine" }],
+  },
 });
 ```
 
@@ -134,9 +132,9 @@ db.knowledge_chunks.aggregate([
       path: "embedding",
       queryVector: [/* test vector */],
       numCandidates: 100,
-      limit: 5
-    }
-  }
+      limit: 5,
+    },
+  },
 ]);
 ```
 

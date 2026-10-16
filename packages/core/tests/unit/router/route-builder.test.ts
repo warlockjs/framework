@@ -79,13 +79,7 @@ describe("RouteBuilder — chainable verbs", () => {
 describe("RouteBuilder — RESTful semantic aliases", () => {
   it("maps list/create/show/update/destroy to the right method+path", async () => {
     await withScope(() => {
-      router
-        .route("/articles")
-        .list(noop)
-        .create(noop)
-        .show(noop)
-        .update(noop)
-        .destroy(noop);
+      router.route("/articles").list(noop).create(noop).show(noop).update(noop).destroy(noop);
     });
 
     expect(methodPaths()).toEqual([
@@ -151,10 +145,7 @@ describe("RouteBuilder — nest()", () => {
 
   it("carries the parent options into the nested builder", async () => {
     await withScope(() => {
-      router
-        .route("/parent", { description: "parent-desc" })
-        .nest("/child")
-        .list(noop);
+      router.route("/parent", { description: "parent-desc" }).nest("/child").list(noop);
     });
 
     const nested = scopedRoutes().find((route) => route.path === "/parent/child");

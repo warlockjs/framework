@@ -1,7 +1,13 @@
 import type { Model } from "@warlock.js/cascade";
 import type { Response } from "@warlock.js/core";
 import { expectTypeOf } from "vitest";
-import { defer, type AppProps, type LayoutProps, type PageMetadata, type PageProps } from "@warlock.js/web";
+import {
+  defer,
+  type AppProps,
+  type LayoutProps,
+  type PageMetadata,
+  type PageProps,
+} from "@warlock.js/web";
 
 /**
  * What a page reads from its loader is what survived `serializeLoaderData` +
@@ -42,7 +48,12 @@ declare const post: LoaderDataPost;
 declare const counter: LoaderDataCounter;
 
 // Registered model -> resource output; Date, Map and Set stay native.
-const richLoader = async () => ({ post, at: new Date(), map: new Map<string, number>(), set: new Set<Date>() });
+const richLoader = async () => ({
+  post,
+  at: new Date(),
+  map: new Map<string, number>(),
+  set: new Set<Date>(),
+});
 
 expectTypeOf<PageProps<typeof richLoader>["data"]>().toEqualTypeOf<{
   post: LoaderDataPostOutput;
@@ -52,7 +63,9 @@ expectTypeOf<PageProps<typeof richLoader>["data"]>().toEqualTypeOf<{
 }>();
 
 // Layout, app and metadata read the same serialized data.
-expectTypeOf<LayoutProps<typeof richLoader>["data"]["post"]>().toEqualTypeOf<LoaderDataPostOutput>();
+expectTypeOf<
+  LayoutProps<typeof richLoader>["data"]["post"]
+>().toEqualTypeOf<LoaderDataPostOutput>();
 expectTypeOf<AppProps<typeof richLoader>["data"]["at"]>().toEqualTypeOf<Date>();
 
 const metadata: PageMetadata<typeof richLoader> = ({ data }) => {
@@ -113,11 +126,12 @@ expectTypeOf<PageProps<typeof deferredLoader>["data"]>().toEqualTypeOf<{
 }>();
 
 const deferredCounterLoader = async () => defer({ late: Promise.resolve(counter) });
-expectTypeOf<PageProps<typeof deferredCounterLoader>["data"]["late"]>().toEqualTypeOf<Promise<never>>();
+expectTypeOf<PageProps<typeof deferredCounterLoader>["data"]["late"]>().toEqualTypeOf<
+  Promise<never>
+>();
 
 // The loader's own declared return type is untouched.
 expectTypeOf<Awaited<ReturnType<typeof richLoader>>["post"]>().toEqualTypeOf<LoaderDataPost>();
 
 // @ts-expect-error The raw model type is not what the page receives.
 expectTypeOf<PageProps<typeof richLoader>["data"]["post"]>().toEqualTypeOf<LoaderDataPost>();
-

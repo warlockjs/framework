@@ -17,33 +17,33 @@ Three scopes of subscription:
 
 Cascade emits these events, in this order, during the model's life:
 
-| Event           | When                                                         | Use case                                |
-| --------------- | ------------------------------------------------------------ | --------------------------------------- |
-| `initializing`  | A model instance has just been constructed                   | Apply request-context defaults          |
-| `fetching`      | Just before a query runs                                     | Modify the query builder mid-flight     |
-| `hydrating`     | Raw rows fetched; about to become instances                  | Pre-hydration tweaks                    |
-| `fetched`       | Models hydrated and ready                                    | Audit reads, attach derived data        |
-| `validating`    | Save kicks off; about to validate against the schema         | Hash passwords, normalise input         |
-| `validated`     | Validation succeeded                                         | Post-validate enrichment                |
-| `saving`        | About to persist (both insert and update)                    | Stamp `updatedBy`, log change context   |
-| `creating`      | About to insert a new row                                    | Generate slugs, assign defaults         |
-| `created`       | Insert succeeded                                             | Fire welcome emails, seed related rows  |
-| `updating`      | About to update an existing row                              | Diff against `getDirtyColumnsWithValues()` |
-| `updated`       | Update succeeded                                             | Invalidate caches                       |
-| `saved`         | Persist succeeded (insert or update)                         | Anything that doesn't care which        |
-| `deleting`      | About to delete                                              | Cleanup linked resources                |
-| `deleted`       | Delete succeeded                                             | Audit the deletion                      |
-| `restoring`     | About to restore a soft-deleted / trashed model              | Rebuild derived state                   |
-| `restored`      | Restore succeeded                                            | Notify subscribers                      |
+| Event          | When                                                 | Use case                                   |
+| -------------- | ---------------------------------------------------- | ------------------------------------------ |
+| `initializing` | A model instance has just been constructed           | Apply request-context defaults             |
+| `fetching`     | Just before a query runs                             | Modify the query builder mid-flight        |
+| `hydrating`    | Raw rows fetched; about to become instances          | Pre-hydration tweaks                       |
+| `fetched`      | Models hydrated and ready                            | Audit reads, attach derived data           |
+| `validating`   | Save kicks off; about to validate against the schema | Hash passwords, normalise input            |
+| `validated`    | Validation succeeded                                 | Post-validate enrichment                   |
+| `saving`       | About to persist (both insert and update)            | Stamp `updatedBy`, log change context      |
+| `creating`     | About to insert a new row                            | Generate slugs, assign defaults            |
+| `created`      | Insert succeeded                                     | Fire welcome emails, seed related rows     |
+| `updating`     | About to update an existing row                      | Diff against `getDirtyColumnsWithValues()` |
+| `updated`      | Update succeeded                                     | Invalidate caches                          |
+| `saved`        | Persist succeeded (insert or update)                 | Anything that doesn't care which           |
+| `deleting`     | About to delete                                      | Cleanup linked resources                   |
+| `deleted`      | Delete succeeded                                     | Audit the deletion                         |
+| `restoring`    | About to restore a soft-deleted / trashed model      | Rebuild derived state                      |
+| `restored`     | Restore succeeded                                    | Notify subscribers                         |
 
 Ordering for a typical save-insert: `validating` → `validated` → `saving` → `creating` → `created` → `saved`. For a save-update: `validating` → `validated` → `saving` → `updating` → `updated` → `saved`. For a delete: `deleting` → `deleted`.
 
 ## Static listeners — the everyday case
 
-Most listeners live on the class, listening for *every* save / delete / etc. on that model:
+Most listeners live on the class, listening for _every_ save / delete / etc. on that model:
 
 ```ts
-User.events().onCreating(async user => {
+User.events().onCreating(async (user) => {
   user.set("slug", slugify(user.get("name")));
 });
 
@@ -71,7 +71,7 @@ export class User extends Model<UserSchema> {
   public static schema = userSchema;
 }
 
-User.events().onCreating(async user => {
+User.events().onCreating(async (user) => {
   user.set("slug", slugify(user.get("name")));
 });
 
@@ -118,7 +118,7 @@ Listeners are awaited in registration order. Each can be async. If a listener th
 ### Stamp metadata before save
 
 ```ts
-Post.events().onSaving(async post => {
+Post.events().onSaving(async (post) => {
   const updates: Record<string, unknown> = { updatedAt: new Date() };
 
   if (post.isNew) {
@@ -134,7 +134,7 @@ Most apps stamp these in the schema/migration. But when the timestamp depends on
 ### Slug generation on insert only
 
 ```ts
-Post.events().onCreating(async post => {
+Post.events().onCreating(async (post) => {
   if (!post.get("slug")) {
     post.set("slug", slugify(post.get("title")));
   }
@@ -146,7 +146,7 @@ Post.events().onCreating(async post => {
 ### Veto a save
 
 ```ts
-Post.events().onSaving(async post => {
+Post.events().onSaving(async (post) => {
   if (post.isDirty("status") && post.get("status") === "published") {
     if (!post.get("body")) throw new Error("Cannot publish empty post");
   }
@@ -158,7 +158,7 @@ Throwing inside `*-ing` events aborts the operation and re-throws to the caller.
 ### Diff-aware update logging
 
 ```ts
-User.events().onUpdating(async user => {
+User.events().onUpdating(async (user) => {
   const changes = user.getDirtyColumnsWithValues();
   if ("email" in changes) {
     await AuditLog.create({
@@ -187,12 +187,12 @@ Conditional on the delete strategy — soft deletes shouldn't cascade, permanent
 
 ## Instance listeners
 
-Sometimes you want a listener that fires only for *this* instance, not every instance of the class:
+Sometimes you want a listener that fires only for _this_ instance, not every instance of the class:
 
 ```ts
 const user = await User.find(123);
 
-user.on("saved", async u => {
+user.on("saved", async (u) => {
   console.log(`Just saved ${u.get("email")}`);
 });
 
@@ -222,7 +222,7 @@ globalModelEvents.on("saving", async (model, ctx) => {
 });
 ```
 
-Most apps don't need this. The static `Model.events()` listeners are usually clearer because they're co-located with the model and don't fire for unrelated tables. Reach for global only when the behaviour really does apply to *every* model.
+Most apps don't need this. The static `Model.events()` listeners are usually clearer because they're co-located with the model and don't fire for unrelated tables. Reach for global only when the behaviour really does apply to _every_ model.
 
 ## Skipping events
 

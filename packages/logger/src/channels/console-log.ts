@@ -44,11 +44,7 @@ type LevelStyle = {
  * Build a single-color, fixed-width tag — `{icon} {name}` with the name padded
  * so every tag spans the same number of columns.
  */
-function buildTag(
-  icon: string,
-  name: string,
-  color: (text: string) => string,
-): string {
+function buildTag(icon: string, name: string, color: (text: string) => string): string {
   return color(`${icon} ${name.padEnd(LEVEL_NAME_WIDTH)}`);
 }
 
@@ -91,7 +87,7 @@ const LEVEL_STYLES: Record<LogLevel, LevelStyle> = {
  */
 const DEFAULT_STYLE: LevelStyle = {
   tag: "[log]".padEnd(LEVEL_NAME_WIDTH + 2),
-  message: message => message as string,
+  message: (message) => message as string,
 };
 
 export class ConsoleLog extends LogChannel<ConsoleLogConfig> {

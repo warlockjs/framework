@@ -166,9 +166,7 @@ export class DatabaseWriter implements WriterContract {
       success: true,
       document: this.model.data,
       isNew: isInsert,
-      modifiedCount: isInsert
-        ? undefined
-        : (result as UpdateResult).modifiedCount,
+      modifiedCount: isInsert ? undefined : (result as UpdateResult).modifiedCount,
     };
   }
 
@@ -182,10 +180,7 @@ export class DatabaseWriter implements WriterContract {
    * @throws {ValidationError} If validation fails
    * @private
    */
-  private async validateAndCast(
-    isInsert: boolean,
-    options: WriterOptions,
-  ): Promise<void> {
+  private async validateAndCast(isInsert: boolean, options: WriterOptions): Promise<void> {
     // Emit validating event
     if (!options.skipEvents) {
       await this.model.emitEvent("validating", {
@@ -235,8 +230,8 @@ export class DatabaseWriter implements WriterContract {
       : Object.fromEntries(
           this.model
             .getDirtyColumns()
-            .filter(column => column in this.model.data)
-            .map(column => [column, this.model.data[column]]),
+            .filter((column) => column in this.model.data)
+            .map((column) => [column, this.model.data[column]]),
         );
 
     const validationSchema = isInsert
@@ -434,11 +429,7 @@ export class DatabaseWriter implements WriterContract {
 
     // Execute update with operations
     try {
-      return await this.driver.update(
-        this.table,
-        this.buildPrimaryKeyFilter(),
-        operations,
-      );
+      return await this.driver.update(this.table, this.buildPrimaryKeyFilter(), operations);
     } catch (error) {
       throw this.mapUniqueViolation(error, false);
     }
@@ -469,7 +460,10 @@ export class DatabaseWriter implements WriterContract {
       field = Object.keys(err.keyPattern)[0];
     } else {
       // Postgres: "Key (email)=(x) already exists."
-      field = /Key \(([^)]+)\)=/.exec(err.detail ?? "")?.[1]?.split(",")[0]?.trim();
+      field = /Key \(([^)]+)\)=/
+        .exec(err.detail ?? "")?.[1]
+        ?.split(",")[0]
+        ?.trim();
     }
 
     if (!field) {
@@ -562,18 +556,18 @@ export class DatabaseWriter implements WriterContract {
     // partial by intent and keep going through the per-leaf path below.
     const replacedColumns = this.model.dirtyTracker
       .getReplacedColumns()
-      .filter(column => !identityColumns.has(column) && !this.unvalidatedColumns.has(column));
+      .filter((column) => !identityColumns.has(column) && !this.unvalidatedColumns.has(column));
 
     // A leaf under a whole-written field must not be sent too: MongoDB rejects
     // an update touching both `nested` and `nested.a`.
     const isUnderReplaced = (column: string): boolean =>
-      replacedColumns.some(root => column === root || column.startsWith(`${root}.`));
+      replacedColumns.some((root) => column === root || column.startsWith(`${root}.`));
 
     // Get dirty columns (modified fields)
     const dirtyColumns = this.model
       .getDirtyColumns()
       .filter(
-        column =>
+        (column) =>
           !identityColumns.has(column) &&
           !this.unvalidatedColumns.has(column) &&
           !isUnderReplaced(column),
@@ -593,7 +587,7 @@ export class DatabaseWriter implements WriterContract {
     // a parent emptied by an unset is removed too instead of left behind as `{}`.
     const removedColumns = this.model.dirtyTracker
       .getRemovedPaths()
-      .filter(column => !identityColumns.has(column) && !isUnderReplaced(column));
+      .filter((column) => !identityColumns.has(column) && !isUnderReplaced(column));
 
     if (removedColumns.length > 0) {
       operations.$unset = {};

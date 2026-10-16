@@ -25,7 +25,7 @@ pnpm add @opentelemetry/api @opentelemetry/sdk-trace-base
 pnpm add langfuse
 ```
 
-A missing SDK surfaces as a curated *"install this"* error on first export — never a boot-time stack trace. So you can register the OTel exporter without `langfuse` installed, and vice versa.
+A missing SDK surfaces as a curated _"install this"_ error on first export — never a boot-time stack trace. So you can register the OTel exporter without `langfuse` installed, and vice versa.
 
 ## Wire the OpenTelemetry SDK (host app's job)
 
@@ -50,11 +50,7 @@ import "./otel-setup"; // your OTel SDK bootstrap — registers the global provi
 
 import { ai } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
-import {
-  panoptic,
-  otelExporter,
-  langfuseExporter,
-} from "@warlock.js/ai-panoptic";
+import { panoptic, otelExporter, langfuseExporter } from "@warlock.js/ai-panoptic";
 
 const openai = new OpenAISDK({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -66,9 +62,7 @@ const openai = new OpenAISDK({
 const agent = ai.agent({
   name: "release-notes-writer",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai
-    .systemPrompt()
-    .persona("You turn raw changelog lines into crisp release notes."),
+  systemPrompt: ai.systemPrompt().persona("You turn raw changelog lines into crisp release notes."),
 });
 
 const observe = panoptic({
@@ -133,7 +127,7 @@ If your app already constructs a Langfuse client (or a custom `Tracer`), hand it
 import { Langfuse } from "langfuse";
 import { trace } from "@opentelemetry/api";
 
-const langfuse = new Langfuse({ /* ... */ });
+const langfuse = new Langfuse({/* ... */});
 
 panoptic({
   exporters: [

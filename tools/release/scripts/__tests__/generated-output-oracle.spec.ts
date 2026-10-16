@@ -35,15 +35,18 @@ import {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ORACLE = path.resolve(HERE, "..", "adapters", "generated-output-oracle.mjs");
 
-function run(args: readonly string[], cwd: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+function run(
+  args: readonly string[],
+  cwd: string,
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [ORACLE, ...args], { cwd });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", chunk => (stdout += chunk));
-    child.stderr.on("data", chunk => (stderr += chunk));
+    child.stdout.on("data", (chunk) => (stdout += chunk));
+    child.stderr.on("data", (chunk) => (stderr += chunk));
     child.once("error", reject);
-    child.once("close", exitCode => resolve({ exitCode: exitCode ?? 1, stdout, stderr }));
+    child.once("close", (exitCode) => resolve({ exitCode: exitCode ?? 1, stdout, stderr }));
   });
 }
 
@@ -119,14 +122,17 @@ describe("substituteRouteParams", () => {
 
 describe("isRequestedStatus — the gate's 404/5xx-fail, 401/422-pass rule", () => {
   it("200 counts as requested", () => assert.equal(isRequestedStatus(200), true));
-  it("401 counts as requested (a registered route answering)", () => assert.equal(isRequestedStatus(401), true));
+  it("401 counts as requested (a registered route answering)", () =>
+    assert.equal(isRequestedStatus(401), true));
   it("403 counts as requested", () => assert.equal(isRequestedStatus(403), true));
   it("422 counts as requested", () => assert.equal(isRequestedStatus(422), true));
   it("404 does NOT count as requested — the route is not actually reachable", () =>
     assert.equal(isRequestedStatus(404), false));
-  it("500 does NOT count as requested — the route blew up", () => assert.equal(isRequestedStatus(500), false));
+  it("500 does NOT count as requested — the route blew up", () =>
+    assert.equal(isRequestedStatus(500), false));
   it("503 does NOT count as requested", () => assert.equal(isRequestedStatus(503), false));
-  it("rejects a non-numeric status defensively", () => assert.equal(isRequestedStatus(undefined as unknown as number), false));
+  it("rejects a non-numeric status defensively", () =>
+    assert.equal(isRequestedStatus(undefined as unknown as number), false));
 });
 
 describe("diffProjectCommands", () => {
@@ -134,7 +140,7 @@ describe("diffProjectCommands", () => {
     const app = {
       commands: {
         "make:foo": { source: "project" as const },
-        "routes": { source: "framework" as const },
+        routes: { source: "framework" as const },
       },
     };
     const baseline = { commands: { routes: { source: "framework" as const } } };
@@ -145,7 +151,7 @@ describe("diffProjectCommands", () => {
     const app = {
       commands: {
         "vendor:sync": { source: "plugin" as const },
-        "doctor": { source: "framework" as const },
+        doctor: { source: "framework" as const },
       },
     };
     assert.deepEqual(diffProjectCommands(app, undefined), []);
@@ -204,7 +210,9 @@ describe("assembleCertificate", () => {
       typecheckPassed: true,
       development: { booted: true, ready: true, cleanExit: true },
       production: { booted: true, ready: true, cleanExit: true },
-      introducedRoutes: [{ id: "GET /widgets", developmentRequested: true, productionRequested: true }],
+      introducedRoutes: [
+        { id: "GET /widgets", developmentRequested: true, productionRequested: true },
+      ],
       introducedCommands: [],
       hasWeb: false,
     });
@@ -218,7 +226,9 @@ describe("assembleCertificate", () => {
       typecheckPassed: true,
       development: { booted: true, ready: true, cleanExit: true },
       production: { booted: true, ready: true, cleanExit: true },
-      introducedRoutes: [{ id: "GET /widgets", developmentRequested: true, productionRequested: true }],
+      introducedRoutes: [
+        { id: "GET /widgets", developmentRequested: true, productionRequested: true },
+      ],
       introducedCommands: [],
       hasWeb: false,
     });
@@ -254,7 +264,7 @@ describe("WARLOCK_GENERATED_OUTPUT_ORACLE — real child-process argument valida
   it("fails with no stdout certificate when --app-root does not exist", async () => {
     const missing = path.join(workspace, "does-not-exist-app");
     const baseline = path.join(workspace, "baseline");
-    await import("node:fs/promises").then(fs => fs.mkdir(baseline, { recursive: true }));
+    await import("node:fs/promises").then((fs) => fs.mkdir(baseline, { recursive: true }));
 
     const result = await run(
       [

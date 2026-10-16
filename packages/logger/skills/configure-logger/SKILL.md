@@ -9,10 +9,10 @@ The logger is a singleton. Do all setup in one place, as early in the app entry 
 
 ## The three channel-registration methods
 
-| Method | Semantics |
-|---|---|
-| `log.addChannel(channel)` | **Appends.** Safe to call multiple times. |
-| `log.setChannels([...])` | **Replaces** the full list. |
+| Method                                                       | Semantics                                                                                                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `log.addChannel(channel)`                                    | **Appends.** Safe to call multiple times.                                                                                      |
+| `log.setChannels([...])`                                     | **Replaces** the full list.                                                                                                    |
 | `log.configure({ channels, autoFlushOn, redact, minLevel })` | **Replaces** channels if provided; installs auto-flush if provided; sets redact / minLevel if provided. All four are optional. |
 
 All three return `this` — chainable.
@@ -31,7 +31,7 @@ if (process.env.NODE_ENV === "production") {
     autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
   });
 } else if (process.env.NODE_ENV === "test") {
-  log.setChannels([]);   // silence logger during tests
+  log.setChannels([]); // silence logger during tests
 } else {
   log.setChannels([new ConsoleLog()]);
 }
@@ -40,7 +40,7 @@ if (process.env.NODE_ENV === "production") {
 Import it once at the top of `src/index.ts`:
 
 ```ts title="src/index.ts"
-import "./logger";                     // side-effect: configures singleton
+import "./logger"; // side-effect: configures singleton
 import { log } from "@warlock.js/logger";
 
 log.info("app", "start", "Server listening on :3000");
@@ -87,10 +87,7 @@ Every `new Logger()` gets a unique `id` (string, prefixed `"logger-"`).
 
 ```ts
 log.configure({
-  channels: [
-    new ConsoleLog({ showContext: true }),
-    new FileLog({ chunk: "daily" }),
-  ],
+  channels: [new ConsoleLog({ showContext: true }), new FileLog({ chunk: "daily" })],
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
   redact: { paths: ["context.password", "context.headers.authorization"] },
   minLevel: process.env.LOG_LEVEL === "debug" ? "debug" : "info",

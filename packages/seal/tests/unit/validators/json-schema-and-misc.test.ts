@@ -52,7 +52,12 @@ describe("StringValidator.toJsonSchema - format hints", () => {
       minLength: 3,
       maxLength: 8,
     });
-    expect(v.string().pattern(/^[a-z]+$/).toJsonSchema().pattern).toBe("^[a-z]+$");
+    expect(
+      v
+        .string()
+        .pattern(/^[a-z]+$/)
+        .toJsonSchema().pattern,
+    ).toBe("^[a-z]+$");
     expect(v.string().in(["a", "b"]).toJsonSchema().enum).toEqual(["a", "b"]);
   });
 
@@ -138,8 +143,7 @@ describe("LiteralValidator", () => {
 });
 
 describe("DiscriminatedUnion - nullable JSON schema + matchesType", () => {
-  const branch = (lit: string) =>
-    v.object({ type: v.literal(lit), value: v.string() });
+  const branch = (lit: string) => v.object({ type: v.literal(lit), value: v.string() });
 
   it("matchesType only accepts plain objects", () => {
     const du = v.discriminatedUnion("type", [branch("a"), branch("b")]);

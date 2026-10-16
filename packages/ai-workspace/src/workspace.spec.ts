@@ -99,7 +99,7 @@ describe("workspace (integration over the real local backend)", () => {
   it("should run a trivial exec and capture stdout + exit code", async () => {
     const ws = makeWorkspace();
 
-    const result = await ws.exec('node -e "process.stdout.write(\'pong\')"');
+    const result = await ws.exec("node -e \"process.stdout.write('pong')\"");
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("pong");
@@ -120,9 +120,7 @@ describe("workspace (integration over the real local backend)", () => {
     const result = await ws.grep("TODO");
 
     expect(result.total).toBeGreaterThanOrEqual(1);
-    expect(result.matches.some((match) => match.path === "a.ts" && match.line === 1)).toBe(
-      true,
-    );
+    expect(result.matches.some((match) => match.path === "a.ts" && match.line === 1)).toBe(true);
   });
 
   it("should glob files within the jail to sorted workspace-relative paths", async () => {
@@ -179,18 +177,14 @@ describe("workspace (integration over the real local backend)", () => {
     // Only the non-mutating tools are vended.
     expect(ro.tools.all().map((tool) => tool.name)).toEqual(["read_file", "grep", "glob"]);
     // pick() cannot be coaxed into vending a mutating tool.
-    expect(ro.tools.pick("writeFile", "readFile").map((tool) => tool.name)).toEqual([
-      "read_file",
-    ]);
+    expect(ro.tools.pick("writeFile", "readFile").map((tool) => tool.name)).toEqual(["read_file"]);
 
     // Reads still work through the read-only projection.
     const read = await ro.readFile("seed.txt");
     expect(read.content).toContain("seeded");
 
     // Mutating direct methods reject.
-    await expect(ro.writeFile("x.txt", "nope")).rejects.toBeInstanceOf(
-      WorkspacePolicyError,
-    );
+    await expect(ro.writeFile("x.txt", "nope")).rejects.toBeInstanceOf(WorkspacePolicyError);
     await expect(ro.exec("node -v")).rejects.toBeInstanceOf(WorkspacePolicyError);
   });
 

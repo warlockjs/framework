@@ -41,7 +41,7 @@ Three things to notice:
 - `.optional()` adds the `?` brand — `age?: number`.
 - `v.literal(...)` narrows to the literal union, not the wider `string`.
 
-This is the type you reach for in HTTP handlers, form payloads, DTOs — anywhere the data is *about to be validated*.
+This is the type you reach for in HTTP handlers, form payloads, DTOs — anywhere the data is _about to be validated_.
 
 ## `Infer.Input` vs `Infer.Output`
 
@@ -74,15 +74,15 @@ type Out = Infer.Output<typeof schema>;
 
 The asymmetry is intentional:
 
-- **`Infer.Input`** describes what the *caller* sends. `.optional()`, `.default()`, and `.catch()` all make a key optional — any of them means "you don't have to supply this".
-- **`Infer.Output`** describes what `result.data` *contains*. `.default()` and `.catch()` guarantee a value, so those keys are required even when chained with `.optional()`.
+- **`Infer.Input`** describes what the _caller_ sends. `.optional()`, `.default()`, and `.catch()` all make a key optional — any of them means "you don't have to supply this".
+- **`Infer.Output`** describes what `result.data` _contains_. `.default()` and `.catch()` guarantee a value, so those keys are required even when chained with `.optional()`.
 
 ## When to reach for which
 
-| Use case | Type to reach for |
-| --- | --- |
-| HTTP request body, form payload, DTO, anything pre-validation | `Infer<T>` (alias) or `Infer.Input<T>` |
-| Validated state, Cascade `Model<>` params, anywhere downstream of `validate()` | `Infer.Output<T>` |
+| Use case                                                                       | Type to reach for                      |
+| ------------------------------------------------------------------------------ | -------------------------------------- |
+| HTTP request body, form payload, DTO, anything pre-validation                  | `Infer<T>` (alias) or `Infer.Input<T>` |
+| Validated state, Cascade `Model<>` params, anywhere downstream of `validate()` | `Infer.Output<T>`                      |
 
 The bare `Infer<T>` is the common case (input). Reach for the explicit `Infer.Output<T>` when you're typing post-validation data:
 
@@ -106,7 +106,7 @@ async function createUser(body: Infer.Input<typeof userSchema>) {
 `validate()` narrows on `isValid`: on success `result.data` is `Infer.Output<typeof schema>`, on failure it is `undefined`. A schema whose type does not describe its output (a value annotated as bare `BaseValidator` or `ObjectValidator`) keeps `data: any`; a typed `v.record(...)` keeps its `Record<string, …>` output. The Standard Schema bridge follows the same rule: `schema["~standard"].validate(...)` resolves to the output type, discriminated unions included.
 
 :::caution[Typing validated data as `Infer<T>`]
-Bare `Infer<T>` is the *input* shape, where `.default()`, `.catch()` and `.optional()` all make a key optional. Annotate post-validation data with it and every defaulted field reads as possibly `undefined`. Use `Infer.Output<T>` (or let `validate()` infer it) for anything downstream of validation.
+Bare `Infer<T>` is the _input_ shape, where `.default()`, `.catch()` and `.optional()` all make a key optional. Annotate post-validation data with it and every defaulted field reads as possibly `undefined`. Use `Infer.Output<T>` (or let `validate()` infer it) for anything downstream of validation.
 :::
 
 ## How the brands work
@@ -118,7 +118,7 @@ Each chain method attaches a type-level brand to the validator's type. The infer
 - `{ hasDefault: true }` — set by `.default(...)`.
 - `{ hasCatch: true }` — set by `.catch(...)`.
 
-`Infer.Input` marks a key optional whenever any of `isOptional`, `hasDefault`, or `hasCatch` is present. `Infer.Output` marks a key optional only when `isOptional` is present *and* neither `hasDefault` nor `hasCatch` is.
+`Infer.Input` marks a key optional whenever any of `isOptional`, `hasDefault`, or `hasCatch` is present. `Infer.Output` marks a key optional only when `isOptional` is present _and_ neither `hasDefault` nor `hasCatch` is.
 
 Both flavours widen with `| null` when `isNullable` is set.
 

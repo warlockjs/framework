@@ -132,9 +132,7 @@ export async function createManyRecords<
   }
 
   const batchSize =
-    options.batchSize && options.batchSize > 0
-      ? options.batchSize
-      : DEFAULT_CREATE_MANY_BATCH_SIZE;
+    options.batchSize && options.batchSize > 0 ? options.batchSize : DEFAULT_CREATE_MANY_BATCH_SIZE;
 
   const chunks = chunkArray(data, batchSize);
 
@@ -382,7 +380,12 @@ export async function upsertRecord<
   const model = ModelClass.hydrate(result as Record<string, unknown>) as TModel;
   model.dirtyTracker.reset();
 
-  await emitModelEvent(model, "saved", { filter: safeFilter, data: result, options, mode: "upsert" });
+  await emitModelEvent(model, "saved", {
+    filter: safeFilter,
+    data: result,
+    options,
+    mode: "upsert",
+  });
 
   return model;
 }

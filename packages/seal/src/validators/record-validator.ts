@@ -103,11 +103,14 @@ export class RecordValidator extends BaseValidator {
 
     await Promise.all(validationPromises);
 
-    return this.refineResult({
-      isValid: errors.length === 0,
-      errors,
-      data: await this.startTransformationPipeline(mutatedData, context),
-    }, context);
+    return this.refineResult(
+      {
+        isValid: errors.length === 0,
+        errors,
+        data: await this.startTransformationPipeline(mutatedData, context),
+      },
+      context,
+    );
   }
 
   /**

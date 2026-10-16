@@ -131,12 +131,12 @@ type SitemapFileResult = {
 
 ## Errors
 
-| Error | Thrown from | When |
-| --- | --- | --- |
-| `InvalidBaseUrlError` | `new Sitemap()`, `new SitemapIndex()` | `baseUrl` is missing, relative, or not `http(s)`. |
-| `InvalidSitemapEntryError` | `add()`, and while `SitemapIndex` writes | No path, a priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, or an alternate with no `hreflang`. |
-| `DuplicateSourceKeyError` | `SitemapIndex.addSource()` | Two source keys differ only in case, so they would overwrite each other's shard files. |
-| `UnownedOutputDirectoryError` | `SitemapIndex.saveTo()`, `Sitemap.publishTo()` | `outDir` isn't empty and has no `.sitemap-set.json` marker. Nothing is written. |
+| Error                         | Thrown from                                    | When                                                                                                                     |
+| ----------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `InvalidBaseUrlError`         | `new Sitemap()`, `new SitemapIndex()`          | `baseUrl` is missing, relative, or not `http(s)`.                                                                        |
+| `InvalidSitemapEntryError`    | `add()`, and while `SitemapIndex` writes       | No path, a priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, or an alternate with no `hreflang`. |
+| `DuplicateSourceKeyError`     | `SitemapIndex.addSource()`                     | Two source keys differ only in case, so they would overwrite each other's shard files.                                   |
+| `UnownedOutputDirectoryError` | `SitemapIndex.saveTo()`, `Sitemap.publishTo()` | `outDir` isn't empty and has no `.sitemap-set.json` marker. Nothing is written.                                          |
 
 `SitemapIndex` also throws `RangeError` from its constructor when
 `maxUrlsPerFile` or `maxBytesPerFile` is above the protocol limit, and from

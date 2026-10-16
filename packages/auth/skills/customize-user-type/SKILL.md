@@ -99,7 +99,9 @@ const dashboardController: RequestHandler = async ({ response }) => response.suc
 
 router.get("/account", userAccountController, { middleware: [authMiddleware("user")] });
 router.get("/admin/users", listUsersController, { middleware: [authMiddleware("admin")] });
-router.get("/back-office", backOfficeController, { middleware: [authMiddleware(["admin", "staff"])] });
+router.get("/back-office", backOfficeController, {
+  middleware: [authMiddleware(["admin", "staff"])],
+});
 router.get("/dashboard", dashboardController, { middleware: [authMiddleware([])] }); // any logged-in
 ```
 

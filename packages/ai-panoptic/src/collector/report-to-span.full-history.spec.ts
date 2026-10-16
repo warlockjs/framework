@@ -33,7 +33,11 @@ function agentReport(
 const MESSAGES: CapturedMessage[] = [
   { role: "system", content: "You are helpful." },
   { role: "user", content: "What's the weather?" },
-  { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "weather", arguments: {} } as never] },
+  {
+    role: "assistant",
+    content: "",
+    toolCalls: [{ id: "c1", name: "weather", arguments: {} } as never],
+  },
   { role: "tool", content: '{"temp":21}', toolCallId: "c1" },
   { role: "assistant", content: "It's 21 degrees." },
 ];
@@ -42,7 +46,10 @@ describe("reportToSpan — fullHistory capture (F2)", () => {
   it("puts the full CapturedMessage[] on span.input when fullHistory and messages present", () => {
     const report = agentReport({
       systemPrompt: "You are helpful.",
-      trips: [{ input: "What's the weather?", output: "" }, { input: "[tool results]", output: "It's 21 degrees." }],
+      trips: [
+        { input: "What's the weather?", output: "" },
+        { input: "[tool results]", output: "It's 21 degrees." },
+      ],
       messages: MESSAGES,
     });
 
@@ -92,7 +99,9 @@ describe("reportToSpan — fullHistory capture (F2)", () => {
 
   it("passes the full array through the redactor as a single value", () => {
     const redactContent: ContentRedactor = (value, { field }) =>
-      field === "input" && Array.isArray(value) ? value.map(() => ({ role: "redacted", content: "***" })) : value;
+      field === "input" && Array.isArray(value)
+        ? value.map(() => ({ role: "redacted", content: "***" }))
+        : value;
 
     const report = agentReport({
       trips: [{ input: "q", output: "a" }],
@@ -105,7 +114,8 @@ describe("reportToSpan — fullHistory capture (F2)", () => {
   });
 
   it("drops span.input entirely when the redactor returns undefined for the array", () => {
-    const redactContent: ContentRedactor = (_value, { field }) => (field === "input" ? undefined : _value);
+    const redactContent: ContentRedactor = (_value, { field }) =>
+      field === "input" ? undefined : _value;
 
     const report = agentReport({
       trips: [{ input: "q", output: "a" }],

@@ -81,8 +81,8 @@ Four exporters ship today, each a factory returning an `ExporterContract`:
 ```ts
 import {
   consoleExporter, // zero-dep — print trace summary or full span tree
-  fileExporter,    // zero-dep — append traces as JSON Lines, buffered
-  otelExporter,    // OpenTelemetry — gen_ai.* semantic conventions (lazy @opentelemetry/api)
+  fileExporter, // zero-dep — append traces as JSON Lines, buffered
+  otelExporter, // OpenTelemetry — gen_ai.* semantic conventions (lazy @opentelemetry/api)
   langfuseExporter, // Langfuse — traces + generations (lazy langfuse)
 } from "@warlock.js/ai-panoptic";
 

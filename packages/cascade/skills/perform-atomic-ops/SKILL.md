@@ -19,10 +19,13 @@ Signature: `Model.increase(filter, field, amount)` / `Model.decrease(filter, fie
 ## Arbitrary atomic mutations — `Model.atomic`
 
 ```ts
-await User.atomic({ id: userId }, {
-  $set: { last_seen: new Date() },
-  $inc: { login_count: 1 },
-});
+await User.atomic(
+  { id: userId },
+  {
+    $set: { last_seen: new Date() },
+    $inc: { login_count: 1 },
+  },
+);
 ```
 
 `Model.atomic(filter, operations)` → `Promise<number>`. Driver-flavored atomic mutation — MongoDB has `$set` / `$inc` / `$push` / `$pull` natively; the Postgres driver supports `$set` / `$unset` / `$inc` / `$dec` (and `$setOnInsert` on upsert) and throws `UnsupportedUpdateOperationError` for the rest. Use when you need to combine multiple field changes atomically without loading the model first.
@@ -48,7 +51,11 @@ const granted = await Quota.atomic(
 
 // MongoDB only: pipeline update, $addToSet, arrayFilters
 await Post.findOneAndUpdate({ slug }, [{ $set: { score: { $add: ["$likes", "$shares"] } } }]);
-await Post.atomic({ slug }, { $set: { "grades.$[low].score": 50 } }, { arrayFilters: [{ "low.score": { $lt: 50 } }] });
+await Post.atomic(
+  { slug },
+  { $set: { "grades.$[low].score": 50 } },
+  { arrayFilters: [{ "low.score": { $lt: 50 } }] },
+);
 ```
 
 - `atomic(filter, update, { upsert?, arrayFilters?, trustedFilter? })` → modified + upserted count.
@@ -56,6 +63,7 @@ await Post.atomic({ slug }, { $set: { "grades.$[low].score": 50 } }, { arrayFilt
 - `findAndUpdate(filter, update, { upsert?, arrayFilters? })`. No `trustedFilter`, because it reads the rows back with `where(filter)`.
 
 **Postgres.** An upsert runs as `INSERT … ON CONFLICT (target) DO UPDATE … RETURNING *`. The target is the primary key, or a unique index, whose columns are ALL equality keys of the filter. Other filter conditions become `DO UPDATE … WHERE`. If the row exists and fails them, nothing is written and `findOneAndUpdate` returns `null`. The driver throws `UnsupportedUpdateOperationError` (`.operation`, `.driver`) for:
+
 - pipeline updates
 - `arrayFilters`
 - `$push`, `$pull`, `$addToSet` and unknown operators
@@ -98,10 +106,7 @@ const rows = await OrderItem.createMany(millionRows, { bulk: true, batchSize: 10
 ## Bulk update — `Model.findAndUpdate(filter, operations)`
 
 ```ts
-const updated = await User.findAndUpdate(
-  { status: "pending" },
-  { $set: { status: "active" } },
-);
+const updated = await User.findAndUpdate({ status: "pending" }, { $set: { status: "active" } });
 // updated: User[] — the matched-and-updated models
 ```
 
@@ -112,8 +117,8 @@ const updated = await User.findAndUpdate(
 ## Bulk delete — `Model.delete(filter)`
 
 ```ts
-await User.delete({ status: "spam" });      // delete all matching → count
-await User.deleteOne({ status: "spam" });   // delete the first match → count
+await User.delete({ status: "spam" }); // delete all matching → count
+await User.deleteOne({ status: "spam" }); // delete the first match → count
 ```
 
 `Model.delete(filter?)` and `Model.deleteOne(filter?)` both return `Promise<number>`. These bypass the per-instance delete strategy and `deleted` events — they are raw driver deletes.
@@ -129,16 +134,16 @@ for (const user of targets) {
 
 ## When to reach for what
 
-| Task | Reach for |
-| --- | --- |
-| Increment a counter | `Model.increase(filter, field, n)` |
-| Atomically change multiple fields on one record | `Model.atomic(filter, ops)` |
-| Insert N records | `Model.createMany(rows)` |
-| Insert a large batch fast (no per-row events) | `Model.createMany(rows, { bulk: true, batchSize })` |
-| Update many rows with operators | `Model.findAndUpdate(filter, { $set: {...} })` |
-| Update one record by id | `Model.update(id, data)` |
-| Delete many rows (raw) | `Model.delete(filter)` |
-| Multi-row read-modify-write | Wrap in a transaction (see the `manage-transactions` topic) |
+| Task                                            | Reach for                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| Increment a counter                             | `Model.increase(filter, field, n)`                            |
+| Atomically change multiple fields on one record | `Model.atomic(filter, ops)`                                   |
+| Insert N records                                | `Model.createMany(rows)`                                      |
+| Insert a large batch fast (no per-row events)   | `Model.createMany(rows, { bulk: true, batchSize })`           |
+| Update many rows with operators                 | `Model.findAndUpdate(filter, { $set: {...} })`                |
+| Update one record by id                         | `Model.update(id, data)`                                      |
+| Delete many rows (raw)                          | `Model.delete(filter)`                                        |
+| Multi-row read-modify-write                     | Wrap in a transaction (see the `manage-transactions` topic)   |
 | Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()` |
 
 ## Things NOT to do

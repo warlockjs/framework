@@ -72,12 +72,7 @@ function totalUSD(cost: ModelPricing | undefined): number {
     return 0;
   }
 
-  return (
-    cost.input +
-    cost.output +
-    (cost.cachedInput ?? 0) +
-    (cost.cachedOutput ?? 0)
-  );
+  return cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
 }
 
 async function recordSpend(tenantId: string, result: AgentResult): Promise<void> {

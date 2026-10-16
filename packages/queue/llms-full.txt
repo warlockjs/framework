@@ -99,11 +99,14 @@ The job module must be imported by the process that runs workers — in a Warloc
 ```ts
 const { id } = await sendInvoice.dispatch({ invoiceId: "42" });
 
-await sendInvoice.dispatch({ invoiceId: "43" }, {
-  delay: "10m", // ms number or "500ms" | "30s" | "10m" | "2h" | "1d"
-  priority: 1, // 1 runs first; larger numbers later
-  jobId: "invoice:43", // a second dispatch with a live id is ignored
-});
+await sendInvoice.dispatch(
+  { invoiceId: "43" },
+  {
+    delay: "10m", // ms number or "500ms" | "30s" | "10m" | "2h" | "1d"
+    priority: 1, // 1 runs first; larger numbers later
+    jobId: "invoice:43", // a second dispatch with a live id is ignored
+  },
+);
 ```
 
 Option precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
@@ -276,6 +279,5 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
 - `channel.send` throws → retried per `attempts` / `backoff`, then listed by `failedJobs()`.
 - Channel not configured in the worker → fails at once, no retries.
 - Deliveries run under the job name `warlock.notifications.deliver`.
-
 
 

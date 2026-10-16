@@ -8,7 +8,7 @@ sidebar:
 
 Warlock's CLI ships a scaffolding suite that creates files in the layout the framework expects. The generators are the structure made executable — every module they produce reads the same as every other module, so your fifth feature works like your first.
 
-This page is the deep dive on the `generate.*` family and the `add` installer. For the bare command reference, see [CLI commands](./cli-commands.md). Here we cover *what* each generator produces, *how* the naming pipeline transforms your input, and the two workflows you'll actually use day to day.
+This page is the deep dive on the `generate.*` family and the `add` installer. For the bare command reference, see [CLI commands](./cli-commands.md). Here we cover _what_ each generator produces, _how_ the naming pipeline transforms your input, and the two workflows you'll actually use day to day.
 
 ## The mental model
 
@@ -24,12 +24,12 @@ That uniformity is the value. Once you know the shape, every generator behaves t
 
 Whatever you type, the generator normalizes it. Each `Name` object exposes four cases:
 
-| Case      | Example                | Used for                                       |
-| --------- | ---------------------- | ---------------------------------------------- |
-| `kebab`   | `create-user`          | File names, folder names, route paths.         |
-| `camel`   | `createUser`           | Function names, controller exports.            |
-| `pascal`  | `CreateUser`           | Class names, type names, schema export names.  |
-| `snake`   | `create_user`          | Database table/column names.                   |
+| Case     | Example       | Used for                                      |
+| -------- | ------------- | --------------------------------------------- |
+| `kebab`  | `create-user` | File names, folder names, route paths.        |
+| `camel`  | `createUser`  | Function names, controller exports.           |
+| `pascal` | `CreateUser`  | Class names, type names, schema export names. |
+| `snake`  | `create_user` | Database table/column names.                  |
 
 The generators also pluralize and singularize. Module names go through `pluralName()` (so `product` becomes `products`); entity names inside modules go through `singularName()` (so `products/products` becomes `products/product` for the entity). You can type either form — the generator will figure it out.
 
@@ -186,11 +186,11 @@ warlock generate.model products/product --timestamps false
 
 Creates `models/<name>/<name>.model.ts` plus an index file and an initial migration file. With `--with-resource`, also creates the resource.
 
-| Flag                  | Description                                                                  |
-| --------------------- | ---------------------------------------------------------------------------- |
-| `--with-resource, -rs` | Also generate a resource at `resources/<name>.resource.ts`.                  |
-| `--table <name>`      | Override the table name. Defaults to the snake-plural of the entity.         |
-| `--timestamps [bool]` | Include `createdAt` / `updatedAt` columns in the migration. Default `true`.  |
+| Flag                   | Description                                                                 |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `--with-resource, -rs` | Also generate a resource at `resources/<name>.resource.ts`.                 |
+| `--table <name>`       | Override the table name. Defaults to the snake-plural of the entity.        |
+| `--timestamps [bool]`  | Include `createdAt` / `updatedAt` columns in the migration. Default `true`. |
 
 Since 5.21 the migration file is named `<timestamp>-<name>.migration.ts`, the same scheme as `generate.migration`.
 
@@ -224,12 +224,12 @@ warlock generate.migration products/product --timestamps false
 
 Creates a new migration file inside the model's `migrations/` folder. Without `--add`/`--drop`/`--rename`, generates a create-table migration. With any of those, generates an alter-table migration using the column DSL.
 
-| Flag                  | Description                                                                                  |
-| --------------------- | -------------------------------------------------------------------------------------------- |
-| `--add <columns>`     | DSL — `name:type:modifier,name:type:modifier,...`                                            |
-| `--drop <columns>`    | Comma-separated column names to drop.                                                        |
-| `--rename <columns>`  | DSL — `oldName:newName,oldName:newName,...`                                                  |
-| `--timestamps [bool]` | Include timestamp columns (create migrations only). Default `true`.                          |
+| Flag                  | Description                                                         |
+| --------------------- | ------------------------------------------------------------------- |
+| `--add <columns>`     | DSL — `name:type:modifier,name:type:modifier,...`                   |
+| `--drop <columns>`    | Comma-separated column names to drop.                               |
+| `--rename <columns>`  | DSL — `oldName:newName,oldName:newName,...`                         |
+| `--timestamps [bool]` | Include timestamp columns (create migrations only). Default `true`. |
 
 File name pattern: `MM-DD-YYYY_HH-MM-SS-<entity>.migration.ts`. Timestamp-prefixed so they sort in execution order.
 
@@ -293,7 +293,7 @@ A few naming conventions that pay off:
 - **Use the verb-noun shape for action endpoints.** `create-product`, `update-user`, `cancel-order`. Cleaner than nouns-only and the generator produces matching names across all files.
 - **Pluralize the module, singularize the entity.** `products/` module holds the `Product` model. The generators do this automatically — feed them either form and they'll figure it out.
 - **Let the generators write the stubs; edit the logic.** Don't fight the layout. If a generator's output looks wrong, the right fix is usually to align your mental model, not customize the stub. The shape is the value.
-- **Scaffold the full module early, prune later.** `generate.module` lays down the complete CRUD pattern by default — it's faster to delete what you don't need than to add files one at a time. The full scaffold also serves as a reference for what *should* exist.
+- **Scaffold the full module early, prune later.** `generate.module` lays down the complete CRUD pattern by default — it's faster to delete what you don't need than to add files one at a time. The full scaffold also serves as a reference for what _should_ exist.
 
 ## Customizing the stubs
 

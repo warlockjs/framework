@@ -11,9 +11,8 @@ import type { Request, Response } from "@warlock.js/core";
 // biome-ignore lint/suspicious/noEmptyInterface: an augmentation point must be an interface.
 export interface SessionRegistry {}
 
-type Registered<Key extends string, Fallback> = SessionRegistry extends Record<Key, infer Value>
-  ? Value
-  : Fallback;
+type Registered<Key extends string, Fallback> =
+  SessionRegistry extends Record<Key, infer Value> ? Value : Fallback;
 
 /** The wire projection of the signed-in user (constrained to carry an `id`). */
 export type SessionUser = Registered<"user", { id: string | number }>;

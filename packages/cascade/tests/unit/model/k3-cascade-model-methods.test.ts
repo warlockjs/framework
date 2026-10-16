@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { performAtomicIncrement } from "../../../src/model/methods/meta-methods";
-import {
-  findAndUpdateRecords,
-  updateById,
-} from "../../../src/model/methods/query-methods";
+import { findAndUpdateRecords, updateById } from "../../../src/model/methods/query-methods";
 import { emitModelEvent } from "../../../src/model/methods/instance-event-methods";
 import { getModelEvents } from "../../../src/model/methods/static-event-methods";
 import { DatabaseDirtyTracker } from "../../../src/database-dirty-tracker";

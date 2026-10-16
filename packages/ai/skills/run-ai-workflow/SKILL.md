@@ -37,7 +37,7 @@ const wf = ai.workflow<CatalogInput, CatalogOutput, CatalogState>({
     ai.step<CatalogInput, CatalogState>({
       name: "fetch",
       run: async (ctx) => {
-        ctx.state.html = await fetch(ctx.input.url).then(r => r.text());
+        ctx.state.html = await fetch(ctx.input.url).then((r) => r.text());
       },
     }),
     ai.step<CatalogInput, CatalogState>({
@@ -102,9 +102,9 @@ const { data, report, usage, error } = await wf.execute(input);
 ```ts
 type WorkflowResult<TOutput> = {
   type: "workflow";
-  data?: TOutput;            // from workflow.output.extract
-  report: WorkflowReport;    // runId, signature, status, timings, per-step snapshots
-  usage: Usage;              // aggregated across all agent calls
+  data?: TOutput; // from workflow.output.extract
+  report: WorkflowReport; // runId, signature, status, timings, per-step snapshots
+  usage: Usage; // aggregated across all agent calls
   error?: AIError;
 };
 ```
@@ -138,18 +138,18 @@ skip? → before? → (run | agent | parallel) → output.extract (+ schema) →
 
 Exactly one of `run` / `agent` / `parallel` per step (enforced at `ai.step()` author time).
 
-| Phase | Purpose |
-| --- | --- |
-| `skip` | Return `true` to skip the step. Output becomes `undefined`. `nextStep` still fires. |
-| `before` | Pre-work — fetch, set state, validate. |
-| `run` | Core non-agent work. |
-| `agent` | Agent to execute. Takes `input(ctx)` as prompt builder. |
-| `input` | Required when `agent` is set. |
-| `output` | `{ extract, schema? }` — extracts the step's output. |
-| `after` | Post-work — save, notify. |
-| `nextStep` | Step-level routing on `completed` / `skipped`. |
-| `onFailure` | Step-level recovery routing after retries exhaust. |
-| `onCancel` | Cleanup if cancelled in-flight. |
+| Phase       | Purpose                                                                             |
+| ----------- | ----------------------------------------------------------------------------------- |
+| `skip`      | Return `true` to skip the step. Output becomes `undefined`. `nextStep` still fires. |
+| `before`    | Pre-work — fetch, set state, validate.                                              |
+| `run`       | Core non-agent work.                                                                |
+| `agent`     | Agent to execute. Takes `input(ctx)` as prompt builder.                             |
+| `input`     | Required when `agent` is set.                                                       |
+| `output`    | `{ extract, schema? }` — extracts the step's output.                                |
+| `after`     | Post-work — save, notify.                                                           |
+| `nextStep`  | Step-level routing on `completed` / `skipped`.                                      |
+| `onFailure` | Step-level recovery routing after retries exhaust.                                  |
+| `onCancel`  | Cleanup if cancelled in-flight.                                                     |
 
 Errors in `before`/`run`/`agent`/`after`/`output` are retryable. Errors in `nextStep` and `onFailure` terminate the workflow with `RoutingError`.
 
@@ -157,11 +157,11 @@ Errors in `before`/`run`/`agent`/`after`/`output` are retryable. Errors in `next
 
 ```ts
 type WorkflowContext<TInput, TState, TContext> = {
-  readonly input: TInput;                         // frozen — durable cause
-  readonly context: TContext;                     // frozen — per-execution
-  readonly steps: Record<string, StepSnapshot>;   // frozen snapshots of COMPLETED steps
-  state: TState;                                  // mutable current shared state
-  readonly agentResult?: AgentResult<unknown>;    // set when current step has an agent
+  readonly input: TInput; // frozen — durable cause
+  readonly context: TContext; // frozen — per-execution
+  readonly steps: Record<string, StepSnapshot>; // frozen snapshots of COMPLETED steps
+  state: TState; // mutable current shared state
+  readonly agentResult?: AgentResult<unknown>; // set when current step has an agent
   readonly runId: string;
   readonly signal?: AbortSignal;
   readonly startedAt: Date;
@@ -172,8 +172,8 @@ type WorkflowContext<TInput, TState, TContext> = {
 
 ### `input` vs `context`
 
-- `input` answers *what* to process — persisted in the snapshot, replayed verbatim on `resume()`.
-- `context` answers *who's running it* — tenancy, user, locale, traceId. **Never persisted.** Callers pass fresh on every `execute()` and `resume()`.
+- `input` answers _what_ to process — persisted in the snapshot, replayed verbatim on `resume()`.
+- `context` answers _who's running it_ — tenancy, user, locale, traceId. **Never persisted.** Callers pass fresh on every `execute()` and `resume()`.
 
 **Resume rule.** No fingerprinting on context. Persistence-scoping fields (e.g. `organizationId`) MUST match across resume — silent data corruption otherwise.
 
@@ -210,7 +210,7 @@ ai.step({
   nextStep: (ctx) => {
     if (!ctx.agentResult?.data.approved) {
       ctx.state.qaFeedback = ctx.agentResult?.data.feedback;
-      return { goto: "draft" };       // success-path route
+      return { goto: "draft" }; // success-path route
     }
   },
   onFailure: (ctx, error) => {
@@ -254,8 +254,8 @@ Between-step cancellation is guaranteed. Mid-step is best-effort. `status: "canc
 See the `persist-ai-data` topic.
 
 ```ts
-await wf.execute({ input, runId: "ticket-123" });  // fresh run
-await wf.resume("ticket-123");                      // after crash
+await wf.execute({ input, runId: "ticket-123" }); // fresh run
+await wf.resume("ticket-123"); // after crash
 ```
 
 ## Events — three-tier subscription

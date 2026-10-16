@@ -193,6 +193,8 @@ describe("isPageLayoutFilePath", () => {
 describe("isPageSetupFilePath", () => {
   it("accepts paired setup files only below src/web", () => {
     expect(isPageSetupFilePath(path.join(webRoot, "home.setup.ts"), appSrcRoot)).toBe(true);
-    expect(isPageSetupFilePath(path.join(appSrcRoot, "app", "home.setup.ts"), appSrcRoot)).toBe(false);
+    expect(isPageSetupFilePath(path.join(appSrcRoot, "app", "home.setup.ts"), appSrcRoot)).toBe(
+      false,
+    );
   });
 });

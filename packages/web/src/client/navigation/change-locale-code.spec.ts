@@ -4,11 +4,7 @@ import type { HydrationDocumentPayloadSource } from "../../hydration-payload";
 import { publishLocaleRouting } from "../../routing/locale-routing";
 import { publishRouteTable, resetRouteTable } from "../../routing/route-table";
 import { routerEvents } from "../../routing/router-events";
-import {
-  changeLocaleCode,
-  connectLocaleChanger,
-  createLocaleChanger,
-} from "./change-locale-code";
+import { changeLocaleCode, connectLocaleChanger, createLocaleChanger } from "./change-locale-code";
 import type { RefreshRuntime, RefreshablePage } from "./refresh";
 
 /**

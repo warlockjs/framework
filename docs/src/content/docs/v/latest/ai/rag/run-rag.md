@@ -18,13 +18,13 @@ import { OpenAISDK } from "@warlock.js/ai-openai";
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 const kb = ai.rag({
-  name: "docs",                                                  // default "rag"
+  name: "docs", // default "rag"
   embedder: openai.embedder({ name: "text-embedding-3-small" }), // REQUIRED
-  store: new MemoryCacheDriver(),                                // or ai.config({ defaultStore })
-  namespace: "ai.rag.docs",                                      // default `ai.rag.<name>`
-  chunk: { type: "markdown", size: 800, overlap: 120 },          // index() defaults
-  reranker: ai.rag.keywordReranker(),                            // OFF by default (cosine-only)
-  retrieve: { topK: 4, threshold: 0.5 },                         // default retrieval knobs
+  store: new MemoryCacheDriver(), // or ai.config({ defaultStore })
+  namespace: "ai.rag.docs", // default `ai.rag.<name>`
+  chunk: { type: "markdown", size: 800, overlap: 120 }, // index() defaults
+  reranker: ai.rag.keywordReranker(), // OFF by default (cosine-only)
+  retrieve: { topK: 4, threshold: 0.5 }, // default retrieval knobs
 });
 ```
 
@@ -54,7 +54,7 @@ This means a misconfigured knowledge base blows up at app boot, not three layers
 ```ts
 const { chunks } = await kb.index([
   { id: "guide", text: longMarkdown, metadata: { url: "/guide" }, tags: ["public"] },
-  { id: "faq",   text: faqText,      metadata: { url: "/faq" } },
+  { id: "faq", text: faqText, metadata: { url: "/faq" } },
 ]);
 
 console.log(chunks); // total chunks written across both documents
@@ -74,18 +74,18 @@ Empty or whitespace-only documents yield zero chunks — nothing is written and 
 
 All sizing is in **characters**, not tokens, so the pipeline stays tokenizer-free (the embedder owns token counting). Pick a strategy with `type`:
 
-| `type` | behaviour |
-| --- | --- |
+| `type`                  | behaviour                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
 | `"recursive"` (default) | Separator-aware greedy packing; tries `["\n\n", "\n", ". ", " ", ""]` largest-unit first. |
-| `"markdown"` | Heading/section-aware, then recursive within each section. Best for docs. |
-| `"sentence"` | Packs whole sentences up to `size`. |
-| `"fixed"` | Back-to-back character windows. |
+| `"markdown"`            | Heading/section-aware, then recursive within each section. Best for docs.                 |
+| `"sentence"`            | Packs whole sentences up to `size`.                                                       |
+| `"fixed"`               | Back-to-back character windows.                                                           |
 
 ```ts
 type ChunkOptions = {
   type?: "recursive" | "sentence" | "fixed" | "markdown"; // default "recursive"
-  size?: number;        // target chunk size in characters. default 1000
-  overlap?: number;     // characters carried between adjacent chunks. default 200
+  size?: number; // target chunk size in characters. default 1000
+  overlap?: number; // characters carried between adjacent chunks. default 200
   separators?: string[]; // recursive splitter only
 };
 ```
@@ -96,9 +96,9 @@ Defaults set on the factory's `chunk` apply to every `index()`; pass a second ar
 
 ```ts
 const { query, chunks } = await kb.retrieve("how do I configure caching?", {
-  topK: 4,          // chunks returned AFTER reranking. default 5
-  threshold: 0.5,   // cosine floor at the store stage. default 0.5
-  candidates: 16,   // pool fetched before reranking. default topK * 4
+  topK: 4, // chunks returned AFTER reranking. default 5
+  threshold: 0.5, // cosine floor at the store stage. default 0.5
+  candidates: 16, // pool fetched before reranking. default topK * 4
   tags: ["public"], // restrict to chunks whose source carried one of these tags
 });
 
@@ -111,14 +111,14 @@ for (const { text, score, citation } of chunks) {
 
 ```ts
 type RetrievedChunk = {
-  text: string;       // the chunk text to inject into a prompt
-  score: number;      // [0,1] — cosine, or the reranker's score when one ran
+  text: string; // the chunk text to inject into a prompt
+  score: number; // [0,1] — cosine, or the reranker's score when one ran
   citation: Citation; // provenance for grounding the answer
 };
 
 type Citation = {
-  sourceId: string;                  // id of the source RagDocument
-  chunkIndex: number;                // 0-based index within that document
+  sourceId: string; // id of the source RagDocument
+  chunkIndex: number; // 0-based index within that document
   span: [start: number, end: number]; // char span in the original text
   score: number;
   metadata?: Record<string, unknown>; // copied verbatim from the source
@@ -142,7 +142,8 @@ A zero-dependency BM25-lite (IDF-free keyword overlap). For each candidate it co
 
 ```ts
 const kb = ai.rag({
-  embedder, store,
+  embedder,
+  store,
   reranker: ai.rag.keywordReranker({ weight: 0.4 }),
 });
 ```
@@ -153,7 +154,8 @@ Asks an LLM to grade each over-fetched candidate's relevance on a `0..1` scale, 
 
 ```ts
 const kb = ai.rag({
-  embedder, store,
+  embedder,
+  store,
   reranker: ai.rag.llmReranker({
     model: openai.model({ name: "gpt-4o-mini" }),
     batchSize: 8,
@@ -169,9 +171,9 @@ Expose `retrieve()` as a tool so the model can search the knowledge base mid-con
 
 ```ts
 const searchDocs = kb.asTool({
-  name: "search_docs",                 // default "retrieve_<rag.name>"
+  name: "search_docs", // default "retrieve_<rag.name>"
   description: "Search the product docs.",
-  retrieve: { topK: 3 },               // override topK / threshold / tags for the tool path
+  retrieve: { topK: 3 }, // override topK / threshold / tags for the tool path
 });
 
 const agent = ai.agent({

@@ -15,7 +15,7 @@ export default function Login() {
   const login = useSubmitForm({
     route: "auth.login",
     beforeSubmit: ({ values }) => Boolean(values.email),
-    onSuccess: async result => console.log(result.data),
+    onSuccess: async (result) => console.log(result.data),
   });
 
   return <Form onSubmit={login.submit}>{/* fields */}</Form>;
@@ -90,11 +90,11 @@ export default function Login() {
 
 Read a declared body anywhere with the public types from `@warlock.js/web`:
 
-| Type                            | Is                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------- |
+| Type                              | Is                                                                                                    |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `ApiResponse<Name, Status = 200>` | The declared body for that status, or `unknown` when the route or status is undeclared (never `any`). |
-| `ApiResponses<Name>`            | The whole status-to-body map (empty for an undeclared or `runtimeRoute` name).   |
-| `ApiSuccessResponse<Name>`      | The union of the declared 2xx bodies, or `unknown` when there is none.            |
+| `ApiResponses<Name>`              | The whole status-to-body map (empty for an undeclared or `runtimeRoute` name).                        |
+| `ApiSuccessResponse<Name>`        | The union of the declared 2xx bodies, or `unknown` when there is none.                                |
 
 ```ts
 import type { ApiResponse } from "@warlock.js/web";
@@ -143,7 +143,10 @@ declare module "@warlock.js/web" {
       path: "/auth/login";
       params: {};
       method: "POST";
-      response: { 200: { user: { id: string | number; name: string }; token: string }; 400: { error: string } };
+      response: {
+        200: { user: { id: string | number; name: string }; token: string };
+        400: { error: string };
+      };
     };
   }
 }

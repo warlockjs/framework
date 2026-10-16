@@ -41,7 +41,12 @@ describe("soft delete / restore sync", () => {
 
   it("fires the updated sync event when a soft-deleted record is restored", async () => {
     SyncModel.deleteStrategy = "soft";
-    const qb = { where: vi.fn().mockReturnThis(), whereNotNull: vi.fn().mockReturnThis(), first: vi.fn().mockResolvedValue({ id: 1, deletedAt: new Date() }), exists: vi.fn().mockResolvedValue(true) };
+    const qb = {
+      where: vi.fn().mockReturnThis(),
+      whereNotNull: vi.fn().mockReturnThis(),
+      first: vi.fn().mockResolvedValue({ id: 1, deletedAt: new Date() }),
+      exists: vi.fn().mockResolvedValue(true),
+    };
     (driver as any).queryBuilder = vi.fn().mockReturnValue(qb);
     (driver as any).update = vi.fn().mockResolvedValue(1);
     await new DatabaseRestorer(SyncModel as any).restore(1);

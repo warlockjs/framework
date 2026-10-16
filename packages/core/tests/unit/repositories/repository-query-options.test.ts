@@ -262,9 +262,12 @@ describe("RepositoryManager — applyOptionsToQuery filters", () => {
       filterBy: { status: "=" },
     });
 
-    repository.exposeApply(query as unknown as QueryBuilderContract<unknown>, {
-      status: "active",
-    } as RepositoryOptions);
+    repository.exposeApply(
+      query as unknown as QueryBuilderContract<unknown>,
+      {
+        status: "active",
+      } as RepositoryOptions,
+    );
 
     const filterCall = query.callTo("applyFilters");
 

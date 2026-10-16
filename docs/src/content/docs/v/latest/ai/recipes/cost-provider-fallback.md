@@ -45,15 +45,15 @@ const agent = ai.agent({
 
 With no `retryOn`, the chain advances only on the built-in transient set:
 
-| Code | Falls over? | Why |
-|---|---|---|
-| `PROVIDER_RATE_LIMIT` | yes | 429 — the backup likely has headroom |
-| `PROVIDER_TIMEOUT` | yes | slow upstream — try a different one |
-| `PROVIDER_ERROR` | yes | generic 5xx / network failure |
-| `PROVIDER_AUTH` | **no** | a bad key fails identically downstream |
-| `CONTEXT_LENGTH_EXCEEDED` | **no** | an oversized prompt fails on every model |
-| `CONTENT_FILTER` | **no** | a blocked prompt is blocked everywhere |
-| `PROVIDER_INVALID_REQUEST` | **no** | a malformed request fails everywhere |
+| Code                       | Falls over? | Why                                      |
+| -------------------------- | ----------- | ---------------------------------------- |
+| `PROVIDER_RATE_LIMIT`      | yes         | 429 — the backup likely has headroom     |
+| `PROVIDER_TIMEOUT`         | yes         | slow upstream — try a different one      |
+| `PROVIDER_ERROR`           | yes         | generic 5xx / network failure            |
+| `PROVIDER_AUTH`            | **no**      | a bad key fails identically downstream   |
+| `CONTEXT_LENGTH_EXCEEDED`  | **no**      | an oversized prompt fails on every model |
+| `CONTENT_FILTER`           | **no**      | a blocked prompt is blocked everywhere   |
+| `PROVIDER_INVALID_REQUEST` | **no**      | a malformed request fails everywhere     |
 
 Non-transient failures re-throw immediately with their original typed `AIError` — falling over on them only burns the backup's budget on input that fails the same way.
 
@@ -110,8 +110,7 @@ const smartFallback = ai.fallbackModel(
   [openai.model({ name: "gpt-4o" }), anthropic.model({ name: "claude-sonnet-4-6" })],
   {
     retryOn: (error) =>
-      error instanceof ProviderRateLimitError ||
-      error instanceof ProviderTimeoutError,
+      error instanceof ProviderRateLimitError || error instanceof ProviderTimeoutError,
   },
 );
 ```
@@ -122,8 +121,8 @@ The list takes any number of models, tried in order. A common shape is cheap-pri
 
 ```ts
 const tieredModel = ai.fallbackModel([
-  openai.model({ name: "gpt-4o-mini" }),       // cheap, tried first
-  openai.model({ name: "gpt-4o" }),            // same provider, more capable
+  openai.model({ name: "gpt-4o-mini" }), // cheap, tried first
+  openai.model({ name: "gpt-4o" }), // same provider, more capable
   anthropic.model({ name: "claude-sonnet-4-6" }), // different provider, last resort
 ]);
 ```

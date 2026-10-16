@@ -6,6 +6,7 @@ slug: v/latest/cache/null
 Disables caching entirely. Useful for testing, debugging, or temporarily turning off cache without code changes.
 
 ## When to Use
+
 - Testing environments
 - Debugging cache-related issues
 - Measuring performance impact of caching
@@ -27,9 +28,10 @@ const cacheConfigurations = {
 ```
 
 ## Options
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `*` | any | `undefined` | All options are accepted but ignored |
+
+| Option | Type | Default     | Description                          |
+| ------ | ---- | ----------- | ------------------------------------ |
+| `*`    | any  | `undefined` | All options are accepted but ignored |
 
 ## Behavior
 
@@ -45,10 +47,10 @@ All cache operations succeed but store nothing:
 ```ts
 import { cache } from "@warlock.js/cache";
 
-await cache.set("products.101", data, 3600);  // Returns data without storing
-const result = await cache.get("products.101");  // Returns null
-await cache.remove("products.101");            // Succeeds
-await cache.flush();                           // Succeeds
+await cache.set("products.101", data, 3600); // Returns data without storing
+const result = await cache.get("products.101"); // Returns null
+await cache.remove("products.101"); // Succeeds
+await cache.flush(); // Succeeds
 ```
 
 n/a — `cache.similar(...)` returns `[]` (matches the driver's read semantics) and `set({ vector })` is a no-op like every other write. The null driver is for tests and benchmarks.

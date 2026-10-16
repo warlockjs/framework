@@ -154,9 +154,7 @@ public register(name: string, context: Context<any>): this;
 ```
 
 ```ts
-contextManager
-  .register("trace", traceContext)
-  .register("user", userContext);
+contextManager.register("trace", traceContext).register("user", userContext);
 ```
 
 ### `unregister(name)`

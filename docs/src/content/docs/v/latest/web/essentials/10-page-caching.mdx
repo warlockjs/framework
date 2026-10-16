@@ -119,8 +119,7 @@ consent banner) always gets a fresh render. Anonymous traffic without cookies
 - With CSP enabled, the `html` variant is **not cached**: a cached document
   would replay a stale nonce. The `json` variant is still cached.
 - A cache-backend outage (redis down, for example) is treated as a miss: the
-  page renders uncached and a throttled warning is logged. It never returns a
-  500. Store writes are fire-and-forget.
+  page renders uncached and a throttled warning is logged. It never returns a 500. Store writes are fire-and-forget.
 
 ## Where entries live: the page-cache namespace
 

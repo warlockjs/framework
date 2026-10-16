@@ -6,7 +6,7 @@ sidebar:
   label: "Redact secrets"
 ---
 
-`redact(value, options?)` deep-copies a value with any property whose **key** matches a sensitive fragment replaced by a placeholder. It is **key-driven, not value-driven** — it never guesses that a bare string is a secret; it only redacts when the *key* looks sensitive (`authorization`, `apiKey`, `cookie`, `password`, `token`, …). One shared redaction policy backs three trust-boundary surfaces — [VCR cassettes](/v/latest/ai/testing/record-replay-testing/), [Panoptic content capture](/v/latest/ai/observability/what-panoptic-traces/), and the error / cause serializer — instead of three divergent guards.
+`redact(value, options?)` deep-copies a value with any property whose **key** matches a sensitive fragment replaced by a placeholder. It is **key-driven, not value-driven** — it never guesses that a bare string is a secret; it only redacts when the _key_ looks sensitive (`authorization`, `apiKey`, `cookie`, `password`, `token`, …). One shared redaction policy backs three trust-boundary surfaces — [VCR cassettes](/v/latest/ai/testing/record-replay-testing/), [Panoptic content capture](/v/latest/ai/observability/what-panoptic-traces/), and the error / cause serializer — instead of three divergent guards.
 
 This is **not** [`ai.guardrail`](/v/latest/ai/reliability/guardrails/). Guardrails are agent middleware that inspect prompt / output / tool content at runtime and emit `allow` / `redact` / `block` / `flag` verdicts. `redact()` is a plain synchronous utility for scrubbing structured payloads (recorded requests, error causes, captured traces) before they are stored or exported.
 
@@ -19,8 +19,8 @@ const safe = redact({
   url: "https://api.openai.com/v1/chat/completions",
   headers: {
     "content-type": "application/json",
-    authorization: "Bearer sk-live-abc123",   // key is sensitive → redacted
-    "x-api-key": "secret-value",               // redacted
+    authorization: "Bearer sk-live-abc123", // key is sensitive → redacted
+    "x-api-key": "secret-value", // redacted
   },
   body: { model: "gpt-4o", apiKey: "leaked" }, // nested apiKey → redacted
 });
@@ -40,11 +40,11 @@ It returns a **new** value of the same type `T` — the input is never mutated. 
 
 ### Options
 
-| Option | Type | Default | What it does |
-| --- | --- | --- | --- |
-| `keys` | `string[]` | — | Extra key fragments to redact, **merged** with `DEFAULT_SENSITIVE_KEYS`. Matched case-insensitively as substrings of each object key. |
-| `placeholder` | `string` | `"[redacted]"` | Replacement value substituted for a redacted property (and for collapsed circular / over-deep branches). |
-| `maxDepth` | `number` | `8` | Maximum recursion depth before a branch collapses to the placeholder. |
+| Option        | Type       | Default        | What it does                                                                                                                          |
+| ------------- | ---------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `keys`        | `string[]` | —              | Extra key fragments to redact, **merged** with `DEFAULT_SENSITIVE_KEYS`. Matched case-insensitively as substrings of each object key. |
+| `placeholder` | `string`   | `"[redacted]"` | Replacement value substituted for a redacted property (and for collapsed circular / over-deep branches).                              |
+| `maxDepth`    | `number`   | `8`            | Maximum recursion depth before a branch collapses to the placeholder.                                                                 |
 
 ### Matching is substring, case-insensitive
 
@@ -74,8 +74,8 @@ Circular references and trees deeper than `maxDepth` collapse to the `placeholde
 
 ```ts
 const node: any = { name: "root" };
-node.self = node;                 // circular
-redact(node);                     // { name: "root", self: "[redacted]" }
+node.self = node; // circular
+redact(node); // { name: "root", self: "[redacted]" }
 ```
 
 ## `redactHeaders(headers, placeholder?)`
@@ -127,8 +127,8 @@ type RedactedError = {
   name: string;
   message: string;
   code?: string;
-  cause?: unknown;   // deep-redacted via redact()
-  stack?: string;    // only when includeStack: true
+  cause?: unknown; // deep-redacted via redact()
+  stack?: string; // only when includeStack: true
 };
 ```
 

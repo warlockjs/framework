@@ -33,11 +33,7 @@ Or
 First step, we need to define the cache configurations, in your configuration directory create a file to define the cache configurations.
 
 ```ts
-import {
-  cache,
-  type CacheConfigurations,
-  MemoryCacheDriver,
-} from "@mongez/warlock.cache";
+import { cache, type CacheConfigurations, MemoryCacheDriver } from "@mongez/warlock.cache";
 
 const configurations: CacheConfigurations = {
   drivers: {
@@ -102,11 +98,11 @@ await cache.set("report", report, "7d");
 
 // 3. Rich options object
 await cache.set("user:1", user, {
-  ttl: "1h",                     // or number of seconds — mutually exclusive with expiresAt
-  expiresAt: new Date("..."),    // absolute deadline (Date or epoch ms)
-  tags: ["users", "active"],     // inline tags
-  onConflict: "create",          // "create" | "update" | "upsert" (default)
-  driver: "redis",               // route this single call to a non-default driver
+  ttl: "1h", // or number of seconds — mutually exclusive with expiresAt
+  expiresAt: new Date("..."), // absolute deadline (Date or epoch ms)
+  tags: ["users", "active"], // inline tags
+  onConflict: "create", // "create" | "update" | "upsert" (default)
+  driver: "redis", // route this single call to a non-default driver
 });
 ```
 
@@ -117,8 +113,8 @@ cache.setCacheConfigurations({
   default: "redis",
   drivers: { redis: RedisCacheDriver, memory: MemoryCacheDriver },
   options: {
-    redis: { url: "...", ttl: "7d" },     // string OK
-    memory: { ttl: 3600 },                 // number OK
+    redis: { url: "...", ttl: "7d" }, // string OK
+    memory: { ttl: 3600 }, // number OK
   },
 });
 ```
@@ -142,7 +138,7 @@ Redis users who know the shorthand: `"create"` maps to `NX`, `"update"` maps to 
 ```ts
 // Read → transform → write under a per-key in-process lock.
 await cache.update<User>("user:1", (current) => {
-  if (!current) return null;                     // returning null removes the entry
+  if (!current) return null; // returning null removes the entry
   return { ...current, lastSeen: Date.now() };
 });
 
@@ -166,7 +162,7 @@ const head = await recent.shift();
 const firstTen = await recent.slice(0, 10);
 const count = await recent.length();
 
-await recent.trim(0, 99);   // keep only indices 0–99
+await recent.trim(0, 99); // keep only indices 0–99
 await recent.clear();
 ```
 
@@ -231,11 +227,7 @@ It could be useful when working with multi tenant applications, we can use the t
 Every driver's options have by default `globalPrefix` async function, this function is called each time an operation is performed, and it returns a string, this string is used as a prefix for the key, let's add it to our memory driver.
 
 ```ts
-import {
-  cache,
-  type CacheConfigurations,
-  MemoryCacheDriver,
-} from "@mongez/warlock.cache";
+import { cache, type CacheConfigurations, MemoryCacheDriver } from "@mongez/warlock.cache";
 
 const configurations: CacheConfigurations = {
   drivers: {
@@ -416,10 +408,9 @@ async function main() {
 }
 ```
 
-
 ### LRU Cache Driver
 
-[LRU Cache](https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)) is a cache driver that caches the data in the memory with LRU algorithm.
+[LRU Cache](<https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)>) is a cache driver that caches the data in the memory with LRU algorithm.
 
 So how this works? The LRU cache driver will store the data in the memory, and when the memory is full, it will remove the least recently used item.
 

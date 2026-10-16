@@ -52,11 +52,11 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
 
 ## `bullmqQueue` options
 
-| Option | Default | Notes |
-|---|---|---|
-| `queue` | the default queue | which queue deliveries run on |
-| `attempts` | `queue.defaultJobOptions.attempts`, else `1` | |
-| `backoff` | — | fixed or exponential |
+| Option     | Default                                      | Notes                         |
+| ---------- | -------------------------------------------- | ----------------------------- |
+| `queue`    | the default queue                            | which queue deliveries run on |
+| `attempts` | `queue.defaultJobOptions.attempts`, else `1` |                               |
+| `backoff`  | —                                            | fixed or exponential          |
 
 `@warlock.js/queue` itself gains no dependency on `@warlock.js/notifications`
 — it only ships the job primitives `bullmqQueue` dispatches through.

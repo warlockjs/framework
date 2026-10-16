@@ -388,7 +388,10 @@ describe("renderModelResourceRegistry", () => {
       generated.push(...extraction.entries);
     }
 
-    const expected = await readFile(path.join(fixtureRoot, "typings/model-resources.d.ts"), "utf-8");
+    const expected = await readFile(
+      path.join(fixtureRoot, "typings/model-resources.d.ts"),
+      "utf-8",
+    );
 
     expect(renderModelResourceRegistry(generated, path.join(fixtureRoot, "typings"))).toBe(
       expected.replaceAll("\r\n", "\n"),

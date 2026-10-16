@@ -1,11 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
-import type {
-  JsonRpcId,
-  JsonRpcRequest,
-  JsonRpcResponse,
-  McpTransport,
-} from "../contracts";
+import type { JsonRpcId, JsonRpcRequest, JsonRpcResponse, McpTransport } from "../contracts";
 import { McpTransportError } from "../errors";
 import type { McpTransportClient } from "./transport.type";
 
@@ -86,10 +81,10 @@ function armCall(
   const timer = setTimeout(() => {
     onSettle();
     reject(
-      new McpTransportError(
-        `MCP request "${method}" timed out after ${timeoutMs}ms.`,
-        { type: "timeout", method },
-      ),
+      new McpTransportError(`MCP request "${method}" timed out after ${timeoutMs}ms.`, {
+        type: "timeout",
+        method,
+      }),
     );
   }, timeoutMs);
 
@@ -228,9 +223,7 @@ class StdioTransport implements McpTransportClient {
     for (const [id, call] of this.pending) {
       this.pending.delete(id);
       call.cleanup();
-      call.reject(
-        new McpTransportError(`MCP stdio transport failed: ${reason}.`, { type }),
-      );
+      call.reject(new McpTransportError(`MCP stdio transport failed: ${reason}.`, { type }));
     }
   }
 
@@ -250,9 +243,7 @@ class StdioTransport implements McpTransportClient {
     const id = request.id;
 
     return new Promise<JsonRpcResponse<TResult>>((resolve, reject) => {
-      const cleanup = armCall(reject, request.method, options, () =>
-        this.pending.delete(id),
-      );
+      const cleanup = armCall(reject, request.method, options, () => this.pending.delete(id));
 
       this.pending.set(id, {
         resolve: (response) => resolve(response as JsonRpcResponse<TResult>),
@@ -404,24 +395,23 @@ class HttpTransport implements McpTransportClient {
     const raw = await response.text();
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
-    const jsonText = contentType.includes("text/event-stream")
-      ? extractSseData(raw)
-      : raw;
+    const jsonText = contentType.includes("text/event-stream") ? extractSseData(raw) : raw;
 
     if (!jsonText) {
-      throw new McpTransportError(
-        `MCP http transport got an empty response for "${method}".`,
-        { type: "protocol", method },
-      );
+      throw new McpTransportError(`MCP http transport got an empty response for "${method}".`, {
+        type: "protocol",
+        method,
+      });
     }
 
     try {
       return JSON.parse(jsonText) as JsonRpcResponse<TResult>;
     } catch (cause) {
-      throw new McpTransportError(
-        `MCP http transport got a non-JSON response for "${method}".`,
-        { type: "protocol", method, cause },
-      );
+      throw new McpTransportError(`MCP http transport got a non-JSON response for "${method}".`, {
+        type: "protocol",
+        method,
+        cause,
+      });
     }
   }
 
@@ -538,7 +528,12 @@ class JsonRpcClient {
     if (response.error) {
       throw new McpTransportError(
         `MCP "${method}" failed: ${response.error.message} (code ${response.error.code}).`,
-        { type: "protocol", method, context: { code: response.error.code }, cause: response.error.data },
+        {
+          type: "protocol",
+          method,
+          context: { code: response.error.code },
+          cause: response.error.data,
+        },
       );
     }
 
@@ -608,9 +603,7 @@ export function createJsonRpcClient(
  * discriminator and no `request` method) from a built
  * {@link McpTransportClient} (which exposes `request`).
  */
-function isTransportConfig(
-  source: McpTransport | McpTransportClient,
-): source is McpTransport {
+function isTransportConfig(source: McpTransport | McpTransportClient): source is McpTransport {
   return typeof (source as McpTransportClient).request !== "function";
 }
 

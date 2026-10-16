@@ -35,7 +35,9 @@ export function NavigationProgress() {
     <div
       aria-hidden={!isNavigating}
       aria-label="Loading next page"
-      className={isNavigating ? "navigation-progress navigation-progress--active" : "navigation-progress"}
+      className={
+        isNavigating ? "navigation-progress navigation-progress--active" : "navigation-progress"
+      }
     />
   );
 }

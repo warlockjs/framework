@@ -36,7 +36,9 @@ export function toOllamaTools(
  * an object root for function parameters; anything else (or a failed
  * extraction) degrades to a parameterless object.
  */
-function toParameters(input: ToolConfig<unknown, unknown>["input"]): Tool["function"]["parameters"] {
+function toParameters(
+  input: ToolConfig<unknown, unknown>["input"],
+): Tool["function"]["parameters"] {
   const schema = extractJsonSchema(input);
 
   if (schema && schema.type === "object") {

@@ -153,7 +153,10 @@ describe("toAnthropicMessages", () => {
       {
         role: "user",
         content: [
-          { type: "image", source: { type: "base64", media_type: "image/png", data: "iVBORw0KGgo=" } },
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/png", data: "iVBORw0KGgo=" },
+          },
         ],
       },
     ]);

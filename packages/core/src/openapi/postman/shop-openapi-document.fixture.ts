@@ -39,15 +39,21 @@ export const shopOpenApiDocument: OpenApiDocument = {
         responses: {
           "201": {
             description: "Created",
-            content: { "application/json": { schema: { $ref: "#/components/schemas/UserResource" } } },
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/UserResource" } },
+            },
           },
           "401": {
             description: "Unauthorized",
-            content: { "application/json": { schema: { $ref: "#/components/schemas/Unauthorized" } } },
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/Unauthorized" } },
+            },
           },
           "422": {
             description: "Validation failed",
-            content: { "application/json": { schema: { $ref: "#/components/schemas/ValidationFailed" } } },
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/ValidationFailed" } },
+            },
           },
         },
         security: [{ bearerAuth: [] }],
@@ -59,14 +65,27 @@ export const shopOpenApiDocument: OpenApiDocument = {
         summary: "Show a user",
         tags: ["users"],
         parameters: [
-          { name: "id", in: "path", required: true, description: "The user id.", schema: { type: "integer" } },
-          { name: "include", in: "query", description: "Related data to embed.", schema: { enum: ["posts", "orders"] } },
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            description: "The user id.",
+            schema: { type: "integer" },
+          },
+          {
+            name: "include",
+            in: "query",
+            description: "Related data to embed.",
+            schema: { enum: ["posts", "orders"] },
+          },
           { name: "page", in: "query", required: true, schema: { type: "integer", minimum: 1 } },
         ],
         responses: {
           "200": {
             description: "Successful response",
-            content: { "application/json": { schema: { $ref: "#/components/schemas/UserResource" } } },
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/UserResource" } },
+            },
           },
           "404": { description: "Not found" },
         },
@@ -76,7 +95,14 @@ export const shopOpenApiDocument: OpenApiDocument = {
     "/health": {
       get: {
         operationId: "health",
-        parameters: [{ name: "x-request-id", in: "header", description: "Correlation id.", schema: { type: "string" } }],
+        parameters: [
+          {
+            name: "x-request-id",
+            in: "header",
+            description: "Correlation id.",
+            schema: { type: "string" },
+          },
+        ],
         responses: {
           "200": {
             description: "Successful response",
@@ -84,7 +110,10 @@ export const shopOpenApiDocument: OpenApiDocument = {
               "application/json": {
                 schema: {
                   type: "object",
-                  properties: { status: { const: "ok" }, checkedAt: { type: "string", format: "date-time" } },
+                  properties: {
+                    status: { const: "ok" },
+                    checkedAt: { type: "string", format: "date-time" },
+                  },
                   required: ["status", "checkedAt"],
                 },
               },
@@ -125,7 +154,9 @@ export const shopOpenApiDocument: OpenApiDocument = {
         responses: {
           "200": {
             description: "Successful response",
-            content: { "application/json": { schema: { $ref: "#/components/schemas/UserResource" } } },
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/UserResource" } },
+            },
           },
         },
         security: [{ cookieAuth: [] }],

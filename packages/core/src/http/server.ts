@@ -1,7 +1,12 @@
 import config from "@mongez/config";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import type { Server as NodeHttpServer, ServerResponse } from "node:http";
-import type { Http2Server, Http2SecureServer, Http2ServerResponse, ServerHttp2Session } from "node:http2";
+import type {
+  Http2Server,
+  Http2SecureServer,
+  Http2ServerResponse,
+  ServerHttp2Session,
+} from "node:http2";
 
 type DrainServer = NodeHttpServer | Http2Server | Http2SecureServer;
 type DrainResponse = ServerResponse | Http2ServerResponse;
@@ -67,7 +72,8 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
     config.get("http.gracefulShutdown.forceCloseConnections", http2 ? false : "idle");
   // HTTP/2 has sessions rather than closeIdleConnections(); session tracking
   // below supplies graceful draining even when Fastify cannot use idle mode.
-  const forceCloseConnections = http2 && requestedForceClose === "idle" ? false : requestedForceClose;
+  const forceCloseConnections =
+    http2 && requestedForceClose === "idle" ? false : requestedForceClose;
 
   // Keep the framework's established HTTP-compatible reply facade while
   // accepting Fastify's HTTP/1 and HTTP/2 option overloads at this boundary.

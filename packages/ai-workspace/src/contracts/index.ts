@@ -33,7 +33,4 @@ export type {
   WorkspaceReadPolicy,
   WorkspaceShellPolicy,
 } from "./workspace-policy.type";
-export type {
-  Workspace,
-  WorkspaceTools,
-} from "./workspace.contract";
+export type { Workspace, WorkspaceTools } from "./workspace.contract";

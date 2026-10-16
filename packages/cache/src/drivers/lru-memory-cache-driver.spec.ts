@@ -183,7 +183,7 @@ describe("LRUMemoryCacheDriver", () => {
     });
 
     it("does not evict siblings that merely share a prefix substring", async () => {
-      await ns.set("users.1", 1);   // "users" starts with "user" but is a different namespace
+      await ns.set("users.1", 1); // "users" starts with "user" but is a different namespace
       await ns.set("user.1", 2);
 
       const removed = await ns.removeNamespace("user");

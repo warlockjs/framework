@@ -50,12 +50,12 @@ Now `notify.discord(user, { content: "🎉" })` works, and `discord:` is a valid
 
 ## `route` resolution
 
-| What `route` returns | Effect |
-|---|---|
-| `string` | Used directly as the address (`"user@example.com"`, webhook URL). |
-| `{ id: Id }` | The recipient's storage id — for database/internal channels. |
-| `undefined` | Dispatcher falls back to `{ id: notifiable.id }`. |
-| `route` omitted | Same as returning `undefined` — `{ id }` fallback. |
+| What `route` returns | Effect                                                            |
+| -------------------- | ----------------------------------------------------------------- |
+| `string`             | Used directly as the address (`"user@example.com"`, webhook URL). |
+| `{ id: Id }`         | The recipient's storage id — for database/internal channels.      |
+| `undefined`          | Dispatcher falls back to `{ id: notifiable.id }`.                 |
+| `route` omitted      | Same as returning `undefined` — `{ id }` fallback.                |
 
 For raw-target ad-hoc sends (`notify.discord("https://hooks.../foo", payload)`), the raw string wins over `route()`.
 
@@ -83,7 +83,9 @@ import type { WebClient } from "@slack/web-api";
 let Slack: typeof import("@slack/web-api");
 let isModuleExists: boolean | null = null;
 
-async function loadSlack() { /* try/catch await import; set flag */ }
+async function loadSlack() {
+  /* try/catch await import; set flag */
+}
 loadSlack();
 
 export const slackChannel = (config: { token: string }) =>

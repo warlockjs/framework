@@ -61,7 +61,7 @@ A typical locale entry uses those params:
 {
   "email": "The :input must be a valid email",
   "min": "The :input must be at least :min characters",
-  "required": "The :input field is required"
+  "required": "The :input field is required",
 }
 ```
 
@@ -81,12 +81,12 @@ const schema = v
 
 ## Per-rule override vs translation hook — which to use
 
-| Situation | Reach for |
-| --- | --- |
-| One rule in one schema needs custom wording | per-rule `errorMessage` argument |
-| Consistent wording for a rule across all schemas | `translateRule` hook |
-| Multiple languages | `translateRule` + `translateAttribute` hooks |
-| Friendly field labels in messages | `.attributes()` + `translateAttribute` hook |
+| Situation                                        | Reach for                                    |
+| ------------------------------------------------ | -------------------------------------------- |
+| One rule in one schema needs custom wording      | per-rule `errorMessage` argument             |
+| Consistent wording for a rule across all schemas | `translateRule` hook                         |
+| Multiple languages                               | `translateRule` + `translateAttribute` hooks |
+| Friendly field labels in messages                | `.attributes()` + `translateAttribute` hook  |
 
 The two layers compose: a per-rule override wins for that specific call site even when a global `translateRule` is configured, so you can localize globally and still hard-override the odd special case.
 

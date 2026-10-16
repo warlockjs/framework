@@ -38,7 +38,12 @@
  * pays one boolean check and allocates nothing extra.
  */
 import type { Request } from "../http/request";
-import { buildTracingContext, dispatchRequestEnd, dispatchRequestStart, isTracingEnabled } from "../http/tracing";
+import {
+  buildTracingContext,
+  dispatchRequestEnd,
+  dispatchRequestStart,
+  isTracingEnabled,
+} from "../http/tracing";
 
 export type RequestLogEntry = {
   module: string;

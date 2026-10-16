@@ -99,12 +99,9 @@ const { ProductionBuilder } = await import("../../../src/production/production-b
 // Imported after the config-manager mock is in place, so the registration
 // under test reads `configuredConnectors` and not a real warlock.config.
 const { connectorsManager } = await import("../../../src/connectors/connectors-manager");
-const { registerConfiguredConnectors } = await import(
-  "../../../src/connectors/register-configured-connectors"
-);
-const { warlockConfigManager } = await import(
-  "../../../src/warlock-config/warlock-config.manager"
-);
+const { registerConfiguredConnectors } =
+  await import("../../../src/connectors/register-configured-connectors");
+const { warlockConfigManager } = await import("../../../src/warlock-config/warlock-config.manager");
 
 /** `generateEntryPoint`, `bundle` and the contribution fields are private;
  * reached through an instance cast, as the sibling entry-point test does. */
@@ -208,9 +205,9 @@ describe("esbuild merge precedence — defaults < contributor < user config", ()
 
   it("merges define per key, with the user winning on a shared key", async () => {
     const options = await bundleWith(
-      { define: { "import.meta.env.DEV": "true", "process.env.APP": '"user"' } } as Partial<
-        ResolvedBuildConfig
-      >,
+      {
+        define: { "import.meta.env.DEV": "true", "process.env.APP": '"user"' },
+      } as Partial<ResolvedBuildConfig>,
       { define: { "import.meta.env.DEV": "false", "import.meta.env.SSR": "true" } },
     );
 
@@ -246,17 +243,19 @@ describe("esbuild merge precedence — defaults < contributor < user config", ()
   });
 
   it("merges loader per extension instead of replacing the contributor map", async () => {
-    const options = await bundleWith({ loader: { ".png": "dataurl" } } as Partial<
-      ResolvedBuildConfig
-    >, { loader: { ".svg": "file" } });
+    const options = await bundleWith(
+      { loader: { ".png": "dataurl" } } as Partial<ResolvedBuildConfig>,
+      { loader: { ".svg": "file" } },
+    );
 
     expect(options.loader).toEqual({ ".svg": "file", ".png": "dataurl" });
   });
 
   it("lets the user win on a shared extension", async () => {
-    const options = await bundleWith({ loader: { ".svg": "text" } } as Partial<
-      ResolvedBuildConfig
-    >, { loader: { ".svg": "file", ".png": "file" } });
+    const options = await bundleWith(
+      { loader: { ".svg": "text" } } as Partial<ResolvedBuildConfig>,
+      { loader: { ".svg": "file", ".png": "file" } },
+    );
 
     expect(options.loader).toEqual({ ".svg": "text", ".png": "file" });
   });

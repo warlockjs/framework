@@ -255,9 +255,7 @@ describe("checkForFrameworkUpdate", () => {
 
       await checkForFrameworkUpdate(devServer);
 
-      const [shortcut] = register.mock.calls[0] as unknown as [
-        { handler: () => Promise<void> },
-      ];
+      const [shortcut] = register.mock.calls[0] as unknown as [{ handler: () => Promise<void> }];
 
       return shortcut.handler;
     }

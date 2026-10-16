@@ -7,7 +7,7 @@ description: Attach Panoptic to every production run, export to OTel or Langfuse
 
 The pillar this page answers: **when a production AI run misbehaves or the bill spikes, can you say exactly what happened and exactly what it cost — per run, per session, per tenant?**
 
-If the answer is "we'd have to add logging and reproduce it," you wired observability too late. The discipline is to make every run leave a complete, queryable trace and an honest cost number *by default* — attached once at boot, off the request's hot path, before the traffic that makes you need it. Everything below is one running scenario.
+If the answer is "we'd have to add logging and reproduce it," you wired observability too late. The discipline is to make every run leave a complete, queryable trace and an honest cost number _by default_ — attached once at boot, off the request's hot path, before the traffic that makes you need it. Everything below is one running scenario.
 
 ## The running scenario
 
@@ -40,11 +40,7 @@ The whole point of Panoptic is that capture is automatic and ambient. You build 
 **Do this — one subscriber, attached at boot, capturing every outcome.** `attach` subscribes to the primitive's terminal `*.completed` event, which fires once per run regardless of outcome. The failing run is already captured before your error branch runs.
 
 ```ts
-import {
-  panoptic,
-  createInMemoryTraceStore,
-  consoleExporter,
-} from "@warlock.js/ai-panoptic";
+import { panoptic, createInMemoryTraceStore, consoleExporter } from "@warlock.js/ai-panoptic";
 
 const supportAgent = ai.agent({ name: "refund-support", model: strong });
 
@@ -58,7 +54,7 @@ const detach = observe.attach(supportAgent); // every run captured from here on
 const { data, error } = await supportAgent.execute(message, { sessionId });
 ```
 
-**Avoid this — instrumenting one run by hand after it breaks.** Wrapping a single `execute` in ad-hoc timing and logging captures *that* call shape and nothing else: no child-span tree, no cost rollup, no failed/cancelled runs, and none of the runs that broke before you added it.
+**Avoid this — instrumenting one run by hand after it breaks.** Wrapping a single `execute` in ad-hoc timing and logging captures _that_ call shape and nothing else: no child-span tree, no cost rollup, no failed/cancelled runs, and none of the runs that broke before you added it.
 
 ```ts
 // Anti-pattern: bespoke, per-call, lossy — and only on the path you remembered.
@@ -120,7 +116,7 @@ observe.attach(supportAgent);
 const observe = panoptic({ exporters: [consoleExporter()] });
 ```
 
-> A missing optional-peer SDK surfaces as a curated *"install this"* error on first export, never a boot-time stack trace — so you can register `otelExporter` without `langfuse` installed and vice versa. The OTel exporter never owns a `TracerProvider`; provider, processors, and the OTLP span exporter are your existing instrumentation, so AI spans land in the same pipeline as the rest of your service. Full setup in the [export to OTel & Langfuse recipe](/v/latest/ai/recipes/observability-export-otel-langfuse/).
+> A missing optional-peer SDK surfaces as a curated _"install this"_ error on first export, never a boot-time stack trace — so you can register `otelExporter` without `langfuse` installed and vice versa. The OTel exporter never owns a `TracerProvider`; provider, processors, and the OTLP span exporter are your existing instrumentation, so AI spans land in the same pipeline as the rest of your service. Full setup in the [export to OTel & Langfuse recipe](/v/latest/ai/recipes/observability-export-otel-langfuse/).
 
 ## Set ModelPricing so cost is computed honestly — never zero
 
@@ -151,7 +147,7 @@ function runCostUsd(usage: Usage): number {
 }
 ```
 
-**Avoid this — coercing a missing cost to `0` and summing it into a total.** An unpriced model (a new finetune, a legacy adapter) reporting `usage.cost === undefined` silently becomes free in your dashboard. The result is a cost report that *looks* complete and *is* wrong — the worst failure mode, because nobody questions a number.
+**Avoid this — coercing a missing cost to `0` and summing it into a total.** An unpriced model (a new finetune, a legacy adapter) reporting `usage.cost === undefined` silently becomes free in your dashboard. The result is a cost report that _looks_ complete and _is_ wrong — the worst failure mode, because nobody questions a number.
 
 ```ts
 // Anti-pattern: undefined → 0 hides unpriced spend behind a confident total.
@@ -162,9 +158,9 @@ const total = result.usage.cost?.input ?? 0; // and the rest of the bill vanishe
 
 ## Read the rolled-up `Usage.cost` to attribute spend per tenant or feature
 
-"We spent $4,200 on OpenAI" answers no one's question. The question is *which tenant, which feature, which model* — and the answer is already on every result, because `Usage` rolls up the whole run tree. Stamp each run with the dimension you bill by (the tenant id as `sessionId`, the feature as part of it), then roll the per-channel `Usage.cost` into a keyed ledger.
+"We spent $4,200 on OpenAI" answers no one's question. The question is _which tenant, which feature, which model_ — and the answer is already on every result, because `Usage` rolls up the whole run tree. Stamp each run with the dimension you bill by (the tenant id as `sessionId`, the feature as part of it), then roll the per-channel `Usage.cost` into a keyed ledger.
 
-**Do this — stamp the tenant, read the per-channel breakdown, roll it up.** `cachedTokens` (cheap cache hits) and `reasoningTokens` (expensive thinking) are separate channels, so you can tell *why* a tenant is costly, not just *that* they are.
+**Do this — stamp the tenant, read the per-channel breakdown, roll it up.** `cachedTokens` (cheap cache hits) and `reasoningTokens` (expensive thinking) are separate channels, so you can tell _why_ a tenant is costly, not just _that_ they are.
 
 ```ts
 const sessionId = `tenant_${tenantId}:refund-flow`; // tenant + feature in one key
@@ -176,7 +172,7 @@ await tenantLedger.add(tenantId, {
   model: "gpt-4o",
   inputTokens: usage.input,
   outputTokens: usage.output,
-  cachedTokens: usage.cachedTokens ?? 0,       // billed at the cached rate
+  cachedTokens: usage.cachedTokens ?? 0, // billed at the cached rate
   reasoningTokens: usage.reasoningTokens ?? 0, // counted within output
   // Usage.cost has no single scalar — sum the populated channels.
   costUsd: usage.cost
@@ -212,11 +208,11 @@ console.log(
 
 **Avoid this — billing from one opaque provider invoice.** The provider's monthly total can't be split by tenant or feature after the fact. If you didn't stamp the dimension at run time, no amount of querying recovers it — you're left allocating a lump sum by guesswork.
 
-> The dimension has to be on the run when it executes — `sessionId` is the join key Panoptic mirrors onto every span (`gen_ai.conversation.id` in OTel, the session dimension in Langfuse). Pick a scheme that encodes tenant *and* feature so one filter answers both finance's and engineering's questions. See the [cost per tenant recipe](/v/latest/ai/recipes/cost-aggregate-per-tenant/) for the full ledger.
+> The dimension has to be on the run when it executes — `sessionId` is the join key Panoptic mirrors onto every span (`gen_ai.conversation.id` in OTel, the session dimension in Langfuse). Pick a scheme that encodes tenant _and_ feature so one filter answers both finance's and engineering's questions. See the [cost per tenant recipe](/v/latest/ai/recipes/cost-aggregate-per-tenant/) for the full ledger.
 
 ## Use the trace tree — children and lineage — for forensics
 
-When a run fails, the flat error tells you *that* it failed; the trace tree tells you *where*. Every `TraceSpan` carries `parentSpanId` / `traceId` lineage and a `children` array in invocation order, and each span has its own rolled-up `usage` — so you can pinpoint the failing trip or the expensive tool without re-running anything.
+When a run fails, the flat error tells you _that_ it failed; the trace tree tells you _where_. Every `TraceSpan` carries `parentSpanId` / `traceId` lineage and a `children` array in invocation order, and each span has its own rolled-up `usage` — so you can pinpoint the failing trip or the expensive tool without re-running anything.
 
 **Do this — pull the run by id and walk its tree.** `store.get(traceId)` returns the retained run; `walkSpans` does the depth-first traversal so you can attribute failure and cost span by span.
 
@@ -260,7 +256,7 @@ for (const failure of recentFailures) {
 
 ## Wire tracing before you scale — and flush it on shutdown
 
-Observability you add *after* an incident can't explain the incident. Wire it on day one so the traffic that eventually surprises you is already captured. The two operational requirements: bound any in-memory retention so a long-lived process doesn't leak, and flush exporters on shutdown so the last buffered records actually leave the box.
+Observability you add _after_ an incident can't explain the incident. Wire it on day one so the traffic that eventually surprises you is already captured. The two operational requirements: bound any in-memory retention so a long-lived process doesn't leak, and flush exporters on shutdown so the last buffered records actually leave the box.
 
 **Do this — bound the store and drain exporters on teardown.** `capacity` caps memory with FIFO eviction; `shutdown()` flushes and releases every registered exporter (the Langfuse client and any batching backend hold buffered observations).
 
@@ -290,7 +286,7 @@ const observe = panoptic({ exporters: [createInMemoryTraceStore()] });
 // ...no detach, no shutdown — process.exit() loses buffered traces.
 ```
 
-> Observability faults never crash the run: the collector wraps every exporter in `Promise.allSettled`, and the event handler swallows the `collect` rejection — a broken sink degrades to *missing telemetry*, never a failed agent. The in-memory store is O(n) on `query` / `aggregate` with no secondary indexes, so treat it as a dev/test and modest-volume runtime surface; beyond that, export to a warehouse via OTel / Langfuse and aggregate there.
+> Observability faults never crash the run: the collector wraps every exporter in `Promise.allSettled`, and the event handler swallows the `collect` rejection — a broken sink degrades to _missing telemetry_, never a failed agent. The in-memory store is O(n) on `query` / `aggregate` with no secondary indexes, so treat it as a dev/test and modest-volume runtime surface; beyond that, export to a warehouse via OTel / Langfuse and aggregate there.
 
 ## Avoid list
 

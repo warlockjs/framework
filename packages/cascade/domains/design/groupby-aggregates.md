@@ -37,7 +37,7 @@ Decompose-via-`selectRaw`-keep-parser-pure is the driver's dominant idiom (`appl
 
 ### 3. Parse-time HAVING rewrite (`applyGroupByAggregates`)
 
-A pre-parse pass (mirrors `applyHasRelations`' in-place `Array.map` rewrite) called in the `get()` / `parse()` preludes after `applyCountRelations`. It rewrites every `having` op whose `field` matches a recorded aggregate alias into a `havingRaw` carrying the substituted expression (`SUM("input_tokens") > ?`, bindings `[value]`). A `having` on a grouped *column* (no alias match) is left untouched. Running at parse time (not in the override) makes it independent of fluent call order. Idempotent via `groupByAggregatesApplied`; `aggregateAliases` + the guard are copied in `clone()`.
+A pre-parse pass (mirrors `applyHasRelations`' in-place `Array.map` rewrite) called in the `get()` / `parse()` preludes after `applyCountRelations`. It rewrites every `having` op whose `field` matches a recorded aggregate alias into a `havingRaw` carrying the substituted expression (`SUM("input_tokens") > ?`, bindings `[value]`). A `having` on a grouped _column_ (no alias match) is left untouched. Running at parse time (not in the override) makes it independent of fluent call order. Idempotent via `groupByAggregatesApplied`; `aggregateAliases` + the guard are copied in `clone()`.
 
 #### `processHavingRaw` consistency fix (+ latent bug)
 
@@ -45,12 +45,12 @@ A pre-parse pass (mirrors `applyHasRelations`' in-place `Array.map` rewrite) cal
 
 ## Five cross-driver, four MongoDB-only
 
-| Helper | Postgres | Why |
-| --- | --- | --- |
-| `count`/`sum`/`avg`/`min`/`max` | ✅ ANSI SQL | clean scalar aggregates |
-| `distinct` | ⛔ throw | Mongo returns the array of distinct values; SQL `DISTINCT` is a set quantifier, not a scalar aggregate — `COUNT(DISTINCT f)` would be a silently-different semantic |
-| `floor` | ⛔ throw | scalar function, not an aggregate; meaningless in a bare `GROUP BY` |
-| `first`/`last` | ⛔ throw | needs `FIRST_VALUE/LAST_VALUE OVER (ORDER BY …)` — a windowing context `$agg` doesn't carry |
+| Helper                          | Postgres    | Why                                                                                                                                                                 |
+| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `count`/`sum`/`avg`/`min`/`max` | ✅ ANSI SQL | clean scalar aggregates                                                                                                                                             |
+| `distinct`                      | ⛔ throw    | Mongo returns the array of distinct values; SQL `DISTINCT` is a set quantifier, not a scalar aggregate — `COUNT(DISTINCT f)` would be a silently-different semantic |
+| `floor`                         | ⛔ throw    | scalar function, not an aggregate; meaningless in a bare `GROUP BY`                                                                                                 |
+| `first`/`last`                  | ⛔ throw    | needs `FIRST_VALUE/LAST_VALUE OVER (ORDER BY …)` — a windowing context `$agg` doesn't carry                                                                         |
 
 The throw lives in `PostgresDialect.aggregateToSql` (`default:` arm). v1 covers the 95% reporting case; the four are documented MongoDB-only with the `selectRaw` escape hatch.
 

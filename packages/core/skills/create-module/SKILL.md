@@ -76,7 +76,7 @@ Run after `generate.module` to fill in gaps or add to an existing module.
 | Command                                         | Alias     | Flags                                                             |
 | ----------------------------------------------- | --------- | ----------------------------------------------------------------- |
 | `warlock generate.module <name>`                | `gen.m`   | `--minimal` (`-m`), `--force`                                     |
-| `warlock generate.controller <module>/<action>` | `gen.c`   | `--with-validation` (also generates the `schema/` file)            |
+| `warlock generate.controller <module>/<action>` | `gen.c`   | `--with-validation` (also generates the `schema/` file)           |
 | `warlock generate.service <module>/<action>`    | `gen.s`   | `--force`                                                         |
 | `warlock generate.model <module>/<entity>`      | `gen.md`  | `--with-resource`, `--table <name>`, `--timestamps`               |
 | `warlock generate.repository <module>/<entity>` | `gen.r`   | `--force`                                                         |
@@ -85,7 +85,7 @@ Run after `generate.module` to fill in gaps or add to an existing module.
 
 The DSL for `--add` is `name:type:modifier,…` — see `write-cli-command` and the column-DSL parser in `@warlock.js/core/src/cli/commands/generate/generators/column-dsl-parser.ts`.
 
-Every `generate.*` command (and the master `generate`) also accepts **`--dry-run`** — it prints the files it *would* create and writes nothing. Run it before a full `generate.module` scaffold or any `--force` to preview the blast radius.
+Every `generate.*` command (and the master `generate`) also accepts **`--dry-run`** — it prints the files it _would_ create and writes nothing. Run it before a full `generate.module` scaffold or any `--force` to preview the blast radius.
 
 ## Path alias
 

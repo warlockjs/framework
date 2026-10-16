@@ -23,10 +23,7 @@ yarn add @warlock.js/logger
 ```ts
 import { log, ConsoleLog, FileLog } from "@warlock.js/logger";
 
-log.setChannels([
-  new ConsoleLog(),
-  new FileLog({ chunk: "daily" }),
-]);
+log.setChannels([new ConsoleLog(), new FileLog({ chunk: "daily" })]);
 
 log.info("users", "register", "New user created");
 log.error("payments", "charge", new Error("Card declined"));
@@ -61,12 +58,12 @@ log.error({
 
 ## Built-in channels
 
-| Channel | Name | Purpose |
-|---|---|---|
-| `ConsoleLog` | `"console"` | Colorized terminal output |
-| `FileLog` | `"file"` | Plain-text files, optional chunking + rotation + grouping |
-| `JSONFileLog` | `"fileJson"` | Structured JSON files — ideal for aggregators |
-| `SentryLog` | `"sentry"` | Forwards to Sentry (events + breadcrumbs); needs the optional `@sentry/node` peer |
+| Channel       | Name         | Purpose                                                                           |
+| ------------- | ------------ | --------------------------------------------------------------------------------- |
+| `ConsoleLog`  | `"console"`  | Colorized terminal output                                                         |
+| `FileLog`     | `"file"`     | Plain-text files, optional chunking + rotation + grouping                         |
+| `JSONFileLog` | `"fileJson"` | Structured JSON files — ideal for aggregators                                     |
+| `SentryLog`   | `"sentry"`   | Forwards to Sentry (events + breadcrumbs); needs the optional `@sentry/node` peer |
 
 All channels share the `BasicLogConfigurations` options (`levels`, `filter`, `dateFormat`); `FileLog` / `JSONFileLog` add storage, chunking, rotation, and grouping options, and `SentryLog` adds `client` / `options` / `eventLevels`.
 
@@ -74,7 +71,7 @@ All channels share the `BasicLogConfigurations` options (`levels`, `filter`, `da
 
 The package exports one default singleton and one class:
 
-- **`log`** — a pre-instantiated `Logger`. Day-to-day logging *and* configuration both go through it: `log.info(...)`, `log.configure(...)`, `log.flush()` / `log.flushSync()`, `log.addChannel(...)`.
+- **`log`** — a pre-instantiated `Logger`. Day-to-day logging _and_ configuration both go through it: `log.info(...)`, `log.configure(...)`, `log.flush()` / `log.flushSync()`, `log.addChannel(...)`.
 - **`Logger`** — the class. Use it when you need an isolated logger (libraries, sandboxes, parallel test suites).
 
 `log` is a `Logger` instance, not a function — every level shortcut and configuration method is reachable on it. The bare-callable `log(data)` form was removed; use `log.log(data)` for the data-object form, or `log.info(...)` / `log.error(...)` / etc. for the positional form.

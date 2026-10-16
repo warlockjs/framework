@@ -105,9 +105,7 @@ export class BedrockEmbedder implements EmbedderContract {
 
     const body = JSON.stringify({
       inputText: input,
-      ...(this.configuredDimensions !== undefined
-        ? { dimensions: this.configuredDimensions }
-        : {}),
+      ...(this.configuredDimensions !== undefined ? { dimensions: this.configuredDimensions } : {}),
     });
 
     let raw;

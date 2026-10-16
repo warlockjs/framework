@@ -34,14 +34,14 @@ ergonomic surface on top.
 `fs.files.get` reads a file as a UTF-8 string — the common case in one call.
 
 ```ts
-const readme = await fs.files.get("README.md");   // string
+const readme = await fs.files.get("README.md"); // string
 ```
 
 Need the raw bytes instead? Pass `{ encoding: null }` and you get a `Buffer`
 back. The return type follows the option, so there's no cast either way.
 
 ```ts
-const bytes = await fs.files.get("logo.png", { encoding: null });   // Buffer
+const bytes = await fs.files.get("logo.png", { encoding: null }); // Buffer
 ```
 
 It throws `ENOENT` if the file is missing. Don't try/catch that — gate the
@@ -141,13 +141,13 @@ await fs.files.putJson("out/min.json", value, { indent: 0 });
 
 ## Create-if-absent
 
-When you want to write a file *only* if it isn't there yet — a scaffolded
+When you want to write a file _only_ if it isn't there yet — a scaffolded
 default, a seed record — use `create` / `createJson`. They're exactly `put` /
 `putJson` with `{ overwrite: false }` baked in.
 
 ```ts
-await fs.files.create("config.toml", defaultConfig);       // text
-await fs.files.createJson("state.json", { counter: 0 });   // JSON
+await fs.files.create("config.toml", defaultConfig); // text
+await fs.files.createJson("state.json", { counter: 0 }); // JSON
 ```
 
 Both throw if the file already exists, so a re-run won't quietly wipe live
@@ -170,7 +170,7 @@ flow. If you don't care whether the path is a file or a directory, use the
 type-agnostic `fs.exists`.
 
 ```ts
-await fs.exists("build-output");   // true for a file OR a directory
+await fs.exists("build-output"); // true for a file OR a directory
 ```
 
 For directory-specific checks and the rest of the folder toolkit, see
@@ -191,7 +191,7 @@ directory, and `raw` is the underlying `fs.Stats` if you need mode bits. When
 size is all you want, `fs.files.size` skips straight to the number.
 
 ```ts
-const bytes = await fs.files.size("bundle.js");   // number
+const bytes = await fs.files.size("bundle.js"); // number
 ```
 
 Both throw `ENOENT` on a missing path — guard with `fs.files.exists` if the

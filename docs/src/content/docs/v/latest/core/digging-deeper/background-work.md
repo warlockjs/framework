@@ -8,7 +8,7 @@ sidebar:
 
 Let's be honest up front: **`@warlock.js/core` does not ship a distributed job queue.** There is no `dispatch(job)`, no worker process, no Redis-backed retry table, no "jobs" directory. If you came here looking for Laravel queues or BullMQ baked into core, it isn't here — and pretending otherwise would set you up for a bad time.
 
-What core *does* give you are two small, honest primitives for moving work off the critical path **inside a single process**, plus a clear pointer to the packages that own real background infrastructure. This page draws those boundaries so nobody ships a "background job" that silently dies on the next deploy.
+What core _does_ give you are two small, honest primitives for moving work off the critical path **inside a single process**, plus a clear pointer to the packages that own real background infrastructure. This page draws those boundaries so nobody ships a "background job" that silently dies on the next deploy.
 
 ## The 30-second look
 
@@ -63,14 +63,14 @@ if (!error && after && output !== undefined) {
 
 What this means in practice:
 
-| Property | Behavior |
-| --- | --- |
-| When they run | After the handler succeeds (`output !== undefined`, no error). Skipped entirely on failure. |
-| Failure isolation | Each hook's throw is caught and logged via `log.error("use-cases", name, "after middleware failed", { error })` — the next hook still runs, the use-case still returns its output. |
-| Ordering | Sequential and **awaited** — each `after` middleware is `await`ed before the next. "Fire-and-forget" means failures are swallowed, **not** that the use-case returns before they finish. |
-| Durability | None. They run in the same process, in the same call. If the process dies mid-loop, remaining hooks are lost. |
+| Property          | Behavior                                                                                                                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| When they run     | After the handler succeeds (`output !== undefined`, no error). Skipped entirely on failure.                                                                                              |
+| Failure isolation | Each hook's throw is caught and logged via `log.error("use-cases", name, "after middleware failed", { error })` — the next hook still runs, the use-case still returns its output.       |
+| Ordering          | Sequential and **awaited** — each `after` middleware is `await`ed before the next. "Fire-and-forget" means failures are swallowed, **not** that the use-case returns before they finish. |
+| Durability        | None. They run in the same process, in the same call. If the process dies mid-loop, remaining hooks are lost.                                                                            |
 
-So "fire-and-forget" is about *fault isolation*, not detachment: the caller still waits for the hooks, but a broken side effect can't take down the business operation. If you genuinely need the work to outlive the request — survive a crash, run on another box — an after-hook is the wrong tool. Have the after-hook **hand the work to herald or the notifications queue** instead of doing it inline.
+So "fire-and-forget" is about _fault isolation_, not detachment: the caller still waits for the hooks, but a broken side effect can't take down the business operation. If you genuinely need the work to outlive the request — survive a crash, run on another box — an after-hook is the wrong tool. Have the after-hook **hand the work to herald or the notifications queue** instead of doing it inline.
 
 See [Use-cases (deep dive)](../the-basics/use-cases-deep.md) for the full execution order and the rest of the option surface.
 
@@ -89,10 +89,10 @@ const queue = new Queue<AnalyticsEvent>(
   async (items) => {
     await analytics.bulkInsert(items);
   },
-  true,  // executeInParallel — default true
-  5000,  // executeEvery (ms) — default 5000
-  100,   // batchSize — how many items per execute call
-  500,   // maxSize — flush immediately once the buffer reaches this (optional)
+  true, // executeInParallel — default true
+  5000, // executeEvery (ms) — default 5000
+  100, // batchSize — how many items per execute call
+  500, // maxSize — flush immediately once the buffer reaches this (optional)
 );
 
 queue.enqueue({ type: "page_view", path: "/home" });
@@ -100,13 +100,13 @@ queue.enqueue({ type: "page_view", path: "/home" });
 
 The positional argument order is exactly this — note that `executeInParallel` comes **before** the timing/size args:
 
-| Position | Parameter | Type | Default | What it does |
-| --- | --- | --- | --- | --- |
-| 1 | `executeFn` | `(items: T[]) => Promise<void>` | — | Called with a batch of items to process. |
-| 2 | `executeInParallel` | `boolean` | `true` | When `true`, the batch is processed with `Promise.all`, one `executeFn` call per item. When `false`, items are processed one at a time, sequentially. |
-| 3 | `executeEvery` | `number` (ms) | `5000` | Interval timer — if items are waiting, the queue flushes this often. |
-| 4 | `batchSize` | `number` | — | How many items are pulled off the front of the buffer per flush. **Required for items to actually drain** (see Gotchas). |
-| 5 | `maxSize` | `number?` | `undefined` | When set, `enqueue` triggers an immediate flush once the buffer reaches this length, instead of waiting for the timer. |
+| Position | Parameter           | Type                            | Default     | What it does                                                                                                                                          |
+| -------- | ------------------- | ------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1        | `executeFn`         | `(items: T[]) => Promise<void>` | —           | Called with a batch of items to process.                                                                                                              |
+| 2        | `executeInParallel` | `boolean`                       | `true`      | When `true`, the batch is processed with `Promise.all`, one `executeFn` call per item. When `false`, items are processed one at a time, sequentially. |
+| 3        | `executeEvery`      | `number` (ms)                   | `5000`      | Interval timer — if items are waiting, the queue flushes this often.                                                                                  |
+| 4        | `batchSize`         | `number`                        | —           | How many items are pulled off the front of the buffer per flush. **Required for items to actually drain** (see Gotchas).                              |
+| 5        | `maxSize`           | `number?`                       | `undefined` | When set, `enqueue` triggers an immediate flush once the buffer reaches this length, instead of waiting for the timer.                                |
 
 ### How a flush works
 
@@ -122,9 +122,9 @@ const auditQueue = new Queue<AuditRow>(
     await auditModel.insertMany(rows);
   },
   false, // sequential — keep insert order deterministic
-  2000,  // flush every 2s
-  50,    // up to 50 rows per flush
-  200,   // or immediately once 200 pile up
+  2000, // flush every 2s
+  50, // up to 50 rows per flush
+  200, // or immediately once 200 pile up
 );
 
 // somewhere hot, called thousands of times:
@@ -137,11 +137,11 @@ That's the whole surface. There is no `flush()`, no `drain()`, no `stop()` metho
 
 When the work has to be **durable, cross-process, scheduled, or retried until it succeeds**, it does not belong in core. Three sibling packages own that ground:
 
-| Package | Owns | Reach for it when |
-| --- | --- | --- |
-| **`@warlock.js/herald`** | Message broker / queues | You need durable queues, pub/sub, request–reply, dead-letter handling — work that survives restarts and crosses process boundaries. Wired into core through the herald connector (`src/config/herald.ts`). |
-| **`@warlock.js/scheduler`** | Cron / recurring jobs | You need "run this every night at 2 AM" — timezone-aware schedules, overlap guards, retry/backoff. |
-| **`@warlock.js/notifications`** | Notifications, optional queue worker | You're sending notifications and want the slow channels (SMTP, HTTP) off the request path via a herald-backed queue worker. |
+| Package                         | Owns                                 | Reach for it when                                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`@warlock.js/herald`**        | Message broker / queues              | You need durable queues, pub/sub, request–reply, dead-letter handling — work that survives restarts and crosses process boundaries. Wired into core through the herald connector (`src/config/herald.ts`). |
+| **`@warlock.js/scheduler`**     | Cron / recurring jobs                | You need "run this every night at 2 AM" — timezone-aware schedules, overlap guards, retry/backoff.                                                                                                         |
+| **`@warlock.js/notifications`** | Notifications, optional queue worker | You're sending notifications and want the slow channels (SMTP, HTTP) off the request path via a herald-backed queue worker.                                                                                |
 
 The herald and notifications connectors are **always registered** in core, but they no-op unless you provide their config file (`src/config/herald.ts`, `src/config/notifications.ts`) — config presence is what activates the subsystem. See [Bootstrap & connectors](../architecture-concepts/bootstrap-and-connectors.md) for that declarative model.
 

@@ -73,7 +73,7 @@ export const config = {
 - `userType` restricts to one user type and `when(model)` adds a check (it may be async). A failure is a 403, not a redirect.
 
 ```ts
-requireUser({ userType: "admin", when: model => model.isActive });
+requireUser({ userType: "admin", when: (model) => model.isActive });
 ```
 
 ### Loader form
@@ -136,18 +136,18 @@ The generator types a page as guarded only when it can prove the guard from sour
 
 These do **not** count, and the page stays unguarded in the types (no `guard` is emitted):
 
-| Not a guard                                                   | Example                                                     |
-| ------------------------------------------------------------- | ----------------------------------------------------------- |
-| a spread into the array                                       | `middleware: [...guards]`                                   |
-| `middleware` that is not an array literal                     | `middleware: guards`                                        |
-| an identifier in the array                                    | `middleware: [guard]`                                       |
-| a conditional                                                 | `middleware: [isPrivate ? requireUser() : audit]`           |
-| a wrapper call around it                                      | `middleware: [withAudit(requireUser())]`                    |
-| `requireGuest()`                                              | `middleware: [requireGuest()]`                              |
-| `config.action.middleware`                                    | only the page's action is guarded                           |
-| a type-only import, or an import from any other module        | `import type { requireUser } from "@warlock.js/web/session"` |
-| a namespace or member call                                    | `session.requireUser()`                                     |
-| the loader form inside a loader                               | `requireUser(ctx)` guards at runtime but is not seen by the generator |
+| Not a guard                                            | Example                                                               |
+| ------------------------------------------------------ | --------------------------------------------------------------------- |
+| a spread into the array                                | `middleware: [...guards]`                                             |
+| `middleware` that is not an array literal              | `middleware: guards`                                                  |
+| an identifier in the array                             | `middleware: [guard]`                                                 |
+| a conditional                                          | `middleware: [isPrivate ? requireUser() : audit]`                     |
+| a wrapper call around it                               | `middleware: [withAudit(requireUser())]`                              |
+| `requireGuest()`                                       | `middleware: [requireGuest()]`                                        |
+| `config.action.middleware`                             | only the page's action is guarded                                     |
+| a type-only import, or an import from any other module | `import type { requireUser } from "@warlock.js/web/session"`          |
+| a namespace or member call                             | `session.requireUser()`                                               |
+| the loader form inside a loader                        | `requireUser(ctx)` guards at runtime but is not seen by the generator |
 
 The not-found page is never guarded. A guard the generator cannot prove still runs at runtime; only the types stay loose, so `useUser()` keeps returning `null` for a guest. In development a file the generator cannot parse reads as unguarded rather than breaking boot.
 

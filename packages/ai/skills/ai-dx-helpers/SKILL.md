@@ -13,11 +13,11 @@ Runs the SAME executable (agent / workflow / supervisor / tool — anything `Exe
 
 ```ts
 const result = await ai.batch(summarizer, articles, {
-  concurrency: 4,                                   // default = items.length (all at once); <=0 → serial
-  retry: { attempts: 3, backoff: "exponential" },   // workflow RetryConfig, applied per item
+  concurrency: 4, // default = items.length (all at once); <=0 → serial
+  retry: { attempts: 3, backoff: "exponential" }, // workflow RetryConfig, applied per item
   onItem: (item) => log.info("batch", "item", "settled", { index: item.index }),
   signal: AbortSignal.timeout(120_000),
-  sessionId: "ingest-2026-06-19",                   // lineage onto every child report
+  sessionId: "ingest-2026-06-19", // lineage onto every child report
   name: "summarize-articles",
 });
 
@@ -42,7 +42,7 @@ const model = ai.fallbackModel([
   anthropic.model({ name: "claude-3-5-sonnet" }),
 ]);
 
-const agent = ai.agent({ model });   // hand it anywhere a model goes
+const agent = ai.agent({ model }); // hand it anywhere a model goes
 
 // custom retry predicate or code list:
 ai.fallbackModel([primary, backup], { retryOn: ["PROVIDER_RATE_LIMIT", "PROVIDER_TIMEOUT"] });
@@ -51,7 +51,7 @@ ai.fallbackModel([primary, backup], { retryOn: (error) => error instanceof Provi
 
 Default retryable codes: `PROVIDER_RATE_LIMIT`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. Inspect `model.lastAttempts` for the failed models of the most recent call.
 
-**Streaming caveat:** `stream()` can only fail over while no chunk has been emitted yet — once the first `delta` / `tool-call` reaches the consumer, a mid-stream failure propagates instead of restarting. It advances *instantly* (no backoff) — pair with a backoff middleware if you want delay.
+**Streaming caveat:** `stream()` can only fail over while no chunk has been emitted yet — once the first `delta` / `tool-call` reaches the consumer, a mid-stream failure propagates instead of restarting. It advances _instantly_ (no backoff) — pair with a backoff middleware if you want delay.
 
 ## `agent.eval(options)` + `ai.eval.*` scorers — evaluate an agent
 
@@ -61,16 +61,18 @@ Run a suite of cases through `agent.execute()` and score each.
 const report = await myAgent.eval({
   cases: [
     { name: "capital", input: "Capital of Egypt?", expected: "Cairo" },
-    { name: "tone", input: "Comfort an upset user." },          // judge-scored
+    { name: "tone", input: "Comfort an upset user." }, // judge-scored
   ],
-  scorers: [ai.eval.contains()],                                 // default scorers for cases w/o their own
-  judge: { agent: judgeAgent, rubric: "Score 1.0 only if empathetic." },  // LLM-as-judge fallback
-  passThreshold: 0.5,                                            // default
+  scorers: [ai.eval.contains()], // default scorers for cases w/o their own
+  judge: { agent: judgeAgent, rubric: "Score 1.0 only if empathetic." }, // LLM-as-judge fallback
+  passThreshold: 0.5, // default
   onFailure: (caseResult) => snapshot(caseResult),
 });
 
-expect(report.passed).toBe(true);   // true only when EVERY case passed
-report.passRate; report.meanScore; report.cases;   // drill-down
+expect(report.passed).toBe(true); // true only when EVERY case passed
+report.passRate;
+report.meanScore;
+report.cases; // drill-down
 ```
 
 Built-in scorers on `ai.eval.*`: `exact()` (trimmed, case-insensitive; structured compared by canonical JSON), `contains()` (substring), `predicate(fn)` (arbitrary boolean assertion), `judge(config)` (LLM-as-judge). Scorer precedence per case: the case's own `scorers` → suite `scorers` → synthesized judge. A case with NONE throws at author time. A case passes only when the agent did not error AND every scorer passed.
@@ -79,12 +81,12 @@ Built-in scorers on `ai.eval.*`: `exact()` (trimmed, case-insensitive; structure
 
 ```ts
 import { registerAiMatchers } from "@warlock.js/ai";
-registerAiMatchers();   // once per test file (idempotent)
+registerAiMatchers(); // once per test file (idempotent)
 
-expect(await supervisor.execute(input)).toRouteTo("critic");        // dispatched the named intent
-expect(await supervisor.execute(input)).toConverge();               // terminated cleanly on own decision
-expect(await workflow.execute(input)).toPassStep("draft");          // named step completed
-expect(await agent.execute(input, { output: schema })).toOutputShape(schema);  // data validates
+expect(await supervisor.execute(input)).toRouteTo("critic"); // dispatched the named intent
+expect(await supervisor.execute(input)).toConverge(); // terminated cleanly on own decision
+expect(await workflow.execute(input)).toPassStep("draft"); // named step completed
+expect(await agent.execute(input, { output: schema })).toOutputShape(schema); // data validates
 ```
 
 The pure verdict functions (`matchConverge`, `matchOutputShape`, `matchPassStep`, `matchRouteTo`) and `AiMatchers` ship eagerly with no `vitest` coupling; only `registerAiMatchers` lazily imports `vitest` (a devDependency), so importing `@warlock.js/ai` in production never pulls in `vitest`.
@@ -101,7 +103,9 @@ ai.supervisor({
 });
 
 // branch on state, repeat the last decision until done:
-ai.mockRouter(["research", (ctx) => (ctx.state.summary ? END : "research")], { onExhausted: "repeat" });
+ai.mockRouter(["research", (ctx) => (ctx.state.summary ? END : "research")], {
+  onExhausted: "repeat",
+});
 ```
 
 A decision is a literal `Next` (intent name / fan-out array / `END`) or a predicate over the live `RouteContext`. On exhaustion: `"end"` (default — terminate), `"throw"` (test failure), `"repeat"` (replay last). For a scripted LLM, use `MockSDK` (script the model output) and `mockAgent({ name, responses })` for fixed-response capabilities.
@@ -115,9 +119,9 @@ const guard = ai.middleware.budget({
   pricing: { "gpt-4o": { inputPer1K: 0.005, outputPer1K: 0.015 } },
   contract: {
     maxCostUSD: 0.05,
-    maxLatencyMs: 8_000,        // wall-clock from first execute.before to each trip.after
+    maxLatencyMs: 8_000, // wall-clock from first execute.before to each trip.after
     maxTokens: 40_000,
-    onViolation: "fallback",    // "abort" (default) hard-stops; "fallback" records a signal + continues
+    onViolation: "fallback", // "abort" (default) hard-stops; "fallback" records a signal + continues
     fallback: (violation) => routeToCheaperModel(violation.dimension),
   },
 });
@@ -130,7 +134,7 @@ Read a recorded fallback signal in an outer middleware's `execute.after`:
 ```ts
 import { readBudgetFallbackSignal } from "@warlock.js/ai";
 
-const signal = readBudgetFallbackSignal(ctx.state);   // pass the middleware name as 2nd arg if non-default
+const signal = readBudgetFallbackSignal(ctx.state); // pass the middleware name as 2nd arg if non-default
 if (signal?.dimension === "cost") await rerunOnCheaperModel();
 ```
 
@@ -161,11 +165,16 @@ One-shot by design (never re-read on `resolve()`). Throws `InvalidRequestError` 
 An agent's `tools` array accepts a raw executable primitive (`AgentContract` / `WorkflowInstance` / `SupervisorContract` / orchestrator) directly — it is auto-adapted into a `ToolContract` at factory time. The tool manifest is derived from the executable's `name` + `description` + (optional) `inputSchema`; dispatch flows through its `execute()`.
 
 ```ts
-const support = ai.supervisor({ name: "support", inputSchema: v.object({ message: v.string() }), router, intents });
+const support = ai.supervisor({
+  name: "support",
+  inputSchema: v.object({ message: v.string() }),
+  router,
+  intents,
+});
 
 const concierge = ai.agent({
   model,
-  tools: [support, billingWorkflow, lookupTool],   // no .asTool() needed
+  tools: [support, billingWorkflow, lookupTool], // no .asTool() needed
 });
 ```
 

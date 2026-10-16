@@ -92,17 +92,13 @@ describe("wrapOpenAIError", () => {
   });
 
   it("maps rate_limit_exceeded code to ProviderRateLimitError", () => {
-    const wrapped = wrapOpenAIError(
-      fakeOpenAIError({ status: 400, code: "rate_limit_exceeded" }),
-    );
+    const wrapped = wrapOpenAIError(fakeOpenAIError({ status: 400, code: "rate_limit_exceeded" }));
 
     expect(wrapped).toBeInstanceOf(ProviderRateLimitError);
   });
 
   it("maps insufficient_quota to QuotaExceededError (not rate-limit)", () => {
-    const wrapped = wrapOpenAIError(
-      fakeOpenAIError({ status: 429, code: "insufficient_quota" }),
-    );
+    const wrapped = wrapOpenAIError(fakeOpenAIError({ status: 429, code: "insufficient_quota" }));
 
     expect(wrapped).toBeInstanceOf(QuotaExceededError);
     expect(wrapped).not.toBeInstanceOf(ProviderRateLimitError);
@@ -110,9 +106,7 @@ describe("wrapOpenAIError", () => {
   });
 
   it("insufficient_quota still a ProviderError for broad catches", () => {
-    const wrapped = wrapOpenAIError(
-      fakeOpenAIError({ status: 429, code: "insufficient_quota" }),
-    );
+    const wrapped = wrapOpenAIError(fakeOpenAIError({ status: 429, code: "insufficient_quota" }));
 
     expect(wrapped).toBeInstanceOf(ProviderError);
   });
@@ -235,9 +229,7 @@ describe("wrapOpenAIError", () => {
   });
 
   it("attaches status, code, and type to context", () => {
-    const wrapped = wrapOpenAIError(
-      fakeOpenAIError({ status: 429, code: "rate_limit_exceeded" }),
-    );
+    const wrapped = wrapOpenAIError(fakeOpenAIError({ status: 429, code: "rate_limit_exceeded" }));
 
     expect(wrapped.context).toMatchObject({
       status: 429,
@@ -247,9 +239,7 @@ describe("wrapOpenAIError", () => {
   });
 
   it("attaches request_id (snake_case) to context as requestId", () => {
-    const wrapped = wrapOpenAIError(
-      fakeOpenAIError({ status: 500, requestId: "req_abc" }),
-    );
+    const wrapped = wrapOpenAIError(fakeOpenAIError({ status: 500, requestId: "req_abc" }));
 
     expect(wrapped.context?.requestId).toBe("req_abc");
   });

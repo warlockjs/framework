@@ -106,11 +106,14 @@ export class TupleValidator extends BaseValidator {
 
     await Promise.all(validationPromises);
 
-    return this.refineResult({
-      isValid: errors.length === 0,
-      errors,
-      data: await this.startTransformationPipeline(mutatedData, context),
-    }, context);
+    return this.refineResult(
+      {
+        isValid: errors.length === 0,
+        errors,
+        data: await this.startTransformationPipeline(mutatedData, context),
+      },
+      context,
+    );
   }
 
   /**
@@ -134,7 +137,7 @@ export class TupleValidator extends BaseValidator {
    * ```
    */
   public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
-    const itemSchemas = this.validators.map(v => v.toJsonSchema(target));
+    const itemSchemas = this.validators.map((v) => v.toJsonSchema(target));
     const length = this.validators.length;
 
     const schema: JsonSchemaResult = {

@@ -14,9 +14,7 @@ You can call `context.run(store, fn)` directly when you only have one context. W
 ```ts
 // ❌ Without the manager — fragile, easy to forget a layer
 await requestContext.run(reqStore, async () =>
-  databaseContext.run(dbStore, async () =>
-    tenantContext.run(tenantStore, async () => handle()),
-  ),
+  databaseContext.run(dbStore, async () => tenantContext.run(tenantStore, async () => handle())),
 );
 
 // ✅ With the manager — one call, deterministic order
@@ -78,11 +76,11 @@ function contextMiddleware(req, res, next) {
 ## Lookup + introspection
 
 ```ts
-contextManager.hasContext("tenant");                // boolean
+contextManager.hasContext("tenant"); // boolean
 const tenant = contextManager.getContext<TenantContext>("tenant");
 // returns the registered instance or undefined
-contextManager.unregister("debug");                  // remove a context
-contextManager.clearAll();                           // clear stores on every context
+contextManager.unregister("debug"); // remove a context
+contextManager.clearAll(); // clear stores on every context
 ```
 
 `getContext<T>` returns the registered instance cast to `T` (the generic is constrained to `Context<any>`, so pass the concrete context class — `getContext<TenantContext>("tenant")`). It's an unchecked cast: an unknown `name` returns `undefined`, and a wrong type argument won't be caught at runtime. Useful in shared utilities that want to read from a context without importing it at the call site.
@@ -93,10 +91,10 @@ contextManager.clearAll();                           // clear stores on every co
 
 ```ts
 contextManager
-  .register("trace", traceContext)        // outermost — runs first
+  .register("trace", traceContext) // outermost — runs first
   .register("request", requestContext)
   .register("database", databaseContext)
-  .register("tenant", tenantContext);     // innermost — runs last, inside all others
+  .register("tenant", tenantContext); // innermost — runs last, inside all others
 ```
 
 ## Real-world: multi-tenant request lifecycle

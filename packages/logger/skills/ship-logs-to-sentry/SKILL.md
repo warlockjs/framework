@@ -50,14 +50,14 @@ With neither `client` nor `options`, the channel reuses whatever global Sentry c
 
 This is the quota-control decision. Only `eventLevels` create Sentry **events** (which consume your error quota); every other level becomes a **breadcrumb** that rides along with the next event for free.
 
-| Logger level | Default | Sentry call |
-|---|---|---|
-| `fatal` | event | `captureException` for an `Error` message, else `captureMessage(…, "fatal")` |
-| `error` | event | `captureException` for an `Error` message, else `captureMessage(…, "error")` |
-| `warn` | event | `captureMessage(…, "warning")` |
-| `success` | breadcrumb | `addBreadcrumb({ level: "info" })` |
-| `info` | breadcrumb | `addBreadcrumb({ level: "info" })` |
-| `debug` | breadcrumb | `addBreadcrumb({ level: "debug" })` |
+| Logger level | Default    | Sentry call                                                                  |
+| ------------ | ---------- | ---------------------------------------------------------------------------- |
+| `fatal`      | event      | `captureException` for an `Error` message, else `captureMessage(…, "fatal")` |
+| `error`      | event      | `captureException` for an `Error` message, else `captureMessage(…, "error")` |
+| `warn`       | event      | `captureMessage(…, "warning")`                                               |
+| `success`    | breadcrumb | `addBreadcrumb({ level: "info" })`                                           |
+| `info`       | breadcrumb | `addBreadcrumb({ level: "info" })`                                           |
+| `debug`      | breadcrumb | `addBreadcrumb({ level: "debug" })`                                          |
 
 - **Errors keep their stack.** A `message` that is an `Error` goes through `captureException`, so Sentry parses the real stack and groups correctly — never pre-stringify the error.
 - **`module` / `action` become tags** and the entry's `context` becomes a structured Sentry context, both scoped to that single event via `withScope`.
@@ -82,14 +82,14 @@ Sentry sends events asynchronously over the network, so a synchronous flush can'
 ```ts
 async function shutdown() {
   await httpServer.close();
-  await log.flush();   // SentryLog.flush() → Sentry.flush(flushTimeout)
+  await log.flush(); // SentryLog.flush() → Sentry.flush(flushTimeout)
   process.exit(0);
 }
 
 process.once("SIGTERM", shutdown);
 ```
 
-`flushTimeout` (default `2000` ms) bounds the wait so an unreachable Sentry can't hang shutdown. `autoFlushOn` uses the **synchronous** `flushSync()`, which does *not* drain Sentry — wire `await log.flush()` yourself. See the `flush-logs-on-shutdown` topic.
+`flushTimeout` (default `2000` ms) bounds the wait so an unreachable Sentry can't hang shutdown. `autoFlushOn` uses the **synchronous** `flushSync()`, which does _not_ drain Sentry — wire `await log.flush()` yourself. See the `flush-logs-on-shutdown` topic.
 
 ## If `@sentry/node` isn't installed
 
@@ -97,17 +97,17 @@ The channel never crashes your app: the dynamic import failure is swallowed, the
 
 ## Config reference
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `client` | Sentry namespace / forwarder | — | Reuse an already-initialized Sentry instance. |
-| `options` | `SentryInitOptions` | — | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`) — used when the channel owns Sentry. |
-| `eventLevels` | `LogLevel[]` | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
-| `flushTimeout` | `number` | `2000` | Ms `flush()` waits for the transport to drain. |
-| `levels`, `filter`, `dateFormat`, `redact` | — | — | Inherited from `BasicLogConfigurations`. |
+| Option                                     | Type                         | Default                      | Description                                                                                       |
+| ------------------------------------------ | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| `client`                                   | Sentry namespace / forwarder | —                            | Reuse an already-initialized Sentry instance.                                                     |
+| `options`                                  | `SentryInitOptions`          | —                            | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`) — used when the channel owns Sentry. |
+| `eventLevels`                              | `LogLevel[]`                 | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs.                                               |
+| `flushTimeout`                             | `number`                     | `2000`                       | Ms `flush()` waits for the transport to drain.                                                    |
+| `levels`, `filter`, `dateFormat`, `redact` | —                            | —                            | Inherited from `BasicLogConfigurations`.                                                          |
 
 ## Don't do
 
-- **Don't double-init Sentry.** Pass *either* `client` *or* `options`, not both. The channel guards against double-init, but a single owner of `Sentry.init` is cleaner.
+- **Don't double-init Sentry.** Pass _either_ `client` _or_ `options`, not both. The channel guards against double-init, but a single owner of `Sentry.init` is cleaner.
 - **Don't send every level as an event.** `eventLevels` with `info`/`debug`/`success` will flood your Sentry quota — keep them as breadcrumbs.
 - **Don't rely on `autoFlushOn` for Sentry.** It's synchronous; a network channel needs `await log.flush()`.
 

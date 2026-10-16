@@ -208,7 +208,7 @@ compared or serialized values. Keep any raw input you need before validation.
 Add your own validation logic:
 
 ```typescript
-v.string().refine(async value => {
+v.string().refine(async (value) => {
   const exists = await checkUsername(value);
   if (exists) return "Username already taken";
 });
@@ -342,19 +342,14 @@ const bookingSchema = v.object({
 ### Array Validation
 
 ```typescript
-const tagsSchema = v
-  .array(v.string())
-  .required()
-  .minLength(1)
-  .maxLength(10)
-  .unique();
+const tagsSchema = v.array(v.string()).required().minLength(1).maxLength(10).unique();
 
 const usersSchema = v
   .array(
     v.object({
       name: v.string().required(),
       email: v.string().email(),
-    })
+    }),
   )
   .minLength(1);
 ```

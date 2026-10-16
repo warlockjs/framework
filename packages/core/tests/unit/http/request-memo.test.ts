@@ -38,7 +38,7 @@ describe("requestMemo", () => {
 
     await withRequestContext(async () => {
       const fn = () =>
-        new Promise<string>(resolve => {
+        new Promise<string>((resolve) => {
           calls++;
           resolveFn = resolve;
         });
@@ -85,12 +85,15 @@ describe("requestMemo", () => {
         return requestMemo("shared-key", async () => {
           seen[label] = (seen[label] || 0) + 1;
           // Yield so the two contexts genuinely interleave.
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
           return label;
         });
       });
 
-    const [resultA, resultB] = await Promise.all([runInContext("request-a"), runInContext("request-b")]);
+    const [resultA, resultB] = await Promise.all([
+      runInContext("request-a"),
+      runInContext("request-b"),
+    ]);
 
     expect(resultA).toBe("request-a");
     expect(resultB).toBe("request-b");

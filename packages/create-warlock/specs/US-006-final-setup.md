@@ -133,10 +133,7 @@ if (database === "mongodb") {
 for (const feature of selectedFeatures) {
   Object.assign(packageJson.dependencies, featuresMap[feature].dependencies);
   if (featuresMap[feature].devDependencies) {
-    Object.assign(
-      packageJson.devDependencies,
-      featuresMap[feature].devDependencies,
-    );
+    Object.assign(packageJson.devDependencies, featuresMap[feature].devDependencies);
   }
 }
 
@@ -165,9 +162,7 @@ Git initialization can run in parallel with dependency installation to save time
 
 ```typescript
 // Start both immediately
-const gitPromise = useGit
-  ? initializeGitRepository(projectPath)
-  : Promise.resolve();
+const gitPromise = useGit ? initializeGitRepository(projectPath) : Promise.resolve();
 const installPromise = runCommand(packageManager, ["install"], projectPath);
 
 // Wait for both

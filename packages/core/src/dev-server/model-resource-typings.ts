@@ -66,7 +66,9 @@ type ImportBinding = { specifier: string; exportName: string };
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
-  return ts.canHaveModifiers(node) && (ts.getModifiers(node)?.some((m) => m.kind === kind) ?? false);
+  return (
+    ts.canHaveModifiers(node) && (ts.getModifiers(node)?.some((m) => m.kind === kind) ?? false)
+  );
 }
 
 function unwrapParentheses(expression: ts.Expression): ts.Expression {

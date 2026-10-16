@@ -60,7 +60,7 @@ Source: `@warlock.js/seal/src/factory/validate.ts`.
 
 ```ts
 type ValidateOptions = {
-  context?: Record<string, any>;  // passed through to SchemaContext.rootContext
+  context?: Record<string, any>; // passed through to SchemaContext.rootContext
   translateRule?: TranslateRuleCallback;
   translateAttribute?: TranslateAttributeCallback;
   firstErrorOnly?: boolean;
@@ -72,101 +72,101 @@ type ValidateOptions = {
 ### `v.string(errorMessage?)`
 
 ```ts
-v.string()           // type: string
-v.string().email()
-v.string().url()
-v.string().uuid(4)
-v.string().min(3).max(50)
+v.string(); // type: string
+v.string().email();
+v.string().url();
+v.string().uuid(4);
+v.string().min(3).max(50);
 ```
 
 ### `v.email(emailMessage?, errorMessage?)`
 
 ```ts
-v.email()  // shortcut for v.string().email()
+v.email(); // shortcut for v.string().email()
 ```
 
 ### `v.number(errorMessage?)`
 
 ```ts
-v.number().min(0).max(100)
+v.number().min(0).max(100);
 ```
 
 ### `v.int(errorMessage?)`
 
 ```ts
-v.int().positive()  // rejects 1.5 and negatives
+v.int().positive(); // rejects 1.5 and negatives
 ```
 
 ### `v.float(errorMessage?)`
 
 ```ts
-v.float().between(0, 1)  // rejects 1 and 0
+v.float().between(0, 1); // rejects 1 and 0
 ```
 
 ### `v.numeric(errorMessage?)`
 
 ```ts
-v.numeric().min(0)  // accepts "42" and 42
+v.numeric().min(0); // accepts "42" and 42
 ```
 
 ### `v.boolean(errorMessage?)`
 
 ```ts
-v.boolean()
-v.boolean().accepted()  // for "on" / "yes" / "1" form values → real boolean
-v.boolean().coerce()    // "true"/"1"/1 → true, "false"/"0"/0 → false (query strings)
+v.boolean();
+v.boolean().accepted(); // for "on" / "yes" / "1" form values → real boolean
+v.boolean().coerce(); // "true"/"1"/1 → true, "false"/"0"/0 → false (query strings)
 ```
 
 ### `v.scalar(errorMessage?)`
 
 ```ts
-v.scalar()  // type: string | number | boolean
+v.scalar(); // type: string | number | boolean
 ```
 
 ### `v.date(errorMessage?)`
 
 ```ts
-v.date().past()
-v.date().defaultNow()
+v.date().past();
+v.date().defaultNow();
 ```
 
 ### `v.literal(...values)`
 
 ```ts
-v.literal("admin", "user")  // type: "admin" | "user"
+v.literal("admin", "user"); // type: "admin" | "user"
 ```
 
 ### `v.enum(values, errorMessage?)`
 
 ```ts
-v.enum(["draft", "published"])  // array form
-v.enum(StatusEnum)              // TS enum object
+v.enum(["draft", "published"]); // array form
+v.enum(StatusEnum); // TS enum object
 ```
 
 ### `v.instanceof(ctor, errorMessage?)`
 
 ```ts
-v.instanceof(File)
-v.instanceof(MyClass)
+v.instanceof(File);
+v.instanceof(MyClass);
 ```
 
 ### `v.computed<T>(callback, resultValidator?)`
 
 ```ts
-v.computed<string>(({ first, last }) => `${first} ${last}`)
+v.computed<string>(({ first, last }) => `${first} ${last}`);
 ```
 
 ### `v.managed<T>(callback?, resultValidator?)`
 
 ```ts
-v.managed<Date>(() => new Date())
-v.managed<string>(({ user }) => user.id)
+v.managed<Date>(() => new Date());
+v.managed<string>(({ user }) => user.id);
 ```
 
 ### `v.any()`
 
 ```ts
-v.any()  // type: any
+v.any(); // type: any
 ```
 
 ## Structural validators
@@ -177,31 +177,31 @@ v.any()  // type: any
 v.object({
   email: v.string().email(),
   age: v.int().optional(),
-})
+});
 ```
 
 ### `v.array(validator, errorMessage?)`
 
 ```ts
-v.array(v.string()).minLength(1).maxLength(10)
+v.array(v.string()).minLength(1).maxLength(10);
 ```
 
 ### `v.record(valueValidator?, errorMessage?)`
 
 ```ts
-v.record(v.int())  // type: Record<string, number>
+v.record(v.int()); // type: Record<string, number>
 ```
 
 ### `v.tuple(validators, errorMessage?)`
 
 ```ts
-v.tuple([v.string(), v.int()])  // type: [string, number]
+v.tuple([v.string(), v.int()]); // type: [string, number]
 ```
 
 ### `v.union(validators, errorMessage?)`
 
 ```ts
-v.union([v.string(), v.int()])  // type: string | number
+v.union([v.string(), v.int()]); // type: string | number
 ```
 
 ### `v.discriminatedUnion(key, branches)`
@@ -210,13 +210,13 @@ v.union([v.string(), v.int()])  // type: string | number
 v.discriminatedUnion("type", [
   v.object({ type: v.literal("a"), x: v.string() }),
   v.object({ type: v.literal("b"), y: v.int() }),
-])
+]);
 ```
 
 ### `v.lazy(thunk)`
 
 ```ts
-v.lazy(() => categorySchema)  // for recursive / forward refs
+v.lazy(() => categorySchema); // for recursive / forward refs
 ```
 
 ## Inference
@@ -238,7 +238,7 @@ What the caller is allowed to send (pre-validation). `.optional()`, `.default()`
 What `result.data` contains (post-validation). `.default()` and `.catch()` guarantee a value, so those keys are required here.
 
 ```ts
-type In  = Infer.Input<typeof schema>;
+type In = Infer.Input<typeof schema>;
 type Out = Infer.Output<typeof schema>;
 ```
 
@@ -256,13 +256,13 @@ configureSeal({
 ### `getSealConfig()`
 
 ```ts
-const config = getSealConfig();  // SealConfig
+const config = getSealConfig(); // SealConfig
 ```
 
 ### `resetSealConfig()`
 
 ```ts
-resetSealConfig();  // clear translation hooks + reset firstErrorOnly to true
+resetSealConfig(); // clear translation hooks + reset firstErrorOnly to true
 ```
 
 ### `SealConfig`
@@ -271,7 +271,7 @@ resetSealConfig();  // clear translation hooks + reset firstErrorOnly to true
 type SealConfig = {
   translateRule?: (ruleTranslation: RuleTranslation) => string;
   translateAttribute?: (attributeTranslation: AttributeTranslation) => string;
-  firstErrorOnly?: boolean;  // default: true
+  firstErrorOnly?: boolean; // default: true
 };
 ```
 
@@ -298,13 +298,15 @@ Runs the plugin's `uninstall?.()` and removes from the registry.
 ### `hasPlugin(name)`
 
 ```ts
-if (hasPlugin("slug")) { /* ... */ }
+if (hasPlugin("slug")) {
+  /* ... */
+}
 ```
 
 ### `getInstalledPlugins()`
 
 ```ts
-const plugins = getInstalledPlugins();  // SealPlugin[]
+const plugins = getInstalledPlugins(); // SealPlugin[]
 ```
 
 ### `SealPlugin`
@@ -372,11 +374,7 @@ Default target is `"draft-2020-12"`.
 ### `JsonSchemaTarget`
 
 ```ts
-type JsonSchemaTarget =
-  | "draft-2020-12"
-  | "draft-07"
-  | "openapi-3.0"
-  | "openai-strict";
+type JsonSchemaTarget = "draft-2020-12" | "draft-07" | "openapi-3.0" | "openai-strict";
 ```
 
 Source: `@warlock.js/seal/src/standard-schema/json-schema.ts`.

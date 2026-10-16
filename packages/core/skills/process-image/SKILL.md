@@ -37,16 +37,16 @@ Adds `sharp` to your dependencies. Skip it and the first `new Image(...)` throws
 ## Constructors
 
 ```ts
-new Image("./avatar.jpg")            // path
-new Image(buffer)                     // Buffer
-new Image(uint8Array)                 // Uint8Array
-new Image(arrayBuffer)                // ArrayBuffer
-new Image(existingSharpInstance)      // wrap a sharp.Sharp you already built
+new Image("./avatar.jpg"); // path
+new Image(buffer); // Buffer
+new Image(uint8Array); // Uint8Array
+new Image(arrayBuffer); // ArrayBuffer
+new Image(existingSharpInstance); // wrap a sharp.Sharp you already built
 
 // Or via static factories:
 Image.fromFile("./avatar.jpg");
 Image.fromBuffer(buffer);
-await Image.fromUrl("https://example.com/photo.jpg");   // @mongez/http under the hood
+await Image.fromUrl("https://example.com/photo.jpg"); // @mongez/http under the hood
 ```
 
 `Image.fromUrl(...)` is the only async factory — it fetches the URL via `@mongez/http` (`responseType: "arrayBuffer"`), then wraps the bytes. The rest are synchronous.
@@ -55,25 +55,25 @@ await Image.fromUrl("https://example.com/photo.jpg");   // @mongez/http under th
 
 Every method returns `this` so calls chain. Transforms are descriptors; nothing runs until the output method.
 
-| Method                                       | Effect                                                                       |
-| -------------------------------------------- | ---------------------------------------------------------------------------- |
-| `.resize({ width?, height?, fit?, ... })`    | sharp resize — accepts the full `sharp.ResizeOptions` shape                  |
-| `.crop({ left, top, width, height })`        | extract a region                                                             |
-| `.rotate(deg)`                               | clockwise rotation                                                           |
-| `.flip()`                                    | mirror vertically (top↔bottom)                                               |
-| `.flop()`                                    | mirror horizontally (left↔right)                                             |
-| `.blur(sigma)`                               | gaussian blur (sigma is required, must be ≥ 0.3 — throws otherwise)          |
-| `.sharpen(options?)`                         | sharp's sharpen                                                              |
-| `.grayscale()` / `.blackAndWhite()`          | grayscale (aliases)                                                          |
-| `.tint(color)`                               | color tint                                                                   |
-| `.negate(options?)`                          | invert colors                                                                |
-| `.opacity(value)`                            | 0–100, applied via composite                                                 |
-| `.trim(options?)`                            | trim borders                                                                 |
-| `.watermark(image, options?)`                | overlay one watermark — two positional args (`image` accepts the same inputs as the constructor, plus another `Image`; `options` is `sharp.OverlayOptions`) |
-| `.watermarks([{ image, options }, ...])`     | overlay many — one `WatermarkConfig` object (`{ image, options }`) per entry  |
-| `.format(format)`                            | output format — `"jpeg"`, `"png"`, `"webp"`, `"avif"`, `"tiff"`, `"heif"`, ... |
-| `.quality(1–100)`                            | lossy formats only (`jpeg` / `webp` / `avif` / `tiff` / `heif`); ignored otherwise |
-| `.apply(options)`                            | apply many transforms in one call, in a fixed canonical order                |
+| Method                                    | Effect                                                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.resize({ width?, height?, fit?, ... })` | sharp resize — accepts the full `sharp.ResizeOptions` shape                                                                                                 |
+| `.crop({ left, top, width, height })`     | extract a region                                                                                                                                            |
+| `.rotate(deg)`                            | clockwise rotation                                                                                                                                          |
+| `.flip()`                                 | mirror vertically (top↔bottom)                                                                                                                              |
+| `.flop()`                                 | mirror horizontally (left↔right)                                                                                                                            |
+| `.blur(sigma)`                            | gaussian blur (sigma is required, must be ≥ 0.3 — throws otherwise)                                                                                         |
+| `.sharpen(options?)`                      | sharp's sharpen                                                                                                                                             |
+| `.grayscale()` / `.blackAndWhite()`       | grayscale (aliases)                                                                                                                                         |
+| `.tint(color)`                            | color tint                                                                                                                                                  |
+| `.negate(options?)`                       | invert colors                                                                                                                                               |
+| `.opacity(value)`                         | 0–100, applied via composite                                                                                                                                |
+| `.trim(options?)`                         | trim borders                                                                                                                                                |
+| `.watermark(image, options?)`             | overlay one watermark — two positional args (`image` accepts the same inputs as the constructor, plus another `Image`; `options` is `sharp.OverlayOptions`) |
+| `.watermarks([{ image, options }, ...])`  | overlay many — one `WatermarkConfig` object (`{ image, options }`) per entry                                                                                |
+| `.format(format)`                         | output format — `"jpeg"`, `"png"`, `"webp"`, `"avif"`, `"tiff"`, `"heif"`, ...                                                                              |
+| `.quality(1–100)`                         | lossy formats only (`jpeg` / `webp` / `avif` / `tiff` / `heif`); ignored otherwise                                                                          |
+| `.apply(options)`                         | apply many transforms in one call, in a fixed canonical order                                                                                               |
 
 `apply(options)` accepts an `ImageTransformOptions` object — every transform above as a key. Useful when transforms come from config or a request payload.
 
@@ -82,10 +82,10 @@ Every method returns `this` so calls chain. Transforms are descriptors; nothing 
 Each of these fires the pipeline exactly once and returns the result. Subsequent calls run the pipeline again (operations aren't memoised).
 
 ```ts
-await image.save("./output.webp");          // write to disk; returns the absolute path
-const buffer = await image.toBuffer();      // → Buffer
-const base64 = await image.toBase64();      // → "iVBORw0KGgo..."
-const dataUrl = await image.toDataUrl();    // → "data:image/webp;base64,..."
+await image.save("./output.webp"); // write to disk; returns the absolute path
+const buffer = await image.toBuffer(); // → Buffer
+const base64 = await image.toBase64(); // → "iVBORw0KGgo..."
+const dataUrl = await image.toDataUrl(); // → "data:image/webp;base64,..."
 ```
 
 ## Common patterns

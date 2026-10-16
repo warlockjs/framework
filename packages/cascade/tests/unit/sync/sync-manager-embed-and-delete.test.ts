@@ -36,21 +36,29 @@ describe("SyncManager — unsetOnDelete on many-relations", () => {
   const options = { currentDepth: 0, syncChain: [] };
 
   it("$pulls the deleted element by id instead of $unset-ing the array", () => {
-    const instruction = manager().buildDeleteInstruction(7, {
-      ...base,
-      targetField: "tags",
-      isMany: true,
-    }, options);
+    const instruction = manager().buildDeleteInstruction(
+      7,
+      {
+        ...base,
+        targetField: "tags",
+        isMany: true,
+      },
+      options,
+    );
 
     expect(instruction.update).toEqual({ $pull: { tags: { id: 7 } } });
   });
 
   it("still $unsets a single embedded object", () => {
-    const instruction = manager().buildDeleteInstruction(7, {
-      ...base,
-      targetField: "category",
-      isMany: false,
-    }, options);
+    const instruction = manager().buildDeleteInstruction(
+      7,
+      {
+        ...base,
+        targetField: "category",
+        isMany: false,
+      },
+      options,
+    );
 
     expect(instruction.update).toEqual({ $unset: { category: 1 } });
   });

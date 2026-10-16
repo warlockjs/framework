@@ -169,7 +169,13 @@ export type MetadataInput = Omit<MetadataOutput, "title"> & { readonly title?: M
 // Primitives first: a branded string such as `string & {}` (used for open
 // unions like `openGraph.type`) must stay a string, not become a mapped object.
 type DeepReadonlyMetadataValue<Value> = Value extends
-  string | number | boolean | bigint | symbol | null | undefined
+  | string
+  | number
+  | boolean
+  | bigint
+  | symbol
+  | null
+  | undefined
   ? Value
   : Value extends readonly (infer Item)[]
     ? readonly DeepReadonlyMetadataValue<Item>[]
@@ -310,4 +316,5 @@ export type TwitterKeysAreExact = [
  * threw a `TypeError` that replaced the loader's real error.
  */
 export type PageMetadata<TLoader extends LoaderFunction | undefined = undefined> =
-  MetadataInput | ((context: MetadataContext<LoaderData<TLoader>>) => MetadataInput);
+  | MetadataInput
+  | ((context: MetadataContext<LoaderData<TLoader>>) => MetadataInput);

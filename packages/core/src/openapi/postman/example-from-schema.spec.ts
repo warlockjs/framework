@@ -31,7 +31,9 @@ describe("exampleFromSchema", () => {
   });
 
   it("prefers explicit example, const, default and enum values, in that order", () => {
-    expect(exampleFromSchema({ type: "string", example: "e", const: "c", default: "d", enum: ["x"] })).toBe("e");
+    expect(
+      exampleFromSchema({ type: "string", example: "e", const: "c", default: "d", enum: ["x"] }),
+    ).toBe("e");
     expect(exampleFromSchema({ type: "string", const: "c", default: "d", enum: ["x"] })).toBe("c");
     expect(exampleFromSchema({ type: "string", default: "d", enum: ["x"] })).toBe("d");
     expect(exampleFromSchema({ enum: ["admin", "member"] })).toBe("admin");
@@ -61,7 +63,9 @@ describe("exampleFromSchema", () => {
   it("resolves $ref against components", () => {
     const components = { Name: { type: "string", format: "email" } };
 
-    expect(exampleFromSchema({ $ref: "#/components/schemas/Name" }, components)).toBe("user@example.com");
+    expect(exampleFromSchema({ $ref: "#/components/schemas/Name" }, components)).toBe(
+      "user@example.com",
+    );
     expect(exampleFromSchema({ $ref: "#/components/schemas/Missing" }, components)).toBeNull();
   });
 
@@ -88,7 +92,10 @@ describe("exampleFromSchema", () => {
       Point: { type: "object", properties: { x: { type: "number" } } },
       Line: {
         type: "object",
-        properties: { from: { $ref: "#/components/schemas/Point" }, to: { $ref: "#/components/schemas/Point" } },
+        properties: {
+          from: { $ref: "#/components/schemas/Point" },
+          to: { $ref: "#/components/schemas/Point" },
+        },
       },
     };
 
@@ -100,7 +107,9 @@ describe("exampleFromSchema", () => {
 
   it("takes the non-null branch of a nullable union", () => {
     expect(exampleFromSchema({ type: ["integer", "null"] })).toBe(0);
-    expect(exampleFromSchema({ type: ["null", "string"], format: "email" })).toBe("user@example.com");
+    expect(exampleFromSchema({ type: ["null", "string"], format: "email" })).toBe(
+      "user@example.com",
+    );
     expect(exampleFromSchema({ anyOf: [{ type: "null" }, { type: "boolean" }] })).toBe(false);
     expect(exampleFromSchema({ oneOf: [{ type: "string" }, { type: "null" }] })).toBe("string");
   });
@@ -117,7 +126,10 @@ describe("exampleFromSchema", () => {
   });
 
   it("is deterministic", () => {
-    const schema = { type: "object", properties: { when: { type: "string", format: "date-time" } } };
+    const schema = {
+      type: "object",
+      properties: { when: { type: "string", format: "date-time" } },
+    };
 
     expect(exampleFromSchema(schema)).toEqual(exampleFromSchema(schema));
   });

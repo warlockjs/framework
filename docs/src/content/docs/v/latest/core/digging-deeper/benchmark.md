@@ -6,7 +6,7 @@ sidebar:
   label: "Benchmark"
 ---
 
-Performance problems hide in the operations you're not looking at. The endpoint that's *usually* fast but spikes to a second twice a day. The cache lookup that's instant in dev but takes 300ms when the cache is cold. The third-party API that started getting slower last week and nobody noticed.
+Performance problems hide in the operations you're not looking at. The endpoint that's _usually_ fast but spikes to a second twice a day. The cache lookup that's instant in dev but takes 300ms when the cache is cold. The third-party API that started getting slower last week and nobody noticed.
 
 `measure()` is the wrapper that surfaces all of it. Time any function, classify the result against latency thresholds you pick, fire hooks for downstream observability, and optionally accumulate percentile stats over time. Around the same primitive, two optional helpers — `BenchmarkProfiler` for p50/p95/p99, `BenchmarkSnapshots` for raw error captures.
 
@@ -47,11 +47,11 @@ import { measure } from "@warlock.js/core";
 const result = await measure("db.findUser", () => db.users.findOne({ id }));
 
 if (result.success) {
-  console.log(result.value);    // the user object
-  console.log(result.latency);  // 42
-  console.log(result.state);    // "good"
+  console.log(result.value); // the user object
+  console.log(result.latency); // 42
+  console.log(result.state); // "good"
 } else {
-  console.error(result.error);  // the thrown error
+  console.error(result.error); // the thrown error
 }
 ```
 
@@ -103,11 +103,7 @@ The two boundary fields are exactly `excellent` (the upper bound for "excellent"
 Most apps set this globally rather than per-call. Drop it in `src/config/benchmark.ts` and `measure()` reads it as the fallback — only override per-call when one operation has wildly different expectations.
 
 ```ts title="src/config/benchmark.ts"
-import {
-  BenchmarkProfiler,
-  ConsoleChannel,
-  type BenchmarkConfigurations,
-} from "@warlock.js/core";
+import { BenchmarkProfiler, ConsoleChannel, type BenchmarkConfigurations } from "@warlock.js/core";
 
 const benchmarkConfig: BenchmarkConfigurations = {
   enabled: true,
@@ -126,7 +122,7 @@ Every `measure()` call now defaults to those thresholds and records into that pr
 
 ## Hooks
 
-Three optional callbacks. `onComplete` *or* `onError` fires (never both), then `onFinish` always fires:
+Three optional callbacks. `onComplete` _or_ `onError` fires (never both), then `onFinish` always fires:
 
 ```ts
 await measure("send-email", () => mailer.send(payload), {
@@ -165,7 +161,7 @@ await measure("create-user", () => createUser(input), {
 });
 ```
 
-> **Why not `instanceof ValidationError`?** seal exposes no runtime `ValidationError` class — `v.validate(...)` *returns* `{ isValid, errors }` rather than throwing, so importing one and using `instanceof` would crash with a `TypeError`. Match on a real exported error class instead (the HTTP error classes from `@warlock.js/core` all extend `HttpError`), or do a property check like `(error as { name?: string })?.name !== "ValidationError"` when you only have a plain thrown error to discriminate on.
+> **Why not `instanceof ValidationError`?** seal exposes no runtime `ValidationError` class — `v.validate(...)` _returns_ `{ isValid, errors }` rather than throwing, so importing one and using `instanceof` would crash with a `TypeError`. Match on a real exported error class instead (the HTTP error classes from `@warlock.js/core` all extend `HttpError`), or do a property check like `(error as { name?: string })?.name !== "ValidationError"` when you only have a plain thrown error to discriminate on.
 
 The default is `true` — every thrown error becomes a `BenchmarkErrorResult`. Override only when you have a specific class of errors that should bypass benchmarking entirely.
 
@@ -195,17 +191,16 @@ For high-volume operations where per-call hooks are too noisy, you want p50/p95/
 import { BenchmarkProfiler, ConsoleChannel, measure } from "@warlock.js/core";
 
 const profiler = new BenchmarkProfiler({
-  maxSamples: 1000,                  // ring buffer per operation name
-  channels: [new ConsoleChannel()],  // where stats go on flush()
-  flushEvery: 60_000,                // auto-flush every minute
+  maxSamples: 1000, // ring buffer per operation name
+  channels: [new ConsoleChannel()], // where stats go on flush()
+  flushEvery: 60_000, // auto-flush every minute
 });
 
 for (let i = 0; i < 100; i++) {
-  await measure(
-    "db.findUser",
-    () => db.users.findOne({ id: i }),
-    { profiler, latencyRange: { excellent: 50, poor: 300 } },
-  );
+  await measure("db.findUser", () => db.users.findOne({ id: i }), {
+    profiler,
+    latencyRange: { excellent: 50, poor: 300 },
+  });
 }
 
 const stats = profiler.stats("db.findUser");
@@ -226,8 +221,8 @@ The profiler keeps two pieces of state you may need to manage explicitly:
 ```ts
 const profiler = new BenchmarkProfiler({ flushEvery: 60_000 });
 // ... use it ...
-profiler.reset();    // wipe ring buffers, keep lifetime counters
-profiler.dispose();  // clear the flush interval so the process can exit
+profiler.reset(); // wipe ring buffers, keep lifetime counters
+profiler.dispose(); // clear the flush interval so the process can exit
 ```
 
 ### `BenchmarkChannel` — where stats go
@@ -265,14 +260,14 @@ Pass it via `channels: [new DatadogChannel()]` and every `flush()` (manual or au
 
 ## `BenchmarkSnapshots` — raw captures
 
-Percentiles tell you "we got slow." Snapshots tell you "*here are the exact requests* that got slow." For post-mortem work:
+Percentiles tell you "we got slow." Snapshots tell you "_here are the exact requests_ that got slow." For post-mortem work:
 
 ```ts
 import { BenchmarkSnapshots, measure } from "@warlock.js/core";
 
 const snapshots = new BenchmarkSnapshots({
   maxSnapshots: 100,
-  capture: "error",   // "error" (default, safe) | "value" | "all"
+  capture: "error", // "error" (default, safe) | "value" | "all"
 });
 
 await measure("payment.charge", () => stripe.charge(payload), {
@@ -285,11 +280,11 @@ const failed = snapshots.getSnapshots("payment.charge");
 
 The `capture` setting matters:
 
-| `capture` | What's stored                                                                  | Memory profile          |
-| --------- | ------------------------------------------------------------------------------ | ----------------------- |
-| `"error"` | Only `BenchmarkErrorResult`. The default.                                      | Bounded by failure rate. Safe in production. |
-| `"value"` | Only `BenchmarkSuccessResult<T>` with the full return value.                   | Stores T in memory.     |
-| `"all"`   | Both.                                                                          | Stores T in memory.     |
+| `capture` | What's stored                                                | Memory profile                               |
+| --------- | ------------------------------------------------------------ | -------------------------------------------- |
+| `"error"` | Only `BenchmarkErrorResult`. The default.                    | Bounded by failure rate. Safe in production. |
+| `"value"` | Only `BenchmarkSuccessResult<T>` with the full return value. | Stores T in memory.                          |
+| `"all"`   | Both.                                                        | Stores T in memory.                          |
 
 `"value"` and `"all"` keep references to whatever `fn()` returned. If that's a database row, that's fine. If it's a streamed response or a large buffer, you've now kept it in memory until the ring buffer evicts it. Default to `"error"` unless you have a specific reason.
 
@@ -335,7 +330,7 @@ if (!result.success) {
 return response.successCreate({ order: result.value });
 ```
 
-The result is your error-handling fork *and* your latency tracker. Less ceremony than a try/catch.
+The result is your error-handling fork _and_ your latency tracker. Less ceremony than a try/catch.
 
 ### Time an external HTTP call
 
@@ -386,7 +381,7 @@ If you've wired a profiler in `src/config/benchmark.ts`, you can drop into a deb
 
 - **Name collisions aggregate.** Two calls to `measure("foo", …)` from different code paths share one profiler bucket. Make `name` specific — `"db.findUser"`, not `"db.query"` — so percentiles actually mean something.
 - **`measure()` doesn't propagate AbortSignal.** If `fn` is cancellable, plumb the signal through yourself. The wrapper only times.
-- **Don't `measure()` synchronous trivia.** A `Math.round` call isn't worth the microsecond of overhead and the noise in your stats. Reserve `measure()` for things that *can* be slow — I/O, computation that scales with input size, anything crossing a network or disk.
+- **Don't `measure()` synchronous trivia.** A `Math.round` call isn't worth the microsecond of overhead and the noise in your stats. Reserve `measure()` for things that _can_ be slow — I/O, computation that scales with input size, anything crossing a network or disk.
 - **Snapshots with `"value"` retain references.** If `value` holds a streamed body or a large buffer, you've kept it in memory until eviction. Default `capture: "error"` keeps you safe.
 - **`shouldBenchmarkError` re-throws.** Make sure the caller is ready for an unwrapped throw on that error class. The discriminated-result contract holds for every other path; this one carves out an exception.
 - **Hook errors crash the call.** Throwing inside `onComplete`/`onError`/`onFinish` propagates up and discards the measurement. Keep hooks side-effect-only; wrap risky work in their own try/catch.

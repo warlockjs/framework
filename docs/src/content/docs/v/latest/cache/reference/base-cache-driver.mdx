@@ -6,6 +6,7 @@ slug: v/latest/cache/base-cache-driver
 Abstract class that all built-in drivers extend. Provides key parsing, TTL handling, logging, and default implementations of optional methods.
 
 ## Example: Extending BaseCacheDriver
+
 ```ts
 import { BaseCacheDriver } from "@warlock.js/cache";
 import type { CacheDriver } from "@warlock.js/cache";
@@ -15,28 +16,29 @@ interface MyOptions {
   ttl?: number;
 }
 
-export class MyDriver extends BaseCacheDriver<MyDriver, MyOptions> 
-  implements CacheDriver<MyDriver, MyOptions> {
-  
+export class MyDriver
+  extends BaseCacheDriver<MyDriver, MyOptions>
+  implements CacheDriver<MyDriver, MyOptions>
+{
   public name = "myDriver";
-  
+
   // Implement required abstract methods
   public async removeNamespace(namespace: string) {
     // Implementation
   }
-  
+
   public async set(key: string | GenericObject, value: any, ttl?: number) {
     // Implementation
   }
-  
+
   public async get(key: string | GenericObject) {
     // Implementation
   }
-  
+
   public async remove(key: string | GenericObject) {
     // Implementation
   }
-  
+
   public async flush() {
     // Implementation
   }
@@ -101,15 +103,15 @@ Internally composed of three pure helpers exported from [`utils`](/v/latest/cach
 
 The merge is centralized so that **every shape that lacks a caller-provided TTL respects the driver-level default**:
 
-| Caller passes… | Resolved `ttl` |
-|---|---|
-| nothing (`set(k, v)`) | `this.ttl` (driver default, or `Infinity`) |
-| `undefined` / `null` explicitly | same as above |
-| `{ tags: [...] }` (options without `ttl`) | same as above |
-| `{ ttl: "1h" }` | `3600` |
-| `60` (positional seconds) | `60` |
-| `"30m"` (positional duration) | `1800` |
-| `{ expiresAt: futureDate }` | computed seconds-until-deadline |
+| Caller passes…                            | Resolved `ttl`                             |
+| ----------------------------------------- | ------------------------------------------ |
+| nothing (`set(k, v)`)                     | `this.ttl` (driver default, or `Infinity`) |
+| `undefined` / `null` explicitly           | same as above                              |
+| `{ tags: [...] }` (options without `ttl`) | same as above                              |
+| `{ ttl: "1h" }`                           | `3600`                                     |
+| `60` (positional seconds)                 | `60`                                       |
+| `"30m"` (positional duration)             | `1800`                                     |
+| `{ expiresAt: futureDate }`               | computed seconds-until-deadline            |
 
 **Every driver's `set()` method should call this as its first step.** It's the single normalization point for the v2 options surface — anything that accepts `CacheTtl | CacheSetOptions` in the interface funnels through here.
 
@@ -137,6 +139,7 @@ public async set(
 The base class also ships a default `similar()` that throws `CacheUnsupportedError` — drivers that support similarity override it with a real impl. See [Make Your Own Driver](/v/latest/cache/make-your-own-cache-driver/) for the full extension surface.
 
 Throws [`CacheConfigurationError`](/v/latest/cache/errors/#cacheconfigurationerror) on:
+
 - Both `ttl` and `expiresAt` supplied together.
 - `expiresAt` in the past.
 - Invalid duration string like `"2 weeksandahalf"`.
@@ -158,6 +161,7 @@ getExpiresAt(ttl?: number): number | undefined;
 ```
 
 Example:
+
 ```ts
 const expiresAt = driver.getExpiresAt(3600); // 1 hour from now
 ```
@@ -171,6 +175,7 @@ prepareDataForStorage(data: any, ttl?: number): CacheData;
 ```
 
 Example:
+
 ```ts
 const wrapped = driver.prepareDataForStorage({ status: "active" }, 3600);
 // { data: { status: "active" }, ttl: 3600, expiresAt: 1713399600000 }
@@ -185,6 +190,7 @@ parseCachedData(key: string | GenericObject, data: CacheData): any;
 ```
 
 Example:
+
 ```ts
 const value = driver.parseCachedData("product:123", storedData);
 // Returns value if not expired, null and logs error if expired
@@ -202,27 +208,28 @@ log(operation: string, key?: string): void;
 
 Supported operations:
 
-| Operation | Level | Usage |
-|-----------|-------|-------|
-| `fetching` | info | Before getting a value |
-| `fetched` | success | After successfully retrieving a value |
-| `caching` | info | Before setting a value |
-| `cached` | success | After successfully storing a value |
-| `removing` | info | Before removing a key |
-| `removed` | success | After successfully removing a key |
-| `clearing` | info | Before clearing a namespace |
-| `cleared` | success | After successfully clearing a namespace |
-| `flushing` | info | Before flushing all cache |
-| `flushed` | success | After successfully flushing |
-| `expired` | error | When a cached entry has expired |
-| `notFound` | error | When a key is not found |
-| `connecting` | info | Before connecting to backend |
-| `connected` | success | After successful backend connection |
-| `disconnecting` | info | Before disconnecting from backend |
-| `disconnected` | success | After successful disconnection |
-| `error` | error | For operation failures |
+| Operation       | Level   | Usage                                   |
+| --------------- | ------- | --------------------------------------- |
+| `fetching`      | info    | Before getting a value                  |
+| `fetched`       | success | After successfully retrieving a value   |
+| `caching`       | info    | Before setting a value                  |
+| `cached`        | success | After successfully storing a value      |
+| `removing`      | info    | Before removing a key                   |
+| `removed`       | success | After successfully removing a key       |
+| `clearing`      | info    | Before clearing a namespace             |
+| `cleared`       | success | After successfully clearing a namespace |
+| `flushing`      | info    | Before flushing all cache               |
+| `flushed`       | success | After successfully flushing             |
+| `expired`       | error   | When a cached entry has expired         |
+| `notFound`      | error   | When a key is not found                 |
+| `connecting`    | info    | Before connecting to backend            |
+| `connected`     | success | After successful backend connection     |
+| `disconnecting` | info    | Before disconnecting from backend       |
+| `disconnected`  | success | After successful disconnection          |
+| `error`         | error   | For operation failures                  |
 
 Example:
+
 ```ts
 this.log("caching", "user:123");
 // Logs: "redis: caching user:123"
@@ -234,9 +241,9 @@ The base driver automatically wraps cached values with metadata:
 
 ```ts
 interface CacheData {
-  data: any;           // The actual cached value
-  ttl?: number;        // Time to live in seconds
-  expiresAt?: number;  // Millisecond timestamp when entry expires
+  data: any; // The actual cached value
+  ttl?: number; // Time to live in seconds
+  expiresAt?: number; // Millisecond timestamp when entry expires
 }
 ```
 
@@ -254,60 +261,61 @@ interface MyCacheOptions {
   storage: Map<string, any>;
 }
 
-export class MyCacheDriver extends BaseCacheDriver<MyCacheDriver, MyCacheOptions> 
-  implements CacheDriver<MyCacheDriver, MyCacheOptions> {
-  
+export class MyCacheDriver
+  extends BaseCacheDriver<MyCacheDriver, MyCacheOptions>
+  implements CacheDriver<MyCacheDriver, MyCacheOptions>
+{
   public name = "myCache";
-  
+
   public async removeNamespace(namespace: string) {
     namespace = await this.parseKey(namespace);
-    
+
     this.log("clearing", namespace);
-    
+
     // Remove all keys starting with namespace
     for (const key of this.options.storage.keys()) {
       if (key.startsWith(namespace)) {
         this.options.storage.delete(key);
       }
     }
-    
+
     this.log("cleared", namespace);
   }
-  
+
   public async set(key: string | GenericObject, value: any, ttl?: number) {
     key = await this.parseKey(key);
-    
+
     this.log("caching", key);
-    
+
     const data = this.prepareDataForStorage(value, ttl);
     this.options.storage.set(key, data);
-    
+
     this.log("cached", key);
     return value;
   }
-  
+
   public async get(key: string | GenericObject) {
     key = await this.parseKey(key);
-    
+
     this.log("fetching", key);
-    
+
     const data = this.options.storage.get(key);
     if (!data) {
       this.log("notFound", key);
       return null;
     }
-    
+
     return this.parseCachedData(key, data);
   }
-  
+
   public async remove(key: string | GenericObject) {
     key = await this.parseKey(key);
-    
+
     this.log("removing", key);
     this.options.storage.delete(key);
     this.log("removed", key);
   }
-  
+
   public async flush() {
     this.log("flushing");
     this.options.storage.clear();

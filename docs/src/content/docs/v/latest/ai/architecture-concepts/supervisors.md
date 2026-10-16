@@ -6,7 +6,7 @@ sidebar:
   label: "Supervisors"
 ---
 
-A supervisor takes one input, picks which intent(s) handle it, runs them, optionally evaluates the result, and either terminates or iterates. It's the right tool when the *shape* of the work depends on the input — when an agent has too many tools and a workflow has too many branches.
+A supervisor takes one input, picks which intent(s) handle it, runs them, optionally evaluates the result, and either terminates or iterates. It's the right tool when the _shape_ of the work depends on the input — when an agent has too many tools and a workflow has too many branches.
 
 This page is the mental model. For the API surface see [Run supervisor](/v/latest/ai/orchestration/run-supervisor/).
 
@@ -20,11 +20,11 @@ This page is the mental model. For the API surface see [Run supervisor](/v/lates
 
 A supervisor has three places it can decide what to run, and they compose:
 
-| Surface | Fires when | Iterations |
-| --- | --- | --- |
-| `classifier` | iter-0 prelude — picks the FIRST intent | exactly 1 |
-| `router` | iter 0+ without classifier; iter 1+ with classifier | 1..maxIterations |
-| `route` | same as router but deterministic (callback, no LLM) | 1..maxIterations |
+| Surface      | Fires when                                          | Iterations       |
+| ------------ | --------------------------------------------------- | ---------------- |
+| `classifier` | iter-0 prelude — picks the FIRST intent             | exactly 1        |
+| `router`     | iter 0+ without classifier; iter 1+ with classifier | 1..maxIterations |
+| `route`      | same as router but deterministic (callback, no LLM) | 1..maxIterations |
 
 `router` and `route` are mutually exclusive — pick one. `classifier` composes with either. Classifier alone (no router/route) terminates after the first intent.
 
@@ -61,9 +61,9 @@ type RefundOutput = { category: string; order?: { id: string }; reply: string };
 const supervisor = ai.supervisor<RefundOutput>({
   output: outputSchema,
   intents: {
-    classify:    { agent: classifierAgent, output: v.object({ category: v.string() }) },
+    classify: { agent: classifierAgent, output: v.object({ category: v.string() }) },
     lookupOrder: { run: async (ctx) => ({ order: await ordersRepo.find(extractId(ctx.input)) }) },
-    compose:     { agent: replyAgent, output: v.object({ reply: v.string() }) },
+    compose: { agent: replyAgent, output: v.object({ reply: v.string() }) },
   },
   router: routerAgent,
   evaluate: (ctx) => (ctx.state.reply ? { satisfied: true } : undefined),
@@ -124,7 +124,7 @@ The bag resets every iteration. Use `finalizeArtifacts` for concat / dedupe acro
 When the first specialist takes 5+ seconds and the user feels it, an `ack` fires on iteration 0 in parallel with the routing decision:
 
 ```ts
-ack: (ctx) => ({ ack: "Got it, one moment..." })
+ack: (ctx) => ({ ack: "Got it, one moment..." });
 ```
 
 There's a same-model trap: if `ack` uses the same model + provider as the router, the ack often takes longer than the routing decision. The callback form sidesteps it for the common case.
@@ -148,8 +148,8 @@ Token-level streaming requires the dispatched agents to be streamed — the supe
 Same model as workflows. After every iteration the supervisor checkpoints. On resume:
 
 ```ts
-await supervisor.execute(message, { runId: "support-7" });   // fresh
-await supervisor.resume("support-7");                         // after crash
+await supervisor.execute(message, { runId: "support-7" }); // fresh
+await supervisor.resume("support-7"); // after crash
 ```
 
 Signature drift detection throws `SupervisorDriftError` on shape mismatch. `force: true` bypasses for safe edits.

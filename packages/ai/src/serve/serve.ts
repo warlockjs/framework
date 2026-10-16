@@ -205,7 +205,8 @@ function readJsonBody(
       settled = true;
       cleanup();
       try {
-        const value: unknown = chunks.length === 0 ? {} : JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        const value: unknown =
+          chunks.length === 0 ? {} : JSON.parse(Buffer.concat(chunks).toString("utf8"));
         if (value === null || Array.isArray(value) || typeof value !== "object") {
           throw new TypeError("JSON request body must be an object");
         }

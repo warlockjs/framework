@@ -9,7 +9,9 @@ type transformCallbackOptions = {
   isNew: boolean;
 };
 
-export type ModelTransformCallback = (options: transformCallbackOptions) => unknown | Promise<unknown>;
+export type ModelTransformCallback = (
+  options: transformCallbackOptions,
+) => unknown | Promise<unknown>;
 
 /**
  * Transfer value before saving it into the database

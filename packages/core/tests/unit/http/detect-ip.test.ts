@@ -25,10 +25,7 @@ vi.setConfig({ testTimeout: 120_000 });
  * re-implementation of the chain walk. `X-Real-IP` is not part of Fastify's
  * resolution and is asserted against a seeded `baseRequest`.
  */
-function makeRequest(seed: {
-  headers?: Record<string, string>;
-  ip?: string;
-}): Request {
+function makeRequest(seed: { headers?: Record<string, string>; ip?: string }): Request {
   const request = new Request();
 
   request.setRequest({
@@ -188,9 +185,7 @@ describe("Request.detectIp", () => {
 
   describe("with a numeric http.trustProxy", () => {
     it("rejects the unsupported hop-count shape before the server starts", async () => {
-      await expect(
-        detectIpThroughServer({ trustProxy: 1 }),
-      ).rejects.toThrowError(
+      await expect(detectIpThroughServer({ trustProxy: 1 })).rejects.toThrowError(
         /Invalid http\.trustProxy configuration.*received number/,
       );
     });

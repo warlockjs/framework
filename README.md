@@ -87,40 +87,40 @@ All packages live in [`packages/`](packages) and are published to npm at the sam
 
 ### Foundation
 
-| Package | Description |
-| --- | --- |
-| [`@warlock.js/core`](packages/core) | The server framework: application lifecycle, HTTP router, controllers, responses, resources, repositories, CLI, mail, storage and security helpers. |
-| [`@warlock.js/web`](packages/web) | Server-rendered React pages on Vite: loaders, layouts, streaming, hydration, navigation, forms and page actions. |
-| [`@warlock.js/cascade`](packages/cascade) | Model-first ORM for MongoDB and PostgreSQL: models, relations, migrations, transactions, soft deletes and vector search. |
-| [`@warlock.js/seal`](packages/seal) | Schema validation for request input and data, Standard Schema compatible. |
-| [`@warlock.js/context`](packages/context) | Request-scoped context on `AsyncLocalStorage`, shared by the whole family. |
-| [`create-warlock`](packages/create-warlock) | The project scaffolder: an interactive wizard and a non-interactive CLI. |
+| Package                                     | Description                                                                                                                                         |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@warlock.js/core`](packages/core)         | The server framework: application lifecycle, HTTP router, controllers, responses, resources, repositories, CLI, mail, storage and security helpers. |
+| [`@warlock.js/web`](packages/web)           | Server-rendered React pages on Vite: loaders, layouts, streaming, hydration, navigation, forms and page actions.                                    |
+| [`@warlock.js/cascade`](packages/cascade)   | Model-first ORM for MongoDB and PostgreSQL: models, relations, migrations, transactions, soft deletes and vector search.                            |
+| [`@warlock.js/seal`](packages/seal)         | Schema validation for request input and data, Standard Schema compatible.                                                                           |
+| [`@warlock.js/context`](packages/context)   | Request-scoped context on `AsyncLocalStorage`, shared by the whole family.                                                                          |
+| [`create-warlock`](packages/create-warlock) | The project scaffolder: an interactive wizard and a non-interactive CLI.                                                                            |
 
 ### Application services
 
-| Package | Description |
-| --- | --- |
-| [`@warlock.js/auth`](packages/auth) | JWT authentication: login, logout and refresh with token rotation, an auth middleware, multiple user types and brute-force throttling. |
-| [`@warlock.js/access`](packages/access) | Authorization with RBAC and ABAC: policies, gates, roles and permissions. |
-| [`@warlock.js/cache`](packages/cache) | A cache manager with memory, Redis and custom drivers. |
-| [`@warlock.js/queue`](packages/queue) | Durable background jobs on BullMQ and Redis: retries, backoff, progress and graceful shutdown. |
-| [`@warlock.js/scheduler`](packages/scheduler) | Run jobs on a schedule. |
-| [`@warlock.js/notifications`](packages/notifications) | Multi-channel notifications: mail, in-app and custom channels with preferences, rate limits and idempotency. |
-| [`@warlock.js/herald`](packages/herald) | A message bus over RabbitMQ, Kafka and more. |
-| [`@warlock.js/logger`](packages/logger) | Structured logging for messages and errors. |
-| [`@warlock.js/fs`](packages/fs) | Filesystem primitives. |
-| [`@warlock.js/sitemap`](packages/sitemap) | A framework-blind sitemap builder with zero runtime dependencies. |
-| [`@warlock.js/devtools`](packages/devtools) | A development-only dashboard at `/__warlock`: request timeline, queries with `EXPLAIN`, N+1 detection, dev mailbox, logs and the route map. |
+| Package                                               | Description                                                                                                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@warlock.js/auth`](packages/auth)                   | JWT authentication: login, logout and refresh with token rotation, an auth middleware, multiple user types and brute-force throttling.      |
+| [`@warlock.js/access`](packages/access)               | Authorization with RBAC and ABAC: policies, gates, roles and permissions.                                                                   |
+| [`@warlock.js/cache`](packages/cache)                 | A cache manager with memory, Redis and custom drivers.                                                                                      |
+| [`@warlock.js/queue`](packages/queue)                 | Durable background jobs on BullMQ and Redis: retries, backoff, progress and graceful shutdown.                                              |
+| [`@warlock.js/scheduler`](packages/scheduler)         | Run jobs on a schedule.                                                                                                                     |
+| [`@warlock.js/notifications`](packages/notifications) | Multi-channel notifications: mail, in-app and custom channels with preferences, rate limits and idempotency.                                |
+| [`@warlock.js/herald`](packages/herald)               | A message bus over RabbitMQ, Kafka and more.                                                                                                |
+| [`@warlock.js/logger`](packages/logger)               | Structured logging for messages and errors.                                                                                                 |
+| [`@warlock.js/fs`](packages/fs)                       | Filesystem primitives.                                                                                                                      |
+| [`@warlock.js/sitemap`](packages/sitemap)             | A framework-blind sitemap builder with zero runtime dependencies.                                                                           |
+| [`@warlock.js/devtools`](packages/devtools)           | A development-only dashboard at `/__warlock`: request timeline, queries with `EXPLAIN`, N+1 detection, dev mailbox, logs and the route map. |
 
 ### AI
 
-| Package | Description |
-| --- | --- |
-| [`@warlock.js/ai`](packages/ai) | Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RAG, memory and guardrails. |
-| [`@warlock.js/ai-tools`](packages/ai-tools) | Ready-made agent tools (web search, fetch, HTTP, calculator, date-time) and an MCP client and server. |
-| [`@warlock.js/ai-workspace`](packages/ai-workspace) | A policy-jailed filesystem and shell workspace for agents. |
-| [`@warlock.js/ai-panoptic`](packages/ai-panoptic) | Observability: a collector and exporters for traces of model and tool calls. |
-| [`@warlock.js/ai-live`](packages/ai-live) | Realtime duplex voice sessions and text-to-video. |
+| Package                                             | Description                                                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [`@warlock.js/ai`](packages/ai)                     | Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RAG, memory and guardrails.           |
+| [`@warlock.js/ai-tools`](packages/ai-tools)         | Ready-made agent tools (web search, fetch, HTTP, calculator, date-time) and an MCP client and server. |
+| [`@warlock.js/ai-workspace`](packages/ai-workspace) | A policy-jailed filesystem and shell workspace for agents.                                            |
+| [`@warlock.js/ai-panoptic`](packages/ai-panoptic)   | Observability: a collector and exporters for traces of model and tool calls.                          |
+| [`@warlock.js/ai-live`](packages/ai-live)           | Realtime duplex voice sessions and text-to-video.                                                     |
 
 **Model providers:** [`ai-openai`](packages/ai-openai) · [`ai-anthropic`](packages/ai-anthropic) · [`ai-google`](packages/ai-google) · [`ai-bedrock`](packages/ai-bedrock) · [`ai-mistral`](packages/ai-mistral) · [`ai-groq`](packages/ai-groq) · [`ai-deepseek`](packages/ai-deepseek) · [`ai-xai`](packages/ai-xai) · [`ai-ollama`](packages/ai-ollama)
 
@@ -157,18 +157,18 @@ Packages resolve each other from this repository, never from npm, so a change in
 
 ### Common tasks
 
-| Task | Command |
-| --- | --- |
-| Typecheck every package | `pnpm typecheck` |
-| Test every package | `pnpm test` |
-| Work on one package | `pnpm --filter @warlock.js/core test` |
-| Typecheck one package | `pnpm --filter @warlock.js/core typecheck` |
-| Run the docs site locally | `pnpm docs:dev` |
-| Build the docs site | `pnpm docs:build` |
-| Check formatting | `pnpm format:check` |
-| Check shared correctness rules | `pnpm lint:oxlint` |
-| List packages a branch affects | `pnpm ci:affected --base origin/main` |
-| Move the whole family to a new version | `pnpm release:version 5.30.0` |
+| Task                                   | Command                                    |
+| -------------------------------------- | ------------------------------------------ |
+| Typecheck every package                | `pnpm typecheck`                           |
+| Test every package                     | `pnpm test`                                |
+| Work on one package                    | `pnpm --filter @warlock.js/core test`      |
+| Typecheck one package                  | `pnpm --filter @warlock.js/core typecheck` |
+| Run the docs site locally              | `pnpm docs:dev`                            |
+| Build the docs site                    | `pnpm docs:build`                          |
+| Check formatting                       | `pnpm format:check`                        |
+| Check shared correctness rules         | `pnpm lint:oxlint`                         |
+| List packages a branch affects         | `pnpm ci:affected --base origin/main`      |
+| Move the whole family to a new version | `pnpm release:version 5.30.0`              |
 
 Some suites need services: `queue` and `notifications` expect Redis on port `6390`, and parts of `cascade` and `auth` start databases through Testcontainers, which needs Docker.
 
@@ -185,12 +185,12 @@ array allocation and typed `createElement` children follow the repository's
 existing conventions. Exceptions to safety checks belong on the specific line
 with a reason; do not disable a safety rule to conceal a failing check.
 
-| Workflow | Runs on | What it does |
-| --- | --- | --- |
-| [`ci.yml`](.github/workflows/ci.yml) | pull requests, `main`, nightly | Typechecks and tests every package a change affects, plus its dependents; all packages on `main` and nightly. |
-| [`docs.yml`](.github/workflows/docs.yml) | changes to `docs/` or package changelogs | Builds the site and deploys it to GitHub Pages from `main`. |
-| [`create-warlock.yml`](.github/workflows/create-warlock.yml) | changes to the scaffolder, nightly | Checks the scaffolder on its own install and typechecks a freshly scaffolded app against the published framework. |
-| [`release.yml`](.github/workflows/release.yml) | manual | Gates, publishes and confirms the whole family at one version. |
+| Workflow                                                     | Runs on                                  | What it does                                                                                                      |
+| ------------------------------------------------------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [`ci.yml`](.github/workflows/ci.yml)                         | pull requests, `main`, nightly           | Typechecks and tests every package a change affects, plus its dependents; all packages on `main` and nightly.     |
+| [`docs.yml`](.github/workflows/docs.yml)                     | changes to `docs/` or package changelogs | Builds the site and deploys it to GitHub Pages from `main`.                                                       |
+| [`create-warlock.yml`](.github/workflows/create-warlock.yml) | changes to the scaffolder, nightly       | Checks the scaffolder on its own install and typechecks a freshly scaffolded app against the published framework. |
+| [`release.yml`](.github/workflows/release.yml)               | manual                                   | Gates, publishes and confirms the whole family at one version.                                                    |
 
 ## Releasing
 
@@ -223,3 +223,16 @@ CI must pass before a change is merged. Report security issues privately to the 
 ## License
 
 [MIT](LICENSE) © Hassan Zohdy
+
+Repository formatting uses the pinned Oxfmt tool and one root `.oxfmtrc.json`:
+run `pnpm format` to write changes and `pnpm format:check` to check them. CI checks
+the same configuration. Generated references, locks, build output and archived
+material are excluded; regenerate their source projections instead. Scaffolder
+source uses this root formatter even in its standalone test job. Generated app
+templates retain their own toolchain checks.
+
+`format:prettier` and `format:prettier:check` preserve the previous commands during
+migration. Oxfmt's optional import sorting differs from TypeScript-aware
+`prettier-plugin-organize-imports`: it does not provide the same unused-import
+removal/type-aware organization. Repository sorting is disabled for this pass;
+ESLint and the generated-template Prettier gate remain available.

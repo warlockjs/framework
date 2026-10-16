@@ -51,5 +51,5 @@
   // written today has no reason to start with an allowance, and the ratchet
   // only moves down.
   "sitemap": 0,
-  "web": 169
+  "web": 169,
 }

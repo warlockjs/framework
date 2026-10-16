@@ -33,16 +33,10 @@ export interface WorkspaceOps {
    * window; `read.maxBytes` bounds the UTF-8 bytes of the returned
    * `content` (see {@link ReadFileResult}).
    */
-  readFile(
-    path: string,
-    opts?: { offset?: number; limit?: number },
-  ): Promise<ReadFileResult>;
+  readFile(path: string, opts?: { offset?: number; limit?: number }): Promise<ReadFileResult>;
 
   /** Atomically write full content to a jailed path, returning size + hash. */
-  writeFile(
-    path: string,
-    content: string,
-  ): Promise<{ hash: string; bytesWritten: number }>;
+  writeFile(path: string, content: string): Promise<{ hash: string; bytesWritten: number }>;
 
   /**
    * Apply an exact-string edit under the read-before-edit guard:
@@ -60,10 +54,7 @@ export interface WorkspaceOps {
   exec(command: string, opts?: ExecOptions): Promise<RunShellResult>;
 
   /** Search jailed file contents for a regex pattern. */
-  grep(
-    pattern: string,
-    opts?: { glob?: string; ignoreCase?: boolean },
-  ): Promise<GrepResult>;
+  grep(pattern: string, opts?: { glob?: string; ignoreCase?: boolean }): Promise<GrepResult>;
 
   /** Resolve a glob to matching workspace-relative paths within the jail. */
   glob(pattern: string): Promise<string[]>;

@@ -22,7 +22,10 @@ function isInside(root, candidate) {
   const resolvedCandidate = realPath(candidate);
   const relative = path.relative(resolvedRoot, resolvedCandidate);
 
-  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+  return (
+    relative === "" ||
+    (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative))
+  );
 }
 
 function realPath(candidate) {
@@ -31,7 +34,7 @@ function realPath(candidate) {
 
 function packageRoots(root) {
   const roots = [];
-  const walk = directory => {
+  const walk = (directory) => {
     if (existsSync(path.join(directory, "package.json"))) roots.push(directory);
 
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -47,7 +50,7 @@ function packageRoots(root) {
 
 function filesInPackage(packageRoot, predicate) {
   const files = [];
-  const walk = directory => {
+  const walk = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) {
         if (
@@ -84,8 +87,8 @@ function aliasTargets(source, configFile) {
   }
 
   return targets
-    .filter(target => target.startsWith(".") || path.isAbsolute(target))
-    .map(target => path.resolve(path.dirname(configFile), target));
+    .filter((target) => target.startsWith(".") || path.isAbsolute(target))
+    .map((target) => path.resolve(path.dirname(configFile), target));
 }
 
 function addViolation(violations, packageRoot, configFile, target, kind) {
@@ -104,7 +107,7 @@ export function findResolverBoundaryViolations(root) {
   const violations = [];
 
   for (const packageRoot of packageRoots(root)) {
-    for (const configFile of filesInPackage(packageRoot, name => name === "tsconfig.json")) {
+    for (const configFile of filesInPackage(packageRoot, (name) => name === "tsconfig.json")) {
       const config = JSON.parse(stripJsonComments(readFileSync(configFile, "utf8")));
       const compilerOptions = config.compilerOptions ?? {};
       const baseUrl = path.resolve(path.dirname(configFile), compilerOptions.baseUrl ?? ".");
@@ -122,7 +125,7 @@ export function findResolverBoundaryViolations(root) {
       }
     }
 
-    for (const configFile of filesInPackage(packageRoot, name => CONFIG_FILE.test(name))) {
+    for (const configFile of filesInPackage(packageRoot, (name) => CONFIG_FILE.test(name))) {
       const source = readFileSync(configFile, "utf8");
       for (const target of aliasTargets(source, configFile)) {
         addViolation(violations, packageRoot, configFile, target, "Vite/Vitest alias");

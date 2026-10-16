@@ -39,9 +39,9 @@ const { data, error, usage, report } = await ai.video({
 });
 
 if (error) {
-  console.warn(error.code);   // typed AIError — NEVER thrown
+  console.warn(error.code); // typed AIError — NEVER thrown
 } else {
-  const clip = data.video;    // GeneratedVideo (discriminated)
+  const clip = data.video; // GeneratedVideo (discriminated)
   if (clip.type === "url") download(clip.url);
   else save(Buffer.from(clip.base64, "base64"), clip.mediaType);
 }
@@ -59,17 +59,17 @@ type GeneratedVideo =
 
 // VideoParams (provider-neutral) — the model is the only required field beyond prompt:
 await ai.video({
-  model,                 // VideoModelContract from an adapter's video({ name })
+  model, // VideoModelContract from an adapter's video({ name })
   prompt: "...",
-  durationSeconds: 8,    // requested clip length
+  durationSeconds: 8, // requested clip length
   aspectRatio: "9:16",
-  resolution: "1080p",   // hint
+  resolution: "1080p", // hint
   negativePrompt: "blurry, watermark",
-  signal,                // AbortSignal → status "cancelled"
-  observe: collector,    // route the report to an Observer (panoptic), like agents
+  signal, // AbortSignal → status "cancelled"
+  observe: collector, // route the report to an Observer (panoptic), like agents
   sessionId: "campaign-42",
-  name: "hero-clip",     // report node name (defaults to "video")
-  options: { seed: 7 },  // provider-specific escape hatch, forwarded verbatim
+  name: "hero-clip", // report node name (defaults to "video")
+  options: { seed: 7 }, // provider-specific escape hatch, forwarded verbatim
 });
 ```
 
@@ -97,13 +97,23 @@ const session = await ai.realtime({
 session.sendAudio(micChunkBase64, "audio/pcm"); // push mic audio upstream
 session.sendText("Please hold for one moment."); // or a text turn
 
-for await (const event of session.events()) {    // duplex output
+for await (const event of session.events()) {
+  // duplex output
   switch (event.type) {
-    case "audio":      speaker.write(event.base64); break;
-    case "transcript": if (event.final) log(event.role, event.text); break;
-    case "tool-call":  await handleTool(event.name, event.input); break;
-    case "error":      console.warn(event.error.code); break;
-    case "done":       break;
+    case "audio":
+      speaker.write(event.base64);
+      break;
+    case "transcript":
+      if (event.final) log(event.role, event.text);
+      break;
+    case "tool-call":
+      await handleTool(event.name, event.input);
+      break;
+    case "error":
+      console.warn(event.error.code);
+      break;
+    case "done":
+      break;
   }
 }
 
@@ -124,13 +134,19 @@ type RealtimeEvent =
   | { type: "audio"; base64: string; mediaType: string }
   | { type: "transcript"; role: "user" | "assistant"; text: string; final: boolean }
   | { type: "tool-call"; id: string; name: string; input: unknown }
-  | { type: "error"; error: AIError }   // typed, non-fatal
-  | { type: "done" };                   // server ended the session
+  | { type: "error"; error: AIError } // typed, non-fatal
+  | { type: "done" }; // server ended the session
 
 type RealtimeReport = {
-  runId: string; rootRunId: string; type: "realtime";
-  name: string; status: "completed" | "failed" | "cancelled";
-  startedAt: string; endedAt: string; duration: number; sessionId?: string;
+  runId: string;
+  rootRunId: string;
+  type: "realtime";
+  name: string;
+  status: "completed" | "failed" | "cancelled";
+  startedAt: string;
+  endedAt: string;
+  duration: number;
+  sessionId?: string;
 };
 ```
 
@@ -187,7 +203,9 @@ const transport = new MockRealtimeTransport([
 ]);
 const session = await ai.realtime({ transport, model: "mock-realtime" });
 session.sendText("hello");
-for await (const e of session.events()) { /* ... */ }
+for await (const e of session.events()) {
+  /* ... */
+}
 const report = await session.close();
 // transport.lastConnection.sentText → ["hello"]
 // transport.connectConfigs[0] → { model: "mock-realtime", ... }

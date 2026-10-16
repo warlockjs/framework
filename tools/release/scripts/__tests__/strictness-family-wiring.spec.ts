@@ -72,9 +72,7 @@ function overStrictnessResult(): StrictnessGateRunResult {
  * to run BEFORE any member is built or packed, the OVER-case tests below
  * never need the build/pack stubs to do anything but exist.
  */
-function fixture(
-  overrides: Partial<ReleaseFamilyDependencies> = {},
-): {
+function fixture(overrides: Partial<ReleaseFamilyDependencies> = {}): {
   dependencies: ReleaseFamilyDependencies;
   commands: CommandRequest[];
   handoffs: ReleaseHandoff[];
@@ -88,7 +86,7 @@ function fixture(
     removeDirectory: async () => undefined,
     removeFile: async () => undefined,
     writeTextFile: async () => undefined,
-    readTextFile: async filePath => {
+    readTextFile: async (filePath) => {
       if (path.basename(filePath) === "package.json") {
         return JSON.stringify({ scripts: { test: "vitest run", typecheck: "tsc --noEmit" } });
       }
@@ -102,15 +100,23 @@ function fixture(
       command: "resolved-node",
       args: [memberRoot, scriptCommand],
     }),
-    runCommand: async request => {
+    runCommand: async (request) => {
       commands.push(request);
-      if (request.command === "git" && request.args[0] === "rev-parse" && request.args[1] === "--abbrev-ref") {
+      if (
+        request.command === "git" &&
+        request.args[0] === "rev-parse" &&
+        request.args[1] === "--abbrev-ref"
+      ) {
         return { stdout: "main\n", stderr: "" };
       }
       if (request.command === "git" && request.args[0] === "rev-parse") {
         return { stdout: `${"a".repeat(40)}\n`, stderr: "" };
       }
-      if (request.command === "git" && request.args[0] === "ls-remote" && request.args[1] === "--symref") {
+      if (
+        request.command === "git" &&
+        request.args[0] === "ls-remote" &&
+        request.args[1] === "--symref"
+      ) {
         return { stdout: `ref: refs/heads/main\tHEAD\n${"a".repeat(40)}\tHEAD\n`, stderr: "" };
       }
       if (request.args[1] === "pack") {
@@ -143,10 +149,10 @@ function fixture(
       ],
     }),
     sha256File: async () => HASH,
-    runLocalGate: async input => ({
+    runLocalGate: async (input) => ({
       kind: "warlock-family-publish-handoff",
       candidateVersion: input.candidateVersion,
-      artifacts: input.artifacts.map(artifact => ({ ...artifact })),
+      artifacts: input.artifacts.map((artifact) => ({ ...artifact })),
       verifiedAt: "2026-09-02T12:00:00.000Z",
     }),
     writeHandoff: async (_filePath, handoff) => {
@@ -164,7 +170,7 @@ describe("release-family gate mode -- strictness ratchet wiring", () => {
 
     await assert.rejects(
       runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
-      error => {
+      (error) => {
         const message = (error as Error).message;
         assert.match(message, /strictness/i);
         assert.match(message, /web/);
@@ -175,7 +181,7 @@ describe("release-family gate mode -- strictness ratchet wiring", () => {
     );
     assert.equal(control.handoffs.length, 0);
     // Refused before any member was ever built or packed.
-    const builds = control.commands.filter(command => command.args[1] === "build");
+    const builds = control.commands.filter((command) => command.args[1] === "build");
     assert.equal(builds.length, 0, "must refuse before building any tarball");
   });
 
@@ -209,7 +215,12 @@ describe("release-family gate mode -- strictness ratchet wiring", () => {
     });
 
     const handoff = (await runReleaseFamily(
-      { mode: "gate", version: VERSION, ...FULL_MATRIX, skipStrictness: "web is mid-refactor, tracked in card 9f" },
+      {
+        mode: "gate",
+        version: VERSION,
+        ...FULL_MATRIX,
+        skipStrictness: "web is mid-refactor, tracked in card 9f",
+      },
       control.dependencies,
     )) as ReleaseHandoff;
 
@@ -227,7 +238,8 @@ describe("release-family gate mode -- strictness ratchet wiring", () => {
       /--skip-strictness requires a reason/,
     );
     assert.throws(
-      () => parseArguments(["gate", "--version", VERSION, "--matrix", "none", "--skip-strictness="]),
+      () =>
+        parseArguments(["gate", "--version", VERSION, "--matrix", "none", "--skip-strictness="]),
       /--skip-strictness requires a reason/,
     );
   });

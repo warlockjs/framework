@@ -31,7 +31,9 @@ describe("container.get", () => {
     try {
       container.get("does-not-exist");
     } catch (error) {
-      expect((error as Error).message).toMatch(/^Container key "does-not-exist" is not registered\./);
+      expect((error as Error).message).toMatch(
+        /^Container key "does-not-exist" is not registered\./,
+      );
       expect((error as Error).message).not.toMatch(/separate copies/i);
     }
   });

@@ -40,11 +40,15 @@ describe("evaluateSystemPrompt", () => {
   it("a per-run instructions override wins over config.instructions", async () => {
     const model = new MockModel("judge", [{ content: verdict(0.7, "matches override rule") }]);
 
-    await evaluateSystemPrompt("Prompt text", { model, instructions: "config rule" }, "override rule");
+    await evaluateSystemPrompt(
+      "Prompt text",
+      { model, instructions: "config rule" },
+      "override rule",
+    );
 
     const sent = model.callHistory
-      .flatMap(call => call.messages)
-      .map(message => JSON.stringify(message.content))
+      .flatMap((call) => call.messages)
+      .map((message) => JSON.stringify(message.content))
       .join("\n");
     expect(sent).toContain("override rule");
     expect(sent).not.toContain("config rule");
@@ -56,8 +60,8 @@ describe("evaluateSystemPrompt", () => {
     await evaluateSystemPrompt("Prompt text", { model, instructions: "config rule" });
 
     const sent = model.callHistory
-      .flatMap(call => call.messages)
-      .map(message => JSON.stringify(message.content))
+      .flatMap((call) => call.messages)
+      .map((message) => JSON.stringify(message.content))
       .join("\n");
     expect(sent).toContain("config rule");
   });
@@ -68,8 +72,8 @@ describe("evaluateSystemPrompt", () => {
     await evaluateSystemPrompt("Prompt text", { model, instructions: "config rule" }, "   ");
 
     const sent = model.callHistory
-      .flatMap(call => call.messages)
-      .map(message => JSON.stringify(message.content))
+      .flatMap((call) => call.messages)
+      .map((message) => JSON.stringify(message.content))
       .join("\n");
     expect(sent).toContain("config rule");
   });

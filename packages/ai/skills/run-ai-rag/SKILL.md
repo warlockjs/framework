@@ -17,13 +17,13 @@ import { OpenAISDK } from "@warlock.js/ai-openai";
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 const kb = ai.rag({
-  name: "docs",                                            // default "rag"
+  name: "docs", // default "rag"
   embedder: openai.embedder({ name: "text-embedding-3-small" }), // REQUIRED
-  store: new MemoryCacheDriver(),                          // or ai.config({ defaultStore })
-  namespace: "ai.rag.docs",                                // default `ai.rag.<name>`
-  chunk: { type: "markdown", size: 800, overlap: 120 },    // index() defaults
-  reranker: ai.rag.keywordReranker(),                      // OFF by default (cosine-only)
-  retrieve: { topK: 4, threshold: 0.5 },                   // default retrieval knobs
+  store: new MemoryCacheDriver(), // or ai.config({ defaultStore })
+  namespace: "ai.rag.docs", // default `ai.rag.<name>`
+  chunk: { type: "markdown", size: 800, overlap: 120 }, // index() defaults
+  reranker: ai.rag.keywordReranker(), // OFF by default (cosine-only)
+  retrieve: { topK: 4, threshold: 0.5 }, // default retrieval knobs
 });
 ```
 
@@ -81,9 +81,9 @@ Every chunk records its exact `[start, end)` span in the original text, so a `Ci
 
 ```ts
 const { query, chunks } = await kb.retrieve("how do I configure caching?", {
-  topK: 4,          // returned AFTER reranking. default 5
-  threshold: 0.5,   // cosine floor at the store stage. default 0.5
-  candidates: 16,   // pool fetched before rerank. default topK * 4 (clamped >= topK)
+  topK: 4, // returned AFTER reranking. default 5
+  threshold: 0.5, // cosine floor at the store stage. default 0.5
+  candidates: 16, // pool fetched before rerank. default topK * 4 (clamped >= topK)
   tags: ["frontend"], // restrict to chunks whose source had one of these tags
 });
 

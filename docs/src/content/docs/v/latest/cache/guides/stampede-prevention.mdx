@@ -76,18 +76,15 @@ The `remember()` pattern with a product catalog fetch is the most common real-wo
 import { cache, CACHE_FOR } from "@warlock.js/cache";
 
 async function getProductsByCategory(categoryId: number) {
-  return await cache.remember(
-    `products.category.${categoryId}`,
-    CACHE_FOR.HALF_HOUR,
-    async () => {
-      // Only ONE request executes this, even with 1000 concurrent requests
-      return await db.products.findByCategory(categoryId);
-    }
-  );
+  return await cache.remember(`products.category.${categoryId}`, CACHE_FOR.HALF_HOUR, async () => {
+    // Only ONE request executes this, even with 1000 concurrent requests
+    return await db.products.findByCategory(categoryId);
+  });
 }
 ```
 
 When multiple requests arrive for the same cache key simultaneously:
+
 1. First request: Cache miss → Creates lock → Fetches products → Caches result
 2. Concurrent requests: Cache miss → See existing lock → Wait → Get cached result
 
@@ -121,14 +118,10 @@ async function getCategory(categoryId: number) {
 ```ts
 async function getProductsByCategory(categoryId: number) {
   const tagged = cache.tags([`category.${categoryId}`, "products"]);
-  
-  return await tagged.remember(
-    `products.category.${categoryId}`,
-    CACHE_FOR.HALF_HOUR,
-    async () => {
-      return await db.products.findByCategory(categoryId);
-    }
-  );
+
+  return await tagged.remember(`products.category.${categoryId}`, CACHE_FOR.HALF_HOUR, async () => {
+    return await db.products.findByCategory(categoryId);
+  });
 }
 
 // Invalidate when category is updated
@@ -169,7 +162,7 @@ async function getDataWithDistributedLock(key: string) {
 
   if (!acquired.wasSet) {
     // Another process is computing — wait briefly then re-check cache
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     return cache.get(key);
   }
 
@@ -207,6 +200,7 @@ async function getData() {
 ```
 
 If the callback throws an error:
+
 - The lock is automatically released
 - Waiting requests will see the error
 - The cache is not updated
@@ -256,4 +250,3 @@ If the callback throws an error:
 - **Distributed systems?** Use Redis driver with `set(k, v, { onConflict: "create", ttl })` for true cross-process locking
 
 See [Best Practices](/v/latest/cache/best-practices/) for more caching patterns.
-

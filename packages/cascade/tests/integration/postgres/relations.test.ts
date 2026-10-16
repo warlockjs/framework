@@ -241,7 +241,9 @@ describe("Postgres integration — relations", () => {
 
       const loaded = await RelUser.with("posts", (query) => {
         query.where("title", "keep");
-      }).where("id", user.id).first();
+      })
+        .where("id", user.id)
+        .first();
 
       const posts = loaded!.getRelation<RelPost[]>("posts")!;
       expect(posts).toHaveLength(1);
@@ -477,7 +479,9 @@ describe("Postgres integration — relations", () => {
       await RelPost.create({ title: "p", rel_user_id: user.id });
       await RelProfile.create({ bio: "b", rel_user_id: user.id });
 
-      const loaded = await RelUser.with({ posts: true, profile: true }).where("id", user.id).first();
+      const loaded = await RelUser.with({ posts: true, profile: true })
+        .where("id", user.id)
+        .first();
 
       expect(loaded!.getRelation<RelPost[]>("posts")).toHaveLength(1);
       expect(loaded!.getRelation<RelProfile>("profile")).toBeInstanceOf(RelProfile);

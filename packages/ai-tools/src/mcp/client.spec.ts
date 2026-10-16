@@ -84,7 +84,11 @@ function scriptedTransport(tools: McpToolDescriptor[]): FakeTransport {
   transport.on("initialize", (request) => ({
     jsonrpc: "2.0",
     id: request.id,
-    result: { protocolVersion: "2025-06-18", capabilities: {}, serverInfo: { name: "fake", version: "1.0" } },
+    result: {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      serverInfo: { name: "fake", version: "1.0" },
+    },
   }));
 
   transport.on("tools/list", (request) => ({
@@ -106,7 +110,11 @@ function textCallResult(request: JsonRpcRequest, text: string, isError = false):
 const ECHO_TOOL: McpToolDescriptor = {
   name: "echo",
   description: "Echo the input back",
-  inputSchema: { type: "object", properties: { message: { type: "string" } }, required: ["message"] },
+  inputSchema: {
+    type: "object",
+    properties: { message: { type: "string" } },
+    required: ["message"],
+  },
 };
 
 const ADD_TOOL: McpToolDescriptor = { name: "add", description: "Add two numbers" };
@@ -292,7 +300,10 @@ describe("mcp() client — tools/call execution", () => {
     const controller = new AbortController();
     controller.abort();
 
-    const { error } = await contract.invoke({ message: "hi" }, { artifacts: {}, signal: controller.signal });
+    const { error } = await contract.invoke(
+      { message: "hi" },
+      { artifacts: {}, signal: controller.signal },
+    );
 
     expect(error).toBeDefined();
   });

@@ -67,9 +67,7 @@ function makeContext(): DoctorBootContext {
 }
 
 const importCheck = async () => {
-  const module = await import(
-    "../../../../src/cli/commands/doctor/checks/release-hygiene.check"
-  );
+  const module = await import("../../../../src/cli/commands/doctor/checks/release-hygiene.check");
 
   return module.releaseHygieneCheck;
 };

@@ -93,7 +93,8 @@ type Bundle = PageDataBundle & {
  */
 function hasCommittedResponseHeaders(response: Response): boolean {
   const raw = response.baseResponse?.raw as
-    { headersSent?: boolean; writableEnded?: boolean } | undefined;
+    | { headersSent?: boolean; writableEnded?: boolean }
+    | undefined;
 
   return raw?.headersSent === true || raw?.writableEnded === true;
 }

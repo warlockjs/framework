@@ -31,8 +31,8 @@ export class User extends Model<Infer<typeof userSchema>> {
 
 // Write — validated against the schema, returns a hydrated instance
 const user = await User.create({ name: "Ada Lovelace", email: "ada@example.com" });
-user.id;             // the new ID Cascade assigned
-user.get("status");  // "active" — the schema default applied
+user.id; // the new ID Cascade assigned
+user.get("status"); // "active" — the schema default applied
 
 // Read it back — the model is the query entry point, no repository to import
 const found = await User.find(user.id);

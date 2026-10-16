@@ -10,10 +10,7 @@ Every `Job` has its own timezone. The default is **UTC** — `.daily().at("09:00
 ## Basic usage
 
 ```ts
-job("morning-digest", sendDailyDigest)
-  .daily()
-  .at("08:00")
-  .inTimezone("America/New_York");   // 8 AM ET, not 8 AM UTC
+job("morning-digest", sendDailyDigest).daily().at("08:00").inTimezone("America/New_York"); // 8 AM ET, not 8 AM UTC
 ```
 
 `.inTimezone()` is chainable — typically placed after the time/day methods.
@@ -30,9 +27,9 @@ Same logical task, three regions:
 import { scheduler, job } from "@warlock.js/scheduler";
 
 const regions = [
-  { name: "us-east",   tz: "America/New_York" },
-  { name: "eu-west",   tz: "Europe/Berlin" },
-  { name: "asia",      tz: "Asia/Tokyo" },
+  { name: "us-east", tz: "America/New_York" },
+  { name: "eu-west", tz: "Europe/Berlin" },
+  { name: "asia", tz: "Asia/Tokyo" },
 ];
 
 for (const { name, tz } of regions) {
@@ -40,7 +37,7 @@ for (const { name, tz } of regions) {
     job(`morning-report-${name}`, () => sendReport(name))
       .daily()
       .at("09:00")
-      .inTimezone(tz)
+      .inTimezone(tz),
   );
 }
 
@@ -55,20 +52,20 @@ dayjs handles transitions correctly. A daily 09:00 job in `America/New_York` shi
 
 ## Common IANA strings
 
-| Region              | TZ string                   |
-| ------------------- | --------------------------- |
-| UTC                 | `UTC`                       |
-| US Eastern          | `America/New_York`          |
-| US Central          | `America/Chicago`           |
-| US Mountain         | `America/Denver`            |
-| US Pacific          | `America/Los_Angeles`       |
-| UK / Ireland        | `Europe/London`             |
-| Central Europe      | `Europe/Berlin`             |
-| Eastern Europe      | `Europe/Kyiv`               |
-| India               | `Asia/Kolkata`              |
-| Japan               | `Asia/Tokyo`                |
-| Australia (Sydney)  | `Australia/Sydney`          |
-| Egypt               | `Africa/Cairo`              |
+| Region             | TZ string             |
+| ------------------ | --------------------- |
+| UTC                | `UTC`                 |
+| US Eastern         | `America/New_York`    |
+| US Central         | `America/Chicago`     |
+| US Mountain        | `America/Denver`      |
+| US Pacific         | `America/Los_Angeles` |
+| UK / Ireland       | `Europe/London`       |
+| Central Europe     | `Europe/Berlin`       |
+| Eastern Europe     | `Europe/Kyiv`         |
+| India              | `Asia/Kolkata`        |
+| Japan              | `Asia/Tokyo`          |
+| Australia (Sydney) | `Australia/Sydney`    |
+| Egypt              | `Africa/Cairo`        |
 
 Full list: [IANA Time Zone Database](https://www.iana.org/time-zones).
 
@@ -77,17 +74,11 @@ Full list: [IANA Time Zone Database](https://www.iana.org/time-zones).
 The timezone applies to every interpretation of "now" and every constraint:
 
 ```ts
-job("monday-standup", task)
-  .weekly()
-  .on("monday")
-  .at("09:00")
-  .inTimezone("Europe/Berlin");
+job("monday-standup", task).weekly().on("monday").at("09:00").inTimezone("Europe/Berlin");
 // "Monday in Berlin local time" + "09:00 Berlin local time"
 // — automatically shifts CET ↔ CEST as DST changes.
 
-job("nightly-cron", task)
-  .cron("0 3 * * *")
-  .inTimezone("Asia/Tokyo");
+job("nightly-cron", task).cron("0 3 * * *").inTimezone("Asia/Tokyo");
 // "0 3 * * *" interpreted in Tokyo local time → 03:00 JST = 18:00 UTC.
 ```
 

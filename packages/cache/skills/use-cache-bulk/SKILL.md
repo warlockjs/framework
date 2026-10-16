@@ -30,11 +30,14 @@ const missingIds = ids.filter((_, index) => users[index] === null);
 ## Write many — `setMany(items, ttl?)`
 
 ```ts
-await cache.setMany({
-  "user.1": alice,
-  "user.2": bob,
-  "user.3": carol,
-}, 3600); // optional TTL (seconds) applied to every entry
+await cache.setMany(
+  {
+    "user.1": alice,
+    "user.2": bob,
+    "user.3": carol,
+  },
+  3600,
+); // optional TTL (seconds) applied to every entry
 ```
 
 - Keys are the object keys; values are the object values.

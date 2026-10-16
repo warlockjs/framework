@@ -24,7 +24,11 @@ const DEFAULT_IO_MAX_CHARS = 500;
  * formatSpanIO(toolSpan, 1);
  * // ['    in:  {"query":"specialty coffee demand"}', '    out: {"results":[…]}']
  */
-export function formatSpanIO(span: TraceSpan, depth = 0, maxChars = DEFAULT_IO_MAX_CHARS): string[] {
+export function formatSpanIO(
+  span: TraceSpan,
+  depth = 0,
+  maxChars = DEFAULT_IO_MAX_CHARS,
+): string[] {
   const lines: string[] = [];
   const indent = "  ".repeat(depth + 1);
 

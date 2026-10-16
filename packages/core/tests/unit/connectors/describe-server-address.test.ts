@@ -69,8 +69,9 @@ describe("describeServerAddress — the reverse-proxy case is not a defect", () 
   });
 
   it("does not warn on a non-loopback host even when the port differs", () => {
-    expect(describeServerAddress("http://0.0.0.0:3000", "https://example.com:8443").warning)
-      .toBeUndefined();
+    expect(
+      describeServerAddress("http://0.0.0.0:3000", "https://example.com:8443").warning,
+    ).toBeUndefined();
   });
 });
 
@@ -199,14 +200,9 @@ describe("wildcardBind survives Fastify normalising a 0.0.0.0 bind to loopback",
     expect(report.wildcardBind).toBe(true);
   });
 
-  it.each(["0.0.0.0", "::", "[::]", " 0.0.0.0 "])(
-    "treats %j as a wildcard host",
-    (host) => {
-      expect(describeServerAddress("http://127.0.0.1:2030", undefined, host).wildcardBind).toBe(
-        true,
-      );
-    },
-  );
+  it.each(["0.0.0.0", "::", "[::]", " 0.0.0.0 "])("treats %j as a wildcard host", (host) => {
+    expect(describeServerAddress("http://127.0.0.1:2030", undefined, host).wildcardBind).toBe(true);
+  });
 
   it.each(["localhost", "127.0.0.1", "::1", "192.168.1.10", undefined])(
     "does not invent a wildcard for %j",

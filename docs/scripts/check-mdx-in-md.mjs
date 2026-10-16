@@ -78,7 +78,9 @@ function stripFencedCode(/** @type {string} */ text) {
 function stripInlineCode(/** @type {string} */ text) {
   return text
     .split("\n")
-    .map((/** @type {string} */ line) => line.replace(/`[^`\n]*`/g, (/** @type {string} */ m) => " ".repeat(m.length)))
+    .map((/** @type {string} */ line) =>
+      line.replace(/`[^`\n]*`/g, (/** @type {string} */ m) => " ".repeat(m.length)),
+    )
     .join("\n");
 }
 

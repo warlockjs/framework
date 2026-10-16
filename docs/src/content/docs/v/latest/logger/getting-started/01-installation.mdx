@@ -45,21 +45,9 @@ That's the core value: one consistent call shape, colored and searchable, ready 
 `@warlock.js/logger` is a standalone package — no framework required. Install it in any Node project and configure it in plain TypeScript or JavaScript.
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm install @warlock.js/logger
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm add @warlock.js/logger
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm add @warlock.js/logger
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm install @warlock.js/logger ```</TabItem>
+  <TabItem label="yarn">```bash pnpm add @warlock.js/logger ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm add @warlock.js/logger ```</TabItem>
 </Tabs>
 
 Inside a Warlock app, the logger ships transitively through `@warlock.js/core` — you can import `log` directly without adding the dependency yourself.
@@ -82,10 +70,10 @@ Three lines of setup, then you're logging. Adding channels is covered in full on
 
 The package exports one default instance and one class:
 
-| Export | What it is | When to use |
-| --- | --- | --- |
-| `log` | The `Logger` singleton — pre-instantiated with zero channels | Almost always. Day-to-day logging *and* configuration go through it. |
-| `Logger` | The class | When you need an isolated logger (libraries, sandboxes, parallel test suites). |
+| Export   | What it is                                                   | When to use                                                                    |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `log`    | The `Logger` singleton — pre-instantiated with zero channels | Almost always. Day-to-day logging _and_ configuration go through it.           |
+| `Logger` | The class                                                    | When you need an isolated logger (libraries, sandboxes, parallel test suites). |
 
 ```ts
 import { log, Logger, ConsoleLog, FileLog } from "@warlock.js/logger";

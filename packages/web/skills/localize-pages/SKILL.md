@@ -105,11 +105,11 @@ const web: WebConfigurations = {
 export default web;
 ```
 
-| `strategy` | URLs | Locale comes from |
-| --- | --- | --- |
-| `"none"` (**default** when the key is absent) | `/about` for every locale | `?locale=`, then the browser preference cookie, then the legacy server cookie, then a `locale` request header, else `app.localeCode` |
-| `"prefix"` | `/en/about`, `/ar/about`; a bare `/about` answers a 302 to the resolved locale's URL | the path prefix |
-| `"prefix-except-default"` | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about` | the path prefix, else the default locale |
+| `strategy`                                    | URLs                                                                                 | Locale comes from                                                                                                                    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `"none"` (**default** when the key is absent) | `/about` for every locale                                                            | `?locale=`, then the browser preference cookie, then the legacy server cookie, then a `locale` request header, else `app.localeCode` |
+| `"prefix"`                                    | `/en/about`, `/ar/about`; a bare `/about` answers a 302 to the resolved locale's URL | the path prefix                                                                                                                      |
+| `"prefix-except-default"`                     | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about`        | the path prefix, else the default locale                                                                                             |
 
 Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. A multi-site app can override the strategy per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
 

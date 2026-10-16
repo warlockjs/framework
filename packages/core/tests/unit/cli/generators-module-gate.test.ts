@@ -22,8 +22,7 @@ const data = (args: string[], options: CommandActionData["options"] = {}): Comma
   options,
 });
 
-const appPathFor = (...segments: string[]) =>
-  path.join(process.cwd(), "src", "app", ...segments);
+const appPathFor = (...segments: string[]) => path.join(process.cwd(), "src", "app", ...segments);
 
 class ProcessExitError extends Error {
   public constructor(public readonly code?: number) {

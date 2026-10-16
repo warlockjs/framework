@@ -54,9 +54,7 @@ function readCache(): string[] | undefined {
     const raw = readFileSync(cacheFilePath(), "utf8");
     const parsed = JSON.parse(raw) as { targets?: unknown };
     if (Array.isArray(parsed.targets)) {
-      return parsed.targets.filter(
-        (value): value is string => typeof value === "string",
-      );
+      return parsed.targets.filter((value): value is string => typeof value === "string");
     }
     return undefined;
   } catch {
@@ -88,17 +86,14 @@ function writeCache(targets: string[]): void {
 function readInstalledPackageTargets(): string[] | undefined {
   for (const base of [process.cwd(), tmpdir()]) {
     try {
-      const packageJsonPath = requireFromHere.resolve(
-        "@mongez/agent-kit/package.json",
-        { paths: [base] },
-      );
+      const packageJsonPath = requireFromHere.resolve("@mongez/agent-kit/package.json", {
+        paths: [base],
+      });
       const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
         agentKit?: { targets?: unknown };
       };
       if (Array.isArray(pkg.agentKit?.targets)) {
-        return pkg.agentKit.targets.filter(
-          (value): value is string => typeof value === "string",
-        );
+        return pkg.agentKit.targets.filter((value): value is string => typeof value === "string");
       }
     } catch {
       // Not installed, or no metadata — try the next base / fall through.
@@ -121,9 +116,7 @@ export async function fetchRemoteAgentKitTargets(
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!indexResponse.ok) {
-    throw new Error(
-      `agent-kit llms.txt request failed with HTTP ${indexResponse.status}`,
-    );
+    throw new Error(`agent-kit llms.txt request failed with HTTP ${indexResponse.status}`);
   }
   const index = await indexResponse.text();
 
@@ -152,9 +145,7 @@ export async function fetchRemoteAgentKitTargets(
   }
 
   if (targets.size === 0) {
-    throw new Error(
-      "Could not parse any agent-kit target names out of the fetched docs",
-    );
+    throw new Error("Could not parse any agent-kit target names out of the fetched docs");
   }
 
   return [...targets];
@@ -178,10 +169,7 @@ export async function getValidAgentKitTargets(
   }
 
   try {
-    const fetched = await withTimeout(
-      fetchRemoteAgentKitTargets(fetchImpl, timeoutMs),
-      timeoutMs,
-    );
+    const fetched = await withTimeout(fetchRemoteAgentKitTargets(fetchImpl, timeoutMs), timeoutMs);
     writeCache(fetched);
     return dedupe([...BUILTIN_AGENT_KIT_TARGETS, ...fetched]);
   } catch (fetchError) {
@@ -205,10 +193,7 @@ export async function getValidAgentKitTargets(
  * simply never settles. Without it "bounded" would be a property of the
  * happy path only.
  */
-export async function withTimeout<T>(
-  work: Promise<T>,
-  timeoutMs: number,
-): Promise<T> {
+export async function withTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   try {
@@ -216,12 +201,7 @@ export async function withTimeout<T>(
       work,
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(
-          () =>
-            reject(
-              new Error(
-                `agent-kit target lookup timed out after ${timeoutMs}ms`,
-              ),
-            ),
+          () => reject(new Error(`agent-kit target lookup timed out after ${timeoutMs}ms`)),
           timeoutMs,
         );
       }),
@@ -248,19 +228,16 @@ export async function resolveAgentTargets(
   requested: string[] | undefined,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string[]> {
-  const targets =
-    requested && requested.length > 0 ? requested : [DEFAULT_AGENT_KIT_TARGET];
+  const targets = requested && requested.length > 0 ? requested : [DEFAULT_AGENT_KIT_TARGET];
 
-  const needsValidation = targets.some(
-    target => !BUILTIN_AGENT_KIT_TARGETS.includes(target),
-  );
+  const needsValidation = targets.some((target) => !BUILTIN_AGENT_KIT_TARGETS.includes(target));
 
   if (!needsValidation) {
     return targets;
   }
 
   const valid = await getValidAgentKitTargets(fetchImpl);
-  const invalid = targets.filter(target => !valid.includes(target));
+  const invalid = targets.filter((target) => !valid.includes(target));
 
   if (invalid.length > 0) {
     throw new Error(

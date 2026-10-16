@@ -38,7 +38,11 @@ describe("OpenAITranscriptionModel", () => {
 
   it("whisper-1 defaults to verbose_json and returns text + duration + segments", async () => {
     const { client, calls } = makeFakeClient({
-      response: { text: "hello world", duration: 12, segments: [{ text: "hello world", start: 0, end: 1 }] },
+      response: {
+        text: "hello world",
+        duration: 12,
+        segments: [{ text: "hello world", start: 0, end: 1 }],
+      },
     });
     const model = new OpenAITranscriptionModel(client, { name: "whisper-1" });
 

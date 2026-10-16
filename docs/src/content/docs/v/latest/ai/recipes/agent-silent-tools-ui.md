@@ -8,11 +8,11 @@ sidebar:
 
 A shopping assistant returns a product carousel. The naive design is: the model calls `search_catalog`, the tool returns a JSON blob of products, that blob round-trips back into the model, and the model re-emits the products as prose or some structured shape your UI then parses. That's a second LLM trip you pay for, plus a lossy reformatting of data you already had in hand.
 
-The better design: the tool writes the carousel *blocks* — exactly the shape your frontend renders — into a **side-channel** that never touches the model, and returns only a tiny summary (`{ total: 5 }`) on the LLM channel so the model can say "I found 5 quiet ACs" without ever seeing or reshaping the product data. That side-channel is `ctx.artifacts`.
+The better design: the tool writes the carousel _blocks_ — exactly the shape your frontend renders — into a **side-channel** that never touches the model, and returns only a tiny summary (`{ total: 5 }`) on the LLM channel so the model can say "I found 5 quiet ACs" without ever seeing or reshaping the product data. That side-channel is `ctx.artifacts`.
 
 This recipe combines two `@warlock.js/ai` features:
 
-- **`ctx.artifacts`** — a mutable bag threaded into every tool's `execute(input, ctx)`. Writes here are captured by the system; they never round-trip through the LLM. The tool's *return value* is what the model sees; `ctx.artifacts` is what your UI consumes.
+- **`ctx.artifacts`** — a mutable bag threaded into every tool's `execute(input, ctx)`. Writes here are captured by the system; they never round-trip through the LLM. The tool's _return value_ is what the model sees; `ctx.artifacts` is what your UI consumes.
 - **`mode: "silent"`** — when every tool call in a generation is silent, the agent loop terminates after dispatch. The prose the model already streamed IS the final reply. No second trip.
 
 ## Setup
@@ -85,10 +85,13 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const shopper = ai.agent({
   name: "shopping-assistant",
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: ai.systemPrompt()
+  systemPrompt: ai
+    .systemPrompt()
     .persona("You are a friendly shopping assistant.")
     .instruction("When the customer asks for products, call search_catalog.")
-    .instruction("Summarize the result in one short sentence. The UI shows the cards — do not list products yourself."),
+    .instruction(
+      "Summarize the result in one short sentence. The UI shows the cards — do not list products yourself.",
+    ),
   tools: [searchCatalogTool],
   maxTrips: 4,
 });
@@ -113,8 +116,8 @@ if (error) {
 
 // `text` is the model's one-line narration; `ctx.artifacts.blocks` is the UI payload.
 return {
-  reply: text,                          // "I found 5 quiet units for you."
-  blocks: ctx.artifacts.blocks ?? [],   // [{ type: "product_card", ... }, ...]
+  reply: text, // "I found 5 quiet units for you."
+  blocks: ctx.artifacts.blocks ?? [], // [{ type: "product_card", ... }, ...]
 };
 ```
 
@@ -128,7 +131,7 @@ When the model's reply does **not** depend on the tool's result at all — e.g. 
 const pinPreferenceTool = ai.tool({
   name: "pin_preference",
   description: "Persist a stated customer preference and surface a confirmation chip.",
-  mode: "silent",                       // result never round-trips to the model
+  mode: "silent", // result never round-trips to the model
   input: v.object({
     key: v.string(),
     value: v.string(),
@@ -143,7 +146,7 @@ const pinPreferenceTool = ai.tool({
       bag.blocks.push({ type: "notice", text: `Saved: ${key} = ${value}` });
     }
 
-    return { ok: true };               // the model never reads this
+    return { ok: true }; // the model never reads this
   },
 });
 ```
@@ -154,12 +157,12 @@ On the OpenAI line (`gpt-4o`, `gpt-4o-mini`), a silent-**only** turn often produ
 
 ## Why feedback vs silent here
 
-| Tool | Mode | Why |
-| --- | --- | --- |
-| `search_catalog` | `feedback` | The model must narrate *something* about the results ("I found 5"). It needs the `{ total }` summary back to phrase that — so it round-trips. The heavy product data still bypasses the model via artifacts. |
-| `pin_preference` | `silent` | The model's reply doesn't depend on the write succeeding. Skip the second trip entirely; render the confirmation from artifacts. |
+| Tool             | Mode       | Why                                                                                                                                                                                                          |
+| ---------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `search_catalog` | `feedback` | The model must narrate _something_ about the results ("I found 5"). It needs the `{ total }` summary back to phrase that — so it round-trips. The heavy product data still bypasses the model via artifacts. |
+| `pin_preference` | `silent`   | The model's reply doesn't depend on the write succeeding. Skip the second trip entirely; render the confirmation from artifacts.                                                                             |
 
-The rule of thumb: if the model needs to *say something that depends on the tool's outcome*, keep it `feedback` and return a **minimal** summary (not the full payload). If the model's reply is independent of the outcome, make it `silent`.
+The rule of thumb: if the model needs to _say something that depends on the tool's outcome_, keep it `feedback` and return a **minimal** summary (not the full payload). If the model's reply is independent of the outcome, make it `silent`.
 
 ## Production notes
 

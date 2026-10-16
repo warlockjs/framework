@@ -28,7 +28,10 @@ describe("parseRouteLocaleFile", () => {
         source: '{"$group":"account","title":{"en":"Account","ar":"الحساب"}}',
         localeCodes: locales,
       }),
-    ).toMatchObject({ group: "account", entries: { "account.title": { en: "Account", ar: "الحساب" } } });
+    ).toMatchObject({
+      group: "account",
+      entries: { "account.title": { en: "Account", ar: "الحساب" } },
+    });
   });
 
   it("skips $sites/<site> and other $-prefixed folders when deriving the namespace", () => {
@@ -39,7 +42,10 @@ describe("parseRouteLocaleFile", () => {
         source: '{"title":{"en":"Account","ar":"الحساب"}}',
         localeCodes: locales,
       }),
-    ).toMatchObject({ group: "account", entries: { "account.title": { en: "Account", ar: "الحساب" } } });
+    ).toMatchObject({
+      group: "account",
+      entries: { "account.title": { en: "Account", ar: "الحساب" } },
+    });
   });
 
   it("does not derive a namespace at all when $group is declared", () => {
