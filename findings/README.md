@@ -65,7 +65,7 @@ finding's request is met; **partial** names what is left.
 | WR-005 | Fixed   | Typed `http.serverOptions`, including `serverOptions.http.maxHeaderSize`.                                                                                                          |
 | WR-006 | Fixed   | `response.sse()` and `response.stream()` retain nothing by default (`retainEvents` / `retainChunks`), with awaitable `write()`, `drain()`, `backpressured` and a disconnect `signal`. |
 | WR-007 | Fixed   | An optional discriminated union accepts an absent or `undefined` field; `null` still needs `.nullable()`.                                                                          |
-| WR-008 | Fixed   | `v.literal("")` keeps `""` under required, `.present()`, `.optional()` and `.nullable()`; `.default("")` no longer fails "is required".                                           |
+| WR-008 | Fixed   | `v.literal("")` keeps `""` in its default (implicit) required state and under `.present()`, `.optional()` and `.nullable()`; an explicit `.required()` or `requiredIf` still rejects `""`. `.default("")` satisfies "is required" for an absent, `null` or `""` input. |
 | WR-009 | Fixed   | `read.maxBytes` bounds direct and tool reads (UTF-8 safe, `truncated` metadata); `hash` stays the whole-file hash.                                                                |
 | WR-010 | Fixed   | `ctx.signal` reaches `WorkspaceBackend.exec()`; pre-aborted calls never spawn; abort kills the process tree; results separate `cancelled` from `timedOut`.                        |
 | WR-011 | Fixed   | `<Form>` honours the submitter's `formAction` and name/value in both paths; new `query` prop.                                                                                      |

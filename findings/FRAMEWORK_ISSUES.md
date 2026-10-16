@@ -62,6 +62,28 @@ Severity: high = wrong behaviour a user sees or a security gap; medium = develop
 | FW-14 | The HTTP rate limiter cannot share its counts between processes without an ioredis client | `@warlock.js/core` | medium | 2026-10-14 |
 | FW-15 | The production build rejects `import.meta.url` in test files and test helpers under `src/web` | `@warlock.js/web` | medium | 2026-10-14 |
 
+## Status in 5.30.0
+
+Each package's `CHANGELOG.md` (`## 5.30.0`) has the exact entries.
+
+| Id | Status | What 5.30.0 ships |
+| --- | --- | --- |
+| FW-01 | Fixed | The client accepts 400–599 error-page payloads with `errors` and `errorCode`, so 4xx pages hydrate. |
+| FW-02 | Fixed | Dev and test boot discovery includes `app/*/utils/locales.json`. |
+| FW-03 | Fixed | `<Head />` renders a viewport tag by default (`metadata.viewport`, `false` to omit); scaffolded roots no longer need their own. |
+| FW-04 | Fixed | Mail and cache logs mask addresses (`maskEmail` in `@warlock.js/logger`); the auth login throttle keys by a SHA-256 of the credential, which resets existing throttle counters once on upgrade. |
+| FW-05 | Fixed | The loader port is unreferenced except while a sync waits, so Vitest exits. |
+| FW-06 | Fixed | Config and storage-driver keys are read by name and written with `JSON.stringify` in `config.d.ts`. |
+| FW-07 | Fixed (cause unconfirmed) | Locale, document and session contexts live in a `globalThis` registry, so a re-evaluated module reuses them. No reproduction was available. |
+| FW-08 | Fixed | Covered by WR-016: an abandoned request throws `ClientDisconnectedError` before render. A regression test follows this entry's path. |
+| FW-09 | Fixed | `warlock add notifications` writes a module that follows the conventions (resource, schema, typed request, service, locales, one controller per file). Clear-all and delete endpoints are no longer generated; existing modules are left alone. |
+| FW-10 | Fixed | Variants are cached per source file and purged on delete, move and rewrite; `purgeImageVariants()` clears them. No size or age cap. |
+| FW-11 | Fixed | `createUploadedFileController({ disk })` and `resolveImageVariant()`. |
+| FW-12 | Fixed | `storage.use()` returns `ScopedStorage`. |
+| FW-13 | Fixed | The import scan ignores comments and self-imports. |
+| FW-14 | Fixed | `http.rateLimit.store: "cache"` shares counts through `@warlock.js/cache`; a custom store class is accepted. |
+| FW-15 | Fixed | The page scan skips test files and folders, plus `build.testOnly` paths. |
+
 ---
 
 ## FW-01: A 4xx error page (403, 400) renders but never hydrates
