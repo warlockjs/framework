@@ -258,6 +258,39 @@ Raw SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. 
 - 5xx / overloaded → `ProviderError`
 - Connection timeouts → `ProviderTimeoutError`
 
+## Build and send an audited request
+
+`model.buildRequest(messages, options?)` is synchronous and makes no network call.
+It returns a detached `{ endpoint, body, betas }` snapshot, including thinking,
+cache markers, provider body options and merged tool results. `body.stream` is
+`false` by default; pass `{ ...options, stream: true }` to build a streaming request.
+`betas` identifies the beta header flags; the SDK receives these separately from
+its serialized Messages body.
+
+```ts
+const request = model.buildRequest(messages, options);
+const bodyJSON = JSON.stringify(request.body);
+// Hash or reserve spend against bodyJSON before sending.
+const response = await model.send(request, { signal });
+
+const streamingRequest = model.buildRequest(messages, { ...options, stream: true });
+for await (const chunk of model.send(streamingRequest, { signal })) {
+  // Consume the same neutral chunks as model.stream().
+}
+```
+
+`send()` uses the built endpoint, body and beta flags without rebuilding the
+conversation or applying new defaults. Transport cancellation stays separate from
+the audited body. `complete()` and `stream()` use this same build/send path.
+Treat the snapshot as read-only after hashing it; SDK JSON serialization and beta
+header handling still apply.
+
+Hosts with their own transport can import `toAnthropicMessages`,
+`toAnthropicTools`, `toProviderBlocks`, `fromProviderBlocks`,
+`ANTHROPIC_BLOCK_FORMAT` and the `AnthropicMessages` type from the package root.
+`fromProviderBlocks(blocks, toolCalls)` retains the adapter's assistant-block
+allowlist and tool-id validation.
+
 ## Token counting
 
 ```ts

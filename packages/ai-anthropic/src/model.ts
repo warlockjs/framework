@@ -15,6 +15,12 @@ import {
 import { log, type Logger } from "@warlock.js/logger";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { AnthropicCallOptions, AnthropicModelConfig } from "./config.type";
+import type {
+  AnthropicRequest,
+  AnthropicRequestOptions,
+  AnthropicStreamingRequest,
+  AnthropicNonStreamingRequest,
+} from "./request.type";
 import { inferVisionCapability } from "./known-vision-models";
 import {
   acceptsBetweenTools,
@@ -227,21 +233,72 @@ export class AnthropicModel implements ModelContract {
    * instance's `ModelConfig` defaults for this call only.
    */
   public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
-    this.logger.debug(LOG_MODULE, "request", "Starting call to messages.create", {
-      model: this.name,
-      messageCount: messages.length,
-      streaming: false,
-      toolCount: options?.tools?.length ?? 0,
+    return this.send(this.buildRequest(messages, options), { signal: options?.signal });
+  }
+
+  /** Build a detached request snapshot without sending it to Anthropic. */
+  public buildRequest(
+    messages: Message[],
+    options: ModelCallOptions & { stream: true },
+  ): AnthropicStreamingRequest;
+  public buildRequest(
+    messages: Message[],
+    options?: ModelCallOptions & { stream?: false },
+  ): AnthropicNonStreamingRequest;
+  public buildRequest(
+    messages: Message[],
+    options?: ModelCallOptions & { stream?: boolean },
+  ): AnthropicRequest;
+  public buildRequest(
+    messages: Message[],
+    options?: ModelCallOptions & { stream?: boolean },
+  ): AnthropicRequest {
+    const betas = [...(resolveAnthropicOptions(options).betas ?? [])];
+    const body = structuredClone({
+      ...this.buildBody(messages, options),
+      stream: options?.stream ?? false,
     });
 
+    return { endpoint: betas.length > 0 ? "beta.messages" : "messages", body, betas };
+  }
+
+  /** Send a built request without rebuilding its body or applying model defaults. */
+  public send(
+    request: AnthropicNonStreamingRequest,
+    options?: AnthropicRequestOptions,
+  ): Promise<ModelResponse>;
+  public send(
+    request: AnthropicStreamingRequest,
+    options?: AnthropicRequestOptions,
+  ): AsyncIterable<ModelStreamChunk>;
+  public send(
+    request: AnthropicRequest,
+    options?: AnthropicRequestOptions,
+  ): Promise<ModelResponse> | AsyncIterable<ModelStreamChunk>;
+  public send(
+    request: AnthropicRequest,
+    options?: AnthropicRequestOptions,
+  ): Promise<ModelResponse> | AsyncIterable<ModelStreamChunk> {
+    this.logger.debug(LOG_MODULE, "request", "Starting call to messages.create", {
+      model: request.body.model,
+      messageCount: Array.isArray(request.body.messages) ? request.body.messages.length : 0,
+      streaming: request.body.stream,
+      toolCount: Array.isArray(request.body.tools) ? request.body.tools.length : 0,
+    });
+
+    return request.body.stream
+      ? this.streamRequest(request, options)
+      : this.completeRequest(request, options);
+  }
+
+  private async completeRequest(
+    request: AnthropicRequest,
+    options?: AnthropicRequestOptions,
+  ): Promise<ModelResponse> {
     let response: Anthropic.Message;
 
     try {
-      response = (await this.send(
-        { ...this.buildBody(messages, options), stream: false },
-        options,
-        "create",
-      )) as Anthropic.Message;
+      response = (await this.dispatch(request, options, "create")) as Anthropic.Message;
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
@@ -277,7 +334,8 @@ export class AnthropicModel implements ModelContract {
    * const tokens = await model.countTokens(messages, { tools });
    */
   public async countTokens(messages: Message[], options?: ModelCallOptions): Promise<number> {
-    const body = this.buildBody(messages, options);
+    const request = this.buildRequest(messages, options);
+    const body = request.body;
     const countBody: Record<string, unknown> = {};
 
     for (const key of COUNT_TOKENS_FIELDS) {
@@ -287,7 +345,11 @@ export class AnthropicModel implements ModelContract {
     }
 
     try {
-      const result = (await this.send(countBody, options, "countTokens")) as {
+      const result = (await this.dispatch(
+        { ...request, body: countBody },
+        options,
+        "countTokens",
+      )) as {
         input_tokens: number;
       };
 
@@ -308,18 +370,20 @@ export class AnthropicModel implements ModelContract {
     messages: Message[],
     options?: ModelCallOptions,
   ): AsyncIterable<ModelStreamChunk> {
-    this.logger.debug(LOG_MODULE, "request", "Starting streaming call to messages.create", {
-      model: this.name,
-      messageCount: messages.length,
-      streaming: true,
-      toolCount: options?.tools?.length ?? 0,
+    yield* this.send(this.buildRequest(messages, { ...options, stream: true }), {
+      signal: options?.signal,
     });
+  }
 
+  private async *streamRequest(
+    request: AnthropicRequest,
+    options?: AnthropicRequestOptions,
+  ): AsyncIterable<ModelStreamChunk> {
     let stream: AsyncIterable<Anthropic.RawMessageStreamEvent>;
 
     try {
-      stream = (await this.send(
-        { ...this.buildBody(messages, options), stream: true },
+      stream = (await this.dispatch(
+        request,
         options,
         "create",
       )) as AsyncIterable<Anthropic.RawMessageStreamEvent>;
@@ -544,17 +608,27 @@ export class AnthropicModel implements ModelContract {
    * and the beta-only body fields); otherwise to `client.messages`. The
    * cancellation signal rides in the request options, as before.
    */
-  private send(
-    body: Record<string, unknown>,
-    options: ModelCallOptions | undefined,
+  private dispatch(
+    request: {
+      endpoint: AnthropicRequest["endpoint"];
+      body: Record<string, unknown>;
+      betas: string[];
+    },
+    options: AnthropicRequestOptions | undefined,
     method: "create" | "countTokens",
   ): Promise<unknown> {
-    const betas = resolveAnthropicOptions(options).betas;
     const requestOptions = options?.signal ? { signal: options.signal } : undefined;
-    const api = betas && betas.length > 0 ? this.client.beta.messages : this.client.messages;
+    const api =
+      request.endpoint === "beta.messages" ? this.client.beta.messages : this.client.messages;
     const call = api[method] as unknown as LooseCreate;
 
-    return call.call(api, betas && betas.length > 0 ? { ...body, betas } : body, requestOptions);
+    return call.call(
+      api,
+      request.endpoint === "beta.messages"
+        ? { ...request.body, betas: request.betas }
+        : request.body,
+      requestOptions,
+    );
   }
 
   /**

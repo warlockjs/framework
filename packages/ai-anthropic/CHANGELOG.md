@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Added
+
+- `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
+- Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.
+
 ## 5.30.0 - 2026-10-16
 
 ### Upgrading
