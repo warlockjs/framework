@@ -156,6 +156,21 @@ posixOnly("moveDirectoryNoReplaceAsync", () => {
     await expect(lstat(path.join(dir, "missing"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("accepts a destination parent that is a symlink to a directory", async () => {
+    // macOS `/tmp` → `/private/tmp`, or a deploy `current` → `releases/N`
+    const real = path.join(dir, "real");
+    const alias = path.join(dir, "alias");
+    await mkdir(real);
+    await symlink(real, alias);
+
+    const result = await moveDirectoryNoReplaceAsync(source, path.join(alias, "archive"));
+
+    expect(result.type).toBe("moved");
+    expect(await readFile(path.join(real, "archive", "receipts", "op-1.json"), "utf8")).toBe(
+      '{"ok":true}',
+    );
+  });
+
   it("is reachable as fs.dirs.moveNoReplace", async () => {
     const destination = path.join(dir, "via-facade");
 

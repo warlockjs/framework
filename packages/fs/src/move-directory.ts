@@ -1,4 +1,4 @@
-import { lstat, mkdir, open, rename, rmdir } from "node:fs/promises";
+import { lstat, mkdir, open, rename, rmdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 /**
@@ -43,11 +43,20 @@ export type MoveDirectoryNoReplaceResult = {
 /**
  * What the caller can rely on after a failed move:
  *
- * - `not-moved` — the source is known to be where it was; the destination
- *   was not replaced.
+ * - `not-moved` — this call did not move the directory: nothing of the
+ *   source is at the destination, and whatever was at the destination was
+ *   not replaced. For most reasons the source is still where it was; for
+ *   `source-missing` and `source-identity-mismatch` another process removed
+ *   or swapped it, so read the source path again before retrying.
  * - `moved` — the directory is at the destination, but a later step failed
  *   (only `sync-failed`: durability is unknown).
  * - `uncertain` — neither location could be verified; inspect both paths.
+ *
+ * When the move stopped after the destination name was claimed and the empty
+ * placeholder could not be removed, `placeholderCleanupError` holds the
+ * reason and the message says so: an empty directory is left at the
+ * destination, and a retry will report `destination-exists` until it is
+ * removed.
  */
 export type DirectoryMoveOutcome = "not-moved" | "moved" | "uncertain";
 
@@ -69,6 +78,12 @@ export type DirectoryMoveFailure =
  * about the directory's location; `reason` says why the move stopped.
  */
 export class DirectoryMoveError extends Error {
+  /**
+   * Set when the empty placeholder this call created at the destination could
+   * not be removed after the move stopped (see {@link DirectoryMoveOutcome}).
+   */
+  public placeholderCleanupError?: unknown;
+
   public constructor(
     public readonly reason: DirectoryMoveFailure,
     public readonly outcome: DirectoryMoveOutcome,
@@ -126,7 +141,8 @@ export async function directoryIdentityAsync(directoryPath: string): Promise<Dir
  *
  * Refuses explicitly on Windows (directory renames there are not POSIX
  * renames) and across devices — the source and destination parent must share
- * a filesystem. The destination parent must exist.
+ * a filesystem. The destination parent must exist; it may be a symlink to a
+ * directory (its target's device is the one compared).
  *
  * @throws {DirectoryMoveError} with `outcome` (`not-moved` / `moved` /
  *   `uncertain`) and `reason`.
@@ -168,7 +184,10 @@ export async function moveDirectoryNoReplaceAsync(
 
   const sourceIdentity = await readSourceIdentity(source, options.expectedSource, fail);
 
-  const destinationParent = await lstatOrUndefined(path.dirname(destination));
+  // Follow a symlink here: a parent such as macOS `/tmp` (→ `/private/tmp`)
+  // or a deploy `current` → `releases/N` link is a real directory, and the
+  // device that matters for the rename is the one it points at.
+  const destinationParent = await statOrUndefined(path.dirname(destination));
 
   if (!destinationParent?.isDirectory()) {
     throw fail(
@@ -216,11 +235,13 @@ export async function moveDirectoryNoReplaceAsync(
   const currentSource = await identityOf(source);
 
   if (!currentSource || !sameIdentity(currentSource, sourceIdentity)) {
-    await removePlaceholder(destination, placeholder);
-    throw fail(
-      "source-identity-mismatch",
-      "not-moved",
-      "the source changed while the destination was being claimed",
+    throw withCleanup(
+      fail(
+        "source-identity-mismatch",
+        "not-moved",
+        "the source changed while the destination was being claimed",
+      ),
+      await removePlaceholder(destination, placeholder),
     );
   }
 
@@ -335,6 +356,21 @@ async function classifyRenameFailure(
   }
 
   if (!atSource || !sameIdentity(atSource, sourceIdentity)) {
+    // The destination still holds our own empty placeholder, so the rename
+    // certainly did not land there: another process removed or swapped the
+    // source just before it. Release the claim so a retry is not blocked.
+    if (placeholder && atDestination && sameIdentity(atDestination, placeholder)) {
+      return withCleanup(
+        fail(
+          "source-identity-mismatch",
+          "not-moved",
+          "the source was removed or replaced just before the rename",
+          error,
+        ),
+        await removePlaceholder(destination, placeholder),
+      );
+    }
+
     return fail(
       "rename-failed",
       "uncertain",
@@ -345,9 +381,11 @@ async function classifyRenameFailure(
 
   // The source is still in place: nothing moved. Release our claim when the
   // placeholder is still ours and empty (rmdir refuses a non-empty one).
-  await removePlaceholder(destination, placeholder);
+  const cleanupError = await removePlaceholder(destination, placeholder);
 
   if (code === "ENOTEMPTY" || code === "EEXIST" || code === "ENOTDIR") {
+    // rmdir refused a placeholder another process wrote into: expected, the
+    // entry is theirs and is kept.
     return fail(
       "destination-exists",
       "not-moved",
@@ -357,25 +395,56 @@ async function classifyRenameFailure(
   }
 
   if (code === "EXDEV") {
-    return fail(
-      "cross-device",
-      "not-moved",
-      "the source and destination are on different filesystems",
-      error,
+    return withCleanup(
+      fail(
+        "cross-device",
+        "not-moved",
+        "the source and destination are on different filesystems",
+        error,
+      ),
+      cleanupError,
     );
   }
 
-  return fail("rename-failed", "not-moved", "the rename failed", error);
+  return withCleanup(fail("rename-failed", "not-moved", "the rename failed", error), cleanupError);
 }
 
-async function removePlaceholder(destination: string, placeholder: DirectoryIdentity | undefined) {
+/**
+ * Remove the empty placeholder this call created, if the destination still
+ * holds it. Returns the `rmdir` error when removal failed, so the caller can
+ * report the leftover instead of hiding it.
+ */
+async function removePlaceholder(
+  destination: string,
+  placeholder: DirectoryIdentity | undefined,
+): Promise<unknown> {
   const current = await identityOf(destination);
 
   if (!placeholder || !current || !sameIdentity(current, placeholder)) {
-    return;
+    return undefined;
   }
 
-  await rmdir(destination).catch(() => undefined);
+  try {
+    await rmdir(destination);
+    return undefined;
+  } catch (error) {
+    return error ?? new Error("rmdir failed");
+  }
+}
+
+/**
+ * Attach a failed placeholder cleanup to the error: the caller must learn that
+ * an empty directory was left at the destination.
+ */
+function withCleanup(error: DirectoryMoveError, cleanupError: unknown): DirectoryMoveError {
+  if (cleanupError === undefined) return error;
+
+  error.placeholderCleanupError = cleanupError;
+
+  const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+  error.message += ` (the empty placeholder left at the destination could not be removed: ${reason})`;
+
+  return error;
 }
 
 async function syncDirectory(directoryPath: string) {
@@ -385,6 +454,14 @@ async function syncDirectory(directoryPath: string) {
     await handle.sync();
   } finally {
     await handle.close();
+  }
+}
+
+async function statOrUndefined(target: string) {
+  try {
+    return await stat(target);
+  } catch {
+    return undefined;
   }
 }
 

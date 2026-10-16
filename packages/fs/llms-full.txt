@@ -221,7 +221,7 @@ await moveDirectoryNoReplaceAsync("./features/billing", "./archive/billing", {
 });
 ```
 
-It claims the destination with an exclusive `mkdir`, then renames over that empty placeholder; an occupied destination throws `DirectoryMoveError` (`reason: "destination-exists"`, `outcome: "not-moved"`). `outcome` is `not-moved` / `moved` / `uncertain`. Never copies, refuses `cross-device`, Windows (`unsupported-platform`) and a missing destination parent. Identity checks are sequential (no descriptor-relative rename in Node): a placeholder swap after its identity is recorded is refused (`placeholder-replaced`), one in the instant right after the claim or right before the rename is not; without `syncParents` the parents are not fsynced.
+It claims the destination with an exclusive `mkdir`, then renames over that empty placeholder; an occupied destination throws `DirectoryMoveError` (`reason: "destination-exists"`, `outcome: "not-moved"`). `outcome` is `not-moved` (this call moved and replaced nothing; with `source-missing`/`source-identity-mismatch` the source itself was changed by someone else) / `moved` / `uncertain`; a placeholder it could not remove is reported in `error.placeholderCleanupError`. Never copies, refuses `cross-device`, Windows (`unsupported-platform`) and a missing destination parent; a parent that is a symlink to a directory is fine. Identity checks are sequential (no descriptor-relative rename in Node): a placeholder swap after its identity is recorded is refused (`placeholder-replaced`), one in the instant right after the claim or right before the rename is not; without `syncParents` the parents are not fsynced.
 
 ## Delete
 

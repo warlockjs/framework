@@ -11,6 +11,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     lstat: vi.fn(original.lstat),
     mkdir: vi.fn(original.mkdir),
     rename: vi.fn(original.rename),
+    rmdir: vi.fn(original.rmdir),
   };
 });
 
@@ -38,6 +39,7 @@ posixOnly("moveDirectoryNoReplaceAsync — interleavings", () => {
     lstat: vi.mocked(lstat).getMockImplementation()!,
     mkdir: vi.mocked(mkdir).getMockImplementation()!,
     rename: vi.mocked(rename).getMockImplementation()!,
+    rmdir: vi.mocked(rmdir).getMockImplementation()!,
   };
 
   beforeEach(async () => {
@@ -53,6 +55,7 @@ posixOnly("moveDirectoryNoReplaceAsync — interleavings", () => {
     vi.mocked(lstat).mockImplementation(original.lstat);
     vi.mocked(mkdir).mockImplementation(original.mkdir);
     vi.mocked(rename).mockImplementation(original.rename);
+    vi.mocked(rmdir).mockImplementation(original.rmdir);
     await cleanup();
   });
 
@@ -131,14 +134,50 @@ posixOnly("moveDirectoryNoReplaceAsync — interleavings", () => {
     const moved = await moveError(moveDirectoryNoReplaceAsync(source, destination));
     expect(moved.outcome).toBe("moved");
 
+    // The source vanishes just before the rename while our own placeholder
+    // is untouched: the rename certainly did not land, so this is not-moved
+    // and the claim is released (a retry is not blocked by a stray dir).
     const elsewhere = path.join(dir, "elsewhere");
     vi.mocked(rename).mockImplementationOnce(async (from) => {
       await original.rename(from, elsewhere);
       throw Object.assign(new Error("I/O error"), { code: "EIO" });
     });
 
-    const uncertain = await moveError(moveDirectoryNoReplaceAsync(destination, source));
+    const vanished = await moveError(moveDirectoryNoReplaceAsync(destination, source));
+    expect(vanished.outcome).toBe("not-moved");
+    expect(vanished.reason).toBe("source-identity-mismatch");
+    await expect(lstat(source)).rejects.toMatchObject({ code: "ENOENT" });
+
+    // Neither location holds what we expect (source gone, placeholder
+    // replaced by a stranger): only then is the outcome uncertain.
+    const third = path.join(dir, "third");
+    vi.mocked(rename).mockImplementationOnce(async (from, to) => {
+      await original.rename(from, third);
+      await original.rmdir(to);
+      await original.mkdir(to);
+      throw Object.assign(new Error("I/O error"), { code: "EIO" });
+    });
+
+    const uncertain = await moveError(moveDirectoryNoReplaceAsync(elsewhere, source));
     expect(uncertain.outcome).toBe("uncertain");
+  });
+
+  it("reports a placeholder it could not remove instead of hiding it", async () => {
+    vi.mocked(rename).mockImplementationOnce(async () => {
+      throw Object.assign(new Error("I/O error"), { code: "EIO" });
+    });
+    vi.mocked(rmdir).mockImplementationOnce(async () => {
+      throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+    });
+
+    const error = await moveError(moveDirectoryNoReplaceAsync(source, destination));
+
+    expect(error.outcome).toBe("not-moved");
+    expect(error.reason).toBe("rename-failed");
+    expect(error.placeholderCleanupError).toMatchObject({ code: "EACCES" });
+    expect(error.message).toContain("could not be removed");
+    // The empty placeholder really is still there.
+    expect((await lstat(destination)).isDirectory()).toBe(true);
   });
 
   it("never falls back to copy + delete", async () => {

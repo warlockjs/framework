@@ -150,7 +150,7 @@ try {
   });
 } catch (error) {
   if (error instanceof DirectoryMoveError && error.outcome === "not-moved") {
-    // known: the source is still in place and nothing at the destination was touched
+    // known: this call moved nothing, and nothing at the destination was replaced
   }
   throw error;
 }
@@ -161,11 +161,21 @@ anything holds the name), then renames the source over that empty placeholder.
 A destination that exists, or that someone writes into meanwhile, is refused
 with `reason: "destination-exists"`. It never falls back to copy + delete.
 
-The error's `outcome` tells you what to rely on: `not-moved` (source in place),
-`moved` (only after a failed `syncParents` — the move happened, durability is
-unknown) or `uncertain` (inspect both paths). Without `syncParents` the move is
-atomic but not crash-durable: flushing both parent directories is the caller's
-job.
+The error's `outcome` tells you what to rely on:
+
+- `not-moved`: this call moved nothing and replaced nothing at the
+  destination. For most reasons the source is still where it was; with
+  `source-missing` or `source-identity-mismatch` another process removed or
+  swapped it, so read the source again before retrying.
+- `moved`: only after a failed `syncParents`. The move happened; durability is
+  unknown.
+- `uncertain`: neither location holds what was expected. Inspect both paths.
+
+If the move stopped after claiming the destination and the empty placeholder
+could not be removed, `error.placeholderCleanupError` is set and the message
+says so: remove that empty directory before retrying, or the retry reports
+`destination-exists`. Without `syncParents` the move is atomic but not
+crash-durable: flushing both parent directories is the caller's job.
 
 Limits: Node has no `renameat2(RENAME_NOREPLACE)` or descriptor-relative
 renames, so paths are resolved by name; the empty placeholder is briefly
@@ -175,7 +185,9 @@ the placeholder after its identity is recorded is refused
 for its own empty directory in the instant right after the claim (before the
 identity can be read) or right before the rename would still be replaced. It refuses
 on Windows (`unsupported-platform`), across filesystems (`cross-device`) and
-when the destination's parent is missing. Existing `move` behavior is unchanged.
+when the destination's parent is missing. The parent may be a symlink to a
+directory (macOS `/tmp`, a deploy `current` link); its target is what is
+checked. Existing `move` behavior is unchanged.
 
 ## Measure and fingerprint
 
