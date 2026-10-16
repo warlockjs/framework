@@ -5819,6 +5819,9 @@ try {
 }
 ```
 
+`actingAs()` requires `NODE_ENV="test"` before issuing any credentials.
+Cookie-only auth middleware needs the app's login route rather than this Bearer client.
+
 The helper calls the user's real `generateAccessToken()` and sends its persisted
 credential as a Bearer header. Auth middleware, account policy and token expiry
 still apply. It does not test the app's login route or create a user for you.
