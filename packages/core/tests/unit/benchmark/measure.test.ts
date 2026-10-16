@@ -24,16 +24,18 @@ describe("Benchmark Module - measure()", () => {
   });
 
   it("returns latency in milliseconds", async () => {
-    const result = await measure("test", async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      return "done";
-    });
+    // The claim is "milliseconds, not seconds or microseconds". A real sleep
+    // made this flaky (a 50ms timer measured 48ms on a CI runner), so the
+    // clock is controlled: 50.4ms between start and end rounds to 50.
+    const now = vi.spyOn(performance, "now").mockReturnValueOnce(1_000).mockReturnValueOnce(1_050.4);
 
-    // Timers may fire a fraction of a millisecond early on some hosts (a 50ms
-    // sleep measured 49ms on a CI runner); the claim is "milliseconds, not
-    // seconds or microseconds", so allow one tick either way.
-    expect(result.latency).toBeGreaterThanOrEqual(49);
-    expect(result.latency).toBeLessThan(1_000);
+    try {
+      const result = await measure("test", async () => "done");
+
+      expect(result.latency).toBe(50);
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("works with async functions", async () => {
