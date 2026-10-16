@@ -1638,6 +1638,8 @@ export function qualityCheckEnvironment(source: NodeJS.ProcessEnv): NodeJS.Proce
   const env = { ...source };
   delete env.HTTP_PORT;
   delete env.NODE_ENV;
+  // Release quality must exercise real shared-driver behavior, including locally.
+  env.WARLOCK_REDIS_INTEGRATION = "1";
   return env;
 }
 

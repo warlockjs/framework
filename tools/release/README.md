@@ -428,3 +428,6 @@ gate, and stale generated changes cannot be silently packed.
 The strictness ratchet also checks noUncheckedIndexedAccess. Preserve real bounds
 checks and assertions rather than widening types, and lower budgets to measured
 counts after fixes. The release gate verifies the full workspace again.
+
+Release gates always set WARLOCK_REDIS_INTEGRATION=1 for package quality scripts,
+including local runs. The release workflow supplies Redis6390 explicitly.

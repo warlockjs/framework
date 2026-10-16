@@ -75,6 +75,8 @@ When present, `tools/release/sources/@warlock.js/**` holds copies of package sou
 
 `@mongez/events` `trigger` / `triggerAll` / `emit` are **fully synchronous** — they do not await handlers. `await events.triggerAll(...)` silently drops async listeners and lets rejections escape. Use **`triggerAsync` / `triggerAllAsync`** when an `await` is intended. Handlers run in registration order, and **a handler returning `false` silently cancels every handler after it**.
 
+## Redis and HTTP test services
+
 Queue/notification integration tests probe Redis with PING at
 `QUEUE_REDIS_HOST:QUEUE_REDIS_PORT` (default `127.0.0.1:6390`). Local runs skip
 unavailable integration cases with a clear message while unit cases still run.
@@ -86,3 +88,7 @@ Strictness allowances are measured per source owner; lower them after fixing
 indexed reads and retain explicit nonempty bounds or runtime assertions. Never
 raise an existing allowance to absorb new errors. Empty generator selections
 reject before opening stdin.
+
+Release quality commands force `WARLOCK_REDIS_INTEGRATION=1`, so local release
+gates require Redis just like release CI. Mocked configured-port reporting cases
+mock the availability preflight too; their port numbers never need to be free.

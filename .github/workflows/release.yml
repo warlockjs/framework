@@ -44,7 +44,7 @@ jobs:
       # The confirm step pushes the release commit and the v<version> tag.
       contents: write
     services:
-      # queue + notifications test suites need a real Redis on 6390; there is no skip path.
+      # Release quality checks require Redis integration coverage on port 6390.
       redis:
         image: redis:7
         ports:
@@ -69,6 +69,7 @@ jobs:
       LOGS: ${{ github.workspace }}/release-logs
       QUEUE_REDIS_HOST: 127.0.0.1
       QUEUE_REDIS_PORT: "6390"
+      WARLOCK_REDIS_INTEGRATION: "1"
       CI: "1"
       NO_COLOR: "1"
     steps:

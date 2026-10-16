@@ -6,6 +6,7 @@ import { HttpConnector } from "../../../src/connectors/http-connector";
 import { getHttpReadyReport, resetHttpReadyReport } from "../../../src/http/ready-report";
 import type { FastifyInstance } from "../../../src/http/server";
 import { startHttpServer } from "../../../src/http/server";
+import * as portPreflight from "../../../src/http/port-preflight";
 import { getTestServerUrl } from "../../../src/tests/test-helpers";
 import { TEST_SERVER_PORT_ENV_KEY } from "../../../src/tests/test-server-port-channel";
 
@@ -51,6 +52,7 @@ describe("HttpConnector.start — innocent cases publish exactly what they bind 
 
     silenceHttpLogs();
 
+    vi.spyOn(portPreflight, "assertPortIsAvailable").mockResolvedValue();
     const server = startHttpServer();
     vi.spyOn(server, "listen").mockImplementation(async () => mockAddress);
 

@@ -1,9 +1,10 @@
-import { redisTestsAvailable } from "../../../queue/tests/redis-availability";
 /**
  * Integration specs against a REAL Redis (no mocking `@warlock.js/queue`).
  * Point them at one with `QUEUE_REDIS_HOST` / `QUEUE_REDIS_PORT` (default
  * 127.0.0.1:6390) — same convention `@warlock.js/queue`'s own specs use.
  */
+import { redisTestsAvailable } from "../../../queue/tests/redis-availability";
+
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import {

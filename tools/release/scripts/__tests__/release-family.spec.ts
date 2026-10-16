@@ -1566,6 +1566,7 @@ describe("qualityCheckEnvironment", () => {
     const result = qualityCheckEnvironment(source);
     assert.equal("HTTP_PORT" in result, false);
     assert.equal("NODE_ENV" in result, false);
+    assert.equal(result.WARLOCK_REDIS_INTEGRATION, "1");
     assert.equal(result.KEEP, "yes");
     assert.equal(source.HTTP_PORT, "4000", "source object must be untouched");
   });
