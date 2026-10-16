@@ -8,7 +8,7 @@ vi.mock("./submit-page-action", () => ({
 }));
 vi.mock("./prefetch", () => ({ clearPrefetchCache: () => clearPrefetchCache() }));
 
-import { createActionSubmitter } from "./action-submitter";
+import { createActionSubmitter, serializeFormData } from "./action-submitter";
 import { readSubmitting } from "./submitting-store";
 
 const PAYLOAD = {
@@ -272,5 +272,105 @@ describe("createActionSubmitter — independent submissions", () => {
 
     expect(await pending).toEqual({ type: "dropped" });
     expect(readSubmitting()).toBe(false);
+  });
+
+  // Review fix: a Cancel per row posts the same action with a different id.
+  it("never merges two rows' submissions of the same action", async () => {
+    const h = makeRuntime();
+    const rowA = deferred();
+
+    submitPageAction.mockReturnValueOnce(rowA.promise);
+    submitPageAction.mockResolvedValueOnce({ type: "payload", payload: PAYLOAD, url: "/jobs" });
+
+    const submit = createActionSubmitter(h.runtime);
+    const a = form("cancel");
+    const b = form("cancel");
+
+    a.set("id", "A");
+    b.set("id", "B");
+
+    const first = submit("/jobs", a, { independent: true, dedupeKey: "row-a" });
+    const second = submit("/jobs", b, { independent: true, dedupeKey: "row-b" });
+
+    expect(second).not.toBe(first);
+    expect(submitPageAction).toHaveBeenCalledTimes(2);
+    expect((submitPageAction.mock.calls[1]![1] as FormData).get("id")).toBe("B");
+
+    rowA.resolve({ type: "payload", payload: PAYLOAD, url: "/jobs" });
+    await Promise.all([first, second]);
+  });
+
+  it("does not merge the same form submitted with different fields", async () => {
+    const h = makeRuntime();
+
+    submitPageAction.mockResolvedValue({ type: "payload", payload: PAYLOAD, url: "/jobs" });
+
+    const submit = createActionSubmitter(h.runtime);
+    const a = form("cancel");
+    const b = form("cancel");
+
+    a.set("id", "A");
+    b.set("id", "B");
+
+    const first = submit("/jobs", a, { independent: true, dedupeKey: "row" });
+    const second = submit("/jobs", b, { independent: true, dedupeKey: "row" });
+
+    expect(second).not.toBe(first);
+    await Promise.all([first, second]);
+    expect(submitPageAction).toHaveBeenCalledTimes(2);
+  });
+
+  // Review fix: a "Stop" in a persistent layout must not pull the user off the
+  // page they navigated to after submitting it.
+  it("drops its redirect when a navigation started after it", async () => {
+    const h = makeRuntime();
+    const stop = deferred();
+
+    submitPageAction.mockReturnValueOnce(stop.promise);
+
+    const pending = createActionSubmitter(h.runtime)("/run", form("stop"), { independent: true });
+
+    h.newerTicket();
+    stop.resolve({ type: "redirect", url: "/jobs" });
+
+    expect(await pending).toEqual({ type: "dropped" });
+    expect(h.runtime.navigate).not.toHaveBeenCalled();
+  });
+
+  it("drops its redirect when its own signal aborted", async () => {
+    const h = makeRuntime();
+    const controller = new AbortController();
+    const stop = deferred();
+
+    submitPageAction.mockReturnValueOnce(stop.promise);
+
+    const pending = createActionSubmitter(h.runtime)("/run", form("stop"), {
+      independent: true,
+      signal: controller.signal,
+    });
+
+    controller.abort();
+    stop.resolve({ type: "redirect", url: "/jobs" });
+
+    expect(await pending).toEqual({ type: "dropped" });
+    expect(h.runtime.navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe("serializeFormData", () => {
+  it("distinguishes fields and identifies files without reading them", () => {
+    const a = new FormData();
+    const b = new FormData();
+
+    a.set("id", "1");
+    b.set("id", "2");
+
+    expect(serializeFormData(a)).not.toBe(serializeFormData(b));
+
+    const withFile = new FormData();
+
+    withFile.set("upload", new File(["abc"], "a.txt", { type: "text/plain", lastModified: 1 }));
+
+    expect(serializeFormData(withFile)).toContain("a.txt:3:text/plain:1");
   });
 });

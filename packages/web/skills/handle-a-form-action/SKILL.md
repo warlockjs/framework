@@ -46,7 +46,7 @@ export default function Contact() {
 - Export `action` OR `actions` (a record), never both; page modules only. Policy goes in `config.action` / `config.actions.<name>` (`validation`, `middleware`), and the key must match an export.
 - Several forms: `actions = { save, remove }`, `<Form action="remove">`. The name travels as the body field `_action`; names match `/^[a-z][a-zA-Z0-9]*$/`; `default` is reserved.
 - Validation runs on the body only (files included); use `request.validated()`. Failure is a 422 `ActionState`, the action does not run.
-- Return `response.redirect(url)`, data, or a failure helper: `badRequest`, `unauthorized`, `forbidden`, `conflict`, `unprocessableEntity`, `tooManyRequests`, each with optional `{ message, errors }`.
+- Return `response.redirect(url)` (relative or `http(s)` only; other schemes throw), data, or a failure helper: `badRequest`, `unauthorized`, `forbidden`, `conflict`, `unprocessableEntity`, `tooManyRequests`, each with optional `{ message, errors }`.
 - Outcomes: no JS redirect is 303; JS redirect is 204 + `x-warlock-redirect`; failure is 422/4xx (page rendered at that status without JS, `actionData` body only with JS).
 - `values` is echoed on failure only, never files, and omits names in `web.forms.redactValues` (default `password`, `password_confirmation`, `*token*`, `*secret*`). `web.forms.redactValues` is a typed config key of `readonly string[]`; set it at boot to replace that list (patterns support `*`).
 - Same-origin `Origin`/`Referer` is always required (403 otherwise); no opt-out.
@@ -142,7 +142,7 @@ A sign-out button that lives on another page or in a layout posts to this action
 - **A button's `formAction` and `name`/`value` are honoured** on the enhanced path and without JS, as the browser does: `<button name="purpose" value="inspect" formAction="/runs?mode=inspect">` posts there with `purpose=inspect` plus the form's fields.
 - **`query` sets the target URL's query string, not the body**: `<Form action="recover" query={{ mode: "inspect" }}>` posts to the current page as `?mode=inspect` (or to `to`'s page). `action` stays the page action's name.
 - **A redirect ends the submission when the new page is on screen.** `useIsSubmitting()` (and `onSuccess`) wait for the redirected page's loader data, so a revision-guarded form cannot resubmit stale data.
-- **Ordinary submissions are single-flight**; a second submit shares the pending one. A form that must run while another is pending (Cancel during a long Start) is `<Form action="cancel" independent>`: it neither aborts nor is aborted by the pending submission, a double submit of it still shares one request, and unmounting cancels it.
+- **Ordinary submissions are single-flight**; a second submit shares the pending one. A form that must run while another is pending (Cancel during a long Start) is `<Form action="cancel" independent>`: it neither aborts nor is aborted by the pending submission; a double submit of the same form with the same fields shares one request, a different row's form never does, unmounting cancels only its own submission, and its result (redirect included) is dropped once the user has left the page.
 
 - **Failure keeps the cookie writes too.** A failed sign-in that also called `response.cookie()` would still send it, so set the cookie only after the credentials check passes.
 - **The password is never echoed.** `values` omits `password` by default (`web.forms.redactValues`), so only `email` is re-filled.

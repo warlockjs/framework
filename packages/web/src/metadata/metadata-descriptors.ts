@@ -191,6 +191,32 @@ function normalizeAuthors(value: MetadataOutput["authors"]): { name: string; url
     .filter((author) => typeof author.name === "string" && author.name !== "");
 }
 
+const VIEWPORT_KEY = 'meta[name="viewport"]';
+
+/** The viewport every page gets unless its metadata says otherwise (FW-03). */
+export const DEFAULT_VIEWPORT = "width=device-width, initial-scale=1";
+
+/**
+ * The viewport `<Head/>` renders (FW-03). `metadata.viewport` wins; `false`
+ * emits none. When the field is absent, a `metadata.meta` entry named
+ * `viewport` is used, then the default.
+ *
+ * Document-level, like the charset: `<Head/>` renders it during SSR and the
+ * client navigation applier never touches it, so a viewport tag `root.tsx`
+ * writes itself is never overwritten. That is also why it is not one of the
+ * descriptors below.
+ */
+export function resolveViewport(metadata: MetadataOutput | undefined): string | undefined {
+  if (metadata?.viewport === false) return undefined;
+  if (typeof metadata?.viewport === "string") return metadata.viewport;
+
+  const fromMeta = (metadata?.meta ?? []).find(
+    (entry) => "name" in entry && entry.name === "viewport" && typeof entry.content === "string",
+  );
+
+  return fromMeta?.content ?? DEFAULT_VIEWPORT;
+}
+
 function dynamicMetaDescriptors(entries: MetadataOutput["meta"]): MetadataDescriptor[] {
   const result: MetadataDescriptor[] = [];
   const seen = new Set<string>();
@@ -223,6 +249,11 @@ function dynamicMetaDescriptors(entries: MetadataOutput["meta"]): MetadataDescri
     }
 
     const key = `meta[${attribute}="${selectorValue(name)}"]`;
+
+    // Rendered by `<Head/>` through `resolveViewport`, so a `meta` viewport
+    // written before `metadata.viewport` existed still wins over the default
+    // and is never emitted twice.
+    if (key === VIEWPORT_KEY) continue;
 
     if (RESERVED_KEYS.has(key)) {
       warnDropped(`meta ${key}`, "a built-in metadata field owns that tag");

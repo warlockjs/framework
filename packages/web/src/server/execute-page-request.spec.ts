@@ -350,6 +350,47 @@ describe("executePageRequest ctx.signal", () => {
     expect(calls).toEqual(["app"]);
   });
 
+  // Review fix: an abandoned request answers nobody, but a genuine loader bug
+  // that happened first is still a bug and rides along for the handler to report.
+  it("keeps a genuine loader failure as the cause when the client then disconnects", async () => {
+    const { request: abortRequest, response, rawRequest } = abortableHttp();
+    const bug = new TypeError("Cannot read properties of undefined (reading 'id')");
+    const entry = route({
+      app: () => {
+        rawRequest.emit("aborted");
+        throw bug;
+      },
+    });
+
+    const rejection = await executePageRequest({
+      url: "/account",
+      routes: [entry],
+      createHttp: () => ({ request: abortRequest, response }),
+    }).catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(ClientDisconnectedError);
+    expect((rejection as ClientDisconnectedError).cause).toBe(bug);
+  });
+
+  it("drops a failure the abort itself caused", async () => {
+    const { request: abortRequest, response, rawRequest } = abortableHttp();
+    const entry = route({
+      app: () => {
+        rawRequest.emit("aborted");
+        throw new DOMException("The operation was aborted.", "AbortError");
+      },
+    });
+
+    const rejection = await executePageRequest({
+      url: "/account",
+      routes: [entry],
+      createHttp: () => ({ request: abortRequest, response }),
+    }).catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(ClientDisconnectedError);
+    expect((rejection as ClientDisconnectedError).cause).toBeUndefined();
+  });
+
   it("discards a cookie a loader queued before the request was abandoned", async () => {
     const { request: abortRequest, response, rawRequest } = abortableHttp();
     const setCookie = vi.spyOn(response, "cookie");
@@ -414,6 +455,43 @@ describe("executePageRequest ctx.signal", () => {
       }),
     ).rejects.toBeInstanceOf(ClientDisconnectedError);
 
+    expect(finish).not.toHaveBeenCalled();
+  });
+
+  // FW-08: a crossed navigation aborted the request after the layout loader
+  // and before the page loader, and the page component rendered with `data`
+  // undefined (`Cannot destructure property 'create' of 'data'`).
+  it("never renders the page when the request is abandoned between the layout and page loaders", async () => {
+    const { request: abortRequest, response, rawRequest } = abortableHttp();
+    const finish = vi.fn();
+    const calls: string[] = [];
+    const entry = route({
+      app: () => {
+        calls.push("app");
+      },
+      layout: () => {
+        calls.push("layout");
+        rawRequest.emit("aborted");
+
+        return { activePage: "maintenances" };
+      },
+      page: () => {
+        calls.push("page");
+
+        return { create: true };
+      },
+    });
+
+    await expect(
+      executePageRequest({
+        url: "/account",
+        routes: [entry],
+        createHttp: () => ({ request: abortRequest, response }),
+        finish,
+      }),
+    ).rejects.toBeInstanceOf(ClientDisconnectedError);
+
+    expect(calls).toEqual(["app", "layout"]);
     expect(finish).not.toHaveBeenCalled();
   });
 

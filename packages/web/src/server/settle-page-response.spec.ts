@@ -91,6 +91,29 @@ describe("createActionResponse()", () => {
     expect(isLoaderShortCircuit(response.redirect("/x"))).toBe(true);
     expect(isActionFailure({ kind: "failure", statusCode: 400 })).toBe(false);
   });
+  // Security review: `redirect(request.input("next"))` must never emit a
+  // `javascript:` target the client would run, or a header-splitting one.
+  it.each(["javascript:alert(1)", "data:text/html,x", "/ok\r\nSet-Cookie: x=1"])(
+    "refuses to redirect to %j and buffers nothing",
+    (url) => {
+      const buffer = createLevelBuffer();
+      const response = createActionResponse(buffer);
+
+      expect(() => response.redirect(url)).toThrow(/only relative, http: and https:/);
+      expect(buffer.statusCode).toBeUndefined();
+      expect(buffer.headers).toEqual([]);
+    },
+  );
+
+  it("still redirects to relative and https targets", () => {
+    const buffer = createLevelBuffer();
+
+    createActionResponse(buffer).redirect("https://accounts.example.com/start");
+
+    expect(buffer.headers).toEqual([
+      { key: "Location", value: "https://accounts.example.com/start" },
+    ]);
+  });
 });
 
 describe("clearCookie() on a buffered response", () => {

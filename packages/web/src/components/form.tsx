@@ -24,8 +24,10 @@ export type FormProps = Omit<FormHTMLAttributes<HTMLFormElement>, "action" | "me
   /**
    * Submit alongside whatever is already in flight instead of sharing or
    * superseding it, such as a Cancel next to a pending Start. Neither
-   * submission aborts the other; a double submit of THIS form still shares
-   * one request, and unmounting the form cancels its submission.
+   * submission aborts the other; a double submit of THIS form with the same
+   * fields still shares one request, another form's submission never does,
+   * and unmounting the form cancels its own submission only. Its result is
+   * dropped if the user has navigated to another page meanwhile.
    */
   independent?: boolean;
   resetOnSuccess?: boolean;
@@ -46,6 +48,29 @@ function targetUrl(form: HTMLFormElement, submitter: Submitter | null): string {
 
   return form.getAttribute("action") ?? `${window.location.pathname}${window.location.search}`;
 }
+
+/**
+ * Whether the runtime may enhance a submission to `target`: same origin and
+ * `http:`/`https:`. A submit button can name any `formaction`, and enhancing a
+ * cross-origin one would `fetch` it and then trust what that origin answered
+ * (its redirect header, its page payload). The browser posts those natively.
+ */
+function canEnhance(target: string): boolean {
+  let url: URL;
+
+  try {
+    url = new URL(target, window.location.href);
+  } catch {
+    return false;
+  }
+
+  return (
+    (url.protocol === "http:" || url.protocol === "https:") &&
+    url.origin === window.location.origin
+  );
+}
+
+let nextFormInstance = 0;
 
 function formActionAttribute(
   to: string | undefined,
@@ -113,7 +138,21 @@ export function Form({
   // An independent submission is cancelled when its form unmounts.
   const independentController = useRef<AbortController | undefined>(undefined);
 
-  useEffect(() => () => independentController.current?.abort(), []);
+  // Dedupes this form's independent double submits without merging another
+  // form's (a Cancel per row posts the same action with a different id).
+  const instanceKey = useRef<string | undefined>(undefined);
+
+  instanceKey.current ??= `form-${++nextFormInstance}`;
+
+  useEffect(
+    () => () => {
+      independentController.current?.abort();
+      // Effects can be cleaned up and re-run without an unmount (a hidden
+      // `<Activity>` shown again); the next submission needs a live signal.
+      independentController.current = undefined;
+    },
+    [],
+  );
 
   async function handleSubmit(event: ReactSubmitEvent<HTMLFormElement>): Promise<void> {
     // The re-dispatched submit below: the browser performs it natively.
@@ -129,6 +168,10 @@ export function Form({
 
     const form = event.currentTarget;
     const submitter = event.nativeEvent.submitter as Submitter | null;
+    const target = targetUrl(form, submitter);
+
+    // Another origin, or a non-http target: not this runtime's to fetch.
+    if (!canEnhance(target)) return;
 
     event.preventDefault();
 
@@ -139,9 +182,10 @@ export function Form({
       signal = independentController.current.signal;
     }
 
-    const outcome = await submitAction(targetUrl(form, submitter), new FormData(form, submitter), {
+    const outcome = await submitAction(target, new FormData(form, submitter), {
       independent: independent === true,
       signal,
+      dedupeKey: instanceKey.current,
     });
 
     // The runtime went away mid-submit: let the browser do what it would

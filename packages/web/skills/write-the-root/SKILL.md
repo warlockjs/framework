@@ -102,10 +102,11 @@ If `root.tsx` (or any module it needs) fails to load or its `register()` throws,
 `<Head />` renders the resolved page metadata at that position. It takes no props and emits:
 
 - `<meta charset="utf-8">`
+- `<meta name="viewport" content="width=device-width, initial-scale=1">` by default (change it with `metadata.viewport`, or set `viewport: false` to emit none)
 - title, description, keywords, canonical, and robots tags
 - Open Graph and Twitter tags
 
-Do not also hard-code a `<title>` for the current page; that produces two titles. Static root-wide tags such as a favicon or application name can sit beside `<Head />`.
+Do not also hard-code a `<title>` for the current page; that produces two titles. Do not hard-code a viewport `<meta>` either: `<Head />` already emits one, so a second would duplicate it. Static root-wide tags such as a favicon or application name can sit beside `<Head />`.
 
 ## `<Scripts />`
 

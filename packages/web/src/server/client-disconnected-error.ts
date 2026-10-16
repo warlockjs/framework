@@ -13,8 +13,18 @@
  * that ambiguity is exactly what this class closes.
  */
 export class ClientDisconnectedError extends Error {
-  public constructor() {
-    super("The client disconnected before the SSR stream finished.");
+  /**
+   * @param failure A genuine server failure that happened before the
+   * disconnect was noticed (a loader bug, a session resolver that threw). The
+   * request is still abandoned, but the failure is still a bug: the page
+   * handler reports it even though it answers nobody. Never an error caused
+   * BY the abort.
+   */
+  public constructor(failure?: unknown) {
+    super(
+      "The client disconnected before the SSR stream finished.",
+      failure === undefined ? undefined : { cause: failure },
+    );
     this.name = "ClientDisconnectedError";
   }
 }

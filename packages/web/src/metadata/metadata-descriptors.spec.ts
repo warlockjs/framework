@@ -19,6 +19,11 @@ import { applyDocumentMetadata } from "../client/navigation/document-metadata";
 import { DocumentContext, type DocumentContextValue } from "../components/document-context";
 import { Head } from "../components/head";
 import type { MetadataOutput } from "../metadata";
+import {
+  DEFAULT_VIEWPORT,
+  resolveMetadataDescriptors,
+  resolveViewport,
+} from "./metadata-descriptors";
 
 /** The three tag shapes either path can produce, described the same way regardless of source. */
 function describeMetaTag(attributes: Record<string, string | undefined>): string {
@@ -49,6 +54,8 @@ function renderedBySsr(metadata: MetadataOutput | undefined): string[] {
 
     if (metaAttrs !== undefined) {
       if (metaAttrs.includes("charSet")) continue; // unconditional, not page metadata
+      // Document-level like the charset: SSR only, never navigation-managed (FW-03).
+      if (/\bname="viewport"/.test(metaAttrs)) continue;
 
       results.push(
         describeMetaTag({
@@ -350,5 +357,59 @@ describe("SSR/client metadata parity", () => {
       `meta name=twitter:title content=Contact us & "support" <team>`,
       `meta name=twitter:description content=We're here 24/7 & we <care> a lot, "really"`,
     ]);
+  });
+});
+
+/** FW-03: every page lays out at device width unless its metadata says otherwise. */
+describe("viewport", () => {
+  const viewportTags = (metadata: MetadataOutput | undefined) =>
+    renderToStaticMarkup(
+      createElement(
+        DocumentContext.Provider,
+        { value: { metadata } as unknown as DocumentContextValue },
+        createElement(Head),
+      ),
+    ).match(/<meta name="viewport"[^>]*>/g) ?? [];
+
+  it("defaults to device width", () => {
+    expect(resolveViewport(undefined)).toBe(DEFAULT_VIEWPORT);
+    expect(viewportTags(undefined)).toEqual([
+      `<meta name="viewport" content="${DEFAULT_VIEWPORT}"/>`,
+    ]);
+  });
+
+  it("uses metadata.viewport when set", () => {
+    expect(resolveViewport({ viewport: "width=device-width, viewport-fit=cover" })).toBe(
+      "width=device-width, viewport-fit=cover",
+    );
+  });
+
+  it("emits none for viewport: false", () => {
+    expect(resolveViewport({ viewport: false })).toBeUndefined();
+    expect(viewportTags({ viewport: false })).toEqual([]);
+  });
+
+  it("keeps a viewport declared through metadata.meta, once, instead of the default", () => {
+    const metadata = { meta: [{ name: "viewport", content: "width=1024" }] };
+
+    expect(resolveViewport(metadata)).toBe("width=1024");
+    expect(viewportTags(metadata)).toEqual(['<meta name="viewport" content="width=1024"/>']);
+  });
+
+  it("metadata.viewport wins over a metadata.meta viewport", () => {
+    expect(
+      resolveViewport({
+        viewport: "width=device-width",
+        meta: [{ name: "viewport", content: "width=1024" }],
+      }),
+    ).toBe("width=device-width");
+  });
+
+  it("is not a navigation-managed descriptor, so client navigation never rewrites root.tsx's own tag", () => {
+    expect(
+      resolveMetadataDescriptors({ viewport: "width=device-width" }).some((descriptor) =>
+        descriptor.key.includes("viewport"),
+      ),
+    ).toBe(false);
   });
 });

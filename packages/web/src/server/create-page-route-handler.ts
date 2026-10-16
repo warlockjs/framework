@@ -62,6 +62,7 @@ import { resolvePageCacheHitOrMiss } from "./page-route-handler/serve-page-cache
 import { storePageCacheAfterRender } from "./page-route-handler/store-page-cache-after-render";
 import { sendPageDataResponse } from "./page-route-handler/send-page-data-response";
 import { writePageFailureResponse } from "./page-route-handler/write-page-failure-response";
+import { assertSafeRedirectUrl } from "../routing/safe-redirect-url";
 import { normalizePageModule } from "./normalize-page-module";
 
 declare module "@warlock.js/core" {
@@ -309,6 +310,10 @@ async function answerActionOutcome(options: {
 
   if (shortCircuit?.stage === "loaders" && shortCircuit.kind === "redirect") {
     const url = shortCircuit.url ?? "/";
+
+    // Defence in depth: `response.redirect()` already refuses these, but a
+    // short-circuit can be built elsewhere, and the client follows this header.
+    assertSafeRedirectUrl(url);
 
     settle();
 
@@ -920,8 +925,27 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     } catch (thrown) {
       // The client went away while the pipeline was still loading: nothing
       // was committed, nobody is waiting for an answer, and nothing failed on
-      // the server's side. Neither a report nor a failure page.
-      if (thrown instanceof ClientDisconnectedError) return;
+      // the server's side. Neither a report nor a failure page — unless a
+      // genuine failure happened first, which is still a bug worth logging.
+      if (thrown instanceof ClientDisconnectedError) {
+        if (thrown.cause !== undefined) {
+          reportServerError(
+            `page request ${request.method} ${request.path} failed before the client disconnected`,
+            thrown.cause,
+            {
+              kind: "request-handler",
+              phase: "request-handler",
+              routeName: name,
+              routePath: path,
+              pathname: pathnameFromRequest(request),
+              method: request.method,
+              requestId: request.id,
+            },
+          );
+        }
+
+        return;
+      }
 
       // Floor first, before any error page renders: this path runs outside the
       // pipeline, so `buildErrorRecord` never saw `thrown`. Without this line a

@@ -12,15 +12,28 @@ import { renderPageFailure } from "./render-page";
 
 const LOCALE_PROVIDER_MESSAGE = /outside Warlock's LocaleProvider/;
 
+const CONTEXT_REGISTRY_SLOT = Symbol.for("warlock.web.reactContexts");
+
 /**
- * A SECOND copy of the localization module: its own `LocaleContext`, which the
- * framework's `LocaleProvider` (the first copy) never fills. That is exactly
- * what a broken dev module graph produces, and it throws the real error.
+ * A SECOND copy of the localization module with its own `LocaleContext`, which
+ * the framework's `LocaleProvider` (the first copy) never fills, and it throws
+ * the real error. A plain re-evaluation now shares the first context (FW-07,
+ * `shared/shared-context.ts`), so the shared registry is hidden while the copy
+ * loads — the case a graph that cannot share it at all still produces — and
+ * put back afterwards.
  */
 async function secondLocaleCopy() {
+  const holder = globalThis as unknown as Record<symbol, unknown>;
+  const registry = holder[CONTEXT_REGISTRY_SLOT];
+
+  delete holder[CONTEXT_REGISTRY_SLOT];
   vi.resetModules();
 
-  return import("../localization");
+  try {
+    return await import("../localization");
+  } finally {
+    holder[CONTEXT_REGISTRY_SLOT] = registry;
+  }
 }
 
 function createHttp() {

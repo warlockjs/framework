@@ -90,6 +90,7 @@ All fields are optional. An unknown key (`tittle`) is a build error naming the f
 | `keywords`    | `string` or `string[]` (joined with `, `)                                       | `<meta name="keywords">`                                                     |
 | `robots`      | `string`, e.g. `"noindex,nofollow"`                                             | `<meta name="robots">`                                                       |
 | `canonical`   | `string` (path or absolute URL) or `false`                                      | `<link rel="canonical">`                                                     |
+| `viewport`    | `string` or `false`; default `"width=device-width, initial-scale=1"`            | `<meta name="viewport">`, SSR only; client navigation never rewrites it     |
 | `image`       | `string` or `{ url, width?, height?, alt?, type? }`                             | The share image: fallback for `og:image` and `twitter:image`                 |
 | `authors`     | `string`, or an array of `string` / `{ name, url? }`                            | `<meta name="author">` (names joined), plus `<link rel="author">` per `url`  |
 | `openGraph`   | see below                                                                       | `og:*` and `article:*` tags                                                  |

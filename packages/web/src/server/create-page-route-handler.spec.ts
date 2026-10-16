@@ -227,6 +227,32 @@ describe("createPageRouteHandler — universal registration", () => {
     error.mockRestore();
   });
 
+  it("still reports a genuine failure that happened before the client disconnected", async () => {
+    const requestContext = context();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const bug = new TypeError("loader bug");
+    const handler = createPageRouteHandler(
+      handlerOptions({
+        "app.tsx": {},
+        "composed-layout.tsx": {},
+        "account.page.tsx": { default: MockPage },
+      }),
+    );
+
+    renderPageRequest.mockRejectedValue(new ClientDisconnectedError(bug));
+
+    await expect(handler(requestContext as never)).resolves.toBeUndefined();
+
+    // Reported, but nothing is rendered or sent to the departed client.
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("failed before the client disconnected"),
+      bug,
+    );
+    expect(renderPageFailure).not.toHaveBeenCalled();
+    expect(requestContext.response.send).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it("registers App, real layouts outermost-first, and page before render", async () => {
     const calls: string[] = [];
     const app = { register: () => calls.push("app") };

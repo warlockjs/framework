@@ -208,7 +208,136 @@ describe("<Form>", () => {
     expect((submitter.mock.calls[0] as unknown[])[2]).toEqual({
       independent: false,
       signal: undefined,
+      dedupeKey: expect.stringMatching(/^form-/),
     });
+  });
+
+  // Review fix: two rows' forms must never be merged into one request.
+  it("gives each form instance its own dedupe key", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+
+    connectActionSubmitter(submitter);
+    const { container } = mount(
+      <>
+        <Form action="cancel" independent>
+          <input name="id" defaultValue="A" />
+        </Form>
+        <Form action="cancel" independent>
+          <input name="id" defaultValue="B" />
+        </Form>
+      </>,
+    );
+    const forms = container.querySelectorAll("form");
+
+    await act(async () => {
+      for (const form of Array.from(forms)) {
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      }
+    });
+
+    const keys = submitter.mock.calls.map(
+      (call) => ((call as unknown[])[2] as { dedupeKey: string }).dedupeKey,
+    );
+
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  // Review fix: effects re-run without an unmount (a hidden <Activity> shown
+  // again) must not leave the form with an already-aborted signal.
+  it("submits with a live signal after its effects were cleaned up and re-run", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+    const { Activity } = await import("react");
+
+    connectActionSubmitter(submitter);
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const render = (mode: "visible" | "hidden") =>
+      act(() =>
+        root.render(
+          createElement(
+            DocumentContext.Provider,
+            { value: documentValue() },
+            <Activity mode={mode}>
+              <Form action="cancel" independent />
+            </Activity>,
+          ),
+        ),
+      );
+
+    render("visible");
+    await submit(container);
+
+    const first = ((submitter.mock.calls[0] as unknown[])[2] as { signal: AbortSignal }).signal;
+
+    render("hidden");
+    expect(first.aborted).toBe(true);
+
+    render("visible");
+    await submit(container);
+
+    const second = ((submitter.mock.calls[1] as unknown[])[2] as { signal: AbortSignal }).signal;
+
+    expect(second.aborted).toBe(false);
+    act(() => root.unmount());
+  });
+
+  // Security review: a button may name any `formaction`; enhancing a
+  // cross-origin one would fetch it and trust what that origin answered.
+  it("leaves a cross-origin formaction to the browser", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+
+    connectActionSubmitter(submitter);
+    const { container } = mount(
+      <Form>
+        <button type="submit" formAction="https://elsewhere.example/collect">
+          Send
+        </button>
+      </Form>,
+    );
+    const form = container.querySelector("form")!;
+    let prevented: boolean | undefined;
+    // `document` hears the event after React's root listener has run.
+    const listener = (event: Event) => {
+      prevented = event.defaultPrevented;
+    };
+
+    document.addEventListener("submit", listener);
+
+    const event = new Event("submit", { bubbles: true, cancelable: true });
+
+    Object.defineProperty(event, "submitter", { value: container.querySelector("button") });
+
+    await act(async () => {
+      form.dispatchEvent(event);
+    });
+
+    document.removeEventListener("submit", listener);
+
+    expect(submitter).not.toHaveBeenCalled();
+    // Not prevented: the browser posts it natively.
+    expect(prevented).toBe(false);
+  });
+
+  it("enhances a same-origin absolute formaction", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+
+    connectActionSubmitter(submitter);
+    const { container } = mount(
+      <Form>
+        <button type="submit" formAction={`${window.location.origin}/save`}>
+          Save
+        </button>
+      </Form>,
+    );
+
+    await act(async () => {
+      container.querySelector("button")!.click();
+    });
+
+    expect(submitter).toHaveBeenCalledTimes(1);
   });
 
   it("renders field errors and wires aria-invalid / aria-describedby", () => {

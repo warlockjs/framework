@@ -152,6 +152,10 @@ const CASE_FOR_KEY: Record<string, RenderCase> = {
     metadata: { robots: "index,follow" },
     tag: '<meta name="robots" content="index,follow"/>',
   },
+  viewport: {
+    metadata: { viewport: "width=device-width, initial-scale=1, viewport-fit=cover" },
+    tag: '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>',
+  },
   openGraph: {
     metadata: { openGraph: { type: "website" } },
     tag: '<meta property="og:type" content="website"/>',
@@ -274,7 +278,9 @@ describe("MetadataOutput — every declared key is a key something reads", () =>
     // without the build gate in `build/discover-pages.ts`.
     const html = renderHead({ tittle: "Products" } as unknown as MetadataOutput);
 
-    expect(html).toBe('<meta charSet="utf-8"/>');
+    expect(html).toBe(
+      '<meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>',
+    );
     expect(html).not.toContain("tittle");
     expect(html).not.toContain("Products");
   });

@@ -148,6 +148,21 @@ describe("web build contribution — zero pages", () => {
     log.mockRestore();
   });
 
+  it("forwards build.testOnly into the barrel generator (FW-15)", async () => {
+    const appRoot = makeTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    stubGeneratedPages(1);
+
+    await createWebBuildContribution({ testOnly: ["src/web/shared/testing"] }).generate?.(
+      buildContext(appRoot),
+    );
+
+    expect(generatePagesBarrelSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ testOnly: ["src/web/shared/testing"] }),
+    );
+    log.mockRestore();
+  });
+
   it("contributes its entry import even when the generator reports no pages", async () => {
     const appRoot = makeTree({ "src/web/root.tsx": APP });
     const context = buildContext(appRoot);

@@ -1,4 +1,5 @@
-import { createContext, useContext, useRef, useSyncExternalStore } from "react";
+import { useContext, useRef, useSyncExternalStore } from "react";
+import { sharedContext } from "../shared/shared-context";
 import { clearPrefetchCache } from "../client/navigation/prefetch";
 import type { GuardedPageRouteName } from "../routing/route-types";
 import type { SessionUser } from "./session.types";
@@ -68,7 +69,8 @@ function getSnapshot(): SessionUser | null {
  * `<SessionContext.Provider value={{ user }}>`; on the client no provider is
  * mounted and `useUser()` reads the store.
  */
-export const SessionContext = createContext<{ readonly user: SessionUser | null } | undefined>(
+export const SessionContext = sharedContext<{ readonly user: SessionUser | null } | undefined>(
+  "WarlockSessionContext",
   undefined,
 );
 

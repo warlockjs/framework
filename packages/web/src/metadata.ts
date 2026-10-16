@@ -47,6 +47,13 @@ export type MetadataOutput = {
   canonical?: string | false;
   robots?: string;
   /**
+   * `<meta name="viewport">`. Defaults to
+   * `"width=device-width, initial-scale=1"` so a new app lays out at device
+   * width on phones; set a string to change it or `false` to emit none. A
+   * `meta` entry named `viewport` is used when this field is absent.
+   */
+  viewport?: string | false;
+  /**
    * `og:title`/`og:description` fall back to the top-level `title`/
    * `description` ALWAYS, even without `openGraph`; `og:type` defaults to
    * `"website"` whenever any `og:*` tag is emitted. `article` is only
@@ -212,6 +219,7 @@ export const METADATA_KEYS = [
   "authors",
   "canonical",
   "robots",
+  "viewport",
   "openGraph",
   "twitter",
   "meta",

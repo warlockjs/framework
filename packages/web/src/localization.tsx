@@ -5,7 +5,8 @@ import {
   type Keywords,
   type Translatable,
 } from "@mongez/localization";
-import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { useCallback, useContext, type ReactNode } from "react";
+import { sharedContext } from "./shared/shared-context";
 import type { TranslationKey } from "./index";
 import { recordCurrentLocale } from "./routing/current-locale";
 
@@ -59,7 +60,7 @@ type LocaleValue = {
   readonly translations?: Readonly<Keywords>;
 };
 
-const LocaleContext = createContext<LocaleValue | undefined>(undefined);
+const LocaleContext = sharedContext<LocaleValue | undefined>("WarlockLocaleContext", undefined);
 
 /**
  * Bind translations to the request locale carried by the hydration payload.

@@ -289,6 +289,13 @@ function validateMetadataInput(value: unknown, sourceFile: string): MetadataInpu
   ) {
     fail(sourceFile, "config.metadata.canonical must be a string or false when defined.");
   }
+  if (
+    value.viewport !== undefined &&
+    value.viewport !== false &&
+    typeof value.viewport !== "string"
+  ) {
+    fail(sourceFile, "config.metadata.viewport must be a string or false when defined.");
+  }
   if (value.image !== undefined && typeof value.image !== "string") {
     validateImage(value.image, sourceFile, "config.metadata.image");
   }

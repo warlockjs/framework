@@ -176,7 +176,7 @@ The same state renders on the server without JS, after a JS swap, and after a JS
 
 The action's `response` is buffered like a loader's, so `header()` and `cookie()` work. Return one of:
 
-- `response.redirect(url)`, a redirect (see outcomes below).
+- `response.redirect(url)`, a redirect (see outcomes below). `url` must be relative or `http:`/`https:`; any other scheme (`javascript:`, `data:`) or a control character throws, so redirecting to a `next` parameter from the request cannot send script to the browser.
 - A value: success, and the page's loaders re-run.
 - A failure helper: `badRequest` (400), `unauthorized` (401), `forbidden` (403), `conflict` (409), `unprocessableEntity` (422), `tooManyRequests` (429), `serviceUnavailable` (503). Pass an optional `{ message, errors }`; `errors` may be a Seal array or a `{ field: message }` record.
 
@@ -191,7 +191,7 @@ The action's `response` is buffered like a loader's, so `header()` and `cookie()
 
 ## `<Form>`
 
-`<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `query` (the query string of the URL it posts to), `independent`, `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, `<Form>` leaves the submit to the browser, which posts natively.
+`<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `query` (the query string of the URL it posts to), `independent`, `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, `<Form>` leaves the submit to the browser, which posts natively. A submit button whose `formaction` names another origin is always posted natively: the runtime only enhances same-origin targets.
 
 A submit button's own `formAction` and its `name`/`value` are honoured on both paths, as the browser does: the button below posts to `/runs?mode=inspect` with `purpose=inspect` alongside the form's fields.
 
@@ -219,7 +219,7 @@ Ordinary submissions are single-flight: a second submit while one is pending sha
 </Form>
 ```
 
-An independent submission neither aborts the pending one nor is aborted by it, and its result is applied unless a navigation started after it. A double submit of the same independent action (same URL and `_action`) still shares one request, and unmounting the form cancels its submission. A redirect from an independent action is a navigation like any other and supersedes what is pending.
+An independent submission neither aborts the pending one nor is aborted by it. Its result, a redirect included, is applied only while the user is still on the page it was made on: once a navigation has started or committed, it is dropped. A double submit of the same form with the same fields still shares one request; another form that posts the same action (a Cancel button on each row) always sends its own. Unmounting a form cancels only its own submission. A redirect from an independent action is a navigation like any other and supersedes what is pending.
 
 Using `@mongez/react-form`? `useSubmitAction({ action?, to? })` from `@warlock.js/web/form` is an `onSubmit` for its `<Form method="post">` and maps `errors` into the form. Import one of the two `Form`s under an alias if both appear.
 

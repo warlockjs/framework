@@ -378,6 +378,97 @@ describe("the Vite-switch tripwire", () => {
     ).rejects.toThrowError(WebPageGraphUnsupportedImportError);
   });
 
+  // FW-15: test code under src/web never reaches the server bundle, so it may
+  // use `import.meta.url` like test code anywhere else.
+  describe("test-only sources (FW-15)", () => {
+    const productionDirOf = (appRoot: string) => path.join(appRoot, ".warlock/production");
+
+    it.each([
+      ["a spec file", "src/web/main/home.spec.tsx"],
+      ["a test file", "src/web/shared/format.test.ts"],
+      ["a __tests__ folder", "src/web/shared/__tests__/helper.ts"],
+      ["a __mocks__ folder", "src/web/shared/__mocks__/api.ts"],
+    ])("skips %s", async (_name, file) => {
+      const appRoot = makeAppTree({
+        "src/web/root.tsx": APP,
+        "src/web/main/home.page.tsx": PAGE,
+        [file]: "export const here = import.meta.url;\n",
+      });
+
+      await expect(
+        generatePagesBarrel({ appRoot, productionDir: productionDirOf(appRoot), clientDir: "dist/client" }),
+      ).resolves.toMatchObject({ pageCount: 1 });
+    });
+
+    it("skips a configured testOnly folder", async () => {
+      const appRoot = makeAppTree({
+        "src/web/root.tsx": APP,
+        "src/web/main/home.page.tsx": PAGE,
+        "src/web/shared/testing/count-queries.ts": "export const here = import.meta.url;\n",
+      });
+
+      await expect(
+        generatePagesBarrel({
+          appRoot,
+          productionDir: productionDirOf(appRoot),
+          clientDir: "dist/client",
+          testOnly: ["src/web/shared/testing"],
+        }),
+      ).resolves.toMatchObject({ pageCount: 1 });
+    });
+
+    it("still fires on a test helper outside any test-only location", async () => {
+      const appRoot = makeAppTree({
+        "src/web/root.tsx": APP,
+        "src/web/main/home.page.tsx": PAGE,
+        "src/web/shared/testing/count-queries.ts": "export const here = import.meta.url;\n",
+      });
+
+      await expect(
+        generatePagesBarrel({ appRoot, productionDir: productionDirOf(appRoot), clientDir: "dist/client" }),
+      ).rejects.toThrowError(/count-queries\.ts/);
+    });
+
+    // Review fix: folder names are read BELOW the web root, so an app that
+    // itself lives under `__tests__` (an e2e fixture) is not exempted wholesale.
+    it("still fires for an app located under a __tests__ folder", async () => {
+      const outer = makeAppTree({});
+      const appRoot = path.join(outer, "__tests__", "fixtures", "app");
+      const files: Record<string, string> = {
+        "src/web/root.tsx": APP,
+        "src/web/main/home.page.tsx": PAGE,
+        "src/web/shared/helper.ts": "export const here = import.meta.url;\n",
+      };
+
+      for (const [relative, contents] of Object.entries(files)) {
+        const full = path.join(appRoot, relative);
+
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.writeFileSync(full, contents, "utf-8");
+      }
+
+      await expect(
+        generatePagesBarrel({ appRoot, productionDir: productionDirOf(appRoot), clientDir: "dist/client" }),
+      ).rejects.toThrowError(/helper\.ts/);
+    });
+
+    it("never skips a page inside a testOnly folder", async () => {
+      const appRoot = makeAppTree({
+        "src/web/root.tsx": APP,
+        "src/web/main/home.page.tsx": `const here = import.meta.url;\n${PAGE}`,
+      });
+
+      await expect(
+        generatePagesBarrel({
+          appRoot,
+          productionDir: productionDirOf(appRoot),
+          clientDir: "dist/client",
+          testOnly: ["src/web/main"],
+        }),
+      ).rejects.toThrowError(WebPageGraphUnsupportedImportError);
+    });
+  });
+
   it("scans non-page sources under the web roots too, and leaves the barrel unwritten", async () => {
     const appRoot = makeAppTree({
       "src/web/root.tsx": APP,

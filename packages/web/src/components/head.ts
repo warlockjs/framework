@@ -2,6 +2,7 @@ import { createElement, Fragment, type ReactElement } from "react";
 import {
   MANAGED_DYNAMIC_ATTRIBUTE,
   resolveMetadataDescriptors,
+  resolveViewport,
   type MetadataDescriptor,
 } from "../metadata/metadata-descriptors";
 import { useDocumentContext } from "./document-context";
@@ -54,10 +55,17 @@ export function Head(): ReactElement {
     hydrationClientModulePreloadUrls,
   } = useDocumentContext("Head");
 
+  const viewport = resolveViewport(metadata);
+
   return createElement(
     Fragment,
     null,
     createElement("meta", { charSet: "utf-8" }),
+    // Document-level like the charset (FW-03): rendered here, never managed
+    // by client navigation. See `resolveViewport`.
+    ...(viewport === undefined
+      ? []
+      : [createElement("meta", { key: "viewport", name: "viewport", content: viewport })]),
     // `modulepreload` for the hydration entry's own statically imported
     // chunks (card 53f8647e — `vendor-react`, most of all). Placed ahead of
     // everything else in `<head>` so the browser discovers and fetches it in

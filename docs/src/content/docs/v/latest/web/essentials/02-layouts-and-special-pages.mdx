@@ -127,8 +127,13 @@ export default function ErrorPage({ error, status }: ErrorPageProps) {
 }
 ```
 
+The error page renders with the real status, a 4xx (a thrown `HttpError`
+such as `ForbiddenError`, or a failed page validation) as well as a 5xx, and
+hydrates in both cases.
+
 In development, `error` is the thrown value during SSR. After hydration it is
-a JSON-safe `{ name, message, stack?, errorCode? }` record. In **production**,
+a JSON-safe `{ name, message, stack?, errorCode?, errors? }` record; `errors`
+is present only for a failed page validation. In **production**,
 SSR and hydration both receive the same sanitized record. The error's own
 `message` is replaced by a generic one, `stack` is never sent, and an opaque
 `errorCode` matches the line in the server's error report. Error metadata may

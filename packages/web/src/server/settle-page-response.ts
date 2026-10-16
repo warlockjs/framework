@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { environment, type Response } from "@warlock.js/core";
+import { assertSafeRedirectUrl } from "../routing/safe-redirect-url";
 import { isVisitorSafePageError } from "./is-visitor-safe-page-error";
 import { reportServerError } from "./report-server-error";
 import type { ServerErrorContext } from "./error-reporting-config";
@@ -197,6 +198,9 @@ export function createBufferedResponse(buffer: LevelBuffer): BufferedResponse {
       return bufferedResponse;
     },
     redirect(url, statusCode = 302) {
+      // `redirect(request.input("next"))` must never emit `javascript:` or a
+      // header-splitting Location; the client would otherwise run it.
+      assertSafeRedirectUrl(url);
       buffer.statusCode = statusCode;
       buffer.headers.push({ key: "Location", value: url });
       return { [LOADER_SHORT_CIRCUIT]: true, kind: "redirect", statusCode, url, body: undefined };

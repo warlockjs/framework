@@ -68,6 +68,12 @@ immediately before it.
 - emits `page-routes.manifest.json` with each page's method, path, name, and
   source file;
 - rejects page graphs that violate the one-rendering-layout rule;
+- rejects `.ts`/`.tsx` sources under `src/web` that import a static asset or
+  use `import.meta.url`, since the server bundle cannot honour either. Test
+  code is skipped: `*.spec.*` and `*.test.*` files, `__tests__` and
+  `__mocks__` folders, and any app-root-relative path listed in
+  `webConnector({ build: { testOnly: ["src/web/shared/testing"] } })`. A page,
+  layout or root inside such a folder is still checked;
 - builds the hydration client and a Vite manifest;
 - resolves root, matched-layout, and page CSS into ordered, deduplicated,
   render-blocking asset links;

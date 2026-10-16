@@ -1,5 +1,6 @@
 import type { Keywords } from "@mongez/localization";
-import { createContext, useContext } from "react";
+import { useContext } from "react";
+import { sharedContext } from "../shared/shared-context";
 import type { MetadataOutput } from "../metadata";
 import type { LocaleRouting } from "../routing/locale-routing";
 import type { NamedApiRouteMetadata } from "../routing/named-api-routes";
@@ -316,7 +317,10 @@ export type DocumentContextValue = {
   namedApiRoutes?: NamedApiRouteMetadata;
 };
 
-export const DocumentContext = createContext<DocumentContextValue | undefined>(undefined);
+export const DocumentContext = sharedContext<DocumentContextValue | undefined>(
+  "WarlockDocumentContext",
+  undefined,
+);
 
 /**
  * Require the page pipeline's universal document state. The payload id and

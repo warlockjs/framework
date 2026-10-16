@@ -529,6 +529,7 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 - **A page with no default export IS refused.** Named exports alone fail the build naming the file, instead of serving a blank 200.
 - **`.client.tsx` does not prevent SSR evaluation.** It is a naming convention, not an isolation boundary. Use `<ClientOnly>` (the `render-client-only` topic).
 - **Imported static assets do not build.** Put them in `public/` and reference their root URL; CSS imports remain supported.
+- **`import.meta.url` fails the build in page-graph code.** Spec/test files, `__tests__` / `__mocks__` folders and the paths in `webConnector({ build: { testOnly } })` are skipped by that scan.
 - **`[...slug]` is not a catch-all.** It fails boot with
   `PageFileSegmentNotSupportedError`; use an explicit terminal `*` route
   instead — see [Catch-all segments are refused](#catch-all-segments-are-refused).

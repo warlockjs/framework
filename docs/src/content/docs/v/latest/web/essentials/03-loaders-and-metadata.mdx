@@ -224,7 +224,14 @@ export default {
 
 `config.metadata` can be a static object or a function of resolved loader data.
 Pages, layouts, and `root.tsx` all use that same shape. It supports `title`,
-`description`, `keywords`, `canonical`, `robots`, `openGraph`, and `twitter`.
+`description`, `keywords`, `canonical`, `robots`, `viewport`, `openGraph`, and
+`twitter`.
+
+`<Head />` emits `<meta name="viewport" content="width=device-width, initial-scale=1">`
+on every page unless `metadata.viewport` says otherwise: set a string to change
+it, or `false` to emit none. Do not also hard-code the tag in `root.tsx`. Like
+the charset, the viewport is document-level: client navigation never rewrites
+it, so a per-page value applies on a full page load.
 
 Use an explicit config type annotation. A title can be a string, a default and
 template pair, or an absolute title that no ancestor may format:

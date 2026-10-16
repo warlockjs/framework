@@ -49,6 +49,7 @@ import { scrollToFragment } from "./scroll-to-fragment";
 import { syncDocumentLocale } from "./sync-document-locale";
 import { beginNavigationPending, waitForNavigationIdle } from "./navigation-pending-store";
 import { stashNavigationFailure } from "../navigation-failure-stash";
+import { isSafeRedirectUrl } from "../../routing/safe-redirect-url";
 
 /**
  * Carry out a scroll decision (`scroll-restoration.ts`) once the target
@@ -203,9 +204,20 @@ export function NavigationRoot({
 
   const applySwap = (next: Current, complete?: () => void): void => {
     resetTokenRef.current += 1;
+
+    /*
+      A swap that replaces one still waiting for its commit settles that wait
+      now: its tree will never be the committed `current`, so the layout effect
+      below would never match it, and its holder (a navigation, a submit) would
+      keep the router reporting busy forever. A swap without a `complete` of
+      its own (an independent submission) must not simply drop it either.
+    */
+    const superseded = pendingCommit.current;
+
     pendingCommit.current = complete === undefined ? undefined : { next, complete };
 
     setCurrent(next);
+    superseded?.complete();
   };
 
   /*
@@ -518,6 +530,14 @@ export function NavigationRoot({
       createActionSubmitter({
         ...runtime,
         navigate: (url: string) => {
+          // `submitPageAction` already refuses these; a second guard here keeps
+          // any other caller from handing `javascript:` to location.assign.
+          if (!isSafeRedirectUrl(url)) {
+            console.warn("Warlock refused an unsafe redirect target:", url);
+
+            return;
+          }
+
           // External destinations (an OAuth start) leave the document.
           const external = new URL(url, window.location.href).origin !== window.location.origin;
 
@@ -533,8 +553,18 @@ export function NavigationRoot({
         },
         observeTicket: () => {
           const observed = token;
+          // The page the submission was made on. A navigation that had already
+          // claimed its ticket (so `token` will not move again) but had not yet
+          // committed still changes this when it does, and a result for the
+          // page the user left must not be drawn over the one they reached.
+          const observedUrl = withoutFragment(committedUrl);
 
-          return () => !disposed && observed === token;
+          return () =>
+            !disposed &&
+            observed === token &&
+            withoutFragment(committedUrl) === observedUrl &&
+            // A swap waiting for its commit is newer than this result.
+            pendingCommit.current === undefined;
         },
       }),
     );

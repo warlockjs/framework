@@ -219,7 +219,18 @@ describe("readHydrationPayload", () => {
       "an extra serialized error field",
       { error: { name: "Error", message: "boom", cause: "raw" }, status: 500 },
     ],
-    ["a non-5xx status", { error: serializedErrorPage.error, status: 404 }],
+    ["a status below 400", { error: serializedErrorPage.error, status: 399 }],
+    ["a status above 599", { error: serializedErrorPage.error, status: 600 }],
+    ["a non-string errorCode", { error: { name: "Error", message: "boom", errorCode: 7 }, status: 500 }],
+    ["non-array validation errors", { error: { name: "E", message: "m", errors: "bad" }, status: 400 }],
+    [
+      "a validation issue with an extra field",
+      { error: { name: "E", message: "m", errors: [{ input: "a", type: "b", error: "c", value: "raw" }] }, status: 400 },
+    ],
+    [
+      "a validation issue with a non-string field",
+      { error: { name: "E", message: "m", errors: [{ input: "a", type: "b", error: 1 }] }, status: 400 },
+    ],
     ["a non-integer status", { error: serializedErrorPage.error, status: 500.5 }],
   ])("rejects errorPage with %s", (_caseName, errorPage) => {
     const documentNode = makeDocument(stringify({ ...fullPayload, errorPage }));

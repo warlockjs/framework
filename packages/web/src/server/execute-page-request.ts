@@ -489,6 +489,9 @@ export async function executePageRequest<TResult = PageDataBundle>(
   // still connected and still needs the 504 error page, so that abort is not
   // a disconnect (see `throwIfClientDisconnected`).
   let loaderTimedOut = false;
+  // A genuine failure from a stage that hands a bundle straight to `finish`
+  // (the session resolver), kept so an abandoned request still reports it.
+  let stageFailure: unknown;
   const store: PipelineStore = runner.buildStore
     ? runner.buildStore({ request, response })
     : { request, response };
@@ -501,9 +504,17 @@ export async function executePageRequest<TResult = PageDataBundle>(
    * visitor who is no longer there). `ClientDisconnectedError` is the same
    * reason the stream abort sites use; the page handler swallows it.
    */
-  const throwIfClientDisconnected = (): void => {
+  const throwIfClientDisconnected = (failure?: unknown): void => {
     if (requestAbortController.signal.aborted && !loaderTimedOut) {
-      throw new ClientDisconnectedError();
+      // A failure the abort itself caused (a fetch rejected with the abort
+      // reason) is not a bug and is dropped; anything else rides along so the
+      // handler still reports it.
+      const genuine =
+        failure !== undefined && !isAbortCaused(failure, requestAbortController.signal)
+          ? failure
+          : undefined;
+
+      throw new ClientDisconnectedError(genuine);
     }
   };
 
@@ -513,7 +524,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
     enterAdditionalSharedScope(store);
 
     const finish = async (bundle: PageDataBundle): Promise<TResult> => {
-      throwIfClientDisconnected();
+      throwIfClientDisconnected(stageFailure);
 
       return options.finish ? await options.finish(bundle) : (bundle as TResult);
     };
@@ -570,6 +581,8 @@ export async function executePageRequest<TResult = PageDataBundle>(
           stageSession = { user: null, model: null };
         }
       } catch (thrown) {
+        stageFailure = thrown;
+
         const resolvedStatus = resolveThrownHttpStatus(thrown);
         const isClientError = resolvedStatus !== undefined && resolvedStatus < 500;
 
@@ -944,7 +957,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
     // and still needs the 504 error page — so that case is excluded,
     // deliberately, and handled entirely through the ordinary "throw" signal
     // below instead.
-    throwIfClientDisconnected();
+    throwIfClientDisconnected(signal?.kind === "throw" ? signal.thrown : undefined);
 
     if (!signal) {
       committedLevels = [...LEVEL_ORDER];
@@ -1101,4 +1114,19 @@ export async function executePageRequest<TResult = PageDataBundle>(
 
     return finish(bundle);
   });
+}
+
+/**
+ * Whether `failure` is the abort itself surfacing: the signal's own reason,
+ * or an `AbortError` thrown by something that observed the signal.
+ */
+function isAbortCaused(failure: unknown, signal: AbortSignal): boolean {
+  if (failure === signal.reason) return true;
+  if (failure instanceof ClientDisconnectedError) return true;
+
+  return (
+    typeof failure === "object" &&
+    failure !== null &&
+    (failure as { name?: unknown }).name === "AbortError"
+  );
 }

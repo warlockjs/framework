@@ -54,6 +54,13 @@ export type WebBuildOptions = {
   external?: string[];
   /** Build-safe snapshot of `src/config/web.ts`'s static `sites` shape. */
   sites?: SitesConfig;
+  /**
+   * App-root-relative folders or files that hold test-only code (helpers
+   * imported only by specs). The production build's page-graph scan skips
+   * them, so they may use `import.meta.url`. Spec/test files and `__tests__` /
+   * `__mocks__` folders are always skipped. Example: `["src/web/shared/testing"]`.
+   */
+  testOnly?: string[];
 };
 
 function resolveClientOutDir(context: ConnectorBuildContext): string {
@@ -247,6 +254,7 @@ export function createWebBuildContribution(
           .join("/"),
         publicFiles,
         sites,
+        testOnly: options.testOnly,
       });
 
       pageCount = result.pageCount;

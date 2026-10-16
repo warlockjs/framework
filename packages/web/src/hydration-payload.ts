@@ -125,19 +125,48 @@ function requireErrorPagePayload(value: unknown): void {
 
   const error = errorPage.error as Record<PropertyKey, unknown>;
 
-  if (!hasExactStringKeys(error, ["name", "message"], ["stack"])) malformedPayload();
+  // `errorCode` (production correlation id) and `errors` (sanitized page
+  // validation issues) are what `serializePageError` really sends; anything
+  // else is still refused.
+  if (!hasExactStringKeys(error, ["name", "message"], ["stack", "errorCode", "errors"])) {
+    malformedPayload();
+  }
   if (typeof error.name !== "string" || typeof error.message !== "string") {
     malformedPayload();
   }
   if (error.stack !== undefined && typeof error.stack !== "string") malformedPayload();
+  if (error.errorCode !== undefined && typeof error.errorCode !== "string") malformedPayload();
+  if (error.errors !== undefined) requireValidationIssues(error.errors);
 
+  // An error page carries the status the server answered with: a 4xx from a
+  // thrown `HttpError` or a failed page validation, or a 5xx.
   if (
     typeof errorPage.status !== "number" ||
     !Number.isInteger(errorPage.status) ||
-    errorPage.status < 500 ||
+    errorPage.status < 400 ||
     errorPage.status > 599
   ) {
     malformedPayload();
+  }
+}
+
+/** Each page-validation issue is exactly `{ input, type, error }`, all strings. */
+function requireValidationIssues(value: unknown): void {
+  if (!Array.isArray(value)) malformedPayload();
+
+  for (const issue of value as unknown[]) {
+    if (!isPlainObject(issue)) malformedPayload();
+
+    const record = issue as Record<PropertyKey, unknown>;
+
+    if (!hasExactStringKeys(record, ["input", "type", "error"])) malformedPayload();
+    if (
+      typeof record.input !== "string" ||
+      typeof record.type !== "string" ||
+      typeof record.error !== "string"
+    ) {
+      malformedPayload();
+    }
   }
 }
 
@@ -192,7 +221,8 @@ export function isHydrationPayload(value: unknown): value is HydrationDocumentPa
  * malformed, both throw — plus a shape check on the three optional ones
  * ({@link OPTIONAL_OBJECT_PAYLOAD_KEYS}); it deliberately does not require
  * those to be present. `errorPage`, when present, is additionally validated as
- * one atomic `{ error, status }` selection with a serialized error and a 5xx.
+ * one atomic `{ error, status }` selection with a serialized error and a
+ * 4xx or 5xx status.
  */
 export function readHydrationPayload(documentNode: Document): HydrationDocumentPayloadSource {
   const element = documentNode.getElementById(PAYLOAD_SCRIPT_ID);

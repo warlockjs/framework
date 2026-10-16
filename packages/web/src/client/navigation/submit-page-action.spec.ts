@@ -71,6 +71,17 @@ describe("submitPageAction", () => {
     });
   });
 
+  // Security review: the client must never hand a `javascript:` target to
+  // `window.location.assign()`, whatever a response's header says.
+  it("refuses a 204 whose redirect header names a non-http target", async () => {
+    respond(204, "", { "x-warlock-redirect": "javascript:alert(document.cookie)" });
+
+    expect(await submitPageAction("/contact", new FormData())).toEqual({
+      type: "hard-fail",
+      reason: "refused an unsafe redirect target",
+    });
+  });
+
   it("hard-fails for 204 without the header, a 422 without actionData, 500 and a network error", async () => {
     respond(204);
     expect((await submitPageAction("/c", new FormData())).type).toBe("hard-fail");

@@ -15,6 +15,7 @@ import {
 } from "../../routing/data-request";
 import type { HydrationDocumentPayloadSource } from "../../hydration-payload";
 import { readPageDataResponse } from "./fetch-page-data";
+import { isSafeRedirectUrl } from "../../routing/safe-redirect-url";
 
 const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 
@@ -82,7 +83,15 @@ export async function submitPageAction(
   if (response.status === 204) {
     const location = response.headers.get(ACTION_REDIRECT_HEADER);
 
-    if (location) return { type: "redirect", url: location };
+    if (location) {
+      // Never follow `javascript:` (or any non-http) target a response names:
+      // `window.location.assign()` would run it as script on this origin.
+      if (!isSafeRedirectUrl(location)) {
+        return { type: "hard-fail", reason: "refused an unsafe redirect target" };
+      }
+
+      return { type: "redirect", url: location };
+    }
 
     return { type: "hard-fail", reason: "204 without a redirect header" };
   }

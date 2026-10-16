@@ -39,7 +39,7 @@ import {
   isFile,
   walkFiles,
 } from "./discover-pages";
-import type { DiscoveredRoutablePage } from "./discover-pages";
+import type { DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
 import type { SitesConfig } from "../sites/site-config.types";
 import { serializeRouteLocales } from "./serialize-route-locales";
 import {
@@ -188,6 +188,12 @@ export type GeneratePagesBarrelOptions = {
   publicFiles?: readonly string[];
   /** Multi-site page roots to discover. Omitted preserves the single-site barrel verbatim. */
   sites?: SitesConfig;
+  /**
+   * App-root-relative folders or files holding test-only code, skipped by the
+   * build's page-graph scan (FW-15). Spec/test files and `__tests__` /
+   * `__mocks__` folders are always skipped.
+   */
+  testOnly?: readonly string[];
 };
 
 export type GeneratePagesBarrelResult = {
@@ -330,6 +336,72 @@ function hazardFor(specifier: string): string | undefined {
   return undefined;
 }
 
+/** Spec and test files never reach the page graph: `*.spec.ts(x)`, `*.test.ts(x)`. */
+const TEST_FILE_PATTERN = /\.(spec|test)\.tsx?$/;
+
+/** Folder names that hold test-only code by universal convention. */
+const TEST_ONLY_DIRECTORY_NAMES = new Set(["__tests__", "__mocks__"]);
+
+/**
+ * What the tripwire may skip (FW-15). `graphFiles` are the files the page
+ * graph itself is built from (pages, layouts, roots, setup files): they are
+ * never skipped, even inside a `testOnly` folder, because they ARE the bundle.
+ */
+type TestOnlyExemption = {
+  /** Absolute paths of app-configured test-only folders or files. */
+  testOnly: readonly string[];
+  /** Absolute paths of the files the page barrel imports directly. */
+  graphFiles: ReadonlySet<string>;
+};
+
+function isWithin(file: string, target: string): boolean {
+  const relative = path.relative(target, file);
+
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+/**
+ * @param webRoot The scanned root the file was found under. Folder names are
+ * read from the path BELOW it, so an app that itself lives under a folder
+ * named `__tests__` (an e2e fixture in a monorepo) is not exempted wholesale.
+ */
+function isTestOnlySource(
+  sourceFile: string,
+  webRoot: string,
+  exemption: TestOnlyExemption,
+): boolean {
+  if (exemption.graphFiles.has(sourceFile)) return false;
+  if (TEST_FILE_PATTERN.test(sourceFile)) return true;
+
+  const below = path.relative(webRoot, sourceFile).split(path.sep);
+
+  // The last segment is the file name, which the pattern above already read.
+  if (below.slice(0, -1).some((segment) => TEST_ONLY_DIRECTORY_NAMES.has(segment))) {
+    return true;
+  }
+
+  return exemption.testOnly.some((target) => isWithin(sourceFile, target));
+}
+
+/** Every file the barrel imports directly, so none of them can be exempted. */
+function pageGraphFiles(pages: readonly DiscoveredPage[], appFiles: readonly string[]): Set<string> {
+  const files = new Set<string>(appFiles);
+
+  for (const page of pages) {
+    files.add(page.pageFile);
+    if (page.setupFile !== undefined) files.add(page.setupFile);
+
+    if (page.type === "page") {
+      for (const layout of page.layouts) files.add(layout);
+    } else {
+      if (page.appFile !== undefined) files.add(page.appFile);
+      if (page.appSetupFile !== undefined) files.add(page.appSetupFile);
+    }
+  }
+
+  return files;
+}
+
 /**
  * The Vite-switch tripwire. Fails the build
  * the moment the page graph needs a capability the esbuild server build does
@@ -350,8 +422,17 @@ function hazardFor(specifier: string): string | undefined {
  * they cannot be, since real specifiers are string literals — so a specifier
  * inside a template literal (a code sample in a docs page, say) still matches.
  * Rare, and it fails loudly rather than silently, but it is not impossible.
+ *
+ * TEST CODE IS SKIPPED (FW-15). Spec/test files, `__tests__`/`__mocks__`
+ * folders and the app's `build.testOnly` paths never reach the server bundle,
+ * so a test helper may use `import.meta.url` like test code anywhere else. A
+ * page-graph file (page, layout, root, setup) is scanned wherever it lives.
  */
-function assertNoViteOnlyImports(webRoots: readonly string[], appRoot: string): void {
+function assertNoViteOnlyImports(
+  webRoots: readonly string[],
+  appRoot: string,
+  exemption: TestOnlyExemption,
+): void {
   for (const webRoot of webRoots) {
     const sources = walkFiles(
       webRoot,
@@ -359,6 +440,8 @@ function assertNoViteOnlyImports(webRoots: readonly string[], appRoot: string): 
     );
 
     for (const sourceFile of sources) {
+      if (isTestOnlySource(sourceFile, webRoot, exemption)) continue;
+
       // Comments stripped ONCE, and reused by both checks below: `import.meta.url`
       // was as blind to comments as the specifier scan was, and mentioning it in
       // prose — as this very file does — would have failed the build.
@@ -553,7 +636,17 @@ export async function generatePagesBarrel(
     };
   }
 
-  assertNoViteOnlyImports(webRoots, appRoot);
+  assertNoViteOnlyImports(webRoots, appRoot, {
+    testOnly: (options.testOnly ?? []).map((entry) => path.resolve(appRoot, entry)),
+    graphFiles: pageGraphFiles(discovered, [
+      path.join(srcRoot, "web", "root.tsx"),
+      path.join(srcRoot, "web", "root.setup.ts"),
+      ...Object.keys(options.sites ?? {}).flatMap((site) => [
+        path.join(srcRoot, "web", siteFolder(site), "root.tsx"),
+        path.join(srcRoot, "web", siteFolder(site), "root.setup.ts"),
+      ]),
+    ]),
+  });
 
   const appFile = path.join(srcRoot, "web", "root.tsx");
 

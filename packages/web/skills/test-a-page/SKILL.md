@@ -260,6 +260,7 @@ describe("Test Infrastructure", () => {
 
 - **Cast the context once.** `as unknown as Parameters<typeof loader>[0]` in one helper keeps every spec readable; do not scatter `any`.
 - **Mock the service, not Warlock.** Mock the module your loader calls (`vi.mock("./products.service", ...)`), not `@warlock.js/web`, except for the `Link` stand-in above.
+- **Test code may use `import.meta.url`.** The production build's page-graph scan skips `*.spec.*` / `*.test.*` files and `__tests__` / `__mocks__` folders. A helper elsewhere under `src/web` (say `src/web/shared/testing/`) is skipped once listed in `webConnector({ build: { testOnly: ["src/web/shared/testing"] } })`. A page, layout or root inside such a folder is still scanned.
 - **Serialization is not exercised.** A real loader's return is serialized to the browser (see the `load-page-data` topic); your unit test hands the component the raw object. Cover any value whose shape changes in transit in the full-stack check.
 
 ## See also

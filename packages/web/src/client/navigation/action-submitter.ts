@@ -37,11 +37,18 @@ export type ActionSubmitOptions = {
    * superseding it: a Cancel next to a long-running Start. The submission
    * takes no navigation ticket, so it neither aborts the pending submit or
    * navigation nor is aborted by it; its result is applied unless a
-   * navigation (or another ordinary operation) started after it. A double
-   * submit of the SAME independent action (same URL and `_action`) still
-   * shares one request.
+   * navigation (or another ordinary operation) started after it, and unless
+   * the page it was made on has since been left. A double submit of the SAME
+   * submission (same {@link ActionSubmitOptions.dedupeKey}, URL and form data)
+   * still shares one request; a different row's form never does.
    */
   independent?: boolean;
+  /**
+   * Identifies the form instance making an `independent` submission, so two
+   * forms that post the same action (a Cancel per row) are never merged.
+   * `<Form>` passes its own; callers without one get URL plus form data.
+   */
+  dedupeKey?: string;
   /** Cancels this submission only. An aborted submission resolves `dropped`. */
   signal?: AbortSignal;
 };
@@ -174,14 +181,16 @@ export function createActionSubmitter(runtime: ActionSubmitRuntime): ActionSubmi
         return { type: "failed", reason: result.reason };
       }
 
+      // Checked before the redirect too: a "Stop" in a persistent layout must
+      // not pull the user off a page they navigated to after submitting it.
+      if (!isCurrent() || callerSignal?.aborted) return { type: "dropped" };
+
       if (result.type === "redirect") {
         clearPrefetchCache();
         await runtime.navigate(result.url);
 
         return { type: "redirected", url: result.url };
       }
-
-      if (!isCurrent()) return { type: "dropped" };
 
       const previous = runtime.readCurrent();
 
@@ -230,8 +239,7 @@ export function createActionSubmitter(runtime: ActionSubmitRuntime): ActionSubmi
 
   return (url, formData, options) => {
     if (options?.independent === true) {
-      const actionName = formData.get("_action");
-      const key = `${url}\u0000${typeof actionName === "string" ? actionName : ""}`;
+      const key = `${options.dedupeKey ?? ""}\u0000${url}\u0000${serializeFormData(formData)}`;
       const existing = independentInFlight.get(key);
 
       if (existing) return existing;
@@ -256,6 +264,26 @@ export function createActionSubmitter(runtime: ActionSubmitRuntime): ActionSubmi
 
     return promise;
   };
+}
+
+/**
+ * A stable text form of a submission's fields, for telling a double submit
+ * (same fields) from a different submission. A file is identified by its
+ * name, size, type and modification time, never by reading it.
+ */
+export function serializeFormData(formData: FormData): string {
+  const parts: string[] = [];
+
+  for (const [name, value] of formData.entries()) {
+    const text =
+      typeof value === "string"
+        ? `s:${value}`
+        : `f:${value.name}:${value.size}:${value.type}:${value.lastModified}`;
+
+    parts.push(`${JSON.stringify(name)}=${JSON.stringify(text)}`);
+  }
+
+  return parts.join("&");
 }
 
 let connected: ActionSubmitter | undefined;
