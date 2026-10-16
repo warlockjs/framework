@@ -6,6 +6,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
+- Published page skills include complete support modules, schemas and generated-type prerequisites; their HTTP examples and Vitest discovery match current APIs. The skill compile gate verifies them without a failure allowance.
+
 - Locale context reuse after development edits is covered by a real Vite dev-server/HMR regression: a retained provider continues to serve refreshed locale and translation hooks after repeated filesystem edits. An unshared-context control reproduces the missing-provider HTTP failure.
 
 ### Added

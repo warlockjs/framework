@@ -431,3 +431,8 @@ counts after fixes. The release gate verifies the full workspace again.
 
 Release gates always set WARLOCK_REDIS_INTEGRATION=1 for package quality scripts,
 including local runs. The release workflow supplies Redis6390 explicitly.
+Skill compilation maps source package subpaths independently of root barrels,
+resolves installed dependencies from the skill's owning package, and isolates
+application registry augmentations between skills. Missing app support files
+remain compiler errors; examples must include those files or state a complete
+replacement. Existing failure allowances cannot increase.

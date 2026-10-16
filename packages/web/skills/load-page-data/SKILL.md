@@ -208,7 +208,7 @@ import type { PageProps } from "@warlock.js/web";
 import { getProduct } from "app/products/services/get-product.service";
 
 export async function loader() {
-  const product = await getProduct(); // a Product model
+  const product = await getProduct(); // a browser-safe projection
 
   return { product, publishedAt: new Date() };
 }
@@ -493,3 +493,13 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - `navigate-on-the-client` topic: re-fetch loaders with `refresh()`.
 - `stream-deferred-data` topic: stream a slow page-loader key after the shell with `defer()` and `use()`.
 - `handle-a-form-action` topic: set cookies and redirect from a form POST.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/products/services/get-product.service.ts"
+export async function getProduct() {
+  return { id: "42", title: "Anvil" };
+}
+```

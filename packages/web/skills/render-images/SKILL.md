@@ -233,10 +233,14 @@ The `?variant=` URLs inside that descriptor are served by the `/uploads/*` route
 
 ## A CDN or object storage
 
-Do not proxy remote files through `uploadedFileController`. Either store descriptors whose variants carry their own `url` / `urls` (the loader is then not called for them), or give `<Image>` a custom loader:
+For a configured object-storage disk, serve variants through
+`createUploadedFileController({ disk: "assets" })` and generate descriptors with
+`generateImageVariants(path, { disk: "assets", urlPrefix: "/media" })`. Originals
+retain their remote URL; generated variants are cached locally. Alternatively,
+store descriptors with pre-generated `url` / `urls`, or supply a CDN loader:
 
 ```tsx
-import { Image, type ImageLoader } from "@warlock.js/web";
+import { Image, type ImageLoader, type ImageDescriptor } from "@warlock.js/web";
 
 const cdnLoader: ImageLoader = ({ src, variant, format }) =>
   `https://cdn.example.com${src}/${variant}${format ? `.${format}` : ""}`;
@@ -262,3 +266,19 @@ A loader receives `{ src, variant, width, format? }` and returns a string. It mu
 - The `measure-web-vitals` topic: why `width`/`height` and `priority` matter for CLS and LCP.
 - The `serve-styles` topic: styling the `<img>` with imported CSS.
 - The `warlock-js-core` skill: `uploads` configuration, storage and the uploads route.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/posts/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/seal";
+
+const postSchema = v.object({ title: v.string(), cover: v.any() });
+
+export class Post extends Model<Infer<typeof postSchema>> {
+  public static table = "posts";
+  public static schema = postSchema;
+}
+```

@@ -46,8 +46,8 @@ appears with a zero count in generation diagnostics.
 
 ```ts
 import type { PageConfig } from "@warlock.js/web";
-import { Product } from "./product.server";
-import { listPublishedProductSitemapRows } from "./product-sitemap-data.server";
+import { Product } from "web/product.server";
+import { listPublishedProductSitemapRows } from "web/product-sitemap-data.server";
 
 async function productSitemap() {
   const products = await listPublishedProductSitemapRows();
@@ -170,3 +170,21 @@ with `sitemap.cacheControl`. Versioned generation URLs use immutable caching.
 `extra` lines. `referenceSitemap` defaults true and adds the configured
 sitemap URL when enabled and an origin exists. A hand-written
 `public/robots.txt` wins; maintain its Sitemap line yourself.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/web/product.server.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Product extends Model {
+  public static table = "products";
+}
+```
+
+```ts title="src/web/product-sitemap-data.server.ts"
+export async function listPublishedProductSitemapRows() {
+  return [{ slug: "anvil", updatedAt: new Date("2026-01-01"), imageUrl: "https://example.com/anvil.jpg" }];
+}
+```

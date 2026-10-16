@@ -25,7 +25,7 @@ test: {
   setupFiles: ["./src/test-setup.ts"],
   environment: "node",
   globals: false,
-  include: ["src/app/**/*.test.ts"],
+  include: ["src/app/**/*.{test,spec}.ts"],
 },
 ```
 
@@ -194,7 +194,12 @@ What this does and does not prove:
 
 `renderToString` the default export with the props the page receives: `data` (what the loader returned), `shared` and `params`. Wrap it in `LocaleProvider`, because `useTrans()` and `useLocale()` throw outside it (`... was called outside Warlock's LocaleProvider`).
 
-```tsx title="src/web/products/product.spec.tsx"
+```tsx title="src/web/products/product-render.spec.tsx"
+import { LocaleProvider } from "@warlock.js/web";
+import { renderToString } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import ProductPage from "./product.page";
+
 describe("product page render", () => {
   it("renders the component to HTML with loader data and translations", () => {
     const html = renderToString(
@@ -254,7 +259,7 @@ describe("Test Infrastructure", () => {
 });
 ```
 
-`testGet(path)` returns a standard `fetch` `Response`, so `await response.text()` is the rendered HTML. `testPost`, `testPut`, `testPatch`, `testDelete`, `testRequest` and `getTestServerUrl` come from the same module. A page action POST needs a same-origin `Origin` (or `Referer`) header or it answers 403, so pass `headers: { origin: getTestServerUrl() }`. These specs need the `warlock add test` harness above (the connectors, and the database if the page reads it) and must match its `include` (`src/app/**/*.test.ts`), so keep them few and let the unit-level specs carry the branches.
+`testGet(path)` returns a standard `fetch` `Response`, so `await response.text()` is the rendered HTML. `testPost`, `testPut`, `testPatch`, `testDelete`, `testRequest` and `getTestServerUrl` come from the same module. A page action POST needs a same-origin `Origin` (or `Referer`) header or it answers 403, so pass `headers: { origin: getTestServerUrl() }`. These specs need the `warlock add test` harness above (the connectors, and the database if the page reads it) and must match its `include` (`src/app/**/*.{test,spec}.ts`), so keep them few and let the unit-level specs carry the branches.
 
 ## Gotchas
 
@@ -270,3 +275,17 @@ describe("Test Infrastructure", () => {
 - The `stream-deferred-data` topic: for `defer()` data, hand the component a promise you created.
 - The `render-client-only` topic: what `<ClientOnly>` does in a server render.
 - The `create-a-page` topic: the page module shape.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/web/products/products.service.ts"
+export async function findProduct(id: string) {
+  return id === "42" ? { id, name: "Anvil" } : undefined;
+}
+
+export async function subscribe(email: string) {
+  console.info("Subscribed", email);
+}
+```

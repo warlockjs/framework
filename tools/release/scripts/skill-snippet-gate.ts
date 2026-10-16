@@ -328,6 +328,12 @@ function buildPackagePaths(packages: WorkspacePackage[]): Record<string, string[
     const entry = path.join(pkg.absPath, "src", "index.ts");
     if (existsSync(entry)) {
       paths[pkg.name] = [toPosix(entry)];
+      // Published subpaths (for example core/tests and core/errors) have
+      // independent source entries. Do not send them through the root barrel.
+      paths[`${pkg.name}/*`] = [
+        toPosix(path.join(pkg.absPath, "src", "*", "index.ts")),
+        toPosix(path.join(pkg.absPath, "src", "*.ts")),
+      ];
     }
   }
   return paths;
@@ -460,7 +466,7 @@ function resolveAppAlias(moduleName: string, containingFile: string, gateTmpRoot
  */
 const sharedSourceFileCache = new Map<string, ts.SourceFile>();
 
-function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string): ts.CompilerHost {
+function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string, packages: WorkspacePackage[]): ts.CompilerHost {
   const host = ts.createCompilerHost(options, true);
   const gateTmpNormalized = normalizeForCompare(gateTmpRoot);
 
@@ -480,7 +486,19 @@ function createCombinedHost(options: ts.CompilerOptions, gateTmpRoot: string): t
     moduleNames.map((moduleName) => {
       const alias = resolveAppAlias(moduleName, containingFile, gateTmpRoot);
       if (alias) return alias;
-      return ts.resolveModuleName(moduleName, containingFile, options, host).resolvedModule;
+      const resolved = ts.resolveModuleName(moduleName, containingFile, options, host).resolvedModule;
+      if (resolved || moduleName.startsWith(".") || moduleName.startsWith("app/") || moduleName.startsWith("web/")) {
+        return resolved;
+      }
+      // pnpm keeps dependencies/devDependencies beside their owning package.
+      // A scratch file outside that package must use the same dependency scope
+      // as the skill it represents, while retaining isolated app-relative files.
+      const skillRoot = skillRootForFile(gateTmpRoot, containingFile);
+      const packageDir = skillRoot && path.basename(path.dirname(skillRoot));
+      const owner = packages.find((pkg) => pkg.dir === packageDir);
+      return owner
+        ? ts.resolveModuleName(moduleName, path.join(owner.absPath, "__skill__.ts"), options, host).resolvedModule
+        : undefined;
     });
 
   return host;
@@ -496,8 +514,9 @@ function formatDiagnostic(diagnostic: ts.Diagnostic): string {
 }
 
 /**
- * Compiles every given skill's isolated files in ONE shared TypeScript
- * program — see the header comment and `createCombinedHost` for why this is
+ * Compiles ordinary skills together in one shared TypeScript program,
+ * with separate programs for skills that augment application registries.
+ * Each skill's isolated files — see the header comment and `createCombinedHost` for why this is
  * both correct (each skill still only sees its own `app/*` / `web/*` files)
  * and far cheaper than one `ts.createProgram` per skill (each of which would
  * otherwise re-bind and re-check the entire `@warlock.js/*` dependency graph
@@ -510,6 +529,13 @@ function formatDiagnostic(diagnostic: ts.Diagnostic): string {
 export function compileManySkills(skills: DiscoveredSkill[], packages: WorkspacePackage[], gateTmpRoot: string): SkillCompileResult[] {
   const units = skills.map((skill) => writeSkillUnit(skill, packages, gateTmpRoot));
   const allWritten = units.flatMap((u) => u.written);
+  // Declaration merging changes the meaning of shared package types. Keep
+  // those application registries in their own program, just like separate apps.
+  const augmentingUnits = units.filter((unit) =>
+    unit.written.some(({ block }) => /\bdeclare\s+(?:module|global)\b/.test(block.body)),
+  );
+  const plainUnits = units.filter((unit) => !augmentingUnits.includes(unit));
+  const compileGroups = [plainUnits.flatMap((unit) => unit.written), ...augmentingUnits.map((unit) => unit.written)];
 
   let diagnosticsByFile = new Map<string, string[]>();
   if (allWritten.length > 0) {
@@ -522,9 +548,11 @@ export function compileManySkills(skills: DiscoveredSkill[], packages: Workspace
       );
     }
     const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, gateTmpRoot);
-    const host = createCombinedHost(parsed.options, gateTmpRoot);
-    const program = ts.createProgram({ rootNames: allWritten.map((w) => w.absolutePath), options: parsed.options, host });
-    const diagnostics = ts.getPreEmitDiagnostics(program);
+    const host = createCombinedHost(parsed.options, gateTmpRoot, packages);
+    const diagnostics = compileGroups.filter((group) => group.length > 0).flatMap((group) => {
+      const program = ts.createProgram({ rootNames: group.map((written) => written.absolutePath), options: parsed.options, host });
+      return ts.getPreEmitDiagnostics(program);
+    });
 
     const gateTmpNormalized = normalizeForCompare(gateTmpRoot);
     for (const diagnostic of diagnostics) {

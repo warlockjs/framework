@@ -7,6 +7,7 @@
 - Release CI and local gate quality commands require real Redis integration specs; configured-port reporting tests mock availability checks and no longer need fixed ports free.
 
 - Ratcheted strictness budgets to measured counts: AI 453, Core 41, Web 169, Auth 16, Cache 15, Scheduler 7, scaffolder 8 and Ollama 29. Indexed reads now retain proven bounds and test preconditions.
+- Skill compilation resolves source subpaths and each owning package's installed dependencies, isolates application declaration merging between skills, and checks missing modules/registry leakage with compiler-backed controls.
 
 - The release gate regenerates every package llms reference before public-text validation and clean-tree checks, so stale projections must be reviewed and committed before packing.
 

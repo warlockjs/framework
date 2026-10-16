@@ -7,6 +7,7 @@ import {
   REPO_ROOT,
   classifyBlock,
   compileSkill,
+  compileManySkills,
   countFailuresByPackage,
   discoverPackages,
   discoverSkillFiles,
@@ -221,6 +222,48 @@ describe("compileSkill — real compilation against real declarations, with a re
     await writeFile(skillFile, goodMarkdown, "utf8");
     const restored = compileSkill(skill, [pkg], gateTmpRoot);
     assert.deepEqual(restored.files[0].diagnostics, []);
+  });
+
+  it("resolves source subpaths and the skill owner's installed dependency subpaths", async () => {
+    const root = await fixtureRoot();
+    const pkg = await writeFixturePackage(root, "widgets", "@fixture/widgets", "export const widget = 1;\n");
+    await mkdir(path.join(pkg.absPath, "src", "tests"), { recursive: true });
+    await writeFile(path.join(pkg.absPath, "src", "tests", "index.ts"), "export const request = () => 200;\n");
+    const dependency = path.join(pkg.absPath, "node_modules", "fixture-test-runner");
+    await mkdir(dependency, { recursive: true });
+    await writeFile(path.join(dependency, "package.json"), JSON.stringify({ name: "fixture-test-runner", exports: { "./config": "./config.d.ts" } }));
+    await writeFile(path.join(dependency, "config.d.ts"), "export declare function defineConfig(value: { status: number }): unknown;\n");
+    const skillFile = path.join(pkg.absPath, "skills", "SKILL.md");
+    await writeFile(skillFile, [
+      '```ts title="src/example.ts"',
+      'import { request } from "@fixture/widgets/tests";',
+      'import { defineConfig } from "fixture-test-runner/config";',
+      'export default defineConfig({ status: request() });',
+      '```',
+    ].join("\n"));
+    const result = compileSkill(skillFor(pkg, "http-test", skillFile), [pkg], path.join(root, ".gate-tmp"));
+    assert.deepEqual(result.files[0].diagnostics, []);
+
+    await writeFile(skillFile, '```ts\nimport { missing } from "@fixture/widgets/does-not-exist";\nmissing();\n```');
+    const broken = compileSkill(skillFor(pkg, "http-test", skillFile), [pkg], path.join(root, ".gate-tmp"));
+    assert.ok(broken.files[0].diagnostics.some((diagnostic) => /Cannot find module/.test(diagnostic)));
+  });
+
+  it("keeps application declaration merging isolated to the skill that declares it", async () => {
+    const root = await fixtureRoot();
+    const pkg = await writeFixturePackage(root, "widgets", "@fixture/widgets", "export interface Registry {}\nexport type Name = keyof Registry extends never ? string : keyof Registry;\nexport function name(value: Name) { return value; }\n");
+    const skills: DiscoveredSkill[] = [];
+    for (const [slug, body] of [
+      ["registered", 'import { name } from "@fixture/widgets";\ndeclare module "@fixture/widgets" { interface Registry { registered: true } }\nname("registered");'],
+      ["unregistered", 'import { name } from "@fixture/widgets";\nname("other-app-route");'],
+    ]) {
+      const file = path.join(pkg.absPath, "skills", slug, "SKILL.md");
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, "```ts\n" + body + "\n```");
+      skills.push(skillFor(pkg, slug, file));
+    }
+    const results = compileManySkills(skills, [pkg], path.join(root, ".gate-tmp"));
+    assert.deepEqual(results.flatMap((result) => result.files.flatMap((file) => file.diagnostics)), []);
   });
 
   it("fails a titled block whose relative import names a file that does not exist (defect #1's shape)", async () => {

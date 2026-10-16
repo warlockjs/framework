@@ -25,6 +25,7 @@ The folder name is the site key, and neither `$sites` nor the site folder appear
 ## 2. Declare fixed and dynamic sites
 
 ```ts title="src/config/web.ts"
+import { findTenantDomain } from "app/tenants/services/tenant.service";
 import type { WebConfigurations } from "@warlock.js/web";
 
 const web: WebConfigurations = {
@@ -41,7 +42,7 @@ const web: WebConfigurations = {
     const domain = await findTenantDomain(host);
     if (!domain) return null;
     return {
-      site: domain.kind === "dashboard" ? "tenantAdmin" : "tenant",
+      site: domain.type === "dashboard" ? "tenantAdmin" : "tenant",
       key: String(domain.tenantId),
       indexable: domain.tenant.isPublic,
       shared: { theme: domain.tenant.theme },
@@ -70,6 +71,7 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 ## 4. Read the result in a page handler
 
 ```ts
+import { loadTenant } from "app/tenants/services/tenant.service";
 import type { PageLoaderContext } from "@warlock.js/web";
 
 export async function loader({ site }: PageLoaderContext<undefined, undefined>) {
@@ -104,3 +106,19 @@ With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected p
 Boot fails for an unassigned page, a `$sites` folder without a matching `web.sites` entry, a configured site whose `$sites/<name>` folder is missing, a missing site root, overlapping fixed host plus base path, a page shadowing an `src/app` route, or inconsistent dynamic/resolver configuration. Page cache entries are partitioned by site and tenant key. Fix the declared ownership rather than depending on route order.
 
 Out of scope: path- or session-selected tenants, sharing a root between sites, cross-site prefetch, API host scoping, and automatic Cascade query scoping.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/tenants/services/tenant.service.ts"
+const tenant = { id: "demo", isPublic: true, theme: "light" };
+
+export async function findTenantDomain(host: string) {
+  return host === "demo.example.com" ? { type: "site", tenantId: tenant.id, tenant } : null;
+}
+
+export async function loadTenant(id: string) {
+  return id === tenant.id ? tenant : null;
+}
+```

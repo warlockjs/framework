@@ -67,17 +67,17 @@ Pair with `isDirty()` from the `track-changes` topic so the listener only runs i
 
 ## Global listeners — across all models
 
-For framework-level concerns (audit log, observability, cache invalidation), subscribe on the base `Model` — the listener runs for every model:
+For framework-level concerns (audit log, observability, cache invalidation), subscribe through `Model.globalEvents()` — the listener runs for every model:
 
 ```ts
 import { Model } from "@warlock.js/cascade";
 
-Model.on("saved", async (instance) => {
-  await audit.log("save", instance.constructor.name, instance.id, instance.getDirtyColumns());
+Model.globalEvents().on("saved", (instance) => {
+  console.info("save", instance.constructor.name, instance.id, instance.getDirtyColumns());
 });
 ```
 
-Filter by `instance.constructor.name === "User"` when you only care about specific models, or register per-model handlers when the scope is narrow. (`Model.globalEvents()` returns the underlying global emitter if you need direct access.)
+Filter by `instance.constructor.name === "User"` when you only care about specific models, or register per-model handlers when the scope is narrow. The base `Model` is abstract; its per-model `on()` shortcut expects a concrete subclass.
 
 ## `off()` to unsubscribe
 

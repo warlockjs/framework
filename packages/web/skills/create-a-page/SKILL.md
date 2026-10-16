@@ -549,3 +549,13 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 - `navigate-on-the-client` topic: `Link`, `href`, navigation, and `refresh()`.
 - `render-client-only` topic: `ClientOnly` and `useIsClient` for browser-only UI.
 - `serve-styles` topic: CSS imports in page and root modules.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/products/services/find-product.service.ts"
+export async function findProduct(id: string | number) {
+  return id === "missing" ? undefined : { id, name: "Anvil" };
+}
+```

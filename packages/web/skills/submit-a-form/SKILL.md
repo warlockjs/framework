@@ -38,10 +38,10 @@ browser-safe Seal schema can be shared with the API route's server validation:
 ```tsx
 import { Form } from "@mongez/react-form";
 import { useSubmitForm } from "@warlock.js/web/form";
-import { contactSchema } from "./contact.schema";
+import { contactSchema } from "web/contact/contact.schema";
 
 export default function ContactForm() {
-  const submit = useSubmitForm({ path: "/api/contact" });
+  const submit = useSubmitForm<typeof contactSchema>({ path: "/api/contact" });
 
   return (
     <Form schema={contactSchema} onSubmit={submit.submit}>
@@ -121,3 +121,30 @@ modules free of unwanted side effects. Development writes the same declaration
 after successful registration/reload. Include `.warlock/typings/*.d.ts` in
 your TypeScript project; a generated file is replaced atomically and is cleared
 only when its Warlock ownership header proves it is framework-owned.
+
+## Supporting schema and generated response types
+
+```ts title="src/web/contact/contact.schema.ts"
+import { v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({ email: v.string().email(), message: v.string() });
+```
+
+The named login example assumes Core generated this route entry from the
+handler's `responseSchema`. Include `.warlock/typings/*.d.ts` in the app project;
+do not replace that generated file with a hand-written fallback.
+
+```ts title=".warlock/typings/api-routes.d.ts"
+import "@warlock.js/web";
+
+declare module "@warlock.js/web" {
+  interface ApiRouteRegistry {
+    "auth.login": {
+      path: "/auth/login";
+      params: {};
+      method: "POST";
+      response: { 200: { user: { id: string | number; name: string }; token: string }; 400: { error: string } };
+    };
+  }
+}
+```

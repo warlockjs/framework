@@ -169,7 +169,7 @@ export const contactSchema = v.object({
 import { Form as ReactForm } from "@mongez/react-form";
 import { useSubmitAction } from "@warlock.js/web/form";
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
-import { contactSchema } from "./contact.schema";
+import { contactSchema } from "web/contact/contact.schema";
 
 export const config = {
   route: { path: "/contact", name: "contact" },
@@ -219,3 +219,20 @@ It runs for enhanced submissions, including cancellation and unmount; native
 browser submissions do not call it. A submit button with `data-independent`
 opts only that submission into independent mode. Unmarked buttons follow the
 form's `independent` prop.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/web/contact/contact.schema.ts"
+import { v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({ email: v.string().email(), message: v.string() });
+```
+
+```ts title="src/app/accounts/services/sign-in.service.ts"
+export async function signIn(email: string, password: string) {
+  // Replace with your app's credential check; this sample denies every login.
+  return null as { id: string | number; name: string } | null;
+}
+```

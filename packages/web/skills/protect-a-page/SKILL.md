@@ -9,9 +9,10 @@ Wire the resolver once; web never imports auth.
 
 ```ts
 // src/config/web.ts
+import type { Auth } from "@warlock.js/auth";
 import { pageSession } from "@warlock.js/auth";
 
-export default { session: pageSession({ project: (user: User) => userSessionResource(user) }) };
+export default { session: pageSession({ project: (user: Auth) => ({ id: user.id, name: user.get<string>("name") }) }) };
 ```
 
 `project` is required; only its result reaches the browser as the payload's optional `session` key. Type it by augmenting `SessionRegistry { user; model }` in module `"@warlock.js/web"`.
@@ -21,10 +22,10 @@ import { useUser } from "@warlock.js/web";
 import { requireGuest, requireUser } from "@warlock.js/web/session";
 
 // account page
-export const config = { route: "/account", middleware: [requireUser({ loginPath: "/login" })] };
+export const accountConfig = { route: "/account", middleware: [requireUser({ loginPath: "/login" })] };
 
 // login page
-export const config = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
+export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
 ```
 
 - `useUser()` returns the projection or `null`.
@@ -88,3 +89,25 @@ These do **not** count (the page stays unguarded in the types and `guard` is not
 
 The not-found page is never guarded. A guard the generator cannot prove still works at runtime; only the types stay loose (`useUser()` returns `null`-able).
 In dev, a file the generator cannot parse reads as unguarded rather than breaking boot.
+
+## Generated typing prerequisites
+
+The guarded example assumes your generated route declaration and session
+projection declaration are included in the TypeScript project. The relevant
+shape is below; let Warlock generate the route entry, and maintain the session
+projection type alongside your app's resolver.
+
+```ts title="src/types/page-session.d.ts"
+import type { Auth } from "@warlock.js/auth";
+import "@warlock.js/web";
+
+declare module "@warlock.js/web" {
+  interface SessionRegistry {
+    user: { id: string | number; name: string };
+    model: Auth;
+  }
+  interface PageRouteRegistry {
+    "account.show": { path: "/account"; params: {}; guard: "user" };
+  }
+}
+```

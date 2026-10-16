@@ -243,6 +243,10 @@ The generated hreflang set swaps only the locale prefix. If the slug also differ
 ```tsx
 import type { PageConfig } from "@warlock.js/web";
 
+export async function loader() {
+  return { listing: { slug: { en: "anvil", ar: "سندان" } } };
+}
+
 export const config = {
   route: { path: "/listings/:id", name: "listings.show" },
   metadata: ({ data }) => ({
