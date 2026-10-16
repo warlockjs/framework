@@ -328,3 +328,31 @@ Internal `@warlock.js/*` packages read from `config.get("<name>")` the same way 
 - The `pick-cache-driver` topic of the `warlock-js-cache` skill — picking and registering a cache driver in `src/config/cache.ts`.
 - The `send-mail` topic — the `src/config/mail.ts` shape.
 - The `store-file` topic — the `src/config/storage.ts` shape.
+
+## Hide input for a family of URLs
+
+```ts
+import type { HttpConfigurations } from "@warlock.js/core";
+
+export default {
+  logging: {
+    private: [
+      { path: "/api/private", body: false, query: false },
+      { path: /^\/credentials(?:\/|$)/, body: false },
+    ],
+  },
+} satisfies HttpConfigurations;
+```
+
+String paths match a prefix at a segment boundary. Regexes match the decoded,
+normalized pathname: repeated slashes, trailing slashes, dot segments and encoded
+slashes are normalized before matching. These rules apply even when no route
+matches. Matching rules combine and only remove input; a route cannot re-enable
+fields they suppress. `query: false` also removes the logged URL's query string.
+With private policies configured, an undecodable path withholds both body and
+query. The URL's original path spelling is retained in the snapshot.
+
+When upgrading from 5.29, update redaction censors that inspect `context.request`:
+it is a `RequestLogSnapshot`, with `url` and `route` (a string), rather than a
+Request instance with `baseRequest.url` or `route.path`. Custom log calls can use
+`request.toLogSnapshot()` to apply these same policies.

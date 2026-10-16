@@ -10,7 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
+- Redaction censors upgrading from 5.29 must read `context.request.url` and the `route` string from the snapshot; `context.request.baseRequest.url` and `context.request.route.path` no longer exist after the 5.30 snapshot change.
 - **BREAKING:** upgrade development and production runtimes to Node.js 22.15 or newer before running the CLI.
+
+### Added
+
+- `http.logging.private` applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies remove body/query input before snapshots are built and cannot be overridden by per-route logging.
 
 ### Fixed
 

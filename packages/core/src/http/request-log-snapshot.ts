@@ -5,7 +5,7 @@ import { UploadedFile } from "./uploaded-file";
 /**
  * What a request's log entries carry of its input. Set globally under
  * `http.logging` and per route with the route's `logging` option; the route
- * wins key by key.
+ * wins key by key, unless a private URL policy suppresses that field.
  *
  * @example
  * // never log the body or the query string of this route, not even redacted
@@ -33,6 +33,14 @@ export type RequestLoggingOptions = {
   query?: boolean;
 };
 
+/** A URL policy that can only remove input from snapshots, even on unmatched requests. */
+export type PrivateRequestLoggingRule = {
+  /** Path prefix at a segment boundary, or a regular expression over the normalized path. */
+  path: string | RegExp;
+  body?: false;
+  query?: false;
+};
+
 /**
  * `http.logging`: the app-wide defaults for {@link RequestLoggingOptions},
  * plus query parameter names whose values are masked in logged URLs.
@@ -44,6 +52,8 @@ export type HttpLoggingConfig = RequestLoggingOptions & {
    * Matched like the logger's keys: case, `-` and `_` are ignored.
    */
   redactQueryParams?: string[];
+  /** URL policies applied before route logging; matching rules cannot be overridden by a route. */
+  private?: PrivateRequestLoggingRule[];
 };
 
 /**
@@ -195,18 +205,53 @@ function redactQueryValue(value: unknown, isCredential: (name: string) => boolea
 
 /**
  * The effective logging options for a request: `http.logging` overlaid by the
- * route's own `logging` option.
+ * route's own `logging` option, then restricted by matching private URL policies.
  */
 export function resolveRequestLoggingOptions(
   routeOptions: RequestLoggingOptions | undefined,
+  url?: string,
 ): Required<RequestLoggingOptions> & { redactQueryParams: string[] } {
   const global = (config.get("http.logging") ?? {}) as HttpLoggingConfig;
 
-  return {
+  const options = {
     body: routeOptions?.body ?? global.body ?? true,
     query: routeOptions?.query ?? global.query ?? true,
     redactQueryParams: global.redactQueryParams ?? [],
   };
+  if (!global.private?.length || url === undefined) return options;
+  const pathname = normalizedLoggingPath(url);
+  if (pathname === undefined) return { ...options, body: false, query: false };
+
+  for (const rule of global.private) {
+    const prefix = typeof rule.path === "string" ? normalizedLoggingPath(rule.path) : undefined;
+    const matches =
+      rule.path instanceof RegExp
+        ? new RegExp(rule.path.source, rule.path.flags).test(pathname)
+        : prefix !== undefined &&
+          (prefix === "/" || pathname === prefix || pathname.startsWith(`${prefix}/`));
+    if (!matches) continue;
+    if (rule.body === false) options.body = false;
+    if (rule.query === false) options.query = false;
+  }
+  return options;
+}
+
+function normalizedLoggingPath(url: string): string | undefined {
+  try {
+    const pathname = /^[a-z][a-z\d+.-]*:\/\//i.test(url)
+      ? new URL(url).pathname
+      : url.split(/[?#]/u)[0];
+    const decoded = decodeURIComponent(pathname).replace(/\\/g, "/");
+    const segments: string[] = [];
+    for (const segment of decoded.split("/")) {
+      if (segment === "..") segments.pop();
+      else if (segment && segment !== ".") segments.push(segment);
+    }
+    return `/${segments.join("/")}`;
+  } catch {
+    // With a private-path policy, undecodable input is withheld rather than guessed.
+    return undefined;
+  }
 }
 
 /**
@@ -233,7 +278,7 @@ export type RequestLogSource = {
  * Uploaded files are summarised (`{ file, mimeType }`) rather than walked.
  */
 export function buildRequestLogSnapshot(source: RequestLogSource): RequestLogSnapshot {
-  const options = resolveRequestLoggingOptions(source.route?.logging);
+  const options = resolveRequestLoggingOptions(source.route?.logging, source.url);
   const url = options.query ? source.url : stripQuery(source.url);
 
   const snapshot: RequestLogSnapshot = {

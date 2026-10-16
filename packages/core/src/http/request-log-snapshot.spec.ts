@@ -152,6 +152,50 @@ describe("buildRequestLogSnapshot", () => {
     expect(snapshot.query).toEqual({ secret: "[REDACTED]", tab: "[REDACTED]" });
   });
 
+  it.each([
+    "/api/private?note=query-sentinel",
+    "/api//private/?note=query-sentinel",
+    "/api%2Fprivate/missing?note=query-sentinel",
+    "/%61pi/private?note=query-sentinel",
+    "/api/public/../private?note=query-sentinel",
+  ])("omits private input for unmatched and normalized URL %s", (url) => {
+    config.set("http.logging", { private: [{ path: "/api/private", body: false, query: false }] });
+    const snapshot = buildRequestLogSnapshot({ ...source, url });
+    expect(snapshot.body).toBeUndefined();
+    expect(snapshot.query).toBeUndefined();
+    expect(snapshot.url).not.toContain("?");
+    expect(JSON.stringify(snapshot)).not.toContain("sentinel");
+  });
+
+  it("combines matching rules and prevents routes from re-enabling private input", () => {
+    const path = /^\/api\/private(?:\/|$)/g;
+    config.set("http.logging", {
+      private: [
+        { path, body: false },
+        { path: "/api/private", query: false },
+      ],
+    });
+    for (let i = 0; i < 2; i++) {
+      const snapshot = buildRequestLogSnapshot({
+        ...source,
+        url: "/api/private?note=sentinel",
+        route: { path: "/api/private", logging: { body: true, query: true } },
+      });
+      expect(snapshot.body).toBeUndefined();
+      expect(snapshot.query).toBeUndefined();
+    }
+    expect(path.lastIndex).toBe(0);
+    expect(buildRequestLogSnapshot({ ...source, url: "/api/private-extra" }).body).toBeDefined();
+  });
+
+  it("withholds input when a private-policy URL cannot be decoded", () => {
+    config.set("http.logging", { private: [{ path: "/api/private", body: false, query: false }] });
+    const snapshot = buildRequestLogSnapshot({ ...source, url: "/api%2Fprivate%ZZ?note=sentinel" });
+    expect(snapshot.body).toBeUndefined();
+    expect(snapshot.query).toBeUndefined();
+    expect(snapshot.url).not.toContain("?");
+  });
+
   it("summarises uploaded files instead of walking them", () => {
     const file = new UploadedFile({
       filename: "avatar.png",
