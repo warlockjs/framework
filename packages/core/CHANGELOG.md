@@ -31,6 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Oxlint failures preserve stdout config errors alongside stderr warnings and bound command diagnostics without echoing file arguments. Health-worker shutdown waits briefly for child cleanup before forced termination.
+
 - Generator selection prompts reject an empty choices list before opening terminal input; indexed reads retain their validated bounds under stricter compiler checks.
 
 - Framework HTTP/2 servers start with default shutdown options and track sessions even without HTTP/1 idle-connection support. Graceful HTTP/2 drains close sessions after active streams finish without setting forbidden connection headers. SSE and stream helpers omit HTTP/1 framing headers on HTTP/2.

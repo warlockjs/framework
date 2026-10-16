@@ -26,7 +26,7 @@ parentPort?.on("message", async (message: WorkerMessage) => {
         // The CLI reads current disk contents and holds no persistent file cache.
         break;
       case "shutdown":
-        runner.shutdown();
+        await runner.shutdown();
         process.exit(0);
     }
   } catch (error) {

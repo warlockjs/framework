@@ -49,3 +49,8 @@ export default defineConfig({
 Omitted switches keep automatic defaults. Set a switch to `false` to disable only that checker. Setting a linter to `true` still requires its app-root config; Oxlint also needs its package installed in the app. ESLint continues to use core's dependency even when the app does not depend on ESLint directly. Keep both `eslint` and `oxlint` enabled to run both; neither replaces the other's diagnostics. Restart the dev server after adding a new linter or its initial config.
 
 Existing custom checker arrays keep replacing the complete built-in list. `devServer.healthCheckers: false` disables all checks, and `warlock dev --skip-health` overrides any checker configuration for that run. These switches are independent of `devServer.generateTypings`.
+
+Oxlint config failures preserve both warning and error output; structured
+diagnostics keep their specific message. Command failure messages contain a
+bounded status/output summary, without the batch command line. Shutdown gives
+workers up to 500 ms to exit and reap owned CLI children before forcing termination.

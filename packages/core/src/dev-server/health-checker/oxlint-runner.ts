@@ -48,6 +48,21 @@ function coordinate(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1;
 }
 
+class OxlintOutputParseError extends Error {}
+
+function outputDetail(stdout: string, stderr: string): string {
+  return [stderr.trim(), stdout.trim()].filter(Boolean).join("\n").slice(0, 2000);
+}
+
+export function oxlintCommandError(
+  error: { code?: unknown; signal?: string | null; killed?: boolean },
+  stdout: string,
+  stderr: string,
+): Error {
+  const status = error.killed ? "timed out or terminated (30s limit)" : `failed (code ${String(error.code ?? "unknown")}${error.signal ? `, signal ${error.signal}` : ""})`;
+  return new Error(`Oxlint could not check changed files: ${status}${outputDetail(stdout, stderr) ? `\n${outputDetail(stdout, stderr)}` : ""}`);
+}
+
 export function parseOxlintResults(
   output: string,
   files: OxlintFile[],
@@ -57,7 +72,7 @@ export function parseOxlintResults(
   try {
     report = JSON.parse(output);
   } catch {
-    throw new Error(
+    throw new OxlintOutputParseError(
       `Oxlint could not check changed files: ${output.trim().slice(0, 2000) || "empty diagnostics report"}`,
     );
   }
@@ -131,8 +146,11 @@ export class OxlintRunner {
     return { success: true, hasConfig: this.binaryPath !== undefined };
   }
 
-  public shutdown(): void {
-    for (const child of this.children) child.kill();
+  public async shutdown(): Promise<void> {
+    await Promise.all([...this.children].map(child => new Promise<void>(resolve => {
+      child.once("close", () => resolve());
+      child.kill();
+    })));
     this.children.clear();
   }
 
@@ -153,9 +171,7 @@ export class OxlintRunner {
           this.children.delete(child);
           // Exit 1 with a JSON report is the normal result for lint errors.
           if (error && (error.code !== 1 || error.killed)) {
-            reject(
-              new Error(`Oxlint could not check changed files: ${stderr.trim() || error.message}`),
-            );
+            reject(oxlintCommandError(error, stdout, stderr));
             return;
           }
           resolve({ stdout, stderr });
@@ -206,9 +222,10 @@ export class OxlintRunner {
       let checked: OxlintFileResult[];
       try {
         checked = parseOxlintResults(output.stdout, filesInBatch, this.cwd);
-      } catch {
-        const detail = output.stderr.trim() || output.stdout.trim() || "empty diagnostics report";
-        throw new Error(`Oxlint could not check changed files: ${detail.slice(0, 2000)}`);
+      } catch (error) {
+        if (!(error instanceof OxlintOutputParseError)) throw error;
+        const detail = outputDetail(output.stdout, output.stderr) || "empty diagnostics report";
+        throw new Error(`Oxlint could not check changed files: ${detail}`);
       }
       for (const result of checked) results.set(result.path, result);
     }

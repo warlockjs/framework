@@ -544,3 +544,8 @@ NODE_OPTIONS=--max-old-space-size=4096 npx warlock start
 - The `add-connector` topic — Early vs Late connector phases (why HTTP/socket boot late in dev).
 - The `update-packages` topic — `warlock update` + the dev-server update notice (`devServer.checkForUpdates`).
 - The `warlock-routes` topic — `warlock routes` / `warlock routes:diff`, the latter comparing live page routes against the manifest `warlock build` writes.
+
+Oxlint config failures preserve both warning and error output; structured
+diagnostics keep their specific message. Command failure messages contain a
+bounded status/output summary, without the batch command line. Shutdown gives
+workers up to 500 ms to exit and reap owned CLI children before forcing termination.
