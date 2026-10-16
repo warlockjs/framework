@@ -687,7 +687,7 @@ export class Response {
   ): ResponseStreamController {
     validateStreamQueueOptions(options);
     this.header("Cache-Control", "no-cache");
-    this.headers(options.headers ?? {});
+    this.applyStreamHeaders(options.headers);
     this.removeHeader("Content-Length");
     this.setContentType(contentType);
     this.header("Transfer-Encoding", "chunked");
@@ -937,9 +937,9 @@ export class Response {
   public sse(options: ResponseSSEOptions = {}): ResponseSSEController {
     validateStreamQueueOptions(options);
     this.header("Cache-Control", "no-cache, no-store, must-revalidate");
-    this.headers(options.headers ?? {});
+    this.applyStreamHeaders(options.headers);
     this.removeHeader("Content-Length");
-    this.removeHeader("Transfer-Encoding");
+    this.header("Transfer-Encoding", "chunked");
     this.setContentType("text/event-stream");
     this.header("X-Accel-Buffering", "no");
     this.keepLongLivedConnectionAlive();
@@ -1179,6 +1179,23 @@ export class Response {
    */
   public getResponseTime() {
     return this.baseResponse.elapsedTime;
+  }
+
+  /** Apply cache/application overrides without letting callers change framing. */
+  protected applyStreamHeaders(headers: Record<string, string> = {}) {
+    const protectedHeaders = new Set([
+      "content-length",
+      "transfer-encoding",
+      "content-type",
+      "connection",
+      "keep-alive",
+      "proxy-connection",
+      "upgrade",
+    ]);
+
+    for (const [name, value] of Object.entries(headers)) {
+      if (!protectedHeaders.has(name.toLowerCase())) this.header(name, value);
+    }
   }
 
   /**

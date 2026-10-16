@@ -337,8 +337,9 @@ and NUL are removed, so raw data cannot inject event fields.
 Both `sse({ headers })` and `stream(contentType, { headers })` apply caller headers
 before flushing. Cache-Control keeps the safe stream default unless explicitly
 set in options.headers; a pre-existing global cache header does not override it.
-Protocol headers are protected: Content-Length is removed, SSE fixes its content
-type and removes caller Transfer-Encoding, and graceful drain forces Connection: close.
+Caller protocol headers are filtered case-insensitively before applying overrides.
+Both helpers use chunked HTTP/1 framing, set their own content type, and preserve
+Connection: close during graceful drain. Content-Length cannot override framing.
 
 Use synchronous `enqueue()` for event-bus producers. It returns false when closed
 or overflowing. The byte cap includes queued UTF-8 data and Node's unsent buffer.
@@ -359,3 +360,5 @@ headers flush it adds Connection: close; already-streaming replies finish and
 then have their idle connections reaped. A hand-written hijacked writer that sets
 its own Connection header must preserve close during drain rather than overwrite
 it with keep-alive. Headers already on the wire cannot be changed.
+
+Caller framing and connection headers are filtered before applying overrides; SSE and streams retain chunked HTTP/1 framing and drain Connection: close.

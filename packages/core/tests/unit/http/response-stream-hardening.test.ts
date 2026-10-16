@@ -132,6 +132,7 @@ describe("long-lived responses during a graceful drain", () => {
     type: "sse" | "stream",
     drainFirst: boolean,
     headers?: Record<string, string>,
+    onHeaders?: (headers: Headers) => void,
   ): Promise<string | null> {
     server = startHttpServer();
     const started = deferred();
@@ -171,6 +172,7 @@ describe("long-lived responses during a graceful drain", () => {
     const response = await pending;
 
     await response.text();
+    onHeaders?.(response.headers);
 
     return response.headers.get("connection");
   }
@@ -192,7 +194,19 @@ describe("long-lived responses during a graceful drain", () => {
     },
   );
 
+  it.each([
+    { type: "sse" as const, headers: undefined },
+    { type: "stream" as const, headers: undefined },
+    { type: "sse" as const, headers: { "Transfer-Encoding": "gzip" } },
+    { type: "stream" as const, headers: { "Transfer-Encoding": "gzip" } },
+  ])("keeps chunked framing and keep-alive for $type with headers $headers", async ({ type, headers }) => {
+    await expect(connectionHeaderFor(type, false, headers, received => {
+      expect(received.get("transfer-encoding")).toBe("chunked");
+    })).resolves.toBe("keep-alive");
+  });
+
   it("without a drain, an SSE stream still asks for keep-alive", async () => {
     await expect(connectionHeaderFor("sse", false)).resolves.toBe("keep-alive");
   });
 });
+

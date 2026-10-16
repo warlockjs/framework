@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- SSE retains chunked HTTP/1 framing and reusable connections after filtering caller protocol headers.
+
 - Source health-check workers start on Node.js 22.15 through a JavaScript bootstrap and tsx's import API; passing a `.ts` entry directly to a worker could fail before its loader hook ran. Published `.mjs` workers keep their direct startup path.
 
 - The cache-backed rate limiter supplies its per-window TTL on every atomic increment, so a key that expires after the create-only seed cannot be recreated without an expiry.
