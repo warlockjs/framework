@@ -1,3 +1,4 @@
+import type { AgentCompactionRecord } from "../../agent/compaction.type";
 import type { Message } from "../conversation-message.type";
 import type { LLMTrip } from "../result/llm-trip.type";
 import type { ToolCall } from "../result/tool-call.type";
@@ -86,6 +87,8 @@ export type AgentSnapshot = {
    * the resumed loop starts at, so completed trips never re-run.
    */
   trips: LLMTrip[];
+  /** Compaction decisions restored with the live conversation on resume. */
+  compactions?: AgentCompactionRecord[];
   /** Every settled tool dispatch (flat, each carrying its `tripIndex`). */
   toolCalls: ToolCall[];
   /** Running usage total across the persisted trips — never double-counted. */

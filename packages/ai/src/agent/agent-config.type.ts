@@ -15,6 +15,7 @@ import type { FlowObserveOption } from "../observe/resolve-observers";
 import type { SkillsConfig } from "../skills/contracts/skills-config.type";
 import type { SkillsContract } from "../skills/contracts/skills.contract";
 import type { AgentToolEntry } from "../tool/executable-as-tool";
+import type { AgentCompactionConfig } from "./compaction.type";
 import type { JudgeConfig } from "./judge-config.type";
 
 /**
@@ -134,6 +135,8 @@ export type AgentConfig<TOutput = unknown> = {
    * Prevents infinite tool-call loops. Defaults to 10.
    */
   maxTrips?: number;
+  /** Opt-in history compaction before model trips; disabled when omitted. */
+  compaction?: AgentCompactionConfig;
   /** Base model call options merged with per-execute options (execute wins on conflict) */
   modelOptions?: ModelCallOptions;
   /**

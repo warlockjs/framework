@@ -1,3 +1,4 @@
+import type { AgentCompactionRecord } from "../../agent/compaction.type";
 import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { ProviderContentBlock } from "../provider-content-block.type";
 import type { BaseReport, ReportStatus } from "./base-report.type";
@@ -69,6 +70,8 @@ export type AgentReport = BaseReport & {
   model: { name: string; provider: string };
   /** Every LLM round-trip that happened during execution. */
   trips: LLMTrip[];
+  /** Compaction decisions and counter failures; absent when no decision was made. */
+  compactions?: AgentCompactionRecord[];
   /**
    * The resolved system-prompt text sent as the `role: "system"` message
    * (persona + instructions + any auto-appended structured-output

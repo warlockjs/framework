@@ -1,3 +1,4 @@
+import type { AgentCompactionRecord } from "./compaction.type";
 import { resolveDefaultSnapshotStore } from "../config";
 import type { AgentResumeOptions } from "../contracts/agent/agent-options.type";
 import type { AgentSnapshot, AgentSnapshotStatus } from "../contracts/agent/agent-snapshot.type";
@@ -50,6 +51,7 @@ export type PersistAgentParams = {
   promptVersion?: string;
   messages: Message[];
   trips: LLMTrip[];
+  compactions?: AgentCompactionRecord[];
   toolCalls: ToolCall[];
   usage: Usage;
   status: AgentSnapshotStatus;
@@ -86,6 +88,7 @@ export async function persistAgentSnapshot(params: PersistAgentParams): Promise<
     promptVersion: params.promptVersion,
     messages: params.messages,
     trips: params.trips,
+    ...(params.compactions?.length ? { compactions: params.compactions } : {}),
     toolCalls: params.toolCalls,
     usage: params.usage,
     status: params.status,

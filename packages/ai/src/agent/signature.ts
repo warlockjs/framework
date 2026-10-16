@@ -15,6 +15,7 @@ import type { AgentConfig } from "./agent-config.type";
  * - `maxTrips` — the loop bound is a semantic shape change.
  * - Whether a default `output` schema is configured — flips the
  *   structured-output instruction baked into the system turn.
+ * - Opt-in compaction threshold and retained-tail size — changes future history.
  * - `version` — dev-curated; a bump is an explicit "this changed" signal.
  *
  * Does NOT cover: system-prompt text, middleware, per-event handlers,
@@ -33,6 +34,7 @@ export function computeAgentSignature(config: {
   tools?: ReadonlyArray<{ name: string }>;
   maxTrips?: number;
   output?: unknown;
+  compaction?: AgentConfig["compaction"];
 }): string {
   const toolNames = (config.tools ?? [])
     .map((tool) => tool.name)
@@ -46,6 +48,9 @@ export function computeAgentSignature(config: {
     x: config.maxTrips ?? null,
     o: config.output ? 1 : 0,
     v: config.version ?? null,
+    ...(config.compaction
+      ? { c: { afterTokens: config.compaction.afterTokens, keep: config.compaction.keep ?? 8 } }
+      : {}),
   };
 
   return hash(JSON.stringify(fingerprint));

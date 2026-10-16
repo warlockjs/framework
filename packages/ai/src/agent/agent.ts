@@ -16,6 +16,7 @@ import type {
   MiddlewareState,
   MiddlewareToolContext,
   MiddlewareTripContext,
+  ModelCallOptions,
   ModelResponse,
   ModelToolCallRequest,
   ProviderContentBlock,
@@ -59,6 +60,8 @@ import {
   safeJsonParse,
   stampReportLineage,
 } from "../utils";
+import { compactAgentMessages, validateCompaction } from "./compaction";
+import type { AgentCompactionRecord } from "./compaction.type";
 import type { AgentConfig } from "./agent-config.type";
 import { JUDGE_DEFAULT_REPAIR_ATTEMPTS, type JudgeConfig } from "./judge-config.type";
 import { buildAgentInputMessages } from "./agent-input-builder";
@@ -268,6 +271,7 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
   // collide on `ctx.state` keys. Fail fast, fail loud — per the
   // authoring-time rules in `domains/ai/conventions/errors.md`.
   validateMiddleware(config.middleware);
+  validateCompaction(config.compaction);
 
   // Resolve the agent's identity. Explicit `name` wins; otherwise we
   // synthesize a DETERMINISTIC fingerprint from the config's
@@ -308,6 +312,7 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
     tools,
     maxTrips: config.maxTrips,
     output: config.output,
+    compaction: config.compaction,
   });
 
   const resolvedConfig: ResolvedAgentConfig<TOutput> = {
@@ -534,6 +539,7 @@ type InstanceHandlerMap = Map<keyof AgentEventMap, Set<AgentEventHandler<keyof A
  */
 class Execution<TOutput> {
   private readonly trips: LLMTrip[] = [];
+  private readonly compactions: AgentCompactionRecord[] = [];
   private readonly toolCalls: ToolCall[] = [];
   private readonly usage: Usage = { input: 0, output: 0, total: 0 };
   private readonly messages: Message[] = [];
@@ -622,6 +628,7 @@ class Execution<TOutput> {
     if (resumeFrom) {
       this.messages.push(...resumeFrom.messages);
       this.trips.push(...resumeFrom.trips);
+      this.compactions.push(...(resumeFrom.compactions ?? []));
       this.toolCalls.push(...resumeFrom.toolCalls);
       mergeUsage(this.usage, resumeFrom.usage);
       this.systemPrompt = resumeFrom.systemPrompt;
@@ -1078,6 +1085,18 @@ class Execution<TOutput> {
    * hooks can recover from provider failures (fallback chain).
    */
   private async runTripThroughPipeline(tripIndex: number): Promise<ModelResponse> {
+    if (this.config.compaction) {
+      const callOptions = this.buildModelCallOptions();
+      const outcome = await compactAgentMessages(
+        this.config.compaction,
+        this.messages,
+        callOptions,
+        tripIndex,
+      );
+      if (callOptions.signal?.aborted) throw this.makeCancelledError();
+      if (outcome.record) this.compactions.push(outcome.record);
+      if (outcome.messages) this.messages.splice(0, this.messages.length, ...outcome.messages);
+    }
     const context: MiddlewareTripContext = {
       ...this.buildExecuteContext(),
       tripIndex,
@@ -1093,6 +1112,16 @@ class Execution<TOutput> {
     )) as ModelResponse;
   }
 
+  /** Exact call options shared by preflight compaction and generation. */
+  private buildModelCallOptions(): ModelCallOptions {
+    return {
+      ...this.config.modelOptions,
+      tools: this.effectiveTools,
+      ...(this.responseSchema ? { responseSchema: this.responseSchema } : {}),
+      ...(this.options?.signal ? { signal: this.options.signal } : {}),
+    };
+  }
+
   /**
    * Produce the `ModelResponse` for the current trip. In non-streaming
    * mode, delegates straight to `model.complete()`. In streaming mode,
@@ -1102,12 +1131,7 @@ class Execution<TOutput> {
    * aggregation) stays identical between the two modes.
    */
   private async getModelResponse(tripIndex: number): Promise<ModelResponse> {
-    const callOptions = {
-      ...this.config.modelOptions,
-      tools: this.effectiveTools,
-      ...(this.responseSchema ? { responseSchema: this.responseSchema } : {}),
-      ...(this.options?.signal ? { signal: this.options.signal } : {}),
-    };
+    const callOptions = this.buildModelCallOptions();
 
     if (!this.streamController) {
       return this.config.model.complete(this.messages, callOptions);
@@ -1687,6 +1711,7 @@ class Execution<TOutput> {
         provider: this.config.model.provider,
       },
       trips: this.trips,
+      ...(this.compactions.length ? { compactions: this.compactions } : {}),
       systemPrompt: this.systemPrompt,
       // Prompt-version linkage. When the agent resolved a *named* prompt (one
       // registered in `ai.prompts`), stamp its `name` / `version` so observers
@@ -1719,8 +1744,13 @@ class Execution<TOutput> {
       // Only a single-trip run's blocks are safe to replay on their own: a
       // thinking block is signed against every turn before it, and a
       // multi-trip run's intermediate tool turns are not part of `text`.
-      // Persist those through `captureMessages` → `report.messages`.
-      ...(this.trips.length === 1 && finalTrip?.blocks ? { blocks: finalTrip.blocks } : {}),
+      // An applied compaction also changes the original history; replay its
+      // real conversation through `captureMessages` → `report.messages`.
+      ...(this.trips.length === 1 &&
+      !this.compactions.some((record) => record.type === "applied") &&
+      finalTrip?.blocks
+        ? { blocks: finalTrip.blocks }
+        : {}),
       report,
       usage: this.usage,
       error: this.error,
@@ -1771,6 +1801,7 @@ class Execution<TOutput> {
       promptVersion: this.promptVersion,
       messages: this.captureMessages() as unknown as Message[],
       trips: this.trips,
+      ...(this.compactions.length ? { compactions: this.compactions } : {}),
       toolCalls: this.toolCalls,
       usage: this.usage,
       status,

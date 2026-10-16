@@ -8,9 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
+- When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.
+
 - Sub-agents also use the concurrent tool default introduced in 5.30. Callers upgrading from 5.29 whose tools need ordered side effects can now set `spawnSubAgent({ toolDispatch: "sequential", ... })`.
 
 ### Added
+
+- Agents can opt into automatic history compaction with an explicit token threshold, a summary callback and an optional native/custom counter. System prompts, current input and tool groups are preserved; retained provider replay data is conservatively skipped. Applied/skipped decisions are recorded on reports and durable snapshots.
 
 - `ModelContract.countTokens?()` represents optional native input-token preflight, separate from offline SDK estimates.
 
