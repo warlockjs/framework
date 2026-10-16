@@ -32,3 +32,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Local agent coordination (Codex <-> Claude bridge) and scratch files
+.tmp/
