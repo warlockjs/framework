@@ -472,8 +472,8 @@ async function prepareAndGate(
     );
   } else if (matrixScope === "none") {
     console.warn(
-      "[release-family] MATRIX NOT RUN (--matrix none): the local registry is still owned, all 28 tarballs " +
-        "are still staged and every member is still confirmed installable — but the zero-edit generator " +
+      "[release-family] MATRIX NOT RUN (--matrix none): the local registry is still owned, every tarball is still staged " +
+        "and every member is still confirmed installable — but the zero-edit generator " +
         'matrix, the only check that answers "does what we publish actually work?", does not run. ' +
         "The handoff will record matrixScope=none, and that MUST reach the release summary and releases.json.",
     );
