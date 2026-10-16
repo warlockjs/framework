@@ -128,7 +128,7 @@ export default function AccountPage({ data }: PageProps<typeof loader>) {
 ```
 
 - **Loader context.** For a guarded page, `PageLoaderContext<Validation, typeof route>` (and `PageLoader`) type `session` as a non-optional `{ user, model }` with neither field null, and `request.locals.user` as non-null. The route name is passed as the third type argument as above, or read from `typeof config.route` when `route` keeps a literal name: declare `config` `as const satisfies PageConfig`, because plain `satisfies` widens `name` to `string` and the loader then types `session` as optional. Unguarded pages, layout and app loaders, and page actions are unchanged: there `session` stays optional and `user` may be `null`.
-- **`useUser(routeName)`** returns a non-null `SessionUser`. Any name that is not a guarded page fails to compile. Passing the name also keeps the last signed-in user while that component stays mounted, so a sign-out that flips the store to a guest a frame before the navigation completes does not hand `null` to a component that reads `user.name`. Plain `useUser()` is unchanged and still returns `null` for a guest.
+- **`useUser(routeName)`** returns a non-null `SessionUser`. Any name that is not a guarded page fails to compile. Passing the name also keeps the last signed-in user while that component stays mounted, so a sign-out that flips the store to a guest a frame before the navigation completes does not hand `null` to a component that reads `user.name`. Retention follows the last committed render: an abandoned suspended transition cannot replace the retained user. Plain `useUser()` is unchanged and still returns `null` for a guest.
 
 #### What counts as a guard
 

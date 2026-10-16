@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement } from "react";
+import { act, createElement, startTransition, Suspense } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -97,5 +97,32 @@ describe("useUser(name) retains the last signed-in user", () => {
     act(() => root?.render(tree(null)));
 
     expect(view.textContent).toBe("9");
+  });
+
+  it("retains only a committed user when a transition suspends and is abandoned", async () => {
+    const pending = new Promise<never>(() => {});
+    const observed = vi.fn();
+    function SuspendedUser() {
+      const user = useUser("account.show" as never);
+      observed(label(user));
+      if (label(user) === "2") throw pending;
+      return createElement("span", null, label(user));
+    }
+    const tree = (user: { id: number } | null) =>
+      createElement(
+        Suspense,
+        { fallback: "loading" },
+        createElement(SessionContext.Provider, { value: { user } }, createElement(SuspendedUser)),
+      );
+    const view = mount(tree({ id: 1 }));
+
+    await act(async () => {
+      startTransition(() => root?.render(tree({ id: 2 })));
+    });
+    expect(observed).toHaveBeenCalledWith("2");
+    expect(view.textContent).toBe("1");
+
+    act(() => root?.render(tree(null)));
+    expect(view.textContent).toBe("1");
   });
 });

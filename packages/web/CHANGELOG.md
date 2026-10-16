@@ -9,6 +9,8 @@ All notable changes to `@warlock.js/web` are documented here.
 - Published page skills include complete support modules, schemas and generated-type prerequisites; their HTTP examples and Vitest discovery match current APIs. The skill compile gate verifies them without a failure allowance.
 - The root middleware example declares its own request-local type rather than depending on another skill's augmentation.
 
+- Guarded `useUser(name)` retains the last committed signed-in user when a concurrent transition suspends and is abandoned. Navigation callbacks also read the committed page, and boundary reset counters commit with their page swap.
+
 - Locale context reuse after development edits is covered by a real Vite dev-server/HMR regression: a retained provider continues to serve refreshed locale and translation hooks after repeated filesystem edits. An unshared-context control reproduces the missing-provider HTTP failure.
 
 ### Added

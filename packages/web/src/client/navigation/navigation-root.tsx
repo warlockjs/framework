@@ -131,15 +131,17 @@ export function NavigationRoot({
   });
 
   /*
-    The latest state, readable from the effect below — which closes over the
-    render that created it and would otherwise see the page the user was on
+    The latest committed state, readable from the effect below — which closes
+    over the render that created it and would otherwise see the page the user was on
     when the runtime connected. A ref rather than an effect dependency because
     re-running the effect on every swap would disconnect and reconnect the
     navigator mid-navigation.
   */
   const currentRef = useRef(current);
 
-  currentRef.current = current;
+  useLayoutEffect(() => {
+    currentRef.current = current;
+  }, [current]);
 
   /*
     THE DEFAULT ERROR BOUNDARY'S RESET SIGNAL. Bumped by `applySwap` below —
@@ -149,12 +151,11 @@ export function NavigationRoot({
     `current.payload.name`: a same-name swap (`/posts/1` -> `/posts/2`, or a
     plain `refresh()`) must also clear a stale error, and a changing `key`
     would remount the layouts inside it to do that, throwing away the state
-    client navigation exists to keep. A ref, not state: it has nothing to
-    render on its own, and mutating it before the `setCurrent` that follows
-    guarantees the boundary sees the new value on the very render the swap
-    causes.
+    client navigation exists to keep. The counter advances alongside
+    `setCurrent` so both values commit together, even when React abandons
+    an intermediate render.
   */
-  const resetTokenRef = useRef(0);
+  const [resetToken, setResetToken] = useState(0);
   const pendingCommit = useRef<{ next: Current; complete: () => void } | undefined>(undefined);
 
   // Set once the initial document's deferred scope has been released.
@@ -169,8 +170,7 @@ export function NavigationRoot({
     existing `buildTree` (returning a plain `ReactNode`, unchanged) keeps
     working unmodified.
 
-    Kept in STATE, not a ref: unlike `resetTokenRef` (mutated synchronously,
-    always fresh by the render its own swap causes), this resolves later,
+    The component is state because its module resolves later,
     off a dynamic import — nothing else would force `DefaultErrorBoundary` to
     receive the freshly loaded component once that import settles.
 
@@ -185,6 +185,7 @@ export function NavigationRoot({
   useEffect(() => {
     let cancelled = false;
 
+    // oxlint-disable-next-line react/set-state-in-effect -- Resolve an external route module and clear the previous route component while it loads.
     setErrorPageComponent(undefined);
 
     resolveErrorPageComponent(pages, current.payload.name)
@@ -203,7 +204,7 @@ export function NavigationRoot({
   }, [pages, current.payload.name]);
 
   const applySwap = (next: Current, complete?: () => void): void => {
-    resetTokenRef.current += 1;
+    setResetToken(previous => previous + 1);
 
     /*
       A swap that replaces one still waiting for its commit settles that wait
@@ -835,7 +836,7 @@ export function NavigationRoot({
           catches first; this one only fires when nothing else did — see
           `default-error-boundary.tsx`.
         */}
-        <DefaultErrorBoundary resetToken={resetTokenRef.current} errorPage={errorPageComponent}>
+        <DefaultErrorBoundary resetToken={resetToken} errorPage={errorPageComponent}>
           {current.tree}
         </DefaultErrorBoundary>
       </LocaleProvider>

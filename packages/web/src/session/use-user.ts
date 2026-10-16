@@ -1,4 +1,4 @@
-import { useContext, useRef, useSyncExternalStore } from "react";
+import { useContext, useState, useSyncExternalStore } from "react";
 import { sharedContext } from "../shared/shared-context";
 import { clearPrefetchCache } from "../client/navigation/prefetch";
 import type { GuardedPageRouteName } from "../routing/route-types";
@@ -97,11 +97,13 @@ export function useUser(routeName?: string): SessionUser | null {
   const provided = useContext(SessionContext);
   const stored = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const current = provided !== undefined ? provided.user : stored;
-  const lastSignedIn = useRef<SessionUser | null>(null);
+  const [lastSignedIn, setLastSignedIn] = useState<SessionUser | null>(null);
 
   if (routeName === undefined) return current;
 
-  if (current !== null) lastSignedIn.current = current;
+  // State belongs to the render being committed; an abandoned suspended render
+  // must not overwrite the last user retained by the mounted tree.
+  if (current !== null && current !== lastSignedIn) setLastSignedIn(current);
 
-  return current ?? lastSignedIn.current;
+  return current ?? lastSignedIn;
 }
