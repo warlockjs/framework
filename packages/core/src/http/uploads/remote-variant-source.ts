@@ -7,6 +7,18 @@ import { HttpError } from "../errors";
 import { detectImageFormat, isVariantSourceFormat } from "./detect-image-format";
 import type { ResolvedImageVariantsConfig } from "./image-variant-types";
 import { loadVariantSource } from "./load-variant-source";
+import type { Image } from "../../image";
+import type { VariantSourceFormat } from "./image-variant-types";
+
+type LoadedRemoteSource = { image: Image; sourceFormat: VariantSourceFormat; generation: string };
+export type RemoteVariantSource = {
+  relativePath: string;
+  sourcePath: string;
+  metadataGeneration?: string;
+  load(): Promise<LoadedRemoteSource>;
+  release(): void;
+};
+const activeSources = new Map<string, { references: number; source: RemoteVariantSource }>();
 
 export function remoteVariantDisk(disk?: StorageDriverName): {
   driver: StorageDriverContract;
@@ -42,9 +54,10 @@ export async function remoteVariantSource(
   location: string,
   disk: ReturnType<typeof remoteVariantDisk>,
   images: ResolvedImageVariantsConfig,
-) {
+): Promise<RemoteVariantSource | undefined> {
   const relativePath = remoteVariantPath(location);
   if (!relativePath) return undefined;
+  const objectPath = relativePath;
   let metadata;
   try {
     metadata = await disk.driver.metadata(relativePath);
@@ -66,37 +79,64 @@ export async function remoteVariantSource(
     throw new HttpError(413, "The source image is too large.");
   // The identity includes the effective prefix, including tenant context.
   const sourcePath = disk.driver.applyPrefix(relativePath);
-  return {
+  const metadataGeneration = metadata.etag
+    ? createHash("sha256")
+        .update(JSON.stringify([metadata.etag, metadata.size, metadata.lastModified?.getTime()]))
+        .digest("hex")
+    : undefined;
+  const activeKey = JSON.stringify([
+    disk.root,
+    sourcePath,
+    metadataGeneration,
+    images.maxSourceBytes,
+    images.maxSourcePixels,
+  ]);
+  const existing = activeSources.get(activeKey);
+  if (existing) {
+    existing.references++;
+    return existing.source;
+  }
+  let loaded: Promise<LoadedRemoteSource> | undefined;
+  async function load() {
+    const stream = await disk.driver.getStream(objectPath);
+    const chunks: Buffer[] = [];
+    let size = 0;
+    try {
+      for await (const chunk of stream) {
+        const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        size += bytes.length;
+        if (size > images.maxSourceBytes)
+          throw new HttpError(413, "The source image is too large.");
+        chunks.push(bytes);
+      }
+    } finally {
+      stream.destroy();
+    }
+    const buffer = Buffer.concat(chunks);
+    const sourceFormat = detectImageFormat(buffer);
+    if (!isVariantSourceFormat(sourceFormat))
+      throw new HttpError(415, "Variants are only available for jpeg, png, webp and avif images.");
+    const image = await loadVariantSource(buffer, {
+      maxSourceBytes: images.maxSourceBytes,
+      maxSourcePixels: images.maxSourcePixels,
+      expectedFormat: sourceFormat,
+    });
+    return {
+      image,
+      sourceFormat,
+      generation: metadataGeneration ?? createHash("sha256").update(buffer).digest("hex"),
+    };
+  }
+  const source: RemoteVariantSource = {
     relativePath,
     sourcePath,
-    async load() {
-      const stream = await disk.driver.getStream(relativePath);
-      const chunks: Buffer[] = [];
-      let size = 0;
-      try {
-        for await (const chunk of stream) {
-          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          size += buffer.length;
-          if (size > images.maxSourceBytes)
-            throw new HttpError(413, "The source image is too large.");
-          chunks.push(buffer);
-        }
-      } finally {
-        stream.destroy();
-      }
-      const buffer = Buffer.concat(chunks);
-      const sourceFormat = detectImageFormat(buffer);
-      if (!isVariantSourceFormat(sourceFormat))
-        throw new HttpError(
-          415,
-          "Variants are only available for jpeg, png, webp and avif images.",
-        );
-      const image = await loadVariantSource(buffer, {
-        maxSourceBytes: images.maxSourceBytes,
-        maxSourcePixels: images.maxSourcePixels,
-        expectedFormat: sourceFormat,
-      });
-      return { image, sourceFormat, generation: createHash("sha256").update(buffer).digest("hex") };
+    metadataGeneration,
+    load: () => (loaded ??= load()),
+    release() {
+      const active = activeSources.get(activeKey);
+      if (active && --active.references === 0) activeSources.delete(activeKey);
     },
   };
+  activeSources.set(activeKey, { source, references: 1 });
+  return source;
 }

@@ -21,7 +21,7 @@ import {
   variantSourceDirectory,
   variantSourceKey,
 } from "./variant-cache-key";
-import { freshImageVariant, trimImageVariantCache } from "./trim-image-variant-cache";
+import { freshImageVariant, scheduleImageVariantCacheTrim } from "./trim-image-variant-cache";
 import { variantGenerations } from "./variant-generations";
 
 const CONTENT_TYPES: Record<VariantOutputFormat, string> = {
@@ -164,6 +164,7 @@ export async function resolveImageVariant(
       await retryOnVanishedDirectory(() =>
         generateImageVariant({ image: image.clone(), variant, format, targetPath: target }),
       );
+      scheduleImageVariantCacheTrim(images, target);
       await pruneStaleVariantGenerationsIfCurrent(
         source.absolutePath,
         variantSourceDirectory(images.cacheDirectory, sourceKey),
@@ -171,8 +172,6 @@ export async function resolveImageVariant(
       );
     });
   }
-
-  await trimImageVariantCache(images, target);
 
   return { absolutePath: target, hash, format, contentType: CONTENT_TYPES[format] };
 }

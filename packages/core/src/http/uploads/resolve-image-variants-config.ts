@@ -1,4 +1,5 @@
 import path from "node:path";
+import { isPathWithin } from "./is-path-inside";
 import type {
   ImageVariantDefinition,
   ImageVariantFit,
@@ -167,6 +168,12 @@ export function resolveImageVariantsConfig(
   const cacheDirectory = images.cacheDirectory
     ? path.resolve(images.cacheDirectory)
     : path.join(storageRoot, ".cache", "image-variants");
+
+  if (isPathWithin(path.resolve(storageRoot), path.resolve(cacheDirectory))) {
+    throw new ImageVariantsConfigError(
+      "uploads.images.cacheDirectory must not equal or contain the storage root.",
+    );
+  }
 
   return {
     variants,

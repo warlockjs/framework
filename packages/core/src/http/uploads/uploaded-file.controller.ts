@@ -98,6 +98,9 @@ export type UploadedFileControllerOptions = {
    * should be served from a route that checks access first.
    */
   disk?: StorageDriverName;
+
+  /** Allow derivatives from the default cloud disk. Explicit disk selection also opts in. */
+  remote?: boolean;
 };
 
 /**
@@ -126,6 +129,10 @@ export function createUploadedFileController(
 ): RequestHandler {
   return async ({ request, response }) => {
     const diskRoot = localDiskRoot(options.disk);
+    // The scaffold's public route must not expose private objects when the
+    // default disk changes to a cloud bucket. Remote access is deliberate.
+    if (!diskRoot && options.disk === undefined && options.remote !== true)
+      return notFound(response);
 
     const query = parseUploadedFileQuery(request.url);
 

@@ -184,7 +184,7 @@ On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every
 
 ### Bound the cache and render remote disks
 
-Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. Each variant request removes expired derivatives and evicts oldest files to meet the byte budget. The derivative being returned is retained even when it alone exceeds that budget; idle caches are cleaned on the next variant request. Keep the cache on a local, writable filesystem outside `public/`.
+Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules background cleanup, coalesced and throttled to at most once per minute; hits never walk the cache. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain a local storage root.
 
 ```ts
 import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";
@@ -196,7 +196,7 @@ const descriptor = await generateImageVariants("products/photo.jpg", {
 });
 ```
 
-For an object-storage disk, `descriptor.src` is the driver's original URL; variant URLs use `/cloud-images` and its controller accepts variant queries only (an original request there returns 404). Protect that route before serving private derivatives, and use signed original URLs separately for private buckets. `resolveImageVariant` also accepts remote disks. Remote bytes are streamed up to `maxSourceBytes` on every call and hashed, so unchanged content reuses the rendered derivative even if metadata is absent. The default remote cache is `<app>/storage/.cache/image-variants`. Bucket identity and the effective storage prefix isolate cached sources. After remote deletion or moving, call `purgeImageVariants(path, { disk: "r2" })` yourself; age/size cleanup also reclaims those derivatives.
+For an object-storage disk, `descriptor.src` is the driver's original URL; variant URLs use `/cloud-images` and its controller accepts variant queries only (an original request there returns 404). Selecting a remote disk explicitly opts that route into cloud serving; the default `uploadedFileController` continues to return 404 when the default disk is cloud. `createUploadedFileController({ remote: true })` opts into the default cloud disk. Protect a remote route before serving private derivatives: an unguarded route exposes every allowed image in that bucket/prefix, including originals otherwise served only through signed URLs. Use signed original URLs separately for private buckets. `resolveImageVariant` also accepts remote disks. Requests read source metadata; an ETag, size and last-modified date select the cached generation without downloading the source on a hit. Without an ETag, bytes are downloaded and hashed. Concurrent loads for the same disk/path/version are shared, bounded by `maxSourceBytes`, and ingest generation downloads once for all variants and formats. The default remote cache is `<app>/storage/.cache/image-variants`. Bucket identity and the effective storage prefix isolate cached sources. After remote deletion or moving, call `purgeImageVariants(path, { disk: "r2" })` yourself; age/size cleanup also reclaims those derivatives.
 
 ## `StorageFile` — the OOP handle
 
@@ -391,12 +391,10 @@ export const uploadAvatarController: GuardedRequestHandler = async ({ request, r
 ### Direct browser upload via presigned URL
 
 ```ts
-const uploadUrl = await storage
-  .use("r2")
-  .getPresignedUploadUrl(`uploads/${userId}/${filename}`, {
-    expiresIn: 600,
-    contentType: mimeType,
-  });
+const uploadUrl = await storage.use("r2").getPresignedUploadUrl(`uploads/${userId}/${filename}`, {
+  expiresIn: 600,
+  contentType: mimeType,
+});
 
 return response.success({ uploadUrl });
 ```

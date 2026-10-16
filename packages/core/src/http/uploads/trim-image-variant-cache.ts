@@ -1,8 +1,26 @@
+import { log } from "@warlock.js/logger";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ResolvedImageVariantsConfig } from "./image-variant-types";
 
-const sweeps = new Map<string, Promise<void>>();
+const SWEEP_INTERVAL_MS = 60_000;
+type CacheState = {
+  sweep?: Promise<void>;
+  timer?: ReturnType<typeof setTimeout>;
+  lastSweep: number;
+  bytes: number;
+  sizes: Map<string, number>;
+  keep: Set<string>;
+};
+const caches = new Map<string, CacheState>();
+function cacheState(directory: string): CacheState {
+  let state = caches.get(directory);
+  if (!state) {
+    state = { lastSweep: 0, bytes: 0, sizes: new Map(), keep: new Set() };
+    caches.set(directory, state);
+  }
+  return state;
+}
 
 /** Age is measured from generation; hits do not extend a derivative's life. */
 export async function freshImageVariant(target: string, maxAgeSeconds: number): Promise<boolean> {
@@ -16,89 +34,95 @@ export async function freshImageVariant(target: string, maxAgeSeconds: number): 
 }
 
 /**
- * Remove expired derivatives, then the oldest until the byte budget fits.
- * The file about to be served is retained, even if it alone exceeds the budget.
- * Only derivative-shaped paths are considered; symlinks are never followed.
- * Housekeeping is serialized per directory in this process.
+ * Schedule housekeeping only after a write. Hits do no cache-directory I/O.
+ * Writes update a running byte estimate; one background sweep per minute
+ * reconciles that estimate with disk and reclaims expired/oldest derivatives.
+ */
+export function scheduleImageVariantCacheTrim(
+  images: ResolvedImageVariantsConfig,
+  target: string,
+): void {
+  const state = cacheState(images.cacheDirectory);
+  void fs
+    .stat(target)
+    .then((stats) => {
+      state.bytes += stats.size - (state.sizes.get(target) ?? 0);
+      state.sizes.set(target, stats.size);
+      if (state.timer) return;
+      const delay = Math.max(0, state.lastSweep + SWEEP_INTERVAL_MS - Date.now());
+      state.timer = setTimeout(() => {
+        state.timer = undefined;
+        void trimImageVariantCache(images, target).catch((error: unknown) => {
+          log.warn("uploads", "image-variants", error);
+        });
+      }, delay);
+      state.timer.unref();
+    })
+    .catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+        log.warn("uploads", "image-variants", error);
+    });
+}
+
+/**
+ * Join an in-flight sweep rather than queueing another walk. Retain the file
+ * about to be served, even if it alone exceeds the byte budget. Only known
+ * derivative-shaped paths are touched; symlinks are never followed. Empty
+ * directories stay in place so trimming cannot race a generator's mkdir/save.
  */
 export async function trimImageVariantCache(
   images: ResolvedImageVariantsConfig,
   keep: string,
 ): Promise<void> {
-  const previous = sweeps.get(images.cacheDirectory) ?? Promise.resolve();
-  const sweep = previous
-    .catch(() => {})
-    .then(async () => {
-      const files: { target: string; size: number; mtimeMs: number }[] = [];
-      async function walk(directory: string, depth: number): Promise<void> {
-        let entries;
-        try {
-          entries = await fs.readdir(directory, { withFileTypes: true });
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-          throw error;
-        }
-        for (const entry of entries) {
-          const target = path.join(directory, entry.name);
-          if (entry.isDirectory() && depth < 3) {
-            await walk(target, depth + 1);
-          } else if (
-            entry.isFile() &&
-            depth === 3 &&
-            /^[a-f0-9]{64}\.(jpg|png|webp|avif)$/.test(entry.name)
-          ) {
-            try {
-              const stats = await fs.stat(target);
-              files.push({ target, size: stats.size, mtimeMs: stats.mtimeMs });
-            } catch (error) {
-              if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-            }
-          }
-        }
-        // Empty source/generation directories otherwise accumulate after eviction.
-        if (depth > 0) {
+  const state = cacheState(images.cacheDirectory);
+  state.keep.add(keep);
+  if (state.sweep) return state.sweep;
+  state.lastSweep = Date.now();
+  const sweep = (async () => {
+    const files: { target: string; size: number; mtimeMs: number }[] = [];
+    async function walk(directory: string, depth: number): Promise<void> {
+      let entries;
+      try {
+        entries = await fs.readdir(directory, { withFileTypes: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+      for (const entry of entries) {
+        const target = path.join(directory, entry.name);
+        if (entry.isDirectory() && depth < 3) await walk(target, depth + 1);
+        else if (
+          entry.isFile() &&
+          depth === 3 &&
+          /^[a-f0-9]{64}\.(jpg|png|webp|avif)$/.test(entry.name)
+        ) {
           try {
-            await fs.rmdir(directory);
+            const stats = await fs.stat(target);
+            files.push({ target, size: stats.size, mtimeMs: stats.mtimeMs });
           } catch (error) {
-            if (
-              !["ENOENT", "ENOTEMPTY", "EEXIST"].includes(
-                (error as NodeJS.ErrnoException).code ?? "",
-              )
-            )
-              throw error;
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
           }
         }
       }
-      await walk(images.cacheDirectory, 0);
-      let total = files.reduce((sum, file) => sum + file.size, 0);
-      const cutoff = Date.now() - images.maxCacheAge * 1000;
-      for (const file of files.sort((a, b) => a.mtimeMs - b.mtimeMs)) {
-        if (file.target === keep) continue;
-        if (file.mtimeMs <= cutoff || total > images.maxCacheBytes) {
-          await fs.rm(file.target, { force: true });
-          total -= file.size;
-          let parent = path.dirname(file.target);
-          while (parent !== images.cacheDirectory) {
-            try {
-              await fs.rmdir(parent);
-            } catch (error) {
-              if (
-                !["ENOENT", "ENOTEMPTY", "EEXIST"].includes(
-                  (error as NodeJS.ErrnoException).code ?? "",
-                )
-              )
-                throw error;
-              break;
-            }
-            parent = path.dirname(parent);
-          }
-        }
+    }
+    await walk(images.cacheDirectory, 0);
+    state.sizes = new Map(files.map((file) => [file.target, file.size]));
+    state.bytes = files.reduce((sum, file) => sum + file.size, 0);
+    const cutoff = Date.now() - images.maxCacheAge * 1000;
+    for (const file of files.sort((a, b) => a.mtimeMs - b.mtimeMs)) {
+      if (state.keep.has(file.target)) continue;
+      if (file.mtimeMs <= cutoff || state.bytes > images.maxCacheBytes) {
+        await fs.rm(file.target, { force: true });
+        state.bytes -= file.size;
+        state.sizes.delete(file.target);
       }
-    });
-  sweeps.set(images.cacheDirectory, sweep);
+    }
+  })();
+  state.sweep = sweep;
   try {
     await sweep;
   } finally {
-    if (sweeps.get(images.cacheDirectory) === sweep) sweeps.delete(images.cacheDirectory);
+    state.sweep = undefined;
+    state.keep.clear();
   }
 }

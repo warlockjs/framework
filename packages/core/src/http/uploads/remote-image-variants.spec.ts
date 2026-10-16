@@ -2,7 +2,7 @@ import config from "@mongez/config";
 import Fastify from "fastify";
 import { Request } from "../request";
 import { Response } from "../response";
-import { createUploadedFileController } from "./uploaded-file.controller";
+import { createUploadedFileController, uploadedFileController } from "./uploaded-file.controller";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -45,20 +45,81 @@ afterEach(async () => {
 });
 
 describe("remote disk image variants", () => {
+  it("uses ETag metadata on hits and coalesces concurrent misses across variants", async () => {
+    let etag = "revision-a";
+    vi.mocked(driver.metadata).mockImplementation(async () => ({
+      path: "photo.png",
+      name: "photo.png",
+      size: buffer.length,
+      isDirectory: false,
+      etag,
+      lastModified: new Date(10),
+    }));
+    config.set("uploads.images.variants.card", { width: 32 });
+    const input = { disk: "cloud", path: "photo.png", variant: "thumb" };
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        resolveImageVariant({ ...input, variant: index % 2 ? "card" : "thumb" }),
+      ),
+    );
+    expect(driver.getStream).toHaveBeenCalledTimes(1);
+    const first = (await resolveImageVariant(input))!;
+    vi.mocked(driver.getStream).mockClear();
+    const readdir = vi.spyOn(fs, "readdir");
+    await Promise.all(Array.from({ length: 20 }, () => resolveImageVariant(input)));
+    expect(driver.getStream).not.toHaveBeenCalled();
+    expect(readdir).not.toHaveBeenCalled();
+    etag = "revision-b";
+    const revised = (await resolveImageVariant(input))!;
+    expect(revised.hash).not.toBe(first.hash);
+    expect(driver.getStream).toHaveBeenCalledTimes(1);
+  });
+
+  it("downloads a remote ingest source once for every variant and format", async () => {
+    vi.mocked(driver.metadata).mockImplementation(async () => ({
+      path: "photo.png",
+      name: "photo.png",
+      size: buffer.length,
+      isDirectory: false,
+      etag: "revision",
+    }));
+    config.set("uploads.images.variants.card", { width: 32 });
+    config.set("uploads.images.formats", ["webp", "avif"]);
+    const descriptor = await generateImageVariants("photo.png", { disk: "cloud" });
+    expect(Object.keys(descriptor.variants)).toEqual(["thumb", "card"]);
+    expect(driver.getStream).toHaveBeenCalledTimes(1);
+    expect(driver.metadata).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces fallback downloads for sources without ETags", async () => {
+    await Promise.all(
+      Array.from({ length: 20 }, () =>
+        resolveImageVariant({ disk: "cloud", path: "photo.png", variant: "thumb" }),
+      ),
+    );
+    expect(driver.getStream).toHaveBeenCalledTimes(1);
+  });
   it("serves remote derivatives through a scoped controller and leaves originals to the driver", async () => {
     const app = Fastify();
     const controller = createUploadedFileController({ disk: "cloud" });
-    app.get("/cloud-images/*", async (incoming, outgoing) => {
-      const request = new Request();
-      const response = new Response();
-      response.setResponse(outgoing);
-      request.response = response;
-      response.request = request;
-      request.setRequest(incoming).setRoute({ method: "GET", path: "/cloud-images/*" } as never);
-      await controller({ request, response });
-      return outgoing;
-    });
+    const register = (route: string, handler: typeof controller) =>
+      app.get(route, async (incoming, outgoing) => {
+        const request = new Request();
+        const response = new Response();
+        response.setResponse(outgoing);
+        request.response = response;
+        response.request = request;
+        request.setRequest(incoming).setRoute({ method: "GET", path: "/cloud-images/*" } as never);
+        await handler({ request, response });
+        return outgoing;
+      });
+    register("/cloud-images/*", controller);
+    register("/uploads/*", uploadedFileController);
+    register("/default-cloud/*", createUploadedFileController({ remote: true }));
     try {
+      expect((await app.inject("/uploads/private.png?variant=thumb")).statusCode).toBe(404);
+      expect(driver.metadata).not.toHaveBeenCalled();
+      expect((await app.inject("/default-cloud/photo.png?variant=thumb")).statusCode).toBe(200);
       const rendered = await app.inject("/cloud-images/photo.png?variant=thumb&format=webp");
       expect(rendered.statusCode).toBe(200);
       expect(rendered.headers["content-type"]).toBe("image/webp");

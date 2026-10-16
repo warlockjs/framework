@@ -3,7 +3,7 @@ import { Image } from "../../image";
 import type { StorageDriverName } from "../../storage/types";
 import { localDiskRoot } from "./local-disk-root";
 import { remoteVariantDisk, remoteVariantSource } from "./remote-variant-source";
-import { resolveImageVariant } from "./resolve-image-variant";
+import { renderRemoteImageVariant } from "./resolve-remote-image-variant";
 import { HttpError } from "../errors";
 import { uploadsConfig } from "../uploads-config";
 import type { ImageVariantOutputFormat } from "../uploads-types";
@@ -29,7 +29,7 @@ import {
   variantSourceDirectory,
   variantSourceKey,
 } from "./variant-cache-key";
-import { freshImageVariant, trimImageVariantCache } from "./trim-image-variant-cache";
+import { freshImageVariant, scheduleImageVariantCacheTrim } from "./trim-image-variant-cache";
 import { variantGenerations } from "./variant-generations";
 
 /**
@@ -98,8 +98,8 @@ function outputFormatsFor(
  * `url`/`urls` already point at `uploadedFileController`; an app serving
  * uploads from object storage use the driver URL for the original, and
  * `options.urlPrefix` for the route serving locally cached derivatives.
- * Remote sources are streamed with the byte limit on every call; rendered
- * derivatives are reused by content hash.
+ * Ingest downloads a remote source once for all variants and formats.
+ * On-demand cache hits use ETag metadata; sources without ETags are hashed.
  *
  * @param relativePath - path of the saved upload, relative to the storage root
  * @param options.variants - limit generation to these variant names
@@ -189,6 +189,7 @@ export async function generateImageVariants(
           await retryOnVanishedDirectory(() =>
             generateImageVariant({ image: image.clone(), variant, format, targetPath: target }),
           );
+          scheduleImageVariantCacheTrim(images, target);
           await pruneStaleVariantGenerationsIfCurrent(
             source.absolutePath,
             variantSourceDirectory(images.cacheDirectory, sourceKey),
@@ -196,8 +197,6 @@ export async function generateImageVariants(
           );
         });
       }
-
-      await trimImageVariantCache(images, target);
 
       if (dimensions === undefined) {
         dimensions = await readDerivativeDimensions(target);
@@ -244,40 +243,48 @@ async function generateRemoteImageVariants(
   }
   const source = await remoteVariantSource(relativePath, disk, images);
   if (!source) throw new HttpError(404, "File Not Found");
-  const { image, sourceFormat } = await source.load();
-  const { width, height } = await image.metadata();
-  const variantSrc = `${(options.urlPrefix ?? "/uploads").replace(/\/$/, "")}/${encodeUploadsPath(source.relativePath)}`;
-  const variants: Record<string, GeneratedImageVariant> = {};
-  for (const name of names) {
-    let dimensions: { width: number; height: number } | undefined;
-    for (const format of outputFormatsFor(sourceFormat, images.formats)) {
-      const resolved = await resolveImageVariant({
-        path: relativePath,
-        variant: name,
-        disk: options.disk,
-        ...(format === sourceFormat ? {} : { format }),
-      });
-      if (!resolved) throw new HttpError(404, "File Not Found");
-      dimensions ??= await readDerivativeDimensions(resolved.absolutePath);
+  try {
+    const { image, sourceFormat } = await source.load();
+    const { width, height } = await image.metadata();
+    const variantSrc = `${(options.urlPrefix ?? "/uploads").replace(/\/$/, "")}/${encodeUploadsPath(source.relativePath)}`;
+    const variants: Record<string, GeneratedImageVariant> = {};
+    for (const name of names) {
+      let dimensions: { width: number; height: number } | undefined;
+      for (const format of outputFormatsFor(sourceFormat, images.formats)) {
+        const resolved = await renderRemoteImageVariant(
+          {
+            path: relativePath,
+            variant: name,
+            ...(format === sourceFormat ? {} : { format }),
+          },
+          disk,
+          images,
+          source,
+        );
+        if (!resolved) throw new HttpError(404, "File Not Found");
+        dimensions ??= await readDerivativeDimensions(resolved.absolutePath);
+      }
+      variants[name] = {
+        width: dimensions?.width ?? 0,
+        height: dimensions?.height ?? 0,
+        url: variantUrl(variantSrc, name),
+        ...(images.formats.length
+          ? {
+              urls: Object.fromEntries(
+                images.formats.map((format) => [format, variantUrl(variantSrc, name, format)]),
+              ),
+            }
+          : {}),
+      };
     }
-    variants[name] = {
-      width: dimensions?.width ?? 0,
-      height: dimensions?.height ?? 0,
-      url: variantUrl(variantSrc, name),
-      ...(images.formats.length
-        ? {
-            urls: Object.fromEntries(
-              images.formats.map((format) => [format, variantUrl(variantSrc, name, format)]),
-            ),
-          }
-        : {}),
+    return {
+      src: disk.driver.url(source.relativePath),
+      width: width ?? 0,
+      height: height ?? 0,
+      variants,
+      ...(images.formats.length ? { formats: images.formats } : {}),
     };
+  } finally {
+    source.release();
   }
-  return {
-    src: disk.driver.url(source.relativePath),
-    width: width ?? 0,
-    height: height ?? 0,
-    variants,
-    ...(images.formats.length ? { formats: images.formats } : {}),
-  };
 }

@@ -21,6 +21,14 @@ function requiredVariant(
 }
 
 describe("resolveImageVariantsConfig", () => {
+  it.each([root, path.dirname(root)])(
+    "refuses a cache directory that contains the storage root: %s",
+    (cacheDirectory) => {
+      expect(() => resolve({ variants: { thumb: { width: 10 } }, cacheDirectory })).toThrow(
+        /must not equal or contain the storage root/,
+      );
+    },
+  );
   it("returns undefined when no images config exists", () => {
     expect(resolve(undefined)).toBeUndefined();
   });
