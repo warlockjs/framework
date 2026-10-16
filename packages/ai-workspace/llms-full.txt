@@ -283,4 +283,31 @@ const ws = ai.workspace({ cwd: "/srv/app", backend: "mock", shell: { allow: ["np
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes `ws.tools.all()`.
 - The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every workspace tool is built on.
 
+## Complete bounded-read and cancellation example
+
+```ts
+import { workspace } from "@warlock.js/ai-workspace";
+
+export async function inspectWorkspace(cwd: string) {
+  const ws = workspace({
+    cwd,
+    read: { maxBytes: 64_000, defaultLines: 400 },
+    shell: { allow: ["node"], inheritEnv: ["PATH"] },
+  });
+  const page = await ws.readFile("package.json");
+  console.info(page.bytesCapped, page.endLine, page.hash);
+
+  const controller = new AbortController();
+  controller.abort();
+  const result = await ws.exec('node -e "console.log(1)"', { signal: controller.signal });
+  if (result.cancelled) console.info("Command cancelled before it started");
+  return page;
+}
+```
+
+The caller supplies an absolute existing workspace root. The already-aborted
+signal demonstrates the no-spawn path; a later abort also kills a running
+command's process tree. The byte ceiling limits returned content, while the
+hash still describes the whole file.
+
 

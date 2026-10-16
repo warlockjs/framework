@@ -2993,7 +2993,7 @@ The driver must support `similar()`. Without similarity → `CacheUnsupportedErr
 
 ---
 name: pick-ai-provider
-description: 'Choose an AI provider adapter — @warlock.js/ai-openai (shipped, also handles OpenRouter / Azure via baseURL), @warlock.js/ai-anthropic, @warlock.js/ai-bedrock, @warlock.js/ai-google, @warlock.js/ai-ollama — plus cost truth: ModelPricing (per-1M tokens), Usage cost breakdown, the cachedTokens / cacheWriteTokens / reasoningTokens channels, and capability flags. Triggers: `OpenAISDK`, `SDKAdapterContract`, `ModelContract`, `ModelPricing`, `ModelCapabilities`, `sdk.model`, `sdk.embedder`, `capabilities.vision`, `capabilities.structuredOutput`, `capabilities.reasoning`, `capabilities.promptCaching`, `pricing`, `Usage.cost`, `cachedTokens`, `cacheWriteTokens`, `reasoningTokens`, `reasoning.effort`, `cacheControl`, `baseURL`, `provider: "openrouter"`; ''pick a provider'', ''openai vs openrouter'', ''does this model support vision/reasoning'', ''configure pricing'', ''how much did reasoning cost'', ''prompt cache tokens''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent factory — the `run-ai-agent` topic; competing libs raw `openai`, `@anthropic-ai/sdk`, `@aws-sdk/client-bedrock-runtime`.'
+description: 'Choose an AI provider adapter — @warlock.js/ai-openai (shipped, also handles OpenRouter / Azure via baseURL), @warlock.js/ai-anthropic, @warlock.js/ai-bedrock, @warlock.js/ai-google, @warlock.js/ai-ollama — plus cost truth: ModelPricing (per-1M tokens), Usage cost breakdown, the cachedTokens / cacheWriteTokens / reasoningTokens channels, and capability flags. Triggers: `OpenAISDK`, `SDKAdapterContract`, `ModelContract`, `ModelPricing`, `ModelCapabilities`, `sdk.model`, `countTokens`, `providerOptions`, `sdk.embedder`, `capabilities.vision`, `capabilities.structuredOutput`, `capabilities.reasoning`, `capabilities.promptCaching`, `pricing`, `Usage.cost`, `cachedTokens`, `cacheWriteTokens`, `reasoningTokens`, `reasoning.effort`, `cacheControl`, `baseURL`, `provider: "openrouter"`; ''pick a provider'', ''openai vs openrouter'', ''does this model support vision/reasoning'', ''configure pricing'', ''how much did reasoning cost'', ''prompt cache tokens''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent factory — the `run-ai-agent` topic; competing libs raw `openai`, `@anthropic-ai/sdk`, `@aws-sdk/client-bedrock-runtime`.'
 ---
 
 # Pick an AI provider adapter
@@ -3225,6 +3225,29 @@ transport accepts those fields. In particular, `providerOptions.openai.body`
 also reaches the xAI, Groq, DeepSeek and Mistral Chat adapters; they ignore other
 provider keys. OpenAI-only fields can make a compatible provider reject a call.
 Use model-specific options or the common neutral options for mixed providers.
+
+## Count the exact request when supported
+
+```ts
+import type { Message, ModelCallOptions, ModelContract } from "@warlock.js/ai";
+
+export async function completeWithPreflight(model: ModelContract, messages: Message[]) {
+  const options: ModelCallOptions = {
+    maxTokens: 1_024,
+    providerOptions: { anthropic: { body: { metadata: { user_id: "example-user" } } } },
+  };
+  if (model.countTokens) {
+    const inputTokens = await model.countTokens(messages, options);
+    console.info("Native input tokens", inputTokens);
+  }
+  return model.complete(messages, options);
+}
+```
+
+Counting and completion use the same messages/options. Native counting is a
+network request; handle provider errors normally, and omit the preflight when
+the transport lacks it. Pass only options appropriate to your selected adapter;
+provider-only fields do not replace framework-owned messages, tools or model.
 
 
 ## rag-loaders-and-stores  `@warlock.js/ai/rag-loaders-and-stores/SKILL.md`
@@ -3593,7 +3616,7 @@ Factory-time resolution reads whatever is pinned **at that moment** — so warm 
 
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -4054,6 +4077,26 @@ the threshold or `keep` triggers durable drift detection; bump the agent's
 - The `write-system-prompt` topic — persona / instruction builders
 - The `handle-ai-errors` topic — `AIError` hierarchy
 - The `secure-outbound-requests` topic — the `guardedFetch` / `OutboundPolicy` guard behind a remote text attachment fetch
+
+## Complete concurrency configuration
+
+```ts
+import { ai, type ModelContract, type ToolContract } from "@warlock.js/ai";
+
+export function createCatalogAgent(model: ModelContract, tools: ToolContract[]) {
+  return ai.agent({
+    name: "catalog",
+    model,
+    tools,
+    toolDispatch: "concurrent",
+    maxConcurrentTools: 2,
+  });
+}
+```
+
+Use `toolDispatch: "sequential"` for tools whose side effects must run in order.
+A concurrency cap limits calls within one model trip; it is not a process-wide
+limit across many agent runs. Results still reach the model in request order.
 
 
 ## run-ai-rag  `@warlock.js/ai/run-ai-rag/SKILL.md`

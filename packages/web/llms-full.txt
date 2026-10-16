@@ -1124,6 +1124,37 @@ export async function signIn(email: string, password: string) {
 }
 ```
 
+## Independent submission with query parameters
+
+```tsx title="src/web/cancel.page.tsx"
+import { useState } from "react";
+import { Form, type PageConfig } from "@warlock.js/web";
+
+export const config = { route: "/cancel" } satisfies PageConfig;
+
+export async function action() {
+  return { cancelled: true };
+}
+
+export default function CancelPage() {
+  const [message, setMessage] = useState("");
+  return (
+    <>
+      <Form independent query={{ source: "controls" }} onSettled={(outcome) => {
+        setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
+      }}>
+        <button>Cancel</button>
+      </Form>
+      <p>{message}</p>
+    </>
+  );
+}
+```
+
+`query` changes the target URL while form fields remain in the request body.
+An independent form can run beside another pending form; duplicate submissions
+of the same form still share their active request.
+
 ## load-page-data  `@warlock.js/web/load-page-data/SKILL.md`
 
 ---
@@ -1342,7 +1373,7 @@ export async function loader() {
 }
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
-  // data.product      -> the output of the model's resource (see below)
+  // data.product      -> the browser-safe projection returned by the service
   // data.publishedAt  -> Date (devalue keeps it native)
   return <h1>{data.product.title}</h1>;
 }
@@ -2411,7 +2442,7 @@ export const config = {
 
 ---
 name: navigate-on-the-client
-description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `href()`, use `navigateTo` / `navigateBack`, prefetch on interaction, style the active link in a navbar, render `<Link>` as your own component (`component`) or without locale prefixing (`locale`), inspect the server match with `currentRoute()`, re-fetch loaders after a mutation with `refresh()`, and read one query-string key live with `useQueryString`. Triggers: `Link`, `href`, `navigateTo`, `navigateBack`, `refresh`, `currentRoute`, `previousRoute`, `useQueryString`, `component`, `locale`; "active link", "highlight current nav item", "NavLink", "aria-current", "navigate without a reload", "link to a named route", "refresh page data", "revalidate loaders", "client-side back", "read query string in a component", "query string stale after Link navigation"; typical import `import { Link, refresh, useQueryString } from "@warlock.js/web"`. Skip: define a page route — the `create-a-page` topic; loader mechanics — the `load-page-data` topic; root hydration boundary — the `write-the-root` topic; competing routers `@mongez/react-router`, `react-router-dom`, Next navigation.'
+description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `href()`, use `navigateTo` / `navigateBack`, prefetch on interaction, style the active link in a navbar, render `<Link>` as your own component (`component`) or without locale prefixing (`locale`), inspect the server match with `currentRoute()`, re-fetch loaders after a mutation with `refresh()`, and read one query-string key live with `useQueryString`. Triggers: `Link`, `LinkPropsWithout`, `isRouteName`, `href`, `navigateTo`, `navigateBack`, `refresh`, `currentRoute`, `previousRoute`, `useQueryString`, `component`, `locale`; "active link", "highlight current nav item", "NavLink", "aria-current", "navigate without a reload", "link to a named route", "refresh page data", "revalidate loaders", "client-side back", "read query string in a component", "query string stale after Link navigation"; typical import `import { Link, refresh, useQueryString } from "@warlock.js/web"`. Skip: define a page route — the `create-a-page` topic; loader mechanics — the `load-page-data` topic; root hydration boundary — the `write-the-root` topic; competing routers `@mongez/react-router`, `react-router-dom`, Next navigation.'
 ---
 
 # Warlock — navigate on the client
@@ -2863,6 +2894,24 @@ The switch re-fetches the current page and commits after its tree is ready. In t
 - The `use-layouts` topic: why layout state persists.
 - The `write-the-root` topic: the `#vessel` swap boundary.
 - The `localize-pages` topic: locale URL strategies and the locale switcher.
+
+## Keep wrapper destinations typed and check runtime names
+
+```tsx
+import { href, isRouteName, Link, type LinkPropsWithout } from "@warlock.js/web";
+
+export function QuietLink(props: LinkPropsWithout<"className">) {
+  return <Link {...props} className="quiet" />;
+}
+
+export function knownDestination(name: string): string | undefined {
+  return isRouteName(name) ? href(name) : undefined;
+}
+```
+
+`isRouteName()` checks the published runtime page table. It is false before the
+table exists and narrows a dynamic name for `href()`; it does not generate a
+route or validate that all required parameters were supplied.
 
 ## observe-page-requests  `@warlock.js/web/observe-page-requests/SKILL.md`
 
@@ -5014,7 +5063,7 @@ cache policy, validation, or a sitemap supplier.
 
 ---
 name: write-the-root
-description: 'Author `src/web/root.tsx`, the full-document application root that owns `<html>`, `<head>`, and `<body>`, places page metadata with `<Head />`, renders the hydrated subtree inside `#vessel`, and emits the payload with `<Scripts />`. Triggers: `root.tsx`, `AppProps`, `AppLoader`, `Head`, `Scripts`, `id="vessel"`; "customize the root document", "add html lang", "add an app provider", "where do Head and Scripts go"; typical import `import { Head, Scripts, type AppProps } from "@warlock.js/web"`. Skip: page component contract — the `create-a-page` topic; layout wrappers — the `use-layouts` topic; CSS delivery — the `serve-styles` topic; competing roots `next/layout`, Remix `root`, React `createRoot`.'
+description: 'Author `src/web/root.tsx`, the full-document application root that owns `<html>`, `<head>`, and `<body>`, places page metadata with `<Head />`, renders the hydrated subtree inside `#vessel`, and emits the payload with `<Scripts />`. Triggers: `root.tsx`, `AppProps`, `AppLoader`, `Head`, `metadata.viewport`, `Scripts`, `id="vessel"`; "customize the root document", "add html lang", "add an app provider", "where do Head and Scripts go"; typical import `import { Head, Scripts, type AppProps } from "@warlock.js/web"`. Skip: page component contract — the `create-a-page` topic; layout wrappers — the `use-layouts` topic; CSS delivery — the `serve-styles` topic; competing roots `next/layout`, Remix `root`, React `createRoot`.'
 ---
 
 # Warlock — write the root
@@ -5262,4 +5311,23 @@ in production.
 - The `use-layouts` topic: the persistent wrapper inside `#vessel`.
 - The `load-page-data` topic: `AppLoader` and typed `shared`.
 - The `serve-styles` topic: global CSS from `root.tsx`.
+
+## Override the default viewport
+
+```tsx title="src/web/viewport.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: "/viewport",
+  metadata: { viewport: "width=device-width, initial-scale=1, viewport-fit=cover" },
+} satisfies PageConfig;
+
+export default function ViewportPage() {
+  return <main>Viewport settings come from metadata.</main>;
+}
+```
+
+`<Head />` emits a default viewport even without this override. Remove a manual
+duplicate tag from `root.tsx`; use `viewport: false` only when intentionally
+suppressing it.
 
