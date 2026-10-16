@@ -123,7 +123,7 @@ console.log(file.path); // "uploads/photo.jpg"
 console.log(file.hash); // sha256:abc123...
 ```
 
-> **Changed in 5.21:** `storage.put(string, location)` always stores the string as *content*. To upload a file that already exists on local disk, use `storage.putFromPath(localPath, location)`. Code that passed a local path to `put()` must switch to `putFromPath()`. Cloud `list()` prefixes now end in `/`.
+> **Changed in 5.21:** `storage.put(string, location)` always stores the string as _content_. To upload a file that already exists on local disk, use `storage.putFromPath(localPath, location)`. Code that passed a local path to `put()` must switch to `putFromPath()`. Cloud `list()` prefixes now end in `/`.
 
 That's the entire surface for the common case. `storage.put(...)` writes to the default driver and returns a `StorageFile`. Persist `file.path` to your DB and you can rebuild a `StorageFile` later with `storage.file(path)`.
 
@@ -326,6 +326,10 @@ A configured `cacheDirectory` is shared by every local disk (derivatives are key
 :::caution[Keep the cache out of `public/`]
 Because a configured `cacheDirectory` holds every disk's derivatives, a private disk's thumbnails sit next to public ones. Never put it inside `public/` (or `storage.publicRoot`): everything there is served without the checks on the private disk's route. Warlock logs a warning once when it finds the cache there. The default, `<disk root>/.cache/image-variants`, keeps each disk's derivatives under that disk.
 :::
+
+### Bound cache storage and age
+
+`uploads.images.maxCacheBytes` defaults to 512 MiB and `maxCacheAge` defaults to seven days in seconds. Both accept positive integers. A derivative older than the configured age is regenerated even on a cache hit. Variant requests remove expired derivatives and then evict the oldest until the byte budget fits. The file being returned is kept even when it alone exceeds that budget. Cleanup happens on variant requests; an idle cache is reclaimed on its next request. These limits cover derivatives across all disks sharing the configured cache directory. Concurrent readers can observe eviction and should retry resolution if a returned path disappears before it is read (the built-in controller does this).
 
 ### Variants of other disks
 
@@ -607,12 +611,10 @@ The classic large-file pattern. Server returns a signed URL; client uploads dire
 import { storage } from "@warlock.js/core";
 
 export async function issueUploadUrlService(userId: string, filename: string, mimeType: string) {
-  const uploadUrl = await storage
-    .use("r2")
-    .getPresignedUploadUrl(`uploads/${userId}/${filename}`, {
-      expiresIn: 600,
-      contentType: mimeType,
-    });
+  const uploadUrl = await storage.use("r2").getPresignedUploadUrl(`uploads/${userId}/${filename}`, {
+    expiresIn: 600,
+    contentType: mimeType,
+  });
 
   return { uploadUrl, key: `uploads/${userId}/${filename}` };
 }
@@ -658,3 +660,24 @@ Then anywhere you have an `Upload`, you can `upload.storageFile().contents()`, `
 - **[File uploads](./file-uploads.md)** — the `UploadedFile.save(...)` pattern and validation.
 - **[Image processing](./image-processing.md)** — the `Image` class for transforms before saving.
 - **[Recipe: Upload to S3](../recipes/upload-to-s3.md)** — end-to-end cloud upload flow.
+
+### Object-storage variants on a non-default disk
+
+S3, R2 and Spaces sources can use the same variants through their storage driver. Derivatives remain on the application's writable local filesystem: the default cache is `<app>/storage/.cache/image-variants`, or set `uploads.images.cacheDirectory` explicitly outside `public/`.
+
+```ts
+import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";
+
+router.get("/cloud-images/*", createUploadedFileController({ disk: "r2" }));
+
+const image = await generateImageVariants("products/photo.jpg", {
+  disk: "r2",
+  urlPrefix: "/cloud-images",
+});
+// image.src uses the storage driver's original URL.
+// image.variants.thumb.url is /cloud-images/products/photo.jpg?variant=thumb.
+```
+
+Declare `thumb` in `uploads.images.variants`, and pass `image` to the web image component or persist it with the owning record. The remote controller serves variant queries; original requests return 404, so serve originals through the driver's CDN URL. For private objects, guard the variant route and supply a signed original URL separately. `resolveImageVariant({ disk: "r2", path, variant: "thumb" })` supports authenticated custom routes too.
+
+Each call streams the remote source with `maxSourceBytes` enforced on the actual bytes and checks `maxSourcePixels` before rendering. It hashes the bytes to reuse derivatives safely even when provider metadata is missing or timestamps are reused; a cache hit still downloads and reads source metadata. Bucket identity and the effective tenant prefix isolate sources. Remote delete/move operations do not purge local derivatives automatically: call `purgeImageVariants(path, { disk: "r2" })` for immediate cleanup, or let the size/age policy reclaim them. Purging without a path clears the shared cache.

@@ -33,6 +33,8 @@ describe("resolveImageVariantsConfig", () => {
       formats: [],
       maxSourceBytes: 25 * 1024 * 1024,
       maxSourcePixels: 40_000_000,
+      maxCacheBytes: 512 * 1024 * 1024,
+      maxCacheAge: 7 * 24 * 60 * 60,
       cacheDirectory: path.join(root, ".cache", "image-variants"),
     });
   });
@@ -66,6 +68,8 @@ describe("resolveImageVariantsConfig", () => {
   });
 
   it.each([
+    ["cache bytes zero", { variants: { a: { width: 10 } }, maxCacheBytes: 0 }],
+    ["cache age negative", { variants: { a: { width: 10 } }, maxCacheAge: -1 }],
     ["variants missing", {}],
     ["no variants", { variants: {} }],
     ["width 0", { variants: { a: { width: 0 } } }],

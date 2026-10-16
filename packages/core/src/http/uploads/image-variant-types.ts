@@ -9,6 +9,8 @@ export type ResolvedImageVariantsConfig = {
   maxSourceBytes: number;
   maxSourcePixels: number;
   cacheDirectory: string;
+  maxCacheBytes: number;
+  maxCacheAge: number;
 };
 
 /**

@@ -178,5 +178,7 @@ export function resolveImageVariantsConfig(
       DEFAULT_MAX_SOURCE_PIXELS,
     ),
     cacheDirectory,
+    maxCacheBytes: resolveLimit("maxCacheBytes", images.maxCacheBytes, 512 * 1024 * 1024),
+    maxCacheAge: resolveLimit("maxCacheAge", images.maxCacheAge, 7 * 24 * 60 * 60),
   };
 }

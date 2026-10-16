@@ -8,7 +8,7 @@ import {
   retryOnVanishedDirectory,
   warnIfVariantCacheIsPublic,
 } from "./image-variant-cache";
-import { ImageVariantsConfigError } from "./image-variants-config-error";
+import { resolveRemoteImageVariant } from "./resolve-remote-image-variant";
 import type { VariantOutputFormat } from "./image-variant-types";
 import { loadVariantSource } from "./load-variant-source";
 import { localDiskRoot } from "./local-disk-root";
@@ -21,6 +21,7 @@ import {
   variantSourceDirectory,
   variantSourceKey,
 } from "./variant-cache-key";
+import { freshImageVariant, trimImageVariantCache } from "./trim-image-variant-cache";
 import { variantGenerations } from "./variant-generations";
 
 const CONTENT_TYPES: Record<VariantOutputFormat, string> = {
@@ -31,7 +32,7 @@ const CONTENT_TYPES: Record<VariantOutputFormat, string> = {
 };
 
 /**
- * What to render: a file on a local disk and a variant named in
+ * What to render: a file on a storage disk and a variant named in
  * `uploads.images.variants`
  */
 export type ResolveImageVariantInput = {
@@ -52,7 +53,7 @@ export type ResolveImageVariantInput = {
   format?: VariantOutputFormat;
 
   /**
-   * Local disk the source lives on; the default disk when omitted
+   * Disk the source lives on; the default disk when omitted
    */
   disk?: StorageDriverName;
 };
@@ -76,18 +77,8 @@ export type ResolvedImageVariant = {
   contentType: string;
 };
 
-async function exists(target: string): Promise<boolean> {
-  try {
-    await fs.access(target);
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * Resolve, and render on a cache miss, one variant of an image on a local
+ * Resolve, and render on a cache miss, one variant of an image on a storage
  * disk. This is what `uploadedFileController` serves; call it from your own
  * route to serve variants of a private disk behind authentication:
  *
@@ -107,7 +98,6 @@ async function exists(target: string): Promise<boolean> {
  * are pruned once a new derivative is written.
  *
  * @returns `undefined` when the path does not resolve to a file on the disk
- * @throws ImageVariantsConfigError when the disk is not a local disk
  * @throws HttpError(400) when variants are not configured, or the variant or
  * format is not allowed
  * @throws HttpError(413) when the source is over the configured limits
@@ -118,13 +108,7 @@ export async function resolveImageVariant(
 ): Promise<ResolvedImageVariant | undefined> {
   const diskRoot = localDiskRoot(input.disk);
 
-  if (!diskRoot) {
-    throw new ImageVariantsConfigError(
-      input.disk === undefined
-        ? "Image variants need a local storage driver with a root."
-        : `Image variants need a local disk; "${input.disk}" is not one.`,
-    );
-  }
+  if (!diskRoot) return resolveRemoteImageVariant(input);
 
   const images = resolveImageVariantsConfig(uploadsConfig("images"), diskRoot);
 
@@ -163,13 +147,13 @@ export async function resolveImageVariant(
   const generation = variantGenerationTag(stats.size, stats.mtimeMs);
   const target = variantCachePath(images.cacheDirectory, { sourceKey, generation }, hash, format);
 
-  if (!(await exists(target))) {
+  if (!(await freshImageVariant(target, images.maxCacheAge))) {
     // Keyed on the target path, which includes the disk's real root: the
     // same file on two disks (a mirror copied with its mtime) has the same
     // `hash`, and joining the other disk's flight would leave this target
     // unwritten.
     await variantGenerations.run(target, async () => {
-      if (await exists(target)) return;
+      if (await freshImageVariant(target, images.maxCacheAge)) return;
 
       const image = await loadVariantSource(source.absolutePath, {
         maxSourceBytes: images.maxSourceBytes,
@@ -187,6 +171,8 @@ export async function resolveImageVariant(
       );
     });
   }
+
+  await trimImageVariantCache(images, target);
 
   return { absolutePath: target, hash, format, contentType: CONTENT_TYPES[format] };
 }

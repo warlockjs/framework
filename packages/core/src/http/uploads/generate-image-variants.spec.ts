@@ -12,6 +12,7 @@ import { Request } from "../request";
 import { Response } from "../response";
 import type { UploadsImagesConfigurations } from "../uploads-types";
 import { generateImageVariants } from "./generate-image-variants";
+import { StorageNotInitializedError } from "../../storage/utils/storage-not-initialized-error";
 import { ImageVariantsConfigError } from "./image-variants-config-error";
 import { uploadedFileController } from "./uploaded-file.controller";
 
@@ -270,11 +271,13 @@ describe.skipIf(!sharpAvailable)("generateImageVariants — variants filter", ()
 });
 
 describe.skipIf(!sharpAvailable)("generateImageVariants — server misconfiguration", () => {
-  it("throws ImageVariantsConfigError, not a plain Error, when there is no local storage root", async () => {
+  it("reports missing storage initialization when no local disk is available", async () => {
     const rootSpy = vi.spyOn(storage, "root").mockImplementation(() => ".");
 
     try {
-      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(ImageVariantsConfigError);
+      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(
+        StorageNotInitializedError,
+      );
     } finally {
       rootSpy.mockImplementation((appended?: string) => path.join(storageRoot, appended ?? ""));
     }

@@ -93,14 +93,15 @@ async function sendOriginalInline(response: Response, absolutePath: string, cont
  */
 export type UploadedFileControllerOptions = {
   /**
-   * Local disk to serve from; the default disk when omitted. A private disk
+   * Disk to serve from; remote disks support variants only. Uses the default
+   * disk when omitted. A private disk
    * should be served from a route that checks access first.
    */
   disk?: StorageDriverName;
 };
 
 /**
- * Serves local uploads, and bounded on-demand variants of the images among them.
+ * Serves local uploads and bounded on-demand image variants from any disk.
  *
  * ```ts
  * router.get("/uploads/*", uploadedFileController);
@@ -126,18 +127,6 @@ export function createUploadedFileController(
   return async ({ request, response }) => {
     const diskRoot = localDiskRoot(options.disk);
 
-    if (!diskRoot) {
-      log.error(
-        "uploads",
-        "serve",
-        options.disk === undefined
-          ? "uploadedFileController needs a local storage driver with a root."
-          : `uploadedFileController needs a local disk; "${options.disk}" is not one.`,
-      );
-
-      return notFound(response);
-    }
-
     const query = parseUploadedFileQuery(request.url);
 
     if (query.type === "invalid") {
@@ -150,6 +139,18 @@ export function createUploadedFileController(
     response.header("X-Content-Type-Options", "nosniff");
 
     if (query.type === "original") {
+      if (!diskRoot) {
+        log.error(
+          "uploads",
+          "serve",
+          options.disk === undefined
+            ? "uploadedFileController needs a local storage driver with a root."
+            : `uploadedFileController needs a local disk; "${options.disk}" is not one.`,
+        );
+
+        return notFound(response);
+      }
+
       const source = await resolveUploadPath(request.params["*"], diskRoot, [
         path.join(diskRoot, ".cache", "image-variants"),
         variantCacheDirectoryFor(diskRoot),

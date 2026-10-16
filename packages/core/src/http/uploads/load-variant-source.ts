@@ -29,10 +29,10 @@ export type LoadVariantSourceOptions = {
  * I/O) propagates unchanged.
  */
 export async function loadVariantSource(
-  absolutePath: string,
+  absolutePath: string | Buffer,
   { maxSourceBytes, maxSourcePixels, expectedFormat }: LoadVariantSourceOptions,
 ): Promise<Image> {
-  const buffer = await fs.readFile(absolutePath);
+  const buffer = Buffer.isBuffer(absolutePath) ? absolutePath : await fs.readFile(absolutePath);
 
   if (buffer.length > maxSourceBytes) {
     throw new HttpError(413, "The source image is too large.");

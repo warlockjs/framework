@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import { Image } from "../../image";
-import { storage } from "../../storage";
+import type { StorageDriverName } from "../../storage/types";
+import { localDiskRoot } from "./local-disk-root";
+import { remoteVariantDisk, remoteVariantSource } from "./remote-variant-source";
+import { resolveImageVariant } from "./resolve-image-variant";
 import { HttpError } from "../errors";
 import { uploadsConfig } from "../uploads-config";
 import type { ImageVariantOutputFormat } from "../uploads-types";
@@ -26,6 +29,7 @@ import {
   variantSourceDirectory,
   variantSourceKey,
 } from "./variant-cache-key";
+import { freshImageVariant, trimImageVariantCache } from "./trim-image-variant-cache";
 import { variantGenerations } from "./variant-generations";
 
 /**
@@ -37,17 +41,13 @@ export type GenerateImageVariantsOptions = {
    * `uploads.images.variants`.
    */
   variants?: readonly string[];
+
+  /** Disk holding the source; defaults to the active disk. */
+  disk?: StorageDriverName;
+
+  /** Route prefix serving variants of this disk (and originals for local disks). Default /uploads. */
+  urlPrefix?: string;
 };
-
-async function exists(target: string): Promise<boolean> {
-  try {
-    await fs.access(target);
-
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function encodeUploadsPath(relativePath: string): string {
   return relativePath.split("/").map(encodeURIComponent).join("/");
@@ -96,15 +96,15 @@ function outputFormatsFor(
  * The returned descriptor is plain JSON, safe to store next to the record
  * that owns the image, or to carry through loader data. On local storage the
  * `url`/`urls` already point at `uploadedFileController`; an app serving
- * uploads from object storage or a CDN should not proxy the remote files
- * through this route at all — store the descriptor once generation runs
- * against the same bucket the CDN serves from, or resolve its URLs through a
- * custom `ImageLoader` on the client instead.
+ * uploads from object storage use the driver URL for the original, and
+ * `options.urlPrefix` for the route serving locally cached derivatives.
+ * Remote sources are streamed with the byte limit on every call; rendered
+ * derivatives are reused by content hash.
  *
  * @param relativePath - path of the saved upload, relative to the storage root
  * @param options.variants - limit generation to these variant names
- * @throws ImageVariantsConfigError when there is no local storage root, or
- * `uploads.images` is not configured — both are server misconfiguration, not
+ * @throws ImageVariantsConfigError when `uploads.images` is not
+ * configured — this is server misconfiguration, not
  * a bad request
  * @throws HttpError(400) when a name in `options.variants` is not declared in
  * `uploads.images.variants`
@@ -118,13 +118,9 @@ export async function generateImageVariants(
   relativePath: string,
   options: GenerateImageVariantsOptions = {},
 ): Promise<GeneratedImageDescriptor> {
-  const storageRoot = storage.root();
+  const storageRoot = localDiskRoot(options.disk);
 
-  if (!storageRoot || storageRoot === ".") {
-    throw new ImageVariantsConfigError(
-      "generateImageVariants needs a local storage driver with a root.",
-    );
-  }
+  if (!storageRoot) return generateRemoteImageVariants(relativePath, options);
 
   const images = resolveImageVariantsConfig(uploadsConfig("images"), storageRoot);
 
@@ -157,7 +153,7 @@ export async function generateImageVariants(
   const { width: sourceWidth, height: sourceHeight } = await image.metadata();
   warnIfVariantCacheIsPublic(images.cacheDirectory);
 
-  const src = `/uploads/${encodeUploadsPath(source.relativePath)}`;
+  const src = `${(options.urlPrefix ?? "/uploads").replace(/\/$/, "")}/${encodeUploadsPath(source.relativePath)}`;
   const variants: Record<string, GeneratedImageVariant> = {};
 
   for (const name of names) {
@@ -185,10 +181,10 @@ export async function generateImageVariants(
         format,
       );
 
-      if (!(await exists(target))) {
+      if (!(await freshImageVariant(target, images.maxCacheAge))) {
         // keyed on the target, which includes the disk root (see resolveImageVariant)
         await variantGenerations.run(target, async () => {
-          if (await exists(target)) return;
+          if (await freshImageVariant(target, images.maxCacheAge)) return;
 
           await retryOnVanishedDirectory(() =>
             generateImageVariant({ image: image.clone(), variant, format, targetPath: target }),
@@ -200,6 +196,8 @@ export async function generateImageVariants(
           );
         });
       }
+
+      await trimImageVariantCache(images, target);
 
       if (dimensions === undefined) {
         dimensions = await readDerivativeDimensions(target);
@@ -229,5 +227,57 @@ export async function generateImageVariants(
     height: sourceHeight ?? 0,
     variants,
     ...(images.formats.length > 0 ? { formats: images.formats } : {}),
+  };
+}
+
+async function generateRemoteImageVariants(
+  relativePath: string,
+  options: GenerateImageVariantsOptions,
+): Promise<GeneratedImageDescriptor> {
+  const disk = remoteVariantDisk(options.disk);
+  const images = resolveImageVariantsConfig(uploadsConfig("images"), disk.cacheRoot);
+  if (!images) throw new ImageVariantsConfigError("uploads.images is not configured.");
+  const names = options.variants ?? Object.keys(images.variants);
+  for (const name of names) {
+    if (!Object.prototype.hasOwnProperty.call(images.variants, name))
+      throw new HttpError(400, `Unknown variant "${name}".`);
+  }
+  const source = await remoteVariantSource(relativePath, disk, images);
+  if (!source) throw new HttpError(404, "File Not Found");
+  const { image, sourceFormat } = await source.load();
+  const { width, height } = await image.metadata();
+  const variantSrc = `${(options.urlPrefix ?? "/uploads").replace(/\/$/, "")}/${encodeUploadsPath(source.relativePath)}`;
+  const variants: Record<string, GeneratedImageVariant> = {};
+  for (const name of names) {
+    let dimensions: { width: number; height: number } | undefined;
+    for (const format of outputFormatsFor(sourceFormat, images.formats)) {
+      const resolved = await resolveImageVariant({
+        path: relativePath,
+        variant: name,
+        disk: options.disk,
+        ...(format === sourceFormat ? {} : { format }),
+      });
+      if (!resolved) throw new HttpError(404, "File Not Found");
+      dimensions ??= await readDerivativeDimensions(resolved.absolutePath);
+    }
+    variants[name] = {
+      width: dimensions?.width ?? 0,
+      height: dimensions?.height ?? 0,
+      url: variantUrl(variantSrc, name),
+      ...(images.formats.length
+        ? {
+            urls: Object.fromEntries(
+              images.formats.map((format) => [format, variantUrl(variantSrc, name, format)]),
+            ),
+          }
+        : {}),
+    };
+  }
+  return {
+    src: disk.driver.url(source.relativePath),
+    width: width ?? 0,
+    height: height ?? 0,
+    variants,
+    ...(images.formats.length ? { formats: images.formats } : {}),
   };
 }

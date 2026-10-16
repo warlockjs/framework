@@ -14,9 +14,9 @@ import { storage } from "@warlock.js/core";
 
 const file = await storage.put(buffer, "uploads/photo.jpg");
 
-console.log(file.url);     // public URL
-console.log(file.name);    // "photo.jpg"
-console.log(file.hash);    // sha256
+console.log(file.url); // public URL
+console.log(file.name); // "photo.jpg"
+console.log(file.hash); // sha256
 ```
 
 That's the entire surface for the common case. `storage.put(...)` writes to the default driver and returns a `StorageFile`.
@@ -95,10 +95,7 @@ await storage.putStream(createReadStream("./video.mp4"), "uploads/video.mp4");
 await storage.putFromUrl("https://example.com/image.jpg", "uploads/image.jpg");
 
 // From base64 data URL
-await storage.putFromBase64(
-  "data:image/png;base64,iVBORw0KGgo...",
-  "uploads/photo.png",
-);
+await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/photo.png");
 
 // From an UploadedFile (multipart upload)
 await storage.put(request.file("image"), "uploads/avatar.jpg");
@@ -119,8 +116,8 @@ const json = await storage.getJson("config/settings.json");
 ### Existence + metadata
 
 ```ts
-await storage.exists("uploads/photo.jpg");                  // boolean
-const info = await storage.metadata("uploads/photo.jpg");   // { size, mimeType, lastModified, ... }
+await storage.exists("uploads/photo.jpg"); // boolean
+const info = await storage.metadata("uploads/photo.jpg"); // { size, mimeType, lastModified, ... }
 const bytes = await storage.size("uploads/photo.jpg");
 ```
 
@@ -162,8 +159,8 @@ const files = await storage.list("uploads", { recursive: true, limit: 100 });
 ### URLs
 
 ```ts
-storage.url("uploads/photo.jpg");                        // public URL (sync)
-await storage.temporaryUrl("private/doc.pdf", 3600);     // signed URL, expires in seconds
+storage.url("uploads/photo.jpg"); // public URL (sync)
+await storage.temporaryUrl("private/doc.pdf", 3600); // signed URL, expires in seconds
 ```
 
 ## Switching drivers — `storage.use(name)`
@@ -185,6 +182,22 @@ console.log(localFile.url);
 
 On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears the disk's whole derivative cache. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
 
+### Bound the cache and render remote disks
+
+Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. Each variant request removes expired derivatives and evicts oldest files to meet the byte budget. The derivative being returned is retained even when it alone exceeds that budget; idle caches are cleaned on the next variant request. Keep the cache on a local, writable filesystem outside `public/`.
+
+```ts
+import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";
+
+router.get("/cloud-images/*", createUploadedFileController({ disk: "r2" }));
+const descriptor = await generateImageVariants("products/photo.jpg", {
+  disk: "r2",
+  urlPrefix: "/cloud-images",
+});
+```
+
+For an object-storage disk, `descriptor.src` is the driver's original URL; variant URLs use `/cloud-images` and its controller accepts variant queries only (an original request there returns 404). Protect that route before serving private derivatives, and use signed original URLs separately for private buckets. `resolveImageVariant` also accepts remote disks. Remote bytes are streamed up to `maxSourceBytes` on every call and hashed, so unchanged content reuses the rendered derivative even if metadata is absent. The default remote cache is `<app>/storage/.cache/image-variants`. Bucket identity and the effective storage prefix isolate cached sources. After remote deletion or moving, call `purgeImageVariants(path, { disk: "r2" })` yourself; age/size cleanup also reclaims those derivatives.
+
 ## `StorageFile` — the OOP handle
 
 Every `put*`/`copy`/`move` returns a `StorageFile`. You can also build one for an existing path:
@@ -195,33 +208,33 @@ const file = storage.file("uploads/photo.jpg");
 
 ### Sync properties (no I/O)
 
-| Property         | Description                                    |
-| ---------------- | ---------------------------------------------- |
-| `file.path`      | full storage path (`"uploads/photo.jpg"`)      |
-| `file.name`      | basename (`"photo.jpg"`)                       |
-| `file.extension` | lowercased ext, no dot (`"jpg"`)               |
-| `file.directory` | parent directory                               |
-| `file.driver`    | driver name (`"local"` / `"s3"` / …)           |
-| `file.url`       | public URL (uses cached value if present)      |
-| `file.hash`      | sha256, set by `put*` operations               |
-| `file.isDeleted` | `true` after `file.delete()`                   |
+| Property         | Description                               |
+| ---------------- | ----------------------------------------- |
+| `file.path`      | full storage path (`"uploads/photo.jpg"`) |
+| `file.name`      | basename (`"photo.jpg"`)                  |
+| `file.extension` | lowercased ext, no dot (`"jpg"`)          |
+| `file.directory` | parent directory                          |
+| `file.driver`    | driver name (`"local"` / `"s3"` / …)      |
+| `file.url`       | public URL (uses cached value if present) |
+| `file.hash`      | sha256, set by `put*` operations          |
+| `file.isDeleted` | `true` after `file.delete()`              |
 
 ### Async data
 
 ```ts
-await file.data();        // full StorageFileData with size/mimeType/url/hash
+await file.data(); // full StorageFileData with size/mimeType/url/hash
 await file.size();
 await file.mimeType();
 await file.lastModified();
-await file.etag();        // cloud only
+await file.etag(); // cloud only
 ```
 
 ### Operations
 
 ```ts
-await file.copy("backups/photo.jpg");      // → new StorageFile at the copy
-await file.move("archive/photo.jpg");      // → returns this; path is updated in place
-await file.delete();                       // marks isDeleted
+await file.copy("backups/photo.jpg"); // → new StorageFile at the copy
+await file.move("archive/photo.jpg"); // → returns this; path is updated in place
+await file.delete(); // marks isDeleted
 const buffer = await file.contents();
 const stream = await file.stream();
 ```
@@ -319,16 +332,16 @@ await storage.use("tenant-s3").put(buffer, "data.csv");
 
 `storage.on(event, handler)` subscribes to lifecycle hooks. Event types:
 
-| Event          | Fires                              |
-| -------------- | ---------------------------------- |
-| `beforePut`    | before write                       |
-| `afterPut`     | after successful write             |
-| `beforeDelete` | before delete                      |
-| `afterDelete`  | after delete                       |
-| `beforeCopy`   | before copy                        |
-| `afterCopy`    | after copy                         |
-| `beforeMove`   | before move                        |
-| `afterMove`    | after move                         |
+| Event          | Fires                  |
+| -------------- | ---------------------- |
+| `beforePut`    | before write           |
+| `afterPut`     | after successful write |
+| `beforeDelete` | before delete          |
+| `afterDelete`  | after delete           |
+| `beforeCopy`   | before copy            |
+| `afterCopy`    | after copy             |
+| `beforeMove`   | before move            |
+| `afterMove`    | after move             |
 
 ```ts
 storage.on("afterPut", ({ location, file }) => {
@@ -378,10 +391,12 @@ export const uploadAvatarController: GuardedRequestHandler = async ({ request, r
 ### Direct browser upload via presigned URL
 
 ```ts
-const uploadUrl = await storage.use("r2").getPresignedUploadUrl(
-  `uploads/${userId}/${filename}`,
-  { expiresIn: 600, contentType: mimeType },
-);
+const uploadUrl = await storage
+  .use("r2")
+  .getPresignedUploadUrl(`uploads/${userId}/${filename}`, {
+    expiresIn: 600,
+    contentType: mimeType,
+  });
 
 return response.success({ uploadUrl });
 ```

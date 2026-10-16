@@ -328,6 +328,12 @@ export type UploadsImagesConfigurations = {
    * @default storage.root(".cache/image-variants")
    */
   cacheDirectory?: string;
+
+  /** Maximum total cached derivative bytes. Default 512 MiB. */
+  maxCacheBytes?: number;
+
+  /** Maximum derivative age in seconds, measured from generation. Default 7 days. */
+  maxCacheAge?: number;
 };
 
 /**

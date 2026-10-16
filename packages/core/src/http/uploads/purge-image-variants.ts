@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { StorageDriverName } from "../../storage/types";
 import { purgeImageVariantsOfFile, variantCacheDirectoryFor } from "./image-variant-cache";
-import { ImageVariantsConfigError } from "./image-variants-config-error";
+import { remoteVariantDisk, remoteVariantPath } from "./remote-variant-source";
+import { variantSourceDirectory, variantSourceKey } from "./variant-cache-key";
 import { localDiskRoot } from "./local-disk-root";
 
 /**
@@ -10,7 +11,7 @@ import { localDiskRoot } from "./local-disk-root";
  */
 export type PurgeImageVariantsOptions = {
   /**
-   * Local disk the source lives on; the default disk when omitted
+   * Disk the source lives on; the default disk when omitted
    */
   disk?: StorageDriverName;
 };
@@ -29,7 +30,6 @@ export type PurgeImageVariantsOptions = {
  * removed some other way.
  *
  * @returns `true` when something was removed
- * @throws ImageVariantsConfigError when the disk is not a local disk
  */
 export async function purgeImageVariants(
   relativePath?: string,
@@ -38,11 +38,25 @@ export async function purgeImageVariants(
   const diskRoot = localDiskRoot(options.disk);
 
   if (!diskRoot) {
-    throw new ImageVariantsConfigError(
-      options.disk === undefined
-        ? "purgeImageVariants needs a local storage driver with a root."
-        : `purgeImageVariants needs a local disk; "${options.disk}" is not one.`,
-    );
+    const disk = remoteVariantDisk(options.disk);
+    const location = relativePath === undefined ? undefined : remoteVariantPath(relativePath);
+    if (relativePath !== undefined && location === undefined) return false;
+    const cache = variantCacheDirectoryFor(disk.cacheRoot);
+    const directory =
+      location === undefined
+        ? cache
+        : variantSourceDirectory(
+            cache,
+            variantSourceKey(disk.root, disk.driver.applyPrefix(location)),
+          );
+    try {
+      await fs.access(directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+    return true;
   }
 
   if (relativePath === undefined) {
