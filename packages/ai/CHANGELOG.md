@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The streaming agent loop reads the finish reason and usage only from the `done` chunk and ignores chunk types it does not know, instead of treating any other chunk as `done`. `fallbackModel().stream()` still falls over after a model emitted only a `usage` chunk.
 
 - Automatic compaction preserves the original execution input during output repair and durable resume, records its updated snapshot index, and frames a first-turn summary as user context. Legacy snapshots with missing or ambiguous input skip compaction safely.
+- A durable snapshot's persisted input index is trusted on resume only when it is an integer inside the conversation that points at a `user` message. An out-of-range, negative, fractional or non-user index (a corrupted or hand-edited snapshot) falls back to finding the unique matching input, and compaction itself refuses to protect a non-user message, recording `no-safe-range` instead of summarising the input.
 
 ### Upgrading
 

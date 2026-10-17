@@ -535,9 +535,11 @@ result.report.messages?.map((message) => message.compaction);
 ```
 
 Durable snapshots preserve decisions, the compacted conversation and the original
-input message's index. Older snapshots derive the index from an unambiguous
-matching user input; if the input is missing or ambiguous, compaction records
-`no-safe-range` and leaves the conversation intact. Changing
+input message's index. A persisted index is used only when it is an integer
+inside the conversation that points at a `user` message; otherwise (a corrupted
+or hand-edited snapshot), and for older snapshots that lack it, the index is
+derived from an unambiguous matching user input. If the input is missing or
+ambiguous, compaction records `no-safe-range` and leaves the conversation intact. Changing
 the threshold or `keep` triggers durable drift detection; bump the agent's
 `version` when changing summary callback semantics.
 

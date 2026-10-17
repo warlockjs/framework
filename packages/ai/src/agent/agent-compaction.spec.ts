@@ -12,6 +12,7 @@ import { memory as snapshotMemory } from "../snapshot/memory";
 import { tool } from "../tool/tool";
 import { describe, expect, it, vi } from "vitest";
 import { agent } from "./agent";
+import { compactAgentMessages } from "./compaction";
 import type { AgentCompactionConfig } from "./compaction.type";
 
 function summarize(history: Message[]): CompactionResult {
@@ -391,75 +392,121 @@ describe("agent automatic compaction", () => {
     });
   }
 
-  it.each(["persisted", "legacy", "missing", "ambiguous"] as const)(
-    "preserves input provenance across failed-run resume (%s)",
-    async (provenance) => {
-      const { model, calls } = modelFixture([
-        ...["one", "two", "three"].map((id) => ({
-          content: "",
-          finishReason: "tool_calls" as const,
-          toolCalls: [{ id, name: "echo", input: {} }],
-        })),
-        { content: "invalid", finishReason: "stop" },
-        { content: '{"ok":true}', finishReason: "stop" },
-      ]);
-      const complete = model.complete.bind(model);
-      let interrupted = false;
-      model.complete = async (messages, options) => {
-        if (!interrupted && calls.length === 3) {
-          interrupted = true;
-          throw new Error("interrupted before final response");
-        }
-        return complete(messages, options);
-      };
-      const store = snapshotMemory<AgentSnapshot>();
-      const worker = agent({
-        name: "repair-resume",
-        model,
-        tools: [echo],
-        output: validOutput,
-        maxTrips: 7,
-        durable: { store },
-        compaction: policy({
-          countTokens: (messages) =>
-            calls.length === 0 ? count(messages) : repairOnlyCount(messages),
-        }),
-      });
-      const first = await worker.execute("persisted task", { history, runId: "repair-run" });
-      expect(first.error).toBeDefined();
-      const saved = (await store.load("repair-run"))!;
-      expect(saved.inputMessageIndex).toBe(3); // system, memo, retained history, original input
-      expect(saved.messages[saved.inputMessageIndex!]).toEqual({
-        role: "user",
-        content: "persisted task",
-      });
-      if (provenance !== "persisted") {
-        if (provenance === "missing") saved.messages.splice(saved.inputMessageIndex!, 1);
-        if (provenance === "ambiguous")
-          saved.messages.splice(
-            saved.inputMessageIndex! + 1,
-            0,
-            structuredClone(saved.messages[saved.inputMessageIndex!]!),
-          );
-        delete saved.inputMessageIndex;
-        await store.save(saved);
+  it.each([
+    "persisted",
+    "legacy",
+    "missing",
+    "ambiguous",
+    "assistant-index",
+    "tool-index",
+    "out-of-range",
+    "negative",
+    "fractional",
+    "corrupt-and-ambiguous",
+  ] as const)("preserves input provenance across failed-run resume (%s)", async (provenance) => {
+    const { model, calls } = modelFixture([
+      ...["one", "two", "three"].map((id) => ({
+        content: "",
+        finishReason: "tool_calls" as const,
+        toolCalls: [{ id, name: "echo", input: {} }],
+      })),
+      { content: "invalid", finishReason: "stop" },
+      { content: '{"ok":true}', finishReason: "stop" },
+    ]);
+    const complete = model.complete.bind(model);
+    let interrupted = false;
+    model.complete = async (messages, options) => {
+      if (!interrupted && calls.length === 3) {
+        interrupted = true;
+        throw new Error("interrupted before final response");
       }
-      const resumed = await worker.resume("repair-run", { repair: { maxAttempts: 1 } });
-      expect(resumed.error).toBeUndefined();
-      expect(resumed.data).toEqual({ ok: true });
-      if (provenance === "persisted" || provenance === "legacy") {
-        expect(calls.at(-1)?.messages).toContainEqual({ role: "user", content: "persisted task" });
-        expect(
-          resumed.report.compactions?.some(
-            (record) => record.type === "applied" && record.tripIndex === 5,
-          ),
-        ).toBe(true);
-      } else {
-        expect(resumed.report.compactions?.find((record) => record.tripIndex === 5)).toMatchObject({
-          type: "skipped",
-          reason: "no-safe-range",
-        });
-      }
+      return complete(messages, options);
+    };
+    const store = snapshotMemory<AgentSnapshot>();
+    const worker = agent({
+      name: "repair-resume",
+      model,
+      tools: [echo],
+      output: validOutput,
+      maxTrips: 7,
+      durable: { store },
+      compaction: policy({
+        countTokens: (messages) =>
+          calls.length === 0 ? count(messages) : repairOnlyCount(messages),
+      }),
+    });
+    const first = await worker.execute("persisted task", { history, runId: "repair-run" });
+    expect(first.error).toBeDefined();
+    const saved = (await store.load("repair-run"))!;
+    expect(saved.inputMessageIndex).toBe(3); // system, memo, retained history, original input
+    expect(saved.messages[saved.inputMessageIndex!]).toEqual({
+      role: "user",
+      content: "persisted task",
+    });
+    if (provenance !== "persisted") {
+      if (provenance === "missing") saved.messages.splice(saved.inputMessageIndex!, 1);
+      if (provenance === "ambiguous" || provenance === "corrupt-and-ambiguous")
+        saved.messages.splice(
+          saved.inputMessageIndex! + 1,
+          0,
+          structuredClone(saved.messages[saved.inputMessageIndex!]!),
+        );
+      // A corrupted snapshot: the persisted index no longer names a user message.
+      const corrupted = {
+        "assistant-index": saved.messages.findIndex((message) => message.role === "assistant"),
+        "tool-index": saved.messages.findIndex((message) => message.role === "tool"),
+        "out-of-range": saved.messages.length,
+        negative: -1,
+        fractional: 1.5,
+        "corrupt-and-ambiguous": saved.messages.findIndex(
+          (message) => message.role === "assistant",
+        ),
+      } as Record<string, number>;
+      if (provenance in corrupted) {
+        const index = corrupted[provenance];
+        if (index !== undefined && index >= 0 && index < saved.messages.length)
+          expect(saved.messages[index]?.role).not.toBe("user");
+        saved.inputMessageIndex = index;
+      } else delete saved.inputMessageIndex;
+      await store.save(saved);
+    }
+    const resumed = await worker.resume("repair-run", { repair: { maxAttempts: 1 } });
+    expect(resumed.error).toBeUndefined();
+    expect(resumed.data).toEqual({ ok: true });
+    if (
+      provenance !== "missing" &&
+      provenance !== "ambiguous" &&
+      provenance !== "corrupt-and-ambiguous"
+    ) {
+      expect(calls.at(-1)?.messages).toContainEqual({ role: "user", content: "persisted task" });
+      expect(
+        resumed.report.compactions?.some(
+          (record) => record.type === "applied" && record.tripIndex === 5,
+        ),
+      ).toBe(true);
+    } else {
+      expect(resumed.report.compactions?.find((record) => record.tripIndex === 5)).toMatchObject({
+        type: "skipped",
+        reason: "no-safe-range",
+      });
+    }
+  });
+
+  it.each([1, 3, -1, 1.5, 99])(
+    "never compacts around an input index that is not a user message (%s)",
+    async (inputMessageIndex) => {
+      const summarizeSpy = vi.fn(summarize);
+      const messages: Message[] = [...history, { role: "user", content: "go" }];
+      const outcome = await compactAgentMessages(
+        policy({ summarize: summarizeSpy }),
+        messages,
+        {},
+        0,
+        inputMessageIndex,
+      );
+      expect(outcome.record).toMatchObject({ type: "skipped", reason: "no-safe-range" });
+      expect(outcome.messages).toBeUndefined();
+      expect(summarizeSpy).not.toHaveBeenCalled();
     },
   );
 
