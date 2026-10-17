@@ -247,6 +247,71 @@ export default validationConfig;
 
 For most apps the defaults are right. Override only if you need to match an external API contract.
 
+### Custom failure responses
+
+When an API contract needs its own failure body — a stable `{ error: "<CODE>" }` per route, say — shape it declaratively instead of validating inside the handler.
+
+**Per route**, with `validation.onFailure(result, context)`. It receives the seal `ValidationResult` and `{ request, response, route }`, and returns `{ status?, body }`. Without `status`, the configured `validation.response.status` (422) is used:
+
+```ts title="src/app/operations/controllers/import-workspace.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+const importWorkspaceSchema = v.object({
+  name: v.string().required(),
+});
+
+export const importWorkspaceController: RequestHandler = async ({ response }) => {
+  return response.successCreate({ imported: true });
+};
+
+importWorkspaceController.validation = {
+  schema: importWorkspaceSchema,
+  onFailure: () => ({ status: 400, body: { error: "OPERATIONS_IMPORT_REQUEST_INVALID" } }),
+};
+
+// Documents the custom body in the OpenAPI output.
+importWorkspaceController.responseSchema = {
+  201: { body: { imported: "boolean" } },
+  400: { body: { error: "string" } },
+};
+```
+
+The same keys are accepted as a route option, merged over the handler's own `validation` (route keys win), so one handler can serve several routes with different failure codes:
+
+```ts title="src/app/operations/routes.ts"
+import { router } from "@warlock.js/core";
+import { importWorkspaceController } from "./controllers/import-workspace.controller";
+
+router.post("/workspace-import", importWorkspaceController, {
+  validation: {
+    onFailure: () => ({ status: 400, body: { error: "WORKSPACE_IMPORT_INVALID" } }),
+  },
+});
+```
+
+**For every route**, with a `validation.response.body(result, route)` hook. It returns the body; the status stays `validation.response.status`:
+
+```ts title="src/config/validation.ts"
+import type { ValidationConfiguration } from "@warlock.js/core";
+
+const validationConfig: ValidationConfiguration = {
+  response: {
+    status: 400,
+    body: (result, route) => ({
+      error: `${String(route.name).toUpperCase().replace(/\W+/g, "_")}_INVALID`,
+      fields: result.errors.map((error) => error.input),
+    }),
+  },
+};
+
+export default validationConfig;
+```
+
+Precedence: the route's `onFailure`, then the global `body` hook, then the framework body. Either hook may return `undefined` to fall through to the next one, and both may be async. Both apply to `schema` and `params` failures; the custom `validate` middleware keeps answering on its own.
+
+`warlock generate.openapi` documents a custom failure body from the handler's `responseSchema`: declare the failure status there, as above. When a route's `onFailure` has no 4xx entry declared, the configured failure status is documented without a body and the generator warns.
+
 > **Two status keys, two code paths.** Schema failures (`response.failedSchema(result)`) read the status from `validation.response.status` — the `status` key inside the block above. The custom `validate` path (a controller's `validation.validate(request, response)` hook that returns an error) instead reads a separate top-level `validation.responseStatus` key, defaulting to `400`. Schema failures default to `422` and custom-validate failures to `400`; changing one does not change the other. Set `validation.responseStatus` too if your custom-validate handlers should return something other than 400.
 
 ### Locale-aware error messages

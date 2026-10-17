@@ -109,6 +109,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 - **A partial scaffold exits non-zero.** `root.tsx` and connector registration may still have been written; complete only the missing home page after resolving the collision.
 - **Do not register the connector twice.** Use `warlock.config.ts`, not an additional `connectorsManager.register(...)` call.
 - **Do not import the hydration entry.** The connector and build contribution own it.
+- **Built assets skip the global rate limiter.** `/assets/*` and the copied public files are static files, exempt from `http.rateLimit` by default so a page load does not spend the visitor's quota; pages still count. Set `rateLimit: { staticFiles: true }` in `src/config/http.ts` to count them too.
 - **Run `warlock start` with the app root as cwd.** The manifest's `clientDir` (e.g. `dist/client`) resolves from `process.cwd()`, so copying `dist` elsewhere without the app root won't find client assets.
 
 ## See also

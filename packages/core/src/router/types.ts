@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import type { ObjectValidator } from "@warlock.js/seal";
+import type { ObjectValidator, ValidationResult } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
 import type { Request, Response, ReturnedResponse } from "../http";
 import type { RequestLoggingOptions } from "../http/request-log-snapshot";
@@ -54,7 +54,64 @@ export type RequestHandlerValidation<TRequest extends Request = Request> = {
    * schema expose their raw string params.
    */
   params?: ObjectValidator;
+  /**
+   * Shape the response when `schema` or `params` fails, instead of the
+   * framework's `{ errors: [...] }` body.
+   *
+   * Return `{ status?, body }`: `body` is sent as the response, with `status`
+   * or else `validation.response.status` (422 by default). Return `undefined`
+   * to fall back to the global `validation.response.body` hook, then the
+   * framework body. Wins over the global hook.
+   *
+   * Declare the body in the handler's `responseSchema` under the same status
+   * so `warlock generate.openapi` documents it.
+   *
+   * @example
+   * createImportController.validation = {
+   *   schema: importSchema,
+   *   onFailure: () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } }),
+   * };
+   */
+  onFailure?: ValidationFailureHandler<TRequest>;
 };
+
+/**
+ * What a validation failure hook answers with.
+ */
+export type ValidationFailureResponse = {
+  /**
+   * Response status. Defaults to `validation.response.status` (422).
+   */
+  status?: number;
+  /**
+   * Response body, sent as JSON.
+   */
+  body: unknown;
+};
+
+/**
+ * The second argument of a route's `validation.onFailure`.
+ */
+export type ValidationFailureContext<TRequest extends Request = Request> = {
+  request: TRequest;
+  response: Response;
+  /**
+   * The route whose validation failed.
+   */
+  route: Route;
+};
+
+/**
+ * A route's `validation.onFailure` hook.
+ */
+export type ValidationFailureHandler<TRequest extends Request = Request> = (
+  result: ValidationResult,
+  context: ValidationFailureContext<TRequest>,
+) =>
+  | ValidationFailureResponse
+  | undefined
+  | void
+  | Promise<ValidationFailureResponse | undefined | void>;
 
 export interface RequestControllerContract {
   /**
@@ -120,6 +177,39 @@ export type RequestHandler<TRequest extends Request = Request> = {
   responseSchema?: ResponseSchema;
 };
 
+/**
+ * A route's own rate limit: its own bucket and quota instead of the global
+ * `http.rateLimit` policy.
+ */
+export type RouteRateLimitOptions = {
+  /**
+   * Max number of requests within the time window
+   */
+  max: number;
+  /**
+   * Time window in milliseconds
+   */
+  timeWindow: number;
+  /**
+   * Error message when rate limit is exceeded
+   */
+  errorMessage?: string;
+};
+
+/**
+ * Options for a static mount: `router.directory()`, `router.file()`,
+ * `router.cachedFile()`, `router.files()` and `router.cachedFiles()`.
+ */
+export type StaticMountOptions = {
+  /**
+   * How the rate limiter treats this mount. Leave it unset to follow
+   * `http.rateLimit.staticFiles` (exempt by default); `true` counts the
+   * mount against the global limiter, `false` exempts it, and an object
+   * gives it its own limit and bucket.
+   */
+  rateLimit?: RouteRateLimitOptions | boolean;
+};
+
 export interface RouteOptions {
   /**
    * Route middleware
@@ -180,22 +270,21 @@ export interface RouteOptions {
    */
   isPage?: boolean;
   /**
-   * Rate limit options for this route
+   * How the rate limiter treats this route.
+   *
+   * - an object: the route gets its own limit and bucket instead of the
+   *   global `http.rateLimit` policy;
+   * - `false`: the route is exempt from the global limiter (development and
+   *   production alike);
+   * - `true`: the route stays under the global limiter. This is the default
+   *   for application routes; it puts a `router.file()` route back under the
+   *   global limiter when static files are exempt.
+   *
+   * @example
+   * router.post("/login", login, { rateLimit: { max: 5, timeWindow: 60_000 } });
+   * router.get("/webhooks/status", status, { rateLimit: false });
    */
-  rateLimit?: {
-    /**
-     * Max number of requests within the time window
-     */
-    max: number;
-    /**
-     * Time window in milliseconds
-     */
-    timeWindow: number;
-    /**
-     * Error message when rate limit is exceeded
-     */
-    errorMessage?: string;
-  };
+  rateLimit?: RouteRateLimitOptions | boolean;
   /**
    * Opt this route OUT of the default core CSRF-Origin guard
    * (`../http/csrf-default-guard.ts`, SECURITY card 8a752ab2) by passing
@@ -219,6 +308,20 @@ export interface RouteOptions {
    * router.post("/oauth/callback", handler, { csrf: false });
    */
   csrf?: false;
+  /**
+   * Route-level validation, merged over the handler's own `validation`
+   * (keys set here win). Lets one handler serve several routes with different
+   * schemas or failure responses.
+   *
+   * @example
+   * router.post("/workspace-import", importWorkspace, {
+   *   validation: {
+   *     schema: importWorkspaceSchema,
+   *     onFailure: () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } }),
+   *   },
+   * });
+   */
+  validation?: RequestHandlerValidation;
   /**
    * What this route's request log entries carry of its input, overriding
    * `http.logging`. Applied before any entry is built, so an omitted body or
@@ -305,6 +408,12 @@ export type Route = RouteOptions & {
    * Rate limit
    */
   rateLimit?: RouteOptions["rateLimit"];
+  /**
+   * Set by `router.file()`, `router.cachedFile()`, `router.files()` and
+   * `router.cachedFiles()`: the route serves a static file, so it follows
+   * `http.rateLimit.staticFiles` unless it sets `rateLimit` itself.
+   */
+  $staticFile?: boolean;
 };
 
 export type PartialPick<T, F extends keyof T> = Omit<T, F> & Partial<Pick<T, F>>;

@@ -257,6 +257,18 @@ describe("registerSitemapRoutes — manifest-backed serving", () => {
     expect(store.getArtifactStream).not.toHaveBeenCalled();
   });
 
+  it("returns 412 when If-Match names only a weak validator", async () => {
+    const { state, store } = stateFor(manifest());
+    const { router, routes } = capturingRouter();
+    registerSitemapRoutes(router, { path: "/sitemap.xml", getServingState: () => state });
+    const { response, calls } = fakeResponse();
+
+    await routes.get("/sitemap.xml")!(context(response, {}, { "if-match": `W/"${digest}"` }));
+
+    expect(calls.setStatusCode).toEqual([[412]]);
+    expect(store.getArtifactStream).not.toHaveBeenCalled();
+  });
+
   it("streams the current main artifact after validator handling", async () => {
     const current = manifest();
     const { state, store } = stateFor(current);

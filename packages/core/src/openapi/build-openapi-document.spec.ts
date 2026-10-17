@@ -904,6 +904,82 @@ describe("buildOpenApiDocument — automatic 422 and 401", () => {
   });
 });
 
+describe("buildOpenApiDocument — custom validation failure responses", () => {
+  const schema = v.object({ name: v.string().required() });
+  const onFailure = () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } });
+
+  it("documents the route hook's body from the declared failure status", () => {
+    const { document, warnings } = build([
+      route("POST", "/imports", {
+        validation: { schema, onFailure },
+        responseSchema: { 201: { body: { id: "string" } }, 400: { body: { error: "string" } } },
+      }),
+    ]);
+    const op = opAt(document, "/imports", "post");
+
+    expect(Object.keys(op.responses)).toEqual(["201", "400"]);
+    expect(jsonSchemaOf(responseOf(op, "400").content)).toEqual({
+      type: "object",
+      properties: { error: { type: "string" } },
+      required: ["error"],
+    });
+    expect(document.components?.schemas?.ValidationFailed).toBeUndefined();
+    expect(warnings).toEqual([]);
+  });
+
+  it("documents a route-option hook the same way", () => {
+    const { document } = build([
+      route(
+        "POST",
+        "/imports",
+        { validation: { schema }, responseSchema: { 400: { body: { error: "string" } } } },
+        { validation: { onFailure } },
+      ),
+    ]);
+
+    expect(Object.keys(opAt(document, "/imports", "post").responses)).toEqual(["200", "400"]);
+  });
+
+  it("documents the configured status without a body when the hook's body is undeclared", () => {
+    const { document, warnings } = build([
+      route("POST", "/imports", { validation: { schema, onFailure } }),
+    ]);
+
+    expect(opAt(document, "/imports", "post").responses["422"]).toEqual({
+      description: "Validation failed",
+    });
+    expect(document.components?.schemas?.ValidationFailed).toBeUndefined();
+    expect(warnings).toEqual([
+      "POST /imports: validation.onFailure customizes the failure response; declare its status and body in responseSchema to document it.",
+    ]);
+  });
+
+  it("documents a global body hook at the configured status, using a declared entry", () => {
+    const body = () => ({ error: "INVALID" });
+    const { document, warnings } = build(
+      [
+        route("POST", "/declared", {
+          validation: { schema },
+          responseSchema: { 400: { body: { error: "string" } } },
+        }),
+        route("POST", "/undeclared", { validation: { schema } }),
+      ],
+      { validationResponse: { status: 400, body } },
+    );
+
+    expect(jsonSchemaOf(responseOf(opAt(document, "/declared", "post"), "400").content)).toEqual({
+      type: "object",
+      properties: { error: { type: "string" } },
+      required: ["error"],
+    });
+    expect(opAt(document, "/undeclared", "post").responses["400"]).toEqual({
+      description: "Bad request",
+    });
+    expect(document.components?.schemas?.ValidationFailed).toBeUndefined();
+    expect(warnings).toEqual([]);
+  });
+});
+
 describe("buildOpenApiDocument — security from the warlock.auth descriptor", () => {
   it("header source -> bearerAuth", () => {
     const { document } = build([

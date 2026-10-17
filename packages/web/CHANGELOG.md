@@ -4,7 +4,13 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ## 5.31.0
 
+### Security
+
+- The global HTTP rate limiter that 5.31 enforces covers page routes and API routes; the production client bundle (`/assets/*`) and the public files copied by `warlock build` are static files and exempt by default, so one page load's script, stylesheet, font and image requests do not spend the visitor's quota. `http.rateLimit.staticFiles: true` counts them again. In development, Vite answers module and asset requests before any route runs, so they never count.
+
 ### Fixed
+
+- Sitemap routes compare `If-Match` strongly and answer 412 when it does not name the exact strong ETag; `If-None-Match` keeps weak comparison and both use core's RFC 9110 precondition evaluation. The `W/` weakness prefix is matched case-sensitively, as the RFC defines it.
 
 - The server-page-cache test fixture explicitly disables unrelated HTTP throttling and restores its previous configuration on teardown, so repeated cache requests exercise cache behavior after production rate-limit enforcement was corrected.
 

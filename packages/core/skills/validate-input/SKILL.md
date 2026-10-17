@@ -5,7 +5,7 @@ description: 'Author seal schemas, attach them to controllers via `controller.va
 
 # Warlock — validate a request
 
-Validation is a three-file pattern: a seal schema, a `Request<Schema>` type alias, and the controller that attaches the schema via a static property. If validation fails, the framework returns a 400 with an `errors` payload — your handler never runs.
+Validation is a three-file pattern: a seal schema, a `Request<Schema>` type alias, and the controller that attaches the schema via a static property. If validation fails, the framework returns a 422 with an `errors` payload — your handler never runs (see "Your own failure body" to change it).
 
 ## The shape
 
@@ -197,6 +197,48 @@ The framework calls `response.failedSchema(result)` which sends `422` by default
 ```
 
 The key names (`errors`, `input`, `error`) come from `config.get("validation.response")` — change them globally if your wire format differs.
+
+### Your own failure body
+
+For a contract with stable error codes, set `onFailure` on the validation. It gets the seal result and `{ request, response, route }` and returns `{ status?, body }` (no `status` → `validation.response.status`, 422):
+
+```ts title="src/app/imports/controllers/create-import.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+const importSchema = v.object({ name: v.string().required() });
+
+export const createImportController: RequestHandler = async ({ response }) =>
+  response.successCreate({ id: "import-1" });
+
+createImportController.validation = {
+  schema: importSchema,
+  onFailure: () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } }),
+};
+
+// Declare the failure status so `warlock generate.openapi` documents the body.
+createImportController.responseSchema = {
+  201: { body: { id: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+The same `validation` object is accepted as a route option, merged over the handler's (route keys win): `router.post("/imports", createImportController, { validation: { onFailure } })`.
+
+For every route at once, configure a global hook; a route's `onFailure` still wins, and returning `undefined` from either falls through to the next:
+
+```ts title="src/config/validation.ts"
+import type { ValidationConfiguration } from "@warlock.js/core";
+
+const validationConfig: ValidationConfiguration = {
+  response: {
+    status: 400,
+    body: (result, route) => ({ error: `${route.name}.invalid`, fields: result.errors.length }),
+  },
+};
+
+export default validationConfig;
+```
 
 ## Scoping what's validated
 

@@ -202,17 +202,30 @@ trip's output/blocks for replay. It does not replace application retention polic
 ## 5.30 to 5.31 production rate limits
 
 5.31 makes global and per-route rate limits apply to production and development application
-routes, including web page routes and static assets (`/public`, `/assets`). Each
-page load's asset requests use the same bucket. The default global limit is 60
-requests per minute per IP, shared across routes. Check `max` before deployment; configure
-`trustProxy` or `keyGenerator` behind a proxy so clients do not share the proxy's
-single key. Set `http.rateLimit.global: false` to retain the previous global
-behaviour and enable individual route limits deliberately.
+routes, including web page routes. The default global limit is 60 requests per
+minute per IP, in one bucket shared by pages and API routes. Check `max` before
+deployment; configure `trustProxy` or `keyGenerator` behind a proxy so clients do
+not share the proxy's single key. Set `http.rateLimit.global: false` to retain the
+previous global behaviour and enable individual route limits deliberately.
 
-Built-in `/health` and `/ready` routes are exempt by default; set
+Static files are exempt by default, so a page load's assets do not spend that
+quota: the public folder, `router.directory()` mounts, `router.file()` routes and
+the web build's `/assets/*` and public files. `http.rateLimit.staticFiles: true`
+counts them again; `router.directory(options, { rateLimit: true })` counts one
+mount. Built-in `/health` and `/ready` routes are exempt by default too; set
 `http.health.rateLimit: true` to opt them into the limiter (see `health-checks`).
-Development wildcard dispatch has separate
-per-route handling; check route overrides in both environments.
+
+To exempt one route, pass `rateLimit: false` in its options (or the
+`serverOptions: { config: { rateLimit: false } }` pass-through). Development's
+wildcard dispatcher now honours both, the same as production:
+
+```ts title="src/app/status/routes.ts"
+import { router } from "@warlock.js/core";
+
+router.get("/status", ({ response }) => response.success({ status: "ok" }), {
+  rateLimit: false,
+});
+```
 
 ## 5.30 to 5.31 daily log file names
 

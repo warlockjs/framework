@@ -7,6 +7,8 @@ const DEFAULT_VALIDATION_RESPONSE = {
   inputKey: "input",
   inputError: "error",
   status: 422,
+  /** A global `validation.response.body` hook replaces the framework body. */
+  customBody: false,
 };
 
 export type ValidationResponseShape = typeof DEFAULT_VALIDATION_RESPONSE;
@@ -35,6 +37,8 @@ export function resolveValidationResponse(
   if (typeof config?.status === "number" && Number.isInteger(config.status)) {
     merged.status = config.status;
   }
+
+  merged.customBody = typeof config?.body === "function";
 
   return merged;
 }
@@ -88,4 +92,42 @@ export function buildUnauthorizedResponse(registry: SchemaRegistry): OpenApiResp
     description: describeStatus("401"),
     content: { "application/json": { schema: ref } },
   };
+}
+
+/**
+ * The failed-validation response of a route whose failure body is customized, by its own
+ * `validation.onFailure` or the global `validation.response.body` hook. The framework body
+ * would be wrong here, so:
+ *
+ * - a status the handler's `responseSchema` declares documents the custom body as written;
+ * - otherwise the configured failure status is documented without a body. A route hook may
+ *   also change the status, so when the handler declares any 4xx entry of its own, those
+ *   entries are trusted and nothing is added.
+ *
+ * Returns `undefined` when nothing should be added, and warns when a route hook's body is
+ * left undocumented.
+ */
+export function buildCustomValidationFailedResponse(
+  shape: ValidationResponseShape,
+  declared: Readonly<Record<string, OpenApiResponse>>,
+  routeHook: boolean,
+  warn: (message: string) => void,
+): { status: string; response: OpenApiResponse } | undefined {
+  const status = String(shape.status);
+
+  if (declared[status]) {
+    return undefined;
+  }
+
+  if (routeHook && Object.keys(declared).some((code) => /^4\d\d$/.test(code))) {
+    return undefined;
+  }
+
+  if (routeHook) {
+    warn(
+      "validation.onFailure customizes the failure response; declare its status and body in responseSchema to document it.",
+    );
+  }
+
+  return { status, response: { description: describeStatus(status) } };
 }

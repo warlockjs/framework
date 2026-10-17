@@ -69,4 +69,8 @@ describe("buildRateLimitOptions", () => {
     expect(buildRateLimitOptions({ store: CustomStore as never })?.store).toBe(CustomStore);
     expect(buildRateLimitOptions({ store: "memory" })).toEqual({ max: 60, timeWindow: 60000 });
   });
+
+  it("keeps the framework-only staticFiles switch out of the plugin options", () => {
+    expect(buildRateLimitOptions({ staticFiles: true })).toEqual({ max: 60, timeWindow: 60000 });
+  });
 });

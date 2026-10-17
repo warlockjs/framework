@@ -13,7 +13,7 @@ import {
 import { isMissingFileError, variantCacheDirectoryFor } from "./image-variant-cache";
 import type { VariantOutputFormat } from "./image-variant-types";
 import { localDiskRoot } from "./local-disk-root";
-import { matchesIfNoneMatch } from "./matches-if-none-match";
+import { evaluateConditionalRequest } from "../conditional-request";
 import { parseUploadedFileQuery } from "./parse-uploaded-file-query";
 import { readFileHead } from "./read-file-head";
 import { resolveImageVariant } from "./resolve-image-variant";
@@ -197,8 +197,21 @@ export function createUploadedFileController(
 
       if (!variant) return notFound(response);
 
-      if (matchesIfNoneMatch(request.header("if-none-match"), `"${variant.hash}"`)) {
+      // The variant hash is a strong validator: If-None-Match compares weakly,
+      // If-Match strongly (RFC 9110 §13.1).
+      const precondition = evaluateConditionalRequest({
+        method: request.method,
+        etag: `"${variant.hash}"`,
+        ifMatch: request.header("if-match"),
+        ifNoneMatch: request.header("if-none-match"),
+      });
+
+      if (precondition === "not-modified") {
         return response.baseResponse.status(304).send();
+      }
+
+      if (precondition === "precondition-failed") {
+        return response.baseResponse.status(412).send();
       }
 
       let body: Buffer;

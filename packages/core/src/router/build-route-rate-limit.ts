@@ -1,11 +1,11 @@
-import type { RouteOptions } from "./types";
+import type { RouteRateLimitOptions } from "./types";
 
 /**
  * Turn a route's `rateLimit` option into `@fastify/rate-limit` route config.
  * `errorMessage` is not a plugin option, so it is mapped to
  * `errorResponseBuilder`; the rest passes through unchanged.
  */
-export function buildRouteRateLimit(rateLimit: NonNullable<RouteOptions["rateLimit"]>) {
+export function buildRouteRateLimit(rateLimit: RouteRateLimitOptions) {
   const { errorMessage, ...rest } = rateLimit;
 
   if (!errorMessage) {

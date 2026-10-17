@@ -17,8 +17,10 @@ import type {
   StringValidator,
   TranslateAttributeCallback,
   TranslateRuleCallback,
+  ValidationResult,
 } from "@warlock.js/seal";
 import type { UploadedFile } from "../http";
+import type { Route } from "../router/types";
 import type {
   ExistsExceptCurrentIdRuleOptions,
   ExistsExceptCurrentUserRuleOptions,
@@ -132,7 +134,62 @@ export type {
   UniqueExceptCurrentUserRuleOptions,
 } from "./database";
 
+/**
+ * `validation.response`: how a failed schema validation is answered.
+ */
+export type ValidationResponseConfiguration = {
+  /**
+   * Key holding the list of field errors in the framework body.
+   *
+   * @default "errors"
+   */
+  errors?: string;
+  /**
+   * Key holding the field name in each error.
+   *
+   * @default "input"
+   */
+  inputKey?: string;
+  /**
+   * Key holding the message in each error.
+   *
+   * @default "error"
+   */
+  inputError?: string;
+  /**
+   * Status of a failed schema validation, including a body returned by
+   * `body` or by a route's `onFailure` hook without its own `status`.
+   *
+   * @default 422
+   */
+  status?: number;
+  /**
+   * Build the failure body for every route, instead of the framework's
+   * `{ errors: [...] }`. Return `undefined` to keep the framework body for a
+   * route. A route's own `validation.onFailure` wins over this hook.
+   *
+   * @example
+   * response: {
+   *   status: 400,
+   *   body: (result, route) => ({ error: `${route.name}.invalid`, fields: result.errors.length }),
+   * },
+   */
+  body?: (result: ValidationResult, route: Route) => unknown;
+};
+
 export type ValidationConfiguration = {
+  /**
+   * How a failed schema validation is answered: the framework body's keys,
+   * its status, or a `body` hook that replaces it.
+   */
+  response?: ValidationResponseConfiguration;
+  /**
+   * Status sent when a custom `validation.validate` middleware returns a
+   * value that is not a `Response`.
+   *
+   * @default 400
+   */
+  responseStatus?: number;
   // TODO: Map error messages and inputs keys through configurations.
   /**
    * Translation group that will be prefixed the rules

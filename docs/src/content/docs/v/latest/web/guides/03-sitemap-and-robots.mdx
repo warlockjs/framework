@@ -105,8 +105,10 @@ immutable and may be cached for a year. The main endpoint uses
 `sitemap.cacheControl`, defaulting to `public, max-age=300`.
 
 Both routes send `ETag` and `Last-Modified`. `If-None-Match` takes precedence
-over `If-Modified-Since`; a matching GET or HEAD returns `304` without reading
-stored XML. Gzipped artifacts stream with `Content-Encoding: gzip`.
+over `If-Modified-Since` and compares weakly (`W/"…"` matches the strong tag);
+a matching GET or HEAD returns `304` without reading stored XML. `If-Match`
+compares strongly, so only the exact strong tag passes; otherwise the route
+answers `412`. Gzipped artifacts stream with `Content-Encoding: gzip`.
 
 ## Images and robots.txt
 

@@ -170,7 +170,39 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 | `contentType` | `string`  | (buffer only) MIME type                               |
 | `etag`        | `string`  | (buffer only) `ETag` header for conditional requests  |
 
-`sendFile` is `If-None-Match` and `If-Modified-Since` aware out of the box — it returns 304 when the client's cached copy matches. If the path doesn't exist, it returns 404 with `{ error: "File Not Found" }` automatically.
+`sendFile` (and `sendBuffer` / `sendImage` with an `etag`) answer conditional requests out of the box, in the RFC 9110 order:
+
+- `If-Match` uses **strong** comparison: only the exact strong tag (or `*`) passes; a weak `W/"…"` tag never does. A failed `If-Match` answers `412 Precondition Failed`. Without `If-Match`, an `If-Unmodified-Since` older than the file does the same.
+- `If-None-Match` uses **weak** comparison: `W/"abc"` and `"abc"` match each other. A match answers `304` for GET and HEAD (`412` for other methods).
+- `If-Modified-Since` is read only when `If-None-Match` is absent, at second precision.
+
+If the path doesn't exist, `sendFile` returns 404 with `{ error: "File Not Found" }` automatically.
+
+The same comparison is exported for your own handlers:
+
+```ts
+import { evaluateConditionalRequest, type RequestHandler } from "@warlock.js/core";
+
+export const showDocumentController: RequestHandler = async ({ request, response }) => {
+  const etag = `"doc-42-v7"`;
+
+  const outcome = evaluateConditionalRequest({
+    method: request.method,
+    etag,
+    ifMatch: request.header("if-match"),
+    ifNoneMatch: request.header("if-none-match"),
+  });
+
+  if (outcome === "not-modified") return response.setStatusCode(304).send();
+  if (outcome === "precondition-failed") return response.setStatusCode(412).send();
+
+  return response.header("ETag", etag).success({ id: 42 });
+};
+```
+
+`matchesIfNoneMatch(header, etag)` and `matchesIfMatch(header, etag)` expose the two comparisons on their own.
+
+Public-folder and `router.directory()` files are answered by `@fastify/static`, which applies its own conditional-request handling to the weak ETags it generates.
 
 For attachment-style downloads:
 
