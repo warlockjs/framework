@@ -1,4 +1,4 @@
-import type { JsonSchemaTarget, ToolContract } from "@warlock.js/ai";
+import type { ToolContract } from "@warlock.js/ai";
 
 /**
  * Type contracts for the Model Context Protocol surface — the
@@ -75,60 +75,6 @@ export interface McpClient {
   tools(): Promise<ToolContract[]>;
   /** Close the underlying transport (kills the child / ends the HTTP session). */
   close(): Promise<void>;
-}
-
-/**
- * A source of tools to expose via `ai.mcp.serve` — either an object that
- * can enumerate its `ToolContract`s (a built agent / supervisor /
- * orchestrator), or a literal array of contracts.
- */
-export type McpServeSource = { tools(): ToolContract[] } | ToolContract[];
-
-/**
- * Where an `ai.mcp.serve` server listens. Discriminated by `type`.
- *
- * - `"stdio"` — serve JSON-RPC over this process's stdin/stdout.
- * - `"http"` — serve Streamable HTTP on `port`.
- */
-export type McpServeTransport = { type: "stdio" } | { type: "http"; port: number };
-
-/**
- * Options for `ai.mcp.serve(source, options)` (Direction B: local
- * primitive → MCP server other clients can consume).
- */
-export interface McpServeOptions {
-  /** Server name advertised in the `initialize` response. */
-  name: string;
-  /**
-   * Server version advertised in `initialize`.
-   *
-   * @default the package version
-   */
-  version?: string;
-  /**
-   * Where to listen.
-   *
-   * @default { type: "stdio" }
-   */
-  transport?: McpServeTransport;
-  /**
-   * JSON-Schema dialect emitted for each tool's `inputSchema`. Defaults
-   * to a neutral MCP draft rather than `extractJsonSchema`'s own
-   * `"openai-strict"` default.
-   *
-   * @default "draft-2020-12"
-   */
-  schemaTarget?: JsonSchemaTarget;
-}
-
-/**
- * A running `ai.mcp.serve` server.
- */
-export interface McpServer {
-  /** Begin accepting connections / reading the transport. */
-  start(): Promise<void>;
-  /** Stop serving and release the transport. */
-  stop(): Promise<void>;
 }
 
 // ============================================================

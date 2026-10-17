@@ -162,6 +162,51 @@ export class McpTransportError extends AIError {
 }
 
 /**
+ * Why `ai.mcp.serve` refused to build or start a server.
+ *
+ * - `"config"` — invalid serve options: a non-loopback HTTP bind without
+ *   `auth`, an empty bearer token, a bad `path` / `port`, or
+ *   `prefixToolNames` without a grouped source.
+ * - `"collision"` — two exposed tools (or resources / prompts) share a
+ *   name (URI for resources).
+ * - `"listen"` — the HTTP server could not bind (port in use, permission
+ *   denied, unknown host).
+ */
+export type McpServeFailure = "config" | "collision" | "listen";
+
+/**
+ * Options for {@link McpServeError} — the structured `type` discriminator.
+ */
+export type McpServeErrorOptions = AIErrorOptions & {
+  /** Which class of serve failure occurred. */
+  type: McpServeFailure;
+};
+
+/**
+ * `ai.mcp.serve` could not build or start the server. Thrown by `serve()`
+ * itself for an invalid source or a name collision, and by `start()` for
+ * transport configuration and bind failures — never for a single bad request, which gets an HTTP / JSON-RPC
+ * error response instead. Extends {@link AIError} (code `TOOL_EXEC_FAILED`);
+ * branch on `error.type`.
+ *
+ * @example
+ * if (error instanceof McpServeError && error.type === "collision") {
+ *   // two tools share a name — rename one or use a grouped source + prefixToolNames
+ * }
+ */
+export class McpServeError extends AIError {
+  /** Which class of serve failure occurred. */
+  public readonly type: McpServeFailure;
+
+  public constructor(message: string, options: McpServeErrorOptions) {
+    super("TOOL_EXEC_FAILED", message, options);
+
+    this.name = "McpServeError";
+    this.type = options.type;
+  }
+}
+
+/**
  * Why a web tool (`ai.tools.webSearch` / `ai.tools.fetchUrl`) failed
  * before or during a network call.
  *
