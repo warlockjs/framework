@@ -73,12 +73,38 @@ agent.execute(input, {
   repair, // { maxAttempts } — re-ask on validation failure
   signal, // AbortSignal
   sessionId, // stamped onto every report node
+  modelOptions, // model call options for this run, merged over the agent's
+  continueOnOutputLimit, // continue turns allowed after a cut-off response
   streamingToolGuard, // per-call override
   on, // per-call event handlers
 });
 ```
 
 Call-site `output` fully **replaces** the factory's `output` for that run — no merging.
+
+### Per-call model options
+
+`modelOptions` on `execute()` / `stream()` sets the model call options — reasoning effort, `maxTokens`, `temperature`, `cacheControl`, `providerOptions` — for that run only. They are shallow-merged over the agent's `modelOptions`: a key you pass wins, a key you leave out keeps the agent's value. The agent is never changed, so one agent can serve many concurrent runs with different settings.
+
+```ts
+const assistant = ai.agent({
+  model: anthropic.model({ name: "claude-opus-5-5" }),
+  modelOptions: { reasoning: { effort: "medium" } },
+});
+
+// This run thinks harder and keeps its prompt cache for an hour.
+await assistant.execute(question, {
+  modelOptions: {
+    reasoning: { effort: "high" },
+    cacheControl: { breakpoints: 1, ttl: "1h" },
+  },
+});
+
+// The next run is back on the agent's settings.
+await assistant.execute(followUp);
+```
+
+The merge is shallow: a nested object you pass (`reasoning`, `cacheControl`, `providerOptions`) replaces the agent's whole value for that key. Repeat the agent's fields you want to keep, for example `providerOptions: { anthropic: { ...agentBetas, thinkingDisplay: "summarized" } }`. `tools`, `signal` and `responseSchema` belong to the run and are ignored here; use the agent's `tools`, the `signal` option and `output` / `responseSchema` instead.
 
 ## `agent.stream(input, options)`
 
@@ -112,7 +138,7 @@ type AgentResult<T> = {
 };
 
 type AgentReport = {
-  status: "completed" | "failed" | "cancelled";
+  status: "completed" | "failed" | "cancelled" | "incomplete";
   startedAt: string;
   endedAt: string;
   duration: number;
@@ -179,7 +205,50 @@ Options that only one provider understands go under `providerOptions`, keyed by 
 
 ### Finish reasons and provider blocks
 
-Each trip records why the model stopped: `stop`, `tool_calls`, `length`, `context_exceeded` (the history filled the context window; compact or trim it), `pause_turn`, `refusal` or `error`. The agent resumes a `pause_turn` by itself, within `maxTrips`; the continuation carries only the new content, so `result.text` (and the structured output parsed from it) joins the paused segments with the final one. `refusal` and `context_exceeded` end the run; read `report.trips.at(-1)?.finishReason` to decide whether to retry on another model.
+Each trip records why the model stopped: `stop`, `tool_calls`, `length`, `context_exceeded` (the history filled the context window; compact or trim it), `pause_turn`, `refusal` or `error`. The agent resumes a `pause_turn` by itself, within `maxTrips`; the continuation carries only the new content, so `result.text` (and the structured output parsed from it) joins the paused segments with the final one. `refusal` ends the run; read `report.trips.at(-1)?.finishReason` to decide whether to retry on another model. `length` and `context_exceeded` end it as incomplete, below.
+
+### Cut-off responses — `report.status: "incomplete"`
+
+When the final response is cut off — by the output token cap (`length`) or the context window (`context_exceeded`) — the run has no complete answer. It ends with `report.status: "incomplete"` and `result.error` set to an `AgentIncompleteError`:
+
+| Field           | Value                                                                  |
+| --------------- | ---------------------------------------------------------------------- |
+| `code`          | `"AGENT_INCOMPLETE"` (category `"incomplete"`)                         |
+| `reason`        | `"output_limit"` (`length`) or `"context_window"` (`context_exceeded`) |
+| `tripIndex`     | the trip whose response was cut off                                    |
+| `continuations` | continue turns already sent before giving up                           |
+
+`result.text` keeps the partial text. A tool call the model was still writing when the output ran out may have incomplete input, so it is **never executed**; it is listed on that trip's `truncatedToolCalls`.
+
+```ts
+import { AgentIncompleteError } from "@warlock.js/ai";
+
+const result = await worker.execute(task);
+
+if (result.error instanceof AgentIncompleteError) {
+  if (result.error.reason === "output_limit") {
+    // Raise maxTokens, split the task, or let the agent continue (below).
+  } else {
+    // The context window is full: compact or trim the history.
+  }
+}
+```
+
+**Automatic continuation.** `continueOnOutputLimit: n` (on the agent or per call) lets one run recover from up to `n` output-cap cut-offs. The agent keeps the partial text in the conversation, sends a continue turn, and joins the segments in `result.text` (and the structured output parsed from it). If the cut-off happened inside a tool call, the partial call is dropped and the continue turn tells the model the call did not run, so it issues it again — usually smaller. Each continuation is a normal trip, counted against `maxTrips`. When the continuations or trips run out, the run ends incomplete as above. A full context window is never continued.
+
+```ts
+const writer = ai.agent({
+  model: anthropic.model({ name: "claude-haiku-4-5" }),
+  tools: [writeFile],
+  continueOnOutputLimit: 2,
+});
+
+const result = await writer.execute("Write src/report.ts");
+// A response cut off mid-text continues where it stopped; a cut-off
+// `write_file` call is discarded and re-issued by the model.
+```
+
+Streaming behaves the same: the continuation's deltas follow the partial text on the stream, and `stream.result` carries the joined text or the `AgentIncompleteError`.
 
 Some providers return content the neutral `text` cannot carry, such as Anthropic thinking and compaction blocks. The adapter puts the whole turn on `blocks`, and the agent replays it verbatim inside the run.
 
@@ -344,6 +413,20 @@ await myAgent.execute(input, { on: { "agent.trip.completed": handler } });
 ```
 
 Every payload carries `runId` and `rootRunId` so nested runs (workflow → agent → tool) stitch into one trace.
+
+The three tool events also carry `callId`, the provider's id for the tool call. One trip can call the same tool several times, and those calls run concurrently by default, so pair each result with its call by `callId`, not by tool name. The same id is on the `ToolCall` record (`report.children[].callId`) and on the tool middleware context (`ctx.callId`).
+
+```ts
+const pending = new Map<string, string>();
+
+for await (const event of assistant.stream(question)) {
+  if (event.type === "agent.tool.calling") {
+    pending.set(event.callId, event.tool.action ?? event.tool.name);
+  } else if (event.type === "agent.tool.called" || event.type === "agent.tool.failed") {
+    ui.finishToolChip(event.callId, pending.get(event.callId));
+  }
+}
+```
 
 ## Streaming tool guard
 

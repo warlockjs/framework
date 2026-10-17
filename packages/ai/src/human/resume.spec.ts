@@ -62,6 +62,7 @@ function makeToolContext(
     tripIndex: 0,
     messages: [],
     tool: { name: "refundCustomer", description: "Refund a customer order" },
+    callId: "call_1",
     request: {
       id: "call_1",
       name: "refundCustomer",

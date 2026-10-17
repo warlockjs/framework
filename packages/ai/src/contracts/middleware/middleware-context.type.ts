@@ -99,6 +99,12 @@ export type MiddlewareToolContext = MiddlewareTripContext & {
      */
     readonly mode?: ToolMode;
   };
+  /**
+   * The provider's tool-call id (`request.id`), the same value the
+   * `agent.tool.*` events and the `ToolCall` record carry. Use it to
+   * correlate hooks with events when one trip calls a tool twice.
+   */
+  readonly callId: string;
   readonly request: ModelToolCallRequest;
 };
 

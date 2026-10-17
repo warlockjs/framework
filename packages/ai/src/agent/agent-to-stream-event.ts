@@ -34,8 +34,8 @@ export function agentEventToStreamEvent<K extends keyof AgentEventMap>(
     }
 
     case "agent.tool.calling": {
-      const { tool, input, tripIndex } = payload as AgentEventMap["agent.tool.calling"];
-      return { type: "agent.tool.calling", tool, input, tripIndex };
+      const { tool, callId, input, tripIndex } = payload as AgentEventMap["agent.tool.calling"];
+      return { type: "agent.tool.calling", tool, callId, input, tripIndex };
     }
 
     case "agent.tool.called": {
@@ -43,12 +43,12 @@ export function agentEventToStreamEvent<K extends keyof AgentEventMap>(
       // Split off the agent's enriched ToolCall record from the tool meta
       // so the stream event surface mirrors the bus payload shape.
       const { tool, ...toolCall } = called;
-      return { type: "agent.tool.called", toolCall, tool };
+      return { type: "agent.tool.called", toolCall, tool, callId: called.callId };
     }
 
     case "agent.tool.failed": {
-      const { tool, error, tripIndex } = payload as AgentEventMap["agent.tool.failed"];
-      return { type: "agent.tool.failed", tool, error, tripIndex };
+      const { tool, callId, error, tripIndex } = payload as AgentEventMap["agent.tool.failed"];
+      return { type: "agent.tool.failed", tool, callId, error, tripIndex };
     }
 
     case "agent.trip.completed": {

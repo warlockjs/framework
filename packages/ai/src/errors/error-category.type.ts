@@ -33,6 +33,7 @@ export type ErrorCategory =
   | "tool"
   | "cancelled"
   | "max-trips"
+  | "incomplete"
   | "max-iterations"
   | "max-steps"
   | "schema"

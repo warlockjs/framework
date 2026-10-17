@@ -46,6 +46,11 @@ export type ReportType =
  *   (crash, schema failure, max-trips, etc.). The
  *   accompanying `error` on the envelope carries the typed cause.
  * - `"cancelled"` — caller aborted before completion via `AbortSignal`.
+ * - `"incomplete"` — agent-specific: the model's final response was cut
+ *   off by its output token cap or the context window, so there is no
+ *   complete answer. The envelope's `error` is an `AgentIncompleteError`
+ *   (`reason: "output_limit" | "context_window"`); `text` holds the
+ *   partial output. Harmless on non-agent reports.
  * - `"max-iterations"` — supervisor-specific termination when the
  *   iteration cap was hit without an explicit `END` / `satisfied`.
  *   Harmless on non-supervisor reports; keeping it on the shared
@@ -65,6 +70,7 @@ export type ReportStatus =
   | "completed"
   | "failed"
   | "cancelled"
+  | "incomplete"
   | "max-iterations"
   | "awaiting-input"
   | "awaiting-approval";
@@ -142,7 +148,7 @@ export type BaseReport = {
   /** Terminal status of this execution. */
   status: ReportStatus;
   /**
-   * Terminal error stamped on a `failed` / `cancelled` node so the typed
+   * Terminal error stamped on a `failed` / `cancelled` / `incomplete` node so the typed
    * cause travels WITH the report tree — not only on the result envelope.
    * Essential for the observe path: an {@link import("../../observe/observer.contract").Observer}
    * receives `collect(report)` with no envelope, so a failed root would

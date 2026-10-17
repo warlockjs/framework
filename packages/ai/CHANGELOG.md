@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **BREAKING** An agent run whose final response was cut off — by the output token cap (`finishReason: "length"`) or the context window (`"context_exceeded"`) — no longer finishes as a success with empty or partial text. It ends with `result.error` an `AgentIncompleteError` (`code: "AGENT_INCOMPLETE"`, category `"incomplete"`, `reason: "output_limit" | "context_window"`, `tripIndex`, `continuations`) and `report.status: "incomplete"`; `result.text` keeps the partial text. A tool call the model was still writing is never executed and is listed on the trip's new `truncatedToolCalls`. Durable snapshots of such a run are stored as `failed`, so `resume()` retries the cut-off trip.
+- The semantic cache never stores a response cut off by the output cap or the context window; a continued answer is stored whole.
+
 - The provider matrix documents inherited `providerOptions.openai.body` on xAI, Groq, DeepSeek and Mistral, and warns against sharing provider-specific fields across incompatible fallback models.
 
 ### Fixed
@@ -16,11 +19,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
+- Hosts that treated an empty or partial `result.text` with no `result.error` as a finished run must handle `AgentIncompleteError` / `report.status === "incomplete"` instead (and can drop their own `trips.at(-1).finishReason === "length"` checks). Exhaustive switches over `ReportStatus` or `ErrorCategory` need the new `"incomplete"` member. To recover automatically from the output cap, set `continueOnOutputLimit`; otherwise raise `maxTokens` or split the task.
+
 - When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.
 
 - Sub-agents also use the concurrent tool default introduced in 5.30. Callers upgrading from 5.29 whose tools need ordered side effects can now set `spawnSubAgent({ toolDispatch: "sequential", ... })`.
 
 ### Added
+
+- `continueOnOutputLimit: n` on `AgentConfig` and `AgentExecuteOptions`: up to `n` times per run, a response cut off by the output cap is continued with a continue turn and the segments are joined in `result.text` (and the structured output parsed from it), also on the stream and during repair. A tool call cut off mid-input is dropped and the model is told it did not run. Each continuation is a trip within `maxTrips`; a full context window is never continued.
+- `agent.execute(input, { modelOptions })` and `agent.stream(input, { modelOptions })` set model call options (reasoning effort, `maxTokens`, `cacheControl`, `providerOptions`, …) for that run only, shallow-merged over `AgentConfig.modelOptions`; the agent is not changed. `tools`, `signal` and `responseSchema` in the per-call object are ignored.
+- Tool events carry the provider's tool-call id as `callId`: `agent.tool.calling`, `agent.tool.called` and `agent.tool.failed` (event payloads and stream events), the `ToolCall` record (`report.children[].callId`), the tool middleware context (`ctx.callId`), and the human-approval `PolicyContext` / `ApprovalRequestContext`. Concurrent calls to the same tool in one trip can now be told apart. Tool log lines include it.
+- `AgentIncompleteError`, `AgentIncompleteErrorOptions` and `AgentIncompleteReason` are exported; `AIErrorCode` gains `AGENT_INCOMPLETE`, `ErrorCategory` and `ReportStatus` gain `incomplete`, and `LLMTrip` gains `truncatedToolCalls`.
 
 - Regression fixtures assert required model and identifier segments before reading them under stricter indexed-access checks; the compiler error budget falls by ten.
 

@@ -34,9 +34,11 @@ import type {
 import {
   AgentCancelledError,
   AgentExecutionError,
+  AgentIncompleteError,
   AgentMaxTripsError,
   AIError,
   SchemaValidationError,
+  type AgentIncompleteReason,
 } from "../errors";
 import type { AgentContract as AgentContractType } from "../contracts/agent/agent.contract";
 import type { AgentResumeOptions } from "../contracts/agent/agent-options.type";
@@ -76,6 +78,24 @@ const LOG_MODULE = "ai.agent";
 
 /** Default cap on a trip's concurrently running tool calls. */
 const DEFAULT_MAX_CONCURRENT_TOOLS = 4;
+
+/**
+ * Continue turn sent after a response was cut off mid-text by the output
+ * token cap (`continueOnOutputLimit`).
+ */
+const CONTINUE_AFTER_TEXT_PROMPT =
+  "Your previous response was cut off because it reached the output token limit. " +
+  "Continue exactly where it stopped, without repeating anything you already wrote.";
+
+/**
+ * Continue turn sent after a response was cut off while the model was
+ * writing a tool call. The partial call is discarded, so the model is told
+ * it never ran.
+ */
+const CONTINUE_AFTER_TOOL_CALL_PROMPT =
+  "Your previous response was cut off by the output token limit while you were writing a tool call. " +
+  "That tool call was discarded and did not run. Continue from where you stopped and issue the call again; " +
+  "if its input is large, split the work across several smaller calls.";
 
 /** One settled tool dispatch: its record plus the tool-result message for the next trip. */
 type DispatchedToolCall = {
@@ -588,6 +608,12 @@ class Execution<TOutput> {
   private readonly effectiveTools: ToolContract<unknown, unknown>[];
 
   private error?: AIError;
+  /**
+   * Continue turns this run has sent after an output-cap cut-off, bounded
+   * by `continueOnOutputLimit`. Seeded from the resumed trips so a durable
+   * resume keeps the same budget.
+   */
+  private continuations = 0;
   private data?: TOutput;
   private responseSchema?: Record<string, unknown>;
   /**
@@ -631,6 +657,7 @@ class Execution<TOutput> {
       this.inputMessageIndex =
         resumeFrom.inputMessageIndex ?? findExecutionInputIndex(this.messages, this.input);
       this.trips.push(...resumeFrom.trips);
+      this.continuations = resumeFrom.trips.filter((trip) => trip.finishReason === "length").length;
       this.compactions.push(...(resumeFrom.compactions ?? []));
       this.toolCalls.push(...resumeFrom.toolCalls);
       mergeUsage(this.usage, resumeFrom.usage);
@@ -913,7 +940,7 @@ class Execution<TOutput> {
       const tripInput =
         tripIndex === 0
           ? this.input
-          : this.trips[tripIndex - 1]?.finishReason === "pause_turn"
+          : isContinuedFinish(this.trips[tripIndex - 1]?.finishReason)
             ? "[continue]"
             : "[tool results]";
       const outcome = await this.runTrip(tripIndex, tripInput);
@@ -1001,6 +1028,15 @@ class Execution<TOutput> {
     // without joining from elsewhere. Awaited but errors swallowed.
     await this.fireUsageHook(tripIndex, response.usage);
 
+    // A response cut off by the output cap or the context window has no
+    // complete answer. Any tool call it carries may have truncated input,
+    // so it is never dispatched.
+    const truncation = resolveTruncation(response.finishReason);
+    const truncatedToolCalls =
+      truncation && response.toolCalls && response.toolCalls.length > 0
+        ? response.toolCalls
+        : undefined;
+
     const isToolCallTrip =
       response.finishReason === "tool_calls" &&
       response.toolCalls !== undefined &&
@@ -1040,8 +1076,30 @@ class Execution<TOutput> {
       duration: performance.now() - tripStart,
       usage: response.usage,
       toolCalls: tripToolCalls.length > 0 ? tripToolCalls : undefined,
+      ...(truncatedToolCalls ? { truncatedToolCalls } : {}),
       ...(response.blocks ? { blocks: response.blocks } : {}),
     };
+
+    const continued = truncation ? this.queueContinuation(truncation, response, tripIndex) : false;
+
+    if (truncation && !continued) {
+      this.error = new AgentIncompleteError(
+        truncation === "output_limit"
+          ? "The model's response was cut off by the output token limit"
+          : "The conversation filled the model's context window before the response finished",
+        {
+          reason: truncation,
+          tripIndex,
+          continuations: this.continuations,
+          context: {
+            finishReason: response.finishReason,
+            ...(truncatedToolCalls
+              ? { truncatedToolCalls: truncatedToolCalls.map((call) => call.name) }
+              : {}),
+          },
+        },
+      );
+    }
 
     this.trips.push(trip);
 
@@ -1055,6 +1113,10 @@ class Execution<TOutput> {
     // run, it only loses resume-ability from here. No-op when `durable`
     // is absent.
     await this.checkpoint("running");
+
+    if (truncation) {
+      return continued ? "continue" : "error";
+    }
 
     if (isPausedTrip) {
       return "continue";
@@ -1080,6 +1142,74 @@ class Execution<TOutput> {
     });
 
     return allSilent ? "stop" : "continue";
+  }
+
+  /**
+   * After a response cut off by the output cap, append the continue turn
+   * when `continueOnOutputLimit` allows another one and a trip is left
+   * under `maxTrips`. Returns whether the run continues.
+   *
+   * The partial text is replayed as an assistant turn (with its provider
+   * blocks when nothing was cut off mid-call) followed by a user turn
+   * asking the model to continue. A tool call that was being written is
+   * dropped from the history — it never ran — and the continue turn says
+   * so. An empty partial turn is not replayed: providers reject empty
+   * assistant messages. A full context window is never continued.
+   */
+  private queueContinuation(
+    truncation: AgentIncompleteReason,
+    response: ModelResponse,
+    tripIndex: number,
+  ): boolean {
+    if (truncation !== "output_limit") {
+      return false;
+    }
+
+    if (this.continuations >= this.resolveContinueOnOutputLimit()) {
+      return false;
+    }
+
+    // `tripIndex + 1` trips will exist once this one is recorded.
+    if (tripIndex + 1 >= this.maxTrips) {
+      return false;
+    }
+
+    const cutMidToolCall = response.toolCalls !== undefined && response.toolCalls.length > 0;
+
+    if (response.content.length > 0) {
+      this.messages.push({
+        role: "assistant",
+        content: response.content,
+        ...(response.blocks && !cutMidToolCall ? { blocks: response.blocks } : {}),
+      });
+    }
+
+    this.messages.push({
+      role: "user",
+      content: cutMidToolCall ? CONTINUE_AFTER_TOOL_CALL_PROMPT : CONTINUE_AFTER_TEXT_PROMPT,
+    });
+
+    this.continuations++;
+
+    this.logger.warn(LOG_MODULE, "output.continuing", "response hit the output limit; continuing", {
+      runId: this.runId,
+      tripIndex,
+      continuation: this.continuations,
+      cutMidToolCall,
+    });
+
+    return true;
+  }
+
+  /**
+   * Resolve how many continue turns one run may send after output-cap
+   * cut-offs: per-call option, then agent config, then `0`. Anything that
+   * is not a non-negative integer counts as `0`.
+   */
+  private resolveContinueOnOutputLimit(): number {
+    const limit = this.options?.continueOnOutputLimit ?? this.config.continueOnOutputLimit;
+
+    return limit !== undefined && Number.isInteger(limit) && limit > 0 ? limit : 0;
   }
 
   /**
@@ -1126,10 +1256,28 @@ class Execution<TOutput> {
   private buildModelCallOptions(): ModelCallOptions {
     return {
       ...this.config.modelOptions,
+      ...this.runModelOptions(),
       tools: this.effectiveTools,
       ...(this.responseSchema ? { responseSchema: this.responseSchema } : {}),
       ...(this.options?.signal ? { signal: this.options.signal } : {}),
     };
+  }
+
+  /**
+   * This run's `AgentExecuteOptions.modelOptions`, minus the fields the run
+   * owns (`tools`, `signal`, `responseSchema`). Shallow: a nested object
+   * replaces the agent's value for the whole key.
+   */
+  private runModelOptions(): ModelCallOptions {
+    const perCall = this.options?.modelOptions;
+
+    if (!perCall) {
+      return {};
+    }
+
+    const { tools: _tools, signal: _signal, responseSchema: _responseSchema, ...rest } = perCall;
+
+    return rest;
   }
 
   /**
@@ -1358,6 +1506,7 @@ class Execution<TOutput> {
         duration: 0,
         usage: { input: 0, output: 0, total: 0 },
         children: [],
+        callId: toolCallRequest.id,
         tripIndex,
         input: toolCallRequest.input,
         error,
@@ -1378,6 +1527,7 @@ class Execution<TOutput> {
           name: toolCallRequest.name,
           description: "(unregistered tool — no description available)",
         },
+        callId: toolCallRequest.id,
         input: toolCallRequest.input,
         error,
         tripIndex,
@@ -1397,6 +1547,7 @@ class Execution<TOutput> {
 
     this.emit("agent.tool.calling", {
       tool: toolMeta,
+      callId: toolCallRequest.id,
       input: toolCallRequest.input,
       tripIndex,
     });
@@ -1410,6 +1561,7 @@ class Execution<TOutput> {
         description: registeredTool.description,
         mode: registeredTool.mode,
       },
+      callId: toolCallRequest.id,
       request: toolCallRequest,
     };
 
@@ -1489,6 +1641,7 @@ class Execution<TOutput> {
       duration: innerReport.duration,
       usage: invokeResult.usage,
       children: isComposite ? [innerReport] : innerReport.children,
+      callId: toolCallRequest.id,
       tripIndex,
       input: toolCallRequest.input,
       output: invokeResult.data,
@@ -1514,12 +1667,13 @@ class Execution<TOutput> {
     if (invokeResult.error) {
       this.emit("agent.tool.failed", {
         tool: toolMeta,
+        callId: toolCallRequest.id,
         input: toolCallRequest.input,
         error: invokeResult.error,
         tripIndex,
       });
     } else {
-      this.emit("agent.tool.called", { ...record, tool: toolMeta });
+      this.emit("agent.tool.called", { ...record, callId: toolCallRequest.id, tool: toolMeta });
     }
 
     return { record, message };
@@ -1661,7 +1815,16 @@ class Execution<TOutput> {
         reason: failureReason,
       });
 
-      const outcome = await this.runTrip(tripIndex, "[repair attempt]");
+      let outcome = await this.runTrip(tripIndex, "[repair attempt]");
+
+      // A repair answer cut off by the output cap and continued spans
+      // several trips; finish it before re-parsing.
+      while (
+        outcome === "continue" &&
+        this.trips[this.trips.length - 1]?.finishReason === "length"
+      ) {
+        outcome = await this.runTrip(this.trips.length, "[continue]");
+      }
 
       if (outcome === "error") {
         return;
@@ -1696,7 +1859,9 @@ class Execution<TOutput> {
     const status: BaseReport["status"] = this.error
       ? this.error instanceof AgentCancelledError
         ? "cancelled"
-        : "failed"
+        : this.error instanceof AgentIncompleteError
+          ? "incomplete"
+          : "failed"
       : "completed";
 
     const report = {
@@ -1770,8 +1935,9 @@ class Execution<TOutput> {
   /**
    * Map the run's terminal outcome to the persisted snapshot status.
    * A cancelled error reads as `"cancelled"`, any other error as
-   * `"failed"`, otherwise `"completed"`. Mirrors the report-status
-   * mapping in {@link buildResult}.
+   * `"failed"`, otherwise `"completed"`. An incomplete run (cut-off final
+   * response) persists as `"failed"`, so `resume()` retries its last trip
+   * instead of returning the cut-off answer.
    */
   private resolveSnapshotStatus(): AgentSnapshotStatus {
     if (!this.error) {
@@ -1832,10 +1998,11 @@ class Execution<TOutput> {
 
   /**
    * Text of the run's final assistant turn. A turn the provider paused
-   * (`pause_turn`) and the agent resumed arrives in segments, one trip
-   * each, and every continuation carries only its new content — so the
-   * turn's text is the paused trips' output followed by the final trip's.
-   * Without a pause this is the final trip's output.
+   * (`pause_turn`) and the agent resumed — or one cut off by the output
+   * cap and continued (`continueOnOutputLimit`) — arrives in segments, one
+   * trip each, and every continuation carries only its new content — so
+   * the turn's text is the earlier segments' output followed by the final
+   * trip's. Without a pause or cut-off this is the final trip's output.
    */
   private finalTurnText(): string | undefined {
     const last = this.trips.length - 1;
@@ -1847,7 +2014,7 @@ class Execution<TOutput> {
 
     let start = last;
 
-    while (start > 0 && this.trips[start - 1]?.finishReason === "pause_turn") {
+    while (start > 0 && isContinuedFinish(this.trips[start - 1]?.finishReason)) {
       start--;
     }
 
@@ -2229,4 +2396,27 @@ function findExecutionInputIndex(messages: Message[], input: string): number | u
     found = index;
   }
   return found;
+}
+
+/**
+ * Whether a trip ending with this finish reason is followed by a trip
+ * that continues the same assistant turn: a provider pause, or an
+ * output-cap cut-off the agent continued. A cut-off the agent did not
+ * continue ends the run, so it is never followed by another trip.
+ */
+function isContinuedFinish(finishReason: FinishReason | undefined): boolean {
+  return finishReason === "pause_turn" || finishReason === "length";
+}
+
+/** Map a finish reason to the way the response was cut off, if it was. */
+function resolveTruncation(finishReason: FinishReason): AgentIncompleteReason | undefined {
+  if (finishReason === "length") {
+    return "output_limit";
+  }
+
+  if (finishReason === "context_exceeded") {
+    return "context_window";
+  }
+
+  return undefined;
 }

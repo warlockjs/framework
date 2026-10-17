@@ -165,6 +165,23 @@ const latencyLogger: AgentMiddleware = {
 };
 ```
 
+A `tool` hook's `ctx` adds `tool` (name, description, mode), `request` (the model's `ModelToolCallRequest`) and `callId` — the provider's tool-call id, the same value the `agent.tool.*` events and `report.children[].callId` carry. Key per-call state on `callId`: concurrent calls to the same tool share a trip and a tool name.
+
+```ts
+const toolTimer: AgentMiddleware = {
+  name: "tool-timer",
+  tool: {
+    before(ctx) {
+      ctx.state.set(`tool.${ctx.callId}.start`, performance.now());
+    },
+    after(ctx) {
+      const start = ctx.state.get(`tool.${ctx.callId}.start`) as number;
+      metrics.timing(`tool.${ctx.tool.name}`, performance.now() - start, { callId: ctx.callId });
+    },
+  },
+};
+```
+
 ### Rules
 
 - **Never close over mutable state.** Use `ctx.state` — fresh per `execute()` call.

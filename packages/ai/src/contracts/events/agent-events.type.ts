@@ -37,16 +37,28 @@ export type AgentStreamingPayload = { delta: string; tripIndex: number };
 /** LLM has requested a tool call */
 export type AgentToolCallingPayload = {
   tool: ToolEventMeta;
+  /**
+   * The provider's tool-call id (`ModelToolCallRequest.id`). Matches the
+   * `callId` of the `agent.tool.called` / `agent.tool.failed` event for
+   * the same call, so concurrent calls to one tool stay distinguishable.
+   */
+  callId: string;
   input: unknown;
   tripIndex: number;
 };
 
 /** Tool call completed successfully */
-export type AgentToolCalledPayload = ToolCall & { tool: ToolEventMeta };
+export type AgentToolCalledPayload = ToolCall & {
+  tool: ToolEventMeta;
+  /** The provider's tool-call id — same value as on `agent.tool.calling`. */
+  callId: string;
+};
 
 /** Tool call failed with an error */
 export type AgentToolCallingFailedPayload = {
   tool: ToolEventMeta;
+  /** The provider's tool-call id — same value as on `agent.tool.calling`. */
+  callId: string;
   input: unknown;
   error: AIError;
   tripIndex: number;

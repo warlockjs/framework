@@ -38,6 +38,7 @@ function makeToolContext(
     tripIndex,
     messages: [],
     tool: { name: toolName, description: toolDescription },
+    callId: "call_1",
     request: { id: "call_1", name: toolName, input },
   };
 }
