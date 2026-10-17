@@ -2833,11 +2833,22 @@ const httpConfigurations: HttpConfigurations = {
     enabled: true, // default; set false to remove both endpoints
     path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
+    rateLimit: false, // exempt probes from global client quotas (default)
   },
 };
 
 export default httpConfigurations;
 ```
+
+Built-in liveness and readiness routes bypass `http.rateLimit` by default,
+including renamed probe paths. Application traffic cannot consume their quota,
+and probe traffic does not consume the application's quota. Their normal
+liveness/readiness status still applies.
+
+Set `http.health.rateLimit: true` to opt both probes into the global policy and
+shared client bucket. This requires the rate-limit plugin to be enabled and
+`http.rateLimit.global` to remain enabled; exhausted quotas can then return 429
+for probes too. Disabling global limits leaves opted-in probes unlimited.
 
 ## Readiness checks
 
@@ -3350,6 +3361,19 @@ again on the first request, which can be noticeable for large directories. The p
 `reply.sendFile`/`reply.download` decorators are lazy too. `router.directory`
 keeps `decorateReply: false` for additional mounts. Initialization failures reach
 the application's normal error handler.
+
+Global rate limits now apply to production application routes and web page
+routes too. Defaults are 60 requests/minute per IP in one shared bucket across
+routes, pages and static assets. Behind a reverse proxy, configure trusted
+`http.trustProxy` addresses or a suitable `http.rateLimit.keyGenerator`, and
+review `max` before upgrading. `http.rateLimit.global: false` disables blanket
+quotas while retaining explicit route limits. Built-in health/readiness probes
+are exempt unless `http.health.rateLimit: true` opts them into the global policy.
+
+Production supports individual exemptions via
+`serverOptions: { config: { rateLimit: false } }`. Development's wildcard
+currently still applies its global quota to those routes. Use `global: false`
+with explicit `rateLimit` declarations for consistent selective limits.
 
 ## Gotchas
 
@@ -5595,6 +5619,8 @@ console.log(localFile.url);
 
 On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears the disk's whole derivative cache. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
 
+Give derivatives a dedicated cache folder, even when it sits beneath a storage root. Full and per-file purges delete recognized image, source-manifest and temporary files in the generated shard/source/generation layout; they retain directories, unrelated files and symlinks. Eviction validates the same directory layout. Reserve generated-looking paths for derivatives and reclaim files from older cache layouts manually.
+
 ### Bound the cache and render remote disks
 
 Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules background cleanup, coalesced and throttled to at most once per minute; hits never walk the cache. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal.
@@ -6787,7 +6813,7 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 
 ---
 name: upgrade-from-5-29
-description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, fresh rate-limit counters, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -6866,24 +6892,35 @@ Audit body/query policies on sensitive routes. In 5.31, `http.logging.private`
 can suppress input for URL families even before a route matches; it takes
 precedence over per-route logging settings. See `configure-app`.
 
-## Counters start fresh under the new keys
+## Auth login counters and locks reset
 
-Throttle and rate-limit key hashing changed. Existing counters do not carry into
-new windows after upgrading: account for that temporary reset when rolling out a
-security-sensitive limit. Let old TTL keys expire; avoid flushing unrelated
-application cache data. Servers sharing limits should use the same release and
-Redis/Postgres cache configuration (`http.rateLimit.store: "cache"`). A memory
-driver shares nothing across replicas.
+In 5.30, auth login throttle keys hash account and IP identifiers. Both counters
+and locks written under 5.29 are forgotten: previously locked accounts/IPs are
+unlocked on upgrade. Changing `auth.accessToken.secret` resets them again because
+it keys the hash. Account for this temporary reset in a security-sensitive rollout;
+let old TTL keys expire and avoid flushing unrelated application data.
+
+Separately, 5.30 adds `http.rateLimit.store: "cache"`. Moving from the memory store
+starts new windows. Servers sharing limits need the same release and Redis/Postgres
+cache configuration. A memory driver shares nothing across replicas.
+
+## Seal validation results narrow on success
+
+The 5.30 type change makes `validate()` results discriminate on `isValid`: read
+typed `data` after checking success; on failure it is `undefined`. A validator
+typed as bare `BaseValidator` (or bare `ObjectValidator`) retains `data: any`.
+Audit code that used failure data or assigned output to an unrelated type.
 
 ## Image derivatives are re-rendered
 
 5.30 no longer reads the old two-level
 `<cacheDirectory>/<2 hex>/<hash>.<ext>` layout. Originals stay intact; the first
 request recreates each derivative in its source-specific layout. Plan for that
-initial render load. Reclaim old cache files once the rollout is complete, or
-use `purgeImageVariants()` for a configured disk when intentionally clearing its
-whole derivative cache. Purging is an operational action, not a prerequisite for
-successful requests.
+initial render load. Reclaim old cache files manually from their dedicated
+folder once the rollout is complete. In 5.31, `purgeImageVariants()` removes only
+recognized files in the current shard/source/generation layout and retains the
+cache root, unrelated files and symlinks. Purging is an operational action, not a
+prerequisite for successful requests.
 
 For 5.31, derivatives also support configured object-storage disks and bounded
 cache age/size. See `store-file` before adapting a private media route.
@@ -6899,19 +6936,56 @@ a new scaffold.
 ## Additional 5.31 Seal behavior
 
 Refinements run after successful type/child validation and receive parsed output.
-A container's `catch()` does not replace its own failed rules. Union validation
+They skip absent, null and invalid values; input checks belong in `.addRule()`.
+They also run on successful empty defaults such as `.default("")`, so a rejecting
+refinement now rejects that default. A container's `.catch()` is a no-op,
+including failures in the container's own rules; use child catches or handle a
+failed container result explicitly. Union validation
 returns the matched branch's parsed output, including trimming, Date coercion,
 defaults, stripped keys and explicit `undefined`. Read raw request input before
 validation if the app needs both forms. Audit callbacks that previously assumed
 unparsed input or side effects after validation failure; see Seal's `seal-basics`
 and `compose-schemas` topics for the exact typing and output-transform caveats.
 
+## AI finish reasons, provider bodies and resumed output
+
+5.30 adds `context_exceeded`, `pause_turn` and `refusal` to `FinishReason`; update
+exhaustive switches. The Anthropic adapter maps context-window exhaustion to
+`context_exceeded` instead of `length`, and pause/refusal to their own values
+instead of `error`. Handle each as an explicit application decision.
+
+`providerOptions.anthropic.body` cannot replace `model`, `messages`, `system`,
+`tools`, `mcp_servers` or `stream`; these keys throw `InvalidRequestError`.
+Move conversation/model/tool settings to the normal API fields. After a resumed
+`pause_turn`, `result.text` joins the accumulated text. `result.blocks` is only
+provided for single-trip runs; retain captured messages for multi-trip replay.
+
+In 5.31, `autoCompaction` is opt-in. Set an explicit threshold and keep policy
+with a summarization callback, and test tool-result grouping and durable resume
+before enabling it. It preserves the original run input and skips unsafe ranges;
+it does not replace an application's storage or retention policy.
+
+## 5.30 to 5.31 production rate limits
+
+5.31 makes global and per-route rate limits apply to production application
+routes, including web page routes. The default global limit is 60 requests per
+minute per IP, shared across routes. Check `max` before deployment; configure
+`trustProxy` or `keyGenerator` behind a proxy so clients do not share the proxy's
+single key. Set `http.rateLimit.global: false` to retain the previous global
+behaviour and enable individual route limits deliberately.
+
+Built-in liveness/readiness routes are exempt by default; see `health-checks`
+for how to opt them into the limiter. Development wildcard dispatch has separate
+per-route handling; check route overrides in both environments.
+
 ## Verify the application paths that changed
 
 Run the app's type check, its logger channel tests, any tools with ordered side
 effects, shared-counter tests, one cold derivative request and one mobile page
 render. For workspaces, update custom read results with the new window/byte fields
-and custom shell results with required `cancelled`. An aborted command resolves
+and custom shell results with required `cancelled`. `read.maxBytes` now really
+caps returned content, including line-number prefixes (`bytesCapped: true`);
+a window starting past EOF returns empty content. An aborted command resolves
 with `cancelled: true`; it does not throw solely because it was cancelled.
 
 
@@ -8160,8 +8234,8 @@ export default {
 
 Configure the same Redis or Postgres cache on each server before enabling this;
 a process-local memory driver shares no counters across replicas. Route-specific
-limits get independent counters. After upgrading from 5.29, the new key hashing
-starts fresh windows; old keys can expire naturally.
+limits get independent counters. Moving from the memory store to `store: "cache"`
+starts fresh windows; this store was introduced in 5.30.
 
 ```ts title="src/app/private/routes.ts"
 import { router } from "@warlock.js/core";
@@ -28282,7 +28356,20 @@ export default function CancelPage() {
         independent
         query={{ source: "controls" }}
         onSettled={(outcome) => {
-          setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
+          switch (outcome.type) {
+            case "success":
+            case "redirected":
+              setMessage("Completed");
+              break;
+            case "error":
+              setMessage(JSON.stringify(outcome.actionData));
+              break;
+            case "failed":
+              setMessage(outcome.reason);
+              break;
+            case "dropped":
+              break;
+          }
         }}
       >
         <button>Cancel</button>
@@ -31763,7 +31850,7 @@ test: {
 
 Two consequences for page specs:
 
-- **That `include` does not match page specs.** Files under `src/web/` and any `.tsx` spec are never collected. Widen it (for example add `"src/web/**/*.test.{ts,tsx}"`), or keep the unit specs in a second config that has no setup files and no server, which is also faster:
+- **That `include` does not match page specs.** Files under `src/web/` and any `.tsx` spec are never collected. Widen it (for example add `"src/web/**/*.{test,spec}.{ts,tsx}"`), or keep the unit specs in a second config that has no setup files and no server, which is also faster:
 
   ```ts title="vitest.web.config.ts"
   import { defineConfig } from "vitest/config";
