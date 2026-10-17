@@ -119,25 +119,15 @@ export async function purgeImageVariantsOfFile(
  * Remove derivatives made from older versions of a source (a different size
  * or mtime), keeping only the `keep` generation. Called after a derivative of
  * the current version has been written, so a source rewritten in place does
- * not leave its old derivatives behind.
+ * not leave its old derivatives behind. Only recognized cache files in
+ * generation-shaped directories are removed; unrelated entries and all
+ * directories and symlinks stay in place.
  */
 export async function pruneStaleVariantGenerations(
   sourceDirectory: string,
   keep: string,
 ): Promise<void> {
-  let entries: string[];
-
-  try {
-    entries = await fs.readdir(sourceDirectory);
-  } catch {
-    return;
-  }
-
-  await Promise.all(
-    entries
-      .filter((entry) => entry !== keep)
-      .map((entry) => fs.rm(path.join(sourceDirectory, entry), { recursive: true, force: true })),
-  );
+  await purgeVariantCacheEntries(variantSourceCacheEntries(sourceDirectory, keep));
 }
 
 /**

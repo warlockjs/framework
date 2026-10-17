@@ -25,15 +25,24 @@ async function entries(directory: string) {
 /** Recognize only files emitted by the image writers; never traverse symlinks. */
 export async function* variantSourceCacheEntries(
   sourceDirectory: string,
+  keepGeneration?: string,
 ): AsyncGenerator<VariantCacheEntry> {
   try {
-    if (!(await fs.lstat(sourceDirectory)).isDirectory()) return;
+    // Checking the final component alone still follows a symlinked shard.
+    for (const directory of [path.dirname(sourceDirectory), sourceDirectory]) {
+      if (!(await fs.lstat(directory)).isDirectory()) return;
+    }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
     throw error;
   }
   for (const generation of await entries(sourceDirectory)) {
-    if (!generation.isDirectory() || !GENERATION.test(generation.name)) continue;
+    if (
+      generation.name === keepGeneration ||
+      !generation.isDirectory() ||
+      !GENERATION.test(generation.name)
+    )
+      continue;
     const directory = path.join(sourceDirectory, generation.name);
     for (const file of await entries(directory)) {
       if (!file.isFile()) continue;

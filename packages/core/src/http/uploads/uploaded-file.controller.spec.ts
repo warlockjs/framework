@@ -892,12 +892,18 @@ describe("pruneStaleVariantGenerationsIfCurrent", () => {
       fs.writeFileSync(sourceFile, "bytes");
       const stats = fs.statSync(sourceFile);
       const current = `${stats.size}-${Math.trunc(stats.mtimeMs)}`;
-      fs.mkdirSync(path.join(sourceDirectory, "old-generation"), { recursive: true });
+      const oldFile = path.join(sourceDirectory, "1-2", `${"a".repeat(64)}.webp`);
+      fs.mkdirSync(path.dirname(oldFile), { recursive: true });
+      fs.writeFileSync(oldFile, "older cached bytes");
       fs.mkdirSync(path.join(sourceDirectory, current), { recursive: true });
+      const currentFile = path.join(sourceDirectory, current, `${"b".repeat(64)}.webp`);
+      fs.writeFileSync(currentFile, "current cached bytes");
 
       await pruneStaleVariantGenerationsIfCurrent(sourceFile, sourceDirectory, current);
 
-      expect(fs.readdirSync(sourceDirectory)).toEqual([current]);
+      expect(fs.existsSync(oldFile)).toBe(false);
+      expect(fs.readFileSync(currentFile, "utf8")).toBe("current cached bytes");
+      expect(fs.readdirSync(sourceDirectory).sort()).toEqual(["1-2", current].sort());
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

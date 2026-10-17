@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Upgrade guidance names `AgentConfig.compaction`, covers sub-agent dispatch and blank/default validation changes, and includes static assets in production rate quotas. In 5.31, `purgeImageVariants()` preserves legacy two-level cache files; retire them manually, correcting the earlier 5.30 cleanup suggestion.
+- Per-file image-cache purges refuse symlinked shard directories for local and object-storage disks. Stale-generation pruning now removes only recognized cache files from older generation-shaped folders, preserving current-generation files, unrelated entries, directories and symlinks.
 
 - The validation skill shows the HTTP 422 body as strict JSON that can be copied into a JSON parser.
 - Image-variant purges remove only recognized cache files and retain the cache root, directories, unrelated files and symlinks. Purge and background eviction validate every shard/source/generation path component, so a cache nested inside storage cannot recursively delete uploads. Use a dedicated derivative folder.
