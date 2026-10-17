@@ -437,9 +437,6 @@ importers:
 
   packages/ai-tools:
     dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: '*'
-        version: 1.30.0(supports-color@7.2.0)(zod@4.5.4)
       '@mozilla/readability':
         specifier: '*'
         version: 0.6.0
@@ -456,6 +453,9 @@ importers:
         specifier: '*'
         version: 30.0.1
     devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(supports-color@7.2.0)(zod@4.5.4)
       '@warlock.js/ai':
         specifier: workspace:^
         version: link:../ai

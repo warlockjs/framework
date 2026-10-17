@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `initialize` negotiates the protocol version: a client's requested version is echoed when supported (`2025-11-25`, `2025-06-18`, `2025-03-26`), otherwise the newest is offered. It previously always answered `2025-06-18`.
 - `McpServer.start()` resolves a handle (`{ url?, close }`) instead of `void`. The http transport's `port` is optional.
+- `@modelcontextprotocol/sdk` is no longer listed as an optional peer dependency. The MCP client never imported it: it speaks MCP's JSON-RPC itself over a child process (stdio) and `fetch` (http). The SDK is now a development dependency, used only by the interoperability test against the official client. The MCP docs, README and `connect-mcp-server` skill now say so, and name `ajv` as the client's only optional peer.
 
 ### Security
 

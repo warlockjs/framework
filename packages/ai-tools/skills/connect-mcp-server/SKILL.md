@@ -90,7 +90,7 @@ try {
 
 ## Optional peers
 
-The MCP client lazily imports `@modelcontextprotocol/sdk` (the protocol SDK) and `ajv` (runtime JSON-Schema validation) — both optional peers. A missing one surfaces a curated `npm install` string at first use, never a raw module-resolution crash at import time. The stdio transport itself needs no dependency.
+The MCP client does not use `@modelcontextprotocol/sdk`: it speaks MCP's JSON-RPC itself, over a spawned child process (`node:child_process`) for `{ type: "stdio" }` and the global `fetch` for `{ type: "http" }`, so neither transport needs a dependency. Its only optional peer is `ajv`, which validates tool-call input against each MCP tool's `inputSchema`. It is imported lazily the first time a schema is checked; when it is missing, the call fails validation with a curated `npm install ajv` message instead of crashing at import time. A tool with no `inputSchema` needs no validator.
 
 ## See also
 
