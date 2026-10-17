@@ -6,7 +6,7 @@ import { container } from "../../../container";
 import { filesOrchestrator } from "../../../dev-server/files-orchestrator";
 import { ModuleLoadError } from "../../../dev-server/module-loader";
 import { router } from "../../../router/router";
-import type { DoctorBootContext, ModuleFailure } from "./check.types";
+import type { DoctorBootContext, ModelModule, ModuleFailure } from "./check.types";
 
 /**
  * @fileoverview The boot pass `warlock doctor` runs before its checks.
@@ -137,14 +137,18 @@ async function loadAppModules(): Promise<ModuleFailure[]> {
  * `DevelopmentServer.autoDiscoverFiles()` exists, and it must keep the same
  * position in the sequence.
  */
-async function discoverModels(): Promise<ModuleFailure[]> {
+async function discoverModels(modules: ModelModule[]): Promise<ModuleFailure[]> {
   const failures: ModuleFailure[] = [];
 
   for (const file of filesOrchestrator.files.values()) {
     if (file.type !== "model") continue;
 
     try {
-      await filesOrchestrator.moduleLoader.loadModule(file, "model");
+      const exports = await filesOrchestrator.moduleLoader.loadModule<unknown>(file, "model");
+
+      if (typeof exports === "object" && exports !== null) {
+        modules.push({ file: file.relativePath, exports: { ...exports } });
+      }
     } catch (error) {
       failures.push({
         file: file.relativePath,
@@ -180,6 +184,7 @@ export async function bootForDiagnostics(): Promise<DoctorBootContext> {
     appRoutes: 0,
     totalRoutes: 0,
     moduleFailures: [],
+    modelModules: [],
     connectors,
   };
 
@@ -217,7 +222,7 @@ export async function bootForDiagnostics(): Promise<DoctorBootContext> {
 
   await bootPhase(ConnectorLifecyclePhase.Early, connectors);
 
-  context.moduleFailures.push(...(await discoverModels()));
+  context.moduleFailures.push(...(await discoverModels(context.modelModules)));
   context.moduleFailures.push(...(await loadAppModules()));
 
   // Snapshot BEFORE the late phase: everything the app's own route modules
