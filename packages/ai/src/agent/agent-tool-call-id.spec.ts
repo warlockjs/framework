@@ -118,13 +118,17 @@ describe("agent — tool events carry the provider call id", () => {
 
     await stream.result;
 
-    const ids = toolEvents.map((event) =>
-      event.type === "agent.tool.calling" ||
-      event.type === "agent.tool.called" ||
-      event.type === "agent.tool.failed"
-        ? `${event.type}:${event.callId}`
-        : event.type,
-    );
+    // `agent.tool.streaming` (argument deltas under `agent.stream()`) also
+    // carries `callId`; it is checked separately below.
+    const ids = toolEvents
+      .filter((event) => event.type !== "agent.tool.streaming")
+      .map((event) =>
+        event.type === "agent.tool.calling" ||
+        event.type === "agent.tool.called" ||
+        event.type === "agent.tool.failed"
+          ? `${event.type}:${event.callId}`
+          : event.type,
+      );
 
     expect(ids.sort()).toEqual([
       "agent.tool.called:call_a",
@@ -133,6 +137,12 @@ describe("agent — tool events carry the provider call id", () => {
       "agent.tool.failed:call_b",
       "agent.tool.failed:call_c",
     ]);
+
+    const streamingIds = toolEvents.flatMap((event) =>
+      event.type === "agent.tool.streaming" ? [event.callId] : [],
+    );
+
+    expect(streamingIds.every((id) => typeof id === "string" && id.length > 0)).toBe(true);
 
     const calledEvent = toolEvents.find((event) => event.type === "agent.tool.called");
 
