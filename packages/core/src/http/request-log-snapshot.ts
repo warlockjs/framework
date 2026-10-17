@@ -228,17 +228,15 @@ export function resolveRequestLoggingOptions(
     candidates.push(...routeCandidates);
   }
 
-  for (const rule of global.private) {
+  for (const rule of compiledPrivateRules(global.private)) {
     let matches: boolean;
-    if (rule.path instanceof RegExp) {
-      const regex = rule.path;
+    if (rule.type === "regex") {
+      const { regex, needsClone } = rule;
       matches = candidates.some((candidate) =>
-        (regex.global || regex.sticky ? new RegExp(regex.source, regex.flags) : regex).test(
-          candidate,
-        ),
+        (needsClone ? new RegExp(regex.source, regex.flags) : regex).test(candidate),
       );
     } else {
-      const prefixes = loggingPathCandidates(rule.path);
+      const { prefixes } = rule;
       // A malformed configured prefix must never silently disable privacy.
       matches =
         prefixes === undefined ||
@@ -256,14 +254,50 @@ export function resolveRequestLoggingOptions(
   return options;
 }
 
+/** A private rule with its path matcher prepared once. */
+type CompiledPrivateRule = Pick<PrivateRequestLoggingRule, "body" | "query"> &
+  (
+    | { type: "regex"; regex: RegExp; needsClone: boolean }
+    // `undefined` prefixes: the configured path does not decode, so it matches every request.
+    | { type: "prefix"; prefixes: string[] | undefined }
+  );
+
+/**
+ * Compiled rules per configured `http.logging.private` array. Snapshots are
+ * built several times per request, so each array's prefixes are normalised
+ * once; replacing the array (a new config value) compiles the new one.
+ */
+const compiledRulesCache = new WeakMap<
+  readonly PrivateRequestLoggingRule[],
+  CompiledPrivateRule[]
+>();
+
+function compiledPrivateRules(rules: readonly PrivateRequestLoggingRule[]): CompiledPrivateRule[] {
+  let compiled = compiledRulesCache.get(rules);
+  if (compiled) return compiled;
+  compiled = rules.map((rule): CompiledPrivateRule => {
+    const { path, body, query } = rule;
+    if (path instanceof RegExp) {
+      // A global or sticky regex keeps `lastIndex` between tests; use a fresh copy.
+      return { type: "regex", regex: path, needsClone: path.global || path.sticky, body, query };
+    }
+    return { type: "prefix", prefixes: loggingPathCandidates(path), body, query };
+  });
+  compiledRulesCache.set(rules, compiled);
+  return compiled;
+}
+
+/** Backslashes to slashes, repeated slashes collapsed, no trailing slash. */
+function collapseLoggingPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+}
+
 function loggingPathCandidates(url: string): string[] | undefined {
   try {
     // Preserve raw dot segments in absolute-form requests; URL() would erase them.
     const pathname = url.replace(/^[a-z][a-z\d+.-]*:\/\/[^/?#]*/i, "").split(/[?#]/u)[0] || "/";
-    const collapse = (path: string) =>
-      path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "") || "/";
-    const raw = collapse(pathname);
-    const decoded = collapse(decodeURIComponent(pathname));
+    const raw = collapseLoggingPath(pathname);
+    const decoded = collapseLoggingPath(decodeURIComponent(pathname));
     const segments: string[] = [];
     for (const segment of decoded.split("/")) {
       if (segment === "..") segments.pop();
