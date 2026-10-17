@@ -1,0 +1,153 @@
+---
+name: lint-warlock-app
+description: "Enable @warlock.js/eslint-plugin and fix each of its rules: no-request-all, require-route-guard (public: true), safe-redirect (safeRedirect/safeRedirectTarget), no-sensitive-log (maskEmail, redact, escapeLogValue), no-unbounded-regex-on-input, no-await-log, no-js-import-extension, one-controller-per-file, prefer-type-discriminator. Use when a lint run reports a @warlock.js/* rule or when setting the plugin up."
+---
+
+# Lint a Warlock app with `@warlock.js/eslint-plugin`
+
+## Enable
+
+New apps created by `create-warlock` in ESLint mode already include this. For an
+existing app:
+
+```bash
+npm install --save-dev @warlock.js/eslint-plugin
+```
+
+```js
+// eslint.config.js
+import tsParser from "@typescript-eslint/parser";
+import warlock from "@warlock.js/eslint-plugin";
+
+export default [
+  { files: ["**/*.ts", "**/*.tsx"], languageOptions: { parser: tsParser } },
+  warlock.configs.recommended,
+];
+```
+
+Use `warlock.configs.strict` to also enforce `one-controller-per-file` and
+`prefer-type-discriminator` and make `no-await-log` an error.
+
+Oxlint's `jsPlugins` are alpha in Oxlint 1.88 (the version Warlock pins), so run
+this plugin through ESLint.
+
+## Fix each rule
+
+### `no-request-all`
+
+`request.all()` passed to a model query, a service or `inApp()` lets a client set
+fields the endpoint never accepts. Declare a validation schema and pass only what
+it accepted:
+
+```ts
+// src/app/posts/controllers/create-post.controller.ts (imports omitted)
+const createPostSchema = v.object({ title: v.string().required(), body: v.string() });
+
+export const createPostController: RequestHandler = async ({ request, response }) => {
+  const post = await Post.create(request.validated());
+  return response.successCreate({ post });
+};
+
+createPostController.validation = { schema: createPostSchema };
+```
+
+`request.validated()` returns `{}` when the handler has no schema, which is why
+the rule only suggests the replacement instead of applying it.
+
+### `require-route-guard`
+
+Every POST/PUT/PATCH/DELETE route needs auth middleware or an explicit
+`public: true`. Any of these satisfies it:
+
+```ts
+// src/app/posts/routes.ts (imports omitted)
+router.post("/posts", createPostController, { middleware: [authMiddleware("user")] });
+
+guarded(() => {
+  router.route("/posts").create(createPostController);
+});
+
+// Intentionally open: say so.
+router.post("/auth/login", loginController, { public: true });
+router.group({ prefix: "/webhooks", public: true }, () => {
+  router.post("/stripe", stripeWebhookController);
+});
+```
+
+Middleware counts as a guard when its name contains `auth` or `guard`, or is
+listed in the rule's `guardMiddleware` option. Wrappers like `guarded()` are
+listed in `guardFunctions` (default `["guarded"]`). The dev server prints the
+same warning at runtime for a mutating route with neither.
+
+### `safe-redirect`
+
+A redirect target from request input is an open redirect. Server side, use
+`safeRedirect()` from `@warlock.js/core`; in pages, `safeRedirectTarget()` from
+`@warlock.js/web`:
+
+```ts
+import { safeRedirect, type RequestHandler } from "@warlock.js/core";
+
+export const afterLoginController: RequestHandler = async ({ request, response }) => {
+  return response.redirect(
+    safeRedirect(request.input("next"), { allowedOrigins: ["https://app.example.com"] }),
+  );
+};
+```
+
+```tsx
+import { Link, safeRedirectTarget, useQueryString } from "@warlock.js/web";
+
+export function BackLink() {
+  const next = useQueryString("next");
+  return <Link to={safeRedirectTarget(next) ?? "/"}>Back</Link>;
+}
+```
+
+A target checked by `if (isSafeRedirect(target))` is accepted too.
+
+### `no-sensitive-log`
+
+Mask emails and keep credentials and request bodies out of log text:
+
+```ts
+import { log, maskEmail } from "@warlock.js/logger";
+import type { Request } from "@warlock.js/core";
+
+export function logLogin(request: Request, user: { id: number; email: string }, token: string) {
+  log.info("auth", "login", `Signed in ${maskEmail(user.email)}`, {
+    userId: user.id,
+    token, // `token` is a key the logger censors by default
+    request: request.toLogSnapshot(),
+  });
+}
+```
+
+Keys the logger censors by default (`token`, `password`, `apiKey`,
+`authorization`, …) are allowed as structured data. Emails are not censored by
+default, so they always need `maskEmail()`. Free text from the client goes
+through `escapeLogValue()`.
+
+### `no-unbounded-regex-on-input`
+
+Bound every repetition in a regex that runs on request input, or cap the input
+first:
+
+```ts
+const SLUG = /^[a-z0-9-]{1,64}$/;
+
+export function isSlug(value: string): boolean {
+  return SLUG.test(value);
+}
+```
+
+### `no-await-log`, `no-js-import-extension`
+
+Both autofix with `eslint --fix`: `await log.info(…)` becomes `log.info(…)`
+(log calls return the logger; `await log.flush()` waits for delivery), and
+`./user.model.js` becomes `./user.model`.
+
+### `one-controller-per-file`, `prefer-type-discriminator` (strict)
+
+Move each extra controller into its own `<name>.controller.ts`. Rename a
+union's `kind` tag to `type` and update the `switch`.

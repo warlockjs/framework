@@ -40,6 +40,7 @@
   "create-warlock": 8,
   "devtools": 0,
   "docs": 18,
+  "eslint-plugin": 0,
   "fs": 1,
   "herald": 0,
   "logger": 0,
