@@ -1,6 +1,6 @@
 ---
 name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `ai.providerTool`, `web_search_20250305`, `bash_20250124`, `text_editor_20250728`, `streamChunks`, `thinking_delta`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -240,6 +240,30 @@ await agent.execute("…", { cacheControl: { breakpoints: 1 } }); // cache the s
 - `tool_use` blocks accumulate `input_json_delta` fragments and emit one consolidated `{ type: "tool-call", ... }` at `content_block_stop` (no partial-arg `{}` artifact — input is parsed once, whole)
 - every content block is also assembled by index (text, thinking + signature, server-tool input, beta `compaction_delta`) and returned as `done.blocks` when the turn has a non-neutral block
 - terminal `{ type: "done", finishReason, usage, blocks? }` — `usage.input` from `message_start`, `usage.output` from `message_delta`, `total` computed; `cachedTokens` / `cacheWriteTokens` from `message_start` then the cumulative `message_delta` counts (see [Tokens & usage accounting](#tokens--usage-accounting))
+- opt-in (`options.streamChunks`, set by `agent.stream()`): `{ type: "reasoning", delta }` per non-empty `thinking_delta`, `{ type: "tool-args", callId, name, delta }` per `input_json_delta` of a client `tool_use` block (never for `server_tool_use`), `{ type: "usage", usage }` after `message_start` and each `message_delta` (running totals). Claude 5 models stream thinking text only with `providerOptions.anthropic.thinkingDisplay: "summarized"`.
+
+```ts
+for await (const chunk of model.stream(messages, { streamChunks: true, reasoning: { effort: "high" } })) {
+  if (chunk.type === "reasoning") process.stderr.write(chunk.delta);
+}
+```
+
+## Provider-defined tools
+
+`ai.providerTool({ provider: "anthropic", definition })` entries are sent verbatim, before the function tools (the prompt-cache breakpoint stays on the last function tool). Server tools (`web_search_20250305`, `web_fetch_20250910`, `code_execution_20250825`) run inside the response and their `server_tool_use` / `*_tool_result` blocks round-trip via `blocks`. Client tools (`bash_20250124`, `text_editor_20250728` named `str_replace_based_edit_tool`, `memory_20250818`) come back as `tool_use` and dispatch to the provider tool's `execute`. Other providers' tools are skipped with a `providerTool.skipped` warning. `providerOptions.anthropic.body` still cannot set `tools`.
+
+```ts
+const webSearch = ai.providerTool({
+  provider: "anthropic",
+  definition: { type: "web_search_20250305", name: "web_search", max_uses: 5 },
+});
+const editor = ai.providerTool({
+  provider: "anthropic",
+  definition: { type: "text_editor_20250728", name: "str_replace_based_edit_tool" },
+  execute: async (input: { command: string; path: string }) => files.edit(input),
+});
+ai.agent({ model: anthropic.model({ name: "claude-sonnet-4-6" }), tools: [webSearch, editor] });
+```
 
 ## Finish-reason mapping
 

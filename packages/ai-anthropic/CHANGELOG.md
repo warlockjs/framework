@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- With `streamChunks`, `stream()` yields `reasoning` for `thinking_delta`, `tool-args` for the `input_json_delta` of client `tool_use` blocks, and `usage` after `message_start` and each `message_delta`. `send()` takes the same `streamChunks` transport option.
+- `ai.providerTool({ provider: "anthropic", definition })` entries (`web_search`, `web_fetch`, `code_execution`, `bash`, `text_editor`, `memory`, …) are sent verbatim ahead of the function tools; the prompt-cache breakpoint stays on the last function tool. Other providers' tools are skipped with a warning. The reserved `providerOptions.anthropic.body` keys are unchanged.
+
 - `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
 - Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.
 
