@@ -27,7 +27,7 @@ import type { Route } from "../router";
 import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
-import { matchesIfNoneMatch } from "./uploads/matches-if-none-match";
+import { evaluateConditionalRequest } from "./conditional-request";
 import { flushPendingCookies } from "./flush-pending-cookies";
 import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
 import { createBoundedStreamQueue, validateStreamQueueOptions } from "./bounded-stream-queue";
@@ -558,6 +558,15 @@ export class Response {
     const reply = this.baseResponse.status(304).send();
 
     this.fireSentEvents(304);
+
+    return reply;
+  }
+
+  /** Send a bare 412 (a failed `If-Match` / `If-Unmodified-Since`) and fire the lifecycle. */
+  protected send412() {
+    const reply = this.baseResponse.status(412).send();
+
+    this.fireSentEvents(412);
 
     return reply;
   }
@@ -1589,7 +1598,11 @@ export class Response {
     return `${type}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
   }
 
-  private applyResponseOptions(options: SendBufferOptions, defaultFilename?: string): boolean {
+  private applyResponseOptions(
+    options: SendBufferOptions,
+    defaultFilename?: string,
+    lastModified?: Date,
+  ): boolean {
     // Set content type if provided
     if (options.contentType) {
       this.baseResponse.type(options.contentType);
@@ -1607,13 +1620,32 @@ export class Response {
     // Set ETag if provided (for conditional requests)
     if (options.etag) {
       this.header("ETag", options.etag);
+    }
 
-      // Check If-None-Match for conditional request
-      const ifNoneMatch = this.request.header("if-none-match");
-      if (ifNoneMatch && matchesIfNoneMatch(ifNoneMatch, options.etag)) {
-        this.log("Content not modified (ETag match), sending 304");
+    // Conditional request headers, evaluated only against validators this
+    // response actually has: If-Match compares strongly, If-None-Match weakly
+    // (RFC 9110 §13.1), in the §13.2.2 order.
+    if (options.etag || lastModified) {
+      const outcome = evaluateConditionalRequest({
+        method: this.request.method,
+        etag: options.etag,
+        lastModified,
+        ifMatch: this.request.header("if-match"),
+        ifNoneMatch: this.request.header("if-none-match"),
+        ifModifiedSince: this.request.header("if-modified-since"),
+        ifUnmodifiedSince: this.request.header("if-unmodified-since"),
+      });
+
+      if (outcome === "not-modified") {
+        this.log("Content not modified, sending 304");
         this.send304();
-        return true; // Indicates 304 was sent
+        return true; // Indicates a response was sent
+      }
+
+      if (outcome === "precondition-failed") {
+        this.log("Precondition failed, sending 412");
+        this.send412();
+        return true;
       }
     }
 
@@ -1665,32 +1697,14 @@ export class Response {
 
       // Apply common response options (cache, disposition)
       const defaultFilename = path.basename(filePath);
-      const sent304 = this.applyResponseOptions({ ...opts, etag, contentType }, defaultFilename);
-      if (sent304) return this.baseResponse;
-
-      // Check conditional request headers
-      const ifNoneMatch = this.request.header("if-none-match");
-      const ifModifiedSince = this.request.header("if-modified-since");
-
-      // Handle If-None-Match (ETag validation)
-      if (ifNoneMatch && matchesIfNoneMatch(ifNoneMatch, etag)) {
-        this.log("File not modified (ETag match), sending 304");
-        return this.send304();
-      }
-
-      // Handle If-Modified-Since (Last-Modified validation)
-      // RFC 9110: If-Modified-Since is ignored when If-None-Match is present.
-      // The header has second precision, so floor the mtime to seconds.
-      if (ifModifiedSince && !ifNoneMatch) {
-        const modifiedSinceDate = new Date(ifModifiedSince);
-        if (
-          Math.floor(lastModified.getTime() / 1000) <=
-          Math.floor(modifiedSinceDate.getTime() / 1000)
-        ) {
-          this.log("File not modified (Last-Modified check), sending 304");
-          return this.send304();
-        }
-      }
+      // Applies If-Match / If-Unmodified-Since / If-None-Match /
+      // If-Modified-Since against the ETag and mtime (RFC 9110 §13.2.2).
+      const answered = this.applyResponseOptions(
+        { ...opts, etag, contentType },
+        defaultFilename,
+        lastModified,
+      );
+      if (answered) return this.baseResponse;
 
       // Use streaming for efficient file sending
       const stream = fs.createReadStream(filePath);
@@ -1728,8 +1742,8 @@ export class Response {
     const opts = typeof options === "number" ? { cacheTime: options } : options || {};
 
     // Apply common response options (cache, disposition, etag)
-    const sent304 = this.applyResponseOptions(opts);
-    if (sent304) return this.baseResponse;
+    const answered = this.applyResponseOptions(opts);
+    if (answered) return this.baseResponse;
 
     // Note: endTime is set in the main send() method for non-streaming responses
     return this.sendRaw(buffer);
@@ -1768,8 +1782,8 @@ export class Response {
     }
 
     // Apply common response options with auto-detected content type
-    const sent304 = this.applyResponseOptions({ ...opts, contentType });
-    if (sent304) return this.baseResponse;
+    const answered = this.applyResponseOptions({ ...opts, contentType });
+    if (answered) return this.baseResponse;
 
     // Note: endTime is set in the main send() method for non-streaming responses
     return this.sendRaw(buffer);

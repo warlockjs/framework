@@ -564,6 +564,24 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     const stale = await get("/uploads/hero.jpg?variant=thumb", { "if-none-match": '"nope"' });
 
     expect(stale.statusCode).toBe(200);
+
+    const weak = await get("/uploads/hero.jpg?variant=thumb", {
+      "if-none-match": `W/${String(first.headers.etag)}`,
+    });
+
+    expect(weak.statusCode).toBe(304);
+  });
+
+  it("compares If-Match strongly against the variant hash", async () => {
+    const first = await get("/uploads/hero.jpg?variant=thumb");
+    const etag = String(first.headers.etag);
+
+    expect((await get("/uploads/hero.jpg?variant=thumb", { "if-match": etag })).statusCode).toBe(
+      200,
+    );
+    expect(
+      (await get("/uploads/hero.jpg?variant=thumb", { "if-match": `W/${etag}` })).statusCode,
+    ).toBe(412);
   });
 
   it.each([

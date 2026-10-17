@@ -84,6 +84,27 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 
 `SendFileOptions` lets you set `cacheTime`, `immutable`, `inline`, `filename` (download attachment name).
 
+Conditional requests are handled for you (RFC 9110): `If-None-Match` compares weakly (`W/"a"` matches `"a"`) and answers 304 on GET/HEAD; `If-Match` compares strongly (a `W/` tag never passes) and answers 412. For your own ETags, use the same helper:
+
+```ts
+import { evaluateConditionalRequest, type RequestHandler } from "@warlock.js/core";
+
+export const showDocumentController: RequestHandler = async ({ request, response }) => {
+  const etag = `"doc-42-v7"`;
+  const outcome = evaluateConditionalRequest({
+    method: request.method,
+    etag,
+    ifMatch: request.header("if-match"),
+    ifNoneMatch: request.header("if-none-match"),
+  });
+
+  if (outcome === "not-modified") return response.setStatusCode(304).send();
+  if (outcome === "precondition-failed") return response.setStatusCode(412).send();
+
+  return response.header("ETag", etag).success({ id: 42 });
+};
+```
+
 `response.xml(string | XMLable, statusCode?)` sends `application/xml` — pass a raw XML string, or anything with a `toXML(): string` method (structural, so core never depends on `@warlock.js/sitemap`). This is for BOUNDED values only: a raw string, or a single `@warlock.js/sitemap` `Sitemap` under the sitemaps.org 50,000-URL / 50MB ceiling. `SitemapIndex` has no `toXML()` — it is the streaming path for larger URL sets and does not fit in one response body. It writes shards plus a master index as FILES via `saveTo`/`publish`, and those files are served directly rather than passed through `xml()`. In Warlock web this is the `web.sitemap` config: `enabled`, `outputDir` (default `storagePath("sitemap")`), and `path` (default `/sitemap.xml`) — the app serves the generated files from `outputDir` at that route, it never builds a `SitemapIndex` response inline.
 
 ## Streams

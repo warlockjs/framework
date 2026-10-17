@@ -10,6 +10,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
+- Sitemap routes compare `If-Match` strongly and answer 412 when it does not name the exact strong ETag; `If-None-Match` keeps weak comparison and both use core's RFC 9110 precondition evaluation. The `W/` weakness prefix is matched case-sensitively, as the RFC defines it.
+
 - The server-page-cache test fixture explicitly disables unrelated HTTP throttling and restores its previous configuration on teardown, so repeated cache requests exercise cache behavior after production rate-limit enforcement was corrected.
 
 - Published page skills include complete support modules, schemas and generated-type prerequisites; their HTTP examples and Vitest discovery match current APIs. The skill compile gate verifies them without a failure allowance.
