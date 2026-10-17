@@ -250,7 +250,11 @@ Native body fields merge after neutral options. When both values are plain
 objects, their immediate keys merge and caller-provided keys win; untouched
 neutral fields remain. Arrays, scalars and `null` replace the field. This merge
 is one level deep: a nested object explicitly supplied by the caller replaces
-that nested value.
+that nested value. When both objects have string `type` discriminators and the
+caller changes the type, the whole object is replaced. For example, overriding
+`response_format` from `json_schema` to `json_object` removes the old
+`json_schema` fields; switching `tool_choice` variants removes old variant fields
+as well. The rule also applies to OpenAI-compatible adapters using this helper.
 
 `providerOptions.openai.body` adds native request fields to Chat Completions or
 Responses, merged after the neutral options. For example:
