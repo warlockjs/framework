@@ -189,8 +189,9 @@ export interface LogContract {
 
 /**
  * Receives a channel's delivery failure: a synchronous throw from its `log()`
- * or a rejection of the promise it returned, a redaction that threw, or a
- * `flush()` that timed out. Set with `Logger.onChannelError()` or
+ * or a rejection of the promise it returned, a redaction that threw, a
+ * `flush()` that timed out, or a channel's own background failure (such as
+ * `FileLog` retention failing to remove a file). Set with `Logger.onChannelError()` or
  * `configure({ onChannelError })`. It may be async; a rejection is swallowed.
  */
 export type ChannelErrorHandler = (

@@ -7,7 +7,7 @@ sidebar:
 
 Real-world data is often one of N shapes, distinguished by a tag field. Notifications come as email, sms, or push. Events have a type. AI tool calls have a name. The shapes share a discriminator but differ everywhere else.
 
-`v.union` can express this — but routes by `matchesType()`, which only knows "is plain object" / "is array" / "is string". For object-vs-object unions, that's not enough: every branch matches, the first one wins, and the validator confidently produces errors from the wrong branch.
+`v.union` can express this: it tries every object branch in order until one passes. But it has to try them one by one, and when none passes it can only report the branch that came closest — a guess, not the branch the tag names.
 
 `v.discriminatedUnion` solves this. You name the discriminator, every branch carries a `v.literal(…)` on that field, and validation routes by reading the field's value at runtime.
 
@@ -56,19 +56,20 @@ If the discriminator's value isn't in the map, validation fails with one clear e
 ## Compared to plain `v.union`
 
 ```ts
-// Without discriminator routing
+// Without discriminator routing: each branch is tried in turn
 const naive = v.union([email, sms]);
-await validate(naive, { type: "sms", to: "555-1234", message: "hi" });
-// → ERROR: errors from the email branch:
-//   "The to must be a valid email"
-//   "The subject is required"
-// The sms branch was the right match; the user gets nonsense.
+await validate(naive, { type: "sms", to: "555-1234" });
+// → ERROR from the closest branch, ranked by mismatched literals,
+//   then error count, then depth. Here sms wins (its `type` literal matches),
+//   so the error is about its missing `message`.
 
 // With discriminator routing
 const tagged = v.discriminatedUnion("type", [email, sms]);
-await validate(tagged, { type: "sms", to: "555-1234", message: "hi" });
-// → SUCCESS: routed to sms, no errors.
+await validate(tagged, { type: "sms", to: "555-1234" });
+// → ERROR from the sms branch, chosen by reading `type` once.
 ```
+
+Both accept a valid payload for any branch. `v.discriminatedUnion` gets there without validating the other branches first, and its error always comes from the branch the tag names.
 
 ## Construction-time validation
 
@@ -193,7 +194,7 @@ OpenAI strict mode accepts this shape — every branch's required fields are lis
 **Stay on `v.union` when:**
 
 - The branches are different _types_ (string vs number vs boolean) — `matchesType` handles those well
-- There's no natural discriminator
+- There's no natural discriminator (object branches are fine: each is tried in order)
 
 **Use a single `v.object` with `v.literal(...one-of...)` when:**
 

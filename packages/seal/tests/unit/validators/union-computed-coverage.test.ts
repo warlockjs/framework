@@ -28,26 +28,27 @@ describe("UnionValidator - extended coverage", () => {
     expect((await validate(validator, 5)).isValid).toBe(false);
   });
 
-  it("with firstErrorOnly:true the union stops at the first type-matching branch", async () => {
+  it("with firstErrorOnly:true a later same-type branch can rescue the value", async () => {
     // Both branches are strings, so "abcd" matches the FIRST (.email()) branch,
-    // which fails — and firstErrorOnly breaks before the .min(3) branch is tried.
+    // which fails; firstErrorOnly limits the errors reported, not the branches
+    // tried, so the .min(3) branch still validates it.
     const validator = v.union([v.string().email(), v.string().min(3)]);
-    expect((await validate(validator, "abcd")).isValid).toBe(false);
+    expect((await validate(validator, "abcd")).isValid).toBe(true);
   });
 
   it("with firstErrorOnly:false a later same-type branch can rescue the value", async () => {
-    // firstErrorOnly:false lets the union try every type-matching branch, so the
-    // .min(3) branch validates "abcd" after .email() fails.
     const validator = v.union([v.string().email(), v.string().min(3)]);
     expect((await validate(validator, "abcd", { firstErrorOnly: false })).isValid).toBe(true);
   });
 
-  it("collects all branch errors when firstErrorOnly is false", async () => {
+  it("reports the closest branch's errors when every branch fails", async () => {
     const validator = v.union([v.string().min(10), v.string().email()]);
     const result = await validate(validator, "no", { firstErrorOnly: false });
     expect(result.isValid).toBe(false);
-    // joined message contains feedback from both string branches
-    expect(result.errors[0].error).toContain(";");
+    // Both branches fail once; the earlier one wins the tie.
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].type).toBe("union");
+    expect(result.errors[0].error).toContain("at least 10");
   });
 
   it("supports a default value", async () => {

@@ -67,6 +67,18 @@ new FileLog({
   maxFileSize: 10 * 1024 * 1024, // default: 10MB — triggers rotation
   maxMessagesToWrite: 100, // default: 100 — flush threshold
   groupBy: ["level", "module"], // optional subdirectory nesting
+  retention: { maxFiles: 14, maxAgeDays: 30 }, // optional pruning of old files
+});
+```
+
+Name dated files yourself with `fileName` — a pattern (`{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}` `{name}`, local time) or a function of the date:
+
+```ts
+new FileLog({ storagePath: "./storage/logs", fileName: "{name}-{YYYY}-{MM}-{DD}" }); // app-2026-10-17.log
+new FileLog({
+  storagePath: "./storage/logs",
+  fileName: (date) => `audit-${date.getFullYear()}`,
+  retention: { maxFiles: 5, match: /^audit-\d{4}\.log$/ }, // a function fileName needs `match`
 });
 ```
 
@@ -75,7 +87,8 @@ Line format: `[date time] [level] [module][action]: message` — or a `[trace]` 
 ### Key gotchas
 
 - **Buffers!** Messages sit in memory until either `maxMessagesToWrite` is reached, 5 seconds pass, or `flushSync()` is called. A process that crashes without flushing loses buffered entries.
-- **`chunk: "daily"` picks a filename per day.** File name becomes `DD-MM-YYYY.log`. Combined with `rotate: true`, rotated archives get `Date.now()` suffixed.
+- **`chunk: "daily"` picks a filename per day.** File name becomes `YYYY-MM-DD.log` (hourly: `YYYY-MM-DD-HH.log`), ignoring `name` unless `fileName` uses `{name}`. Since 5.31; keep the old `DD-MM-YYYY` with `fileName: "{DD}-{MM}-{YYYY}"`. Rotated archives are `<file name>-<rotateFileName>-<epoch ms>.<ext>`; `rotateFileName` is a pattern or function too (default `{YYYY}-{MM}-{DD}`).
+- **`retention` only touches this channel's files.** On boot and whenever a new file starts it removes files in the log directory (each group directory with `groupBy`) whose names match the channel's pattern — beyond `maxFiles` (newest by modification time, the current file counts) or older than `maxAgeDays`. Failures go to `log.onChannelError(...)`, never to the call site. `await channel.prune()` runs it on demand.
 - **`groupBy` nests directories.** `groupBy: ["level", "module"]` produces `storage/logs/error/payments/app.log`. Order matters.
 - **Dispose channels you discard.** A live `FileLog` keeps a 5-second flush interval running. If you swap the channel list at runtime (reconfigure the logger), call `channel.dispose()` on the old instance — it clears that timer and drains the buffer one last time. Skipping it leaks one timer per discarded channel and keeps the event loop alive. (Channels that live for the whole process don't need this — process exit clears the timer.)
 

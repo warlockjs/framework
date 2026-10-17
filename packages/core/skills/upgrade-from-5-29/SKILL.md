@@ -154,6 +154,14 @@ validation if the app needs both forms. Audit callbacks that previously assumed
 unparsed input or side effects after validation failure; see Seal's `seal-basics`
 and `compose-schemas` topics for the exact typing and output-transform caveats.
 
+`v.union(...)` now tries every member whose type matches, so a union of object
+schemas accepts a value matching a later member. When every member fails, the
+closest member's errors are reported at their own paths (`actor.id`, not `actor`)
+with type `union`; `firstErrorOnly: false` lists each of them instead of one
+`;`-joined message. Update code that maps union errors by path or splits that
+message; a custom `v.union([...], "message")` still reports one error at the
+union's path.
+
 ## AI finish reasons, provider bodies and resumed output
 
 5.30 adds `context_exceeded`, `pause_turn` and `refusal` to `FinishReason`; update
@@ -205,6 +213,26 @@ Built-in `/health` and `/ready` routes are exempt by default; set
 `http.health.rateLimit: true` to opt them into the limiter (see `health-checks`).
 Development wildcard dispatch has separate
 per-route handling; check route overrides in both environments.
+
+## 5.30 to 5.31 daily log file names
+
+`FileLog` and `JSONFileLog` now name dated files by sortable ISO date: a daily
+chunk writes `2026-10-17.log` instead of `17-10-2026.log`, an hourly chunk
+`2026-10-17-14.log`, and rotated archives use `YYYY-MM-DD` in the middle. Update
+log shippers, cron cleanups or scripts that look for the old names. To keep them:
+
+```ts
+new FileLog({
+  chunk: "daily",
+  fileName: "{DD}-{MM}-{YYYY}", // 17-10-2026.log, as before 5.31
+  rotateFileName: "{DD}-{MM}-{YYYY}",
+});
+```
+
+`rotateFileName` is a `{YYYY}`-style pattern or a function, not a Day.js format.
+To replace a custom pruning job, use `retention: { maxFiles, maxAgeDays }` (see the
+Logger `pick-log-channel` topic); it never removes files with another name pattern,
+such as files written under the old names.
 
 ## Verify the application paths that changed
 

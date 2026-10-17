@@ -150,13 +150,13 @@ describe("FileLog", () => {
     it("daily chunk returns a date-based name", () => {
       const channel = track(new FileLog({ storagePath, chunk: "daily" }));
 
-      expect(channel.fileName).toMatch(/^\d{2}-\d{2}-\d{4}$/);
+      expect(channel.fileName).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
     it("hourly chunk returns a date-and-hour-based name", () => {
       const channel = track(new FileLog({ storagePath, chunk: "hourly" }));
 
-      expect(channel.fileName).toMatch(/^\d{2}-\d{2}-\d{4}-\d{2}-00-00-(am|pm)$/);
+      expect(channel.fileName).toMatch(/^\d{4}-\d{2}-\d{2}-\d{2}$/);
     });
   });
 

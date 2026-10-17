@@ -804,11 +804,13 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
 
       if (result.isValid === false) {
         isValid = false;
-        errors.push({
-          type: rule.name,
-          error: result.error,
-          input: result.path ?? context.path,
-        });
+        const reported = result.errors?.length
+          ? result.errors
+          : [{ error: result.error, path: result.path }];
+
+        for (const { error, path } of reported) {
+          errors.push({ type: rule.name, error, input: path ?? context.path });
+        }
 
         if (isFirstErrorOnly) {
           break;

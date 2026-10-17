@@ -1,9 +1,59 @@
 import { invalidRule, VALID_RULE } from "../../helpers";
-import type { SchemaRule } from "../../types";
+import type { SchemaRule, ValidationResult } from "../../types";
 import type { BaseValidator } from "../../validators/base-validator";
 
+type MemberFailure = {
+  /** Declaration order of the member, the last tie-breaker. */
+  index: number;
+  errors: ValidationResult["errors"];
+  /** Mismatched literals: each says the value is a different member. */
+  literalMismatches: number;
+  /** Segments in the deepest error path (`a.b.c` → 3). */
+  depth: number;
+};
+
+const describeFailure = (index: number, errors: ValidationResult["errors"]): MemberFailure => ({
+  index,
+  errors,
+  literalMismatches: errors.filter((error) => error.type === "literal").length,
+  depth: Math.max(0, ...errors.map((error) => (error.input ? error.input.split(".").length : 0))),
+});
+
 /**
- * Union rule - value must match at least one of the provided validators
+ * Whether `candidate` is closer to the value than `best`:
+ *
+ * 1. Fewest mismatched literals. A literal that does not match (`kind: "owner"`
+ *    given `"member"`) says the value is a different member, while any other
+ *    error says it is this member with a bad field.
+ * 2. Fewest errors.
+ * 3. Deepest error: the member matched more of the value's structure.
+ * 4. Declaration order (an earlier member wins a tie).
+ */
+const isCloser = (candidate: MemberFailure, best: MemberFailure): boolean => {
+  if (candidate.literalMismatches !== best.literalMismatches) {
+    return candidate.literalMismatches < best.literalMismatches;
+  }
+
+  if (candidate.errors.length !== best.errors.length) {
+    return candidate.errors.length < best.errors.length;
+  }
+
+  if (candidate.depth !== best.depth) {
+    return candidate.depth > best.depth;
+  }
+
+  return candidate.index < best.index;
+};
+
+/**
+ * Union rule - value must match at least one of the provided validators.
+ *
+ * Every member whose type matches the value is tried, in order, until one
+ * passes. When none passes, the errors of the closest failed member (see
+ * `isCloser`) are reported at their own paths with the `union` type: its
+ * first error under `firstErrorOnly` (the default), all of them otherwise.
+ * A custom union error message replaces them with a single error, as does the
+ * default message when no member matches the value's type.
  */
 export const unionRule: SchemaRule<{ validators: BaseValidator[] }> = {
   name: "union",
@@ -20,39 +70,49 @@ export const unionRule: SchemaRule<{ validators: BaseValidator[] }> = {
 
     const validators = this.context.options.validators;
     const firstErrorOnly = context.configurations?.firstErrorOnly ?? true;
-    const allErrors: string[] = [];
+    let closest: MemberFailure | undefined;
 
-    // Try each validator
-    for (const validator of validators) {
-      // Skip if type doesn't match (optimization)
+    // `firstErrorOnly` limits the errors reported, never the members tried:
+    // several object members all match a plain object, and a later one may
+    // be the member the value belongs to.
+    for (const [index, validator] of validators.entries()) {
+      // A member that cannot hold this type of value cannot pass.
       if (!validator.matchesType(value)) {
         continue;
       }
 
-      // Type matches - validate
-      const result = await validator.validate(value, context);
+      // Each member gets its own context: a member must not see what an
+      // earlier member wrote into it (an object member sets `schema`).
+      const result = await validator.validate(value, { ...context });
 
       if (result.isValid) {
         // Preserve defaults, computed fields and transformations from the branch.
         return { isValid: true, data: result.data };
       }
 
-      // Failed - collect error message
-      const errorMsg = result.errors?.[0]?.error || "Validation failed";
-      allErrors.push(errorMsg);
+      const failure = describeFailure(
+        index,
+        result.errors?.length
+          ? result.errors
+          : [{ type: "union", error: "Validation failed", input: context.path }],
+      );
 
-      // If firstErrorOnly, stop after first failed validator
-      if (firstErrorOnly) {
-        break;
+      if (!closest || isCloser(failure, closest)) {
+        closest = failure;
       }
     }
 
-    // All failed or no validator matched the type
-    if (allErrors.length > 0) {
-      // At least one validator matched type but failed validation
-      this.context.errorMessage = firstErrorOnly ? allErrors[0] : allErrors.join("; ");
+    const failed = invalidRule(this, context);
+
+    // No member matched the type, or the union has its own message.
+    if (!closest || this.context.errorMessage) {
+      return failed;
     }
 
-    return invalidRule(this, context);
+    const reported = firstErrorOnly ? closest.errors.slice(0, 1) : closest.errors;
+    const errors = reported.map((error) => ({ error: error.error, path: error.input }));
+    const first = errors[0];
+
+    return first ? { ...failed, error: first.error, path: first.path, errors } : failed;
   },
 };
