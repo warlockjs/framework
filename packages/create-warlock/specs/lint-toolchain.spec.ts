@@ -61,8 +61,8 @@ function scaffold(lint?: LintToolchain, web = false) {
   return { appPath, app };
 }
 
-function run(tool: string, appPath: string, args: string[]) {
-  const result = spawnSync(process.execPath, [tool, ...args], {
+function run(tool: string, appPath: string, args: string[], nodeArgs: string[] = []) {
+  const result = spawnSync(process.execPath, [...nodeArgs, tool, ...args], {
     cwd: appPath,
     encoding: "utf8",
   });
@@ -116,6 +116,10 @@ describe("generated toolchains", () => {
     const pkg = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
     expect(pkg.devDependencies.eslint).toBeTruthy();
     expect(pkg.devDependencies.prettier).toBeTruthy();
+    expect(pkg.devDependencies["@warlock.js/eslint-plugin"]).toBeTruthy();
+    expect(readFileSync(path.join(appPath, "eslint.config.js"), "utf8")).toContain(
+      "warlock.configs.recommended",
+    );
     expect(pkg.devDependencies.oxlint).toBeUndefined();
     expect(pkg.scripts["lint:check"]).toContain("eslint ./src");
     expect(pkg.scripts["format:check"]).toContain("prettier --check");
@@ -129,10 +133,13 @@ describe("generated toolchains", () => {
   it.each([false, true])("emits ESLint/Prettier-clean source for web=%s", (web) => {
     const { appPath } = scaffold(undefined, web);
     assertPass(
-      run(path.join(packageRoot, "node_modules/eslint/bin/eslint.js"), appPath, [
-        "./src",
-        "--max-warnings=0",
-      ]),
+      // `--import tsx`: the workspace links `@warlock.js/eslint-plugin` as TypeScript source.
+      run(
+        path.join(packageRoot, "node_modules/eslint/bin/eslint.js"),
+        appPath,
+        ["./src", "--max-warnings=0"],
+        ["--import", "tsx"],
+      ),
     );
     assertPass(
       run(path.join(packageRoot, "node_modules/prettier/bin/prettier.cjs"), appPath, [
@@ -154,6 +161,8 @@ describe("generated toolchains", () => {
       expect(pkg.dependencies["@mongez/react-form"]).toBeTruthy();
       expect(pkg.devDependencies.tailwindcss).toBeTruthy();
     }
+    // Oxlint JS plugins are alpha in the pinned 1.88, so the Warlock rules stay ESLint-only.
+    expect(pkg.devDependencies["@warlock.js/eslint-plugin"]).toBeUndefined();
     expect(Object.keys(pkg.devDependencies).filter((name) => /eslint|prettier/.test(name))).toEqual(
       [],
     );

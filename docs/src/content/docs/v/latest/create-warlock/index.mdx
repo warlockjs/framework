@@ -89,6 +89,21 @@ unchanged.
 
 A scaffold failure surfaces the error and halts — there is no automatic rollback of partially-written files.
 
+### Warlock lint rules
+
+The default ESLint toolchain installs
+[`@warlock.js/eslint-plugin`](/v/latest/eslint-plugin/) and enables
+`warlock.configs.recommended` in `eslint.config.js`. `yarn lint` then reports
+`request.all()` reaching a query or service, mutating routes with no auth
+middleware and no `public: true`, redirects to request-supplied targets without
+`safeRedirect()`, raw emails and tokens in logs, unbounded regexes on request
+input, `await log.*` and `.js` import extensions. The scaffold itself passes
+every rule: its sign-in and password-recovery routes say `public: true` and are
+throttled, and its user list validates its query.
+
+Oxlint's JS plugins are alpha in the pinned Oxlint 1.88, so `--lint=oxc`
+projects do not include the plugin.
+
 ### Oxc tooling
 
 `--lint=oxc` installs pinned Oxlint 1.88.0 and Oxfmt 0.73.0, generates
