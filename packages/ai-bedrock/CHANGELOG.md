@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A `toolUse` block with `type: "server_tool_use"` (a system tool run by Bedrock) is no longer returned as a tool call for the agent to dispatch.
+
 - Converse conversion compiles with strict indexed-access checks while preserving empty and system-only histories.
 
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
@@ -15,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Converse conversion combines adjacent same-role turns in content order, preserving parallel tool results and automatic compaction summaries beside assistant tool calls.
 
 ### Added
+
+- With `streamChunks`, `stream()` yields `reasoning` for `reasoningContent.text` deltas and `tool-args` for client `toolUse.input` deltas.
+- `ai.providerTool({ provider: "bedrock", definition })` appends a Converse `Tool` member such as `{ systemTool: { name: "nova_grounding" } }` verbatim; other providers' tools are skipped with a warning.
 
 - `providerOptions.bedrock.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight using the generation request's Converse conversation, tools and additional model fields.
