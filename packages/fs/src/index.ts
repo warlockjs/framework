@@ -10,6 +10,9 @@
  */
 
 export * from "./atomic.js";
+export * from "./confined";
+export * from "./confined-errors";
+export { isPathInside } from "./confined-path";
 export * from "./copy.js";
 export * from "./dirs.js";
 export * from "./exists.js";

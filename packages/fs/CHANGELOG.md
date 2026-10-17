@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Added
+
+- `fs.confined(root, options)` / `createConfinedReader(root, options)`: a reader confined to one folder, for folders you do not control (a user-chosen import folder, an extracted upload). `readText`, `readBuffer`, `readJson` (optional Standard Schema), `stat`, `exists`, `list` and `walk` (async, depth-first) take root-relative paths. The root is canonicalised once and refused when it is itself a symlink (unless `allowSymlinkedRoot`); absolute paths and `..` that climb above the root throw `FsPathEscapeError`; every path component is checked with `lstat` and a symlink or Windows junction anywhere throws `FsLinkRefusedError`; files are opened with `O_NOFOLLOW` where available and the opened handle's device/inode must match the checked entry, so a file or parent folder swapped between check and open is refused. `maxFileBytes` (default 16 MiB) is enforced while reading, `maxEntries` (default 100 000) and `maxDepth` (default 64) bound `list`/`walk`, with `FsLimitExceededError`. `followLinks: true` follows only links whose target stays inside the root.
+- `FsPathEscapeError`, `FsLinkRefusedError`, `FsLimitExceededError` (each with a `type` discriminator, `path` and the reason or limit), the `ConfinedReader` / `ConfinedEntry` / `ConfinedStats` types, and `isPathInside(child, root)`.
+
 ### Changed
 
 - Clarify the concurrency contract of `moveDirectoryNoReplaceAsync` / `fs.dirs.moveNoReplace` at the call-site documentation: the exclusive destination claim protects cooperating writers, while an empty placeholder swapped before its first identity read or after its last check can still be replaced. `expectedSource` and `syncParents` do not eliminate those windows. Deterministic interleaving tests preserve these documented limits.

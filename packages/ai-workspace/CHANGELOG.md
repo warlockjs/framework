@@ -28,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Backends may implement an optional `stat()`; the local and mock backends do. The mock backend's scripted commands accept `running: true` for background starts.
 - The workspace skill and docs cover the new tools, shell mode, argument rules, background commands and `dispose()`.
 
+### Changed
+
+- The docs, the skill and the path resolver's comments explain how the workspace jail differs from `@warlock.js/fs`'s new confined reader (`fs.confined`) and why the workspace keeps its own resolver: it accepts absolute paths inside the jail, `allowPaths` roots, `denyPaths`, links that stay inside and paths that do not exist yet. Behaviour is unchanged.
+
 ### Fixed
 
 - The package README no longer ends with a stray empty code block.

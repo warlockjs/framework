@@ -73,6 +73,17 @@ async function canonicalize(target: string): Promise<string> {
  * `denyPaths` glob even while inside `cwd`, is rejected with a
  * {@link WorkspacePolicyError} of type `"path-escape"`.
  *
+ * Why this does not use `@warlock.js/fs`'s confined reader (`fs.confined`):
+ * the two answer different questions. The confined reader refuses absolute
+ * paths, refuses every symbolic link (or follows only links inside its one
+ * root), requires the path to exist, and reads the file itself through a
+ * no-follow, identity-checked open. This jail must instead accept absolute
+ * paths inside `cwd`, several `allowPaths` roots, `denyPaths` globs, a
+ * symlinked `cwd`, links whose target stays inside, and paths that do not
+ * exist yet (`writeFile`, `mkdir`), and it returns a path that writes,
+ * `exec`'s working directory and redirections use afterwards. Switching would
+ * change what agents may touch, so the workspace keeps this resolver.
+ *
  * @param policy - The bounding policy (its `cwd` is the jail root).
  * @param inputPath - A workspace-relative or absolute path to resolve.
  * @returns The canonical absolute path plus its `/`-separated relative form.

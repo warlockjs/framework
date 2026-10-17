@@ -164,11 +164,12 @@ default behavior — atomic writes, no-clobber creates, schema-checked reads.
 
 :::caution[`fs` does not sandbox paths]
 The facade treats whatever path you hand it as gospel — `"../../etc/passwd"`
-resolves and reads just fine. **Path containment is the storage layer's
-job**, not this package's. If you're accepting paths from user input, run
-them through your storage layer (or validate them yourself) _before_
-they reach `fs`. `@warlock.js/fs` is the low-level toolkit; it trusts its
-caller.
+resolves and reads just fine, and symlinks are followed. If you're accepting
+paths from user input, run them through your storage layer _before_ they
+reach `fs.files.*`. To **read** a folder you do not control (a user-chosen
+import folder, an extracted upload), use
+[`fs.confined(root)`](../guides/read-a-folder-confined): it refuses `..`,
+absolute paths and symlinks, and caps what it reads.
 :::
 
 ## Next

@@ -27,6 +27,8 @@ const ws = ai.workspace({
 
 This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an _allowed_ process does once it runs. For an untrusted agent, run the workspace inside a container, a microVM or as a separate unprivileged user, and treat this policy as a second layer (see [Shell mode is a policy layer, not a sandbox](#shell-mode-is-a-policy-layer-not-a-sandbox)).
 
+**How paths are jailed.** Every path is resolved against `cwd` with symlinks collapsed (`realpath` of the deepest existing ancestor), then accepted only inside `cwd` or an `allowPaths` root and off `denyPaths`. Absolute paths inside the jail, a symlinked `cwd`, links whose target stays inside, and paths that do not exist yet (for `writeFile` / `mkdir`) are all accepted. This is deliberately not `@warlock.js/fs`'s [confined reader](/v/latest/fs/guides/read-a-folder-confined/) (`fs.confined`), which refuses absolute paths and every link and only reads existing files: an app reading a folder it does not trust should use that reader; the workspace keeps its own resolver because its tools also write, run commands and honour several roots.
+
 ## The policy surface
 
 | Field                                               | What it does                                                                                                                                                                                                                          |
