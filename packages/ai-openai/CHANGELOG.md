@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- With `streamChunks`, the Responses model yields `reasoning` for reasoning-summary / reasoning-text deltas and `tool-args` for `response.function_call_arguments.delta`; the Chat model yields `tool-args` for tool-call argument fragments and `reasoning` for a compatible vendor's `reasoning_content` / `reasoning` delta field (DeepSeek, Groq).
+- `ai.providerTool({ provider: "openai", definition })` adds Responses built-in tools (`web_search`, `file_search`, `code_interpreter`, …) verbatim. A reasoning item that led into a hosted tool call is left out of the stateless replay, and built-in calls the caller would have to execute (`shell_call`, `apply_patch_call`, `computer_call`, `custom_tool_call`, …) throw `InvalidRequestError` instead of being dropped. Chat Completions sends a provider tool only when its `provider` equals the model's provider label (e.g. `"groq"`).
+
 - `providerOptions.openai.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Responses models expose native input-token preflight through `countTokens()`; Chat Completions keeps offline estimates separate.
 

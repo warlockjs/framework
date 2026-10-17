@@ -37,6 +37,40 @@ export function pickReplayableReasoning(
   );
 }
 
+/** Output item types that may follow a replayed reasoning item. */
+const REPLAY_SAFE_FOLLOWERS: ReadonlySet<string> = new Set(["function_call", "message"]);
+
+/**
+ * The reasoning items of a turn that are safe to replay, in order.
+ *
+ * The API pairs a reasoning item with the output item that followed it and
+ * rejects a replayed reasoning item whose follower is missing. Only
+ * `function_call` items are replayed, so a reasoning item that led into a
+ * hosted (server-run) tool call — `web_search_call`, `file_search_call`,
+ * `code_interpreter_call`, … from a provider-defined tool — is dropped
+ * rather than sent without its follower. Encrypted reasoning only improves
+ * continuity; dropping it never breaks the request.
+ */
+export function pickTurnReasoning(
+  output: ReadonlyArray<{ type: string }>,
+): ResponsesReasoningItem[] {
+  const picked: ResponsesReasoningItem[] = [];
+
+  output.forEach((item, index) => {
+    if (item.type !== "reasoning") {
+      return;
+    }
+
+    const follower = output.slice(index + 1).find((next) => next.type !== "reasoning");
+
+    if (follower === undefined || REPLAY_SAFE_FOLLOWERS.has(follower.type)) {
+      picked.push(item as ResponsesReasoningItem);
+    }
+  });
+
+  return picked;
+}
+
 /**
  * Attach the turn's reasoning items to the FIRST tool call only (parallel
  * calls do not each repeat the blobs). Returns the calls unchanged when

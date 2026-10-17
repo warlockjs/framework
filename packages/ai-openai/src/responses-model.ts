@@ -1,7 +1,9 @@
 import {
   InvalidRequestError,
   ProviderError,
+  resolveStreamChunks,
   safeJsonParse,
+  selectProviderTools,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -24,6 +26,7 @@ import {
   buildUsage,
   inferStructuredOutput,
   mapResponsesFinishReason,
+  pickTurnReasoning,
   planStructuredOutput,
   toOpenAIReasoningEffort,
   toResponseFailure,
@@ -34,6 +37,20 @@ import {
 } from "./utils";
 
 const LOG_MODULE = "ai.openai";
+
+/**
+ * Responses output item types of built-in tools the CALLER must execute
+ * (installed SDK `ResponseOutputItem` union). The adapter maps only
+ * `function_call` to a neutral tool call, so these fail closed.
+ */
+const CLIENT_RUN_ITEM_TYPES: ReadonlySet<string> = new Set([
+  "computer_call",
+  "custom_tool_call",
+  "local_shell_call",
+  "shell_call",
+  "apply_patch_call",
+  "mcp_approval_request",
+]);
 
 /**
  * OpenAI Responses API implementation of `ModelContract` (`api: "responses"`).
@@ -62,7 +79,16 @@ const LOG_MODULE = "ai.openai";
  *
  * **Streaming.** `stream()` uses `responses.create({ stream: true })` and yields
  * the same chunk sequence as the Chat path: text `delta`s, then the
- * `tool-call`s, then one `done`.
+ * `tool-call`s, then one `done`. With `streamChunks` it also yields
+ * `reasoning` (reasoning summary / reasoning text deltas) and `tool-args`
+ * (`response.function_call_arguments.delta`).
+ *
+ * **Provider-defined tools.** `ai.providerTool({ provider: "openai" })`
+ * definitions are appended to `tools` verbatim. Hosted tools run inside the
+ * response; their output items (`web_search_call`, …) are not replayed
+ * (with `store: false` the next turn only needs the answer text), and a
+ * reasoning item that led into one is not replayed either (see
+ * `pickTurnReasoning`).
  */
 export class OpenAIResponsesModel implements ModelContract {
   public readonly name: string;
@@ -215,7 +241,11 @@ export class OpenAIResponsesModel implements ModelContract {
     }
 
     const toolCalls: ModelToolCallRequest[] = [];
-    const reasoningItems: OpenAI.Responses.ResponseReasoningItem[] = [];
+    const outputItems: OpenAI.Responses.ResponseOutputItem[] = [];
+    const want = resolveStreamChunks(options);
+    // `function_call_arguments.delta` names its item by `item_id` only; the
+    // `call_id` and `name` come from that item's `output_item.added`.
+    const streamingCalls = new Map<string, { callId: string; name: string }>();
     let terminal: OpenAI.Responses.Response | undefined;
 
     try {
@@ -231,12 +261,44 @@ export class OpenAIResponsesModel implements ModelContract {
           continue;
         }
 
+        if (
+          event.type === "response.reasoning_summary_text.delta" ||
+          event.type === "response.reasoning_text.delta"
+        ) {
+          if (want.reasoning && event.delta) {
+            yield { type: "reasoning", delta: event.delta };
+          }
+
+          continue;
+        }
+
+        if (event.type === "response.output_item.added") {
+          const { item } = event;
+
+          if (item.type === "function_call" && item.id) {
+            streamingCalls.set(item.id, { callId: item.call_id, name: item.name });
+          }
+
+          continue;
+        }
+
+        if (event.type === "response.function_call_arguments.delta") {
+          const call = streamingCalls.get(event.item_id);
+
+          if (want.toolArgs && call && event.delta) {
+            yield { type: "tool-args", callId: call.callId, name: call.name, delta: event.delta };
+          }
+
+          continue;
+        }
+
         if (event.type === "response.output_item.done") {
           const { item } = event;
 
-          if (item.type === "reasoning") {
-            reasoningItems.push(item);
-          } else if (item.type === "function_call" && item.status !== "incomplete") {
+          this.assertServerRunItem(item);
+          outputItems.push(item);
+
+          if (item.type === "function_call" && item.status !== "incomplete") {
             toolCalls.push(this.toToolCall(item));
           }
 
@@ -266,7 +328,11 @@ export class OpenAIResponsesModel implements ModelContract {
       throw this.logAndWrap(thrown);
     }
 
-    for (const call of attachReasoningReplay(toolCalls, this.name, reasoningItems)) {
+    for (const call of attachReasoningReplay(
+      toolCalls,
+      this.name,
+      pickTurnReasoning(outputItems),
+    )) {
       yield {
         type: "tool-call",
         id: call.id,
@@ -309,7 +375,7 @@ export class OpenAIResponsesModel implements ModelContract {
     options: ModelCallOptions | undefined,
   ): OpenAI.Responses.ResponseCreateParamsNonStreaming {
     const { instructions, input } = toResponsesInput(messages, this.name);
-    const tools = toResponsesTools(options?.tools);
+    const tools = this.buildTools(options);
     const toolChoice = tools ? toResponsesToolChoice(options?.toolChoice) : undefined;
     const maxTokens = options?.maxTokens ?? this.config.maxTokens;
     const temperature = options?.temperature ?? this.config.temperature;
@@ -333,6 +399,28 @@ export class OpenAIResponsesModel implements ModelContract {
       },
       options,
     );
+  }
+
+  /**
+   * The request `tools`: function tools (flat, `strict: false`), then the
+   * `ai.providerTool({ provider: "openai" })` definitions verbatim — the
+   * Responses built-in tools (`web_search`, `file_search`,
+   * `code_interpreter`, `image_generation`, `mcp`, …). Other providers'
+   * definitions are skipped with a warning. `undefined` when there are none.
+   */
+  private buildTools(options: ModelCallOptions | undefined): OpenAI.Responses.Tool[] | undefined {
+    const { tools, definitions } = selectProviderTools(options, {
+      accepts: [this.provider],
+      module: LOG_MODULE,
+      model: this.name,
+      logger: this.logger,
+    });
+    const mapped: OpenAI.Responses.Tool[] = [
+      ...(toResponsesTools(tools) ?? []),
+      ...(definitions as unknown as OpenAI.Responses.Tool[]),
+    ];
+
+    return mapped.length > 0 ? mapped : undefined;
   }
 
   /**
@@ -388,13 +476,9 @@ export class OpenAIResponsesModel implements ModelContract {
   } {
     let content = "";
     const toolCalls: ModelToolCallRequest[] = [];
-    const reasoningItems: OpenAI.Responses.ResponseReasoningItem[] = [];
 
     for (const item of output) {
-      if (item.type === "reasoning") {
-        reasoningItems.push(item);
-        continue;
-      }
+      this.assertServerRunItem(item);
 
       if (item.type === "message") {
         for (const part of item.content) {
@@ -413,9 +497,30 @@ export class OpenAIResponsesModel implements ModelContract {
       content,
       toolCalls:
         toolCalls.length > 0
-          ? attachReasoningReplay(toolCalls, this.name, reasoningItems)
+          ? attachReasoningReplay(toolCalls, this.name, pickTurnReasoning(output))
           : undefined,
     };
+  }
+
+  /**
+   * Fail closed on a built-in tool call that YOUR code would have to run
+   * (`shell_call`, `apply_patch_call`, `computer_call`, …, from a
+   * provider-defined client tool). These items have their own output item
+   * types that this adapter does not map, so the turn would otherwise end
+   * silently with the call dropped. Hosted (server-run) tool items pass.
+   */
+  private assertServerRunItem(item: { type: string }): void {
+    if (!CLIENT_RUN_ITEM_TYPES.has(item.type)) {
+      return;
+    }
+
+    throw new InvalidRequestError(
+      `OpenAI returned a "${item.type}" item: that built-in tool is executed by the caller, ` +
+        "which the Responses adapter does not support. Use OpenAI's server-run built-in tools " +
+        "(web_search, file_search, code_interpreter, image_generation, mcp without approval) " +
+        "with ai.providerTool(), or a function tool from ai.tool().",
+      { context: { provider: this.provider, model: this.name, itemType: item.type } },
+    );
   }
 
   /** One completed `function_call` item as a neutral tool call (`call_id` -> `id`). */
