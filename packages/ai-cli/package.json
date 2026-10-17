@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-cli",
-  "version": "5.30.0",
+  "version": "5.31.0",
   "type": "module",
   "description": "Drive vendor coding-agent CLIs (Claude Code, Codex, Copilot, Cursor, …) as first-class @warlock.js/ai agents",
   "main": "./src/index.ts",

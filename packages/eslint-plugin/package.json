@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/eslint-plugin",
-  "version": "5.30.0",
+  "version": "5.31.0",
   "type": "module",
   "description": "ESLint rules for Warlock.js applications: validated request input, guarded mutating routes, safe redirects, redacted logs, bounded regexes and the framework's code conventions",
   "keywords": [
