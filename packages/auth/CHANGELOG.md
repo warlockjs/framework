@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Login, token and OTP throttles pass their counting-window TTL into each atomic increment. A counter that expires between the create-only seed and increment is recreated with an expiry rather than becoming permanent.
+- Login, token and OTP throttles pass their counting-window TTL into each atomic increment. A counter that expires between the create-only seed and increment is recreated with an expiry rather than becoming permanent. Token middleware regression assertions cover the issue counters' one-hour window and the consume counter's fifteen-minute window.
 
 ## 5.30.0 - 2026-10-16
 

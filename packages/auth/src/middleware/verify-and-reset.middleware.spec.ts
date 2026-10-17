@@ -120,8 +120,12 @@ describe("tokenIssueThrottleMiddleware", () => {
       ttl: "1h",
       onConflict: "create",
     });
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 1, {
+      ttl: "1h",
+    });
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 1, {
+      ttl: "1h",
+    });
     expect(cacheRemove).not.toHaveBeenCalled();
   });
 
@@ -162,7 +166,9 @@ describe("tokenConsumeThrottleMiddleware", () => {
       ttl: "15m",
       onConflict: "create",
     });
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 1, {
+      ttl: "15m",
+    });
 
     const ok = buildResponse(true);
     await tokenConsumeThrottleMiddleware()(makeCtx({ request, response: ok }));
