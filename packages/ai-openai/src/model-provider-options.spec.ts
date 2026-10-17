@@ -141,6 +141,49 @@ describe("OpenAI provider options and native Responses counts", () => {
     }
   });
 
+  it.each(["json_object", "text"])(
+    "replaces a Chat JSON schema with the %s format variant",
+    async (type) => {
+      const { client, create } = setup();
+      const model = new OpenAIModel(client, { name: "gpt-4o-mini" });
+      const options = {
+        responseSchema: {
+          type: "object",
+          properties: { answer: { type: "string" } },
+          required: ["answer"],
+          additionalProperties: false,
+        },
+        providerOptions: { openai: { body: { response_format: { type } } } },
+      };
+      await model.complete(messages, options);
+      for await (const chunk of model.stream(messages, options)) void chunk;
+      expect(create.mock.calls).toHaveLength(2);
+      for (const [request] of create.mock.calls) expect(request.response_format).toEqual({ type });
+    },
+  );
+
+  it("replaces forced-function choice with an allowed-tools variant for Responses generation and counts", async () => {
+    const { client, create, count } = setup();
+    const model = new OpenAIResponsesModel(client, { name: "gpt-4o-mini" });
+    const choice = {
+      type: "allowed_tools",
+      mode: "auto",
+      tools: [{ type: "function", name: "lookup" }],
+    };
+    const options = {
+      tools: [{ name: "lookup", description: "Look up data", execute: async () => "ok" }],
+      toolChoice: { type: "function", name: "lookup" },
+      providerOptions: { openai: { body: { tool_choice: choice } } },
+    };
+    await model.complete(messages, options);
+    for await (const chunk of model.stream(messages, options)) void chunk;
+    expect(await model.countTokens(messages, options)).toBe(456);
+    expect(create.mock.calls).toHaveLength(2);
+    for (const [request] of create.mock.calls) expect(request.tool_choice).toEqual(choice);
+    expect(count).toHaveBeenCalledWith(expect.objectContaining({ tool_choice: choice }), undefined);
+    expect(options.toolChoice).toEqual({ type: "function", name: "lookup" });
+  });
+
   it("limits object merging to immediate keys and replaces arrays, null and scalars", () => {
     const built = {
       config: { neutral: true, nested: { old: true } },

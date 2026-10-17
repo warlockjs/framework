@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Provider body objects replace the adapter-built object when their string `type` discriminator changes, so format and tool-choice overrides do not retain incompatible fields from the old variant. Same-type and undiscriminated objects keep the one-level merge.
+
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
 
 ### Added

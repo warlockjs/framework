@@ -38,10 +38,16 @@ export function mergeProviderBody<T extends object>(
   const overrides = Object.fromEntries(
     Object.entries(body).map(([key, value]) => {
       const previous = defaults[key];
-      return [
-        key,
-        isPlainObject(previous) && isPlainObject(value) ? { ...previous, ...value } : value,
-      ];
+      if (!isPlainObject(previous) || !isPlainObject(value)) return [key, value];
+      // A different discriminator selects a whole SDK variant. Keeping fields
+      // from the previous variant can make an otherwise valid override invalid.
+      if (
+        typeof previous.type === "string" &&
+        typeof value.type === "string" &&
+        previous.type !== value.type
+      )
+        return [key, value];
+      return [key, { ...previous, ...value }];
     }),
   );
   return { ...built, ...overrides };
