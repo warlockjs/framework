@@ -122,6 +122,34 @@ export type ToolContext<TArtifacts = Record<string, unknown>> = {
   artifacts: TArtifacts;
   /** Same signal threaded through dispatch — for cancellation-aware tools. */
   signal?: AbortSignal;
+  /**
+   * The inbound network request that triggered this call, when a server
+   * transport invokes the tool on a remote client's behalf (for example
+   * `ai.mcp.serve` over HTTP). Absent for in-process dispatch by an agent,
+   * supervisor or a direct `tool.invoke()`.
+   */
+  request?: ToolRequestContext;
+};
+
+/**
+ * Metadata of the inbound request a server transport received before it
+ * invoked a tool. Tools read it (a per-user token, a tenant header, a
+ * trace id); it never travels to the model.
+ *
+ * @example
+ * execute: async (input, ctx) => {
+ *   const tenant = ctx?.request?.headers["x-tenant-id"];
+ *   return lookup(tenant, input.query);
+ * }
+ */
+export type ToolRequestContext = {
+  /**
+   * Request headers with lower-cased names. A header the client repeated
+   * is joined with `", "`.
+   */
+  headers: Readonly<Record<string, string>>;
+  /** The client's socket address, when the transport knows it. */
+  remoteAddress?: string;
 };
 
 /**
