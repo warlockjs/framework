@@ -11,6 +11,7 @@ import { App } from "../src/helpers/app";
 import { setPackageManager } from "../src/helpers/package-manager";
 import { parseFlags } from "../src/index";
 import { askLintToolchain } from "../src/prompts/ask-lint-toolchain";
+import { linkEslintPlugin } from "./support/link-eslint-plugin";
 
 const { select } = vi.hoisted(() => ({ select: vi.fn() }));
 vi.mock("@clack/prompts", async (importOriginal) => ({
@@ -58,6 +59,7 @@ function scaffold(lint?: LintToolchain, web = false) {
     .updatePackageJson()
     .configureWebStarter(web)
     .configureLintToolchain();
+  linkEslintPlugin(appPath);
   return { appPath, app };
 }
 

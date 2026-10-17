@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Application } from "../src/commands/create-new-app/types";
 import { App } from "../src/helpers/app";
 import { setPackageManager } from "../src/helpers/package-manager";
+import { linkEslintPlugin } from "./support/link-eslint-plugin";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const eslintEntry = path.join(packageRoot, "node_modules", "eslint", "bin", "eslint.js");
@@ -35,6 +36,7 @@ function generateApp(): string {
 
   new App(application).use("warlock").configureWebStarter(false);
   generatedRoots.push(root);
+  linkEslintPlugin(appPath);
 
   return appPath;
 }
