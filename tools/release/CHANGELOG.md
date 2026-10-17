@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Shared formatter config changes trigger standalone scaffolder checks; temporary coverage scratch output is ignored and its stale tracked snapshot removed.
+
 - Skill compilation respects package export maps, so an existing internal source file cannot make an unpublished import appear valid. Page-test guidance includes both test and spec filenames.
 - Documentation install tabs retain fenced commands after formatting, with a build guard against collapsed inline fences and focused Markdown/JSON regressions.
 

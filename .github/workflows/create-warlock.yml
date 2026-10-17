@@ -11,10 +11,14 @@ on:
     paths:
       - "packages/create-warlock/**"
       - ".github/workflows/create-warlock.yml"
+      - ".oxfmtrc.json"
+      - ".oxfmtignore"
   pull_request:
     paths:
       - "packages/create-warlock/**"
       - ".github/workflows/create-warlock.yml"
+      - ".oxfmtrc.json"
+      - ".oxfmtignore"
   # The scaffold job installs the framework from the registry, so it can go red
   # without anyone touching this repo — a framework release is enough. The
   # nightly run is what turns that from "the next contributor discovers it" into

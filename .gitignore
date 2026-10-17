@@ -18,6 +18,7 @@ release-logs/
 
 # Scratch
 temp/
+.cov-tmp/
 .skill-snippet-gate-tmp/
 
 # Environment and logs
