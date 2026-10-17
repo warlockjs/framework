@@ -2,6 +2,7 @@ import type { Message } from "./conversation-message.type";
 import type { FinishReason } from "./finish-reason.type";
 import type { ModelToolCallRequest } from "./model-tool-call-request.type";
 import type { ProviderContentBlock } from "./provider-content-block.type";
+import type { ProviderToolDefinition } from "./provider-tool.type";
 import type { ModelPricing } from "./result/model-pricing.type";
 import type { Usage } from "./result/usage.type";
 import type { ToolConfig } from "./tool.contract";
@@ -25,6 +26,35 @@ export type ModelCallOptions = {
   maxTokens?: number;
   /** Tools to expose to the LLM on this call. Each model converts to its provider format. */
   tools?: ToolConfig<unknown, unknown>[];
+  /**
+   * Provider-defined tools for this call (Anthropic `web_search`, OpenAI
+   * Responses `web_search`, Gemini `googleSearch`, …), usually built with
+   * `ai.providerTool()`. Each adapter sends the `definition` verbatim when
+   * `provider` names it, and skips the entry with a logged warning
+   * otherwise. The agent fills this from the `ai.providerTool()` entries of
+   * its `tools` list; pass it directly only when calling a model yourself.
+   *
+   * @example
+   * await model.complete(messages, {
+   *   providerTools: [{ provider: "anthropic", definition: { type: "web_search_20250305", name: "web_search", max_uses: 5 } }],
+   * });
+   */
+  providerTools?: ProviderToolDefinition[];
+  /**
+   * Opt in to the extra `stream()` chunks: `reasoning` (thinking deltas),
+   * `tool-args` (tool-call argument deltas) and `usage` (running token
+   * counts before `done`). Off by default so existing `model.stream()`
+   * consumers see exactly the `delta` / `tool-call` / `done` sequence they
+   * always did. `true` turns every kind on; an object picks kinds. The
+   * agent turns them all on for `agent.stream()` unless `modelOptions`
+   * sets this key. Ignored by `complete()`.
+   *
+   * @example
+   * for await (const chunk of model.stream(messages, { streamChunks: { reasoning: true } })) {
+   *   if (chunk.type === "reasoning") process.stdout.write(chunk.delta);
+   * }
+   */
+  streamChunks?: StreamChunkOptions;
   /**
    * JSON Schema the response must match. Adapters that declare
    * `capabilities.structuredOutput` forward this to the provider's native
@@ -216,7 +246,28 @@ export type ModelResponse = {
 };
 
 /**
+ * Which optional stream chunks a `model.stream()` call should yield — see
+ * `ModelCallOptions.streamChunks`. `true` enables every kind.
+ */
+export type StreamChunkOptions =
+  | boolean
+  | {
+      /** `{ type: "reasoning" }` chunks: the model's thinking text as it streams. */
+      reasoning?: boolean;
+      /** `{ type: "tool-args" }` chunks: a tool call's argument JSON as it streams. */
+      toolArgs?: boolean;
+      /** `{ type: "usage" }` chunks: running token counts before `done`. */
+      usage?: boolean;
+    };
+
+/**
  * A single chunk emitted during a streaming model call.
+ *
+ * `delta`, `tool-call` and `done` are always emitted. `reasoning`,
+ * `tool-args` and `usage` are emitted only when the call opts in through
+ * `ModelCallOptions.streamChunks` **and** the provider streams that data;
+ * a consumer should ignore chunk types it does not handle and read the
+ * finish reason only from `type === "done"`.
  *
  * @example
  * for await (const chunk of model.stream(messages)) {
@@ -226,6 +277,42 @@ export type ModelResponse = {
  */
 export type ModelStreamChunk =
   | { type: "delta"; content: string }
+  | {
+      /**
+       * A piece of the model's reasoning / thinking text (Anthropic
+       * `thinking_delta`, OpenAI Responses reasoning summary or reasoning
+       * text, Gemini thought parts, Bedrock `reasoningContent`, Ollama
+       * `thinking`, DeepSeek-style `reasoning_content`). Never part of the
+       * answer `content`. Opt-in: `streamChunks.reasoning`.
+       */
+      type: "reasoning";
+      delta: string;
+    }
+  | {
+      /**
+       * A piece of a tool call's argument JSON while the model writes it.
+       * Concatenating every `delta` of one `callId` gives the raw argument
+       * string; the parsed input still arrives on the `tool-call` chunk with
+       * the same id. Emitted only by providers that stream arguments.
+       * Opt-in: `streamChunks.toolArgs`.
+       */
+      type: "tool-args";
+      /** The tool call id — matches the later `tool-call` chunk's `id`. */
+      callId: string;
+      /** The tool the model is calling. */
+      name: string;
+      delta: string;
+    }
+  | {
+      /**
+       * Token counts so far for this call — a running total, not an
+       * increment. The `done` chunk still carries the final usage.
+       * Emitted only by providers that report usage mid-stream
+       * (Anthropic, Gemini). Opt-in: `streamChunks.usage`.
+       */
+      type: "usage";
+      usage: Usage;
+    }
   | {
       type: "tool-call";
       id: string;

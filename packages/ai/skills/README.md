@@ -22,7 +22,7 @@ Wire agent + supervisor middleware — ai.middleware.budget (token / USD caps + 
 
 ### `define-ai-tool`
 
-Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, ctx.artifacts side-channel, ToolExecutionError. Load when wiring tools into an agent, authoring ai.tool, inspecting tool dispatches on result.report.children, or debugging a ToolExecutionError.
+Define tools with ai.tool({...}) — typed validated async functions the model can call — and provider-defined tools with ai.providerTool({ provider, definition }). Covers name / description / action / mode (feedback / silent) / input / execute, ctx.artifacts side-channel, ToolExecutionError, built-in provider tools (web search, code execution, bash, text editor, search grounding). Load when wiring tools into an agent, authoring ai.tool, inspecting tool dispatches on result.report.children, or debugging a ToolExecutionError.
 
 ### `durable-resume`
 
@@ -78,7 +78,7 @@ Prompt compiler — systemPrompt(...).refined({ model, criteria, store }): human
 
 ### `run-ai-agent`
 
-Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, AgentResult envelope, streamingToolGuard, the judge-safe preset (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw for Nova-class LLM-as-judge graders), and ai.spawnSubAgent({...}) (a thin one-shot-agent wrapper with a per-task budget — a general primitive, not planner-specific). Load when calling ai.agent(...), reading AgentResult, wiring options.output / attachments / repair, building a resilient LLM-as-judge, streaming, or spawning a one-shot sub-agent.
+Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream (including reasoning, tool-argument and usage stream events), attachments, structured output, placeholders, events, AgentResult envelope, streamingToolGuard, the judge-safe preset (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw for Nova-class LLM-as-judge graders), and ai.spawnSubAgent({...}) (a thin one-shot-agent wrapper with a per-task budget — a general primitive, not planner-specific). Load when calling ai.agent(...), reading AgentResult, wiring options.output / attachments / repair, building a resilient LLM-as-judge, streaming, or spawning a one-shot sub-agent.
 
 ### `run-ai-rag`
 

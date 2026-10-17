@@ -48,6 +48,7 @@ import { notifyObservers } from "../observe/resolve-observers";
 import { skills } from "../skills";
 import type { SkillsContract } from "../skills/contracts/skills.contract";
 import { normalizeAgentTools } from "../tool/executable-as-tool";
+import { isProviderTool } from "../tool/provider-tool";
 import type { ToolContract, ToolInvokeResult } from "../tool/tool";
 import {
   captureChildReport,
@@ -1122,11 +1123,27 @@ class Execution<TOutput> {
     )) as ModelResponse;
   }
 
-  /** Exact call options shared by preflight compaction and generation. */
+  /**
+   * Exact call options shared by preflight compaction and generation.
+   * `ai.providerTool()` entries travel as `providerTools` (sent verbatim
+   * by the adapter they name), never as function tools; they stay in
+   * `effectiveTools` so client-run provider tools dispatch by name.
+   */
   private buildModelCallOptions(): ModelCallOptions {
+    const functionTools = this.effectiveTools.filter((entry) => !isProviderTool(entry));
+    const providerTools = this.effectiveTools.filter(isProviderTool);
+
     return {
       ...this.config.modelOptions,
-      tools: this.effectiveTools,
+      tools: functionTools,
+      ...(providerTools.length > 0
+        ? {
+            providerTools: [
+              ...(this.config.modelOptions?.providerTools ?? []),
+              ...providerTools.map(({ provider, definition }) => ({ provider, definition })),
+            ],
+          }
+        : {}),
       ...(this.responseSchema ? { responseSchema: this.responseSchema } : {}),
       ...(this.options?.signal ? { signal: this.options.signal } : {}),
     };
@@ -1141,11 +1158,18 @@ class Execution<TOutput> {
    * aggregation) stays identical between the two modes.
    */
   private async getModelResponse(tripIndex: number): Promise<ModelResponse> {
-    const callOptions = this.buildModelCallOptions();
+    const baseOptions = this.buildModelCallOptions();
 
     if (!this.streamController) {
-      return this.config.model.complete(this.messages, callOptions);
+      return this.config.model.complete(this.messages, baseOptions);
     }
+
+    // `agent.stream()` surfaces reasoning, tool-argument and mid-stream
+    // usage chunks as events, so ask for all of them unless the caller
+    // set `streamChunks` in `modelOptions` (e.g. `false` to keep the
+    // event volume down).
+    const callOptions: ModelCallOptions =
+      baseOptions.streamChunks === undefined ? { ...baseOptions, streamChunks: true } : baseOptions;
 
     let content = "";
     let finishReason: FinishReason = "stop";
@@ -1203,9 +1227,33 @@ class Execution<TOutput> {
         continue;
       }
 
-      finishReason = chunk.finishReason;
-      usage = chunk.usage;
-      blocks = chunk.blocks;
+      if (chunk.type === "reasoning") {
+        this.emit("agent.trip.reasoning", { delta: chunk.delta, tripIndex });
+        continue;
+      }
+
+      if (chunk.type === "tool-args") {
+        this.emit("agent.tool.streaming", {
+          callId: chunk.callId,
+          name: chunk.name,
+          delta: chunk.delta,
+          tripIndex,
+        });
+        continue;
+      }
+
+      if (chunk.type === "usage") {
+        this.emit("agent.trip.usage", { usage: chunk.usage, tripIndex });
+        continue;
+      }
+
+      // Read the terminal fields only from `done`; any chunk type this
+      // version does not know is ignored rather than mistaken for it.
+      if (chunk.type === "done") {
+        finishReason = chunk.finishReason;
+        usage = chunk.usage;
+        blocks = chunk.blocks;
+      }
     }
 
     if (guard) {

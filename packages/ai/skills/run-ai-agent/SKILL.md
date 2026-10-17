@@ -1,6 +1,6 @@
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`, `agent.trip.reasoning`, `agent.tool.streaming`, `agent.trip.usage`, `streamChunks`, `ModelStreamChunk`; ''run an agent'', ''stream an agent response'', ''show the model thinking'', ''stream tool arguments'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -289,6 +289,19 @@ const result = await stream.result;
 
 Or use `.on({ "agent.trip.streaming": ..., "agent.completed": ..., "agent.error": ... })` alongside iteration.
 
+`agent.stream()` also surfaces what the provider streams besides text — reasoning, tool-call arguments as they are written, and usage before the end:
+
+```ts
+for await (const event of myAgent.stream("Write utils.ts")) {
+  if (event.type === "agent.trip.reasoning") ui.thinking.append(event.delta); // never part of the answer
+  else if (event.type === "agent.trip.streaming") ui.answer.append(event.delta);
+  else if (event.type === "agent.tool.streaming") ui.toolInput(event.callId, event.name).append(event.delta); // raw JSON pieces
+  else if (event.type === "agent.trip.usage") ui.tokens.set(event.usage.total); // running total for the trip
+}
+```
+
+The agent asks the model for these by setting `streamChunks: true` on streaming calls; `modelOptions: { streamChunks: false }` (or `{ reasoning: true }`, …) turns them down. `execute()` never emits them. Calling `model.stream()` yourself, the matching `reasoning` / `tool-args` / `usage` chunks are opt-in through the same `streamChunks` option, so existing chunk consumers see no change. Reasoning only streams when the provider is asked to show it (Anthropic `thinkingDisplay: "summarized"` on Claude 5 models, OpenAI Responses `reasoning.summary`, Gemini `includeThoughts`).
+
 ## Pattern — cancellation
 
 ```ts
@@ -309,6 +322,7 @@ Between-trip abort is guaranteed. Mid-trip best-effort.
 ## Events — dot-notation + 3-tier subscription
 
 - `agent.starting`, `agent.trip.started`, `agent.trip.streaming`, `agent.trip.completed`
+- `agent.trip.reasoning` `{ delta, tripIndex }`, `agent.trip.usage` `{ usage, tripIndex }`, `agent.tool.streaming` `{ callId, name, delta, tripIndex }` — `agent.stream()` only
 - `agent.tool.calling`, `agent.tool.called`, `agent.tool.failed`
 - `agent.completed`, `agent.error`
 

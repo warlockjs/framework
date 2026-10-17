@@ -324,4 +324,46 @@ describe("fallbackModel.stream — fall-over", () => {
     await expect(collect(stream)).rejects.toBeInstanceOf(ProviderTimeoutError);
     expect(backup.callCount).toBe(0);
   });
+
+  it("still falls over when only a mid-stream usage snapshot was emitted", async () => {
+    const usageOnlyModel: ModelContract = {
+      name: "usage-only",
+      provider: "mock",
+      async complete(): Promise<ModelResponse> {
+        throw new Error("not used");
+      },
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        yield { type: "usage", usage: { input: 5, output: 0, total: 5 } };
+        throw new ProviderTimeoutError("overloaded before any output");
+      },
+    };
+    const backup = okModel("backup", "recovered");
+
+    const chunks = await collect(
+      fallbackModel([usageOnlyModel, backup]).stream(userMessage, { streamChunks: true }),
+    );
+
+    expect(backup.callCount).toBe(1);
+    expect(chunks.at(-1)?.type).toBe("done");
+  });
+
+  it("does not fall over once a reasoning chunk has been emitted", async () => {
+    const thinkingModel: ModelContract = {
+      name: "thinking",
+      provider: "mock",
+      async complete(): Promise<ModelResponse> {
+        throw new Error("not used");
+      },
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        yield { type: "reasoning", delta: "Let me think" };
+        throw new ProviderTimeoutError("died mid-thought");
+      },
+    };
+    const backup = okModel("backup", "should-not-run");
+
+    await expect(
+      collect(fallbackModel([thinkingModel, backup]).stream(userMessage)),
+    ).rejects.toBeInstanceOf(ProviderTimeoutError);
+    expect(backup.callCount).toBe(0);
+  });
 });

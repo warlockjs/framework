@@ -3,6 +3,7 @@ import type { ToolEventMeta } from "../events/agent-events.type";
 import type { EventIdentity } from "../events/event-identity.type";
 import type { LLMTrip } from "../result/llm-trip.type";
 import type { ToolCall } from "../result/tool-call.type";
+import type { Usage } from "../result/usage.type";
 
 /**
  * Discriminated union of all events emitted during a streaming execution.
@@ -27,6 +28,15 @@ export type StreamEventBody =
   | { type: "agent.starting"; input: string }
   | { type: "agent.trip.started"; tripIndex: number; input: string }
   | { type: "agent.trip.streaming"; delta: string; tripIndex: number }
+  | { type: "agent.trip.reasoning"; delta: string; tripIndex: number }
+  | { type: "agent.trip.usage"; usage: Usage; tripIndex: number }
+  | {
+      type: "agent.tool.streaming";
+      callId: string;
+      name: string;
+      delta: string;
+      tripIndex: number;
+    }
   | {
       type: "agent.tool.calling";
       tool: ToolEventMeta;
