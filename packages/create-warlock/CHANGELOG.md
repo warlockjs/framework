@@ -26,6 +26,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback. Wrapped values align under their labels, and the summary retains its label, command and link styling.
 - On terminals narrower than 50 columns the project-ready heading keeps its bold green styling, as in the boxed layout.
 - The ESLint-toolchain `lint`, `format` and `tsc` scripts call the local `eslint`, `prettier` and `tsc` binaries instead of `npx`, matching `lint:check`/`format:check` and the Oxc scripts. `format` now quotes its glob, so Prettier formats nested files under `src/` rather than relying on the shell's expansion.
+- The starter's `AGENTS.md` ends with a `## This app (generated)` section whose `warlock:generated` markers `warlock dev` (and `warlock agents-md --write`) fills with the app's modules, routes, models, installed skills and verify commands.
+- Opt-in `--lint=oxc` / `--lint oxc` flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating `lint:check` and `format:check` scripts. Oxc projects configure and recommend the official VS Code extension for format-on-save and lint fixes; default projects retain their Prettier/ESLint editor settings. Help and headless diagnostics include `--lint`.
+- Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys.
 
 ## 5.30.0 - 2026-10-16
 

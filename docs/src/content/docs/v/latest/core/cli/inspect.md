@@ -172,3 +172,7 @@ const report = await inspectApp({
 - **Resource names** come from the export name in a `*.resource.ts` module, as in the OpenAPI document. A resource defined elsewhere falls back to its class name.
 - **Models** are listed when their module is a `*.model.ts` file or when they use `@RegisterModel()`.
 - **Jobs and schedules** are read from the app's own copy of `@warlock.js/queue` / `@warlock.js/scheduler`, so they appear only when a loaded module (usually `worker.ts`) defined them.
+
+## For coding agents
+
+[`warlock mcp`](./mcp.md) serves this report as MCP tools — `inspect_app`, then one `inspect_<section>` tool per section with a `filter`, plus `db_schema` built from the `models` section — and `warlock dev --mcp` serves them from the running dev server. [`warlock agents-md`](./agents-md.md) writes a summary of the report into the project's `AGENTS.md`.

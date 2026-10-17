@@ -24,6 +24,8 @@ export type StartDevServerOptions = {
   generateTypings?: boolean;
   /** Run file health checkers. Default from devServer config (true). */
   healthCheckers?: boolean;
+  /** Serve `warlock mcp` over HTTP from the dev server (`--mcp`). Default from `devServer.mcp`. */
+  mcp?: boolean;
 };
 
 /**

@@ -67,6 +67,18 @@ background list, so it never clutters a request's timeline.
 kept, and an N+1 threshold of 5. Everything lives in memory and is gone on
 restart.
 
+## From the terminal (agents)
+
+`npx warlock trace POST /posts --body '{"title":"Hi"}' --json` sends one
+request to the running dev server and prints this dashboard's record of it as
+JSON — middleware, validation result, queries with N+1 flags, logs, response
+and timings. See the `warlock-trace` skill of `@warlock.js/core`.
+
+`npx warlock mcp` (or `npx warlock dev --mcp`) gives a coding agent the same
+records through its `requests_recent` tool: the newest requests with their
+phases, queries flagged `nPlusOne`, warnings, logs and timings. See the
+`warlock-mcp` skill of `@warlock.js/core`.
+
 ## Secrets
 
 Query bindings and log context go through the logger's redaction rules

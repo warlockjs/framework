@@ -77,6 +77,20 @@ const routes: Route[] = [
     logging: { body: false },
   }),
   route({ method: "GET", path: "/posts", handler: listPosts, name: "posts.list", csrf: false }),
+  route({
+    method: "POST",
+    path: "/posts",
+    handler: listPosts,
+    name: "posts.create",
+    rateLimit: true,
+  }),
+  route({
+    method: "DELETE",
+    path: "/posts/:id",
+    handler: listPosts,
+    name: "posts.delete",
+    rateLimit: false,
+  }),
 ];
 
 let root: string;
@@ -174,7 +188,9 @@ describe("inspectApp", () => {
 
     expect(report.routes?.map((entry) => `${entry.method} ${entry.path}`)).toEqual([
       "GET /posts",
+      "POST /posts",
       "PATCH /posts/:id",
+      "DELETE /posts/:id",
     ]);
     expect(update).toMatchObject({
       handler: "updatePost",
@@ -199,6 +215,17 @@ describe("inspectApp", () => {
       csrf: false,
       rateLimit: { source: "global", max: 100, timeWindow: 30_000 },
       logging: { body: true, query: false },
+    });
+    // `rateLimit: true` keeps the global policy; `false` exempts the route from it.
+    expect(report.routes?.find((entry) => entry.name === "posts.create")?.rateLimit).toEqual({
+      source: "global",
+      max: 100,
+      timeWindow: 30_000,
+    });
+    expect(report.routes?.find((entry) => entry.name === "posts.delete")?.rateLimit).toEqual({
+      source: "none",
+      max: null,
+      timeWindow: null,
     });
   });
 
@@ -287,7 +314,7 @@ describe("inspectApp", () => {
     const report = await inspectFixture(["routes", "packages"]);
 
     expect(report.sections).toEqual(["routes", "packages"]);
-    expect(report.routes).toHaveLength(2);
+    expect(report.routes).toHaveLength(4);
     expect(report.models).toBeUndefined();
     expect(report.config).toBeUndefined();
     // Resources reached from routes still resolve: the $refs point here.

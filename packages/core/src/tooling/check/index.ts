@@ -18,6 +18,7 @@ export {
 export { checkNodeVersion, MIN_NODE_VERSION } from "./environment-step";
 export { runLint, type LintOutcome } from "./lint-step";
 export { runCheck, type CheckOptions, type TypecheckRunner } from "./run-check";
+export { runTests, testRunArguments, type RunTestsOptions, type TestRunReport } from "./run-tests";
 export {
   findVitest,
   parseVitestReport,

@@ -62,6 +62,7 @@
     "@react-email/render": "^2.0.5",
     "@warlock.js/access": "*",
     "@warlock.js/ai": "*",
+    "@warlock.js/ai-tools": "*",
     "@warlock.js/devtools": "*",
     "@warlock.js/herald": "*",
     "@warlock.js/notifications": "*",
@@ -118,6 +119,9 @@
     "@warlock.js/devtools": {
       "optional": true
     },
+    "@warlock.js/ai-tools": {
+      "optional": true
+    },
     "ts-morph": {
       "optional": true
     }
@@ -149,6 +153,7 @@
   "devDependencies": {
     "@warlock.js/access": "workspace:^",
     "@warlock.js/ai": "workspace:^",
+    "@warlock.js/ai-tools": "workspace:^",
     "@warlock.js/auth": "workspace:^",
     "@warlock.js/herald": "workspace:^",
     "@warlock.js/notifications": "workspace:^",

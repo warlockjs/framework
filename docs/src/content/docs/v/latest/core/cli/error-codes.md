@@ -244,6 +244,12 @@ Category: your code · skill: `health-checks`
 
 Category: your code · skill: `health-checks`
 
+### WL5004
+
+**Devtools recorded no timeline for the traced request.** Keep http.requestId enabled (its echoed header is how the request is found) and retry; a path under the devtools prefix is never recorded.
+
+Category: your code · skill: `warlock-trace`
+
 ## WL6xxx — database
 
 ### WL6001
@@ -271,6 +277,24 @@ Category: your code · skill: `write-cli-command` · thrown as `CliOptionValueEr
 **Generated code imports a package the app does not declare.** Add the named package to the app's dependencies, or import it through @warlock.js/core.
 
 Category: your code · skill: `run-app` · thrown as `UndeclaredGeneratedImportError`
+
+### WL7003
+
+**A command needs an optional package that is not installed.** Install the packages named in the message as dev dependencies (warlock mcp needs @warlock.js/ai-tools and @warlock.js/ai).
+
+Category: your code · skill: `warlock-mcp`
+
+### WL7004
+
+**warlock mcp was asked to listen off loopback without a token.** Pass --token (or set WARLOCK_MCP_TOKEN) when --host is not 127.0.0.1, ::1 or localhost, or keep the default loopback host.
+
+Category: your code · skill: `warlock-mcp`
+
+### WL7005
+
+**An MCP tool that writes files was called on a read-only server.** Restart the server with --allow-writes to let generate tools write; without it they only return the diff.
+
+Category: your code · skill: `warlock-mcp`
 
 ### WL7101
 
@@ -307,6 +331,36 @@ Category: your code · skill: `warlock-check`
 **A test file failed before its tests ran.** Fix the import or setup error named in the message; none of the file's tests ran.
 
 Category: your code · skill: `warlock-check`
+
+### WL7401
+
+**The agent board is not initialized.** Run `warlock board init` at the project root first.
+
+Category: your code · skill: `warlock-board`
+
+### WL7402
+
+**A board item does not exist.** Run `warlock board status` to list the item ids.
+
+Category: your code · skill: `warlock-board`
+
+### WL7403
+
+**A board item cannot move to the requested state.** Use one of the next states listed in the message; `warlock board status <id>` shows the item's current state.
+
+Category: your code · skill: `warlock-board`
+
+### WL7404
+
+**No board message arrived before the watch timed out.** Run `warlock board watch` again, or raise --timeout.
+
+Category: your code · skill: `warlock-board`
+
+### WL7501
+
+**AGENTS.md has malformed generated-section markers.** Keep one `<!-- warlock:generated:start -->` line followed by one `<!-- warlock:generated:end -->` line, or remove both.
+
+Category: your code · skill: `warlock-agents-md`
 
 ## WL8xxx — this machine
 
@@ -351,6 +405,18 @@ Category: this machine · skill: `warlock-check`
 **A tool crashed, timed out or ran out of memory.** Re-run the step; if it repeats, raise the memory limit (NODE_OPTIONS=--max-old-space-size) or use --changed.
 
 Category: this machine · skill: `warlock-check`
+
+### WL8008
+
+**The dev server is not running.** Start `warlock dev` in this project, or pass --url with the address of a running dev server.
+
+Category: this machine · skill: `warlock-trace`
+
+### WL8009
+
+**Devtools is not running in the dev server.** Install it with `warlock add devtools` and restart `warlock dev`; devtools answers loopback requests in development only.
+
+Category: this machine · skill: `warlock-trace`
 
 ## WL9xxx — conventions and hygiene
 

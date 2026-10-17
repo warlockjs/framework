@@ -391,3 +391,23 @@ and custom shell results with required `cancelled`. `read.maxBytes` now really
 caps returned content, including line-number prefixes (`bytesCapped: true`);
 a window starting past EOF returns empty content. An aborted command resolves
 with `cancelled: true`; it does not throw solely because it was cancelled.
+
+## 5.30 to 5.31: `warlock dev` keeps a section of AGENTS.md
+
+5.31's `warlock dev` writes an app summary for coding agents into `AGENTS.md`
+at the project root — creating the file when it is missing, otherwise only
+between `<!-- warlock:generated:start -->` and `<!-- warlock:generated:end -->`
+(appended at the end the first time). Commit the file like any other agent
+guide, or turn the refresh off:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: { agentsMd: false },
+});
+```
+
+It also writes `.warlock/dev-server.json` (the server's address, for
+`warlock trace` and `warlock mcp`); `.warlock/` is already git-ignored by the
+starter. See the `warlock-agents-md` topic.

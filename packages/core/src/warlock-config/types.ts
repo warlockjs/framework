@@ -224,6 +224,34 @@ export type WarlockConfig = {
      * @default false
      */
     timings?: boolean;
+    /**
+     * Keep the generated section of the project's `AGENTS.md` fresh: written
+     * on boot and again (debounced) after reloads, between the
+     * `<!-- warlock:generated:start -->` / `end` markers. Content outside the
+     * markers is never touched; the file is created when missing. Set to
+     * `false` to leave `AGENTS.md` alone (`warlock agents-md --write` still
+     * works).
+     * @default true
+     */
+    agentsMd?: boolean;
+    /**
+     * Serve `warlock mcp` from inside the dev server, over Streamable HTTP on
+     * loopback, so its `inspect_*` tools read the live registries. Same as
+     * `warlock dev --mcp`. `true` uses the defaults; an object sets them. The
+     * endpoint is printed and recorded in `.warlock/dev-server.json`. Needs
+     * `@warlock.js/ai-tools`.
+     * @default false
+     */
+    mcp?:
+      | boolean
+      | {
+          /** `0` picks a free port. @default 0 */
+          port?: number;
+          /** Bearer token clients must send. @default none (loopback only) */
+          token?: string;
+          /** Let generate tools write into the project. @default false */
+          allowWrites?: boolean;
+        };
   };
 
   /**

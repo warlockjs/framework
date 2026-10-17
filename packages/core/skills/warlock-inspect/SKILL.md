@@ -1,6 +1,6 @@
 ---
 name: warlock-inspect
-description: 'Ask the app instead of grepping it: `warlock inspect --json` prints the facts of the booted app — routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys and types, event listeners, pages (layouts, loaders, actions), queue jobs, scheduled tasks and installed @warlock.js versions — as a versioned report (`schemaVersion: 1`) with a published JSON Schema; `inspectApp()` returns the same object. Triggers: `warlock inspect`, `--section`, `inspectApp`, `bootForInspect`, `InspectReport`, `INSPECT_REPORT_JSON_SCHEMA`, `inspect-report.schema.json`, `@warlock.js/core/tooling`; "which routes are unguarded", "what does this app expose", "what models and columns exist", "which config keys are set", "list event listeners", "app facts as JSON for an agent". Skip: a route table for humans — the `warlock-routes` topic; health diagnostics — the `warlock-doctor` topic; verifying a change — the `warlock-check` topic; an OpenAPI file — the `generate-openapi` topic.'
+description: 'Ask the app instead of grepping it: `warlock inspect --json` prints the facts of the booted app — routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys and types, event listeners, pages (layouts, loaders, actions), queue jobs, scheduled tasks and installed @warlock.js versions — as a versioned report (`schemaVersion: 1`) with a published JSON Schema; `inspectApp()` returns the same object. Triggers: `warlock inspect`, `--section`, `inspect_routes`, `inspectApp`, `bootForInspect`, `InspectReport`, `INSPECT_REPORT_JSON_SCHEMA`, `inspect-report.schema.json`, `@warlock.js/core/tooling`; "which routes are unguarded", "what does this app expose", "what models and columns exist", "which config keys are set", "list event listeners", "app facts as JSON for an agent". Skip: a route table for humans — the `warlock-routes` topic; health diagnostics — the `warlock-doctor` topic; verifying a change — the `warlock-check` topic; an OpenAPI file — the `generate-openapi` topic.'
 ---
 
 # Warlock — `warlock inspect`
@@ -99,8 +99,9 @@ Validate a report with the published schema — `INSPECT_REPORT_JSON_SCHEMA` (dr
 
 ```ts
 import Ajv2020 from "ajv/dist/2020";
-import { INSPECT_REPORT_JSON_SCHEMA } from "@warlock.js/core/tooling";
+import { INSPECT_REPORT_JSON_SCHEMA, inspectApp } from "@warlock.js/core/tooling";
 
+const report = await inspectApp();
 const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA, report);
 ```
 
@@ -110,6 +111,12 @@ const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA
 - A section you did not request is absent, not empty.
 - Warning and description text is not a contract; match on `code` fields.
 - A breaking change ships as `schemaVersion: 2`, listed under BREAKING in the changelog.
+
+## Agents: ask through MCP instead of shelling out
+
+`npx warlock mcp` serves the same report as tools — `inspect_app` for the counts, then `inspect_routes` (`filter`, `method`, `unguardedWrites`), `inspect_models`, `inspect_config`, … one per section, plus `db_schema` built from the `models` section. `npx warlock dev --mcp` serves them from the dev server, so they reflect the last hot reload. See the `warlock-mcp` topic.
+
+`warlock dev` also writes a summary of this report (modules, routes, unguarded writes, models, installed skills) into the generated section of `AGENTS.md` — see the `warlock-agents-md` topic.
 
 ## Gotchas
 
@@ -121,5 +128,7 @@ const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA
 ## See also
 
 - The `warlock-check` topic — verify a change: typecheck, lint, tests, conventions, error codes.
+- The `warlock-mcp` topic — the same facts as MCP tools for a coding agent.
+- The `warlock-agents-md` topic — the app summary `warlock dev` keeps in AGENTS.md.
 - The `warlock-routes` topic — the human route table.
 - The `generate-openapi` topic — the same route schemas as an OpenAPI document.

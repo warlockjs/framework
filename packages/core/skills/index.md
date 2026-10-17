@@ -12,7 +12,7 @@ Core is the application runtime: it boots the app, auto-loads each module's spec
 2. Write a thin controller (`create-controller.md`); validate input with a schema attached to the handler (`validate-input.md`).
 3. Put logic in a service or use case (`write-use-case.md`), and data access in a repository (`use-repository.md`).
 4. Return via `response.*` (`send-response.md`) and shape output with a resource (`define-resource.md`); declare `responseSchema` for typed clients and docs (`create-controller.md`, `generate-openapi.md`).
-5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md`, and verify a change with `warlock-check.md`.
+5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md` (or serve it to an agent with `warlock-mcp.md`), verify a change with `warlock-check.md`, and a request's runtime behaviour with `warlock-trace.md`.
 
 ## Topics by area
 
@@ -21,6 +21,7 @@ Core is the application runtime: it boots the app, auto-loads each module's spec
 - **Responses & resources:** send-response, define-resource, use-model-transformers, use-localization
 - **Domain layers:** write-use-case, use-repository, write-seeder
 - **CLI & running the app:** run-app, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
+- **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
 - **Security & utilities:** hash-password, encrypt-data, retry-operation, benchmark-code, request-memo, request-tracing
 - **Testing:** test-http, test-service, test-fakes, model-factories
