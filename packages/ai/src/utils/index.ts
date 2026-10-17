@@ -1,4 +1,4 @@
-export { accumulateCost, computeCost, mergeUsage } from "./compute-cost";
+export { accumulateCost, attachCost, computeCost, mergeUsage, totalCost } from "./compute-cost";
 export { extractJsonLenient } from "./extract-json-lenient";
 export { extractJsonPayload } from "./extract-json-payload";
 export { generateRunId } from "./generate-run-id";

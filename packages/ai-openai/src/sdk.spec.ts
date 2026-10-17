@@ -115,9 +115,9 @@ describe("OpenAISDK pricing resolution", () => {
     expect(sdk.model({ name: "unlisted-model" }).pricing).toBeUndefined();
   });
 
-  it("leaves pricing undefined when the SDK has no registry at all", () => {
+  it("leaves pricing undefined for a model with no registry entry and no list price", () => {
     const sdk = new OpenAISDK({ apiKey: "k" });
-    expect(sdk.model({ name: "gpt-4o-mini" }).pricing).toBeUndefined();
+    expect(sdk.model({ name: "ft:gpt-4o-mini:acme" }).pricing).toBeUndefined();
   });
 });
 
@@ -258,5 +258,28 @@ describe("OpenAISDK api gate (Responses adapter)", () => {
     expect(() => new OpenAIResponsesModel(client, { name: "gpt-5.6" }, "groq")).toThrow(
       InvalidRequestError,
     );
+  });
+});
+
+describe("OpenAISDK built-in pricing", () => {
+  it("falls back to the verified list price for exact OpenAI model ids only", () => {
+    const sdk = new OpenAISDK({ apiKey: "test-key" });
+
+    expect(sdk.model({ name: "gpt-4o-mini" }).pricing).toEqual({
+      input: 0.15,
+      output: 0.6,
+      cachedInput: 0.075,
+    });
+    expect(sdk.model({ name: "gpt-4o-2024-05-13" }).pricing).toBeUndefined();
+    expect(sdk.model({ name: "gpt-5.5" }).pricing).toBeUndefined();
+  });
+
+  it("lets SDK and per-model pricing win, and never prices other provider labels", () => {
+    const sdk = new OpenAISDK({ apiKey: "k", pricing: { "gpt-4o": { input: 1, output: 2 } } });
+
+    expect(sdk.model({ name: "gpt-4o" }).pricing).toEqual({ input: 1, output: 2 });
+    expect(
+      new OpenAISDK({ apiKey: "k", provider: "gateway" }).model({ name: "gpt-4o" }).pricing,
+    ).toBeUndefined();
   });
 });

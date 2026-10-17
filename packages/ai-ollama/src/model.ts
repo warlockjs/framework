@@ -1,4 +1,5 @@
 import {
+  attachCost,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -123,7 +124,7 @@ export class OllamaModel implements ModelContract {
 
     const toolCalls = this.extractToolCalls(response.message);
     const finishReason = toolCalls ? "tool_calls" : mapDoneReason(response.done_reason);
-    const usage = this.extractUsage(response);
+    const usage = attachCost(this.extractUsage(response), this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "chat call succeeded", { finishReason, usage });
 
@@ -207,6 +208,8 @@ export class OllamaModel implements ModelContract {
     }
 
     const finishReason = sawToolCall ? "tool_calls" : mapDoneReason(rawDoneReason);
+
+    attachCost(usage, this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "streaming chat call succeeded", {
       finishReason,

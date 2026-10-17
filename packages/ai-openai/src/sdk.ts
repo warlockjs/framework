@@ -9,6 +9,7 @@ import type {
   TranscriptionModelContract,
 } from "@warlock.js/ai";
 import { InvalidRequestError, approximateTokenCount } from "@warlock.js/ai";
+import { openAIPricingFor } from "./known-pricing";
 import type {
   OpenAIEmbedderConfig,
   OpenAIImageConfig,
@@ -84,8 +85,9 @@ export class OpenAISDK implements SDKAdapterContract {
    * coming from the same upstream.
    *
    * Pricing resolution: per-model `config.pricing` wins; otherwise the
-   * SDK-level registry entry keyed by `config.name`; otherwise
-   * `undefined` (no cost computed).
+   * SDK-level registry entry keyed by `config.name`; otherwise, when the
+   * provider label is `"openai"`, the built-in list price
+   * (`OPENAI_MODEL_PRICING`); otherwise `undefined` (no cost computed).
    *
    * `config.api` selects the wire API. Omitted or `"chat"` builds the Chat
    * Completions `OpenAIModel`. `"responses"` builds `OpenAIResponsesModel`
@@ -111,7 +113,10 @@ export class OpenAISDK implements SDKAdapterContract {
       );
     }
 
-    const resolvedPricing = config.pricing ?? this.pricing?.[config.name];
+    const resolvedPricing =
+      config.pricing ??
+      this.pricing?.[config.name] ??
+      (this.provider === "openai" ? openAIPricingFor(config.name) : undefined);
     const resolvedConfig: OpenAIModelConfig =
       resolvedPricing === config.pricing ? config : { ...config, pricing: resolvedPricing };
 

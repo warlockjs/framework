@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
+import { totalCost } from "@warlock.js/ai";
 import { AnthropicModel } from "./model";
 
 /** The first recorded request; fails the test when none was made. */
@@ -134,7 +135,13 @@ describe("AnthropicModel.complete()", () => {
 
     expect(result.content).toBe("hello");
     expect(result.finishReason).toBe("stop");
-    expect(result.usage).toEqual({ input: 5, output: 3, total: 8 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 5,
+      output: 3,
+      total: 8,
+    });
     expect(result.toolCalls).toBeUndefined();
   });
 
@@ -242,7 +249,14 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 10, output: 4, total: 14, cachedTokens: 6 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 10,
+      output: 4,
+      total: 14,
+      cachedTokens: 6,
+    });
   });
 
   it("emits native output_config for an object responseSchema when capable", async () => {
@@ -446,7 +460,13 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 10, output: 4, total: 14 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 10,
+      output: 4,
+      total: 14,
+    });
     expect(result.usage.cachedTokens).toBeUndefined();
   });
 
@@ -463,7 +483,13 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 0, output: 0, total: 0 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 0,
+      output: 0,
+      total: 0,
+    });
   });
 
   it("surfaces Anthropic thinking tokens as reasoningTokens when reported", async () => {
@@ -480,7 +506,14 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 10, output: 14, total: 24, reasoningTokens: 9 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 10,
+      output: 14,
+      total: 24,
+      reasoningTokens: 9,
+    });
   });
 
   it("maps max_tokens stop_reason to the 'length' finish reason", async () => {
@@ -558,7 +591,73 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 12, output: 4, total: 16, cacheWriteTokens: 64 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 12,
+      output: 4,
+      total: 16,
+      cacheWriteTokens: 64,
+    });
+  });
+
+  it("bills a recorded usage block with cache reads and writes once per channel", async () => {
+    const { client } = makeFakeClient({
+      message: message({
+        usage: {
+          input_tokens: 100,
+          output_tokens: 500,
+          cache_read_input_tokens: 50_000,
+          cache_creation_input_tokens: 20_000,
+          cache_creation: { ephemeral_5m_input_tokens: 20_000, ephemeral_1h_input_tokens: 0 },
+        } as Anthropic.Usage,
+      }),
+    });
+    const model = new AnthropicModel(client, {
+      name: "claude-sonnet-4-6",
+      pricing: { input: 3, output: 15, cachedInput: 0.3 },
+    });
+
+    const result = await model.complete([{ role: "user", content: "hi" }]);
+
+    // Caller pricing omits the write rate; Anthropic's 1.25x multiplier fills it.
+    expect(model.pricing).toEqual({
+      input: 3,
+      output: 15,
+      cachedInput: 0.3,
+      cacheWrite: 3.75,
+      cacheWrite1h: 6,
+    });
+    expect(result.usage.cacheWrite1hTokens).toBeUndefined();
+    expect(totalCost(result.usage.cost)).toBeCloseTo(
+      (100 * 3 + 50_000 * 0.3 + 20_000 * 3.75 + 500 * 15) / 1e6,
+      10,
+    );
+  });
+
+  it("attributes cache writes to the 1-hour rate when every marker asked for 1h", async () => {
+    const { client } = makeFakeClient({
+      message: message({
+        usage: {
+          input_tokens: 10,
+          output_tokens: 1,
+          cache_read_input_tokens: null,
+          cache_creation_input_tokens: 4_000,
+        } as Anthropic.Usage,
+      }),
+    });
+    const model = new AnthropicModel(client, { name: "claude-sonnet-4-6" });
+
+    const result = await model.complete(
+      [
+        { role: "system", content: "stable prefix" },
+        { role: "user", content: "hi" },
+      ],
+      { cacheControl: { breakpoints: 1, ttl: "1h" } },
+    );
+
+    expect(result.usage.cacheWrite1hTokens).toBe(4_000);
+    expect(result.usage.cost?.cacheWrite).toBeCloseTo((4_000 * 6) / 1e6, 10);
   });
 
   it("surfaces both cache read and write tokens together", async () => {
@@ -576,12 +675,22 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
+    // Built-in claude-sonnet-4-6 list prices: input 3, output 15, cache
+    // read 0.3, 5-minute write 3.75 (USD / MTok). `input_tokens` excludes
+    // the cache, so each channel is billed once.
     expect(result.usage).toEqual({
       input: 20,
       output: 5,
       total: 25,
       cachedTokens: 10,
       cacheWriteTokens: 8,
+      inputIncludesCache: false,
+      cost: {
+        input: (20 * 3) / 1e6,
+        output: (5 * 15) / 1e6,
+        cachedInput: (10 * 0.3) / 1e6,
+        cacheWrite: (8 * 3.75) / 1e6,
+      },
     });
   });
 
@@ -600,7 +709,13 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 10, output: 4, total: 14 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 10,
+      output: 4,
+      total: 14,
+    });
     expect(result.usage.cacheWriteTokens).toBeUndefined();
   });
 
@@ -842,7 +957,13 @@ describe("AnthropicModel.stream()", () => {
     expect(types).toEqual(["delta", "delta", "done"]);
     expect(done).toEqual({
       finishReason: "stop",
-      usage: { input: 9, output: 4, total: 13 },
+      usage: {
+        inputIncludesCache: false,
+        cost: expect.any(Object),
+        input: 9,
+        output: 4,
+        total: 13,
+      },
     });
   });
 
@@ -873,7 +994,14 @@ describe("AnthropicModel.stream()", () => {
     expect(chunks.at(-1)).toEqual({
       type: "done",
       finishReason: "stop",
-      usage: { input: 9, output: 8, total: 17, reasoningTokens: 5 },
+      usage: {
+        inputIncludesCache: false,
+        cost: expect.any(Object),
+        input: 9,
+        output: 8,
+        total: 17,
+        reasoningTokens: 5,
+      },
     });
   });
 
@@ -1051,7 +1179,14 @@ describe("AnthropicModel.stream()", () => {
     const chunks = await collectStream(model.stream([{ role: "user", content: "hi" }]));
     const done = chunks.find((chunk) => chunk.type === "done");
 
-    expect(done?.usage).toEqual({ input: 8, output: 2, total: 10, cachedTokens: 5 });
+    expect(done?.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 8,
+      output: 2,
+      total: 10,
+      cachedTokens: 5,
+    });
   });
 
   it("does not set cachedTokens when message_start reports zero cache reads", async () => {
@@ -1070,7 +1205,13 @@ describe("AnthropicModel.stream()", () => {
     const chunks = await collectStream(model.stream([{ role: "user", content: "hi" }]));
     const done = chunks.find((chunk) => chunk.type === "done");
 
-    expect(done?.usage).toEqual({ input: 8, output: 2, total: 10 });
+    expect(done?.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 8,
+      output: 2,
+      total: 10,
+    });
     expect((done!.usage as { cachedTokens?: number }).cachedTokens).toBeUndefined();
   });
 
@@ -1091,7 +1232,14 @@ describe("AnthropicModel.stream()", () => {
     const chunks = await collectStream(model.stream([{ role: "user", content: "hi" }]));
     const done = chunks.find((chunk) => chunk.type === "done");
 
-    expect(done?.usage).toEqual({ input: 8, output: 2, total: 10, cacheWriteTokens: 12 });
+    expect(done?.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 8,
+      output: 2,
+      total: 10,
+      cacheWriteTokens: 12,
+    });
   });
 
   it("prefers the cumulative cache counts reported on message_delta", async () => {
@@ -1131,7 +1279,52 @@ describe("AnthropicModel.stream()", () => {
       total: 10,
       cachedTokens: 9,
       cacheWriteTokens: 7,
+      inputIncludesCache: false,
+      cost: expect.any(Object),
     });
+  });
+
+  it("keeps the 1-hour cache-write share from message_start and prices it at 2x input", async () => {
+    const { client } = makeFakeClient({
+      streamEvents: [
+        {
+          type: "message_start",
+          message: {
+            usage: {
+              input_tokens: 100,
+              cache_read_input_tokens: 50_000,
+              cache_creation_input_tokens: 20_000,
+              cache_creation: {
+                ephemeral_5m_input_tokens: 5_000,
+                ephemeral_1h_input_tokens: 15_000,
+              },
+            },
+          },
+        },
+        { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ok" } },
+        {
+          type: "message_delta",
+          delta: { stop_reason: "end_turn" },
+          usage: {
+            output_tokens: 500,
+            cache_read_input_tokens: 50_000,
+            cache_creation_input_tokens: 20_000,
+          },
+        },
+        { type: "message_stop" },
+      ] as unknown as Anthropic.RawMessageStreamEvent[],
+    });
+    const model = new AnthropicModel(client, { name: "claude-sonnet-4-6" });
+
+    const chunks = await collectStream(model.stream([{ role: "user", content: "hi" }]));
+    const done = chunks.find((chunk) => chunk.type === "done");
+
+    expect(done?.usage).toMatchObject({
+      cacheWriteTokens: 20_000,
+      cacheWrite1hTokens: 15_000,
+      inputIncludesCache: false,
+    });
+    expect(done?.usage.cost?.cacheWrite).toBeCloseTo((5_000 * 3.75 + 15_000 * 6) / 1e6, 10);
   });
 
   it("forwards thinking and a cache breakpoint on a streaming request", async () => {
@@ -1288,7 +1481,13 @@ describe("AnthropicModel.stream()", () => {
 
     // stop_reason sticks from the first delta; output_tokens advances to the latest.
     expect(done?.finishReason).toBe("stop");
-    expect(done?.usage).toEqual({ input: 1, output: 5, total: 6 });
+    expect(done?.usage).toEqual({
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+      input: 1,
+      output: 5,
+      total: 6,
+    });
   });
 
   it("yields a terminal done with zeroed usage and 'error' reason for an empty stream", async () => {
@@ -1298,7 +1497,17 @@ describe("AnthropicModel.stream()", () => {
     const chunks = await collectStream(model.stream([{ role: "user", content: "hi" }]));
 
     expect(chunks).toEqual([
-      { type: "done", finishReason: "error", usage: { input: 0, output: 0, total: 0 } },
+      {
+        type: "done",
+        finishReason: "error",
+        usage: {
+          inputIncludesCache: false,
+          cost: expect.any(Object),
+          input: 0,
+          output: 0,
+          total: 0,
+        },
+      },
     ]);
   });
 
@@ -1320,7 +1529,17 @@ describe("AnthropicModel.stream()", () => {
     // A text content_block_stop must NOT emit a tool-call (no accumulator registered).
     expect(chunks).toEqual([
       { type: "delta", content: "Hi" },
-      { type: "done", finishReason: "stop", usage: { input: 2, output: 1, total: 3 } },
+      {
+        type: "done",
+        finishReason: "stop",
+        usage: {
+          inputIncludesCache: false,
+          cost: expect.any(Object),
+          input: 2,
+          output: 1,
+          total: 3,
+        },
+      },
     ]);
   });
 });

@@ -18,11 +18,7 @@ import type { ModelPricing, Usage } from "@warlock.js/ai";
  * @example
  * const stats = store.aggregate({ sessionId: "session-42" });
  * console.log(`${stats.traces} runs, ${stats.usage.total} tokens`);
- * const totalUsd =
- *   (stats.cost?.input ?? 0) +
- *   (stats.cost?.output ?? 0) +
- *   (stats.cost?.cachedInput ?? 0) +
- *   (stats.cost?.cachedOutput ?? 0);
+ * const totalUsd = totalCost(stats.cost) ?? 0; // `totalCost` from @warlock.js/ai
  */
 export type TraceAggregate = {
   /** Number of traces matched by the query. */

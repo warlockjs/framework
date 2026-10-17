@@ -77,6 +77,16 @@ export type MistralModelConfig = ModelConfig & {
    */
   structuredOutput?: boolean;
   /**
+   * Prompt-cache routing key, sent as `prompt_cache_key` so requests that
+   * share a prefix land on the same Mistral cache. Use a stable value per
+   * conversation or tenant. Sent only while the SDK keeps its default
+   * provider label.
+   *
+   * @example
+   * model({ name: "mistral-large-latest", promptCacheKey: `conversation:${conversationId}` });
+   */
+  promptCacheKey?: string;
+  /**
    * Override the wire-level `response_format` the adapter emits when the
    * caller supplies a response schema (`"json_schema"` | `"json_object"`
    * | `"text"`). Forwarded verbatim to the wrapped OpenAI adapter — use

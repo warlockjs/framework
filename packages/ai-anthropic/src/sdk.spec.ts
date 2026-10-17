@@ -73,11 +73,24 @@ describe("AnthropicSDK", () => {
       pricing: { "claude-sonnet-4-6": { input: 3, output: 15 } },
     });
 
-    expect(sdk.model({ name: "claude-sonnet-4-6" }).pricing).toEqual({ input: 3, output: 15 });
+    // Caller entries win over the built-in table; the Anthropic cache-write
+    // multipliers (5m 1.25x, 1h 2x) fill the rates they leave out.
+    expect(sdk.model({ name: "claude-sonnet-4-6" }).pricing).toEqual({
+      input: 3,
+      output: 15,
+      cacheWrite: 3.75,
+      cacheWrite1h: 6,
+    });
     expect(
       sdk.model({ name: "claude-sonnet-4-6", pricing: { input: 1, output: 2 } }).pricing,
-    ).toEqual({ input: 1, output: 2 });
-    expect(sdk.model({ name: "claude-haiku-4-5" }).pricing).toBeUndefined();
+    ).toEqual({ input: 1, output: 2, cacheWrite: 1.25, cacheWrite1h: 2 });
+    expect(sdk.model({ name: "claude-haiku-4-5" }).pricing).toEqual({
+      input: 1,
+      output: 5,
+      cachedInput: 0.1,
+      cacheWrite: 1.25,
+      cacheWrite1h: 2,
+    });
   });
 
   it("count() returns an approximate token count using the core heuristic", async () => {
@@ -104,11 +117,20 @@ describe("AnthropicSDK", () => {
     expect(await sdk.count("abcde")).toBe(2);
   });
 
-  it("model() does not re-wrap config when no SDK pricing applies", () => {
+  it("model() falls back to the built-in list price, and leaves unknown ids unpriced", () => {
     const sdk = new AnthropicSDK({ apiKey: "test-key" });
 
-    // Without any pricing, pricing resolves to undefined on the produced model.
-    expect(sdk.model({ name: "claude-sonnet-4-6" }).pricing).toBeUndefined();
+    expect(sdk.model({ name: "claude-sonnet-4-6" }).pricing).toEqual({
+      input: 3,
+      output: 15,
+      cachedInput: 0.3,
+      cacheWrite: 3.75,
+      cacheWrite1h: 6,
+    });
+    expect(sdk.model({ name: "claude-sonnet-4-5-20250929" }).pricing?.input).toBe(3);
+    // Prompt-length-tiered and unknown models stay unpriced.
+    expect(sdk.model({ name: "claude-haiku-5-5" }).pricing).toBeUndefined();
+    expect(sdk.model({ name: "my-proxy-model" }).pricing).toBeUndefined();
   });
 
   it("model() defaults the provider label to 'anthropic'", () => {

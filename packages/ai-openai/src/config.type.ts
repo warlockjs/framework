@@ -148,9 +148,11 @@ export type OpenAIModelConfig = ModelConfig & {
    */
   reasoning?: boolean;
   /**
-   * Stable request bucket used by OpenAI to improve prompt-cache matching.
-   * Sent only by models whose SDK provider label is `"openai"`; compatible
-   * wrapper endpoints deliberately never receive this OpenAI-only field.
+   * Stable request bucket used to improve prompt-cache matching, sent as
+   * `prompt_cache_key`. Sent when the SDK provider label is `"openai"`,
+   * `"xai"` or `"mistral"` — the endpoints that document the field. Other
+   * labels (Groq and DeepSeek cache automatically; custom gateways) never
+   * receive it.
    */
   promptCacheKey?: string;
   /**

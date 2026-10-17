@@ -242,6 +242,7 @@ describe("GeminiImageModel.generate() — response", () => {
     const { usage } = await model.generate("x");
 
     expect(usage).toEqual({
+      inputIncludesCache: true,
       input: 12,
       output: 1290,
       total: 1302,

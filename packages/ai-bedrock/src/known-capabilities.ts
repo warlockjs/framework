@@ -31,8 +31,10 @@ const REASONING_CAPABLE_SUBSTRINGS = [
 
 /**
  * Families that honor Converse `cachePoint` prompt-cache breakpoints.
- * Anthropic Claude 3.5+ / 3.7 / 4 and the Amazon Nova line support
- * cache points; text-only legacy families do not.
+ * Anthropic Claude 3.5+ / 3.7 / 4 / 5 and the Amazon Nova line support
+ * cache points; text-only legacy families do not. Per the "Supported
+ * models" table of https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html
+ * (checked 2026-10-17).
  */
 const PROMPT_CACHING_CAPABLE_SUBSTRINGS = [
   "claude-3-5",
@@ -40,6 +42,12 @@ const PROMPT_CACHING_CAPABLE_SUBSTRINGS = [
   "claude-sonnet-4",
   "claude-opus-4",
   "claude-haiku-4",
+  "claude-sonnet-5",
+  "claude-opus-5",
+  "claude-haiku-5",
+  "claude-fable-5",
+  "claude-mythos-5",
+  "nova-2-lite",
   "nova-lite",
   "nova-pro",
   "nova-premier",
@@ -108,4 +116,38 @@ export function inferPromptCachingCapability(modelId: string): boolean {
  */
 export function inferPdfCapability(modelId: string): boolean {
   return matchesAny(modelId, PDF_CAPABLE_SUBSTRINGS);
+}
+
+/**
+ * Claude on Bedrock accepts a `cachePoint` in `system`, `messages` and
+ * `tools`; Amazon Nova accepts one only in `system` and `messages`
+ * (https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html,
+ * "Fields that accept prompt cache checkpoints", checked 2026-10-17).
+ * Unknown families get no tool cache point.
+ *
+ * @example
+ * supportsToolCachePoint("global.anthropic.claude-sonnet-4-6"); // true
+ * supportsToolCachePoint("amazon.nova-pro-v1:0"); // false
+ */
+export function supportsToolCachePoint(modelId: string): boolean {
+  return modelId.toLowerCase().includes("anthropic.claude");
+}
+
+/** Claude families whose cache points accept the 1-hour TTL. */
+const ONE_HOUR_TTL_PATTERN =
+  /anthropic\.claude-(?:(?:opus|sonnet|haiku|fable|mythos)-5|opus-4-[5-9]|sonnet-4-[5-9]|haiku-4-5)/;
+
+/**
+ * Claude models whose Converse `cachePoint` accepts `ttl: "1h"`: Claude
+ * Haiku 4.5, the 4.5+ Sonnet / Opus line and every Claude 5 family. Any
+ * other model gets no `ttl` field (the 5-minute default), since AWS
+ * warns that sending it to a 5-minute-only model "can result in a
+ * ValidationException" (same page, checked 2026-10-17).
+ *
+ * @example
+ * supportsOneHourCacheTtl("anthropic.claude-haiku-4-5-20251001-v1:0"); // true
+ * supportsOneHourCacheTtl("anthropic.claude-3-7-sonnet-20250219-v1:0"); // false
+ */
+export function supportsOneHourCacheTtl(modelId: string): boolean {
+  return ONE_HOUR_TTL_PATTERN.test(modelId.toLowerCase());
 }

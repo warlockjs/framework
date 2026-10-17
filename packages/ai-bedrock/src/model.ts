@@ -1,4 +1,5 @@
 import {
+  attachCost,
   InvalidRequestError,
   safeJsonParse,
   type Message,
@@ -27,10 +28,16 @@ import {
   inferPdfCapability,
   inferPromptCachingCapability,
   inferReasoningCapability,
+  supportsOneHourCacheTtl,
+  supportsToolCachePoint,
 } from "./known-capabilities";
+import { bedrockPricingFor, withClaudeCacheWriteRates } from "./known-pricing";
 import { inferVisionCapability } from "./known-vision-models";
 import { toReasoningMetadata, type BedrockReasoningBlock } from "./utils/reasoning-blocks";
 import { mapStopReason, toBedrockMessages, toBedrockToolConfig, wrapBedrockError } from "./utils";
+
+/** A Converse cache point as this adapter emits it. */
+type BedrockCachePoint = { type: "default"; ttl?: "1h" };
 
 const LOG_MODULE = "ai.bedrock";
 
@@ -108,7 +115,12 @@ export class BedrockModel implements ModelContract {
     this.config = config;
     this.name = config.name;
     this.provider = provider;
-    this.pricing = config.pricing;
+    // Explicit pricing wins over the built-in `global.` / `us.` profile
+    // prices; Claude entries get the 1.25x / 2x cache-write rates filled.
+    this.pricing = withClaudeCacheWriteRates(
+      config.name,
+      config.pricing ?? bedrockPricingFor(config.name),
+    );
     this.capabilities = {
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
@@ -146,7 +158,7 @@ export class BedrockModel implements ModelContract {
 
     const blocks = response.output?.message?.content ?? [];
     const finishReason = mapStopReason(response.stopReason);
-    const usage = this.extractUsage(response.usage);
+    const usage = attachCost(this.extractUsage(response.usage), this.pricing);
     const toolCalls = this.extractToolCalls(blocks);
 
     this.logger.debug(LOG_MODULE, "response", "Converse call succeeded", { finishReason, usage });
@@ -214,7 +226,7 @@ export class BedrockModel implements ModelContract {
     }
 
     let rawStopReason: string | undefined;
-    const usage: Usage = { input: 0, output: 0, total: 0 };
+    let usage: Usage = { input: 0, output: 0, total: 0 };
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
     const reasoningBlocks = new Map<
       number,
@@ -306,19 +318,7 @@ export class BedrockModel implements ModelContract {
         }
 
         if (event.metadata?.usage) {
-          const raw = event.metadata.usage;
-
-          usage.input = raw.inputTokens ?? 0;
-          usage.output = raw.outputTokens ?? 0;
-          usage.total = raw.totalTokens ?? usage.input + usage.output;
-
-          if (raw.cacheReadInputTokens && raw.cacheReadInputTokens > 0) {
-            usage.cachedTokens = raw.cacheReadInputTokens;
-          }
-
-          if (raw.cacheWriteInputTokens && raw.cacheWriteInputTokens > 0) {
-            usage.cacheWriteTokens = raw.cacheWriteInputTokens;
-          }
+          usage = this.extractUsage(event.metadata.usage);
         }
       }
     } catch (thrown) {
@@ -326,6 +326,8 @@ export class BedrockModel implements ModelContract {
     }
 
     const finishReason = mapStopReason(rawStopReason);
+
+    attachCost(usage, this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "ConverseStream call succeeded", {
       finishReason,
@@ -350,18 +352,20 @@ export class BedrockModel implements ModelContract {
     const configuredMaxTokens = options?.maxTokens ?? this.config.maxTokens;
     const maxTokens = this.resolveMaxTokens(configuredMaxTokens, thinkingBudget);
     const temperature = options?.temperature ?? this.config.temperature;
-    const cachedMessages = this.applyCacheBreakpoints(bedrockMessages, options?.cacheControl);
+    const cachePoint = this.resolveCachePoint(options?.cacheControl);
+    const cachedMessages = this.applyCacheBreakpoints(bedrockMessages, cachePoint);
+    const cachedSystem = system && cachePoint ? [...system, { cachePoint }] : system;
 
     return mergeProviderBody<ConverseRequest>(
       {
         modelId: this.name,
         messages: cachedMessages,
-        ...(system ? { system } : {}),
+        ...(cachedSystem ? { system: cachedSystem } : {}),
         inferenceConfig: {
           ...(maxTokens !== undefined ? { maxTokens } : {}),
           ...(temperature !== undefined ? { temperature } : {}),
         },
-        ...this.buildToolConfig(options?.tools),
+        ...this.buildToolConfig(options?.tools, cachePoint),
         ...this.buildOutputConfig(options?.responseSchema),
         ...this.buildReasoningConfig(thinkingBudget),
       },
@@ -370,32 +374,46 @@ export class BedrockModel implements ModelContract {
   }
 
   /**
-   * Append a Converse `cachePoint` block to the LAST message when the
-   * caller supplies a `cacheControl` write breakpoint and the model is
-   * `promptCaching`-capable. A cache point tells Bedrock to cache the
-   * whole prefix up to that block, so subsequent calls reusing the same
-   * prefix bill the cached portion at the discounted read rate
-   * (surfaced as `Usage.cachedTokens`). No-ops gracefully when caching
-   * is unsupported, no breakpoint was requested, or there are no
-   * messages to mark — Bedrock then prices the call normally.
+   * Resolve the Converse `cachePoint` to place for this call, or
+   * `undefined` when no cache point applies (the model is not
+   * `promptCaching`-capable or no `cacheControl` breakpoint was asked
+   * for). Bedrock only honors `type: "default"`; the neutral
+   * `breakpoints` count is a presence hint.
    *
-   * Bedrock only honors `CachePointType.DEFAULT`; the neutral
-   * `breakpoints` count is a presence hint (one trailing breakpoint is
-   * the only placement Converse supports without manual block surgery),
-   * so any positive value marks the trailing message.
+   * The lifetime is the per-call `cacheControl.ttl`, else the model's
+   * `promptCacheTtl`. `ttl: "1h"` is sent only to models that accept it
+   * ({@link supportsOneHourCacheTtl}); any other model gets the 5-minute
+   * default, because AWS rejects the field there.
+   */
+  private resolveCachePoint(
+    cacheControl: ModelCallOptions["cacheControl"],
+  ): BedrockCachePoint | undefined {
+    const breakpoints = cacheControl?.breakpoints ?? 0;
+
+    if (!this.capabilities.promptCaching || breakpoints <= 0) {
+      return undefined;
+    }
+
+    const ttl = cacheControl?.ttl ?? this.config.promptCacheTtl;
+
+    return ttl === "1h" && supportsOneHourCacheTtl(this.name)
+      ? { type: "default", ttl: "1h" }
+      : { type: "default" };
+  }
+
+  /**
+   * Append the call's `cachePoint` to the LAST message. Together with the
+   * `system` and `tools` cache points (see `buildRequest` /
+   * `buildToolConfig`) this caches every stable segment of the prefix —
+   * Bedrock processes them in `tools` → `system` → `messages` order, at
+   * most three of the four checkpoints it allows — so later calls reusing
+   * the prefix bill it at the cache-read rate (`Usage.cachedTokens`).
    */
   private applyCacheBreakpoints(
     messages: ConverseRequest["messages"],
-    cacheControl: ModelCallOptions["cacheControl"],
+    cachePoint: BedrockCachePoint | undefined,
   ): ConverseRequest["messages"] {
-    const breakpoints = cacheControl?.breakpoints ?? 0;
-
-    if (
-      !this.capabilities.promptCaching ||
-      breakpoints <= 0 ||
-      !messages ||
-      messages.length === 0
-    ) {
+    if (!cachePoint || !messages || messages.length === 0) {
       return messages;
     }
 
@@ -410,7 +428,7 @@ export class BedrockModel implements ModelContract {
       ...messages.slice(0, last),
       {
         ...lastMessage,
-        content: [...(lastMessage.content ?? []), { cachePoint: { type: "default" } }],
+        content: [...(lastMessage.content ?? []), { cachePoint }],
       },
     ];
   }
@@ -478,12 +496,25 @@ export class BedrockModel implements ModelContract {
 
   /**
    * Spread-friendly tool fragment. Returns an empty object when no
-   * tools were supplied (Bedrock rejects an empty `tools` array).
+   * tools were supplied (Bedrock rejects an empty `tools` array). With a
+   * cache point, a trailing `{ cachePoint }` caches every tool definition
+   * — Claude only, since Nova accepts no cache point in `tools`.
    */
-  private buildToolConfig(tools: ModelCallOptions["tools"]): Pick<ConverseRequest, "toolConfig"> {
+  private buildToolConfig(
+    tools: ModelCallOptions["tools"],
+    cachePoint: BedrockCachePoint | undefined,
+  ): Pick<ConverseRequest, "toolConfig"> {
     const toolConfig = toBedrockToolConfig(tools);
 
-    return toolConfig ? { toolConfig } : {};
+    if (!toolConfig) {
+      return {};
+    }
+
+    if (!cachePoint || !supportsToolCachePoint(this.name) || !toolConfig.tools) {
+      return { toolConfig };
+    }
+
+    return { toolConfig: { ...toolConfig, tools: [...toolConfig.tools, { cachePoint }] } };
   }
 
   /**
@@ -580,10 +611,13 @@ export class BedrockModel implements ModelContract {
    * Normalize Converse's `TokenUsage` into the neutral `Usage` shape.
    * Bedrock supplies a pre-summed `totalTokens`; cache-read and
    * cache-write tokens are surfaced as `cachedTokens` /
-   * `cacheWriteTokens` only when non-zero so callers can price the
-   * discounted read rate and the one-time write cost separately.
-   * Bedrock's Converse `TokenUsage` carries no reasoning-token channel,
-   * so `Usage.reasoningTokens` is intentionally left unset here.
+   * `cacheWriteTokens` only when non-zero, and the 1-hour share of the
+   * writes (`cacheDetails` entries with `ttl: "1h"`) as
+   * `cacheWrite1hTokens`. With caching, `inputTokens` "represents only
+   * the non-cached input tokens" (AWS prompt-caching guide), so the usage
+   * is marked `inputIncludesCache: false`. Bedrock's Converse `TokenUsage`
+   * carries no reasoning-token channel, so `Usage.reasoningTokens` is
+   * intentionally left unset here.
    */
   private extractUsage(raw: TokenUsage | undefined): Usage {
     if (!raw) {
@@ -594,13 +628,20 @@ export class BedrockModel implements ModelContract {
     const output = raw.outputTokens ?? 0;
     const cached = raw.cacheReadInputTokens;
     const cacheWrite = raw.cacheWriteInputTokens;
+    const cacheWrite1h = (raw.cacheDetails ?? [])
+      .filter((detail) => detail.ttl === "1h")
+      .reduce((sum, detail) => sum + (detail.inputTokens ?? 0), 0);
 
     return {
       input,
       output,
       total: raw.totalTokens ?? input + output,
+      inputIncludesCache: false,
       ...(cached && cached > 0 ? { cachedTokens: cached } : {}),
       ...(cacheWrite && cacheWrite > 0 ? { cacheWriteTokens: cacheWrite } : {}),
+      ...(cacheWrite && cacheWrite > 0 && cacheWrite1h > 0
+        ? { cacheWrite1hTokens: Math.min(cacheWrite1h, cacheWrite) }
+        : {}),
     };
   }
 

@@ -130,7 +130,7 @@ describe("GoogleModel.complete()", () => {
     expect(result).toEqual({
       content: "hello",
       finishReason: "stop",
-      usage: { input: 5, output: 3, total: 8 },
+      usage: { inputIncludesCache: true, input: 5, output: 3, total: 8 },
       toolCalls: undefined,
     });
   });
@@ -187,6 +187,7 @@ describe("GoogleModel.complete()", () => {
     const model = new GoogleModel(ai, { name: "gemini-2.5-flash" });
 
     expect((await model.complete([{ role: "user", content: "hi" }])).usage).toEqual({
+      inputIncludesCache: true,
       input: 10,
       output: 40,
       total: 50,
@@ -211,6 +212,7 @@ describe("GoogleModel.complete()", () => {
     const model = new GoogleModel(ai, { name: "gemini-2.5-flash" });
 
     expect((await model.complete([{ role: "user", content: "hi" }])).usage).toEqual({
+      inputIncludesCache: true,
       input: 20,
       output: 30,
       total: 50,
@@ -339,6 +341,7 @@ describe("GoogleModel.complete()", () => {
     const model = new GoogleModel(ai, { name: "gemini-2.5-flash" });
 
     expect((await model.complete([{ role: "user", content: "hi" }])).usage).toEqual({
+      inputIncludesCache: true,
       input: 10,
       output: 4,
       total: 14,
@@ -584,7 +587,10 @@ describe("GoogleModel.stream()", () => {
     }
 
     expect(types).toEqual(["delta", "delta", "done"]);
-    expect(done).toEqual({ finishReason: "stop", usage: { input: 9, output: 4, total: 13 } });
+    expect(done).toEqual({
+      finishReason: "stop",
+      usage: { inputIncludesCache: true, input: 9, output: 4, total: 13 },
+    });
   });
 
   it("emits a tool-call chunk (with thoughtSignature) and finishes as tool_calls", async () => {
@@ -680,7 +686,7 @@ describe("GoogleModel.stream()", () => {
       }
     }
 
-    expect(usage).toEqual({ input: 6, output: 4, total: 10 });
+    expect(usage).toEqual({ inputIncludesCache: true, input: 6, output: 4, total: 10 });
   });
 
   it("surfaces cachedContentTokenCount on the streamed usage", async () => {
@@ -707,7 +713,13 @@ describe("GoogleModel.stream()", () => {
       }
     }
 
-    expect(usage).toEqual({ input: 12, output: 3, total: 15, cachedTokens: 8 });
+    expect(usage).toEqual({
+      inputIncludesCache: true,
+      input: 12,
+      output: 3,
+      total: 15,
+      cachedTokens: 8,
+    });
   });
 
   it("surfaces thoughtsTokenCount as reasoningTokens on the streamed usage", async () => {
@@ -736,6 +748,7 @@ describe("GoogleModel.stream()", () => {
     }
 
     expect(usage).toEqual({
+      inputIncludesCache: true,
       input: 11,
       output: 50,
       total: 61,

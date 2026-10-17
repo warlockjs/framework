@@ -4,7 +4,7 @@ import type { BaseResult } from "../contracts/result/base-result.type";
 import type { ExecutableContract } from "../contracts/executable.contract";
 import type { ExecuteResult } from "../contracts/result/execute-result.type";
 import type { Usage } from "../contracts/result/usage.type";
-import { accumulateCost } from "../utils/compute-cost";
+import { mergeUsage } from "../utils/compute-cost";
 import { generateRunId } from "../utils/generate-run-id";
 import { stampReportLineage } from "../utils/stamp-report-lineage";
 import type { BatchItemResult, BatchOptions, BatchReport, BatchResult } from "./batch.type";
@@ -210,26 +210,7 @@ class BatchRun<TInput, TOptions, TResult extends BaseResult> {
    * them, preserving the "never reported anywhere" signal.
    */
   private mergeUsage(target: Usage, child: Usage): void {
-    target.input += child.input;
-    target.output += child.output;
-    target.total += child.total;
-
-    if (child.cachedTokens !== undefined) {
-      target.cachedTokens = (target.cachedTokens ?? 0) + child.cachedTokens;
-    }
-
-    if (child.reasoningTokens !== undefined) {
-      target.reasoningTokens = (target.reasoningTokens ?? 0) + child.reasoningTokens;
-    }
-
-    if (child.cacheWriteTokens !== undefined) {
-      target.cacheWriteTokens = (target.cacheWriteTokens ?? 0) + child.cacheWriteTokens;
-    }
-
-    const mergedCost = accumulateCost(target.cost, child.cost);
-    if (mergedCost !== undefined) {
-      target.cost = mergedCost;
-    }
+    mergeUsage(target, child);
   }
 
   /**

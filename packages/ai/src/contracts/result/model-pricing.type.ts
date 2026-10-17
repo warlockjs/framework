@@ -5,10 +5,10 @@
  * historical cost (not re-derived against today's pricing).
  *
  * **Optionality.** Every field except `input` / `output` is optional.
- * `cachedInput` / `cachedOutput` are populated only when the provider
- * actually meters them (OpenAI prompt-cache hits, Anthropic cache
- * reads / writes). Leave undefined for adapters that don't report a
- * cache channel — cost falls back to full-rate pricing for those
+ * `cachedInput` / `cacheWrite` / `cacheWrite1h` matter only when the
+ * provider meters them (OpenAI prompt-cache hits, Anthropic cache
+ * reads / writes). Leave them undefined for adapters that don't report a
+ * cache channel — cost falls back to the full input rate for those
  * tokens.
  *
  * **Where it lives.** Two declaration sites, both optional:
@@ -41,9 +41,26 @@ export type ModelPricing = {
    */
   cachedInput?: number;
   /**
-   * USD per 1M tokens written to the provider's prompt cache.
-   * Anthropic charges a small premium on cache-write tokens; OpenAI
-   * does not. Falls back to `output` when undefined.
+   * USD per 1M tokens written to the provider's prompt cache with the
+   * default lifetime (Anthropic: the 5-minute cache, 1.25x the input
+   * rate). Falls back to `cachedOutput`, then to `input`, when
+   * undefined. As a cost-breakdown channel it holds the USD spent on
+   * every cache write of the call (both lifetimes).
+   *
+   * @example
+   * const pricing: ModelPricing = { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75, cacheWrite1h: 6 };
+   */
+  cacheWrite?: number;
+  /**
+   * USD per 1M tokens written to the provider's prompt cache with a
+   * 1-hour lifetime (`Usage.cacheWrite1hTokens`; Anthropic: 2x the input
+   * rate). Falls back to the `cacheWrite` rate when undefined.
+   */
+  cacheWrite1h?: number;
+  /**
+   * @deprecated Use `cacheWrite`. Still read as the cache-write rate when
+   * `cacheWrite` is unset; stored cost breakdowns written before 5.31 may
+   * carry cache-write spend here, so `totalCost()` keeps summing it.
    */
   cachedOutput?: number;
   /**

@@ -77,6 +77,16 @@ export type XaiModelConfig = ModelConfig & {
    * `json_schema` — the agent then re-injects a soft schema hint.
    */
   structuredOutput?: boolean;
+  /**
+   * Prompt-cache routing key, sent as `prompt_cache_key` so requests that
+   * share a prefix land on the same xAI cache. Use a stable value per
+   * conversation or tenant. Sent only while the SDK keeps its default
+   * provider label.
+   *
+   * @example
+   * model({ name: "grok-4.3", promptCacheKey: `conversation:${conversationId}` });
+   */
+  promptCacheKey?: string;
 };
 
 /**

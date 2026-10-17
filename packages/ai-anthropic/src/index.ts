@@ -1,5 +1,12 @@
 export { AnthropicSDK } from "./sdk";
 export { AnthropicModel } from "./model";
+export {
+  ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER,
+  ANTHROPIC_CACHE_WRITE_MULTIPLIER,
+  ANTHROPIC_MODEL_PRICING,
+  anthropicPricingFor,
+  withAnthropicCacheWriteRates,
+} from "./known-pricing";
 export type { AnthropicCallOptions, AnthropicSDKConfig, AnthropicModelConfig } from "./config.type";
 export type { AnthropicThinkingMode } from "./thinking-mode";
 export type {
