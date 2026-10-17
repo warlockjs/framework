@@ -356,3 +356,69 @@ describe("mcp() client — close", () => {
     expect(notifySpy.mock.calls.some((args) => args[0] === "notifications/initialized")).toBe(true);
   });
 });
+
+describe("mcp() client — client-level signal", () => {
+  it("closes the transport when the signal aborts and fails later calls as closed", async () => {
+    const transport = scriptedTransport([ECHO_TOOL]);
+    transport.on("tools/call", (request) => textCallResult(request, "ok"));
+    const controller = new AbortController();
+    const client = mcp(transport, { signal: controller.signal });
+
+    const [contract] = await client.tools();
+    controller.abort();
+    await Promise.resolve();
+
+    expect(transport.closed).toBe(true);
+
+    const { error } = await contract.invoke({ message: "hi" });
+
+    expect(error).toBeDefined();
+    expect(transport.requests.filter((request) => request.method === "tools/call")).toHaveLength(0);
+  });
+
+  it("never connects when the signal is already aborted", async () => {
+    const transport = scriptedTransport([ECHO_TOOL]);
+    const controller = new AbortController();
+    controller.abort();
+
+    const client = mcp(transport, { signal: controller.signal });
+
+    await expect(client.tools()).rejects.toMatchObject({ type: "closed" });
+    expect(transport.requests).toHaveLength(0);
+    expect(transport.closed).toBe(true);
+  });
+
+  it("forwards the client signal to tools/call alongside ctx.signal", async () => {
+    const transport = scriptedTransport([ECHO_TOOL]);
+    const seen: Array<AbortSignal | undefined> = [];
+    const original = transport.request.bind(transport);
+    transport.request = async (request, options) => {
+      if (request.method === "tools/call") {
+        seen.push(options?.signal);
+      }
+
+      return original(request, options);
+    };
+    transport.on("tools/call", (request) => textCallResult(request, "ok"));
+    const client = mcp(transport, { signal: new AbortController().signal });
+    const [contract] = await client.tools();
+    const call = new AbortController();
+
+    await contract.invoke({ message: "hi" }, { artifacts: {}, signal: call.signal });
+    call.abort();
+
+    expect(seen[0]?.aborted).toBe(true);
+  });
+
+  it("closes once even when close() and the signal both fire", async () => {
+    const transport = scriptedTransport([ECHO_TOOL]);
+    const closeSpy = vi.spyOn(transport, "close");
+    const controller = new AbortController();
+    const client = mcp(transport, { signal: controller.signal });
+
+    await client.close();
+    controller.abort();
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+});

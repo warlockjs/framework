@@ -27,7 +27,8 @@ export interface McpFactory {
    * Connect to an external MCP server and adapt its tools as agent tools.
    *
    * @param server - The transport config (`{ type: "stdio" }` / `{ type: "http" }`).
-   * @param options - Prefix / filter / per-call timeout.
+   * @param options - Prefix / filter / per-call timeout, and a `signal`
+   *   that closes the client (and fails its calls) when it aborts.
    */
   (server: McpTransport, options?: McpClientOptions): McpClient;
   /**

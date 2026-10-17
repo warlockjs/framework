@@ -11,6 +11,7 @@ import type { SnapshotStore } from "../contracts/orchestrator/snapshot-store.con
 import type { Placeholders } from "../contracts/placeholders.type";
 import type { StreamingToolGuardConfig } from "../contracts/streaming-tool-guard-config.type";
 import type { SystemPromptContract } from "../contracts/system-prompt.contract";
+import type { ToolSchemaMode } from "../contracts/tool.contract";
 import type { FlowObserveOption } from "../observe/resolve-observers";
 import type { SkillsConfig } from "../skills/contracts/skills-config.type";
 import type { SkillsContract } from "../skills/contracts/skills.contract";
@@ -229,6 +230,17 @@ export type AgentConfig<TOutput = unknown> = {
    * `AgentExecuteOptions.maxConcurrentTools` wins.
    */
   maxConcurrentTools?: number;
+  /**
+   * How tool input schemas are sent to the model on every trip:
+   * `"full"` (default) or `"compact"` — annotations stripped, const
+   * unions collapsed, validation unchanged. Measure the saving with
+   * `ai.tools.measure(tools, { model, mode: "compact" })`. Per-call
+   * `AgentExecuteOptions.toolSchemas` wins. See {@link ToolSchemaMode}.
+   *
+   * @example
+   * ai.agent({ model, tools: [search, fetchPage], toolSchemas: "compact" });
+   */
+  toolSchemas?: ToolSchemaMode;
   /**
    * Per-trip usage callback. Fires once after every LLM round-trip
    * (initial trip, continuation trips after tool results, repair

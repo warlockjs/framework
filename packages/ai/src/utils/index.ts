@@ -3,8 +3,14 @@ export { extractJsonLenient } from "./extract-json-lenient";
 export { extractJsonPayload } from "./extract-json-payload";
 export { generateRunId } from "./generate-run-id";
 export { mapWithConcurrency } from "./map-with-concurrency";
-export { extractJsonSchema } from "./json-schema";
-export type { ExtractJsonSchemaOptions, JsonSchemaTarget } from "./json-schema";
+export { compactJsonSchema, extractJsonSchema, withCompactJsonSchema } from "./json-schema";
+export type {
+  CompactJsonSchemaOptions,
+  ExtractJsonSchemaOptions,
+  JsonSchemaTarget,
+} from "./json-schema";
+export { countInputTokens, estimateInputTokens } from "./estimate-input-tokens";
+export type { EstimateInputTokensOptions, InputTokenCount } from "./estimate-input-tokens";
 export { prepareAttachmentPart } from "./prepare-attachment-part";
 export { resolveAttachment } from "./resolve-attachment";
 export {

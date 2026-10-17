@@ -1,4 +1,4 @@
-import { ai, type ToolContract } from "@warlock.js/ai";
+import { ai, measureTools, type ToolContract } from "@warlock.js/ai";
 import type {
   CalculatorInput,
   CalculatorOptions,
@@ -42,6 +42,17 @@ export interface AiToolsNamespace {
   calculator(options?: CalculatorOptions): ToolContract<CalculatorInput, CalculatorResult>;
   /** Clock/calendar ops — now / add / diff / format over ISO instants. */
   dateTime(options?: DateTimeOptions): ToolContract<DateTimeInput, DateTimeResult>;
+  /**
+   * Measure the input tokens a tool list adds to every call — natively
+   * through the model's count endpoint when it has one, estimated
+   * otherwise (`source` says which), per tool and in total, in `"full"`
+   * or `"compact"` schema mode. Re-exports `measureTools` from
+   * `@warlock.js/ai`.
+   *
+   * @example
+   * const { tokens, perTool, source } = await ai.tools.measure(tools, { model, mode: "compact" });
+   */
+  measure: typeof measureTools;
 }
 
 /**
@@ -81,6 +92,7 @@ ai.tools = {
   http: httpRequestTool,
   calculator: calculatorTool,
   dateTime: (options?: DateTimeOptions) => dateTimeTool(options),
+  measure: measureTools,
 };
 
 ai.mcp = mcp;

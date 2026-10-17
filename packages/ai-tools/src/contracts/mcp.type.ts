@@ -62,6 +62,20 @@ export interface McpClientOptions {
    * @default 30_000
    */
   timeoutMs?: number;
+  /**
+   * Bind the client's lifetime to a run. When it aborts, the client
+   * closes its transport (kills the stdio child / ends the HTTP session),
+   * in-flight requests reject, and later `tools()` / tool calls fail with
+   * an `McpTransportError` of type `"closed"`. Every `tools/call` also
+   * honors it, alongside the per-call `ctx.signal` the agent passes.
+   *
+   * @example
+   * const controller = new AbortController();
+   * const github = ai.mcp(server, { signal: controller.signal });
+   * await agent.execute(task, { signal: controller.signal, tools: await github.tools() });
+   * controller.abort(); // also shuts the MCP server down
+   */
+  signal?: AbortSignal;
 }
 
 /**

@@ -49,6 +49,7 @@ import { skills } from "../skills";
 import type { SkillsContract } from "../skills/contracts/skills.contract";
 import { normalizeAgentTools } from "../tool/executable-as-tool";
 import type { ToolContract, ToolInvokeResult } from "../tool/tool";
+import { compactToolSchemas } from "../tool/tool-schemas";
 import {
   captureChildReport,
   computeCost,
@@ -586,6 +587,8 @@ class Execution<TOutput> {
    * no skills library is attached this is just `config.tools`.
    */
   private readonly effectiveTools: ToolContract<unknown, unknown>[];
+  /** Lazily built compact-schema copies of `effectiveTools` — see `toolsForModel`. */
+  private compactTools?: ToolContract<unknown, unknown>[];
 
   private error?: AIError;
   private data?: TOutput;
@@ -1123,10 +1126,28 @@ class Execution<TOutput> {
   }
 
   /** Exact call options shared by preflight compaction and generation. */
+  /**
+   * The tool list as sent to the model: the effective tools, with their
+   * schemas compacted when `toolSchemas` (per call, else agent config) is
+   * `"compact"`. Compacted copies are built once and reused; dispatch
+   * and validation always use the originals.
+   */
+  private toolsForModel(): ToolContract<unknown, unknown>[] {
+    const mode = this.options?.toolSchemas ?? this.config.toolSchemas ?? "full";
+
+    if (mode !== "compact") {
+      return this.effectiveTools;
+    }
+
+    this.compactTools ??= compactToolSchemas(this.effectiveTools);
+
+    return this.compactTools;
+  }
+
   private buildModelCallOptions(): ModelCallOptions {
     return {
       ...this.config.modelOptions,
-      tools: this.effectiveTools,
+      tools: this.toolsForModel(),
       ...(this.responseSchema ? { responseSchema: this.responseSchema } : {}),
       ...(this.options?.signal ? { signal: this.options.signal } : {}),
     };

@@ -55,6 +55,23 @@ export type ToolMeta = {
 export type ToolMode = "feedback" | "silent";
 
 /**
+ * How tool input schemas are sent to the model.
+ *
+ * - `"full"` (default) — the schema exactly as the schema library emits
+ *   it, descriptions and examples included.
+ * - `"compact"` — annotations (`description`, `title`, `examples`,
+ *   `default`, …) stripped at every level and const unions collapsed to
+ *   `enum` (see `compactJsonSchema`). Validation is unchanged; the model
+ *   reads fewer tokens per call but loses per-field guidance, so name
+ *   fields clearly and keep essential instructions in the tool's
+ *   `description`, which is always sent.
+ *
+ * @example
+ * ai.agent({ model, tools, toolSchemas: "compact" });
+ */
+export type ToolSchemaMode = "full" | "compact";
+
+/**
  * Callback form of {@link ToolConfig.action} — turns the model's
  * arguments into a present-progressive UI string.
  *

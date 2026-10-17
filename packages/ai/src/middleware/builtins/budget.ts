@@ -1,14 +1,24 @@
-import type { AgentMiddleware, MiddlewareExecuteContext } from "../../contracts/middleware";
+import type {
+  AgentMiddleware,
+  MiddlewareExecuteContext,
+  MiddlewareTripContext,
+} from "../../contracts/middleware";
 import type { ModelPricing } from "../../contracts/result/model-pricing.type";
+import type { Usage } from "../../contracts/result/usage.type";
 import { BudgetExceededError, ScopedBudgetExceededError, type BudgetUnit } from "../../errors";
-import { computeCost } from "../../utils/compute-cost";
+import { computeCost, totalCost } from "../../utils/compute-cost";
+import { estimateInputTokens } from "../../utils/estimate-input-tokens";
 import { namespacedState } from "../utils";
 import type {
   BudgetContract,
   BudgetContractDimension,
   BudgetContractViolation,
 } from "./budget-contract.type";
-import type { ScopedBudgetStore, ScopedBudgetWindow } from "./scoped-budget-store.type";
+import type {
+  ScopedBudgetReserveInput,
+  ScopedBudgetStore,
+  ScopedBudgetWindow,
+} from "./scoped-budget-store.type";
 
 export { cacheScopedBudgetStore } from "./cache-scoped-budget-store";
 export type { CacheScopedBudgetStoreOptions } from "./cache-scoped-budget-store";
@@ -38,20 +48,60 @@ export type {
 
 /**
  * Per-model pricing used to compute USD cost from token counts.
- * Caller-supplied — no bundled table. Keys are model names (the
- * `ModelContract.name` value); values are input / output token
- * prices expressed as **USD per 1K tokens** to match every major
- * provider's published pricing sheet.
+ * Caller-supplied; keys are model names (the `ModelContract.name`
+ * value). Each entry is either:
+ *
+ * - a {@link ModelPricing} (USD per **1M** tokens, with the optional
+ *   cache-read / cache-write rates) — billed exactly like `Usage.cost`,
+ *   cache channels included; or
+ * - the legacy `{ inputPer1K, outputPer1K }` (USD per **1K** tokens),
+ *   which prices input and output only and ignores cache rates.
+ *
+ * @example
+ * budget({
+ *   maxCostUSD: 1,
+ *   pricing: { "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75 } },
+ * });
  */
-export type BudgetPricing = Record<
-  string,
-  {
-    /** USD per 1,000 input tokens. */
-    inputPer1K: number;
-    /** USD per 1,000 output tokens. */
-    outputPer1K: number;
-  }
->;
+export type BudgetPricing = Record<string, BudgetPricingEntry>;
+
+/** One {@link BudgetPricing} entry: a `ModelPricing` or the legacy per-1K shape. */
+export type BudgetPricingEntry =
+  | ModelPricing
+  | {
+      /** USD per 1,000 input tokens. */
+      inputPer1K: number;
+      /** USD per 1,000 output tokens. */
+      outputPer1K: number;
+    };
+
+/**
+ * Reserve-then-commit mode for `budget()`: before each model call the
+ * middleware **reserves** the trip's worst case — the input-token count
+ * plus `outputTokens`, priced as uncached input — and refuses the call if
+ * that would cross a cap. After the call it **commits** the actual usage
+ * in place of the reservation; when the call fails it **releases** the
+ * reservation. A single trip therefore can no longer overrun a cap.
+ *
+ * Applies to the top-level `maxTokens` / `maxCostUSD` caps and to the
+ * contract's caps under `onViolation: "abort"` (both per run), and to the
+ * `scoped` ledger, where the reservation is taken atomically by the store
+ * so concurrent runs sharing a key cannot jointly overspend.
+ */
+export type BudgetReserveOptions = {
+  /**
+   * Output tokens to reserve per trip — set it to the `maxTokens` the
+   * model is called with, since that is the most a trip can generate.
+   */
+  outputTokens: number;
+  /**
+   * Input tokens to reserve for a trip. Default: `estimateInputTokens`
+   * over the trip's messages (an offline estimate that does not see the
+   * tool schemas). Supply a native count (`model.countTokens`) or add
+   * headroom here when the estimate is too loose for your caps.
+   */
+  inputTokens?: (context: MiddlewareTripContext) => number | Promise<number>;
+};
 
 /** Behavior when a USD-capped run has no price for its configured model. */
 export type BudgetUnpricedBehavior = "error" | "allow";
@@ -127,11 +177,27 @@ export type BudgetOptions = {
    */
   contract?: BudgetContract;
   /**
-   * Cross-execution UTC ledger. Measured per-trip usage is atomically reserved
-   * after each response because models do not expose a portable preflight
-   * estimate. Supply one or both scoped caps.
+   * Cross-execution UTC ledger. Without `reserve`, measured per-trip usage
+   * is atomically booked after each response. With `reserve`, the trip's
+   * worst case is reserved atomically before the call and settled to the
+   * actual usage after it. Supply one or both scoped caps.
    */
   scoped?: ScopedBudgetOptions;
+  /**
+   * Reserve each trip's worst-case spend before the call instead of only
+   * booking usage after it — see {@link BudgetReserveOptions}.
+   *
+   * @example
+   * budget({ maxCostUSD: 0.5, reserve: { outputTokens: 4_096 } });
+   */
+  reserve?: BudgetReserveOptions;
+};
+
+/** One unit of an in-flight reservation (run-level amounts and the scoped ledger inputs). */
+type PendingReservation = {
+  tokens: number;
+  costUSD: number;
+  scoped: ScopedBudgetReserveInput[];
 };
 
 type BudgetCounters = {
@@ -151,6 +217,8 @@ type BudgetCounters = {
   fallbackFired: boolean;
   scopedKey?: string;
   scopedWindowStart?: number;
+  /** The reservation of the trip in flight (`reserve` mode only). */
+  pending?: PendingReservation;
 };
 
 /**
@@ -190,42 +258,133 @@ function unpricedModelBreach(name: string, modelName: string): never {
 
 function resolveTripCost(
   context: MiddlewareExecuteContext,
-  usage: {
-    input: number;
-    output: number;
-    cachedTokens?: number;
-    cacheWriteTokens?: number;
-    reasoningTokens?: number;
-  },
+  usage: Pick<
+    Usage,
+    | "input"
+    | "output"
+    | "cachedTokens"
+    | "cacheWriteTokens"
+    | "cacheWrite1hTokens"
+    | "reasoningTokens"
+    | "inputIncludesCache"
+  >,
   budgetPricing: BudgetPricing | undefined,
 ): number | undefined {
   const explicitPricing = budgetPricing?.[context.model.name];
 
-  if (explicitPricing) {
+  if (explicitPricing && "inputPer1K" in explicitPricing) {
     return (
       (usage.input / 1000) * explicitPricing.inputPer1K +
       (usage.output / 1000) * explicitPricing.outputPer1K
     );
   }
 
-  const modelPricing: ModelPricing | undefined = context.model.pricing;
+  const modelPricing: ModelPricing | undefined = explicitPricing ?? context.model.pricing;
 
-  if (!modelPricing) {
+  return totalCost(computeCost({ ...usage, total: usage.input + usage.output }, modelPricing));
+}
+
+/** True when `budget()` can price the running model (explicit entry or model pricing). */
+function hasPricing(context: MiddlewareExecuteContext, budgetPricing: BudgetPricing | undefined) {
+  return budgetPricing?.[context.model.name] !== undefined || context.model.pricing !== undefined;
+}
+
+/**
+ * Book a scoped reservation; returns the reservation input to settle
+ * later, or `undefined` when the unit has no cap or nothing to reserve.
+ */
+async function reserveScopedUnit(
+  options: ScopedBudgetOptions,
+  key: string,
+  windowStart: number,
+  unit: BudgetUnit,
+  amount: number,
+): Promise<ScopedBudgetReserveInput | undefined> {
+  const limit = unit === "tokens" ? options.maxTokens : options.maxCostUSD;
+
+  if (limit === undefined || amount <= 0) {
     return undefined;
   }
 
-  const cost = computeCost({ ...usage, total: usage.input + usage.output }, modelPricing);
+  const input: ScopedBudgetReserveInput = { key, windowStart, unit, amount, limit };
+  const reservation = await options.store.reserve(input);
 
-  if (!cost) {
-    return undefined;
+  if (!reservation.allowed) {
+    throw new ScopedBudgetExceededError(
+      `scoped budget "${key}" would be exceeded for ${options.window} — reserving ${amount} ${unit} brings it to ${reservation.used} (cap: ${limit})`,
+      { key, window: options.window, limit, used: reservation.used, unit },
+    );
   }
 
-  return (
-    cost.input +
-    cost.output +
-    (cost.cachedInput ?? 0) +
-    (cost.cachedOutput ?? 0) +
-    (cost.reasoning ?? 0)
+  return input;
+}
+
+/**
+ * Settle a scoped reservation to the actual amount. The money is already
+ * spent, so the actual is always booked (the store's limit check is
+ * lifted); the cap is then compared and breached after the fact.
+ */
+async function commitScopedUnit(
+  options: ScopedBudgetOptions,
+  reservation: ScopedBudgetReserveInput,
+  actual: number,
+): Promise<void> {
+  const result = await options.store.commit(
+    { ...reservation, limit: Number.MAX_SAFE_INTEGER },
+    actual,
+  );
+
+  if (result.used > reservation.limit) {
+    throw new ScopedBudgetExceededError(
+      `scoped budget "${reservation.key}" exceeded for ${options.window} — ${result.used} ${reservation.unit} (cap: ${reservation.limit})`,
+      {
+        key: reservation.key,
+        window: options.window,
+        limit: reservation.limit,
+        used: result.used,
+        unit: reservation.unit,
+      },
+    );
+  }
+}
+
+/** Release an unsettled reservation (failed call, aborted run). */
+async function releasePending(
+  options: BudgetOptions,
+  counters: BudgetCounters | undefined,
+): Promise<void> {
+  const pending = counters?.pending;
+
+  if (!counters || !pending) {
+    return;
+  }
+
+  counters.pending = undefined;
+
+  if (!options.scoped) {
+    return;
+  }
+
+  for (const reservation of pending.scoped) {
+    await options.scoped.store.refund(reservation);
+  }
+}
+
+function reservationBreach(
+  name: string,
+  limit: number,
+  spent: number,
+  reserved: number,
+  unit: BudgetUnit,
+): never {
+  throw new BudgetExceededError(
+    `budget "${name}" would be exceeded — ${spent} ${unit} spent + ${reserved} reserved for the next call (cap: ${limit})`,
+    {
+      limit,
+      actual: spent + reserved,
+      unit,
+      context: { reason: "reservation", spent, reserved },
+    },
   );
 }
 
@@ -405,12 +564,7 @@ export function budget(options: BudgetOptions): AgentMiddleware {
     name,
     execute: {
       before(context) {
-        if (
-          needsCost &&
-          options.onUnpriced !== "allow" &&
-          options.pricing?.[context.model.name] === undefined &&
-          context.model.pricing === undefined
-        ) {
+        if (needsCost && options.onUnpriced !== "allow" && !hasPricing(context, options.pricing)) {
           unpricedModelBreach(name, context.model.name);
         }
 
@@ -428,8 +582,86 @@ export function budget(options: BudgetOptions): AgentMiddleware {
           scopedWindowStart: options.scoped ? scopedWindowStart(options.scoped.window) : undefined,
         });
       },
+      async after(context) {
+        await releasePending(options, namespacedState<BudgetCounters>(context, name).get());
+      },
+      async onError(context) {
+        await releasePending(options, namespacedState<BudgetCounters>(context, name).get());
+      },
     },
     trip: {
+      async before(context) {
+        const reserve = options.reserve;
+        const counters = namespacedState<BudgetCounters>(context, name).get();
+
+        if (!reserve || !counters) {
+          return;
+        }
+
+        // A reservation left by a trip whose `after` never ran (an inner
+        // middleware threw past us) is released before taking a new one.
+        await releasePending(options, counters);
+
+        const inputTokens = Math.max(
+          0,
+          (await reserve.inputTokens?.(context)) ?? estimateInputTokens(context.messages),
+        );
+        const outputTokens = Math.max(0, reserve.outputTokens);
+        const tokens = inputTokens + outputTokens;
+        const costUSD = needsCost
+          ? (resolveTripCost(
+              context,
+              { input: inputTokens, output: outputTokens },
+              options.pricing,
+            ) ?? 0)
+          : 0;
+
+        const tokenCaps = [
+          onExceeded === "abort" ? options.maxTokens : undefined,
+          contractMode === "abort" ? contract?.maxTokens : undefined,
+        ];
+        const costCaps = [
+          onExceeded === "abort" ? options.maxCostUSD : undefined,
+          contractMode === "abort" ? contract?.maxCostUSD : undefined,
+        ];
+
+        for (const cap of tokenCaps) {
+          if (cap !== undefined && counters.tokens + tokens > cap) {
+            reservationBreach(name, cap, counters.tokens, tokens, "tokens");
+          }
+        }
+
+        for (const cap of costCaps) {
+          if (cap !== undefined && counters.costUSD + costUSD > cap) {
+            reservationBreach(name, cap, counters.costUSD, costUSD, "usd");
+          }
+        }
+
+        const pending: PendingReservation = { tokens, costUSD, scoped: [] };
+        counters.pending = pending;
+
+        if (options.scoped && counters.scopedKey && counters.scopedWindowStart !== undefined) {
+          for (const [unit, amount] of [
+            ["tokens", tokens],
+            ["usd", costUSD],
+          ] as const) {
+            const reservation = await reserveScopedUnit(
+              options.scoped,
+              counters.scopedKey,
+              counters.scopedWindowStart,
+              unit,
+              amount,
+            );
+
+            if (reservation) {
+              pending.scoped.push(reservation);
+            }
+          }
+        }
+      },
+      async onError(context) {
+        await releasePending(options, namespacedState<BudgetCounters>(context, name).get());
+      },
       async after(context, response) {
         const counters = namespacedState<BudgetCounters>(context, name).get();
 
@@ -445,22 +677,33 @@ export function budget(options: BudgetOptions): AgentMiddleware {
           counters.costUSD += tripCost;
         }
 
-        if (options.scoped && counters.scopedKey && counters.scopedWindowStart !== undefined) {
-          await reserveScopedBudget(
-            options.scoped,
-            counters.scopedKey,
-            counters.scopedWindowStart,
-            "tokens",
-            response.usage.total,
-          );
+        const pending = counters.pending;
+        counters.pending = undefined;
 
-          await reserveScopedBudget(
-            options.scoped,
-            counters.scopedKey,
-            counters.scopedWindowStart,
-            "usd",
-            tripCost ?? 0,
-          );
+        if (options.scoped && counters.scopedKey && counters.scopedWindowStart !== undefined) {
+          const actualFor = (unit: BudgetUnit): number =>
+            unit === "tokens" ? response.usage.total : (tripCost ?? 0);
+          const settled = new Set<BudgetUnit>();
+
+          // Reserve mode: settle each reservation to the actual usage.
+          for (const reservation of pending?.scoped ?? []) {
+            await commitScopedUnit(options.scoped, reservation, actualFor(reservation.unit));
+            settled.add(reservation.unit);
+          }
+
+          // Book what was not reserved (classic mode, or a unit whose
+          // reservation was zero).
+          for (const unit of ["tokens", "usd"] as const) {
+            if (!settled.has(unit)) {
+              await reserveScopedBudget(
+                options.scoped,
+                counters.scopedKey,
+                counters.scopedWindowStart,
+                unit,
+                actualFor(unit),
+              );
+            }
+          }
         }
 
         if (hasTokenCap && counters.tokens > options.maxTokens!) {

@@ -6,7 +6,7 @@ import type { AgentEventMap } from "../events/event-map.type";
 import type { Placeholders } from "../placeholders.type";
 import type { StreamingToolGuardConfig } from "../streaming-tool-guard-config.type";
 import type { SystemPromptContract } from "../system-prompt.contract";
-import type { ToolContext } from "../tool.contract";
+import type { ToolContext, ToolSchemaMode } from "../tool.contract";
 
 /**
  * Options passed to AgentContract.execute() to configure a single execution run.
@@ -147,6 +147,11 @@ export type AgentExecuteOptions<TOutput = unknown> = {
    * `AgentConfig.maxConcurrentTools` (default `4`).
    */
   maxConcurrentTools?: number;
+  /**
+   * Per-call override for how tool input schemas are sent. Wins over
+   * `AgentConfig.toolSchemas`. See {@link ToolSchemaMode}.
+   */
+  toolSchemas?: ToolSchemaMode;
   /**
    * Opaque caller-supplied identifier that groups multiple `execute()`
    * calls into one conceptual user session / request. Mirrored onto

@@ -48,9 +48,38 @@ class McpClientImpl implements McpClient {
   /** Flipped once the handshake completes so we only do it once. */
   private initialized = false;
 
+  /** The in-flight / settled `close()`, so closing is idempotent. */
+  private closing: Promise<void> | undefined;
+
+  /** Closes the client when `options.signal` aborts. */
+  private readonly onAbort = (): void => {
+    void this.close().catch(() => undefined);
+  };
+
   public constructor(source: McpTransport | McpTransportClient, options: McpClientOptions = {}) {
     this.rpc = createJsonRpcClient(source);
     this.options = options;
+
+    const signal = options.signal;
+
+    if (signal?.aborted) {
+      this.onAbort();
+    } else {
+      signal?.addEventListener("abort", this.onAbort, { once: true });
+    }
+  }
+
+  /**
+   * Reject with a typed `"closed"` error once the client was closed or its
+   * `signal` aborted, so no request is sent on a dead transport.
+   */
+  private assertOpen(method: string): void {
+    if (this.closing || this.options.signal?.aborted) {
+      throw new McpTransportError(`MCP client is closed; "${method}" was not sent.`, {
+        type: "closed",
+        method,
+      });
+    }
   }
 
   /**
@@ -64,12 +93,18 @@ class McpClientImpl implements McpClient {
       return;
     }
 
+    this.assertOpen("initialize");
+
     try {
-      await this.rpc.call("initialize", {
-        protocolVersion: PROTOCOL_VERSION,
-        capabilities: {},
-        clientInfo: { name: "@warlock.js/ai-tools", version: "4.4.0" },
-      });
+      await this.rpc.call(
+        "initialize",
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          capabilities: {},
+          clientInfo: { name: "@warlock.js/ai-tools", version: "4.4.0" },
+        },
+        { signal: this.options.signal },
+      );
 
       await this.rpc.notify("notifications/initialized");
     } catch (cause) {
@@ -118,7 +153,11 @@ class McpClientImpl implements McpClient {
   private async listAndAdapt(): Promise<ToolContract[]> {
     await this.handshake();
 
-    const result = await this.rpc.call<ToolsListResult>("tools/list");
+    this.assertOpen("tools/list");
+
+    const result = await this.rpc.call<ToolsListResult>("tools/list", undefined, {
+      signal: this.options.signal,
+    });
     const descriptors = result.tools ?? [];
 
     const filter = this.options.filter;
@@ -145,10 +184,12 @@ class McpClientImpl implements McpClient {
       description: descriptor.description ?? `Invoke the remote MCP tool "${remoteName}".`,
       input,
       execute: async (args, ctx) => {
+        this.assertOpen("tools/call");
+
         const result = await this.rpc.call<McpToolCallResult>(
           "tools/call",
           { name: remoteName, arguments: args ?? {} },
-          { signal: ctx?.signal, timeoutMs },
+          { signal: combineSignals(ctx?.signal, this.options.signal), timeoutMs },
         );
 
         // An `isError` result is a tool-level failure — throw it so the
@@ -167,8 +208,26 @@ class McpClientImpl implements McpClient {
   }
 
   public close(): Promise<void> {
-    return this.rpc.close();
+    this.options.signal?.removeEventListener("abort", this.onAbort);
+    this.closing ??= this.rpc.close();
+
+    return this.closing;
   }
+}
+
+/**
+ * The signal a `tools/call` honors: the per-call `ctx.signal`, the
+ * client-level `options.signal`, both (whichever aborts first), or none.
+ */
+function combineSignals(
+  callSignal: AbortSignal | undefined,
+  clientSignal: AbortSignal | undefined,
+): AbortSignal | undefined {
+  if (!callSignal || !clientSignal) {
+    return callSignal ?? clientSignal;
+  }
+
+  return AbortSignal.any([callSignal, clientSignal]);
 }
 
 /**
@@ -269,7 +328,8 @@ function tryParseJson(text: string): unknown {
  * @param server - The transport config (`{ type: "stdio" }` /
  *   `{ type: "http" }`). A pre-built transport client may be injected for
  *   testing.
- * @param options - Prefix / filter / per-call timeout.
+ * @param options - Prefix / filter / per-call timeout, and a `signal` that
+ *   closes the client when it aborts.
  * @returns An {@link McpClient} handle.
  *
  * @example
