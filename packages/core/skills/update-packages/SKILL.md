@@ -10,9 +10,12 @@ description: 'Keep a project current with `warlock update` — bump every `@warl
 ## `warlock update` vs `warlock upgrade`
 
 `warlock update` moves the packages to the latest versions and nothing else.
-When a release has breaking changes, use `warlock upgrade --to <version>`
-(`--dry-run` first): it moves the packages to that release AND applies the code
-edits its breaking changes need, listing the rest with `file:line`. See the
+When a release has breaking changes, use
+`warlock upgrade --from <current> --to <version>` (`--dry-run` first), e.g.
+`warlock upgrade --from 5.30 --to 5.31.0`: it moves the packages to that release
+AND applies the code edits its breaking changes need, listing the rest with
+`file:line`. Pass `--from`: the command ships with the new release, so once it
+is installed the detected `@warlock.js/core` is already the target. See the
 `upgrade-from-5-29` topic.
 
 ## `warlock update`

@@ -26,7 +26,8 @@ export const upgradeCommand = command({
     },
     {
       text: "--from",
-      description: "Version to upgrade from (default: the installed @warlock.js/core)",
+      description:
+        "Version to upgrade from (default: the installed @warlock.js/core, so pass it once the new release is installed)",
       type: "string",
     },
     {

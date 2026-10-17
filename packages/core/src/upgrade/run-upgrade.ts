@@ -49,9 +49,7 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<UpgradeRes
   const from = options.from ? toVersion(options.from) : detectInstalledVersion(root);
 
   if (compareVersions(from, to) >= 0) {
-    throw new UpgradeUsageError(
-      `This app is already on ${from}; --to ${to} is not newer. Pass --from if the detected version is wrong.`,
-    );
+    throw new UpgradeUsageError(notNewerMessage(from, to, options.from !== undefined));
   }
 
   const selected = (options.codemods ?? CODEMODS).filter(
@@ -207,6 +205,33 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<UpgradeRes
       installHint: getInstallCommand(await detectPackageManager(root)),
     }),
   };
+}
+
+/**
+ * Explain why `--to` is not newer than the starting version. The usual cause
+ * is running the command after installing the new release: the starting
+ * version is read from the installed `@warlock.js/core`, which is then already
+ * the target, so the command needs `--from`.
+ */
+function notNewerMessage(from: string, to: string, fromWasPassed: boolean): string {
+  if (fromWasPassed) {
+    return `--from ${from} is not older than --to ${to}. Pass the version this app is upgrading from.`;
+  }
+
+  const example = `warlock upgrade --from ${previousMinor(to)} --to ${to}`;
+
+  if (compareVersions(from, to) === 0) {
+    return `The installed @warlock.js/core is already ${from}, the --to version, so the version this app is upgrading from cannot be detected. Pass it with --from <previous version>, e.g. ${example}.`;
+  }
+
+  return `This app is already on ${from}; --to ${to} is not newer. If the detected version is wrong, pass --from <previous version>, e.g. ${example}.`;
+}
+
+/** `5.31.0` → `5.30`. A major's first release has no minor to step back to, so it gets a placeholder. */
+function previousMinor(version: string): string {
+  const [major, minor] = parseVersion(version) ?? [0, 0, 0];
+
+  return minor > 0 ? `${major}.${minor - 1}` : "<previous version>";
 }
 
 function toVersion(value: string): string {

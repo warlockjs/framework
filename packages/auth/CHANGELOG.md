@@ -9,7 +9,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `authMiddleware()` marks itself as an auth guard (`markAuthGuard()` from `@warlock.js/core`), so `warlock dev`'s unguarded-route warning recognises routes behind it; the `{ optional: true }` form is marked as not a guard. Docs and skills list what throttles auth endpoints by default (core's global limit, plus the throttles new apps attach to sign-in and password recovery) and how to add them to an existing app.
-
 - Real Redis integration coverage for login failure counters and lockouts, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with `WARLOCK_REDIS_INTEGRATION=1`; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys.
 
 ### Fixed

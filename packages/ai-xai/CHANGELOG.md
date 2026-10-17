@@ -9,18 +9,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` on the model and cancels the HTTP request.
-
-### Fixed
-
-- The provider-body and token-estimate guidance renders as prose instead of being swallowed by a stray code fence.
+- `XaiModelConfig.promptCacheKey` is sent as `prompt_cache_key` (xAI routes it to `x-grok-conv-id`), so requests sharing a prefix reuse the same cache.
 
 ### Changed
 
 - Chat calls inherit `providerOptions.openai.body` from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native `countTokens` remains absent; `sdk.count(text)` is an offline estimate.
 
-### Added
+### Fixed
 
-- `XaiModelConfig.promptCacheKey` is sent as `prompt_cache_key` (xAI routes it to `x-grok-conv-id`), so requests sharing a prefix reuse the same cache.
+- The provider-body and token-estimate guidance renders as prose instead of being swallowed by a stray code fence.
 
 ## 5.30.0 - 2026-10-16
 

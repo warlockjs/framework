@@ -23,7 +23,11 @@ export async function runUpgradeCommand(
 
   const to =
     typeof options.to === "string" || typeof options.to === "number" ? String(options.to) : "";
-  if (!to) return fail("Pass the version to upgrade to: warlock upgrade --to 5.31");
+  if (!to) {
+    return fail(
+      "Pass the version to upgrade to, and the version upgrading from once the new release is installed: warlock upgrade --from 5.30 --to 5.31.0",
+    );
+  }
 
   try {
     const result = await runUpgrade({

@@ -12,24 +12,17 @@ All notable changes to `@warlock.js/web` are documented here.
 
 - Sitemap routes compare `If-Match` strongly and answer 412 when it does not name the exact strong ETag; `If-None-Match` keeps weak comparison and both use core's RFC 9110 precondition evaluation. The `W/` weakness prefix is matched case-sensitively, as the RFC defines it.
 - Pages render on Bun and Deno. Both runtimes resolve a bare `react-dom/server` import through their own export conditions to a React build without `renderToPipeableStream`, so every page request on a built app failed with "renderToPipeableStream is not a function" (HTTP 500). The page renderer now loads React's Node server build, `react-dom/server.node`, when the selected build cannot stream. Node keeps the module it selected before.
-
 - The server-page-cache test fixture explicitly disables unrelated HTTP throttling and restores its previous configuration on teardown, so repeated cache requests exercise cache behavior after production rate-limit enforcement was corrected.
-
 - Published page skills include complete support modules, schemas and generated-type prerequisites; their HTTP examples and Vitest discovery match current APIs. The skill compile gate verifies them without a failure allowance.
 - The root middleware example declares its own request-local type rather than depending on another skill's augmentation.
-
 - Guarded `useUser(name)` retains the last committed signed-in user when a concurrent transition suspends and is abandoned. Navigation callbacks also read the committed page, and boundary reset counters commit with their page swap. A regression verifies that an abandoned transition preserves the visible error fallback and does not report its error again before the next committed swap.
-
 - Locale context reuse after development edits is covered by a real Vite dev-server/HMR regression: a retained provider continues to serve refreshed locale and translation hooks after repeated filesystem edits. An unshared-context control reproduces the missing-provider HTTP failure.
-
 - `<Form>`'s `onSettled` documentation says that a form unmounting drops only independent submissions (the form's `independent` prop or a `data-independent` submit button); other in-flight submissions are not aborted by an unmount. Regression tests cover `onSettled` running once when `onSuccess` throws and a `data-independent` button's submission being aborted on unmount.
 
 ### Added
 
 - Skills include complete examples for viewport metadata, typed Link wrappers, runtime route-name checks and independent form submissions with query parameters. Settled-outcome guidance handles action errors and dropped submissions separately from completed requests.
-
 - Development checks compile the optional Web Vitals example against its actual types; Web Vitals remains an app-installed optional dependency.
-
 - `<Form onSettled={outcome => …}>` observes every enhanced submission outcome, including network failures and dropped submissions, after the existing success/error callbacks. Native browser submissions do not invoke it.
 - A submit button marked `data-independent` opts that submission into independent mode, so a Cancel button can run beside Start within the same form.
 

@@ -9,7 +9,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `ai.mcp(server, { signal })` binds the client to a run: when the signal aborts the client closes its transport, and later handshakes and tool calls fail with an `McpTransportError` of type `"closed"`. Every `tools/call` honors both the client signal and the per-call `ctx.signal`.
-
 - `ai.tools.measure(tools, { model, mode })` — the `measureTools` helper from `@warlock.js/ai` — measures the input tokens a tool list costs per call.
 - `ai.mcp.serve(source, { transport: { type: "http" } })` serves the MCP Streamable HTTP transport on `node:http` (no extra dependency). It binds `127.0.0.1` on a free port at `/mcp` by default (`host`, `port`, `path` override them), and `start()` resolves `{ url, close }`. `close()` stops accepting connections, waits up to `drainTimeoutMs` (default 5 s) for in-flight calls, then aborts their `ctx.signal` and frees the port. The endpoint is stateless: JSON responses, `202` for notifications, `405` for `GET` / `DELETE`, `400` for batches or an unsupported `MCP-Protocol-Version`.
 - HTTP auth: `auth: { bearer }` accepts one token or a rotation list; `auth: { authorize(request) }` runs a custom check; with both set, a request must pass both. Failures get `401` before the body is read.

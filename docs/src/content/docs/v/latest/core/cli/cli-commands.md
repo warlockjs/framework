@@ -512,10 +512,13 @@ Apply the code changes a release's breaking changes need, and list what needs a
 decision, with `file:line`. See [`warlock upgrade`](./upgrade.md).
 
 ```bash
-warlock upgrade --to 5.31 --dry-run   # diff + review list, nothing written
-warlock upgrade --to 5.31             # apply
-warlock upgrade --to 5.31 --json      # machine-readable result
+warlock upgrade --from 5.30 --to 5.31.0 --dry-run   # diff + review list, nothing written
+warlock upgrade --from 5.30 --to 5.31.0             # apply
+warlock upgrade --from 5.30 --to 5.31.0 --json      # machine-readable result
 ```
+
+Pass `--from`: the command ships with the new release, so once that is
+installed the detected `@warlock.js/core` is already the target.
 
 `update` moves to the latest versions; `upgrade --to` moves to a chosen release
 and edits the code for it.

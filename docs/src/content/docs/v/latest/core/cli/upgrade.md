@@ -13,25 +13,32 @@ needs a decision, with `file:line` and the reason. It also moves every
 `@warlock.js/*` dependency in `package.json` to the target version.
 
 ```bash
-warlock upgrade --to 5.31 --dry-run   # show the diff and the review list; write nothing
-warlock upgrade --to 5.31             # apply it
-warlock upgrade --to 5.31 --json      # machine-readable result, for scripts and agents
+warlock upgrade --from 5.30 --to 5.31.0 --dry-run   # show the diff and the review list; write nothing
+warlock upgrade --from 5.30 --to 5.31.0             # apply it
+warlock upgrade --from 5.30 --to 5.31.0 --json      # machine-readable result, for scripts and agents
 ```
+
+Pass `--from` with the release the app is upgrading from. Without it the
+command reads the installed `@warlock.js/core` as the starting version, and
+once the new release is installed (which it is, since the command ships with
+it) that version is the target itself, so there is nothing to upgrade across
+and the command stops with an error asking for `--from`. An app on 5.29 passes
+`--from 5.29` so the 5.30 changes run too.
 
 Then install (the command prints the right install command for your package
 manager), run the type check and the tests, and work through the review list.
 
 ## Options
 
-| Flag           | Type    | Description                                                                          |
-| -------------- | ------- | ------------------------------------------------------------------------------------ |
-| `--to`         | string  | Version to upgrade to: `5.31` or `5.31.0`. Required.                                 |
-| `--from`       | string  | Version to upgrade from. Default: the installed `@warlock.js/core` (then its range). |
-| `--dry-run`    | boolean | Print the unified diff and the review list without writing any file.                 |
-| `--json`, `-j` | boolean | Print the result as JSON (see below).                                                |
+| Flag           | Type    | Description                                                                                                                                                     |
+| -------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--to`         | string  | Version to upgrade to: `5.31` or `5.31.0`. Required.                                                                                                            |
+| `--from`       | string  | Version to upgrade from. Default: the installed `@warlock.js/core` (then its range), which is already the target once the new release is installed, so pass it. |
+| `--dry-run`    | boolean | Print the unified diff and the review list without writing any file.                                                                                            |
+| `--json`, `-j` | boolean | Print the result as JSON (see below).                                                                                                                           |
 
 A codemod runs when the upgrade crosses its release (`from < release <= to`),
-so `--from 5.30 --to 5.31` skips the 5.30 changes. The command reads
+so `--from 5.30 --to 5.31.0` skips the 5.30 changes. The command reads
 `src/**/*.{ts,tsx}`, `package.json`, `.nvmrc` and `.node-version`; it does not
 boot the app. Exit code `0` means it ran (review items included), `1` means
 bad arguments or a missing `ts-morph`.

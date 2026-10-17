@@ -1,7 +1,6 @@
 ---
 name: upgrade-from-5-29
-description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, cut-off AI agent answers, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
-description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, auth throttle resets, image derivative caches, the Head viewport and test fakes on by default. Use for this migration or when diagnosing changed behavior after that upgrade."
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, cut-off AI agent answers, auth throttle resets, image derivative caches, the Head viewport, production rate limits and test fakes on by default. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -17,10 +16,15 @@ Run the codemods first; they make the mechanical edits below and list every
 other place to review with `file:line`:
 
 ```bash
-warlock upgrade --to 5.31 --dry-run   # diff + review list, nothing written
-warlock upgrade --to 5.31             # apply; then install, type-check, test
-warlock upgrade --to 5.31 --json      # same result as JSON
+warlock upgrade --from 5.30 --to 5.31.0 --dry-run   # diff + review list, nothing written
+warlock upgrade --from 5.30 --to 5.31.0             # apply; then install, type-check, test
+warlock upgrade --from 5.30 --to 5.31.0 --json      # same result as JSON
 ```
+
+Pass `--from`. The command ships in 5.31, so it runs after the new
+`@warlock.js/core` is installed, and without `--from` it reads that installed
+version, the target itself, as the starting point and stops. An app still on
+5.29 passes `--from 5.29` so the 5.30 codemods run too.
 
 It removes `await` before log calls, rewrites custom log channels' snapshot
 reads, drops a duplicate default viewport tag, raises `engines.node`/`.nvmrc`
@@ -238,6 +242,10 @@ the web build's `/assets/*` and public files. `http.rateLimit.staticFiles: true`
 counts them again; `router.directory(options, { rateLimit: true })` counts one
 mount. Built-in `/health` and `/ready` routes are exempt by default too; set
 `http.health.rateLimit: true` to opt them into the limiter (see `health-checks`).
+Files served by a route handler, such as
+`router.get("/uploads/*", createUploadedFileController())`, are not static mounts
+and count against the limit; pass `rateLimit: false` (or a route limit) there if
+pages embed many of them.
 
 To exempt one route, pass `rateLimit: false` in its options (or the
 `serverOptions: { config: { rateLimit: false } }` pass-through). Development's
@@ -300,6 +308,7 @@ Dashboards that switch on `report.status` need the `incomplete` case. The
 Anthropic adapter's default `max_tokens` rose from 4096 to the model's max
 output when streaming and 16384 otherwise; set `maxTokens` to keep a lower cap.
 `agent.execute/stream(input, { modelOptions })` now applies per-run model options.
+
 ## 5.30 to 5.31 MCP serving
 
 `ai.mcp.serve()` now throws `McpServeError` (`type: "collision"`) when two
@@ -344,6 +353,7 @@ Then use the assertions instead of probing real services (`mailFake.assertSent`,
 `queueFake.assertPushed`; see `test-fakes`). `startHttpTestServer({ port: 0 })`
 is now supported and is what `warlock add test` generates; an existing
 `src/test-global-setup.ts` keeps its port until you change it.
+
 ## 5.30 to 5.31 AI cost, prices and provider errors
 
 5.31 bills prompt caching per provider. Anthropic and Bedrock usage is marked

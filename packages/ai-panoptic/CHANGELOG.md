@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Trace cost totals (exporters, the dashboard and trace filters) include the new cache-write cost channel.
+
 ### Added
 
 - Tool spans carry the provider's tool-call id as the `tool.callId` attribute.

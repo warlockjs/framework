@@ -25,7 +25,8 @@ log.info("auth", "login", "Signed in");
 await log.flush({ timeout: 3_000 }); // only where delivery must finish, e.g. shutdown
 ```
 
-`warlock upgrade --to 5.31` applies the same edit across an app.
+`warlock upgrade --from 5.29 --to 5.31.0` applies the same edit across an app
+(the codemod belongs to 5.30, so `--from` names the release before it).
 
 ## Options
 

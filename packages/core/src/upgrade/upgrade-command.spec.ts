@@ -136,7 +136,13 @@ describe("warlock upgrade", () => {
     const { errors, output } = capture();
 
     expect(await runUpgradeCommand({ to: "5.31" }, { root }, output)).toBe(1);
-    expect(errors.join("\n")).toContain("already on 5.31.0");
+    expect(errors.join("\n")).toContain(
+      "The installed @warlock.js/core is already 5.31.0, the --to version",
+    );
+    expect(errors.join("\n")).toContain("--from <previous version>");
+    expect(errors.join("\n")).toContain("warlock upgrade --from 5.30 --to 5.31.0");
+    expect(await runUpgradeCommand({ to: "5.30", from: "5.31" }, { root }, output)).toBe(1);
+    expect(errors.join("\n")).toContain("--from 5.31.0 is not older than --to 5.30.0");
     expect(await runUpgradeCommand({ to: "next" }, { root }, output)).toBe(1);
     expect(errors.join("\n")).toContain('"next" is not a version');
     expect(await runUpgradeCommand({}, { root }, output)).toBe(1);

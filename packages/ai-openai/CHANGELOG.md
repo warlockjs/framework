@@ -9,20 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Provider body objects replace the adapter-built object when their string `type` discriminator changes, so format and tool-choice overrides do not retain incompatible fields from the old variant. Same-type and undiscriminated objects keep the one-level merge.
-
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
 
 ### Added
 
 - Built-in OpenAI list prices (`OPENAI_MODEL_PRICING`, `openAIPricingFor`) for flat-priced models, from OpenAI's pricing page as of 2026-10-17, applied only on the `"openai"` provider label and exact ids. Models priced by prompt length stay unpriced.
-
 - Usage is marked `inputIncludesCache: true`, reports Chat Completions `prompt_tokens_details.cache_write_tokens`, and `complete()` / the streaming `done` chunk attach `usage.cost` when priced.
-
 - 503 / `server_is_overloaded` throws `ProviderOverloadedError`; wrapped errors carry `status`, `billed` and `retryable`.
 - An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` on the Chat Completions and Responses models and cancels the HTTP request.
 - With `streamChunks`, the Responses model yields `reasoning` for reasoning-summary / reasoning-text deltas and `tool-args` for `response.function_call_arguments.delta`; the Chat model yields `tool-args` for tool-call argument fragments and `reasoning` for a compatible vendor's `reasoning_content` / `reasoning` delta field (DeepSeek, Groq).
 - `ai.providerTool({ provider: "openai", definition })` adds Responses built-in tools (`web_search`, `file_search`, `code_interpreter`, …) verbatim. A reasoning item that led into a hosted tool call is left out of the stateless replay, and built-in calls the caller would have to execute (`shell_call`, `apply_patch_call`, `computer_call`, `custom_tool_call`, …) throw `InvalidRequestError` instead of being dropped. Chat Completions sends a provider tool only when its `provider` equals the model's provider label (e.g. `"groq"`).
-
 - `providerOptions.openai.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Responses models expose native input-token preflight through `countTokens()`; Chat Completions keeps offline estimates separate.
 

@@ -8,13 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`.
-- **BREAKING:** `.catch()` is a no-op on container validators, including failures in the container's own rules. Inputs previously accepted by an array/object catch after a length or unknown-key error now fail. Apply catches to child validators or handle a failed container result explicitly.
-- **BREAKING:** `v.union()` now returns its matched branch's validated output. Trimming and date parsing change values; object defaults/computed fields are retained, stripped unknown keys disappear, and an explicit `undefined` output drops the containing object field. Persisted, compared or serialized output can differ. Read and keep the raw input before validation when you need it.
 - **BREAKING:** a failed `v.union(...)` reports the closest member's errors at their own paths (`actor.id` instead of `actor`), still typed `union`; with `firstErrorOnly: false` it reports each of that member's errors separately instead of one `;`-joined message from every member. A custom union message, or a value no member can hold by type, still gives one error at the union's path. Update code that reads union errors by path or splits the joined message.
-- **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`. `warlock upgrade --to 5.31` lists every `.refine()` to review (codemod `seal-refine-output`).
-- **BREAKING:** `.catch()` is a no-op on container validators, including failures in the container's own rules. Inputs previously accepted by an array/object catch after a length or unknown-key error now fail. Apply catches to child validators or handle a failed container result explicitly. `warlock upgrade --to 5.31` lists `.catch()` calls on containers (codemod `seal-container-catch`).
-- **BREAKING:** `v.union()` now returns its matched branch's validated output. Trimming and date parsing change values; object defaults/computed fields are retained, stripped unknown keys disappear, and an explicit `undefined` output drops the containing object field. Persisted, compared or serialized output can differ. Read and keep the raw input before validation when you need it. `warlock upgrade --to 5.31` lists every `v.union()` to review (codemod `seal-union-output`).
+- **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`. `warlock upgrade --from 5.30 --to 5.31.0` lists every `.refine()` to review (codemod `seal-refine-output`).
+- **BREAKING:** `.catch()` is a no-op on container validators, including failures in the container's own rules. Inputs previously accepted by an array/object catch after a length or unknown-key error now fail. Apply catches to child validators or handle a failed container result explicitly. `warlock upgrade --from 5.30 --to 5.31.0` lists `.catch()` calls on containers (codemod `seal-container-catch`).
+- **BREAKING:** `v.union()` now returns its matched branch's validated output. Trimming and date parsing change values; object defaults/computed fields are retained, stripped unknown keys disappear, and an explicit `undefined` output drops the containing object field. Persisted, compared or serialized output can differ. Read and keep the raw input before validation when you need it. `warlock upgrade --from 5.30 --to 5.31.0` lists every `v.union()` to review (codemod `seal-union-output`).
 - Refinements now also check successful empty defaults such as `.default("")`; callbacks that reject those defaults now reject validation.
 
 ### Changed
@@ -26,9 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `v.union(...)` tries every member whose type matches before failing, so a union of several object schemas accepts a value that matches a later member; `firstErrorOnly` limits the errors reported, not the members tried. A failing union reports its closest member: fewest mismatched literals, then fewest errors, then the deepest error path, then declaration order.
 - A failing union no longer stores its last member error on the shared rule, so a later validation with no type-matching member reports the default message instead of a stale one.
 - The custom-error locale example is strict JSON, with its filename outside the code fence.
-
 - Standalone string replacement mutators accept an omitted context or options and preserve the stringified input instead of throwing.
-
 - Object `.merge()` retains refinements from both schemas, in their original order; cloning, extending and selecting fields preserve the original schema's refinements.
 - Union and record Standard Schema types now distinguish child input from validated output; `Infer.Output` reads the Standard Schema output parameter. Defaults and catches remain guaranteed in output.
 - Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types.
@@ -43,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- **BREAKING (types only):** `validate()` now returns a result narrowed on `isValid`. On success `data` is `Infer.Output<typeof schema>`, on failure it is `undefined`. Code that read `result.data` without checking `isValid`, or assigned it to an unrelated type, may need a check or a cast. A schema typed as bare `BaseValidator`/`ObjectValidator` keeps `data: any`. `warlock upgrade --to 5.31` lists `validate()` results read without an `isValid` check (codemod `seal-validate-result`).
+- **BREAKING (types only):** `validate()` now returns a result narrowed on `isValid`. On success `data` is `Infer.Output<typeof schema>`, on failure it is `undefined`. Code that read `result.data` without checking `isValid`, or assigned it to an unrelated type, may need a check or a cast. A schema typed as bare `BaseValidator`/`ObjectValidator` keeps `data: any`. `warlock upgrade --from 5.29 --to 5.31.0` lists `validate()` results read without an `isValid` check (codemod `seal-validate-result`).
 
 ### Added
 

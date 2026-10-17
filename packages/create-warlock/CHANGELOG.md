@@ -9,27 +9,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - The starter's `src/config/tests.ts` documents the test fakes that are on by default and how to opt out (`fakes: false`, or per fake such as `{ cache: false }`).
-
-### Fixed
-
-- Scaffolder source formatting and tests use the workspace Oxfmt configuration, including standalone installs; template formatting continues to use each generated app toolchain.
-
-- Group feature selection preserves explicit unticks when selecting the remaining group, and returns the category cursor to the group last edited.
-- The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback. Wrapped values align under their labels, and the summary retains its label, command and link styling.
-- On terminals narrower than 50 columns the project-ready heading keeps its bold green styling, as in the boxed layout.
-- The ESLint-toolchain `lint`, `format` and `tsc` scripts call the local `eslint`, `prettier` and `tsc` binaries instead of `npx`, matching `lint:check`/`format:check` and the Oxc scripts. `format` now quotes its glob, so Prettier formats nested files under `src/` rather than relying on the shell's expansion.
-
-### Changed
-
-- **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs. In an existing app, `warlock upgrade --to 5.31` raises `engines.node`, `.nvmrc` and `.node-version` (codemod `node-22-15`).
-- `--lint=oxc` projects sort imports on `format`: the generated `.oxfmtrc.json` sets `"sortImports": { "newlinesBetween": false }`, keeping imports in one block as `prettier-plugin-organize-imports` does in the ESLint toolchain. Oxfmt does not remove unused imports; Oxlint reports them.
-
-### Added
-
 - ESLint-mode projects include `@warlock.js/eslint-plugin` with its `recommended` preset in `eslint.config.js`, so `lint` reports unvalidated `request.all()` input, unguarded mutating routes, unsafe redirects, sensitive values in logs, unbounded regexes on input, `await log.*` and `.js` import extensions. `--lint=oxc` projects leave it out (Oxlint's JS plugins are alpha in the pinned 1.88).
 - The scaffold's sign-in and password-recovery routes, contact form and locale switch are marked `public: true`; `/auth/login` uses `loginThrottleMiddleware()`, `/auth/forgot-password` `tokenIssueThrottleMiddleware()`, `/auth/reset-password` `tokenConsumeThrottleMiddleware()`, and `/auth/refresh-token` a 30-per-minute route limit. The user list validates its query (`page`, `limit`, `id`, `name`, `email`) and passes `request.validated()` to the repository.
 - Opt-in `--lint=oxc` / `--lint oxc` flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating `lint:check` and `format:check` scripts. Oxc projects configure and recommend the official VS Code extension for format-on-save and lint fixes; default projects retain their Prettier/ESLint editor settings. Help and headless diagnostics include `--lint`.
 - Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys.
+
+### Changed
+
+- **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs. In an existing app, `warlock upgrade --from 5.30 --to 5.31.0` raises `engines.node`, `.nvmrc` and `.node-version` (codemod `node-22-15`).
+- `--lint=oxc` projects sort imports on `format`: the generated `.oxfmtrc.json` sets `"sortImports": { "newlinesBetween": false }`, keeping imports in one block as `prettier-plugin-organize-imports` does in the ESLint toolchain. Oxfmt does not remove unused imports; Oxlint reports them.
+
+### Fixed
+
+- Scaffolder source formatting and tests use the workspace Oxfmt configuration, including standalone installs; template formatting continues to use each generated app toolchain.
+- Group feature selection preserves explicit unticks when selecting the remaining group, and returns the category cursor to the group last edited.
+- The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback. Wrapped values align under their labels, and the summary retains its label, command and link styling.
+- On terminals narrower than 50 columns the project-ready heading keeps its bold green styling, as in the boxed layout.
+- The ESLint-toolchain `lint`, `format` and `tsc` scripts call the local `eslint`, `prettier` and `tsc` binaries instead of `npx`, matching `lint:check`/`format:check` and the Oxc scripts. `format` now quotes its glob, so Prettier formats nested files under `src/` rather than relying on the shell's expansion.
 
 ## 5.30.0 - 2026-10-16
 

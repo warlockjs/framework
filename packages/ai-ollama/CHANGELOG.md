@@ -15,7 +15,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `complete()` and the streaming `done` chunk attach `usage.cost` when the model is given `pricing`.
 - With `streamChunks`, `stream()` yields `reasoning` for each `message.thinking` piece. Provider-defined tools for other providers are left out of the request with a warning.
-
 - `providerOptions.ollama.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 
 ## 5.30.0 - 2026-10-16
