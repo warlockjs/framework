@@ -123,6 +123,11 @@ export default defineConfig({
           clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
         },
         {
+          name: "@warlock.js/ai-cli",
+          root: "../../packages/ai-cli",
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
+        },
+        {
           name: "@warlock.js/auth",
           root: "../../packages/auth",
           mainType: "esm",
