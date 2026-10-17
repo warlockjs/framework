@@ -12,8 +12,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `AnthropicModelConfig.maxOutputTokens` overrides the inferred model output limit that sizes the default `max_tokens`.
 - `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
 - Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.
+
+### Changed
+
+- **BREAKING** The default `max_tokens` (when no `maxTokens` is set) rose from 4096. Streaming requests use the model's documented max output — 128K for the Claude 5 family and Opus 4.6–4.8 / Sonnet 4.6, 64K for Opus / Sonnet / Haiku 4.5 — and non-streaming requests use 16384, capped by the model's max output (the Anthropic SDK requires streaming for larger non-streaming requests unless the client sets a `timeout`). Unknown ids default to 16384. With thinking on, the default still keeps room for the thinking budget plus 4096 answer tokens, within the model's limit.
+
+### Upgrading
+
+- Responses can be longer, and cost more, when `maxTokens` was never set. Set `maxTokens` on the model or per call to keep a lower cap. For a gateway or proxy id, set `maxOutputTokens` so streaming uses the real limit.
 
 ## 5.30.0 - 2026-10-16
 

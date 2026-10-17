@@ -1,6 +1,6 @@
 ---
 name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?, maxOutputTokens?}). System-prompt hoisting, max_tokens required (default: model max output when streaming, 16384 non-streaming; maxOutputTokens for gateway ids), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `maxOutputTokens`, `max_tokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -79,9 +79,24 @@ In streaming, `cachedTokens` / `cacheWriteTokens` are seeded from `message_start
 
 ## `max_tokens` is required
 
-Unlike OpenAI, Anthropic **requires** `max_tokens` on every request. Resolution: per-call `options.maxTokens` > `config.maxTokens` > **default `4096`**. A caller who never sets a cap still gets a complete answer instead of a 400.
+Unlike OpenAI, Anthropic **requires** `max_tokens` on every request. Resolution: per-call `options.maxTokens` (or the agent's per-run / configured `modelOptions.maxTokens`) > `config.maxTokens` > a default sized for agent work:
 
-With extended thinking enabled and no explicit cap, the adapter reserves answer room in both modes: `max_tokens = thinking budget + 4096`. In budget mode an explicit `maxTokens` must be greater than `budget_tokens` or the call throws before it reaches Anthropic.
+| Request                      | Default `max_tokens`                                                                                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Streaming (`stream()`)       | the model's documented max output: 128K (Claude 5 family, Opus 4.6–4.8, Sonnet 4.6), 64K (Opus / Sonnet / Haiku 4.5) |
+| Non-streaming (`complete()`) | `16384`, capped by the model's max output                                                                            |
+| Unknown id                   | `16384`; set `maxOutputTokens` on the model for gateway / proxy ids                                                  |
+
+The non-streaming default stays at 16384 because `@anthropic-ai/sdk` refuses a non-streaming request whose `max_tokens` implies more than ten minutes (above ~21K tokens) unless the client sets a `timeout`. Limits come from Anthropic's model pages (checked 2026-10-17).
+
+```ts
+anthropic.model({ name: "claude-haiku-4-5" }); // stream 64000, complete 16384
+anthropic.model({ name: "my-gateway/opus", maxOutputTokens: 128_000 });
+```
+
+With extended thinking enabled and no explicit cap, the default keeps room for the thinking budget plus 4096 answer tokens (never above the model's max output). In budget mode an explicit `maxTokens` must be greater than `budget_tokens` or the call throws before it reaches Anthropic.
+
+A response that still hits the cap (`finishReason: "length"`) ends an agent run as incomplete (`AgentIncompleteError`) unless the agent sets `continueOnOutputLimit`.
 
 **Tiny caps + adaptive thinking:** thinking tokens count inside `max_tokens`, so a very small cap can be spent entirely on thinking. Live check: Sonnet 5.5 with `maxTokens: 60` returned `finishReason: "length"` and empty content. For tiny outputs give thinking room (raise `maxTokens`) or turn reasoning off (`reasoning: false` on the model, or no `options.reasoning`).
 
@@ -137,7 +152,7 @@ anthropic.model({ name: "claude-sonnet-4-6", thinkingMode: "adaptive" }); // opt
 `temperature` is **not sent** to models after Opus 4.6 (adaptive mode) — they reject any non-default value with a 400. It is also dropped on any request that enables thinking, since Anthropic 400s on thinking plus an explicit temperature. So it is forwarded only in budget mode on requests without thinking; `thinkingMode` decides this too. Set `reasoning: false` on the model config to suppress the thinking param entirely for proxied/legacy targets.
 
 ```ts
-await agent.execute("Prove it.", { reasoning: { effort: "high" } });
+await agent.execute("Prove it.", { modelOptions: { reasoning: { effort: "high" } } });
 // adaptive model: thinking { type: "adaptive" }, output_config.effort "high"
 // budget model:   thinking { type: "enabled", budget_tokens: 12000 }
 await model.complete(messages, { reasoning: { maxTokens: 8000 } });

@@ -100,10 +100,34 @@ const model = anthropic.model({ name: "claude-sonnet-4-6", temperature: 0.7 });
 // Pass to any @warlock.js/ai agent / workflow / supervisor.
 ```
 
-Anthropic requires a token cap on every request. When you don't set
-`maxTokens` (per-model or per-call), the adapter falls back to a
-generous default of **4096** so a caller who never thought about caps
-still gets a complete answer instead of a 400.
+Anthropic requires a token cap (`max_tokens`) on every request. When you
+don't set `maxTokens` (per-model, per-call, or through an agent's
+`modelOptions`), the adapter picks a default sized for agent work:
+
+| Request                      | Default `max_tokens`                                                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Streaming (`stream()`)       | The model's documented max output — 128K for the Claude 5 family and Opus 4.6–4.8 / Sonnet 4.6, 64K for Opus / Sonnet / Haiku 4.5 |
+| Non-streaming (`complete()`) | **16384**, capped by the model's max output                                                                                       |
+| Unknown model id             | **16384** (set `maxOutputTokens` on the model to use its real limit)                                                              |
+
+The non-streaming default stays at 16384 because the Anthropic SDK refuses
+a non-streaming request whose `max_tokens` implies more than ten minutes
+of generation unless the client sets a `timeout`; stream long outputs (an
+agent's `stream()`), or set `maxTokens` and a client `timeout` yourself.
+With extended thinking on, the default also keeps room for the thinking
+budget plus 4096 answer tokens. Limits are taken from Anthropic's model
+pages (checked 2026-10-17).
+
+```ts
+anthropic.model({ name: "claude-haiku-4-5" }); // stream: 64000, complete: 16384
+anthropic.model({ name: "my-gateway/opus", maxOutputTokens: 128_000 }); // a gateway id
+anthropic.model({ name: "claude-opus-5-5", maxTokens: 8192 }); // explicit cap always wins
+```
+
+A response that still hits the cap ends the agent run as incomplete
+(`AgentIncompleteError`, `report.status: "incomplete"`) — or continues,
+with `continueOnOutputLimit`. See
+[Cut-off responses](/v/latest/ai/agents/run-agent/#cut-off-responses--reportstatus-incomplete).
 
 ## Capabilities
 
@@ -167,8 +191,10 @@ Thinking text is empty by default on these models. Ask for readable summaries wi
 
 ```ts
 await agent.execute("Plan the migration.", {
-  reasoning: { effort: "high" },
-  providerOptions: { anthropic: { thinkingDisplay: "summarized" } },
+  modelOptions: {
+    reasoning: { effort: "high" },
+    providerOptions: { anthropic: { thinkingDisplay: "summarized" } },
+  },
 });
 ```
 
