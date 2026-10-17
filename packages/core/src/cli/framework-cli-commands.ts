@@ -1,4 +1,6 @@
 import { addCommand } from "./commands/add.command";
+import { agentsMdCommand } from "./commands/agents-md.command";
+import { boardCommand } from "./commands/board.command";
 import { buildCommand } from "./commands/build.command";
 import { checkCommand } from "./commands/check.command";
 import { createDatabaseCommand } from "./commands/create-database.command";
@@ -18,12 +20,14 @@ import {
   generateUseCaseCommand,
 } from "./commands/generate/generate.command";
 import { inspectCommand } from "./commands/inspect.command";
+import { mcpCommand } from "./commands/mcp.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { openApiGeneratorCommand } from "./commands/openapi-generator.command";
 import { postmanGeneratorCommand } from "./commands/postman-generator.command";
 import { routesCommand, routesDiffCommand } from "./commands/routes.command";
 import { seedCommand } from "./commands/seed.command";
 import { startProductionCommand } from "./commands/start-production.command";
+import { traceCommand } from "./commands/trace.command";
 import { storagePutCommand } from "./commands/storage-put.command";
 import { typecheckCommand } from "./commands/typecheck.command";
 import { typingsGeneratorCommand } from "./commands/typings-generator.command";
@@ -44,6 +48,12 @@ export const frameworkCommands = [
   explainCommand,
   checkCommand,
   typecheckCommand,
+
+  // agent tooling commands
+  mcpCommand,
+  traceCommand,
+  agentsMdCommand,
+  boardCommand,
 
   // production commands
   buildCommand,

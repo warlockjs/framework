@@ -8,6 +8,7 @@ import { warlockConfigManager } from "../warlock-config";
 import { registerDevelopmentOpenApiProvider } from "../openapi/development-openapi-provider";
 import { BootPreconditionError } from "./boot-precondition-error";
 import { buildDevelopmentOpenApiDocument } from "./build-development-openapi-document";
+import { DevAgentTooling, resolveDevMcpOptions } from "./dev-agent-tooling";
 import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
 import { MANIFEST_PATH } from "./flags";
@@ -43,6 +44,9 @@ export class DevelopmentServer {
   /** Set once boot begins, so a failed boot still closes connectors that already started. */
   private connectorsStarted = false;
   private readonly options: StartDevServerOptions;
+
+  /** `.warlock/dev-server.json`, the AGENTS.md refresher and `--mcp`. */
+  private readonly agentTooling = new DevAgentTooling();
 
   public constructor(options: StartDevServerOptions = {}) {
     this.options = options;
@@ -140,6 +144,11 @@ export class DevelopmentServer {
         this.options.generateTypings ?? devServerConfig?.generateTypings ?? true;
       const healthCheckers = this.options.healthCheckers ?? devServerConfig?.healthCheckers ?? true;
 
+      await this.agentTooling.start({
+        agentsMd: devServerConfig?.agentsMd !== false,
+        mcp: resolveDevMcpOptions(this.options.mcp, devServerConfig?.mcp),
+      });
+
       if (generateTypings) await typeGenerator.executeGenerateAllCommand();
 
       if (healthCheckers) {
@@ -226,6 +235,8 @@ export class DevelopmentServer {
 
       typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed, ...batch.deleted]);
 
+      this.agentTooling.afterReload();
+
       filesOrchestrator.checkHealth(batch);
     } catch (error) {
       devServeLog(colors.redBright(`Failed to execute batch reload: ${error}`));
@@ -280,6 +291,7 @@ export class DevelopmentServer {
     devServeLog(colors.redBright("Shutting down Development Server..."));
     this.running = false;
     this.connectorsStarted = false;
+    await this.agentTooling.shutdown();
     await connectorsManager.shutdown();
     devServeLog(colors.greenBright("Development Server stopped"));
   }

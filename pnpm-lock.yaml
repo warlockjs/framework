@@ -852,6 +852,9 @@ importers:
       '@warlock.js/ai':
         specifier: workspace:^
         version: link:../ai
+      '@warlock.js/ai-tools':
+        specifier: workspace:^
+        version: link:../ai-tools
       '@warlock.js/auth':
         specifier: workspace:^
         version: link:../auth

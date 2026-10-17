@@ -61,6 +61,7 @@ export const devServerCommand = command({
       // lets `warlock.config.ts > devServer.*` defaults apply.
       generateTypings: data.options.skipTypings ? false : undefined,
       healthCheckers: data.options.skipHealth ? false : undefined,
+      mcp: data.options.mcp === true ? true : undefined,
     });
 
     // Fire-and-forget: once the server is ready, surface a one-line notice if
@@ -83,6 +84,12 @@ export const devServerCommand = command({
     {
       text: "--skip-health, -sh",
       description: "Skip file health checkers for this run",
+      type: "boolean",
+    },
+    {
+      text: "--mcp",
+      description:
+        "Also serve `warlock mcp` over HTTP on loopback from the dev server (live registries; needs @warlock.js/ai-tools)",
       type: "boolean",
     },
   ],
