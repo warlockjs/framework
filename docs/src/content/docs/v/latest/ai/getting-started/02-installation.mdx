@@ -134,6 +134,7 @@ A few capabilities live in optional satellite packages that **augment the shared
 - `import "@warlock.js/ai-tools"` → `ai.tools.*` (web search, fetch, HTTP, calculator, date-time) and `ai.mcp(...)`.
 - `import "@warlock.js/ai-workspace"` → `ai.workspace(...)` (a policy-jailed filesystem + shell for coding agents).
 - `import "@warlock.js/ai-panoptic"` → the observability wiring read by `ai.config({ panoptic })`.
+- `import "@warlock.js/ai-cli"` → `ai.cli.*` (vendor coding CLIs — Claude Code, Codex, Copilot, Cursor, … — run headless as agents; see [Run coding CLIs as agents](/v/latest/ai/cli-agents/run-cli-agents/)).
 
 The verb stays dark until its package is imported somewhere in your app — a bare `import "@warlock.js/ai-tools"` is enough, and any named import from the package pulls the side effect in too.
 

@@ -114,13 +114,14 @@ All packages live in [`packages/`](packages) and are published to npm at the sam
 
 ### AI
 
-| Package                                             | Description                                                                                           |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [`@warlock.js/ai`](packages/ai)                     | Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RAG, memory and guardrails.           |
-| [`@warlock.js/ai-tools`](packages/ai-tools)         | Ready-made agent tools (web search, fetch, HTTP, calculator, date-time) and an MCP client and server. |
-| [`@warlock.js/ai-workspace`](packages/ai-workspace) | A policy-jailed filesystem and shell workspace for agents.                                            |
-| [`@warlock.js/ai-panoptic`](packages/ai-panoptic)   | Observability: a collector and exporters for traces of model and tool calls.                          |
-| [`@warlock.js/ai-live`](packages/ai-live)           | Realtime duplex voice sessions and text-to-video.                                                     |
+| Package                                             | Description                                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [`@warlock.js/ai`](packages/ai)                     | Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RAG, memory and guardrails.             |
+| [`@warlock.js/ai-tools`](packages/ai-tools)         | Ready-made agent tools (web search, fetch, HTTP, calculator, date-time) and an MCP client and server.   |
+| [`@warlock.js/ai-workspace`](packages/ai-workspace) | A policy-jailed filesystem and shell workspace for agents.                                              |
+| [`@warlock.js/ai-cli`](packages/ai-cli)             | Drive vendor coding CLIs (Claude Code, Codex, Copilot, Cursor, Grok, …) as agents with one event model. |
+| [`@warlock.js/ai-panoptic`](packages/ai-panoptic)   | Observability: a collector and exporters for traces of model and tool calls.                            |
+| [`@warlock.js/ai-live`](packages/ai-live)           | Realtime duplex voice sessions and text-to-video.                                                       |
 
 **Model providers:** [`ai-openai`](packages/ai-openai) · [`ai-anthropic`](packages/ai-anthropic) · [`ai-google`](packages/ai-google) · [`ai-bedrock`](packages/ai-bedrock) · [`ai-mistral`](packages/ai-mistral) · [`ai-groq`](packages/ai-groq) · [`ai-deepseek`](packages/ai-deepseek) · [`ai-xai`](packages/ai-xai) · [`ai-ollama`](packages/ai-ollama)
 
