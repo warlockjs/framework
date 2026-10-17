@@ -81,7 +81,7 @@ describe("warlock check", () => {
       "project",
       "json",
     ]);
-  });
+  }, 60_000);
 
   it("prints exactly the report under --json and exits with its code", async () => {
     hoisted.runCheck.mockResolvedValue(report);

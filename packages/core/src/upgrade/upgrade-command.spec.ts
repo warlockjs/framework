@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { unifiedDiff } from "./diff";
 import { tsMorphInstallCommand } from "./load-ts-morph";
 import { detectInstalledVersion, runUpgrade } from "./run-upgrade";
@@ -77,6 +77,8 @@ describe("warlock upgrade", () => {
   });
 
   it("applies the edits and bumps the family versions without --dry-run", async () => {
+    // `pnpm test` sets the user agent, which the install hint would follow.
+    vi.stubEnv("npm_config_user_agent", "");
     const root = createApp();
     const result = await runUpgrade({ root, to: "5.31" });
 
@@ -89,6 +91,7 @@ describe("warlock upgrade", () => {
     expect(result.from).toBe("5.29.0");
     expect(result.changedFiles).toEqual(["package.json", "src/app/jobs/run.service.ts"]);
     expect(result.installHint).toBe("npm install");
+    vi.unstubAllEnvs();
   });
 
   it("--json prints the machine-readable result", async () => {

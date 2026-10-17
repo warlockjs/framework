@@ -199,7 +199,9 @@ describe("web starter stubs", () => {
     expect(webContactControllerStub).toContain(
       "contactController.validation = { schema: contactSchema }",
     );
-    expect(webContactRoutesStub).toContain('router.post("/api/contact", contactController)');
+    expect(webContactRoutesStub).toContain(
+      'router.post("/api/contact", contactController, { public: true });',
+    );
   });
 
   it("maps Core's `errors: Array<{input,error}>` validation shape onto form.setErrors, with a message fallback", () => {
