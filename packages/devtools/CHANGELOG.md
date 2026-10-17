@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Changed
+
+- The `devtools-overview` skill shows how to read a request's devtools timeline from the terminal with `warlock trace`, and how coding agents read recent requests through the `requests_recent` tool of `warlock mcp`. The JSON API they use (`GET <path>/api/requests`, `GET <path>/api/requests/:id`) is unchanged.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed
