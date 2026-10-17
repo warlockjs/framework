@@ -4,24 +4,41 @@ import { createLocalBackend } from "./backends/local";
 import { createMockBackend } from "./backends/mock";
 import { WorkspacePolicyError } from "./errors";
 import { createOps } from "./ops";
+import { ShellJobs } from "./shell-jobs";
+import { TodoStore } from "./todos";
 import { makeEditFileTool } from "./tools/edit-file";
 import { makeGlobTool } from "./tools/glob";
 import { makeGrepTool } from "./tools/grep";
+import { makeListDirTool } from "./tools/list-dir";
+import { makeMultiEditTool } from "./tools/multi-edit";
 import { makeReadFileTool } from "./tools/read-file";
 import { makeRunShellTool } from "./tools/run-shell";
 import { makeRunTestsTool } from "./tools/run-tests";
+import { makeShellKillTool } from "./tools/shell-kill";
+import { makeShellOutputTool } from "./tools/shell-output";
+import { makeTodoReadTool, makeTodoWriteTool } from "./tools/todo";
 import { makeWriteFileTool } from "./tools/write-file";
 import type {
   EditFileInput,
   EditFileResult,
   ExecOptions,
   GrepResult,
+  ListDirOptions,
+  ListDirResult,
+  MultiEditInput,
+  MultiEditResult,
   ReadFileResult,
   RunShellResult,
+  ShellJobInfo,
+  ShellOutputOptions,
+  ShellOutputResult,
+  StartShellOptions,
+  TodoListResult,
   Workspace,
   WorkspaceBackend,
   WorkspaceOps,
   WorkspacePolicy,
+  WorkspaceTodoInput,
   WorkspaceToolName,
   WorkspaceTools,
 } from "./contracts";
@@ -33,20 +50,46 @@ import type {
 const ALL_TOOL_NAMES: readonly WorkspaceToolName[] = [
   "readFile",
   "editFile",
+  "multiEdit",
   "writeFile",
+  "listDir",
   "runShell",
+  "shellOutput",
+  "shellKill",
   "runTests",
   "grep",
   "glob",
+  "todoWrite",
+  "todoRead",
 ];
 
 /**
  * The subset a {@link Workspace.readonly} projection exposes — the
- * non-mutating tools only. `editFile` / `writeFile` / `runShell` /
- * `runTests` are deliberately omitted so a reviewer agent has no path to
- * change the tree.
+ * tools that cannot change the tree. `editFile` / `multiEdit` /
+ * `writeFile` / the shell tools / `runTests` are deliberately omitted so a
+ * reviewer agent has no path to change it. The todo tools stay: they only
+ * touch the in-memory plan.
  */
-const READONLY_TOOL_NAMES: readonly WorkspaceToolName[] = ["readFile", "grep", "glob"];
+const READONLY_TOOL_NAMES: readonly WorkspaceToolName[] = [
+  "readFile",
+  "listDir",
+  "grep",
+  "glob",
+  "todoWrite",
+  "todoRead",
+];
+
+/** Tools vended only when the policy enables background commands. */
+const BACKGROUND_TOOL_NAMES: ReadonlySet<WorkspaceToolName> = new Set(["shellOutput", "shellKill"]);
+
+/**
+ * State one workspace shares with every projection made from it: its
+ * background commands and its todo list.
+ */
+interface WorkspaceState {
+  jobs: ShellJobs;
+  todos: TodoStore;
+}
 
 /**
  * Choose the dumb IO executor for a policy. `"mock"` selects the
@@ -86,15 +129,20 @@ class WorkspaceImpl implements Workspace {
 
   public readonly tools: WorkspaceTools;
 
+  /** Background commands + todo list, shared with projections. */
+  private readonly state: WorkspaceState;
+
   public constructor(
     policy: WorkspacePolicy,
     allowedTools: readonly WorkspaceToolName[] = ALL_TOOL_NAMES,
+    state?: WorkspaceState,
   ) {
     this.policy = policy;
     this.allowedTools = new Set(allowedTools);
+    this.state = state ?? { jobs: new ShellJobs(), todos: new TodoStore() };
 
     const backend = selectBackend(policy);
-    this.ops = createOps(backend, policy);
+    this.ops = createOps(backend, policy, { jobs: this.state.jobs });
     this.tools = this.buildTools();
   }
 
@@ -117,34 +165,61 @@ class WorkspaceImpl implements Workspace {
     const erase = <TInput, TOutput>(contract: ToolContract<TInput, TOutput>): ToolContract =>
       contract as unknown as ToolContract;
 
+    const shell = this.policy.shell;
+    const background = shell?.background !== undefined;
+    const interpreter = shell?.interpreter ?? "none";
+
     const factories: Record<
       WorkspaceToolName,
       (opts?: { name?: string; command?: string }) => ToolContract
     > = {
       readFile: (opts) => erase(makeReadFileTool(this.ops, opts)),
       editFile: (opts) => erase(makeEditFileTool(this.ops, opts)),
+      multiEdit: (opts) => erase(makeMultiEditTool(this.ops, opts)),
       writeFile: (opts) => erase(makeWriteFileTool(this.ops, opts)),
-      runShell: (opts) => erase(makeRunShellTool(this.ops, opts)),
-      runTests: (opts) => erase(makeRunTestsTool(this.ops, opts)),
+      listDir: (opts) => erase(makeListDirTool(this.ops, opts)),
+      runShell: (opts) =>
+        erase(
+          makeRunShellTool(this.ops, {
+            ...(opts?.name !== undefined ? { name: opts.name } : {}),
+            ...(shell?.timeoutMs !== undefined ? { maxTimeoutMs: shell.timeoutMs } : {}),
+            background,
+          }),
+        ),
+      shellOutput: (opts) => erase(makeShellOutputTool(this.ops, opts)),
+      shellKill: (opts) => erase(makeShellKillTool(this.ops, opts)),
+      runTests: (opts) => erase(makeRunTestsTool(this.ops, { ...opts, interpreter })),
       grep: (opts) => erase(makeGrepTool(this.ops, opts)),
       glob: (opts) => erase(makeGlobTool(this.ops, opts)),
+      todoWrite: (opts) => erase(makeTodoWriteTool(this.state.todos, opts)),
+      todoRead: (opts) => erase(makeTodoReadTool(this.state.todos, opts)),
     };
 
     const build = (name: WorkspaceToolName, opts?: { name?: string; command?: string }) =>
       factories[name](opts);
 
+    // `shell_output` / `shell_kill` only mean something when background
+    // commands can be started, so `all()` leaves them out otherwise.
+    const vendedByAll = (name: WorkspaceToolName): boolean =>
+      this.allowedTools.has(name) && (background || !BACKGROUND_TOOL_NAMES.has(name));
+
     return {
-      all: () =>
-        ALL_TOOL_NAMES.filter((name) => this.allowedTools.has(name)).map((name) => build(name)),
+      all: () => ALL_TOOL_NAMES.filter(vendedByAll).map((name) => build(name)),
       pick: (...names: WorkspaceToolName[]) =>
         names.filter((name) => this.allowedTools.has(name)).map((name) => build(name)),
       readFile: (opts) => build("readFile", opts),
       editFile: (opts) => build("editFile", opts),
+      multiEdit: (opts) => build("multiEdit", opts),
       writeFile: (opts) => build("writeFile", opts),
+      listDir: (opts) => build("listDir", opts),
       runShell: (opts) => build("runShell", opts),
+      shellOutput: (opts) => build("shellOutput", opts),
+      shellKill: (opts) => build("shellKill", opts),
       runTests: (opts) => build("runTests", opts),
       grep: (opts) => build("grep", opts),
       glob: (opts) => build("glob", opts),
+      todoWrite: (opts) => build("todoWrite", opts),
+      todoRead: (opts) => build("todoRead", opts),
     };
   }
 
@@ -186,10 +261,52 @@ class WorkspaceImpl implements Workspace {
     return this.ops.editFile(input);
   }
 
+  public async multiEdit(input: MultiEditInput): Promise<MultiEditResult> {
+    this.assertWritable("multiEdit");
+
+    return this.ops.multiEdit(input);
+  }
+
+  public listDir(dirPath?: string, opts?: ListDirOptions): Promise<ListDirResult> {
+    return this.ops.listDir(dirPath, opts);
+  }
+
   public async exec(command: string, opts?: ExecOptions): Promise<RunShellResult> {
     this.assertWritable("exec");
 
     return this.ops.exec(command, opts);
+  }
+
+  public async startShell(command: string, opts?: StartShellOptions): Promise<ShellJobInfo> {
+    this.assertWritable("startShell");
+
+    return this.ops.startShell(command, opts);
+  }
+
+  public shellOutput(id: string, opts?: ShellOutputOptions): Promise<ShellOutputResult> {
+    return this.ops.shellOutput(id, opts);
+  }
+
+  public async shellKill(id: string): Promise<ShellJobInfo> {
+    this.assertWritable("shellKill");
+
+    return this.ops.shellKill(id);
+  }
+
+  public listShells(): ShellJobInfo[] {
+    return this.ops.listShells();
+  }
+
+  public readTodos(): TodoListResult {
+    return this.state.todos.read();
+  }
+
+  public writeTodos(todos: WorkspaceTodoInput[]): TodoListResult {
+    return this.state.todos.write(todos);
+  }
+
+  public dispose(): Promise<void> {
+    return this.ops.dispose();
   }
 
   public grep(
@@ -220,45 +337,56 @@ class WorkspaceImpl implements Workspace {
   }
 
   /**
-   * A read-only projection over the SAME policy — only the read/grep/glob
-   * tools are vended and every mutating direct method rejects with a
-   * {@link WorkspacePolicyError}. A fresh ops/backend is built from the
-   * identical policy, so the projection sees the same jailed tree.
+   * A read-only projection over the SAME policy — only the read / list /
+   * grep / glob / todo tools are vended and every mutating direct method
+   * rejects with a {@link WorkspacePolicyError}. A fresh ops/backend is
+   * built from the identical policy, so the projection sees the same jailed
+   * tree; it shares this workspace's background commands and todo list.
    */
   public readonly(): Workspace {
-    return new WorkspaceImpl(this.policy, READONLY_TOOL_NAMES);
+    return new WorkspaceImpl(
+      this.policy,
+      READONLY_TOOL_NAMES.filter((name) => this.allowedTools.has(name)),
+      this.state,
+    );
   }
 
   /**
    * A sub-jailed view rooted at `subdir` (relative to this workspace's
    * `cwd`). Returns a brand-new workspace whose policy is this policy
    * with `cwd` narrowed to `join(cwd, subdir)` — same backend selection,
-   * same allow/deny/shell/read sub-policies, but a tighter jail root.
+   * same allow/deny/shell/read sub-policies, but a tighter jail root. It
+   * shares this workspace's background commands and todo list.
    */
   public scope(subdir: string): Workspace {
-    return new WorkspaceImpl({ ...this.policy, cwd: path.join(this.policy.cwd, subdir) }, [
-      ...this.allowedTools,
-    ]);
+    return new WorkspaceImpl(
+      { ...this.policy, cwd: path.join(this.policy.cwd, subdir) },
+      [...this.allowedTools],
+      this.state,
+    );
   }
 }
 
 /**
  * Build a {@link Workspace} — the integrator that wires a
  * {@link WorkspacePolicy} to a backend, the shared policy-enforced ops
- * layer, and the seven agent-facing tool factories.
+ * layer, and the agent-facing tool factories.
  *
  * The backend is chosen from `policy.backend`: `"mock"` runs in memory
  * (hermetic tests); the `"local"` default (and any absent value) runs
  * over the real disk via `@warlock.js/fs` + `node:child_process`. The
  * returned workspace exposes:
  *
- * - **`tools.*`** — `readFile` / `editFile` / `writeFile` / `runShell` /
- *   `runTests` / `grep` / `glob`, plus `all()` (every tool) and
- *   `pick(...)` (a least-privilege subset).
- * - **direct methods** — `readFile` / `writeFile` / `editFile` / `exec` /
- *   `grep` / `glob` / `exists` / `mkdir` / `remove`, each delegating 1:1
- *   to the shared ops layer.
- * - **`readonly()`** — a projection that vends only read/grep/glob and
+ * - **`tools.*`** — `readFile` / `editFile` / `multiEdit` / `writeFile` /
+ *   `listDir` / `runShell` / `shellOutput` / `shellKill` / `runTests` /
+ *   `grep` / `glob` / `todoWrite` / `todoRead`, plus `all()` (every tool)
+ *   and `pick(...)` (a least-privilege subset).
+ * - **direct methods** — `readFile` / `writeFile` / `editFile` /
+ *   `multiEdit` / `listDir` / `exec` / `startShell` / `shellOutput` /
+ *   `shellKill` / `listShells` / `grep` / `glob` / `exists` / `mkdir` /
+ *   `remove` / `readTodos` / `writeTodos`, each delegating to the shared
+ *   ops layer, and `dispose()`.
+ * - **`readonly()`** — a projection that vends only the read-side tools and
  *   rejects every mutating direct method.
  * - **`scope(subdir)`** — a sub-jailed workspace rooted at `subdir`.
  *

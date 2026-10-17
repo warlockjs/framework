@@ -1,18 +1,22 @@
 import { tool, type ToolContract } from "@warlock.js/ai";
 import { objectSchema, optionalBooleanField, optionalStringField, stringField } from "./schema";
+import { EDIT_FILE_JSON_SCHEMA } from "./json-schemas";
 import type { EditFileInput, EditFileResult, WorkspaceOps } from "../contracts";
 
 /** Default tool name exposed to the LLM. */
 const DEFAULT_NAME = "edit_file";
 
 /** Input schema for the `edit_file` tool. */
-const inputSchema = objectSchema<EditFileInput>({
-  path: stringField(),
-  oldString: stringField(),
-  newString: stringField(),
-  replaceAll: optionalBooleanField(),
-  expectHash: optionalStringField(),
-});
+const inputSchema = objectSchema<EditFileInput>(
+  {
+    path: stringField(),
+    oldString: stringField(),
+    newString: stringField(),
+    replaceAll: optionalBooleanField(),
+    expectHash: optionalStringField(),
+  },
+  EDIT_FILE_JSON_SCHEMA,
+);
 
 /**
  * Build the agent-facing `edit_file` tool over a workspace's policy-

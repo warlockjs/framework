@@ -1,5 +1,5 @@
 /**
- * Input/output shapes for the seven workspace tools and the direct
+ * Input/output shapes for the workspace tools and the direct
  * methods that back them. These are the wire contracts the agent sees
  * (via each tool's schema) and the values the policy-enforced ops layer
  * returns. Paths in every `*Input` are workspace-relative; the policy
@@ -13,11 +13,17 @@
 export type WorkspaceToolName =
   | "readFile"
   | "editFile"
+  | "multiEdit"
   | "writeFile"
+  | "listDir"
   | "runShell"
+  | "shellOutput"
+  | "shellKill"
   | "runTests"
   | "grep"
-  | "glob";
+  | "glob"
+  | "todoWrite"
+  | "todoRead";
 
 /** Input to the `read_file` tool / `readFile()` direct method. */
 export interface ReadFileInput {
@@ -98,6 +104,43 @@ export interface EditFileResult {
   hash: string;
 }
 
+/** One replacement inside a {@link MultiEditInput}. */
+export interface MultiEditOperation {
+  /** Exact substring to replace; must be unique unless `replaceAll`. */
+  oldString: string;
+  /** Replacement text. */
+  newString: string;
+  /** Replace every occurrence instead of requiring a single unique match. */
+  replaceAll?: boolean;
+}
+
+/**
+ * Input to the `multi_edit` tool / `multiEdit()` direct method — several
+ * exact-string replacements in one file, applied in order (each edit sees
+ * the result of the previous ones) and written once. All of them apply or
+ * none do.
+ */
+export interface MultiEditInput {
+  /** Workspace-relative path to edit. */
+  path: string;
+  /** The replacements, applied in order. At least one. */
+  edits: MultiEditOperation[];
+  /** Expected current SHA-256 of the file; a mismatch rejects every edit as stale. */
+  expectHash?: string;
+}
+
+/** Result of a successful multi-edit. */
+export interface MultiEditResult {
+  /** Workspace-relative path that was edited. */
+  path: string;
+  /** Number of edits applied (always `edits.length`). */
+  edits: number;
+  /** Total occurrences replaced across every edit. */
+  replacements: number;
+  /** SHA-256 of the file content after all edits. */
+  hash: string;
+}
+
 /** Input to the `write_file` tool / `writeFile()` direct method. */
 export interface WriteFileInput {
   /** Workspace-relative path to write (created if absent). */
@@ -130,10 +173,112 @@ export interface ExecOptions {
 
 /** Input to the `run_shell` tool / `exec()` direct method. */
 export interface RunShellInput {
-  /** The command line to run; its leading basename is policy-checked. */
+  /** The command line to run; every command in it is policy-checked. */
   command: string;
   /** Per-call wall-clock cap (overrides the policy default if lower). */
   timeoutMs?: number;
+  /**
+   * Start the command as a background job and return its id at once,
+   * instead of waiting for it. Needs `shell.background` in the policy.
+   */
+  background?: boolean;
+}
+
+/**
+ * Lifecycle state of a background command.
+ *
+ * - `"running"` — still running.
+ * - `"exited"` — finished on its own; `exitCode` holds its exit code.
+ * - `"killed"` — stopped by `shell_kill` / `shellKill()` or `dispose()`.
+ * - `"timed-out"` — killed for exceeding `shell.background.timeoutMs` (or
+ *   the per-call `timeoutMs`).
+ */
+export type ShellJobStatus = "running" | "exited" | "killed" | "timed-out";
+
+/** A background command owned by the workspace. */
+export interface ShellJobInfo {
+  /** Workspace-unique id (`"job-1"`, `"job-2"`, …) for `shell_output` / `shell_kill`. */
+  id: string;
+  /** The command line it runs. */
+  command: string;
+  /** Lifecycle state. */
+  status: ShellJobStatus;
+  /** Exit code once it has stopped; `null` while running. */
+  exitCode: number | null;
+  /** OS process id of the direct child, when the backend has one. */
+  pid?: number;
+  /** ISO timestamp it was started. */
+  startedAt: string;
+  /** ISO timestamp it stopped, once it has. */
+  endedAt?: string;
+}
+
+/** What `run_shell` returns when called with `background: true`. */
+export interface RunShellBackgroundResult extends ShellJobInfo {
+  /** Always `true` — tells this result apart from a foreground {@link RunShellResult}. */
+  background: true;
+}
+
+/** Options for `startShell()`. */
+export interface StartShellOptions {
+  /**
+   * Wall-clock cap for this background command, in ms. Lowers
+   * `shell.background.timeoutMs` (never raises it); absent ⇒ the policy
+   * value, or no cap.
+   */
+  timeoutMs?: number;
+}
+
+/** Input to the `shell_output` tool. */
+export interface ShellOutputInput {
+  /** The background command id `run_shell` returned. */
+  id: string;
+  /**
+   * Return only output produced after this `cursor` (from an earlier
+   * result). Omit to get everything since the previous read.
+   */
+  since?: number;
+  /**
+   * Wait up to this many ms (capped at 30 000) for new output or for the
+   * command to stop, when there is nothing new yet.
+   */
+  waitMs?: number;
+}
+
+/** Options for `shellOutput()`. */
+export interface ShellOutputOptions {
+  /** See {@link ShellOutputInput.since}. */
+  since?: number;
+  /** See {@link ShellOutputInput.waitMs}. */
+  waitMs?: number;
+  /** Stops a `waitMs` wait early. */
+  signal?: AbortSignal;
+}
+
+/** New output of a background command plus its current state. */
+export interface ShellOutputResult extends ShellJobInfo {
+  /** Standard output produced after `since`. */
+  stdout: string;
+  /** Standard error produced after `since`. */
+  stderr: string;
+  /**
+   * Total bytes the command has produced so far (both streams). Pass it as
+   * `since` to read only what comes next.
+   */
+  cursor: number;
+  /**
+   * Bytes produced after `since` that are no longer kept (the per-command
+   * buffer holds the newest `shell.maxOutputBytes`).
+   */
+  droppedBytes: number;
+  /** True when `droppedBytes > 0`. */
+  truncated: boolean;
+}
+
+/** Input to the `shell_kill` tool. */
+export interface ShellKillInput {
+  /** The background command id to stop. */
+  id: string;
 }
 
 /** Result of a shell command — captured streams plus how it terminated. */
@@ -194,6 +339,49 @@ export interface GrepResult {
   total: number;
 }
 
+/** Input to the `list_dir` tool. */
+export interface ListDirInput {
+  /** Workspace-relative directory to list. Default `"."` (the root). */
+  path?: string;
+  /** How many levels deep to list (1 = direct children). Default `1`. */
+  depth?: number;
+  /** Extra globs to leave out, on top of `list.ignore` and `denyPaths`. */
+  ignore?: string[];
+}
+
+/** Options for `listDir()`. */
+export interface ListDirOptions {
+  /** See {@link ListDirInput.depth}. */
+  depth?: number;
+  /** See {@link ListDirInput.ignore}. */
+  ignore?: string[];
+}
+
+/** Kind of a listed entry. A symlink is reported, never followed. */
+export type ListDirEntryType = "file" | "directory" | "symlink" | "other";
+
+/** One entry of a directory listing. */
+export interface ListDirEntry {
+  /** Workspace-relative path (absolute for a directory outside `cwd` in `allowPaths`). */
+  path: string;
+  /** Entry kind. */
+  type: ListDirEntryType;
+  /** Size in bytes, for files (when the backend reports it). */
+  size?: number;
+  /** 1 for a direct child of the listed directory, 2 for a grandchild, … */
+  depth: number;
+}
+
+/** Result of a directory listing. */
+export interface ListDirResult {
+  /** The listed directory, workspace-relative (`"."` for the root). */
+  path: string;
+  /** Entries, breadth-first, each level sorted by name. */
+  entries: ListDirEntry[];
+  /** True when `list.maxEntries` cut the listing short. */
+  truncated: boolean;
+}
+
 /** Input to the `glob` tool / `glob()` direct method. */
 export interface GlobInput {
   /** Glob pattern resolved relative to `cwd` (e.g. `"src/api/*.ts"`). */
@@ -204,4 +392,41 @@ export interface GlobInput {
 export interface GlobResult {
   /** Workspace-relative paths matching the pattern, sorted. */
   paths: string[];
+}
+
+/** State of one todo item. */
+export type WorkspaceTodoStatus = "pending" | "in_progress" | "completed";
+
+/** One item of the workspace's todo list. */
+export interface WorkspaceTodo {
+  /** Stable id (assigned `"1"`, `"2"`, … when the writer omits it). */
+  id: string;
+  /** What the step is. */
+  content: string;
+  /** Its state. */
+  status: WorkspaceTodoStatus;
+}
+
+/** One item as written by `todo_write` / `writeTodos()` — `id` is optional. */
+export interface WorkspaceTodoInput {
+  /** Stable id; omit to have one assigned from the item's position. */
+  id?: string;
+  /** What the step is (non-empty, at most 1 000 characters). */
+  content: string;
+  /** Its state. */
+  status: WorkspaceTodoStatus;
+}
+
+/** Input to the `todo_write` tool — the whole new list, replacing the old one. */
+export interface TodoWriteInput {
+  /** The complete list (at most 100 items). An empty list clears it. */
+  todos: WorkspaceTodoInput[];
+}
+
+/** The todo list plus a count per status. */
+export interface TodoListResult {
+  /** Every item, in order. */
+  todos: WorkspaceTodo[];
+  /** How many items are in each status. */
+  counts: Record<WorkspaceTodoStatus, number>;
 }

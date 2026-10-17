@@ -3,8 +3,16 @@ import type {
   EditFileResult,
   ExecOptions,
   GrepResult,
+  ListDirOptions,
+  ListDirResult,
+  MultiEditInput,
+  MultiEditResult,
   ReadFileResult,
   RunShellResult,
+  ShellJobInfo,
+  ShellOutputOptions,
+  ShellOutputResult,
+  StartShellOptions,
 } from "./tool-io.type";
 
 /**
@@ -46,12 +54,41 @@ export interface WorkspaceOps {
   editFile(input: EditFileInput): Promise<EditFileResult>;
 
   /**
-   * Run a shell command after gating its leading executable basename
-   * against the shell allow/deny policy, with the policy environment,
+   * Apply several exact-string edits to one file atomically: each edit runs
+   * against the result of the previous ones, under the same uniqueness rules
+   * as `editFile`, and the file is written once — or, when any edit fails,
+   * not at all (`WorkspaceEditError` with `editIndex`).
+   */
+  multiEdit(input: MultiEditInput): Promise<MultiEditResult>;
+
+  /**
+   * Run a command line after checking every command in it against the
+   * shell policy (see `WorkspaceShellPolicy`), with the policy environment,
    * timeout, and output byte cap applied. `signal` cancels this one call
    * (see {@link ExecOptions}).
    */
   exec(command: string, opts?: ExecOptions): Promise<RunShellResult>;
+
+  /**
+   * Start a policy-checked command as a background job owned by the
+   * workspace and return at once. Needs `shell.background`.
+   */
+  startShell(command: string, opts?: StartShellOptions): Promise<ShellJobInfo>;
+
+  /** New output of a background command since `since` (default: the last read). */
+  shellOutput(id: string, opts?: ShellOutputOptions): Promise<ShellOutputResult>;
+
+  /** Kill a background command's whole process tree and report its final state. */
+  shellKill(id: string): Promise<ShellJobInfo>;
+
+  /** Every background command this workspace knows, oldest first. */
+  listShells(): ShellJobInfo[];
+
+  /**
+   * List a jailed directory — bounded by depth and `list.maxEntries`, with
+   * `denyPaths` and `list.ignore` left out and symlinks never followed.
+   */
+  listDir(path?: string, opts?: ListDirOptions): Promise<ListDirResult>;
 
   /** Search jailed file contents for a regex pattern. */
   grep(pattern: string, opts?: { glob?: string; ignoreCase?: boolean }): Promise<GrepResult>;
@@ -67,4 +104,11 @@ export interface WorkspaceOps {
 
   /** Remove a file or directory tree at a jailed path. */
   remove(path: string): Promise<void>;
+
+  /**
+   * Kill every background command (whole process trees) and refuse new
+   * commands. A foreground command already running finishes on its own (or
+   * by its timeout / signal). Idempotent.
+   */
+  dispose(): Promise<void>;
 }

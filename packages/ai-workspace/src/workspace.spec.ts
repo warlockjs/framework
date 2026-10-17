@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ensureDirectoryAsync, removeDirectoryAsync } from "@warlock.js/fs";
@@ -146,19 +147,32 @@ describe("workspace (integration over the real local backend)", () => {
     expect(await ws.exists("data")).toBe(false);
   });
 
-  it("should vend exactly the seven tools from tools.all()", () => {
+  it("should vend every tool except the background-shell pair from tools.all() by default", () => {
     const ws = makeWorkspace();
     const names = ws.tools.all().map((tool) => tool.name);
 
     expect(names).toEqual([
       "read_file",
       "edit_file",
+      "multi_edit",
       "write_file",
+      "list_dir",
       "run_shell",
       "run_tests",
       "grep",
       "glob",
+      "todo_write",
+      "todo_read",
     ]);
+  });
+
+  it("should add shell_output and shell_kill to tools.all() when background commands are enabled", () => {
+    const ws = workspace({ cwd: root, shell: { ...SHELL_POLICY, background: {} } });
+    const names = ws.tools.all().map((tool) => tool.name);
+
+    expect(names).toContain("shell_output");
+    expect(names).toContain("shell_kill");
+    expect(names.indexOf("shell_output")).toBe(names.indexOf("run_shell") + 1);
   });
 
   it("should vend only the named subset from tools.pick()", () => {
@@ -168,14 +182,21 @@ describe("workspace (integration over the real local backend)", () => {
     expect(names).toEqual(["read_file", "grep", "glob"]);
   });
 
-  it("readonly() should expose only read/grep/glob tools and block writes", async () => {
+  it("readonly() should expose only the read-side tools and block writes", async () => {
     const ws = makeWorkspace();
     await ws.writeFile("seed.txt", "seeded");
 
     const ro = ws.readonly();
 
     // Only the non-mutating tools are vended.
-    expect(ro.tools.all().map((tool) => tool.name)).toEqual(["read_file", "grep", "glob"]);
+    expect(ro.tools.all().map((tool) => tool.name)).toEqual([
+      "read_file",
+      "list_dir",
+      "grep",
+      "glob",
+      "todo_write",
+      "todo_read",
+    ]);
     // pick() cannot be coaxed into vending a mutating tool.
     expect(ro.tools.pick("writeFile", "readFile").map((tool) => tool.name)).toEqual(["read_file"]);
 
@@ -186,6 +207,68 @@ describe("workspace (integration over the real local backend)", () => {
     // Mutating direct methods reject.
     await expect(ro.writeFile("x.txt", "nope")).rejects.toBeInstanceOf(WorkspacePolicyError);
     await expect(ro.exec("node -v")).rejects.toBeInstanceOf(WorkspacePolicyError);
+    await expect(
+      ro.multiEdit({ path: "seed.txt", edits: [{ oldString: "seeded", newString: "x" }] }),
+    ).rejects.toBeInstanceOf(WorkspacePolicyError);
+    await expect(ro.startShell("node -v")).rejects.toBeInstanceOf(WorkspacePolicyError);
+  });
+
+  it("shares the todo list with its readonly() and scope() projections", () => {
+    const ws = makeWorkspace();
+
+    ws.readonly().writeTodos([{ content: "Plan", status: "in_progress" }]);
+
+    expect(ws.readTodos().todos).toEqual([{ id: "1", content: "Plan", status: "in_progress" }]);
+    expect(ws.scope("sub").readTodos().counts.in_progress).toBe(1);
+  });
+
+  it("lists a real directory without following a symlink out of the jail", async () => {
+    const ws = makeWorkspace();
+    const outside = `${root}-outside`;
+
+    await ensureDirectoryAsync(outside);
+    await ws.writeFile("src/a.ts", "export {};");
+    symlinkSync(outside, join(root, "escape"), process.platform === "win32" ? "junction" : "dir");
+
+    try {
+      const listing = await ws.listDir(".", { depth: 3 });
+
+      expect(listing.entries).toEqual([
+        { path: "escape", type: "symlink", depth: 1 },
+        { path: "src", type: "directory", depth: 1 },
+        { path: "src/a.ts", type: "file", size: 10, depth: 2 },
+      ]);
+    } finally {
+      await removeDirectoryAsync(outside);
+    }
+  });
+
+  it("multiEdit applies all edits to a real file or none", async () => {
+    const ws = makeWorkspace();
+
+    await ws.writeFile("a.ts", "const a = 1;\nconst b = 2;\n");
+
+    await expect(
+      ws.multiEdit({
+        path: "a.ts",
+        edits: [
+          { oldString: "const a = 1;", newString: "const a = 10;" },
+          { oldString: "missing", newString: "x" },
+        ],
+      }),
+    ).rejects.toMatchObject({ type: "not-found", editIndex: 1 });
+    expect((await ws.readFile("a.ts")).content).toContain("const a = 1;");
+
+    const result = await ws.multiEdit({
+      path: "a.ts",
+      edits: [
+        { oldString: "const a = 1;", newString: "const a = 10;" },
+        { oldString: "const b = 2;", newString: "const b = 20;" },
+      ],
+    });
+
+    expect(result.replacements).toBe(2);
+    expect((await ws.readFile("a.ts")).content).toContain("const b = 20;");
   });
 
   it("scope(subdir) should jail to the subdirectory", async () => {

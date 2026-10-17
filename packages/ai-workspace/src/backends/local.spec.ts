@@ -7,6 +7,7 @@ import {
   pathExistsAsync,
   removeDirectoryAsync,
 } from "@warlock.js/fs";
+import { symlinkSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLocalBackend } from "./local";
@@ -359,5 +360,29 @@ describe("createLocalBackend", () => {
       expect(add).toHaveBeenCalledWith("abort", expect.any(Function), { once: true });
       expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0]?.[1]);
     });
+  });
+});
+
+describe("createLocalBackend stat()", () => {
+  it("reports files with sizes, directories, and symlinks without following them", async () => {
+    const root = join(tmpdir(), `ws-local-stat-${randomBytes(6).toString("hex")}`);
+
+    await ensureDirectoryAsync(join(root, "dir"));
+    await writeFile(join(root, "file.txt"), "12345");
+    symlinkSync(
+      join(root, "dir"),
+      join(root, "link"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+
+    const backend = createLocalBackend();
+
+    try {
+      expect(await backend.stat?.(join(root, "file.txt"))).toEqual({ type: "file", size: 5 });
+      expect((await backend.stat?.(join(root, "dir")))?.type).toBe("directory");
+      expect((await backend.stat?.(join(root, "link")))?.type).toBe("symlink");
+    } finally {
+      await removeDirectoryAsync(root);
+    }
   });
 });

@@ -1,8 +1,9 @@
 import path from "node:path";
 import { realpath } from "node:fs/promises";
 import { WorkspacePolicyError } from "../errors";
-import { tokenizeCommand } from "./tokenize-command";
 import type { WorkspacePolicy } from "../contracts";
+import { isInside, matchesAnyGlob } from "./jail";
+import { checkShellCommand } from "./shell-check";
 
 /**
  * The outcome of resolving a workspace-relative (or absolute) input path
@@ -63,81 +64,6 @@ async function canonicalize(target: string): Promise<string> {
 }
 
 /**
- * Whether `child` is contained within `root` (or equals it), comparing
- * canonical absolute paths. Guards against the `/srv/app-evil` vs
- * `/srv/app` prefix-collision by anchoring on a path separator.
- */
-function isInside(child: string, root: string): boolean {
-  const relative = path.relative(root, child);
-
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
-}
-
-/**
- * Translate a glob (the small subset used by `denyPaths` — `*`, `**`,
- * `?`) into an anchored `RegExp` over a `/`-separated relative path.
- * `**` spans path separators; a single `*` does not.
- */
-function globToRegExp(glob: string): RegExp {
-  let source = "";
-
-  for (let index = 0; index < glob.length; index++) {
-    const char = glob[index];
-
-    if (char === "*") {
-      if (glob[index + 1] === "*") {
-        // `**` — match across segments (and an optional trailing slash).
-        source += ".*";
-        index++;
-
-        if (glob[index + 1] === "/") {
-          index++;
-        }
-      } else {
-        // `*` — match within a single segment.
-        source += "[^/]*";
-      }
-
-      continue;
-    }
-
-    if (char === "?") {
-      source += "[^/]";
-
-      continue;
-    }
-
-    // Escape everything else so it matches literally.
-    source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-  }
-
-  return new RegExp(`^${source}$`);
-}
-
-/**
- * Whether a workspace-relative (`/`-separated) path matches any of the
- * policy's `denyPaths` globs. A deny glob also blocks everything beneath
- * a matched directory (`".git/**"` blocks `.git/config`).
- */
-function matchesDeny(relativePath: string, denyPaths: string[]): boolean {
-  return denyPaths.some((glob) => {
-    if (globToRegExp(glob).test(relativePath)) {
-      return true;
-    }
-
-    // A bare directory glob (`".git"`, `"node_modules"`) should also
-    // block its contents, mirroring how `".git/**"` would behave.
-    if (!glob.includes("*") && !glob.includes("?")) {
-      const prefix = glob.endsWith("/") ? glob : `${glob}/`;
-
-      return relativePath.startsWith(prefix);
-    }
-
-    return false;
-  });
-}
-
-/**
  * Resolve and jail a single input path against a {@link WorkspacePolicy}.
  *
  * The input is resolved against `policy.cwd`, canonicalized (symlinks in
@@ -193,7 +119,7 @@ export async function resolveInJail(
     : "";
 
   if (insideCwd && policy.denyPaths && policy.denyPaths.length > 0) {
-    if (matchesDeny(relativeToJail, policy.denyPaths)) {
+    if (matchesAnyGlob(relativeToJail, policy.denyPaths)) {
       throw new WorkspacePolicyError(`Path "${inputPath}" is blocked by the workspace deny list.`, {
         type: "path-escape",
         path: inputPath,
@@ -205,35 +131,22 @@ export async function resolveInJail(
 }
 
 /**
- * Reduce an argv's first element to the basename the allow/deny policy is
- * keyed on. `"npm"` → `"npm"`; `"/usr/bin/node"` → `"node"`; `"node.exe"`
- * → `"node"` (the `.exe`/`.cmd`/`.bat`/`.com` Windows extension is
- * stripped).
- */
-function executableBasename(firstToken: string): string {
-  const base = path.basename(firstToken);
-
-  return base.replace(/\.(exe|cmd|bat|com)$/i, "");
-}
-
-/**
- * Whether a shell command is permitted by the policy's `shell` sub-policy.
+ * Whether a command line is permitted by the policy's `shell` sub-policy —
+ * `checkShellCommand(policy, command).allowed`.
  *
- * The command is first tokenized via {@link tokenizeCommand} — a command
- * that cannot be represented as a single argv (unbalanced quotes, or
- * unquoted shell metacharacters such as `;`, `&&`, `|`, backticks, `$`,
- * redirection) is denied outright. The backend spawns the argv directly
- * with no shell, so such a command has no meaning here — and unquoted
- * metacharacters were exactly how an injected command chain used to ride
- * past the allowlist. The resolved `argv[0]` basename is then matched
- * against `shell.deny` then `shell.allow`. **Deny always wins.** When
- * `shell.allow` is set, the executable MUST appear in it (fail-closed
- * allowlist); when `allow` is absent/empty, any non-denied command is
- * permitted. An absent `shell` block means no command may run at all.
+ * In argv mode (the default) the command must tokenize into a single argv
+ * (no unquoted `;`, `&&`, `|`, backticks, `$`, redirection, …): the backend
+ * spawns it with no shell, and unquoted metacharacters were exactly how an
+ * injected command chain used to ride past the allowlist. In shell mode
+ * (`interpreter: "sh"`) every simple command in the line is checked. Each
+ * argv's executable basename is matched against `shell.deny` (wins, case
+ * insensitive) then `shell.allow` (exhaustive when non-empty), then
+ * `shell.denyPatterns` and `shell.allowCommand`. An absent `shell` block
+ * means no command may run at all.
  *
- * Returns a plain `boolean` rather than throwing — the ops layer raises
- * the {@link WorkspacePolicyError} so the thrown context (`command`)
- * lives next to the call site.
+ * Returns a plain `boolean`; use {@link checkShellCommand} for the reason
+ * and the model-facing message. Redirection targets are checked lexically
+ * here; `exec` re-checks them with symlinks resolved.
  *
  * @example
  * isCommandAllowed({ cwd, shell: { allow: ["npm"] } }, "npm test"); // true
@@ -241,37 +154,7 @@ function executableBasename(firstToken: string): string {
  * isCommandAllowed({ cwd, shell: { allow: ["npm"] } }, "npm test; rm -rf /"); // false
  */
 export function isCommandAllowed(policy: WorkspacePolicy, command: string): boolean {
-  const shell = policy.shell;
-
-  // No shell sub-policy ⇒ fail-closed: nothing may run.
-  if (!shell) {
-    return false;
-  }
-
-  const argv = tokenizeCommand(command);
-
-  if (argv === null) {
-    return false;
-  }
-
-  const executable = executableBasename(argv[0]);
-
-  if (executable === "") {
-    return false;
-  }
-
-  // Deny wins over everything else.
-  if (shell.deny && shell.deny.includes(executable)) {
-    return false;
-  }
-
-  // An allowlist, when present, is exhaustive.
-  if (shell.allow && shell.allow.length > 0) {
-    return shell.allow.includes(executable);
-  }
-
-  // No allowlist: anything not explicitly denied is permitted.
-  return true;
+  return checkShellCommand(policy, command).allowed;
 }
 
 /**
@@ -305,6 +188,47 @@ export function buildEnv(policy: WorkspacePolicy): Record<string, string> {
   if (shell.env) {
     for (const [key, value] of Object.entries(shell.env)) {
       env[key] = value;
+    }
+  }
+
+  return env;
+}
+
+/**
+ * Variables removed from the environment of a shell-mode (`interpreter:
+ * "sh"`) command: each changes how the shell itself starts, parses or
+ * resolves the line (`ENV`/`BASH_ENV` run a startup file, `SHELLOPTS` +
+ * `PS4` can run command substitutions, `BASH_FUNC_*` imports functions that
+ * shadow commands, `CDPATH` moves `cd`, `IFS` re-splits words).
+ */
+const SHELL_STARTUP_VARIABLES = new Set([
+  "ENV",
+  "BASH_ENV",
+  "SHELLOPTS",
+  "BASHOPTS",
+  "CDPATH",
+  "IFS",
+  "PS4",
+  "GLOBIGNORE",
+]);
+
+/**
+ * The environment a command actually receives: {@link buildEnv}, minus the
+ * shell start-up variables when the policy runs lines through a shell.
+ * Compared case-insensitively, because Windows environment names are.
+ */
+export function buildCommandEnv(policy: WorkspacePolicy): Record<string, string> {
+  const env = buildEnv(policy);
+
+  if ((policy.shell?.interpreter ?? "none") !== "sh") {
+    return env;
+  }
+
+  for (const key of Object.keys(env)) {
+    const upper = key.toUpperCase();
+
+    if (SHELL_STARTUP_VARIABLES.has(upper) || upper.startsWith("BASH_FUNC_")) {
+      delete env[key];
     }
   }
 

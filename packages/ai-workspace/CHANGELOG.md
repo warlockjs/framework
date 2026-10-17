@@ -6,13 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
-### Fixed
+### Upgrading
 
-- The package README no longer ends with a stray empty code block.
+- **BREAKING** `ws.tools.all()` now also returns `multi_edit`, `list_dir`, `todo_write` and `todo_read` (plus `shell_output` / `shell_kill` when `shell.background` is set), and `readonly().tools.all()` adds `list_dir` and the todo tools. To keep the previous set, use `ws.tools.pick("readFile", "editFile", "writeFile", "runShell", "runTests", "grep", "glob")`.
+- **BREAKING** `WorkspaceOps` gains `multiEdit`, `listDir`, `startShell`, `shellOutput`, `shellKill`, `listShells` and `dispose`, and `Workspace` gains those plus `readTodos` / `writeTodos`. A custom implementation or test double must add them.
+- **BREAKING** With deny rules in force (`shell.deny`, `shell.denyPatterns` or `shell.allowCommand`) and no allowlist entry for it, a command that runs another command out of the policy's sight — `sh`/`bash -c`, `eval`, `source`, `xargs`, `sudo`, `setsid`, … — is now refused (`reason: "nested-command"`). List the runner in `shell.allow` to permit it deliberately. `shell.deny` now also matches case-insensitively.
+- Shell refusal messages changed: they now name the cause and say how to fix the command. Branch on the new `WorkspacePolicyError.reason` instead of parsing `message`.
+- `makeRunShellTool(ops, { background: true })` returns `ToolContract<RunShellInput, RunShellResult | RunShellBackgroundResult>`; without `background` the type is unchanged.
 
 ### Added
 
-- The workspace skill includes a complete bounded-read and per-call cancellation example.
+- `list_dir` tool and `ws.listDir(path, { depth, ignore })`: a bounded, jailed directory listing (breadth-first, types and file sizes, `denyPaths` and `list.ignore` left out, symlinks reported but never followed), configured by the new `list` policy (`ignore`, `maxDepth`, `maxEntries`).
+- `multi_edit` tool and `ws.multiEdit({ path, edits, expectHash })`: several exact-string replacements in one file, applied in order and written once — all of them or none. `WorkspaceEditError.editIndex` names the failing edit.
+- Background commands: with `shell.background` (`{ maxJobs?, timeoutMs? }`), `run_shell({ background: true })` / `ws.startShell()` start a long-running command owned by the workspace; `shell_output` / `ws.shellOutput(id, { since, waitMs })` read its new output (newest `shell.maxOutputBytes` kept, with a `cursor`), and `shell_kill` / `ws.shellKill(id)` kill its whole process tree. `ws.listShells()` lists them; `WorkspaceJobError` reports an unknown id. Backends implement the new optional `start()`.
+- `ws.dispose()` kills every background command (whole process trees) and makes the workspace refuse new commands; trees still running when the Node process exits are killed too.
+- `todo_write` / `todo_read` tools and `ws.writeTodos()` / `ws.readTodos()`: an in-memory todo list per workspace, shared with its `readonly()` / `scope()` projections. `TodoStore` is exported.
+- `shell.denyPatterns` (string prefix patterns or RegExps) and `shell.allowCommand(argv, ctx)` (return `true`, `false`, or a refusal explanation) check every command's arguments, so a policy can refuse `git push --force` or `rm -rf /` while allowing `git` and `rm`.
+- `shell.interpreter: "sh"` — an explicit opt-in to shell syntax. The line runs through `/bin/sh -c` (`cmd.exe /d /v:off /s /c` on Windows) after it is parsed and every simple command in it — inside `;`, `&&`, `||`, pipes, subshells, `$( )`, backticks, here-documents and `NAME=value` prefixes — is checked against `deny` / `allow` / `denyPatterns` / `allowCommand`. Redirection targets and `cd` directories must stay in the jail (re-checked with symlinks resolved). Syntax the parser cannot read with confidence is refused. The default stays `"none"` (argv, no shell).
+- `WorkspacePolicyError.reason` (`WorkspaceShellRefusalReason`: `"metacharacter"`, `"unbalanced-quotes"`, `"denied-executable"`, `"not-allowed"`, `"denied-pattern"`, `"nested-command"`, `"unsupported-syntax"`, `"path-escape"`) and `executable`, so hosts can phrase refusals themselves. In argv mode the message suggests the split, e.g. "`&&` is not supported in argv mode: run `git add -A`, then `git commit -m …`, as separate commands."
+- `checkShellCommand(policy, command)` returns the shell policy's verdict (reason, message, every checked argv, paths) without running anything; `analyzeArgvCommand()` and `tokenizeCommand()` are exported.
+- Backends may implement an optional `stat()`; the local and mock backends do. The mock backend's scripted commands accept `running: true` for background starts.
+- The workspace skill and docs cover the new tools, shell mode, argument rules, background commands and `dispose()`.
+
+### Fixed
+
+- The package README no longer ends with a stray empty code block.
+- The workspace tools now publish a JSON Schema of their input, so providers send the model the real parameter names instead of an empty object schema.
+- `run_tests` quotes its `pattern` for the shell in use: single quotes under `interpreter: "sh"`, so `$` and backticks in a test-name filter stay literal.
+
+### Security
+
+- Wrapper commands no longer hide the command they run: `env`, `time`, `timeout`, `nice`, `nohup`, `command`, `builtin`, `exec` and `find -exec` are unwrapped and the inner command is checked too, and a wrapper used with options the policy cannot read is refused. Before, `env rm -rf /` passed a `deny: ["rm"]` policy.
+- `shell.deny` matches executable names case-insensitively, so `RM` on a case-insensitive filesystem no longer slips past `deny: ["rm"]`.
+- A model-supplied `timeoutMs` on `run_shell` can now only lower `shell.timeoutMs`, as documented, never raise it.
+- Shell mode removes `ENV`, `BASH_ENV`, `SHELLOPTS`, `BASHOPTS`, `CDPATH`, `IFS`, `PS4`, `GLOBIGNORE` and `BASH_FUNC_*` from the spawned environment, refuses assignments to such variables, refuses `&` (use background commands), and refuses arithmetic-evaluating constructs (`$(( ))`, array subscripts in builtins) that bash can use to run hidden commands.
+- Killing a background command, a timeout and `dispose()` signal only the process tree the workspace spawned (its own process group on POSIX, `taskkill /T` on its PID on Windows).
 
 ## 5.30.0 - 2026-10-16
 

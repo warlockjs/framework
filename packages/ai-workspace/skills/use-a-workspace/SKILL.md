@@ -1,6 +1,6 @@
 ---
 name: use-a-workspace
-description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `WorkspacePolicyError`, `WorkspaceEditError`, `denyPaths`, `inheritEnv`, `expectHash`, `read.maxBytes`, `bytesCapped`, `cancelled`, `ExecOptions`, `tokenizeCommand`, `read_file`/`edit_file`/`write_file`/`run_shell`/`run_tests`/`grep`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent'', ''cap how many bytes a read returns'', ''cancel a running workspace command''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — the `build-loop-agent` topic; defining a non-filesystem custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
+description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `ws.multiEdit`, `ws.listDir`, `ws.startShell`, `ws.shellOutput`, `ws.shellKill`, `ws.dispose`, `ws.readTodos`, `ws.writeTodos`, `WorkspacePolicyError`, `WorkspaceEditError`, `WorkspaceJobError`, `WorkspaceShellRefusalReason`, `checkShellCommand`, `denyPaths`, `denyPatterns`, `allowCommand`, `interpreter`, `shell.background`, `list.ignore`, `inheritEnv`, `expectHash`, `read.maxBytes`, `bytesCapped`, `cancelled`, `ExecOptions`, `tokenizeCommand`, `read_file`/`edit_file`/`multi_edit`/`write_file`/`list_dir`/`run_shell`/`shell_output`/`shell_kill`/`run_tests`/`grep`/`todo_write`/`todo_read`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent'', ''cap how many bytes a read returns'', ''cancel a running workspace command'', ''let the agent use pipes and &&'', ''why was my shell command refused'', ''deny git push --force'', ''run a dev server in the background'', ''atomic multi-edit'', ''list a directory for an agent'', ''todo list tool for an agent''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — the `build-loop-agent` topic; defining a non-filesystem custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
 ---
 
 # Use a workspace — a policy jail for an agent's filesystem + shell
@@ -26,17 +26,21 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 
 ## The policy surface
 
-| Field                                      | What it does                                                                                                                                                                                                     |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cwd`                                      | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                     |
-| `allowPaths`                               | Extra readable roots outside `cwd`.                                                                                                                                                                              |
-| `denyPaths`                                | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                 |
-| `shell.allow` / `shell.deny`               | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
-| `shell.inheritEnv`                         | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                  |
-| `shell.env`                                | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                         |
-| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                      |
-| `read.defaultLines` / `read.maxBytes`      | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                               |
-| `backend`                                  | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                              |
+| Field                                               | What it does                                                                                                                                                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cwd`                                               | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                             |
+| `allowPaths`                                        | Extra readable roots outside `cwd`.                                                                                                                                                                                      |
+| `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                         |
+| `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins**, case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
+| `shell.denyPatterns` / `shell.allowCommand`         | Argument rules on every command: string prefix patterns (`"git push --force"`) or RegExps, and a predicate `(argv, ctx) => true \| false \| "why"`.                                                                      |
+| `shell.interpreter`                                 | `"none"` (default, argv) or `"sh"` (opt-in shell syntax, every command checked).                                                                                                                                         |
+| `shell.background`                                  | `{ maxJobs?, timeoutMs? }` — enables background commands. Absent ⇒ refused.                                                                                                                                              |
+| `list.ignore` / `list.maxDepth` / `list.maxEntries` | `list_dir` bounds: hidden globs (default `node_modules`, `.git`), depth cap (5), entry cap (500).                                                                                                                        |
+| `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                          |
+| `shell.env`                                         | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                 |
+| `shell.timeoutMs` / `shell.maxOutputBytes`          | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                              |
+| `read.defaultLines` / `read.maxBytes`               | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                       |
+| `backend`                                           | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                      |
 
 > **The most common gotcha:** `run_shell` fails to find `node`/`npm` because the env is empty. Add `shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] }`.
 
@@ -53,16 +57,53 @@ await ws.exec("npm test; curl http://evil"); // rejected — unquoted `;` is a m
 - **Quoting is respected**; **unquoted** shell metacharacters — `;` `&` `|` `<` `>` `` ` `` `$` `(` `)` and newlines — are rejected as a `WorkspacePolicyError` `type: "denied-command"` before anything spawns. The `shell.allow`/`shell.deny` basename check runs against the tokenized argv's first element, not a raw string prefix, so a disguised leading token can't slip past the gate.
 - **On Windows**, the argv is run through a `cmd.exe /d /s /c` wrapper with every element individually quoted (needed because batch shims like `npm.cmd` can't be spawned shell-less); arguments containing `"`, `%`, or newlines are refused there rather than risked (guards the BatBadBut-class argument-smuggling bug class).
 - **`run_tests`'s `pattern`** (model-controlled test-name filter) is forwarded as a **single double-quoted argv token** to the runner, not concatenated into the command string — a pattern containing double quotes or newlines is rejected at input validation rather than passed through.
-- This is a **behavior change, not just a hardening detail**: shell conveniences your commands may have relied on (pipes, redirection, `&&` chaining, `$(...)` substitution) no longer work in `run_shell`/`exec`. Compose multi-step work as separate `ws.exec()` calls instead of a single shelled pipeline.
+- Shell conveniences (pipes, redirection, `&&` chaining, `$(...)` substitution) don't work in argv mode. The refusal (`reason: "metacharacter"`) names the operator and suggests the split — e.g. "`&&` is not supported in argv mode: run `git add -A`, then `git commit -m "wip"`, as separate commands." — so the model retries correctly.
+- **Wrappers are followed**: `env`, `time`, `timeout`, `nice`, `nohup`, `command`, `builtin`, `exec`, `find -exec` — the inner command is checked too. Runners the policy can't see into (`sh -c`, `bash`, `eval`, `source`, `xargs`, `sudo`, `setsid`, …) are refused with `reason: "nested-command"` while deny rules are in force, unless `allow` names them.
+
+## Argument rules and shell mode
+
+```ts
+import { workspace, WorkspacePolicyError } from "@warlock.js/ai-workspace";
+
+export async function commitWork(cwd: string) {
+  const ws = workspace({
+    cwd,
+    shell: {
+      interpreter: "sh", // opt in: pipes, &&, redirections — every command still checked
+      allow: ["git", "npm", "grep"],
+      denyPatterns: ["git push --force", /^git reset --hard\b/],
+      allowCommand: (argv) => (argv[0] === "git" && argv[1] === "push" ? "CI pushes." : true),
+      inheritEnv: ["PATH"],
+      timeoutMs: 120_000,
+    },
+  });
+
+  try {
+    await ws.exec("git add -A && git commit -m 'wip'");
+    return await ws.exec("npm test 2>&1 | grep -i fail > logs/failures.txt");
+  } catch (error) {
+    if (error instanceof WorkspacePolicyError && error.type === "denied-command") {
+      console.warn(error.reason, error.message); // e.g. "denied-pattern", "path-escape"
+    }
+
+    throw error;
+  }
+}
+```
+
+- Shell mode parses the line and checks every simple command — inside `;`, `&&`, `||`, pipes, `( )`, `$( )`, backticks, here-documents and `NAME=value cmd` prefixes. Redirection targets and `cd` directories must be literal paths inside the jail (`/dev/null` is fine), re-checked with symlinks resolved.
+- It refuses what it can't parse with confidence (`reason: "unsupported-syntax"`): compound commands, arithmetic, brace expansion, unusual `${…}` forms, bash-only redirections, a command name decided at run time, `&` in a line (use `background: true`), assignments to `IFS`/`PS4`/`CDPATH`/`BASH_ENV`…; it drops shell start-up variables (`ENV`, `BASH_ENV`, `SHELLOPTS`, `BASH_FUNC_*`, …) from the environment.
+- `reason` values: `"metacharacter"`, `"unbalanced-quotes"`, `"denied-executable"`, `"not-allowed"`, `"denied-pattern"`, `"nested-command"`, `"unsupported-syntax"`, `"path-escape"`. `checkShellCommand(policy, line)` returns the verdict without running anything.
+- Pair shell mode with an exhaustive `allow`: `deny` alone is a best-effort filter.
 
 ## Two callers, one jail
 
 ### Agent-facing — `ws.tools.*`
 
-Each tool is a `ToolContract` ready for `ai.agent({ tools })`. The seven LLM-visible tool names are `read_file`, `edit_file`, `write_file`, `run_shell`, `run_tests`, `grep`, `glob`.
+Each tool is a `ToolContract` (with a JSON Schema of its input) ready for `ai.agent({ tools })`. The LLM-visible tool names are `read_file`, `edit_file`, `multi_edit`, `write_file`, `list_dir`, `run_shell`, `shell_output`, `shell_kill`, `run_tests`, `grep`, `glob`, `todo_write`, `todo_read` — `shell_output` / `shell_kill` only in `all()` when `shell.background` is set.
 
 ```ts
-ws.tools.all(); // all seven, canonical order
+ws.tools.all(); // every tool, canonical order
 ws.tools.pick("readFile", "grep", "glob"); // a least-privilege subset
 ws.tools.readFile({ name: "open" }); // one tool, optionally renamed
 ws.tools.runTests({ command: "vitest run" }); // override the test base command
@@ -86,6 +127,51 @@ await ws.exists("package.json");
 await ws.mkdir("src/generated");
 await ws.remove("dist");
 ```
+
+## The coding-agent tool belt
+
+```ts
+import { workspace } from "@warlock.js/ai-workspace";
+
+export async function devLoop(cwd: string) {
+  const ws = workspace({
+    cwd,
+    list: { maxEntries: 300 },
+    shell: { allow: ["npm", "node"], inheritEnv: ["PATH"], background: { maxJobs: 2 } },
+  });
+
+  try {
+    const { entries } = await ws.listDir("src", { depth: 2 }); // bounded, jailed, node_modules/.git hidden
+    console.info(entries.map((entry) => `${entry.type} ${entry.path}`));
+
+    const { hash } = await ws.readFile("src/cart.ts");
+    await ws.multiEdit({
+      path: "src/cart.ts",
+      expectHash: hash,
+      edits: [
+        { oldString: "let total = 0;", newString: "let total = 0n;" },
+        { oldString: "total += price;", newString: "total += BigInt(price);" },
+      ], // all apply, or none (WorkspaceEditError.editIndex names the failing one)
+    });
+
+    const server = await ws.startShell("npm run dev"); // run_shell({ command, background: true })
+    const { stdout, cursor } = await ws.shellOutput(server.id, { waitMs: 5_000 });
+    console.info(stdout, cursor); // pass `since: cursor` to read only what comes next
+    await ws.shellKill(server.id); // kills the whole process tree
+
+    ws.writeTodos([{ content: "Fix the rounding bug", status: "completed" }]); // todo_write
+    return ws.readTodos().counts; // todo_read
+  } finally {
+    await ws.dispose(); // kills every background command; the workspace refuses new commands
+  }
+}
+```
+
+- `list_dir({ path?, depth?, ignore? })` → `{ path, entries: [{ path, type, size?, depth }], truncated }`; `denyPaths` always hidden, `list.ignore` (default `node_modules`, `.git`) hidden from listings, symlinks reported but never followed.
+- `multi_edit({ path, edits, expectHash? })` → `{ path, edits, replacements, hash }`; same uniqueness rules as `edit_file`, at most 100 edits.
+- Background: `shell_output({ id, since?, waitMs? })` → `{ stdout, stderr, cursor, droppedBytes, truncated, status, exitCode }`; only the newest `shell.maxOutputBytes` per command are kept. States `"running"`, `"exited"`, `"killed"`, `"timed-out"`. Unknown id → `WorkspaceJobError`. Background commands outlive the agent run; `dispose()` (or process exit) kills them. Only processes the workspace spawned are ever signalled.
+- Todos: one in-memory list per workspace, shared with `readonly()` / `scope()`; `todo_write` replaces the whole list (≤ 100 items, status `pending` / `in_progress` / `completed`).
+- `run_shell`'s model-supplied `timeoutMs` can only lower `shell.timeoutMs`.
 
 ## `grep` is ReDoS-bounded
 
@@ -147,8 +233,9 @@ try {
 }
 ```
 
-- `WorkspacePolicyError.type`: `"path-escape"` (jail escape / deny glob) | `"denied-command"` (not allow-listed, or rejected during tokenizing — unquoted metacharacters, disallowed Windows-wrapper characters) | `"unsafe-pattern"` (`grep` pattern too long or nested-quantifier ReDoS shape).
-- `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"`.
+- `WorkspacePolicyError.type`: `"path-escape"` (jail escape / deny glob) | `"denied-command"` (the shell policy refused the line — `reason` says why) | `"unsafe-pattern"` (`grep` pattern too long or nested-quantifier ReDoS shape).
+- `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"` (+ `editIndex` for `multiEdit`).
+- `WorkspaceJobError.type`: `"not-found"` (unknown background command id).
 
 ## Composition — `readonly()` and `scope()`
 
@@ -157,7 +244,7 @@ const ro = ws.readonly(); // vends only read/grep/glob; mutating direct methods 
 const api = ws.scope("packages/api"); // a sub-jailed workspace rooted at the subdir
 ```
 
-`readonly()` is the least-privilege reviewer projection — `tools.all()` on it returns `read_file` + `grep` + `glob` only, and `writeFile` / `editFile` / `exec` / `mkdir` / `remove` throw a `WorkspacePolicyError`. `scope(subdir)` narrows `cwd` to `join(cwd, subdir)` (same sub-policies, same backend), so a per-package agent gets a tighter blast radius.
+`readonly()` is the least-privilege reviewer projection — `tools.all()` on it returns `read_file`, `list_dir`, `grep`, `glob` and the todo tools only, and `writeFile` / `editFile` / `multiEdit` / `exec` / `startShell` / `shellKill` / `mkdir` / `remove` throw a `WorkspacePolicyError`. Projections share the workspace's background commands and todo list. `scope(subdir)` narrows `cwd` to `join(cwd, subdir)` (same sub-policies, same backend), so a per-package agent gets a tighter blast radius.
 
 ## Hermetic tests with the mock backend
 

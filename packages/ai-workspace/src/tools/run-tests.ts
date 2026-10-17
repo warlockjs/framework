@@ -1,6 +1,13 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { tool, type ToolContract } from "@warlock.js/ai";
-import type { RunShellResult, RunTestsInput, WorkspaceOps } from "../contracts";
+import type {
+  RunShellResult,
+  RunTestsInput,
+  WorkspaceOps,
+  WorkspaceShellInterpreter,
+} from "../contracts";
+import { RUN_TESTS_JSON_SCHEMA } from "./json-schemas";
+import { withJsonSchema } from "./schema";
 
 /** The default tool name `run_tests` is exposed to the LLM under. */
 const DEFAULT_RUN_TESTS_TOOL_NAME = "run_tests";
@@ -17,48 +24,51 @@ const DEFAULT_TEST_COMMAND = "npm test";
  * happens without a runtime schema dependency, mirroring the wider tool
  * layer.
  */
-const runTestsInputSchema: StandardSchemaV1<RunTestsInput> = {
-  "~standard": {
-    version: 1,
-    vendor: "@warlock.js/ai-workspace",
-    validate: (value) => {
-      // A no-argument call (the common case) is valid and runs the bare
-      // test command.
-      if (value === undefined || value === null) {
-        return { value: {} };
-      }
+const runTestsInputSchema: StandardSchemaV1<RunTestsInput> = withJsonSchema<RunTestsInput>(
+  {
+    "~standard": {
+      version: 1,
+      vendor: "@warlock.js/ai-workspace",
+      validate: (value) => {
+        // A no-argument call (the common case) is valid and runs the bare
+        // test command.
+        if (value === undefined || value === null) {
+          return { value: {} };
+        }
 
-      if (typeof value !== "object") {
-        return { issues: [{ message: "expected an object" }] };
-      }
+        if (typeof value !== "object") {
+          return { issues: [{ message: "expected an object" }] };
+        }
 
-      const candidate = value as Record<string, unknown>;
+        const candidate = value as Record<string, unknown>;
 
-      if (candidate.pattern !== undefined && typeof candidate.pattern !== "string") {
-        return { issues: [{ message: "pattern must be a string", path: ["pattern"] }] };
-      }
+        if (candidate.pattern !== undefined && typeof candidate.pattern !== "string") {
+          return { issues: [{ message: "pattern must be a string", path: ["pattern"] }] };
+        }
 
-      if (typeof candidate.pattern === "string" && /["\r\n]/.test(candidate.pattern)) {
-        return {
-          issues: [
-            {
-              message: "pattern must not contain double quotes or newlines",
-              path: ["pattern"],
-            },
-          ],
-        };
-      }
+        if (typeof candidate.pattern === "string" && /["\r\n]/.test(candidate.pattern)) {
+          return {
+            issues: [
+              {
+                message: "pattern must not contain double quotes or newlines",
+                path: ["pattern"],
+              },
+            ],
+          };
+        }
 
-      const result: RunTestsInput = {};
+        const result: RunTestsInput = {};
 
-      if (candidate.pattern !== undefined) {
-        result.pattern = candidate.pattern as string;
-      }
+        if (candidate.pattern !== undefined) {
+          result.pattern = candidate.pattern as string;
+        }
 
-      return { value: result };
+        return { value: result };
+      },
     },
   },
-};
+  RUN_TESTS_JSON_SCHEMA,
+);
 
 /** Options for {@link makeRunTestsTool}. */
 export interface MakeRunTestsToolOptions {
@@ -70,6 +80,22 @@ export interface MakeRunTestsToolOptions {
    * quoted argument.
    */
   command?: string;
+  /**
+   * The workspace's `shell.interpreter`, so the pattern is quoted for the
+   * way the line runs: double quotes in argv mode (the default), single
+   * quotes for `/bin/sh` (so `$` and backticks in a pattern stay literal),
+   * double quotes for cmd.exe.
+   */
+  interpreter?: WorkspaceShellInterpreter;
+}
+
+/** Quote the test pattern as one literal argument for the line's interpreter. */
+function quotePattern(pattern: string, interpreter: WorkspaceShellInterpreter): string {
+  if (interpreter === "sh" && process.platform !== "win32") {
+    return `'${pattern.replace(/'/g, "'\\''")}'`;
+  }
+
+  return `"${pattern}"`;
 }
 
 /**
@@ -112,10 +138,13 @@ export function makeRunTestsTool(
       input.pattern ? `Running tests matching "${input.pattern}"` : "Running tests",
     input: runTestsInputSchema,
     execute: (input, ctx) => {
-      // The pattern rides as ONE double-quoted token (quotes/newlines are
-      // rejected by the schema), so it reaches the runner as a single argv
+      // The pattern rides as ONE quoted token (double quotes and newlines are
+      // rejected by the schema; under /bin/sh it is single-quoted, so `$` and
+      // backticks stay literal), so it reaches the runner as a single argv
       // element and can never smuggle in additional commands or arguments.
-      const command = input.pattern ? `${baseCommand} "${input.pattern}"` : baseCommand;
+      const command = input.pattern
+        ? `${baseCommand} ${quotePattern(input.pattern, options?.interpreter ?? "none")}`
+        : baseCommand;
 
       return ops.exec(command, ctx?.signal ? { signal: ctx.signal } : undefined);
     },

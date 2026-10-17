@@ -18,12 +18,31 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 /** The vendor tag stamped on every issue these builders produce. */
 const VENDOR = "ai-workspace";
 
+/** A JSON Schema object, as providers send it with a tool definition. */
+export type JsonSchemaObject = Record<string, unknown>;
+
+/**
+ * A Standard Schema that also carries the JSON Schema of its input as a
+ * top-level `jsonSchema` property — the property `@warlock.js/ai`'s
+ * `extractJsonSchema` reads — so providers send the model the real
+ * parameter shape instead of a bare `{ type: "object" }`.
+ */
+export type JsonStandardSchema<T> = StandardSchemaV1<T> & { jsonSchema: JsonSchemaObject };
+
+/** Attach a JSON Schema description to a hand-rolled Standard Schema. */
+export function withJsonSchema<T>(
+  schema: StandardSchemaV1<T>,
+  jsonSchema: JsonSchemaObject,
+): JsonStandardSchema<T> {
+  return Object.assign(schema, { jsonSchema });
+}
+
 /**
  * A single field validator inside {@link objectSchema}: given a value,
  * return either the coerced value or a list of issues. Field validators
  * receive the raw property and the property name (for issue messages).
  */
-type FieldValidator<T> = (
+export type FieldValidator<T> = (
   value: unknown,
   key: string,
 ) => { value: T } | { issues: StandardSchemaV1.Issue[] };
@@ -96,6 +115,35 @@ export function optionalBooleanField(): FieldValidator<boolean | undefined> {
   };
 }
 
+/**
+ * Optional array-of-strings field — accepts `undefined` or an array whose
+ * every element is a string (at most `maxItems` of them).
+ */
+export function optionalStringArrayField(maxItems = 50): FieldValidator<string[] | undefined> {
+  return (value, key) => {
+    if (value === undefined) {
+      return { value: undefined };
+    }
+
+    if (
+      Array.isArray(value) &&
+      value.length <= maxItems &&
+      value.every((item) => typeof item === "string")
+    ) {
+      return { value: value as string[] };
+    }
+
+    return {
+      issues: [
+        {
+          message: `"${key}" must be an array of at most ${maxItems} strings when provided`,
+          path: [key],
+        },
+      ],
+    };
+  };
+}
+
 /** The per-key field validator map describing an object schema's shape. */
 type ObjectShape<T> = {
   [K in keyof T]-?: FieldValidator<T[K]>;
@@ -119,7 +167,22 @@ type ObjectShape<T> = {
  *   limit: optionalNumberField(),
  * });
  */
-export function objectSchema<T extends object>(shape: ObjectShape<T>): StandardSchemaV1<T> {
+export function objectSchema<T extends object>(shape: ObjectShape<T>): StandardSchemaV1<T>;
+export function objectSchema<T extends object>(
+  shape: ObjectShape<T>,
+  jsonSchema: JsonSchemaObject,
+): JsonStandardSchema<T>;
+export function objectSchema<T extends object>(
+  shape: ObjectShape<T>,
+  jsonSchema?: JsonSchemaObject,
+): StandardSchemaV1<T> {
+  const schema = buildObjectSchema(shape);
+
+  return jsonSchema === undefined ? schema : withJsonSchema(schema, jsonSchema);
+}
+
+/** The validator behind {@link objectSchema}. */
+function buildObjectSchema<T extends object>(shape: ObjectShape<T>): StandardSchemaV1<T> {
   return {
     "~standard": {
       version: 1,

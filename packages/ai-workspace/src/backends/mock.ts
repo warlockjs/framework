@@ -2,15 +2,25 @@ import type {
   WorkspaceBackend,
   WorkspaceBackendExecOptions,
   WorkspaceBackendExecResult,
+  WorkspaceBackendProcess,
+  WorkspaceBackendStartOptions,
+  WorkspaceBackendStat,
 } from "../contracts/workspace-backend.contract";
 
 /**
- * A scripted outcome for the mock backend's `exec`. Mirrors
- * {@link WorkspaceBackendExecResult} but every field is optional so a
- * registration can specify only what it cares about — the rest fall back
- * to a successful, empty-output, non-timed-out run.
+ * A scripted outcome for the mock backend's `exec` (and background
+ * `start`). Mirrors {@link WorkspaceBackendExecResult} but every field is
+ * optional so a registration can specify only what it cares about — the
+ * rest fall back to a successful, empty-output, non-timed-out run.
+ *
+ * `running: true` makes a background start keep "running" (after emitting
+ * its scripted output) until it is killed, like a dev server; otherwise it
+ * exits at once with `exitCode`.
  */
-export type MockExecResult = Partial<WorkspaceBackendExecResult>;
+export type MockExecResult = Partial<WorkspaceBackendExecResult> & {
+  /** Background starts only: stay running until killed. */
+  running?: boolean;
+};
 
 /**
  * The two seedable inputs of a mock backend:
@@ -201,6 +211,49 @@ class MockBackend implements WorkspaceBackend {
 
   public async realpath(absPath: string): Promise<string> {
     return canonicalize(absPath);
+  }
+
+  public async stat(absPath: string): Promise<WorkspaceBackendStat> {
+    const canonical = canonicalize(absPath);
+    const content = this.files.get(canonical);
+
+    if (content !== undefined) {
+      return { type: "file", size: Buffer.byteLength(content, "utf8") };
+    }
+
+    if (this.directories.has(canonical)) {
+      return { type: "directory", size: 0 };
+    }
+
+    throw new Error(`Mock backend: no such file or directory: ${canonical}`);
+  }
+
+  /**
+   * Scripted background start: emits the registered `stdout` / `stderr`
+   * synchronously, then exits with `exitCode` — or, when scripted with
+   * `running: true`, stays running until `kill()` (exit code 137).
+   */
+  public start(command: string, opts: WorkspaceBackendStartOptions): WorkspaceBackendProcess {
+    const scripted = this.commands.get(command);
+
+    if (scripted?.stdout) {
+      opts.onOutput("stdout", scripted.stdout);
+    }
+
+    if (scripted?.stderr) {
+      opts.onOutput("stderr", scripted.stderr);
+    }
+
+    if (scripted?.running !== true) {
+      return { done: Promise.resolve({ exitCode: scripted?.exitCode ?? 0 }), kill: () => {} };
+    }
+
+    let stop: (result: { exitCode: number }) => void = () => {};
+    const done = new Promise<{ exitCode: number }>((resolve) => {
+      stop = resolve;
+    });
+
+    return { done, kill: () => stop({ exitCode: 137 }) };
   }
 
   public async exec(
