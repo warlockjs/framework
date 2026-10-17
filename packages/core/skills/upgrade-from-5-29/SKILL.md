@@ -288,6 +288,18 @@ Rename one tool, or serve `{ groups: { a: toolsA, b: toolsB } }` with
 non-loopback `host` needs `auth`. Code implementing `McpServer` itself must
 return that handle from `start()`.
 
+## 5.30 to 5.31 AI workspace
+
+`ws.tools.all()` now also vends `multi_edit`, `list_dir`, `todo_write` and
+`todo_read` (and `shell_output` / `shell_kill` with `shell.background`); use
+`ws.tools.pick(...)` to keep the old set. Custom `WorkspaceOps` / `Workspace`
+implementations must add `multiEdit`, `listDir`, `startShell`, `shellOutput`,
+`shellKill`, `listShells`, `dispose` (and `readTodos` / `writeTodos`). With deny
+rules and no allowlist entry, `bash -c`, `eval`, `xargs`, `sudo` and similar
+runners are refused (`reason: "nested-command"`); `shell.deny` is
+case-insensitive. Branch on `WorkspacePolicyError.reason`, not the message text.
+Call `ws.dispose()` when a workspace with background commands is done.
+
 ## Verify the application paths that changed
 
 Run the app's type check, its logger channel tests, any tools with ordered side

@@ -1,15 +1,19 @@
 import { tool, type ToolContract } from "@warlock.js/ai";
 import { objectSchema, stringField } from "./schema";
+import { WRITE_FILE_JSON_SCHEMA } from "./json-schemas";
 import type { WorkspaceOps, WriteFileInput, WriteFileResult } from "../contracts";
 
 /** Default tool name exposed to the LLM. */
 const DEFAULT_NAME = "write_file";
 
 /** Input schema for the `write_file` tool. */
-const inputSchema = objectSchema<WriteFileInput>({
-  path: stringField(),
-  content: stringField(),
-});
+const inputSchema = objectSchema<WriteFileInput>(
+  {
+    path: stringField(),
+    content: stringField(),
+  },
+  WRITE_FILE_JSON_SCHEMA,
+);
 
 /**
  * Build the agent-facing `write_file` tool over a workspace's policy-

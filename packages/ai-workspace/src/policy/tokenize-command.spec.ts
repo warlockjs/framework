@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tokenizeCommand } from "./tokenize-command";
+import { analyzeArgvCommand, tokenizeCommand } from "./tokenize-command";
 
 describe("tokenizeCommand", () => {
   it("splits a plain command on whitespace", () => {
@@ -50,5 +50,38 @@ describe("tokenizeCommand", () => {
   it("returns null for an empty or whitespace-only command", () => {
     expect(tokenizeCommand("")).toBeNull();
     expect(tokenizeCommand("   ")).toBeNull();
+  });
+});
+
+describe("analyzeArgvCommand", () => {
+  it("returns the argv for a plain command", () => {
+    expect(analyzeArgvCommand('node -e "a && b"')).toEqual({
+      ok: true,
+      argv: ["node", "-e", "a && b"],
+    });
+  });
+
+  it("names the first unquoted operator and where it is", () => {
+    expect(analyzeArgvCommand("git add -A && git commit")).toEqual({
+      ok: false,
+      type: "metacharacter",
+      token: "&&",
+      index: 11,
+    });
+    expect(analyzeArgvCommand("a || b")).toMatchObject({ token: "||" });
+    expect(analyzeArgvCommand("a >> log")).toMatchObject({ token: ">>" });
+    expect(analyzeArgvCommand("echo $(id)")).toMatchObject({ token: "$(" });
+    expect(analyzeArgvCommand("a | b")).toMatchObject({ token: "|" });
+    expect(analyzeArgvCommand("a\nb")).toMatchObject({ token: "\n" });
+  });
+
+  it("reports an unbalanced quote and an empty line", () => {
+    expect(analyzeArgvCommand("echo 'x")).toEqual({
+      ok: false,
+      type: "unbalanced-quotes",
+      quote: "'",
+      index: 5,
+    });
+    expect(analyzeArgvCommand("  ")).toEqual({ ok: false, type: "empty" });
   });
 });

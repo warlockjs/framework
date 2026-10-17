@@ -114,6 +114,22 @@ describe("makeRunTestsTool", () => {
     expect(data?.stdout).toBe("0 matching");
   });
 
+  it("single-quotes the pattern for /bin/sh so `$` and backticks stay literal", async () => {
+    const shPolicy: WorkspacePolicy = {
+      cwd: "/srv/app",
+      shell: { interpreter: "sh", allow: ["npm"] },
+    };
+    const backend = createMockBackend({
+      commands: { "npm test 'adds $(id) `x` it'\\''s'": { exitCode: 0, stdout: "quoted" } },
+    });
+    const runTests = makeRunTestsTool(createOps(backend, shPolicy), { interpreter: "sh" });
+
+    const { data, error } = await runTests.invoke({ pattern: "adds $(id) `x` it's" });
+
+    expect(error).toBeUndefined();
+    expect(data?.stdout).toBe(process.platform === "win32" ? "" : "quoted");
+  });
+
   it("rejects a pattern containing a double quote with a validation error (quote breakout)", async () => {
     const runTests = makeTool({});
 

@@ -1,3 +1,5 @@
+import type { WorkspaceShellInterpreter } from "./workspace-policy.type";
+
 /**
  * Low-level result of a backend command execution. Mirrors the shape the
  * policy-enforced ops layer surfaces as `RunShellResult`, minus the
@@ -43,6 +45,54 @@ export interface WorkspaceBackendExecOptions {
    * backend.
    */
   signal?: AbortSignal;
+  /**
+   * How to run `command`: `"none"` (default) tokenizes it into an argv and
+   * spawns it without a shell; `"sh"` hands the whole line to `/bin/sh -c`
+   * (`cmd.exe /d /v:off /s /c` on Windows). The ops layer has already
+   * checked every command in the line against the policy; a backend that
+   * does not support `"sh"` must refuse the command rather than run it
+   * another way.
+   */
+  interpreter?: WorkspaceShellInterpreter;
+}
+
+/** Which stream a background command's output chunk came from. */
+export type WorkspaceOutputStream = "stdout" | "stderr";
+
+/** Options for {@link WorkspaceBackend.start}. */
+export interface WorkspaceBackendStartOptions {
+  /** Working directory for the spawned process (already jail-resolved). */
+  cwd?: string;
+  /** Exact environment for the spawned process (NOT merged with process.env). */
+  env?: Record<string, string>;
+  /** See {@link WorkspaceBackendExecOptions.interpreter}. */
+  interpreter?: WorkspaceShellInterpreter;
+  /**
+   * Receives output as it arrives, decoded as UTF-8 and never split inside a
+   * character. Called synchronously or later — never after `done` settles.
+   */
+  onOutput(stream: WorkspaceOutputStream, chunk: string): void;
+}
+
+/** A running background command, as a backend hands it to the ops layer. */
+export interface WorkspaceBackendProcess {
+  /** OS process id of the direct child, when there is one. */
+  readonly pid?: number;
+  /**
+   * Settles once the process has exited and its output has been delivered.
+   * Never rejects: a spawn failure resolves with exit code `127`.
+   */
+  readonly done: Promise<{ exitCode: number }>;
+  /** Kill the whole process tree. Idempotent; safe after it has exited. */
+  kill(): void;
+}
+
+/** What {@link WorkspaceBackend.stat} reports about a path (symlinks are not followed). */
+export interface WorkspaceBackendStat {
+  /** Entry kind. */
+  type: "file" | "directory" | "symlink" | "other";
+  /** Size in bytes. */
+  size: number;
 }
 
 /**
@@ -80,4 +130,16 @@ export interface WorkspaceBackend {
   realpath(absPath: string): Promise<string>;
   /** Run a command and capture its outcome. */
   exec(command: string, opts?: WorkspaceBackendExecOptions): Promise<WorkspaceBackendExecResult>;
+  /**
+   * Describe an absolute path without following a final symlink. Optional:
+   * without it, `list_dir` tells files from directories by trying to list
+   * them and reports no sizes.
+   */
+  stat?(absPath: string): Promise<WorkspaceBackendStat>;
+  /**
+   * Start a long-running command and return at once. Optional: without it,
+   * background commands are refused. The process must be its own process
+   * group (or equivalent) so `kill()` reaches every descendant.
+   */
+  start?(command: string, opts: WorkspaceBackendStartOptions): WorkspaceBackendProcess;
 }

@@ -4,7 +4,7 @@ description: "Policy-jailed filesystem and shell access for @warlock.js/ai agent
 
 # @warlock.js/ai-workspace
 
-A workspace is a policy jail around a directory: it decides which paths an agent may read or write and which shell commands may run, then exposes read, write, edit, glob, grep, shell and test tools bound to that policy. Importing the package registers `ai.workspace(...)` on the shared `ai` object.
+A workspace is a policy jail around a directory: it decides which paths an agent may read or write and which shell commands may run, then exposes read, write, edit, multi-edit, list, glob, grep, shell (argv by default, opt-in `sh`, background commands), test and todo tools bound to that policy. Importing the package registers `ai.workspace(...)` on the shared `ai` object.
 
 ## The 80% path
 
@@ -17,4 +17,6 @@ A workspace is a policy jail around a directory: it decides which paths an agent
 - The policy is the security boundary: keep the root narrow and the shell allowlist explicit; violations throw `WorkspacePolicyError`.
 - Paths resolve inside the jail; escaping it via `..` or symlinks is rejected on purpose.
 - The local backend runs real processes. Use `createMockBackend` in tests so no disk or shell is touched.
+- Shell refusals carry a `reason` and a message that says how to split the command; `interpreter: "sh"` is an explicit opt-in that still checks every command in the line.
+- Call `ws.dispose()` when done: it kills background commands (whole process trees).
 - Edits fail loudly (`WorkspaceEditError`) when the target text is not found; re-read the file rather than retrying blindly.

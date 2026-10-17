@@ -100,6 +100,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `warlock dev` exits with code 1 and a clear error when it is started on Bun or Deno: the development server is Node-only. Before, it started partway and then failed in confusing ways. The error names the runtime and points to the production start commands. `warlock build` on Bun or Deno still runs, but prints a notice that only the Node build is verified.
 - A source checkout of `@warlock.js/core` run by a runtime without `module.registerHooks` now prints what is missing, instead of failing with "registerHooks is not a function".
 
+- The `upgrade-from-5-29` skill covers the 5.31 AI workspace changes: the larger `tools.all()` set, the new `WorkspaceOps` / `Workspace` methods, nested-command refusals and `dispose()`.
 - Static file serving loads `@fastify/static` on the first file request instead of at boot, including existing public folders and `router.directory` mounts. The directory globber loads at boot only for `wildcard: false`. Concurrent first requests share initialization; upstream headers, ranges, listings, decorators and exact routes for `wildcard: false` are preserved.
 
 - **BREAKING:** Node.js 22.15 or newer is required (`engines.node: ">=22.15"`): the `warlock` CLI loads TypeScript through `module.registerHooks`, which Node added in 22.15.

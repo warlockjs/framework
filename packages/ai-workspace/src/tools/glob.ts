@@ -1,5 +1,6 @@
 import { type ToolContract, tool } from "@warlock.js/ai";
 import { objectSchema, stringField } from "./schema";
+import { GLOB_JSON_SCHEMA } from "./json-schemas";
 import type { GlobInput, GlobResult, WorkspaceOps } from "../contracts";
 
 /** Options accepted by {@link makeGlobTool} to customize the vended tool. */
@@ -18,9 +19,12 @@ export interface MakeGlobToolOptions {
  * (no schema library, matching the validator idiom the `@warlock.js/ai`
  * tool runtime expects).
  */
-const globInputSchema = objectSchema<GlobInput>({
-  pattern: stringField(),
-});
+const globInputSchema = objectSchema<GlobInput>(
+  {
+    pattern: stringField(),
+  },
+  GLOB_JSON_SCHEMA,
+);
 
 /**
  * Build the agent-facing `glob` tool — resolve a glob pattern to the

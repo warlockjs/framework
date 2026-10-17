@@ -130,6 +130,39 @@ describe("makeRunShellTool cancellation", () => {
     expect(received?.timeoutMs).toBe(500);
   });
 
+  it("lets a model-supplied timeoutMs lower the cap, never raise it", async () => {
+    const seen: Array<number | undefined> = [];
+    const ops = {
+      exec: async (_command: string, opts?: ExecOptions): Promise<RunShellResult> => {
+        seen.push(opts?.timeoutMs);
+
+        return {
+          exitCode: 0,
+          stdout: "",
+          stderr: "",
+          truncated: false,
+          timedOut: false,
+          cancelled: false,
+        };
+      },
+    } as unknown as WorkspaceOps;
+    const runShell = makeRunShellTool(ops, { maxTimeoutMs: 1_000 });
+
+    await runShell.invoke({ command: "npm test", timeoutMs: 60_000 });
+    await runShell.invoke({ command: "npm test", timeoutMs: 200 });
+    await runShell.invoke({ command: "npm test" });
+
+    expect(seen).toEqual([1_000, 200, 1_000]);
+  });
+
+  it("returns the refusal reason and a split suggestion for a chained command", async () => {
+    const runShell = makeTool({});
+    const { error } = await runShell.invoke({ command: "npm install && npm test" });
+
+    expect(causeOf(error)).toMatchObject({ type: "denied-command", reason: "metacharacter" });
+    expect((causeOf(error) as Error).message).toMatch(/run `npm install`, then `npm test`/);
+  });
+
   it("returns cancelled data without running when the run is already cancelled", async () => {
     const runShell = makeTool({ "npm run build": { exitCode: 0, stdout: "built ok" } });
     const controller = new AbortController();

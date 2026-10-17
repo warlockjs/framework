@@ -1,16 +1,20 @@
 import { tool, type ToolContract } from "@warlock.js/ai";
 import { objectSchema, optionalNumberField, stringField } from "./schema";
+import { READ_FILE_JSON_SCHEMA } from "./json-schemas";
 import type { ReadFileInput, ReadFileResult, WorkspaceOps } from "../contracts";
 
 /** Default tool name exposed to the LLM. */
 const DEFAULT_NAME = "read_file";
 
 /** Input schema for the `read_file` tool. */
-const inputSchema = objectSchema<ReadFileInput>({
-  path: stringField(),
-  startLine: optionalNumberField(),
-  limit: optionalNumberField(),
-});
+const inputSchema = objectSchema<ReadFileInput>(
+  {
+    path: stringField(),
+    startLine: optionalNumberField(),
+    limit: optionalNumberField(),
+  },
+  READ_FILE_JSON_SCHEMA,
+);
 
 /**
  * Build the agent-facing `read_file` tool over a workspace's policy-

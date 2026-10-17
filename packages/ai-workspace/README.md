@@ -80,7 +80,7 @@ await reviewer.execute("Review src/cart for off-by-one bugs and summarize.");
 
 // Equivalent, as a projection of the same jail:
 const ro = ws.readonly();
-ai.agent({ model, tools: ro.tools.all() }); // read_file + grep + glob only
+ai.agent({ model, tools: ro.tools.all() }); // read_file, list_dir, grep, glob, todo tools
 ```
 
 ### 3. Direct programmatic use (no LLM)
@@ -114,21 +114,32 @@ for (const file of await ws.glob("src/models/**/*.ts")) {
 }
 ```
 
-## What's in this release (W1)
+## What's in the package
 
 - **Policy jail** — `cwd` path jail (`realpath`-resolved), `allowPaths` / `denyPaths`,
-  a fail-closed shell allow/deny list (deny wins), per-command timeout + output cap,
-  and opt-in `inheritEnv` (no blanket `process.env`).
+  a fail-closed shell allow/deny list (deny wins), argument rules (`denyPatterns`,
+  `allowCommand`), per-command timeout + output cap, and opt-in `inheritEnv` (no
+  blanket `process.env`).
+- **argv by default, shell on request** — commands run as one argv without a shell;
+  a refusal names the operator and suggests the split. `shell.interpreter: "sh"`
+  opts in to pipes, `&&` and redirections, with every command in the line checked
+  and redirections kept inside the jail.
 - **Backends** — `local` (default; `@warlock.js/fs` + `node:child_process`) and
   `mock` (in-memory, for hermetic disk-free tests).
-- **Seven tools** under `ws.tools.*` — `read_file`, `edit_file`, `write_file`,
-  `run_shell`, `run_tests`, `grep`, `glob` — each a `ToolContract` ready for
-  `ai.agent({ tools })`.
-- **Direct methods** — `readFile` / `writeFile` / `editFile` / `exec` / `grep` /
-  `glob` / `exists` / `mkdir` / `remove`, sharing the exact same policy seam.
+- **Tools** under `ws.tools.*` — `read_file`, `edit_file`, `multi_edit`, `write_file`,
+  `list_dir`, `run_shell` (optionally in the background), `shell_output`,
+  `shell_kill`, `run_tests`, `grep`, `glob`, `todo_write`, `todo_read` — each a
+  `ToolContract` (with a JSON Schema of its input) ready for `ai.agent({ tools })`.
+- **Direct methods** — `readFile` / `writeFile` / `editFile` / `multiEdit` /
+  `listDir` / `exec` / `startShell` / `shellOutput` / `shellKill` / `listShells` /
+  `grep` / `glob` / `exists` / `mkdir` / `remove` / `readTodos` / `writeTodos`,
+  sharing the exact same policy seam, and `dispose()`.
+- **Background commands** — with `shell.background`, dev servers and watchers run
+  as jobs owned by the workspace, read incrementally, and are killed (whole process
+  tree) by `shell_kill` or `dispose()`.
 - **`tools.all()` / `tools.pick(...)`** — every tool, or a least-privilege subset.
-- **`readonly()`** — a projection that vends only read/grep/glob and rejects every
-  mutating direct method.
+- **`readonly()`** — a projection that vends only the read-side tools (read, list,
+  grep, glob, todos) and rejects every mutating direct method.
 - **`scope(subdir)`** — a sub-jailed view rooted at `subdir` (tighter blast radius).
 - **Read-before-edit guard** — `read_file` returns a SHA-256 `hash`; `edit_file`
   requires an exact, unique `oldString` (or `replaceAll`) and rejects on an
@@ -140,9 +151,9 @@ for (const file of await ws.glob("src/models/**/*.ts")) {
   in `run_shell` / `run_tests`, stop the command (process tree killed, or never
   started when already aborted) and report `cancelled: true`.
 
-**Deferred to later phases** (intentionally absent here): the transactional
-lifecycle (`snapshot` / `restore` / `diff` / `changes`), `on()` hooks, `dispose`,
-`usage()`, and the worktree / container backends plus provisioning helpers.
+**Not in the package yet**: the transactional lifecycle (`snapshot` / `restore` /
+`diff` / `changes`), `on()` hooks, `usage()`, and the worktree / container backends
+plus provisioning helpers.
 
 ## Skills
 

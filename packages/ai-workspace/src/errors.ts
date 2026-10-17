@@ -5,13 +5,50 @@ import { AIError, type AIErrorOptions } from "@warlock.js/ai";
  *
  * - `"path-escape"` — a resolved path fell outside the `cwd` jail (or an
  *   `allowPaths` root), or matched a `denyPaths` glob.
- * - `"denied-command"` — a shell command's leading executable basename
- *   was not in `shell.allow`, or was explicitly in `shell.deny`.
+ * - `"denied-command"` — the shell policy refused a command line (`reason`
+ *   says why: an executable outside `shell.allow` or inside `shell.deny`, a
+ *   metacharacter in argv mode, a redirection outside the jail in shell
+ *   mode, …), or a mutating method was called on a read-only projection.
  * - `"unsafe-pattern"` — a `grep` pattern was too long or matched a
  *   catastrophic-backtracking shape (nested quantifiers) that could hang
  *   the process (ReDoS).
  */
 export type WorkspacePolicyViolation = "path-escape" | "denied-command" | "unsafe-pattern";
+
+/**
+ * Why the shell policy refused a command. Set on every
+ * {@link WorkspacePolicyError} of type `"denied-command"` raised for a
+ * command line, so a host can phrase the refusal itself instead of parsing
+ * the message.
+ *
+ * - `"metacharacter"` — argv mode (the default `interpreter: "none"`) met an
+ *   unquoted shell operator (`&&`, `;`, `|`, `>`, `$`, backticks, …). The
+ *   message suggests how to split the line into separate commands.
+ * - `"unbalanced-quotes"` — a quote is never closed.
+ * - `"denied-executable"` — a command's executable is listed in `shell.deny`.
+ * - `"not-allowed"` — a command's executable is not in `shell.allow`, the
+ *   `shell.allowCommand` hook refused it, the workspace has no shell policy,
+ *   the line is empty, or background commands are not enabled.
+ * - `"denied-pattern"` — a command matched one of `shell.denyPatterns`.
+ * - `"nested-command"` — a command runs another command the policy cannot
+ *   inspect (`bash -c …`, `eval`, `xargs`, `sudo`, a wrapper with options the
+ *   policy cannot read), while the policy has deny rules it would bypass.
+ * - `"unsupported-syntax"` — shell mode (`interpreter: "sh"`) met syntax the
+ *   policy does not parse with confidence (compound commands, arithmetic,
+ *   brace expansion, background `&`, a command name decided at run time, …),
+ *   so the line is refused rather than guessed at.
+ * - `"path-escape"` — shell mode: a redirection target or `cd` directory
+ *   resolves outside the workspace jail or hits `denyPaths`.
+ */
+export type WorkspaceShellRefusalReason =
+  | "metacharacter"
+  | "unbalanced-quotes"
+  | "denied-executable"
+  | "not-allowed"
+  | "denied-pattern"
+  | "nested-command"
+  | "unsupported-syntax"
+  | "path-escape";
 
 /**
  * Options for {@link WorkspacePolicyError} — the structured `type`
@@ -27,6 +64,10 @@ export type WorkspacePolicyErrorOptions = AIErrorOptions & {
   command?: string;
   /** The offending regex pattern (for `"unsafe-pattern"`). */
   pattern?: string;
+  /** Why the shell policy refused the command (for `"denied-command"`). */
+  reason?: WorkspaceShellRefusalReason;
+  /** The executable the refusal is about, when there is one. */
+  executable?: string;
 };
 
 /**
@@ -55,6 +96,14 @@ export class WorkspacePolicyError extends AIError {
   public readonly command?: string;
   /** The offending regex pattern, when the violation was `"unsafe-pattern"`. */
   public readonly pattern?: string;
+  /**
+   * Why the shell policy refused a command line — set on every
+   * `"denied-command"` refusal of a command (see
+   * {@link WorkspaceShellRefusalReason}).
+   */
+  public readonly reason?: WorkspaceShellRefusalReason;
+  /** The executable the shell refusal is about, when there is one. */
+  public readonly executable?: string;
 
   public constructor(message: string, options: WorkspacePolicyErrorOptions) {
     super("TOOL_EXEC_FAILED", message, options);
@@ -64,6 +113,8 @@ export class WorkspacePolicyError extends AIError {
     this.path = options.path;
     this.command = options.command;
     this.pattern = options.pattern;
+    this.reason = options.reason;
+    this.executable = options.executable;
   }
 }
 
@@ -94,6 +145,8 @@ export type WorkspaceEditErrorOptions = AIErrorOptions & {
   expectedHash?: string;
   /** The file's actual current hash (for `"stale-hash"`). */
   actualHash?: string;
+  /** 0-based index of the failing edit, for a `multiEdit` rejection. */
+  editIndex?: number;
 };
 
 /**
@@ -121,6 +174,11 @@ export class WorkspaceEditError extends AIError {
   public readonly expectedHash?: string;
   /** The file's actual current hash, for the `"stale-hash"` case. */
   public readonly actualHash?: string;
+  /**
+   * For a `multiEdit` rejection, the 0-based index of the edit that failed.
+   * Nothing was written: a multi-edit applies all of its edits or none.
+   */
+  public readonly editIndex?: number;
 
   public constructor(message: string, options: WorkspaceEditErrorOptions) {
     super("TOOL_EXEC_FAILED", message, options);
@@ -131,5 +189,48 @@ export class WorkspaceEditError extends AIError {
     this.matches = options.matches;
     this.expectedHash = options.expectedHash;
     this.actualHash = options.actualHash;
+    this.editIndex = options.editIndex;
+  }
+}
+
+/**
+ * Why a background-command operation failed.
+ *
+ * - `"not-found"` — no background command with that id exists in this
+ *   workspace (it never existed, or it finished long enough ago to be
+ *   pruned).
+ */
+export type WorkspaceJobFailure = "not-found";
+
+/** Options for {@link WorkspaceJobError}. */
+export type WorkspaceJobErrorOptions = AIErrorOptions & {
+  /** Why the operation failed. */
+  type: WorkspaceJobFailure;
+  /** The background command id the caller asked for. */
+  jobId: string;
+};
+
+/**
+ * A `shell_output` / `shell_kill` call (or `shellOutput()` / `shellKill()`)
+ * named a background command this workspace does not know. Returned to the
+ * agent as tool-error data like the other workspace errors.
+ *
+ * @example
+ * if (error instanceof WorkspaceJobError && error.type === "not-found") {
+ *   console.warn(`No background command ${error.jobId}`);
+ * }
+ */
+export class WorkspaceJobError extends AIError {
+  /** Why the operation failed. */
+  public readonly type: WorkspaceJobFailure;
+  /** The background command id the caller asked for. */
+  public readonly jobId: string;
+
+  public constructor(message: string, options: WorkspaceJobErrorOptions) {
+    super("TOOL_EXEC_FAILED", message, options);
+
+    this.name = "WorkspaceJobError";
+    this.type = options.type;
+    this.jobId = options.jobId;
   }
 }

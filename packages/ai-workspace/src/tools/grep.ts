@@ -1,5 +1,6 @@
 import { type ToolContract, tool } from "@warlock.js/ai";
 import { objectSchema, optionalBooleanField, optionalStringField, stringField } from "./schema";
+import { GREP_JSON_SCHEMA } from "./json-schemas";
 import type { GrepInput, GrepResult, WorkspaceOps } from "../contracts";
 
 /** Options accepted by {@link makeGrepTool} to customize the vended tool. */
@@ -18,11 +19,14 @@ export interface MakeGrepToolOptions {
  * dependency-free schema builders (no schema library, matching the
  * validator idiom the `@warlock.js/ai` tool runtime expects).
  */
-const grepInputSchema = objectSchema<GrepInput>({
-  pattern: stringField(),
-  glob: optionalStringField(),
-  ignoreCase: optionalBooleanField(),
-});
+const grepInputSchema = objectSchema<GrepInput>(
+  {
+    pattern: stringField(),
+    glob: optionalStringField(),
+    ignoreCase: optionalBooleanField(),
+  },
+  GREP_JSON_SCHEMA,
+);
 
 /**
  * Build the agent-facing `grep` tool — a regex content search across the

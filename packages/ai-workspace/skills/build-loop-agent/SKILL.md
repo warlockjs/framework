@@ -19,7 +19,7 @@ const ws = ai.workspace({
 
 const dev = ai.agent({
   model,
-  tools: ws.tools.all(), // read_file, edit_file, write_file, run_shell, run_tests, grep, glob
+  tools: ws.tools.all(), // read/edit/multi_edit/write, list_dir, run_shell, run_tests, grep, glob, todo_write/todo_read
   maxTrips: 25, // give the loop room to iterate
 });
 
@@ -53,7 +53,7 @@ const reviewer = ai.agent({
 await reviewer.execute("Review src/cart for off-by-one bugs and summarize.");
 
 // Equivalent projection of the same jail:
-ai.agent({ model, tools: ws.readonly().tools.all() }); // read_file + grep + glob only
+ai.agent({ model, tools: ws.readonly().tools.all() }); // read_file, list_dir, grep, glob, todo tools
 ```
 
 ### Scope an agent to one package

@@ -1,15 +1,29 @@
 import path from "node:path";
 import { fs } from "@warlock.js/fs";
 import { WorkspaceEditError, WorkspacePolicyError } from "./errors";
-import { buildEnv, isCommandAllowed, resolveInJail } from "./policy/policy";
+import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
+import { buildCommandEnv, resolveInJail } from "./policy/policy";
+import { checkShellCommand } from "./policy/shell-check";
+import { DEFAULT_MAX_BACKGROUND_JOBS, ShellJobs } from "./shell-jobs";
 import type {
   EditFileInput,
   EditFileResult,
   ExecOptions,
   GrepMatch,
   GrepResult,
+  ListDirEntry,
+  ListDirEntryType,
+  ListDirOptions,
+  ListDirResult,
+  MultiEditInput,
+  MultiEditOperation,
+  MultiEditResult,
   ReadFileResult,
   RunShellResult,
+  ShellJobInfo,
+  ShellOutputOptions,
+  ShellOutputResult,
+  StartShellOptions,
   WorkspaceBackend,
   WorkspaceOps,
   WorkspacePolicy,
@@ -21,6 +35,14 @@ const DEFAULT_READ_LINES = 2000;
 const DEFAULT_MAX_GREP_MATCHES = 1000;
 /** Default per-command output byte cap when the policy sets none. */
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
+/** Default `list.ignore` when the policy sets none. */
+const DEFAULT_LIST_IGNORE: readonly string[] = ["node_modules", ".git"];
+/** Default deepest `depth` a listing may ask for. */
+const DEFAULT_LIST_MAX_DEPTH = 5;
+/** Default most entries one listing returns. */
+const DEFAULT_LIST_MAX_ENTRIES = 500;
+/** Most edits one `multiEdit` call may carry. */
+export const MAX_MULTI_EDITS = 100;
 /**
  * Exit code reported for a command refused because its signal was already
  * aborted (the shell convention for an interrupted command). Callers should
@@ -126,45 +148,6 @@ function capOutput(value: string, maxBytes: number): { value: string; truncated:
 }
 
 /**
- * Minimal glob match over a `/`-separated relative path. Supports `**`
- * (spans separators), `*` (within a segment), and `?` (one non-separator
- * char) — enough for the workspace's `glob`/grep narrowing without
- * pulling in a runtime dependency.
- */
-function globToRegExp(glob: string): RegExp {
-  let source = "";
-
-  for (let index = 0; index < glob.length; index++) {
-    const char = glob[index];
-
-    if (char === "*") {
-      if (glob[index + 1] === "*") {
-        source += ".*";
-        index++;
-
-        if (glob[index + 1] === "/") {
-          index++;
-        }
-      } else {
-        source += "[^/]*";
-      }
-
-      continue;
-    }
-
-    if (char === "?") {
-      source += "[^/]";
-
-      continue;
-    }
-
-    source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-  }
-
-  return new RegExp(`^${source}$`);
-}
-
-/**
  * A quantifier: `+`, `*`, `?`, or a `{m,n}` bound.
  */
 const QUANTIFIER_SOURCE = String.raw`[+*?]|\{\d*,?\d*\}`;
@@ -201,6 +184,15 @@ function isSafeGrepPattern(pattern: string): boolean {
  * the agent-facing tools and the human-facing direct methods funnel
  * through this object, so there is exactly one set of rules.
  */
+/**
+ * State an ops layer shares with the other projections of the same
+ * workspace (`readonly()`, `scope()`): the background commands it owns.
+ */
+export interface OpsRuntime {
+  /** The workspace's background commands. */
+  jobs: ShellJobs;
+}
+
 class Ops implements WorkspaceOps {
   /**
    * Tail of the mutation chain per resolved absolute path. Writes, edits and
@@ -214,6 +206,7 @@ class Ops implements WorkspaceOps {
   public constructor(
     private readonly backend: WorkspaceBackend,
     private readonly policy: WorkspacePolicy,
+    private readonly runtime: OpsRuntime,
   ) {}
 
   /** Run `task` after every earlier mutation of `absolutePath` has settled. */
@@ -369,44 +362,118 @@ class Ops implements WorkspaceOps {
       );
     }
 
-    const occurrences = countOccurrences(current, input.oldString);
-
-    if (occurrences === 0) {
-      throw new WorkspaceEditError(`The text to replace was not found in "${input.path}".`, {
-        type: "not-found",
-        path: relativePath || input.path,
-        matches: 0,
-      });
-    }
-
-    if (occurrences > 1 && !input.replaceAll) {
-      throw new WorkspaceEditError(
-        `The text to replace is not unique in "${input.path}" (${occurrences} matches); ` +
-          `pass replaceAll or include more surrounding context.`,
-        { type: "not-unique", path: relativePath || input.path, matches: occurrences },
-      );
-    }
-
-    const updated = input.replaceAll
-      ? current.split(input.oldString).join(input.newString)
-      : replaceFirst(current, input.oldString, input.newString);
+    const { content: updated, replacements } = applyReplacement(
+      current,
+      input,
+      input.path,
+      relativePath || input.path,
+    );
 
     await this.backend.writeFile(absolutePath, updated);
 
     return {
       path: relativePath || input.path,
-      replacements: input.replaceAll ? occurrences : 1,
+      replacements,
       hash: fs.hash.string(updated),
     };
   }
 
-  public async exec(command: string, opts?: ExecOptions): Promise<RunShellResult> {
-    if (!isCommandAllowed(this.policy, command)) {
-      throw new WorkspacePolicyError(
-        `Command is not permitted by the workspace shell policy: ${command}`,
-        { type: "denied-command", command },
+  public async multiEdit(input: MultiEditInput): Promise<MultiEditResult> {
+    const { absolutePath, relativePath } = await resolveInJail(this.policy, input.path);
+    const shownPath = relativePath || input.path;
+
+    if (input.edits.length === 0 || input.edits.length > MAX_MULTI_EDITS) {
+      throw new RangeError(
+        `A multi-edit needs between 1 and ${MAX_MULTI_EDITS} edits (got ${input.edits.length}).`,
       );
     }
+
+    return this.withPathLock(absolutePath, async () => {
+      const current = await this.backend.readFile(absolutePath);
+      const currentHash = fs.hash.string(current);
+
+      if (input.expectHash !== undefined && input.expectHash !== currentHash) {
+        throw new WorkspaceEditError(
+          `File "${input.path}" changed since it was read; none of the edits were applied.`,
+          {
+            type: "stale-hash",
+            path: shownPath,
+            expectedHash: input.expectHash,
+            actualHash: currentHash,
+          },
+        );
+      }
+
+      // Apply every edit in memory first; one failure leaves the file untouched.
+      let content = current;
+      let replacements = 0;
+
+      input.edits.forEach((edit, editIndex) => {
+        const applied = applyReplacement(content, edit, input.path, shownPath, editIndex);
+
+        content = applied.content;
+        replacements += applied.replacements;
+      });
+
+      await this.backend.writeFile(absolutePath, content);
+
+      return {
+        path: shownPath,
+        edits: input.edits.length,
+        replacements,
+        hash: fs.hash.string(content),
+      };
+    });
+  }
+
+  /**
+   * Check a command line against the shell policy: every command in it
+   * (argv or shell mode), then — shell mode — every redirection target and
+   * `cd` directory against the jail with symlinks resolved.
+   */
+  private async assertCommandAllowed(command: string): Promise<void> {
+    const verdict = checkShellCommand(this.policy, command);
+
+    if (!verdict.allowed) {
+      throw new WorkspacePolicyError(
+        verdict.message ?? `Command is not permitted by the workspace shell policy: ${command}`,
+        {
+          type: "denied-command",
+          command,
+          ...(verdict.reason !== undefined ? { reason: verdict.reason } : {}),
+          ...(verdict.executable !== undefined ? { executable: verdict.executable } : {}),
+          ...(verdict.path !== undefined ? { path: verdict.path } : {}),
+        },
+      );
+    }
+
+    for (const target of verdict.paths) {
+      try {
+        await resolveInJail(this.policy, target.path);
+      } catch (error) {
+        if (!(error instanceof WorkspacePolicyError)) {
+          throw error;
+        }
+
+        throw new WorkspacePolicyError(
+          target.access === "cwd"
+            ? `\`cd ${target.target}\` resolves (through a symlink) outside the workspace jail or onto a denied path.`
+            : `The redirection target \`${target.target}\` resolves (through a symlink) outside the workspace jail or onto a denied path.`,
+          { type: "denied-command", reason: "path-escape", command, path: target.target },
+        );
+      }
+    }
+
+    if (this.runtime.jobs.isDisposed) {
+      throw new WorkspacePolicyError(
+        "The workspace has been disposed; it cannot run new commands.",
+        { type: "denied-command", reason: "not-allowed", command },
+      );
+    }
+  }
+
+  public async exec(command: string, opts?: ExecOptions): Promise<RunShellResult> {
+    await this.assertCommandAllowed(command);
 
     const signal = opts?.signal;
 
@@ -426,12 +493,14 @@ class Ops implements WorkspaceOps {
     const shell = this.policy.shell;
     const timeoutMs = opts?.timeoutMs ?? shell?.timeoutMs;
     const maxOutputBytes = shell?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+    const interpreter = shell?.interpreter ?? "none";
 
     const result = await this.backend.exec(command, {
       cwd: this.policy.cwd,
       timeoutMs,
-      env: buildEnv(this.policy),
+      env: buildCommandEnv(this.policy),
       ...(signal ? { signal } : {}),
+      ...(interpreter !== "none" ? { interpreter } : {}),
     });
 
     const stdout = capOutput(result.stdout, maxOutputBytes);
@@ -446,6 +515,179 @@ class Ops implements WorkspaceOps {
       timedOut: result.timedOut && !cancelled,
       cancelled,
     };
+  }
+
+  public async startShell(command: string, opts?: StartShellOptions): Promise<ShellJobInfo> {
+    const background = this.policy.shell?.background;
+
+    if (background === undefined) {
+      throw new WorkspacePolicyError(
+        "Background commands are not enabled for this workspace. Run the command without background, or ask for shell.background to be enabled.",
+        { type: "denied-command", reason: "not-allowed", command },
+      );
+    }
+
+    await this.assertCommandAllowed(command);
+
+    const start = this.backend.start?.bind(this.backend);
+
+    if (start === undefined) {
+      throw new WorkspacePolicyError("This workspace backend cannot run background commands.", {
+        type: "denied-command",
+        reason: "not-allowed",
+        command,
+      });
+    }
+
+    const shell = this.policy.shell;
+    const interpreter = shell?.interpreter ?? "none";
+    const timeoutMs = lowerOf(background.timeoutMs, opts?.timeoutMs);
+    const env = buildCommandEnv(this.policy);
+
+    return this.runtime.jobs.start({
+      command,
+      retainBytes: shell?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
+      maxJobs: background.maxJobs ?? DEFAULT_MAX_BACKGROUND_JOBS,
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+      launch: (onOutput) =>
+        start(command, {
+          cwd: this.policy.cwd,
+          env,
+          ...(interpreter !== "none" ? { interpreter } : {}),
+          onOutput,
+        }),
+    });
+  }
+
+  public shellOutput(id: string, opts?: ShellOutputOptions): Promise<ShellOutputResult> {
+    return this.runtime.jobs.output(id, opts);
+  }
+
+  public shellKill(id: string): Promise<ShellJobInfo> {
+    return this.runtime.jobs.kill(id);
+  }
+
+  public listShells(): ShellJobInfo[] {
+    return this.runtime.jobs.list();
+  }
+
+  public dispose(): Promise<void> {
+    return this.runtime.jobs.dispose();
+  }
+
+  public async listDir(inputPath = ".", opts?: ListDirOptions): Promise<ListDirResult> {
+    const { absolutePath: root, relativePath: rootRelative } = await resolveInJail(
+      this.policy,
+      inputPath,
+    );
+    const { absolutePath: jailRoot } = await resolveInJail(this.policy, ".");
+    const listPolicy = this.policy.list;
+    const maxDepth = Math.max(1, Math.floor(listPolicy?.maxDepth ?? DEFAULT_LIST_MAX_DEPTH));
+    const depth = Math.min(Math.max(1, Math.floor(opts?.depth ?? 1)), maxDepth);
+    const maxEntries = Math.max(1, Math.floor(listPolicy?.maxEntries ?? DEFAULT_LIST_MAX_ENTRIES));
+    const ignore = [...(listPolicy?.ignore ?? DEFAULT_LIST_IGNORE), ...(opts?.ignore ?? [])];
+    const insideCwd = isInside(root, jailRoot);
+
+    if (!(await this.isDirectory(root))) {
+      throw new Error(`"${inputPath}" is not a directory in the workspace.`);
+    }
+
+    const entries: ListDirEntry[] = [];
+    let level: string[] = [root];
+    let truncated = false;
+
+    for (let currentDepth = 1; currentDepth <= depth && level.length > 0; currentDepth++) {
+      const nextLevel: string[] = [];
+
+      for (const directory of level) {
+        let children: string[];
+
+        try {
+          children = await this.backend.list(directory);
+        } catch {
+          continue;
+        }
+
+        children.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+
+        for (const child of children) {
+          const relativeToJail = insideCwd
+            ? path.relative(jailRoot, child).split(path.sep).join("/")
+            : child;
+
+          if (
+            insideCwd &&
+            (this.isDenied(relativeToJail) || matchesAnyGlob(relativeToJail, ignore))
+          ) {
+            continue;
+          }
+
+          const relativeToRoot = path.relative(root, child).split(path.sep).join("/");
+
+          if (!insideCwd && matchesAnyGlob(relativeToRoot, ignore)) {
+            continue;
+          }
+
+          if (entries.length >= maxEntries) {
+            truncated = true;
+
+            break;
+          }
+
+          const described = await this.describe(child);
+
+          entries.push({
+            path: relativeToJail,
+            type: described.type,
+            ...(described.size !== undefined ? { size: described.size } : {}),
+            depth: currentDepth,
+          });
+
+          if (described.type === "directory") {
+            nextLevel.push(child);
+          }
+        }
+
+        if (truncated) {
+          break;
+        }
+      }
+
+      if (truncated) {
+        break;
+      }
+
+      level = nextLevel;
+    }
+
+    return { path: insideCwd ? rootRelative || "." : root, entries, truncated };
+  }
+
+  /** Kind and size of a listed entry; symlinks are reported, never followed. */
+  private async describe(absPath: string): Promise<{ type: ListDirEntryType; size?: number }> {
+    if (this.backend.stat) {
+      try {
+        const stats = await this.backend.stat(absPath);
+
+        return stats.type === "file" ? { type: "file", size: stats.size } : { type: stats.type };
+      } catch {
+        return { type: "other" };
+      }
+    }
+
+    // No `stat`: a child is a directory iff it can be listed, and it must
+    // still resolve inside the jail before it is descended into.
+    if (await this.isDirectory(absPath)) {
+      try {
+        await resolveInJail(this.policy, absPath);
+
+        return { type: "directory" };
+      } catch {
+        return { type: "other" };
+      }
+    }
+
+    return { type: "file" };
   }
 
   public async grep(
@@ -491,7 +733,7 @@ class Ops implements WorkspaceOps {
       const lines = content.split("\n");
 
       for (let index = 0; index < lines.length; index++) {
-        const line = lines[index];
+        const line = lines[index] ?? "";
 
         // Cap the input size a single `RegExp#test` call scans: backtracking
         // cost is exponential in input length, so this bounds the worst-case
@@ -558,24 +800,61 @@ class Ops implements WorkspaceOps {
   private isDenied(relativePath: string): boolean {
     const denyPaths = this.policy.denyPaths;
 
-    if (!denyPaths || denyPaths.length === 0) {
-      return false;
-    }
-
-    return denyPaths.some((glob) => {
-      if (globToRegExp(glob).test(relativePath)) {
-        return true;
-      }
-
-      if (!glob.includes("*") && !glob.includes("?")) {
-        const prefix = glob.endsWith("/") ? glob : `${glob}/`;
-
-        return relativePath.startsWith(prefix);
-      }
-
-      return false;
-    });
+    return (
+      denyPaths !== undefined && denyPaths.length > 0 && matchesAnyGlob(relativePath, denyPaths)
+    );
   }
+}
+
+/** The lower of two optional limits (either may be absent). */
+function lowerOf(
+  policyLimit: number | undefined,
+  requested: number | undefined,
+): number | undefined {
+  if (requested === undefined || requested <= 0) {
+    return policyLimit;
+  }
+
+  return policyLimit === undefined ? requested : Math.min(policyLimit, requested);
+}
+
+/**
+ * Apply one exact-string replacement to `content` under the edit rules:
+ * `oldString` must occur, and exactly once unless `replaceAll`.
+ */
+function applyReplacement(
+  content: string,
+  edit: MultiEditOperation,
+  inputPath: string,
+  shownPath: string,
+  editIndex?: number,
+): { content: string; replacements: number } {
+  const occurrences = countOccurrences(content, edit.oldString);
+  const which = editIndex === undefined ? "" : `Edit ${editIndex + 1}: `;
+  const nothingApplied = editIndex === undefined ? "" : " None of the edits were applied.";
+  const indexOption = editIndex === undefined ? {} : { editIndex };
+
+  if (occurrences === 0) {
+    throw new WorkspaceEditError(
+      `${which}The text to replace was not found in "${inputPath}".${nothingApplied}`,
+      { type: "not-found", path: shownPath, matches: 0, ...indexOption },
+    );
+  }
+
+  if (occurrences > 1 && !edit.replaceAll) {
+    throw new WorkspaceEditError(
+      `${which}The text to replace is not unique in "${inputPath}" (${occurrences} matches); ` +
+        `pass replaceAll or include more surrounding context.${nothingApplied}`,
+      { type: "not-unique", path: shownPath, matches: occurrences, ...indexOption },
+    );
+  }
+
+  return {
+    content: edit.replaceAll
+      ? content.split(edit.oldString).join(edit.newString)
+      : replaceFirst(content, edit.oldString, edit.newString),
+    replacements: edit.replaceAll ? occurrences : 1,
+  };
 }
 
 /** Count non-overlapping occurrences of `needle` in `haystack`. */
@@ -625,11 +904,17 @@ function replaceFirst(haystack: string, needle: string, replacement: string): st
  *
  * @param backend - The dumb IO executor (local disk or in-memory mock).
  * @param policy - The policy that bounds every operation.
+ * @param runtime - State shared with other views of the same workspace
+ *   (its background commands); a fresh one when omitted.
  *
  * @example
  * const ops = createOps(localBackend, { cwd: "/srv/api", shell: { allow: ["npm"] } });
  * const { content, hash } = await ops.readFile("src/index.ts");
  */
-export function createOps(backend: WorkspaceBackend, policy: WorkspacePolicy): WorkspaceOps {
-  return new Ops(backend, policy);
+export function createOps(
+  backend: WorkspaceBackend,
+  policy: WorkspacePolicy,
+  runtime?: OpsRuntime,
+): WorkspaceOps {
+  return new Ops(backend, policy, runtime ?? { jobs: new ShellJobs() });
 }
