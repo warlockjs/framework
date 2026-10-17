@@ -6,6 +6,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
+- The server-page-cache test fixture explicitly disables unrelated HTTP throttling and restores its previous configuration on teardown, so repeated cache requests exercise cache behavior after production rate-limit enforcement was corrected.
+
 - Published page skills include complete support modules, schemas and generated-type prerequisites; their HTTP examples and Vitest discovery match current APIs. The skill compile gate verifies them without a failure allowance.
 - The root middleware example declares its own request-local type rather than depending on another skill's augmentation.
 

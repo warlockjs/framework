@@ -19,6 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { parse as devalueParse } from "devalue";
 import Fastify, { type FastifyInstance } from "fastify";
 import {
+  config,
   registerHttpPlugins,
   requestContext,
   router,
@@ -235,6 +236,7 @@ let touchAuth: (request: Request) => void = () => {};
 describe("server-side page cache (route.cache.serverCache)", () => {
   const server = Fastify();
   let previousRunner: PageContextRunner | undefined;
+  let previousRateLimit: unknown;
   let translationRevision = "one";
   let englishKeyword = "English one";
   let arabicKeyword = "Arabic one";
@@ -249,6 +251,11 @@ describe("server-side page cache (route.cache.serverCache)", () => {
     // runs the middleware gate through it, so the harness must connect it too.
     previousRunner = connectPageContext(requestContext as unknown as PageContextRunner);
 
+    // These cache cases share one server and exceed its default request quota.
+    // Keep the fixture's requests focused on the cache, with the real limiter
+    // covered separately by the HTTP plugin/connector integration specs.
+    previousRateLimit = config.key("http.rateLimit");
+    setConfig("http.rateLimit", { enabled: false });
     await registerHttpPlugins(server);
 
     registerRoute("/__scache-guarded", server, {
@@ -375,8 +382,12 @@ describe("server-side page cache (route.cache.serverCache)", () => {
   });
 
   afterAll(async () => {
-    connectPageContext(previousRunner);
-    await server.close();
+    try {
+      await server.close();
+    } finally {
+      connectPageContext(previousRunner);
+      setConfig("http.rateLimit", previousRateLimit);
+    }
   });
 
   // ── Miss then hit ──────────────────────────────────────────────────────
@@ -899,8 +910,10 @@ describe("server-side page cache (route.cache.serverCache)", () => {
 
   // ── Invalidation ─────────────────────────────────────────────────────────
   it("invalidatePageCache(tags) makes the next request for a previously-hit URL miss again", async () => {
-    await server.inject({ method: "GET", url: "/__scache-invalidate" });
+    const first = await server.inject({ method: "GET", url: "/__scache-invalidate" });
+    expect(first.statusCode, first.body).toBe(200);
     const hit = await server.inject({ method: "GET", url: "/__scache-invalidate" });
+    expect(hit.statusCode, hit.body).toBe(200);
     expect(hit.headers["x-warlock-cache"]).toBe("hit");
     expect(renderPageRequest).toHaveBeenCalledTimes(1);
 
