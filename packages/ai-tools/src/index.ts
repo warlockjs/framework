@@ -16,11 +16,11 @@ import "./register";
 // ---------------------------------------------------------------------------
 // MCP — client (`mcp`) + server (`serve`) + the schema/transport seams.
 // ---------------------------------------------------------------------------
-export { mcp, serve, createServeHandler } from "./mcp";
+export { mcp, serve, createServeHandler, SUPPORTED_PROTOCOL_VERSIONS } from "./mcp";
 export { jsonSchemaToStandard } from "./mcp/json-schema-to-standard";
 export { createJsonRpcClient, createTransport } from "./mcp/transport";
 export type { JsonRpcClientHandle } from "./mcp/transport";
-export type { McpFactory, McpTransportClient } from "./mcp";
+export type { McpFactory, McpServeRequestHandler, McpTransportClient } from "./mcp";
 
 // ---------------------------------------------------------------------------
 // The `ai.tools.*` namespace shape (declared once in `./register`).
@@ -47,6 +47,9 @@ export {
   HttpPolicyError,
   type HttpPolicyErrorOptions,
   type HttpPolicyFailure,
+  McpServeError,
+  type McpServeErrorOptions,
+  type McpServeFailure,
   McpTransportError,
   type McpTransportErrorOptions,
   type McpTransportFailure,
@@ -84,12 +87,24 @@ export type {
   McpClient,
   McpClientOptions,
   McpContentBlock,
+  McpGroupedToolSource,
+  McpHttpAuth,
+  McpHttpRequestInfo,
+  McpHttpServeHandle,
+  McpHttpServeTransport,
+  McpPromptArgument,
+  McpPromptMessage,
+  McpServeCallContext,
+  McpServeHandle,
   McpServeOptions,
+  McpServePrompt,
+  McpServeResource,
   McpServeSource,
   McpServeTransport,
   McpServer,
   McpToolCallResult,
   McpToolDescriptor,
+  McpToolSource,
   McpTransport,
   SearchProvider,
   WebSearchInput,

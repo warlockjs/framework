@@ -392,6 +392,26 @@ describe("tool()", () => {
       expect(seenCtx).toBe(ctx);
     });
 
+    it("forwards inbound request metadata on ctx.request to execute()", async () => {
+      let seenTenant: string | undefined;
+      const wrapped = tool({
+        name: "tenantReader",
+        description: "reads a request header",
+        input: stringSchema,
+        execute: async (_input: string, ctx) => {
+          seenTenant = ctx?.request?.headers["x-tenant-id"];
+          return "ok";
+        },
+      });
+
+      await wrapped.invoke("x", {
+        artifacts: {},
+        request: { headers: { "x-tenant-id": "acme" }, remoteAddress: "127.0.0.1" },
+      });
+
+      expect(seenTenant).toBe("acme");
+    });
+
     it("supplies a degraded { artifacts: {} } ctx when none is threaded through", async () => {
       let seenCtx: { artifacts: Record<string, unknown> } | undefined;
       const wrapped = tool({

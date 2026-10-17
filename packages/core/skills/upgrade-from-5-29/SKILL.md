@@ -263,6 +263,15 @@ Dashboards that switch on `report.status` need the `incomplete` case. The
 Anthropic adapter's default `max_tokens` rose from 4096 to the model's max
 output when streaming and 16384 otherwise; set `maxTokens` to keep a lower cap.
 `agent.execute/stream(input, { modelOptions })` now applies per-run model options.
+## 5.30 to 5.31 MCP serving
+
+`ai.mcp.serve()` now throws `McpServeError` (`type: "collision"`) when two
+exposed tools share a name; before, both were listed and calls reached only one.
+Rename one tool, or serve `{ groups: { a: toolsA, b: toolsB } }` with
+`prefixToolNames: true`. `{ type: "http" }` now binds a real endpoint
+(`127.0.0.1` by default) and `start()` resolves `{ url, close }`; a
+non-loopback `host` needs `auth`. Code implementing `McpServer` itself must
+return that handle from `start()`.
 
 ## Verify the application paths that changed
 

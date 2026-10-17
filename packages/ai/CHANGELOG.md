@@ -47,6 +47,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `SpawnSubAgentSpec` accepts `toolDispatch` and `maxConcurrentTools`, forwarded to the fresh agent. Defaults match `ai.agent()` (concurrent, up to four calls).
 
+- `ToolContext.request` (`ToolRequestContext`: `headers`, `remoteAddress`) carries the inbound request when a server transport runs the tool for a remote client, such as `ai.mcp.serve` over HTTP. It is unset for in-process dispatch and never reaches the model.
+
 ## 5.30.0 - 2026-10-16
 
 ### Upgrading
