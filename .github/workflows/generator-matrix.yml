@@ -17,7 +17,7 @@ on:
       scope:
         description: >-
           Owner-authorised scope: "all" for every row (baseline + every
-          feature + composed), or a comma-separated row list (e.g.
+          feature + generators + composed), or a comma-separated row list (e.g.
           "web,cache,composed"). Baseline always runs regardless. There is no
           default — an unstated scope is refused, same as the local gate CLI.
         required: true
@@ -129,7 +129,7 @@ jobs:
           if [ "$SCOPE" = "all" ]; then
             core_root=$(node -e "console.log(require('path').resolve('builds/@warlock.js/core/${WARLOCK_VERSION}'))")
             features=$(node scripts/adapters/feature-catalog-adapter.mjs --core-root "$core_root" --format json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>console.log(JSON.parse(s).features.join(',')))")
-            rows="baseline,${features},composed"
+            rows="baseline,${features},generators,composed"
           else
             rows="$SCOPE"
           fi

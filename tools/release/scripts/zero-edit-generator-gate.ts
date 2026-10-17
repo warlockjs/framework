@@ -193,6 +193,7 @@ export async function runZeroEditGeneratorGate(
     console.warn(
       `[zero-edit-generator-gate] SUBSET RUN (--only): isolated rows = ` +
         `${selection.isolatedFeatures.length > 0 ? selection.isolatedFeatures.join(", ") : "(none)"}; ` +
+        `generators row = ${selection.runGenerators ? "RUNS" : "SKIPPED"}; ` +
         `composed row = ${selection.runComposed ? "RUNS" : "SKIPPED"}; skipped feature rows = ` +
         `${selection.skippedFeatures.length > 0 ? selection.skippedFeatures.join(", ") : "(none)"}. ` +
         "This is NOT a full matrix run.",
@@ -213,6 +214,10 @@ export async function runZeroEditGeneratorGate(
     await exerciseCase(runtime, context, config, app, baseline, [feature]);
   }
 
+  if (selection.runGenerators) {
+    await exerciseGeneratorRow(runtime, context, config, createCli, casesRoot, baseline);
+  }
+
   if (selection.runComposed) {
     const composed = await scaffold(runtime, context, createCli, casesRoot, "composed");
     await addFeatures(runtime, context, composed, catalog.features);
@@ -224,14 +229,26 @@ export async function runZeroEditGeneratorGate(
     console.warn(
       `[zero-edit-generator-gate] SUBSET RUN COMPLETE (--only): rows executed = baseline` +
         `${selection.isolatedFeatures.length > 0 ? `, ${selection.isolatedFeatures.join(", ")}` : ""}` +
+        `${selection.runGenerators ? ", generators" : ""}` +
         `${selection.runComposed ? ", composed" : ""}. Skipped rows: ` +
         `${selection.skippedFeatures.length > 0 ? selection.skippedFeatures.join(", ") : "(none)"}` +
+        `${selection.runGenerators ? "" : ", generators"}` +
         `${selection.runComposed ? "" : ", composed"}.`,
     );
   }
 }
 
 const COMPOSED_ROW_KEYWORD = "composed";
+
+/**
+ * The generator row: a fresh scaffold that runs `warlock make endpoint` and
+ * then proves the generated code typechecks, boots, answers over HTTP and
+ * that its own generated test passes. Named like `composed`: it runs in a full
+ * matrix and in a subset only when `--only` names it.
+ */
+export const GENERATORS_ROW_KEYWORD = "generators";
+
+const ROW_KEYWORDS = new Set([COMPOSED_ROW_KEYWORD, GENERATORS_ROW_KEYWORD]);
 
 export interface FeatureSelection {
   /** True whenever `onlyFeatures` was supplied at all -- this is not a full run. */
@@ -240,6 +257,8 @@ export interface FeatureSelection {
   isolatedFeatures: readonly string[];
   /** Whether the composed row (every catalog feature added together) runs. */
   runComposed: boolean;
+  /** Whether the generator row (`warlock make endpoint` output, end to end) runs. */
+  runGenerators: boolean;
   /** Catalog features that get NO isolated row this run, for the loud report. */
   skippedFeatures: readonly string[];
 }
@@ -262,6 +281,7 @@ export function resolveFeatureSelection(
       isSubset: false,
       isolatedFeatures: catalogFeatures,
       runComposed: true,
+      runGenerators: true,
       skippedFeatures: [],
     };
   }
@@ -270,12 +290,12 @@ export function resolveFeatureSelection(
   }
 
   const catalogSet = new Set(catalogFeatures);
-  const requestedFeatures = only.filter((name) => name !== COMPOSED_ROW_KEYWORD);
+  const requestedFeatures = only.filter((name) => !ROW_KEYWORDS.has(name));
   const unknown = requestedFeatures.filter((name) => !catalogSet.has(name));
   if (unknown.length > 0) {
     throw new Error(
       `--only names unknown feature(s): ${unknown.join(", ")}. Valid features are: ` +
-        `${catalogFeatures.join(", ")} (pass "composed" separately to also run the composed row).`,
+        `${catalogFeatures.join(", ")} (pass "composed" or "generators" separately to also run those rows).`,
     );
   }
 
@@ -284,6 +304,7 @@ export function resolveFeatureSelection(
     isSubset: true,
     isolatedFeatures: catalogFeatures.filter((feature) => requestedSet.has(feature)),
     runComposed: only.includes(COMPOSED_ROW_KEYWORD),
+    runGenerators: only.includes(GENERATORS_ROW_KEYWORD),
     skippedFeatures: catalogFeatures.filter((feature) => !requestedSet.has(feature)),
   };
 }
@@ -388,6 +409,127 @@ async function exerciseCase(
     app,
   );
   runtime.onEvent("browser-and-red-control-proved", caseLabel(features));
+}
+
+/**
+ * The request schema the generator row feeds to `make endpoint --schema`: a
+ * spec file outside `src/`, the way an agent writes one before generating.
+ */
+export const GENERATOR_ROW_SCHEMA = `import { type Infer, v } from "@warlock.js/seal";
+
+export const reportInput = v.object({
+  title: v.string().min(3),
+  pages: v.int().min(1),
+  draft: v.boolean().optional(),
+});
+
+export type ReportInput = Infer<typeof reportInput>;
+`;
+
+/**
+ * The endpoints the generator row generates. The public one's whole generated
+ * test must pass; the guarded one's anonymous case must pass (its signed-in
+ * cases need a database, which this scaffold is created without).
+ */
+export const GENERATOR_ROW_ENDPOINTS = [
+  {
+    name: "reports/create-report",
+    args: ["--schema", "./report.spec-input.ts", "--public"],
+    test: "src/app/reports/tests/create-report.test.ts",
+    testNamePattern: undefined,
+  },
+  {
+    name: "reports/update-report",
+    args: ["--method", "patch", "--schema", "./report.spec-input.ts"],
+    test: "src/app/reports/tests/update-report.test.ts",
+    testNamePattern: "anonymous",
+  },
+] as const;
+
+interface GenerationReportShape {
+  schemaVersion: 1;
+  ok: boolean;
+  written: string[];
+  skipped: Array<{ path: string; reason: string }>;
+}
+
+/** Parse `make endpoint --json` output: exactly one report, ok, nothing skipped. */
+export function parseGenerationReport(stdout: string, label: string): GenerationReportShape {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout.trim());
+  } catch (error) {
+    throw new Error(`${label} --json did not print one JSON report: ${String(error)}\n${tail(stdout)}`);
+  }
+  if (!isRecord(parsed) || parsed.schemaVersion !== 1 || !Array.isArray(parsed.written)) {
+    throw new Error(`${label} --json printed an unrecognised report: ${tail(stdout)}`);
+  }
+  if (parsed.ok !== true) {
+    throw new Error(`${label} reported failure: ${String(parsed.error ?? "no error given")}`);
+  }
+  const skipped = Array.isArray(parsed.skipped) ? parsed.skipped : [];
+  return {
+    schemaVersion: 1,
+    ok: true,
+    written: parsed.written.map(String),
+    skipped: skipped as GenerationReportShape["skipped"],
+  };
+}
+
+async function exerciseGeneratorRow(
+  runtime: Runtime,
+  context: GeneratorGateContext,
+  config: RequiredAdapterConfig,
+  createCli: string,
+  casesRoot: string,
+  baseline: string,
+): Promise<void> {
+  const app = await scaffold(runtime, context, createCli, casesRoot, GENERATORS_ROW_KEYWORD);
+  // The generated test runs on the test kit `warlock add test` wires up.
+  await addFeatures(runtime, context, app, ["test"]);
+  await assertGeneratedAndInstalled(runtime, context, config.npmCliPath, app);
+  await runtime.writeTextFile(path.join(app, "report.spec-input.ts"), GENERATOR_ROW_SCHEMA);
+
+  const warlockCli = path.join(app, "node_modules", "@warlock.js", "core", "bin", "warlock.js");
+  for (const endpoint of GENERATOR_ROW_ENDPOINTS) {
+    const label = `warlock make endpoint ${endpoint.name}`;
+    const result = await runRequired(
+      runtime,
+      {
+        command: process.execPath,
+        args: [warlockCli, "make", "endpoint", endpoint.name, ...endpoint.args, "--json"],
+        cwd: app,
+        env: gateEnvironment(context),
+      },
+      label,
+    );
+    const report = parseGenerationReport(result.stdout, label);
+    if (!report.written.includes(endpoint.test)) {
+      throw new Error(`${label} did not write its test ${endpoint.test}.`);
+    }
+  }
+  runtime.onEvent("generator-endpoints-generated", GENERATORS_ROW_KEYWORD);
+
+  // Typecheck, boot in development and production, request every new route.
+  await exerciseCase(runtime, context, config, app, baseline, ["test"]);
+
+  const vitestCli = path.join(app, "node_modules", "vitest", "vitest.mjs");
+  for (const endpoint of GENERATOR_ROW_ENDPOINTS) {
+    const args = [vitestCli, "run", endpoint.test];
+    if (endpoint.testNamePattern) args.push("--testNamePattern", endpoint.testNamePattern);
+    await runRequired(
+      runtime,
+      {
+        command: process.execPath,
+        args,
+        cwd: app,
+        // The test server refuses any other environment.
+        env: { ...gateEnvironment(context), NODE_ENV: "test" },
+      },
+      `generated test ${endpoint.test}`,
+    );
+  }
+  runtime.onEvent("generator-tests-passed", GENERATORS_ROW_KEYWORD);
 }
 
 async function proveBrowserMutation(
@@ -725,6 +867,10 @@ function parseObject(source: string, label: string): Record<string, unknown> {
   } catch (error) {
     throw new Error(`Cannot parse ${label} JSON: ${formatError(error)}.`);
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isStringRecord(value: unknown): value is Record<string, string> {

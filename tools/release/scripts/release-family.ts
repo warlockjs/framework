@@ -464,7 +464,8 @@ async function prepareAndGate(
   if (matrixScope === "subset") {
     console.warn(
       `[release-family] SUBSET GATE RUN (--only ${(only ?? []).join(",")}): baseline always runs; composed row ` +
-        `${(only ?? []).includes("composed") ? "WILL run (explicitly requested)" : "is SKIPPED (pass --only composed to include it)"}. ` +
+        `${(only ?? []).includes("composed") ? "WILL run (explicitly requested)" : "is SKIPPED (pass --only composed to include it)"}; generators row ` +
+        `${(only ?? []).includes("generators") ? "WILL run (explicitly requested)" : "is SKIPPED (pass --only generators to include it)"}. ` +
         "The handoff will record matrixScope=subset and the exact rows.",
     );
   } else if (matrixScope === "none") {
