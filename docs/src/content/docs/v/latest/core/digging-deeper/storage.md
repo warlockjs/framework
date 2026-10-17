@@ -164,6 +164,18 @@ await storage.put(request.file("avatar"), `avatars/${userId}.jpg`);
 
 For uploads, the usual pattern is `UploadedFile.save(directory, options?)` — that lives on the file object itself. See [File uploads](./file-uploads.md) for the full flow.
 
+`putFromUrl` refuses private, loopback, link-local and cloud-metadata hosts before it downloads. The classifier behind that check, `isPrivateOrReservedIp`, is also exported on its own from `@warlock.js/core/net`. That subpath loads only `node:net` and the classifier — never the HTTP server, database, cache or mail modules the root `@warlock.js/core` entry boots — so a worker, CLI or standalone agent process can use the same rules without bundling the framework:
+
+```ts
+import { isPrivateOrReservedIp } from "@warlock.js/core/net";
+
+isPrivateOrReservedIp("10.0.0.1"); // true
+isPrivateOrReservedIp("169.254.169.254"); // true (cloud metadata)
+isPrivateOrReservedIp("93.184.216.34"); // false
+```
+
+It is the same function the root `@warlock.js/core` exports, so both entries apply identical rules.
+
 ### Put options
 
 ```ts

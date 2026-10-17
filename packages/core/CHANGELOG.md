@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `@warlock.js/core/net`: a side-effect-free subpath exporting the SSRF IP classifier `isPrivateOrReservedIp` (the same function the root exports). It loads only `node:net`, so workers, CLIs and standalone processes — `@warlock.js/ai` among them — can reuse the private-address rules without loading the HTTP server, database, cache or mail modules behind the root entry.
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
 
 - The `upgrade-from-5-29` skill guides application upgrades through logger delivery, tool concurrency, request snapshots, auth counter/lock resets, image cache layouts and viewport metadata. It covers Seal result narrowing and refinement/container/union behavior, AI finish reasons and replay, bounded workspace reads, and production rate-limit migration in 5.31.

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `@warlock.js/ai` imports Core's private-address classifier from the new side-effect-free `@warlock.js/core/net` subpath instead of the Core root, so a standalone process running `ai.agent` no longer loads Core's HTTP server, database, cache and mail modules, and bundlers no longer need to alias Core. An import-graph test fails if anything reachable from the package entry imports the Core root. The installation guide documents `@warlock.js/cache` and `@warlock.js/cascade` as optional, lazily loaded peers for standalone use.
 - The provider matrix documents inherited `providerOptions.openai.body` on xAI, Groq, DeepSeek and Mistral, and warns against sharing provider-specific fields across incompatible fallback models.
 
 ### Fixed

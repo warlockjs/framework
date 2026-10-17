@@ -69,6 +69,10 @@ pnpm add @warlock.js/cache @warlock.js/logger
 
 Both are optional. The AI package works without them — you just lose snapshot resume, semantic cache, and structured logging.
 
+**Standalone processes and bundling.** `@warlock.js/ai` depends on `@warlock.js/core` only for its network helpers, and imports them from the side-effect-free `@warlock.js/core/net` subpath. Running `ai.agent` in a process that is not a Warlock app — a queue worker, a CLI, a standalone agent runner — therefore never loads Core's HTTP server, database, cache or mail modules, and a bundler does not need to alias Core away.
+
+`@warlock.js/cache` and `@warlock.js/cascade` are **optional peer dependencies**. Nothing imports them eagerly: the cache- and Cascade-backed scoped budget stores load them with a dynamic `import()` the first time they run (the cache store only when you don't pass your own `cache` driver), and memory, semantic cache and RAG stores take a cache driver you construct yourself. A standalone bundle that does not use those features can mark both as external and leave them uninstalled.
+
 Now write a smoke test to confirm everything resolves:
 
 ```ts
