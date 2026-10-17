@@ -32136,6 +32136,7 @@ describe("Test Infrastructure", () => {
 
 ## Gotchas
 
+- **A shared HTTP fixture shares its rate-limit window.** For cache or rendering tests that make many requests through one server, disable unrelated throttling with `setConfig("http.rateLimit", { enabled: false })` before `registerHttpPlugins`, and restore the previous configuration during teardown. Rate-limit specs should keep the limiter enabled and assert their expected 429 responses.
 - **Cast the context once.** `as unknown as Parameters<typeof loader>[0]` in one helper keeps every spec readable; do not scatter `any`.
 - **Mock the service, not Warlock.** Mock the module your loader calls (`vi.mock("./products.service", ...)`), not `@warlock.js/web`, except for the `Link` stand-in above.
 - **Test code may use `import.meta.url`.** The production build's page-graph scan skips `*.spec.*` / `*.test.*` files and `__tests__` / `__mocks__` folders. A helper elsewhere under `src/web` (say `src/web/shared/testing/`) is skipped once listed in `webConnector({ build: { testOnly: ["src/web/shared/testing"] } })`. A page, layout or root inside such a folder is still scanned.
