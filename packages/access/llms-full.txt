@@ -172,10 +172,6 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 - The `implement-resolver` topic — write a resolver for your own storage.
 - The `manage-roles` topic — assign / revoke with the ejected table.
 
-```
-
-```
-
 
 ## define-policies  `@warlock.js/access/define-policies/SKILL.md`
 
@@ -360,10 +356,6 @@ class DirectResolver implements AccessResolver {
 
 - The `configure-access` topic — the quickstart `DefaultAccessResolver`.
 
-```
-
-```
-
 
 ## manage-roles  `@warlock.js/access/manage-roles/SKILL.md`
 
@@ -437,10 +429,6 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 
 - The `configure-access` topic — choosing the resolver.
 - The `implement-resolver` topic — non-table role storage.
-
-```
-
-```
 
 
 ## overview  `@warlock.js/access/overview/SKILL.md`

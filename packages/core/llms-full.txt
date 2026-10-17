@@ -2824,11 +2824,22 @@ const httpConfigurations: HttpConfigurations = {
     enabled: true, // default; set false to remove both endpoints
     path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
+    rateLimit: false, // exempt probes from global client quotas (default)
   },
 };
 
 export default httpConfigurations;
 ```
+
+Built-in liveness and readiness routes bypass `http.rateLimit` by default,
+including renamed probe paths. Application traffic cannot consume their quota,
+and probe traffic does not consume the application's quota. Their normal
+liveness/readiness status still applies.
+
+Set `http.health.rateLimit: true` to opt both probes into the global policy and
+shared client bucket. This requires the rate-limit plugin to be enabled and
+`http.rateLimit.global` to remain enabled; exhausted quotas can then return 429
+for probes too. Disabling global limits leaves opted-in probes unlimited.
 
 ## Readiness checks
 
@@ -3341,6 +3352,19 @@ again on the first request, which can be noticeable for large directories. The p
 `reply.sendFile`/`reply.download` decorators are lazy too. `router.directory`
 keeps `decorateReply: false` for additional mounts. Initialization failures reach
 the application's normal error handler.
+
+Global rate limits now apply to production application routes and web page
+routes too. Defaults are 60 requests/minute per IP in one shared bucket across
+routes, pages and static assets. Behind a reverse proxy, configure trusted
+`http.trustProxy` addresses or a suitable `http.rateLimit.keyGenerator`, and
+review `max` before upgrading. `http.rateLimit.global: false` disables blanket
+quotas while retaining explicit route limits. Built-in health/readiness probes
+are exempt unless `http.health.rateLimit: true` opts them into the global policy.
+
+Production supports individual exemptions via
+`serverOptions: { config: { rateLimit: false } }`. Development's wildcard
+currently still applies its global quota to those routes. Use `global: false`
+with explicit `rateLimit` declarations for consistent selective limits.
 
 ## Gotchas
 
@@ -9230,13 +9254,12 @@ const updateAvatarSchema = v.object({
 
 The framework calls `response.failedSchema(result)` which sends `422` by default (set `validation.response.status` to change it) with the shape configured under `validation.response` (defaults shown):
 
-```jsonc
-// 422 Unprocessable Entity
+```json
 {
   "errors": [
     { "input": "email", "error": "The email must be a valid email" },
-    { "input": "password", "error": "The password must be at least 6 characters" },
-  ],
+    { "input": "password", "error": "The password must be at least 6 characters" }
+  ]
 }
 ```
 

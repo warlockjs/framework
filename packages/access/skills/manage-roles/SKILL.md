@@ -68,7 +68,3 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 
 - The `configure-access` topic — choosing the resolver.
 - The `implement-resolver` topic — non-table role storage.
-
-```
-
-```

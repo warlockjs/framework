@@ -54,14 +54,13 @@ The `ruleTranslation` argument carries everything you need to build a message:
 - `ruleTranslation.rule.name` — the rule type (`"email"`, `"min"`, `"required"`).
 - `ruleTranslation.attributes` — substitution params: `input` (the field name), `path`, `value`, plus rule-specific values like `min`.
 
-A typical locale entry uses those params:
+A typical locale entry in `en/validation.json` uses those params:
 
-```jsonc
-// en/validation.json
+```json
 {
   "email": "The :input must be a valid email",
   "min": "The :input must be at least :min characters",
-  "required": "The :input field is required",
+  "required": "The :input field is required"
 }
 ```
 

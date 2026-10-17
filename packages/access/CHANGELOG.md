@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/access` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Fixed
+
+- Access skills no longer end in stray code fences, and the cache configuration recipe is an object expression rather than a labelled statement.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed

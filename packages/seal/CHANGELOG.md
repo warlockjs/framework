@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The custom-error locale example is strict JSON, with its filename outside the code fence.
+
 - Standalone string replacement mutators accept an omitted context or options and preserve the stringified input instead of throwing.
 
 - Object `.merge()` retains refinements from both schemas, in their original order; cloning, extending and selecting fields preserve the original schema's refinements.

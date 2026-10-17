@@ -9183,13 +9183,12 @@ const updateAvatarSchema = v.object({
 
 The framework calls `response.failedSchema(result)` which sends `422` by default (set `validation.response.status` to change it) with the shape configured under `validation.response` (defaults shown):
 
-```jsonc
-// 422 Unprocessable Entity
+```json
 {
   "errors": [
     { "input": "email", "error": "The email must be a valid email" },
-    { "input": "password", "error": "The password must be at least 6 characters" },
-  ],
+    { "input": "password", "error": "The password must be at least 6 characters" }
+  ]
 }
 ```
 

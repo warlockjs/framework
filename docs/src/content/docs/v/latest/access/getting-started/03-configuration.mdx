@@ -39,9 +39,9 @@ Omitting `resolver` is a developer mistake, not a runtime denial — the framewo
 How long a user's resolved permission/role set is cached (default `"10m"`). The cache is **best-effort**: if it's down, the engine reads straight from the resolver — it never denies because the cache failed. After changing a user's roles out of band, call `access.flush(user, tenant)`.
 
 ```ts
-cache: {
-  ttl: "10m";
-} // string duration or a number of seconds
+export default {
+  cache: { ttl: "10m" }, // string duration or a number of seconds
+};
 ```
 
 ## `strictPolicies`

@@ -152,7 +152,3 @@ Progressive-disclosure, per-task docs live under [`skills/`](./skills/README.md)
   and operate it (policy, tools, direct methods, `readonly` / `scope`).
 - [`build-loop-agent/`](./skills/build-loop-agent/SKILL.md) — wire `ws.tools.all()`
   into a coding agent that reads → edits → runs tests until green.
-
-```
-
-```

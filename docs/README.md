@@ -47,3 +47,11 @@ All commands are run from the root of the project, from a terminal:
 ## 👀 Want to learn more?
 
 Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+
+## Authoring install tabs
+
+Inside a `<TabItem>`, put a blank line before and after its code block, and keep
+fence markers at column zero. This layout survives repository formatting and
+renders commands as block code. `npm run check:mdx-guard` checks live MDX syntax
+and collapsed tab fences in the current-version docs; the same checks run before a docs build. Run
+`npm run test:mdx-guard` for the regression cases.

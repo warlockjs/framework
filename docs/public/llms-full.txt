@@ -9192,13 +9192,12 @@ const updateAvatarSchema = v.object({
 
 The framework calls `response.failedSchema(result)` which sends `422` by default (set `validation.response.status` to change it) with the shape configured under `validation.response` (defaults shown):
 
-```jsonc
-// 422 Unprocessable Entity
+```json
 {
   "errors": [
     { "input": "email", "error": "The email must be a valid email" },
-    { "input": "password", "error": "The password must be at least 6 characters" },
-  ],
+    { "input": "password", "error": "The password must be at least 6 characters" }
+  ]
 }
 ```
 
@@ -24752,10 +24751,6 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 - The `implement-resolver` topic — write a resolver for your own storage.
 - The `manage-roles` topic — assign / revoke with the ejected table.
 
-```
-
-```
-
 
 ## define-policies  `@warlock.js/access/define-policies/SKILL.md`
 
@@ -24940,10 +24935,6 @@ class DirectResolver implements AccessResolver {
 
 - The `configure-access` topic — the quickstart `DefaultAccessResolver`.
 
-```
-
-```
-
 
 ## manage-roles  `@warlock.js/access/manage-roles/SKILL.md`
 
@@ -25017,10 +25008,6 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 
 - The `configure-access` topic — choosing the resolver.
 - The `implement-resolver` topic — non-table role storage.
-
-```
-
-```
 
 
 ## overview  `@warlock.js/access/overview/SKILL.md`
@@ -40420,8 +40407,6 @@ Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
 
-```
-
 ## Provider body options and token estimates
 
 This adapter delegates Chat Completions to the OpenAI adapter, so
@@ -40435,7 +40420,6 @@ OpenAI-only bodies across a mixed-provider fallback chain.
 Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
-```
 
 
 ================================================================================

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Fixed
+
+- The package README no longer ends with a stray empty code block.
+
 ### Added
 
 - The workspace skill includes a complete bounded-read and per-call cancellation example.

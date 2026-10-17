@@ -13,9 +13,27 @@ Auth is coupled to `@warlock.js/core` — you're already inside a Warlock projec
 ## Install the package
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">```bash npm install @warlock.js/auth ```</TabItem>
-  <TabItem label="yarn">```bash pnpm add @warlock.js/auth ```</TabItem>
-  <TabItem label="pnpm">```bash pnpm add @warlock.js/auth ```</TabItem>
+  <TabItem label="npm">
+
+```bash
+npm install @warlock.js/auth
+```
+
+  </TabItem>
+  <TabItem label="yarn">
+
+```bash
+pnpm add @warlock.js/auth
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```bash
+pnpm add @warlock.js/auth
+```
+
+  </TabItem>
 </Tabs>
 
 ## Register migrations + CLI commands
@@ -47,9 +65,27 @@ export default defineConfig({
 The package signs tokens with secrets from `.env`. Generate them once per environment:
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">```bash npx warlock jwt.generate ```</TabItem>
-  <TabItem label="yarn">```bash pnpm warlock jwt.generate ```</TabItem>
-  <TabItem label="pnpm">```bash pnpm warlock jwt.generate ```</TabItem>
+  <TabItem label="npm">
+
+```bash
+npx warlock jwt.generate
+```
+
+  </TabItem>
+  <TabItem label="yarn">
+
+```bash
+pnpm warlock jwt.generate
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```bash
+pnpm warlock jwt.generate
+```
+
+  </TabItem>
 </Tabs>
 
 This writes `JWT_SECRET=...` and `JWT_REFRESH_SECRET=...` into `.env` (or `.env.development` / `.env.production` if `.env` is missing). The command is idempotent — it skips keys that already exist.
@@ -61,9 +97,27 @@ Don't commit `.env`. The default Warlock `.gitignore` already excludes it. In pr
 ## Run the migrations
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">```bash npx warlock migrate ```</TabItem>
-  <TabItem label="yarn">```bash pnpm warlock migrate ```</TabItem>
-  <TabItem label="pnpm">```bash pnpm warlock migrate ```</TabItem>
+  <TabItem label="npm">
+
+```bash
+npx warlock migrate
+```
+
+  </TabItem>
+  <TabItem label="yarn">
+
+```bash
+pnpm warlock migrate
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```bash
+pnpm warlock migrate
+```
+
+  </TabItem>
 </Tabs>
 
 You should now have `access_tokens` and `refresh_tokens` tables in your database.

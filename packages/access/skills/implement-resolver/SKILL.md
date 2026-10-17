@@ -103,7 +103,3 @@ class DirectResolver implements AccessResolver {
 ## See also
 
 - The `configure-access` topic — the quickstart `DefaultAccessResolver`.
-
-```
-
-```

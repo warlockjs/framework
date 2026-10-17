@@ -5,6 +5,7 @@
 ### Fixed
 
 - Skill compilation respects package export maps, so an existing internal source file cannot make an unpublished import appear valid. Page-test guidance includes both test and spec filenames.
+- Documentation install tabs retain fenced commands after formatting, with a build guard against collapsed inline fences and focused Markdown/JSON regressions.
 
 - Lowered skill compilation allowances to the measured 280 remaining failures and the AI Tools strictness allowance to 68 after final formatting, preserving every package's ratchet.
 
