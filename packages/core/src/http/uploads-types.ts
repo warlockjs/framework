@@ -323,7 +323,9 @@ export type UploadsImagesConfigurations = {
   maxSourcePixels?: number;
 
   /**
-   * Absolute directory the generated variants are cached in
+   * Absolute directory dedicated to generated variants. Keep originals and
+   * other application files elsewhere; purge removes recognized cache files
+   * without deleting this directory.
    *
    * @default storage.root(".cache/image-variants")
    */

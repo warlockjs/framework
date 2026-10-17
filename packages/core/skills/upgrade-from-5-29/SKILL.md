@@ -103,10 +103,11 @@ Audit code that used failure data or assigned output to an unrelated type.
 5.30 no longer reads the old two-level
 `<cacheDirectory>/<2 hex>/<hash>.<ext>` layout. Originals stay intact; the first
 request recreates each derivative in its source-specific layout. Plan for that
-initial render load. Reclaim old cache files once the rollout is complete, or
-use `purgeImageVariants()` for a configured disk when intentionally clearing its
-whole derivative cache. Purging is an operational action, not a prerequisite for
-successful requests.
+initial render load. Reclaim old cache files manually from their dedicated
+folder once the rollout is complete. In 5.31, `purgeImageVariants()` removes only
+recognized files in the current shard/source/generation layout and retains the
+cache root, unrelated files and symlinks. Purging is an operational action, not a
+prerequisite for successful requests.
 
 For 5.31, derivatives also support configured object-storage disks and bounded
 cache age/size. See `store-file` before adapting a private media route.

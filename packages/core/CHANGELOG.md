@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The validation skill shows the HTTP 422 body as strict JSON that can be copied into a JSON parser.
+- Image-variant purges remove only recognized cache files and retain the cache root, directories, unrelated files and symlinks. Purge and background eviction validate every shard/source/generation path component, so a cache nested inside storage cannot recursively delete uploads. Use a dedicated derivative folder.
 
 - Notification test fixtures roll back partially created users, tokens and rows on setup failure, attempt all cleanup operations and clear their reference before teardown. `actingAs()` refuses non-test environments before issuing credentials and revokes a newly issued blank token before rejecting it.
 

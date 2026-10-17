@@ -7,6 +7,8 @@ import { storage } from "../../storage";
 import { variantCacheDirectoryFor } from "./image-variant-cache";
 import { purgeImageVariants } from "./purge-image-variants";
 import { resolveImageVariantsConfig } from "./resolve-image-variants-config";
+import { variantCachePath, variantSourceKey } from "./variant-cache-key";
+import type { StorageDriverContract } from "../../storage/types";
 
 let workspace: string;
 let primary: string;
@@ -38,6 +40,82 @@ afterEach(async () => {
 });
 
 describe("image variant cache overlap safety", () => {
+  it.each(["local", "remote"])(
+    "purges only recognized cache files inside a storage folder: %s",
+    async (disk) => {
+      const cacheDirectory = path.join(primary, "photos");
+      config.set("uploads.images", { variants: { thumb: { width: 10 } }, cacheDirectory });
+      if (disk === "remote") {
+        vi.spyOn(storage, "getDriver").mockReturnValue({
+          name: "s3",
+          options: { bucket: "photos" },
+        } as StorageDriverContract);
+      }
+      const target = variantCachePath(
+        cacheDirectory,
+        { sourceKey: "a".repeat(64), generation: "10-20" },
+        "b".repeat(64),
+        "webp",
+      );
+      const remoteTarget = variantCachePath(
+        cacheDirectory,
+        { sourceKey: "c".repeat(64), generation: "d".repeat(64) },
+        "e".repeat(64),
+        "avif",
+      );
+      const owned = [
+        target,
+        remoteTarget,
+        `${target}.tmp-${"f".repeat(16)}`,
+        path.join(path.dirname(remoteTarget), "source.json"),
+        path.join(path.dirname(remoteTarget), ".source.json.abcdef123456.tmp"),
+      ];
+      const uploads = [
+        path.join(cacheDirectory, "user.jpg"),
+        path.join(cacheDirectory, "source.json"),
+        path.join(cacheDirectory, ".tmp-user"),
+        path.join(cacheDirectory, "user", "photos", "10-20", `${"b".repeat(64)}.webp`),
+        path.join(cacheDirectory, "aa", "photos", "10-20", `${"b".repeat(64)}.webp`),
+        path.join(cacheDirectory, "aa", "b".repeat(64), "10-20", `${"b".repeat(64)}.webp`),
+        path.join(path.dirname(target), "user.jpg"),
+        path.join(path.dirname(path.dirname(target)), "photos", `${"b".repeat(64)}.webp`),
+      ];
+      for (const file of [...owned, ...uploads]) {
+        await fs.mkdir(path.dirname(file), { recursive: true });
+        await fs.writeFile(file, "keep user bytes");
+      }
+      const linkedSource = path.join(cacheDirectory, "ab", `ab${"0".repeat(62)}`);
+      await fs.mkdir(path.dirname(linkedSource), { recursive: true });
+      await fs.symlink(path.dirname(path.dirname(target)), linkedSource, "junction");
+      const options = disk === "remote" ? { disk: "cloud" } : {};
+      expect(await purgeImageVariants(undefined, options)).toBe(true);
+      for (const file of owned) {
+        await expect(fs.access(file)).rejects.toMatchObject({ code: "ENOENT" });
+      }
+      for (const file of uploads) {
+        expect(await fs.readFile(file, "utf8")).toBe("keep user bytes");
+      }
+      expect((await fs.lstat(linkedSource)).isSymbolicLink()).toBe(true);
+      expect((await fs.stat(cacheDirectory)).isDirectory()).toBe(true);
+      expect(await purgeImageVariants(undefined, options)).toBe(false);
+    },
+  );
+
+  it("leaves a source-cache symlink and its user files untouched during a per-file purge", async () => {
+    const cacheDirectory = path.join(primary, "photos");
+    config.set("uploads.images", { variants: { thumb: { width: 10 } }, cacheDirectory });
+    const sourceKey = variantSourceKey(primary, "photo.png");
+    const directory = path.join(cacheDirectory, sourceKey.slice(0, 2));
+    const original = path.join(backup, "10-20", `${"a".repeat(64)}.webp`);
+    await fs.mkdir(path.dirname(original));
+    await fs.writeFile(original, "user upload");
+    await fs.mkdir(directory, { recursive: true });
+    await fs.symlink(backup, path.join(directory, sourceKey), "junction");
+
+    expect(await purgeImageVariants("photo.png")).toBe(false);
+    expect(await fs.readFile(original, "utf8")).toBe("user upload");
+  });
+
   it.each(["equal", "parent", "another disk", "symlinked cache", "symlinked disk"])(
     "refuses purge and rendering when the cache overlaps a local root: %s",
     async (scenario) => {

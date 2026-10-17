@@ -1,7 +1,7 @@
 import { log } from "@warlock.js/logger";
 import fs from "node:fs/promises";
-import path from "node:path";
 import type { ResolvedImageVariantsConfig } from "./image-variant-types";
+import { variantCacheEntries } from "./image-variant-cache-entries";
 
 const SWEEP_INTERVAL_MS = 60_000;
 type CacheState = {
@@ -80,32 +80,15 @@ export async function trimImageVariantCache(
   state.lastSweep = Date.now();
   const sweep = (async () => {
     const files: { target: string; size: number; mtimeMs: number }[] = [];
-    async function walk(directory: string, depth: number): Promise<void> {
-      let entries;
+    for await (const entry of variantCacheEntries(images.cacheDirectory)) {
+      if (entry.type !== "derivative") continue;
       try {
-        entries = await fs.readdir(directory, { withFileTypes: true });
+        const stats = await fs.stat(entry.target);
+        files.push({ target: entry.target, size: stats.size, mtimeMs: stats.mtimeMs });
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-        throw error;
-      }
-      for (const entry of entries) {
-        const target = path.join(directory, entry.name);
-        if (entry.isDirectory() && depth < 3) await walk(target, depth + 1);
-        else if (
-          entry.isFile() &&
-          depth === 3 &&
-          /^[a-f0-9]{64}\.(jpg|png|webp|avif)$/.test(entry.name)
-        ) {
-          try {
-            const stats = await fs.stat(target);
-            files.push({ target, size: stats.size, mtimeMs: stats.mtimeMs });
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-          }
-        }
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
     }
-    await walk(images.cacheDirectory, 0);
     state.sizes = new Map(files.map((file) => [file.target, file.size]));
     state.bytes = files.reduce((sum, file) => sum + file.size, 0);
     const cutoff = Date.now() - images.maxCacheAge * 1000;

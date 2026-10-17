@@ -5,6 +5,7 @@ import { realpathSync } from "node:fs";
 import { configuredLocalDiskRoots } from "../../storage/local-disk-roots";
 import type { UploadsImagesConfigurations } from "../uploads-types";
 import { ImageVariantsConfigError } from "./image-variants-config-error";
+import { purgeVariantCacheEntries, variantSourceCacheEntries } from "./image-variant-cache-entries";
 import path from "node:path";
 import { rootPath } from "../../utils/paths";
 import { uploadsConfig } from "../uploads-config";
@@ -101,7 +102,7 @@ export async function variantSourceDirectoryForFile(
 /**
  * Remove every cached derivative of one file on a local disk.
  *
- * @returns `true` when a cache directory for the file existed and was removed
+ * @returns `true` when recognized cache files were removed
  */
 export async function purgeImageVariantsOfFile(
   diskRoot: string,
@@ -111,15 +112,7 @@ export async function purgeImageVariantsOfFile(
 
   if (!directory) return false;
 
-  try {
-    await fs.access(directory);
-  } catch {
-    return false;
-  }
-
-  await fs.rm(directory, { recursive: true, force: true });
-
-  return true;
+  return purgeVariantCacheEntries(variantSourceCacheEntries(directory));
 }
 
 /**

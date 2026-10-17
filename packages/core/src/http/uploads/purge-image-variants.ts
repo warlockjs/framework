@@ -1,10 +1,14 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { StorageDriverName } from "../../storage/types";
 import { purgeImageVariantsOfFile, variantCacheDirectoryFor } from "./image-variant-cache";
 import { remoteVariantDisk, remoteVariantPath } from "./remote-variant-source";
 import { variantSourceDirectory, variantSourceKey } from "./variant-cache-key";
 import { localDiskRoot } from "./local-disk-root";
+import {
+  purgeVariantCacheEntries,
+  variantCacheEntries,
+  variantSourceCacheEntries,
+} from "./image-variant-cache-entries";
 
 /**
  * Options for {@link purgeImageVariants}
@@ -25,6 +29,10 @@ export type PurgeImageVariantsOptions = {
  *   `uploads.images.cacheDirectory` is set, that directory is shared by every
  *   local disk, so this clears all of them.
  *
+ * Only recognized derivative, source-manifest and temporary files in the
+ * generated cache layout are removed. The cache root, directories, unrelated
+ * files and symlinks stay in place. Use a dedicated folder for derivatives.
+ *
  * Deleting or moving a file through local storage (`storage.delete`,
  * `deleteMany`, `move`) already purges its derivatives; call this for files
  * removed some other way.
@@ -44,35 +52,20 @@ export async function purgeImageVariants(
     const location = relativePath === undefined ? undefined : remoteVariantPath(relativePath);
     if (relativePath !== undefined && location === undefined) return false;
     const cache = variantCacheDirectoryFor(disk.cacheRoot);
-    const directory =
+    return purgeVariantCacheEntries(
       location === undefined
-        ? cache
-        : variantSourceDirectory(
-            cache,
-            variantSourceKey(disk.root, disk.driver.applyPrefix(location)),
-          );
-    try {
-      await fs.access(directory);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      throw error;
-    }
-    await fs.rm(directory, { recursive: true, force: true });
-    return true;
+        ? variantCacheEntries(cache)
+        : variantSourceCacheEntries(
+            variantSourceDirectory(
+              cache,
+              variantSourceKey(disk.root, disk.driver.applyPrefix(location)),
+            ),
+          ),
+    );
   }
 
   if (relativePath === undefined) {
-    const directory = variantCacheDirectoryFor(diskRoot);
-
-    try {
-      await fs.access(directory);
-    } catch {
-      return false;
-    }
-
-    await fs.rm(directory, { recursive: true, force: true });
-
-    return true;
+    return purgeVariantCacheEntries(variantCacheEntries(variantCacheDirectoryFor(diskRoot)));
   }
 
   const location = relativePath.replace(/\\/g, "/").replace(/^\/+/, "");

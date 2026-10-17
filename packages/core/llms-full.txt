@@ -5610,6 +5610,8 @@ console.log(localFile.url);
 
 On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears the disk's whole derivative cache. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
 
+Give derivatives a dedicated cache folder, even when it sits beneath a storage root. Full and per-file purges delete recognized image, source-manifest and temporary files in the generated shard/source/generation layout; they retain directories, unrelated files and symlinks. Eviction validates the same directory layout. Reserve generated-looking paths for derivatives and reclaim files from older cache layouts manually.
+
 ### Bound the cache and render remote disks
 
 Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules background cleanup, coalesced and throttled to at most once per minute; hits never walk the cache. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal.
@@ -6905,10 +6907,11 @@ Audit code that used failure data or assigned output to an unrelated type.
 5.30 no longer reads the old two-level
 `<cacheDirectory>/<2 hex>/<hash>.<ext>` layout. Originals stay intact; the first
 request recreates each derivative in its source-specific layout. Plan for that
-initial render load. Reclaim old cache files once the rollout is complete, or
-use `purgeImageVariants()` for a configured disk when intentionally clearing its
-whole derivative cache. Purging is an operational action, not a prerequisite for
-successful requests.
+initial render load. Reclaim old cache files manually from their dedicated
+folder once the rollout is complete. In 5.31, `purgeImageVariants()` removes only
+recognized files in the current shard/source/generation layout and retains the
+cache root, unrelated files and symlinks. Purging is an operational action, not a
+prerequisite for successful requests.
 
 For 5.31, derivatives also support configured object-storage disks and bounded
 cache age/size. See `store-file` before adapting a private media route.

@@ -106,4 +106,36 @@ describe("image derivative cache limits", () => {
     expect(await fs.readFile(unrelated, "utf8")).toBe("keep");
     await expect(fs.access(keep)).resolves.toBeUndefined();
   });
+
+  it("requires every path component to match the derivative layout before eviction", async () => {
+    const keep = await derivative("a", 10);
+    const expired = await derivative("b", 10, 100);
+    const name = `${"c".repeat(64)}.webp`;
+    const unrelated = [
+      path.join(root, "photos", "c".repeat(64), "10-20", name),
+      path.join(root, "cc", "photos", "10-20", name),
+      path.join(root, "cc", "d".repeat(64), "10-20", name),
+      path.join(root, "cc", "c".repeat(64), "photos", name),
+    ];
+    for (const target of unrelated) {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, "user photo");
+      const date = new Date(0);
+      await fs.utimes(target, date, date);
+    }
+    const images = resolveImageVariantsConfig(
+      {
+        variants: { thumb: { width: 10 } },
+        cacheDirectory: root,
+        maxCacheAge: 60,
+        maxCacheBytes: 1,
+      },
+      `${root}-sources`,
+    )!;
+    await trimImageVariantCache(images, keep);
+    await expect(fs.access(expired)).rejects.toMatchObject({ code: "ENOENT" });
+    for (const target of unrelated) {
+      expect(await fs.readFile(target, "utf8")).toBe("user photo");
+    }
+  });
 });
