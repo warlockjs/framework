@@ -4,20 +4,29 @@ import {
   putFileAsync as fsPutFileAsync,
 } from "@warlock.js/fs";
 import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
+import {
+  isGenerationDryRun,
+  pendingGeneratedContent,
+  recordGeneratedFile,
+  recordSkippedFile,
+  setPendingGeneratedContent,
+  toReportPath,
+} from "../../../../generations/generation-run";
 
 /**
  * Dry-run state for the `generate.*` command family.
  *
  * When enabled (via `--dry-run`), every generator write becomes a no-op
- * that instead reports the file it *would* have created — letting a
- * developer preview a scaffold (especially `generate.module --crud`,
- * which writes ~25 files) before anything touches disk.
+ * that instead reports the file it *would* have created, overwritten or
+ * skipped — letting a developer preview a scaffold (especially
+ * `generate.module`, which writes ~25 files) before anything touches disk.
  *
  * The flag is process-wide module state: the CLI runs one command per
  * process, and a top-level generator (e.g. `generateModule`) sets it
  * once, so nested helpers (`createMigrationFile`, `ensureComponentDirectory`)
  * inherit it without threading a parameter through every signature.
+ * A generation run started by `runGenerationCommand` (`--json`) is honoured
+ * too, and records every file for the report.
  */
 let dryRun = false;
 
@@ -67,17 +76,31 @@ export function reportSkippedFiles(): void {
 }
 
 export function isDryRun(): boolean {
-  return dryRun;
+  return dryRun || isGenerationDryRun();
 }
 
 /** Render an absolute path relative to the cwd for tidy logs. */
 function relativePath(target: string): string {
-  return path.relative(process.cwd(), target) || target;
+  return toReportPath(target);
+}
+
+/** The content at `target`: what this dry run already "wrote", else the disk. */
+function existingContent(target: string): string | undefined {
+  const pending = pendingGeneratedContent(target);
+
+  if (pending !== undefined) return pending;
+
+  return existsSync(target) ? readFileSync(target, "utf8") : undefined;
 }
 
 /**
  * Write a generated file — or, in dry-run, report what *would* be
  * written. Owns the per-file log so call sites stay a single line.
+ *
+ * A file that already holds exactly the generated content is left alone.
+ * With `setSkipExisting(true)` an existing file that differs is skipped and
+ * listed; otherwise it is overwritten (generators refuse to reach this point
+ * for an existing file unless `--force` was given).
  *
  * @example
  * await putFileAsync(controllerPath, controllerContent);
@@ -85,21 +108,33 @@ function relativePath(target: string): string {
  * // dry-run: ○ would create src/app/users/controllers/create-user.controller.ts
  */
 export async function putFileAsync(target: string, content: string): Promise<void> {
-  if (dryRun) {
-    console.log(`${colors.cyan("○")} would create ${colors.gray(relativePath(target))}`);
+  const current = existingContent(target);
+
+  if (current !== undefined && current === content) {
+    recordGeneratedFile(target, "unchanged");
     return;
   }
 
-  if (skipExisting && existsSync(target)) {
-    if (readFileSync(target, "utf8") !== content) {
-      skippedFiles.push(relativePath(target));
-    }
+  if (current !== undefined && skipExisting) {
+    skippedFiles.push(relativePath(target));
+    recordSkippedFile(target, "exists and differs from the generated output");
+    return;
+  }
 
+  const type = current === undefined ? "create" : "overwrite";
+
+  recordGeneratedFile(target, type);
+
+  if (isDryRun()) {
+    setPendingGeneratedContent(target, content);
+    console.log(`${colors.cyan("○")} would ${type} ${colors.gray(relativePath(target))}`);
     return;
   }
 
   await fsPutFileAsync(target, content);
-  console.log(`${colors.green("✓")} created ${colors.gray(relativePath(target))}`);
+  console.log(
+    `${colors.green("✓")} ${type === "create" ? "created" : "overwrote"} ${colors.gray(relativePath(target))}`,
+  );
 }
 
 /**
@@ -107,7 +142,7 @@ export async function putFileAsync(target: string, content: string): Promise<voi
  * leaves empty folders behind.
  */
 export async function ensureDirectoryAsync(target: string): Promise<void> {
-  if (dryRun) return;
+  if (isDryRun()) return;
 
   await fsEnsureDirectoryAsync(target);
 }

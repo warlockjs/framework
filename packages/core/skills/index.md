@@ -16,14 +16,14 @@ Core is the application runtime: it boots the app, auto-loads each module's spec
 
 ## Topics by area
 
-- **Foundations:** warlock-conventions, create-module, configure-app, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators
+- **Foundations:** warlock-conventions, create-module, make-endpoint, configure-app, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators
 - **HTTP & routing:** register-route, warlock-routes, create-controller, use-middleware, write-middleware, validate-input, use-request-locals, build-restful, wire-socket
 - **Responses & resources:** send-response, define-resource, use-model-transformers, use-localization
 - **Domain layers:** write-use-case, use-repository, write-seeder
 - **CLI & running the app:** run-app, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
 - **Security & utilities:** hash-password, encrypt-data, retry-operation, benchmark-code, request-memo, request-tracing
-- **Testing:** test-http, test-service
+- **Testing:** test-http, test-service, test-fakes, model-factories
 
 ## Conventions and pitfalls
 

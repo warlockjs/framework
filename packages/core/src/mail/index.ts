@@ -1,12 +1,14 @@
 // Configuration
 export {
   getDefaultMailConfig,
+  getExplicitMailMode,
   getMailMode,
   getMailerConfig,
   isDevelopmentMode,
   isProductionMode,
   isTestMode,
   resetMailConfig,
+  resetMailMode,
   resolveMailConfig,
   setMailConfigurations,
   setMailMode,

@@ -7,6 +7,10 @@ export * from "./start-http-development-server";
 export * from "./test-helpers";
 export * from "./authenticated-test-client";
 export * from "./vitest-setup";
+export * from "./fakes";
+export * from "./factories";
+export * from "./test-http-server";
+export * from "./snapshot-response";
 export { assertPortIsAvailable, isPortAvailable } from "../http/port-preflight";
 
 // `./test-server-port-channel` is deliberately NOT re-exported. It is the
@@ -26,4 +30,5 @@ export { assertPortIsAvailable, isPortAvailable } from "../http/port-preflight";
 // `WARLOCK_TEST_SERVER_PORT` — is documented in `skills/test-http` and in
 // `llms.txt`, so someone can set it by hand. That is a weaker contract than an
 // export, but it is still a contract: renaming the variable is a user-visible
-// change even though nothing exports it.
+// change even though nothing exports it. The storage fake's
+// `WARLOCK_TEST_STORAGE_ROOT` is the same kind of channel.

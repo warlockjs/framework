@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, getFileAsync, getJsonFileAsync, putFileAsync } from "@warlock.js/fs";
+import { fileExistsAsync, getFileAsync, getJsonFileAsync, putFileAsync } from "../generation-fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
 import { insertQueueDashboardBlock } from "./shared/insert-queue-dashboard-block";

@@ -34,6 +34,14 @@ const startWithoutMock = vi.fn(async () => undefined);
 const shutdownMock = vi.fn(async () => undefined);
 const configGetMock = vi.fn();
 
+// Fakes are covered by tests/unit/test-server/setup-test-fakes.test.ts; this
+// file is about the connector lifecycle, whose config and connectors are mocked
+// at a level the real fakes cannot run against.
+vi.mock("../../../src/tests/fakes/test-fakes", () => ({
+  installTestFakes: vi.fn(async () => []),
+  restoreTestFakes: vi.fn(async () => undefined),
+}));
+
 vi.mock("../../../src/connectors", () => ({
   connectorsManager: {
     start: (...args: unknown[]) => startMock(...(args as [])),

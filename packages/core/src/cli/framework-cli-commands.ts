@@ -9,6 +9,7 @@ import { explainCommand } from "./commands/explain.command";
 import {
   generateCommand,
   generateControllerCommand,
+  generateEndpointCommand,
   generateMigrationCommand,
   generateModelCommand,
   generateModuleCommand,
@@ -16,6 +17,7 @@ import {
   generateResourceCommand,
   generateServiceCommand,
   generateUseCaseCommand,
+  makeCommand,
 } from "./commands/generate/generate.command";
 import { inspectCommand } from "./commands/inspect.command";
 import { migrateCommand } from "./commands/migrate.command";
@@ -26,6 +28,7 @@ import { seedCommand } from "./commands/seed.command";
 import { startProductionCommand } from "./commands/start-production.command";
 import { storagePutCommand } from "./commands/storage-put.command";
 import { typecheckCommand } from "./commands/typecheck.command";
+import { testCommand } from "./commands/test.command";
 import { typingsGeneratorCommand } from "./commands/typings-generator.command";
 import { updateCommand } from "./commands/update.command";
 
@@ -35,6 +38,9 @@ export const frameworkCommands = [
   typingsGeneratorCommand,
   openApiGeneratorCommand,
   postmanGeneratorCommand,
+
+  // testing commands
+  testCommand,
 
   // diagnostics commands
   doctorCommand,
@@ -61,6 +67,8 @@ export const frameworkCommands = [
 
   // scaffolding commands
   generateCommand,
+  makeCommand,
+  generateEndpointCommand,
   generateModuleCommand,
   generateControllerCommand,
   generateServiceCommand,

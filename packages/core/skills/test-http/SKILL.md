@@ -1,6 +1,6 @@
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `startHttpTestServer({ port: 0 })`, `stopHttpTestServer`, `createTestHttpServer`, `TestHttpServer`, `createTestRequestClient`, `snapshotResponse`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up", "ephemeral test port", "test with the real Fastify plugins", "assert mail sent by a request", "response snapshot"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
@@ -136,22 +136,74 @@ startHttpTestServer({ port: 2032 }).
 
 This runs whether or not you passed a port, so a collision never reaches you as a bare `EADDRINUSE` from inside Fastify. The failure is a `PortInUseError` carrying `port` and `host`. The same check is available on its own — `assertPortIsAvailable(port, host)` throws it, `isPortAvailable(port, host)` returns a boolean.
 
-### Port `0` is refused
+### Port `0` — let the OS pick
 
-`port: 0` — "let the OS pick one" — is not supported, and says so rather than half-working:
-
-```
-startHttpTestServer() cannot run on port 0. Pass an explicit port — e.g.
-startHttpTestServer({ port: 3999 }) — or set `http.port` in your config. Test workers
-are separate processes that resolve the server's URL from the port published at
-startup, and an OS-assigned port is not knowable to them.
+```ts
+await startHttpTestServer({ port: 0 });
 ```
 
-The reason is the worker handoff described above: the port the OS assigns is never recorded anywhere the workers can read, so `getTestServerUrl()` would resolve `0` and send every request to `http://host:0`.
+`port: 0` binds whatever free port the OS hands out — what `warlock add test` generates. There is nothing to preflight; once the HTTP connector has bound, the port it actually took is published as `WARLOCK_TEST_SERVER_PORT`, so `testGet()`, `actingAs()` and friends follow it. If the connector bound nothing (no `src/config/http.ts`, or a worker-only role), startup fails saying so instead of publishing `0`. A negative port is refused.
+
+⚠ **Changed in 5.31.0.** `port: 0` used to be refused, because the bound port was not recorded anywhere the workers could read. `HttpConnector.start()` now records the port `listen()` returned, and that is what gets published.
 
 ### If startup fails, nothing is left behind
 
 `startHttpTestServer()` owns the connectors it starts. A failure part-way through — a bad config, a connector that won't boot — tears down whatever came up, withdraws the published port, and **rethrows the original error**; a failure during that cleanup is logged but never replaces the cause. `stopHttpTestServer()` withdraws the port and resets its state even when the shutdown itself throws, and still surfaces that failure.
+
+## In the worker, with the production plugins — `createTestHttpServer()`
+
+The shared server runs in Vitest's main process, so the test fakes in a worker never see what a request did there. `createTestHttpServer()` serves requests inside the worker instead, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
+
+```ts
+import { createTestHttpServer, mailFake, type TestHttpServer } from "@warlock.js/core/tests";
+import { afterEach, expect, it } from "vitest";
+
+let app: TestHttpServer | undefined;
+
+afterEach(async () => {
+  await app?.close();
+});
+
+it("answers through the real plugins and lets the fakes see the handler", async () => {
+  app = await createTestHttpServer({
+    routes: (router) =>
+      router.post("/echo", ({ request, response }) =>
+        response.success({ name: request.input("name") }),
+      ),
+  });
+
+  const response = await app.post("/echo", { name: "Ada" });
+
+  expect(response.status).toBe(200);
+  mailFake.assertNothingSent();
+});
+```
+
+- `loadAppModules: true` (with `importModule: (file) => import(file)`, as `setupTest()` takes it) serves every app route; modules load once per process. Needs `setupTest()` to have run in the worker.
+- `routes: (router) => …` registers routes for this server only; `close()` removes them.
+- It returns `url`, `port`, `server` (Fastify, for `inject()`), the request helpers, `actingAs(user)` bound to it, and `close()`.
+- `createTestRequestClient(baseUrl)` gives the same helpers bound to any URL.
+
+## Response snapshots — `snapshotResponse()`
+
+```ts
+import { snapshotResponse, testPost } from "@warlock.js/core/tests";
+import { expect, it } from "vitest";
+
+it("creates a post", async () => {
+  const response = await testPost("/posts", { title: "Hello" });
+
+  expect(
+    await snapshotResponse(response, { redact: ["post.id", "post.createdAt"] }),
+  ).toMatchSnapshot();
+});
+```
+
+The snapshot is `{ status, contentType, body }`; redacted paths read `"[redacted]"`, and `*` matches any key or index (`"posts.*.id"`). It consumes the body.
+
+## Fakes in the server process
+
+`startHttpTestServer()` installs the test fakes too (mail, queue, cache, storage, clock, ids — see the `test-fakes` topic), honouring `tests.fakes` and its own `fakes` option. They record in the main process, so assert on request side effects with `createTestHttpServer()`; the storage fake's temp root is shared with the workers (`WARLOCK_TEST_STORAGE_ROOT`).
 
 ## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
 
@@ -163,7 +215,7 @@ The reason is the worker handoff described above: the port the OS assigns is nev
 import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
-  await startHttpTestServer();
+  await startHttpTestServer({ port: 0 });
 }
 
 export async function teardown() {
@@ -388,7 +440,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 ## Gotchas
 
 - **`globalSetup` must export `setup` and `teardown`.** Vitest reads them by name. A typo in the export gets you a confusing "server not running" error on the first `testGet` call.
-- **Port conflicts.** If `http.port` matches your running dev server, the preflight fails with a `PortInUseError` naming the port. Either stop the dev server or pass a free one: `startHttpTestServer({ port: 3999 })`.
+- **Port conflicts.** If `http.port` matches your running dev server, the preflight fails with a `PortInUseError` naming the port. Pass `startHttpTestServer({ port: 0 })` to let the OS pick, or a fixed free one: `startHttpTestServer({ port: 3999 })`.
 - **Auth tokens need a real user.** Generating a JWT with a non-existent `user_id` works — but the auth middleware's user-loading step will reject the request with 401 because it can't find the user in the DB.
 - **`expectJson` parses the body once.** If you call it twice on the same response, the second call gets an already-consumed stream error. Capture the result.
 - **The HTTP server's connection is NOT torn down between test files.** Data persists across files within a single `vitest` run. Either truncate in `afterEach` / `afterAll`, or design your tests to be order-independent.
@@ -397,6 +449,9 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 ## See also
 
 - The `test-service` topic — pure unit tests against services/repositories/models (no HTTP).
+- The `test-fakes` topic — mail, queue, cache, storage, clock and ids fakes and their assertions.
+- The `model-factories` topic — `defineFactory()` for deterministic fixtures.
+- The `make-endpoint` topic — `warlock make endpoint` writes an endpoint with its HTTP test.
 - The `create-controller` topic — the controller shape your HTTP tests are exercising.
 - The `warlock-conventions` topic — module layout, where `tests/*.test.ts` files live.
 - The `write-cli-command` topic — `warlock add test` scaffolds both global + worker setup files.

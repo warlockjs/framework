@@ -1,6 +1,6 @@
 ---
 title: "Generators"
-description: The scaffolding family — add, generate.module, generate.controller, generate.model and the rest. What each one produces, how naming works, and the workflows people actually use.
+description: The scaffolding family — make endpoint, add, generate.module, generate.controller, generate.model and the rest. What each one produces, how naming works, --dry-run and --json, and the workflows people actually use.
 sidebar:
   order: 2
   label: "Generators"
@@ -233,6 +233,71 @@ Creates a new migration file inside the model's `migrations/` folder. Without `-
 
 File name pattern: `MM-DD-YYYY_HH-MM-SS-<entity>.migration.ts`. Timestamp-prefixed so they sort in execution order.
 
+### `make endpoint <module>/<name>`
+
+The spec-first generator: one endpoint, from its request schema to a passing test, following the conventions the framework's lint rules enforce.
+
+```bash
+# write the request schema first, anywhere — a scratch file is fine
+warlock make endpoint posts/create-post --schema ./post.spec-input.ts --resource Post
+warlock make endpoint posts/update-post --method patch --schema ./post.spec-input.ts
+warlock make endpoint contact/send-message --schema ./message.ts --public
+```
+
+| Option              | Meaning                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `--method <method>` | `get`, `post`, `put`, `patch` or `delete`. Default `post`.                                                |
+| `--path <path>`     | Route path. Default `/<module>`, or `/<module>/:id` for `put`, `patch` and `delete`.                      |
+| `--schema <file>`   | A TypeScript file exporting the request's seal object schema. Its fields shape the resource and the test. |
+| `--resource <Name>` | The resource the endpoint answers with. Default: the module's singular name (`posts` → `Post`).           |
+| `--auth`            | Guard the route with the auth middleware. This is the default.                                            |
+| `--public`          | Register the route without a guard, marked `public: true`.                                                |
+| `--force`           | Overwrite generated files that already exist (otherwise they are skipped and listed).                     |
+| `--dry-run`         | Write nothing; list what would be written and what would be skipped.                                      |
+| `--json`            | Print one JSON report on stdout (see below).                                                              |
+
+What lands in `src/app/<module>/` (the module folder is created if it does not exist):
+
+| File                               | What it holds                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema/<name>.schema.ts`          | The request schema, exported as `<name>Schema` with its `<Name>Schema` type. A `--schema` file outside `src/` is copied in (relative imports re-pointed); one already under `src/` is imported where it lives. Without `--schema`, an empty `v.object({})` to fill in. |
+| `services/<name>.service.ts`       | The work behind the endpoint. It takes validated input and never sees the request, so a job or another service can call it.                                                                                                                                            |
+| `resources/<resource>.resource.ts` | A `defineResource` whose fields come from the schema (`int`, `string`, `boolean`, `date`, `?` for optional fields). Skipped when the resource exists.                                                                                                                  |
+| `controllers/<name>.controller.ts` | One handler: reads `request.validated()` only, calls the service, answers with the resource and a localized message, binds the schema as `validation`, and declares `responseSchema` so `warlock generate.openapi` documents the response.                             |
+| `routes.ts`                        | The route, appended (imports placed after the existing ones). Guarded routes go in a `guarded(() => …)` block; `--public` routes carry `{ public: true }`. A controller already registered is not added twice.                                                         |
+| `utils/locales.json`               | The success message key (`createPostSuccess`), merged in; existing keys win.                                                                                                                                                                                           |
+| `tests/<name>.test.ts`             | A test that requests the endpoint over the real HTTP stack with a valid input derived from the schema, and drops a required field to prove validation runs. Guarded endpoints also get an anonymous `401` case and sign a real user in with `actingAs()`.              |
+
+The generated test needs the test kit (`warlock add test`). Its signed-in cases create a user through the configured `auth.userType.user` model, so they need the test database; adjust the user fields if your model requires more. A field JSON cannot carry (a file upload) turns the happy path into an `it.todo` that says to send it as multipart.
+
+### `--dry-run` and `--json` on every generator
+
+Every `generate.*` command, `make`, and `add` accept both flags.
+
+- **`--dry-run`** writes nothing. It lists each file the command would create, overwrite or update, and each file it would leave alone because it exists. `add --dry-run` also installs nothing; feature setup runs against an in-memory copy of the files, so a step that edits a file it created earlier previews correctly.
+- **`--json`** sends everything the command prints to stderr and prints exactly one report on stdout — also when the command fails:
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "make endpoint",
+  "dryRun": true,
+  "ok": true,
+  "written": ["src/app/posts/schema/create-post.schema.ts", "src/app/posts/routes.ts"],
+  "skipped": [
+    {
+      "path": "src/app/posts/resources/post.resource.ts",
+      "reason": "exists (pass --force to overwrite)"
+    }
+  ],
+  "files": [{ "path": "src/app/posts/routes.ts", "type": "update" }],
+  "details": { "endpoint": { "method": "POST", "path": "/posts", "access": "guarded" } },
+  "messages": ["…everything the command printed, without colours…"]
+}
+```
+
+`files[].type` is `create`, `overwrite`, `update`, `unchanged` or `skip`. `details` carries command-specific facts: the endpoint for `make endpoint`; the features, dependencies and scripts for `add` (and the feature catalog for `add --list --json`). On failure `ok` is `false` and `error` holds the reason. `schemaVersion` changes only when a field is removed or changes meaning.
+
 ### `generate <generator> [args...]` (master)
 
 ```bash
@@ -241,7 +306,7 @@ warlock generate controller products/list-products
 warlock g module products --minimal
 ```
 
-Dispatcher. Forwards to the named generator. Alias `g`. The longer form (`generate.<name>`) exists too and is what most projects use in their `package.json` scripts.
+Dispatcher. Forwards to the named generator. Alias `g`. `warlock make <generator>` is the same dispatcher (`warlock make endpoint posts/create-post`). The longer form (`generate.<name>`) exists too and is what most projects use in their `package.json` scripts.
 
 ### `add <features...>`
 

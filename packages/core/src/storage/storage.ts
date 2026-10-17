@@ -140,6 +140,29 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
   }
 
   /**
+   * Whether `init()` has run (and `reset()` has not run since).
+   */
+  public get isInitialized(): boolean {
+    return this.initialized;
+  }
+
+  /**
+   * The names of every registered driver configuration, including the
+   * built-in `local` one. The test kit's storage fake reads it to replace
+   * every driver with a local one.
+   */
+  public driverNames(): StorageDriverName[] {
+    return [...this.configs.keys()] as StorageDriverName[];
+  }
+
+  /**
+   * The name of the default driver, once initialized.
+   */
+  public getDefaultName(): StorageDriverName | undefined {
+    return this.defaultDriverName ?? undefined;
+  }
+
+  /**
    * Reset storage defaults
    */
   public reset(): void {

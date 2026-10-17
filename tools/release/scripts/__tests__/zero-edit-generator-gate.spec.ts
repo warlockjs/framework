@@ -31,6 +31,8 @@ async function harness(
     badPin?: boolean;
     nestedCore?: boolean;
     brokenGenerator?: boolean;
+    failingGeneratedTest?: boolean;
+    failedMakeReport?: boolean;
   } = {},
 ) {
   const root = await mkdtemp(path.join(tmpdir(), "zero-edit-generator-spec-"));
@@ -115,6 +117,30 @@ async function harness(
           "utf8",
         );
         return { exitCode: 0, stdout: "", stderr: "" };
+      }
+
+      if (String(first).endsWith(path.join("bin", "warlock.js")) && request.args[1] === "make") {
+        const name = String(request.args[3]);
+        const test = `src/app/${name.replace(/\/(.*)$/, "/tests/$1")}.test.ts`;
+        await mkdir(path.join(request.cwd, path.dirname(test)), { recursive: true });
+        await writeFile(path.join(request.cwd, test), "// generated test\n", "utf8");
+        return {
+          exitCode: 0,
+          stdout: `${JSON.stringify({
+            schemaVersion: 1,
+            ok: !options.failedMakeReport,
+            error: options.failedMakeReport ? "Error: Schema file not found" : undefined,
+            written: [test],
+            skipped: [],
+          })}\n`,
+          stderr: "",
+        };
+      }
+
+      if (String(first).endsWith(path.join("vitest", "vitest.mjs"))) {
+        return options.failingGeneratedTest
+          ? { exitCode: 1, stdout: "", stderr: "1 failed" }
+          : { exitCode: 0, stdout: "1 passed", stderr: "" };
       }
 
       if (first === FEATURE_ADAPTER) {
@@ -262,7 +288,13 @@ describe("zero-edit generator matrix", () => {
     const creates = fixture.events
       .filter(([event]) => event === "scaffold-created")
       .map(([, name]) => name);
-    assert.deepEqual(creates, ["baseline", "feature-alpha", "feature-web", "composed"]);
+    assert.deepEqual(creates, [
+      "baseline",
+      "feature-alpha",
+      "feature-web",
+      "generators",
+      "composed",
+    ]);
     assert.deepEqual(
       fixture.events.filter(
         ([event]) => event === "isolated-feature-added" || event === "composed-features-added",
@@ -270,6 +302,7 @@ describe("zero-edit generator matrix", () => {
       [
         ["isolated-feature-added", "alpha"],
         ["isolated-feature-added", "web"],
+        ["isolated-feature-added", "test"],
         ["composed-features-added", "alpha,web"],
       ],
     );
@@ -279,6 +312,7 @@ describe("zero-edit generator matrix", () => {
       [
         ["alpha", "--no-install"],
         ["web", "--no-install"],
+        ["test", "--no-install"],
         ["alpha", "web", "--no-install"],
       ],
     );
@@ -323,6 +357,11 @@ describe("zero-edit generator matrix", () => {
       .filter(([event]) => event === "scaffold-created")
       .map(([, name]) => name);
     assert.deepEqual(creates, ["baseline", "feature-web"]);
+    assert.equal(
+      fixture.commands.some((command) => command.args[1] === "make"),
+      false,
+      "the generator row runs only in a full matrix or when --only names it",
+    );
     assert.deepEqual(
       fixture.events.filter(
         ([event]) => event === "isolated-feature-added" || event === "composed-features-added",
@@ -422,6 +461,83 @@ describe("zero-edit generator matrix", () => {
         `npm ${command.args[1]} in ${command.cwd}`,
       );
     }
+  });
+
+  it("the generators row runs make endpoint --json, the output oracle, then the generated tests", async () => {
+    const fixture = await harness(["alpha"]);
+    await runZeroEditGeneratorGate(
+      { ...fixture.context, onlyFeatures: ["generators"] },
+      fixture.dependencies,
+    );
+
+    const creates = fixture.events
+      .filter(([event]) => event === "scaffold-created")
+      .map(([, name]) => name);
+    assert.deepEqual(creates, ["baseline", "generators"]);
+
+    const app = path.join(fixture.root, "zero-edit-generator", "cases", "generators");
+    assert.match(
+      await readFile(path.join(app, "report.spec-input.ts"), "utf8"),
+      /export const reportInput = v\.object/,
+    );
+
+    const makes = fixture.commands.filter((command) => command.args[1] === "make");
+    assert.deepEqual(
+      makes.map((command) => command.args.slice(2)),
+      [
+        ["endpoint", "reports/create-report", "--schema", "./report.spec-input.ts", "--public", "--json"],
+        [
+          "endpoint",
+          "reports/update-report",
+          "--method",
+          "patch",
+          "--schema",
+          "./report.spec-input.ts",
+          "--json",
+        ],
+      ],
+    );
+
+    const oracleIndex = fixture.commands.findIndex(
+      (command) => command.args[0] === OUTPUT_ORACLE && command.cwd === app,
+    );
+    const vitestRuns = fixture.commands.filter((command) =>
+      String(command.args[0]).endsWith(path.join("vitest", "vitest.mjs")),
+    );
+    const lastMake = makes.at(-1);
+    assert.ok(lastMake);
+    assert.ok(oracleIndex > fixture.commands.indexOf(lastMake));
+    assert.deepEqual(
+      vitestRuns.map((command) => command.args.slice(1)),
+      [
+        ["run", "src/app/reports/tests/create-report.test.ts"],
+        ["run", "src/app/reports/tests/update-report.test.ts", "--testNamePattern", "anonymous"],
+      ],
+    );
+    assert.ok(vitestRuns.every((command) => command.env.NODE_ENV === "test"));
+    assert.ok(fixture.events.some(([event]) => event === "generator-tests-passed"));
+  });
+
+  it("a failing generated test fails the gate", async () => {
+    const fixture = await harness(["alpha"], { failingGeneratedTest: true });
+    await assert.rejects(
+      runZeroEditGeneratorGate(
+        { ...fixture.context, onlyFeatures: ["generators"] },
+        fixture.dependencies,
+      ),
+      /generated test src\/app\/reports\/tests\/create-report\.test\.ts exited 1/,
+    );
+  });
+
+  it("a make endpoint report with ok: false fails the gate, naming the error", async () => {
+    const fixture = await harness(["alpha"], { failedMakeReport: true });
+    await assert.rejects(
+      runZeroEditGeneratorGate(
+        { ...fixture.context, onlyFeatures: ["generators"] },
+        fixture.dependencies,
+      ),
+      /reported failure: Error: Schema file not found/,
+    );
   });
 });
 

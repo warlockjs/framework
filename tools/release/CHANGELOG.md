@@ -2,6 +2,10 @@
 
 ## 5.31.0
 
+### Added
+
+- The zero-edit generator matrix has a generators row: a fresh scaffold with the test kit runs `warlock make endpoint --json` for a public and a guarded endpoint, is proved by the generated-output oracle (typecheck, development and production boot, new routes requested), then runs the generated tests with the app's own Vitest. It runs in every full matrix and with `--only generators`; a failed `make` report, a missing test or a failing generated test fails it.
+
 ### Fixed
 
 - A tag or push that fails after origin confirmation now preserves the release commit bundle and prints recovery, as a failed confirmation already did. Recovery steps are also saved as `recover-release-v<version>.sh` in the uploaded logs; the script and the printed `( set -euo pipefail … )` block stop at the first failure without closing an interactive shell, and rerunning them after a partial tag or push keeps a tag already at the release commit.

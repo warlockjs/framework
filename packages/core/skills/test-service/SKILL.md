@@ -1,6 +1,6 @@
 ---
 name: test-service
-description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — the `test-http` topic; warlock add test scaffold — the `write-cli-command` topic; competing tooling: jest direct, `supertest`, `nock`.'
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `setupTest({ fakes })`, `tests.fakes`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`, `clock`, `ids`, `warlock test --changed`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests", "run only the tests my change affects", "deterministic time in a test"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — the `test-http` topic; warlock add test scaffold — the `write-cli-command` topic; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service
@@ -315,6 +315,38 @@ afterAll(async () => {
 
 **Option 2 is usually right, and option 1 is easy to get wrong.** Tearing down and re-bootstrapping costs a full framework startup — twice, once for your file and once for the next — to avoid a DB connection you were never going to use. **Reach for option 1 only when a connector's mere presence breaks the thing you're testing**, not to save setup time.
 
+## Fakes are on — `setupTest({ fakes })`
+
+Once its connectors are up, `setupTest()` installs the test fakes — mail, queue, cache, storage, clock and ids — and `teardownTest()` restores them first, while the real drivers are still connected. A service under test therefore sends no mail, pushes no job to Redis, uploads nothing and reads a frozen `clock`:
+
+```ts
+// with: import { clock } from "@warlock.js/core";
+//       import { clockFake, mailFake } from "@warlock.js/core/tests";
+//       plus your service (issueResetToken, isResetTokenValid)
+it("expires a reset token after 15 minutes", async () => {
+  const token = await issueResetToken("ada@example.test"); // expiresAt = clock.timestamp() + 15 min
+
+  clockFake.travel(16 * 60_000);
+
+  expect(await isResetTokenValid(token)).toBe(false);
+  expect(clock.now().toISOString()).toBe("2026-01-01T00:16:00.000Z");
+  mailFake.assertSent({ to: "ada@example.test" });
+});
+```
+
+Precedence is `explicit option > tests.fakes config > true`. Opt out in `src/config/tests.ts` (`fakes: false`, or `fakes: { cache: false }`) or per call (`setupTest({ importModule, fakes: false })`). The full assertion API is the `test-fakes` topic; deterministic fixtures are `model-factories`.
+
+## Running only what changed — `warlock test`
+
+```bash
+warlock test --changed                # tests affected by uncommitted changes
+warlock test --changed --since main   # ... by changes since main
+warlock test --related src/app/posts/services/create-post.service.ts
+warlock test --json                   # Vitest's JSON report on stdout
+```
+
+It runs the project's own Vitest with `NODE_ENV=test`; a change that affects no test passes (`--passWithNoTests`).
+
 ## Lifecycle and repeated calls
 
 `setupTest` / `teardownTest` are a pair. **The harness that calls one owns calling the other in the same context.**
@@ -397,6 +429,8 @@ child process exit status with its captured stderr before checking stdout.
 
 ## See also
 
+- The `test-fakes` topic — every fake and its assertions.
+- The `model-factories` topic — `defineFactory()`.
 - The `test-http` topic — integration tests via the real HTTP server (`startHttpTestServer` + `testGet` / `testPost` / `expectJson`).
 - The `warlock-conventions` topic — where tests live in a module (`tests/*.test.ts`).
 - The `write-cli-command` topic — `warlock add test` for the initial scaffold.

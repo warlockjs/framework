@@ -17,8 +17,11 @@ import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { assertPortIsAvailable } from "../http/port-preflight";
+import { getHttpReadyReport } from "../http/ready-report";
 import { loadEnvironmentFiles } from "../utils/load-environment";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { installTestFakes, restoreTestFakes } from "./fakes/test-fakes";
+import type { TestFakesSelection } from "./fakes/test-fakes";
 import { publishTestServerPort, withdrawTestServerPort } from "./test-server-port-channel";
 
 let isServerRunning = false;
@@ -29,6 +32,10 @@ export type StartHttpTestServerOptions = {
    *
    * Needed because the server cannot be moved from outside: this function
    * bootstraps the app itself, and that bootstrap re-reads `.env`.
+   *
+   * `0` asks the OS for a free port. The port actually bound is published to
+   * the test workers, so `testGet()`, `actingAs()` and friends follow it, and
+   * a suite never collides with `warlock dev` or another suite.
    */
   port?: number;
 
@@ -42,6 +49,19 @@ export type StartHttpTestServerOptions = {
    * @default true
    */
   web?: boolean;
+
+  /**
+   * Which test fakes the server process installs (mail, queue, cache,
+   * storage, clock, ids). Same values and precedence as `setupTest({ fakes })`:
+   * this option > `tests.fakes` config > all on.
+   *
+   * A fake records what happens in ITS process: mail sent while this server
+   * handles a request is captured here, not in the test worker that sent the
+   * request. To assert on what an HTTP request did, serve it in the worker
+   * with `createTestHttpServer()`. The storage fake is the exception: its
+   * temp root is shared with the workers.
+   */
+  fakes?: TestFakesSelection;
 };
 
 /**
@@ -77,7 +97,7 @@ async function startTestServerPhase(phase: ConnectorLifecyclePhase): Promise<voi
  * `process.env.HTTP_PORT` has no effect, since `env()` reads dotenv's own store
  * and never falls back to `process.env`.
  */
-async function applyTestServerPort(port?: number): Promise<void> {
+async function applyTestServerPort(port?: number): Promise<"published" | "ephemeral" | "none"> {
   const httpConfig = config.get("http");
 
   if (!httpConfig) {
@@ -87,7 +107,7 @@ async function applyTestServerPort(port?: number): Promise<void> {
       );
     }
 
-    return;
+    return "none";
   }
 
   if (port !== undefined) {
@@ -113,22 +133,45 @@ async function applyTestServerPort(port?: number): Promise<void> {
     );
   }
 
-  // `0` is the OS's "pick a free one for me" idiom, and the test server cannot
-  // support it. Preflighting 0 would bind some unrelated ephemeral port and pass
-  // without proving anything, and there is nothing meaningful to publish: the
-  // port Fastify ends up binding is never recorded — `HttpConnector.start()`
-  // stores the port it ASKED for, not the one it got. Accepting 0 silently is
-  // what left `getTestServerUrl()` resolving to `http://host:0` through its own
-  // config fallback, so every worker request went to a port nothing listens on.
-  if (resolvedPort <= 0) {
+  // `0` is the OS's "pick a free one for me". There is nothing to preflight —
+  // probing 0 would bind some unrelated port and prove nothing — and nothing to
+  // publish yet: the port is only known once the HTTP connector has bound, and
+  // `HttpConnector.start()` records the port `listen()` actually returned (see
+  // `ready-report.ts`). It is published right after the late phase instead.
+  if (resolvedPort === 0) {
+    return "ephemeral";
+  }
+
+  if (resolvedPort < 0) {
     throw new Error(
-      `startHttpTestServer() cannot run on port ${resolvedPort}. Pass an explicit port — e.g. startHttpTestServer({ port: 3999 }) — or set \`http.port\` in your config. Test workers are separate processes that resolve the server's URL from the port published at startup, and an OS-assigned port is not knowable to them.`,
+      `startHttpTestServer() cannot run on port ${resolvedPort}. Pass a port number, or 0 to let the OS pick a free one — e.g. startHttpTestServer({ port: 0 }).`,
     );
   }
 
   await assertPortIsAvailable(resolvedPort, config.get("http.host") || "localhost");
 
   publishTestServerPort(resolvedPort);
+
+  return "published";
+}
+
+/**
+ * Publish the port an ephemeral (`port: 0`) bind actually took.
+ *
+ * `before` is the ready report from before the late phase: the report is a
+ * module-level record, so an unchanged one means THIS boot bound nothing and an
+ * older report must not be mistaken for it.
+ */
+function publishEphemeralPort(before: ReturnType<typeof getHttpReadyReport>): void {
+  const report = getHttpReadyReport();
+
+  if (!report || report === before || report.port <= 0) {
+    throw new Error(
+      "startHttpTestServer({ port: 0 }) booted, but the HTTP connector did not bind a port, so there is no address to give the test workers. Check that `src/config/http.ts` exists and that this process serves HTTP (its role is not worker-only).",
+    );
+  }
+
+  publishTestServerPort(report.port);
 }
 
 /**
@@ -138,6 +181,10 @@ async function applyTestServerPort(port?: number): Promise<void> {
  * @example
  * // run this suite on its own port, whatever `.env` says
  * await startHttpTestServer({ port: 3999 });
+ *
+ * @example
+ * // let the OS pick a free port; the request helpers follow it
+ * await startHttpTestServer({ port: 0 });
  */
 export async function startHttpTestServer(options: StartHttpTestServerOptions = {}): Promise<void> {
   const nodeEnvironment = process.env.NODE_ENV;
@@ -188,10 +235,14 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
       await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
     }
 
+    // Fakes before app modules load, so module boot code already sees them.
+    await installTestFakes(options.fakes);
+
     // Load application modules (their boot side-effects now see a live DB).
     await filesOrchestrator.moduleLoader.loadAll();
 
-    await applyTestServerPort(options.port);
+    const portMode = await applyTestServerPort(options.port);
+    const readyReportBefore = getHttpReadyReport();
 
     // A rejecting validator (Application.onValidateBoot) must abort boot
     // before late-phase connectors bind a port — same slot as
@@ -204,6 +255,10 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
       await startTestServerPhase(ConnectorLifecyclePhase.Late);
     } else {
       await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
+    }
+
+    if (portMode === "ephemeral") {
+      publishEphemeralPort(readyReportBefore);
     }
 
     isServerRunning = true;
@@ -230,6 +285,15 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
  */
 async function unwindPartialStartup(): Promise<void> {
   try {
+    await restoreTestFakes();
+  } catch (fakesError) {
+    console.error(
+      "[test-server] Restoring the test fakes after a failed start did not complete:",
+      fakesError,
+    );
+  }
+
+  try {
     await connectorsManager.shutdown();
   } catch (shutdownError) {
     // Reported, not thrown — it is secondary to the startup error being
@@ -252,6 +316,12 @@ export async function stopHttpTestServer(): Promise<void> {
   }
 
   try {
+    try {
+      await restoreTestFakes();
+    } catch (fakesError) {
+      console.error("[test-server] Restoring the test fakes did not complete:", fakesError);
+    }
+
     await connectorsManager.shutdown();
 
     console.log("[test-server] HTTP test server stopped");

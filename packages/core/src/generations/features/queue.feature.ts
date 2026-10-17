@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
+import { fileExistsAsync, getFileAsync, putFileAsync } from "../generation-fs";
 import { rootPath } from "../../utils";
 import { insertConnectorEntry } from "./shared/insert-connector-entry";
 import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";

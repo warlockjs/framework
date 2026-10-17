@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
+import { fileExistsAsync, getFileAsync, putFileAsync } from "../../generation-fs";
 import { srcPath } from "../../../utils";
 
 /**

@@ -1,6 +1,7 @@
 ---
 name: upgrade-from-5-29
 description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, cut-off AI agent answers, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, auth throttle resets, image derivative caches, the Head viewport and test fakes on by default. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -299,6 +300,29 @@ rules and no allowlist entry, `bash -c`, `eval`, `xargs`, `sudo` and similar
 runners are refused (`reason: "nested-command"`); `shell.deny` is
 case-insensitive. Branch on `WorkspacePolicyError.reason`, not the message text.
 Call `ws.dispose()` when a workspace with background commands is done.
+
+## 5.30 to 5.31 test fakes are on by default
+
+In 5.31 `setupTest()` and `startHttpTestServer()` install the test fakes once
+their connectors are up: mail is captured instead of sent, `@warlock.js/queue`
+dispatches are recorded instead of pushed to Redis, the cache uses a fresh
+in-memory driver, every storage driver writes to a temp directory, and the
+framework `clock` / `ids` are deterministic. A suite that relied on a real SMTP
+sink, a Redis cache shared between the HTTP test server and the workers, a real
+bucket or jobs actually processed by a worker opts out in `src/config/tests.ts`:
+
+```ts title="src/config/tests.ts"
+const testsConfigurations = {
+  fakes: false, // or only some: { cache: false, queue: false }
+};
+
+export default testsConfigurations;
+```
+
+Then use the assertions instead of probing real services (`mailFake.assertSent`,
+`queueFake.assertPushed`; see `test-fakes`). `startHttpTestServer({ port: 0 })`
+is now supported and is what `warlock add test` generates; an existing
+`src/test-global-setup.ts` keeps its port until you change it.
 
 ## Verify the application paths that changed
 

@@ -323,6 +323,19 @@ export interface RouteOptions {
    */
   validation?: RequestHandlerValidation;
   /**
+   * Declare that this route deliberately runs without an auth guard.
+   *
+   * Changes nothing at runtime: the route answers exactly as it would without
+   * it. It records intent, so a mutating route (`POST`, `PUT`, `PATCH`,
+   * `DELETE`) that no guard covers reads as a decision rather than an
+   * omission — to reviewers, to lint rules and to tooling that lists routes.
+   * `warlock make endpoint --public` writes it.
+   *
+   * @example
+   * router.post("/api/contact", contactController, { public: true });
+   */
+  public?: boolean;
+  /**
    * What this route's request log entries carry of its input, overriding
    * `http.logging`. Applied before any entry is built, so an omitted body or
    * query never reaches a log channel.

@@ -1,7 +1,9 @@
 import { colors } from "@mongez/copper";
 import { command } from "../../../commands/cli-command";
 import type { CommandActionData } from "../../../commands/types";
+import { runGenerationCommand } from "../../../generations/generation-run";
 import { generateController } from "./generators/controller.generator";
+import { generateEndpoint } from "./generators/endpoint.generator";
 import { generateMigration } from "./generators/migration.generator";
 import { generateModel } from "./generators/model.generator";
 import { generateModule } from "./generators/module.generator";
@@ -12,6 +14,7 @@ import { generateUseCase } from "./generators/use-case.generator";
 
 const generators: Record<string, (data: CommandActionData) => Promise<void>> = {
   module: generateModule,
+  endpoint: generateEndpoint,
   controller: generateController,
   service: generateService,
   "use-case": generateUseCase,
@@ -21,57 +24,138 @@ const generators: Record<string, (data: CommandActionData) => Promise<void>> = {
   resource: generateResource,
 };
 
-async function generateCommandAction(data: CommandActionData) {
-  const commandName = data.args[0];
-
-  if (!commandName) {
-    console.log(colors.red("Error: Generator name is required"));
-    console.log(colors.yellow("\nAvailable generators:"));
-    Object.keys(generators).forEach((cmd) => {
-      console.log(colors.cyan(`  - ${cmd}`));
-    });
-    console.log(colors.yellow("\nUsage: warlock generate <generator> <name> [options]"));
-    process.exit(1);
-  }
-
-  const generator = generators[commandName];
-
-  if (!generator) {
-    console.log(colors.red(`Error: Unknown generator "${commandName}"`));
-    console.log(colors.yellow("\nAvailable generators:"));
-    Object.keys(generators).forEach((cmd) => {
-      console.log(colors.cyan(`  - ${cmd}`));
-    });
-    process.exit(1);
-  }
-
-  // Remove the command name from args for the generator
-  const generatorData: CommandActionData = {
-    ...data,
-    args: data.args.slice(1),
-  };
-
-  await generator(generatorData);
+/**
+ * Run one generator under the recorder that implements `--dry-run` and
+ * `--json` (see `generations/generation-run.ts`).
+ */
+function recorded(
+  commandName: string,
+  generator: (data: CommandActionData) => Promise<void>,
+): (data: CommandActionData) => Promise<void> {
+  return (data) => runGenerationCommand(commandName, data, generator);
 }
+
+/** Options every generator accepts. */
+const commonOptions = [
+  {
+    text: "--force, -f",
+    description: "Overwrite existing files",
+    type: "boolean" as const,
+  },
+  {
+    text: "--dry-run",
+    description: "Preview the files that would be written or skipped without writing anything",
+    type: "boolean" as const,
+  },
+  {
+    text: "--json",
+    description:
+      "Print one JSON report on stdout: files written, files skipped because they exist, messages",
+    type: "boolean" as const,
+  },
+];
+
+/** Options of `make endpoint` / `generate.endpoint`. */
+const endpointOptions = [
+  {
+    text: "--method <method>",
+    description: "HTTP method: get, post, put, patch or delete (default: post)",
+  },
+  {
+    text: "--path <path>",
+    description: "Route path (default: /<module>, or /<module>/:id for put, patch and delete)",
+  },
+  {
+    text: "--schema <file>",
+    description:
+      "A TypeScript file exporting the request's seal object schema; its fields shape the resource and the test",
+  },
+  {
+    text: "--resource <Name>",
+    description: "Resource the endpoint answers with (default: the module's singular name)",
+  },
+  {
+    text: "--auth",
+    description: "Guard the route with the auth middleware (the default)",
+    type: "boolean" as const,
+  },
+  {
+    text: "--public",
+    description: "Register the route without a guard, marked public: true",
+    type: "boolean" as const,
+  },
+];
+
+/** The `generate <generator>` / `make <generator>` dispatcher. */
+function dispatchGenerator(label: "generate" | "make") {
+  return async (data: CommandActionData) => {
+    const generatorName = data.args[0];
+    const generator = generatorName ? generators[generatorName] : undefined;
+
+    if (!generatorName || !generator) {
+      console.log(
+        colors.red(
+          generatorName
+            ? `Error: Unknown generator "${generatorName}"`
+            : "Error: Generator name is required",
+        ),
+      );
+      console.log(colors.yellow("\nAvailable generators:"));
+      Object.keys(generators).forEach((name) => {
+        console.log(colors.cyan(`  - ${name}`));
+      });
+      console.log(colors.yellow(`\nUsage: warlock ${label} <generator> <name> [options]`));
+      process.exit(1);
+    }
+
+    // Remove the generator name from args for the generator
+    await runGenerationCommand(
+      `${label} ${generatorName}`,
+      { ...data, args: data.args.slice(1) },
+      generator,
+    );
+  };
+}
+
+const generatorOptionsForDispatch = [
+  ...commonOptions,
+  {
+    text: "--overwrite",
+    description:
+      "With --force, also replace existing files that differ from the generated output (default: skip and list them)",
+    type: "boolean" as const,
+  },
+  ...endpointOptions,
+];
 
 // Master generate command
 export const generateCommand = command({
   name: "generate <generator> [args...]",
   alias: "g", // Allows 'warlock g module ...'
   description: "Scaffold a new component",
-  action: generateCommandAction,
-  options: [
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
-  ],
+  action: dispatchGenerator("generate"),
+  options: generatorOptionsForDispatch,
+});
+
+/**
+ * `warlock make <generator>` — the same generators as `generate`, e.g.
+ * `warlock make endpoint posts/create-post --schema ./schema.ts --public`.
+ */
+export const makeCommand = command({
+  name: "make <generator> [args...]",
+  description: "Scaffold a new component (same generators as generate)",
+  action: dispatchGenerator("make"),
+  options: generatorOptionsForDispatch,
+});
+
+/** `warlock make.endpoint` / `generate.endpoint` — one spec-first endpoint. */
+export const generateEndpointCommand = command({
+  name: "generate.endpoint <module>/<name>",
+  alias: "make.endpoint",
+  description:
+    "Generate an endpoint: route, controller, validation, service, resource, locale key, OpenAPI response schema and an HTTP test",
+  action: recorded("make endpoint", generateEndpoint),
+  options: [...endpointOptions, ...commonOptions],
 });
 
 // Individual commands
@@ -79,7 +163,7 @@ export const generateModuleCommand = command({
   name: "generate.module <name>",
   alias: "gen.m",
   description: "Generate a new module",
-  action: generateModule,
+  action: recorded("generate.module", generateModule),
   options: [
     {
       text: "--minimal, -m",
@@ -88,21 +172,12 @@ export const generateModuleCommand = command({
       type: "boolean",
     },
     {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
       text: "--overwrite",
       description:
         "With --force, also replace existing files that differ from the generated output (default: skip and list them)",
       type: "boolean",
     },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
+    ...commonOptions,
   ],
 });
 
@@ -110,23 +185,14 @@ export const generateControllerCommand = command({
   name: "generate.controller <module>/<name>",
   alias: "gen.c",
   description: "Generate a new controller",
-  action: generateController,
+  action: recorded("generate.controller", generateController),
   options: [
     {
       text: "--with-validation, -v",
       description: "Generate a validation schema and bind it to the controller",
       type: "boolean",
     },
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
+    ...commonOptions,
   ],
 });
 
@@ -134,44 +200,22 @@ export const generateServiceCommand = command({
   name: "generate.service <module>/<name>",
   alias: "gen.s",
   description: "Generate a new service",
-  action: generateService,
-  options: [
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
-  ],
+  action: recorded("generate.service", generateService),
+  options: commonOptions,
 });
 
 export const generateUseCaseCommand = command({
   name: "generate.use-case <module>/<verb-noun>",
   description: "Generate a transport-agnostic use-case and its spec",
-  action: generateUseCase,
-  options: [
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
-  ],
+  action: recorded("generate.use-case", generateUseCase),
+  options: commonOptions,
 });
 
 export const generateModelCommand = command({
   name: "generate.model <module>/<name>",
   alias: "gen.md",
   description: "Generate a new model with migration",
-  action: generateModel,
+  action: recorded("generate.model", generateModel),
   options: [
     {
       text: "--with-resource, -rs",
@@ -183,21 +227,12 @@ export const generateModelCommand = command({
       description: "Specify table name",
     },
     {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
       text: "--overwrite",
       description:
         "With --force, also replace existing files that differ from the generated output (default: skip and list them)",
       type: "boolean",
     },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
+    ...commonOptions,
     {
       text: "--timestamps [bool]",
       description: "Include timestamps in migration (default: true)",
@@ -215,56 +250,25 @@ export const generateRepositoryCommand = command({
   name: "generate.repository <module>/<name>",
   alias: "gen.r",
   description: "Generate a new repository",
-  action: generateRepository,
-  options: [
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
-  ],
+  action: recorded("generate.repository", generateRepository),
+  options: commonOptions,
 });
 
 export const generateResourceCommand = command({
   name: "generate.resource <module>/<name>",
   alias: "gen.rs",
   description: "Generate a new resource",
-  action: generateResource,
-  options: [
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
-  ],
+  action: recorded("generate.resource", generateResource),
+  options: commonOptions,
 });
 
 export const generateMigrationCommand = command({
   name: "generate.migration <model-path>",
   alias: "gen.mig",
   description: "Generate a new migration for a model",
-  action: generateMigration,
+  action: recorded("generate.migration", generateMigration),
   options: [
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
-      type: "boolean",
-    },
-    {
-      text: "--dry-run",
-      description: "Preview the files that would be generated without writing anything",
-      type: "boolean",
-    },
+    ...commonOptions,
     {
       text: "--add <columns>",
       description: "Columns to add (DSL: name:type:modifier,...)",

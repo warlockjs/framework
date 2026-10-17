@@ -1,4 +1,14 @@
-import { testDelete, testGet, testPatch, testPost, testPut, testRequest } from "./test-helpers";
+import {
+  type TestRequestClient,
+  createTestRequestClient,
+  getTestServerUrl,
+  type testDelete,
+  type testGet,
+  type testPatch,
+  type testPost,
+  type testPut,
+  type testRequest,
+} from "./test-helpers";
 
 /** Structural auth contract: an Auth model satisfies this without a runtime auth import. */
 export interface TestAuthenticableUser {
@@ -22,8 +32,14 @@ export type AuthenticatedTestClient = {
  * Issue a real persisted access token and bind it to this client's requests.
  * Authentication middleware still verifies every request; no globals or bypasses
  * are installed. The bound identity takes precedence over per-request headers.
+ *
+ * Requests go to the shared test server, or through `client` — e.g. the one
+ * `createTestHttpServer()` returns (its own `actingAs()` passes it).
  */
-export async function actingAs(user: TestAuthenticableUser): Promise<AuthenticatedTestClient> {
+export async function actingAs(
+  user: TestAuthenticableUser,
+  client: TestRequestClient = createTestRequestClient(getTestServerUrl),
+): Promise<AuthenticatedTestClient> {
   if (process.env.NODE_ENV !== "test") {
     throw new Error(
       `actingAs() requires NODE_ENV="test", but received NODE_ENV=${JSON.stringify(process.env.NODE_ENV)}. Set NODE_ENV=test before creating a test client.`,
@@ -42,12 +58,12 @@ export async function actingAs(user: TestAuthenticableUser): Promise<Authenticat
   };
 
   return {
-    request: (path, options) => testRequest(path, authorized(options)),
-    get: (path, options) => testGet(path, authorized(options)),
-    post: (path, body, options) => testPost(path, body, authorized(options)),
-    put: (path, body, options) => testPut(path, body, authorized(options)),
-    patch: (path, body, options) => testPatch(path, body, authorized(options)),
-    delete: (path, options) => testDelete(path, authorized(options)),
+    request: (path, options) => client.request(path, authorized(options)),
+    get: (path, options) => client.get(path, authorized(options)),
+    post: (path, body, options) => client.post(path, body, authorized(options)),
+    put: (path, body, options) => client.put(path, body, authorized(options)),
+    patch: (path, body, options) => client.patch(path, body, authorized(options)),
+    delete: (path, options) => client.delete(path, authorized(options)),
     dispose: () => user.removeAccessToken(token),
   };
 }

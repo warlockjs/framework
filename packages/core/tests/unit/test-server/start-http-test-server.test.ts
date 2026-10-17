@@ -24,6 +24,8 @@ const fixture = vi.hoisted(() => ({
   failLatePhase: false,
   /** Fails teardown, including the best-effort unwind of a failed startup. */
   failShutdown: false,
+  /** The port the late phase "binds" when asked for port 0; 0 = binds nothing. */
+  ephemeralPort: 0,
 }));
 
 vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
@@ -77,6 +79,18 @@ vi.mock("../../../src/connectors/connectors-manager", async () => {
         }
 
         fixture.portAtLatePhase = appConfig.get("http.port");
+
+        // The real HttpConnector records the port listen() returned.
+        if (fixture.portAtLatePhase === 0 && fixture.ephemeralPort > 0) {
+          const { setHttpReadyReport } = await import("../../../src/http/ready-report");
+
+          setHttpReadyReport({
+            url: `http://127.0.0.1:${fixture.ephemeralPort}`,
+            wildcardBind: false,
+            port: fixture.ephemeralPort,
+            routeCount: 0,
+          });
+        }
       }),
       shutdown: vi.fn(async () => {
         if (fixture.failShutdown) {
@@ -143,6 +157,7 @@ describe("startHttpTestServer", () => {
     }
 
     fixture.portAtLatePhase = undefined;
+    fixture.ephemeralPort = 0;
     delete process.env.HTTP_PORT;
     delete process.env[TEST_SERVER_PORT_ENV_KEY];
   });
@@ -224,30 +239,44 @@ describe("startHttpTestServer", () => {
     expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
   });
 
-  it("rejects port 0 with an actionable message instead of half-supporting it", async () => {
-    // Port `0` used to be accepted and deliberately not published, on the
-    // grounds that the OS picks the port. That left the trap this test now
-    // closes: `getTestServerUrl()` resolves `0` through its own
-    // `config.key("http.port", 2031)` fallback — `0` is a defined value and
-    // never reaches that default — so every worker request went to
-    // `http://host:0`, where nothing listens. Publishing the real port instead
-    // is not available: `HttpConnector.start()` records the port it ASKED for,
-    // not the one Fastify bound.
-    // Cast the awaited result, not the caught value: the call resolves to
-    // `void` on success, so `.catch(x => x as Error)` types as `void | Error`
-    // and `.message` never narrows.
+  it("accepts port 0: binds whatever the OS hands out, then publishes that port to the workers", async () => {
+    holder = await holdPort(envPort);
+    fixture.ephemeralPort = 41_234;
+
+    await startHttpTestServer({ port: 0 });
+
+    // asked the connector for "any free port", without preflighting 0
+    expect(fixture.portAtLatePhase).toBe(0);
+    // and published the port it actually bound, which the request helpers use
+    expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBe("41234");
+    expect(getTestServerUrl()).toContain(":41234");
+
+    await stopHttpTestServer();
+
+    expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
+  });
+
+  it("fails, and unwinds, when port 0 was asked for but no port was bound", async () => {
+    fixture.ephemeralPort = 0;
+
     const error = (await startHttpTestServer({ port: 0 }).catch(
       (thrown: unknown) => thrown,
     )) as Error;
 
     expect(error).toBeInstanceOf(Error);
-    // says what to do, not only what failed — the standard `PortInUseError` sets
-    expect(error.message).toContain("cannot run on port 0");
-    expect(error.message).toContain("startHttpTestServer({ port: 3999 })");
-
-    // rejected before anything bound
-    expect(fixture.portAtLatePhase).toBeUndefined();
+    expect(error.message).toContain("did not bind a port");
+    expect(isTestServerRunning()).toBe(false);
     expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
+  });
+
+  it("rejects a negative port with an actionable message", async () => {
+    const error = (await startHttpTestServer({ port: -1 }).catch(
+      (thrown: unknown) => thrown,
+    )) as Error;
+
+    expect(error.message).toContain("cannot run on port -1");
+    expect(error.message).toContain("startHttpTestServer({ port: 0 })");
+    expect(fixture.portAtLatePhase).toBeUndefined();
   });
 
   /**

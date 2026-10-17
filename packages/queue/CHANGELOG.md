@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `registeredJobs()` and `queueOf()` are exported, so tools can list the jobs an app defined with `defineJob()` and the queue each runs on; `warlock inspect` reads them for its `jobs` section.
+- `setDispatchInterceptor({ dispatch, find? })` / `getDispatchInterceptor()`: while an interceptor is set, every job's `dispatch()` and `find()` go to it instead of BullMQ, so nothing connects to Redis. The slot is process-wide. `queueFake` in `@warlock.js/core/tests` is built on it.
 
 ### Fixed
 
