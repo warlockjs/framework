@@ -55,7 +55,7 @@ ai.middleware.budget({
 });
 ```
 
-Breach surfaces `BudgetExceededError` with `unit`, `limit`, `actual`. Warn mode logs and continues — useful for measuring before enforcing.
+Breach surfaces `BudgetExceededError` with `unit`, `limit`, `actual`. Warn mode logs and continues — useful for measuring before enforcing. Add `reserve: { outputTokens }` to reserve each trip's worst case before the call (reserve-then-commit), so one trip cannot overrun the cap; add `scoped` for a ledger shared across runs.
 
 ### `ai.middleware.guardrail`
 

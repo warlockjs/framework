@@ -140,6 +140,25 @@ await ai.tools
 - Units are millisecond-based: `milliseconds`, `seconds`, `minutes`, `hours`, `days`, `weeks` (plus singular/short aliases like `day` / `d`). Calendar-relative `month` / `year` are intentionally **unsupported** — they have no fixed length. An unknown unit → `DateTimeError` `"invalid-unit"`; an unknown IANA zone → `"invalid-time-zone"`.
 - For deterministic tests, inject a clock by calling the factory directly: `dateTimeTool({}, { clock: () => Date.parse("2026-06-22T00:00:00Z") })`.
 
+## `ai.tools.measure` — what the tool belt costs per call
+
+`ai.tools.measure(tools, options?)` (the same function as `measureTools` from `@warlock.js/ai`) reports the input tokens a tool list adds to every model call, per tool and in total:
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+
+const belt = [ai.tools.fetchUrl(), ai.tools.calculator(), ai.tools.dateTime()];
+
+const full = await ai.tools.measure(belt, { model });
+const compact = await ai.tools.measure(belt, { model, mode: "compact" });
+
+console.log(full.source, full.tokens, "→", compact.tokens);
+for (const { name, tokens } of full.perTool) console.log(name, tokens);
+```
+
+With a model that has a native count endpoint (`countTokens`) the counts are exact (`source: "native"`, `tools.length + 2` count calls, plus `overhead` — the tokens a provider adds once whenever any tool is present); otherwise they are estimates (`source: "estimate"`). If compact mode saves enough, run the agent with `toolSchemas: "compact"` — see [Define tools](/v/latest/ai/tools/define-tools/).
+
 ## Errors flow as data, not throws
 
 Every failure above is thrown inside the tool handler, caught by the framework's `tool()` wrapper, and surfaced in the returned `{ error }` field — `invoke()` never throws, so the agent reads the failure as a `role: "tool"` message and self-corrects on the next trip. Each error class extends the `@warlock.js/ai` `AIError` base; branch on `.type`:

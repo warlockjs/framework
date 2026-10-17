@@ -251,18 +251,23 @@ import { ai /* types, errors */ } from "@warlock.js/ai";
 
 ## Tools
 
-| Export                         | What it is                                                                                                                                                                       |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ToolContract<TIn, TOut>`      | Returned by `ai.tool`. Has `.name`, `.description`, `.invoke()`.                                                                                                                 |
-| `ExecutableTool<TIn, TOut>`    | Structural shape of an executable (agent / workflow / supervisor) dropped into `tools: []` without `.asTool()` — `{ name, description?, inputSchema?, execute() }`, no `invoke`. |
-| `AgentToolEntry<TIn, TOut>`    | An entry accepted in `tools: []` — a `ToolContract` or a raw `ExecutableTool` the framework auto-adapts.                                                                         |
-| `executableToTool(executable)` | Adapt one raw `ExecutableTool` into a `ToolContract` (manifest derived from its `name` / `description` / `inputSchema`); throws `AgentExecutionError` when it has no `name`.     |
-| `normalizeAgentTools(tools?)`  | Normalize an agent's `tools: []` to `ToolContract[]` — built tools pass through, raw executables auto-adapt.                                                                     |
-| `isExecutableTool(entry)`      | Type guard — `true` when `entry` has `execute()` but no `invoke()`.                                                                                                              |
-| `ToolConfig<TIn, TOut>`        | Config for `ai.tool`.                                                                                                                                                            |
-| `ToolContext<TArtifacts>`      | Second argument to `execute` — `{ artifacts, signal, ... }`.                                                                                                                     |
-| `ToolCall`                     | One recorded tool call — `{ name, input, output, error?, tripIndex, duration, startedAt, endedAt }`.                                                                             |
-| `ToolMode`                     | `"feedback"                                                                                                                                                                      | "silent"`. |
+| Export                                | What it is                                                                                                                                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ToolContract<TIn, TOut>`             | Returned by `ai.tool`. Has `.name`, `.description`, `.invoke()`.                                                                                                                                              |
+| `ExecutableTool<TIn, TOut>`           | Structural shape of an executable (agent / workflow / supervisor) dropped into `tools: []` without `.asTool()` — `{ name, description?, inputSchema?, execute() }`, no `invoke`.                              |
+| `AgentToolEntry<TIn, TOut>`           | An entry accepted in `tools: []` — a `ToolContract` or a raw `ExecutableTool` the framework auto-adapts.                                                                                                      |
+| `executableToTool(executable)`        | Adapt one raw `ExecutableTool` into a `ToolContract` (manifest derived from its `name` / `description` / `inputSchema`); throws `AgentExecutionError` when it has no `name`.                                  |
+| `normalizeAgentTools(tools?)`         | Normalize an agent's `tools: []` to `ToolContract[]` — built tools pass through, raw executables auto-adapt.                                                                                                  |
+| `isExecutableTool(entry)`             | Type guard — `true` when `entry` has `execute()` but no `invoke()`.                                                                                                                                           |
+| `ToolConfig<TIn, TOut>`               | Config for `ai.tool`.                                                                                                                                                                                         |
+| `ToolContext<TArtifacts>`             | Second argument to `execute` — `{ artifacts, signal, ... }`.                                                                                                                                                  |
+| `createToolContext(options?)`         | Build a `ToolContext` (`{ artifacts?, signal? }`, empty bag by default) for invoking a tool outside the agent loop.                                                                                           |
+| `ToolSchemaMode`                      | `"full"` (default) or `"compact"` — how tool input schemas are sent; the `toolSchemas` agent / execute option.                                                                                                |
+| `compactToolSchemas(tools, options?)` | Copies of `tools` whose schemas serialize compact for every adapter; validation still uses the originals.                                                                                                     |
+| `measureTools(tools, options?)`       | Input tokens a tool list adds to every call — `{ tokens, perTool, overhead, source: "native" \| "estimate", mode }`. Also `ai.tools.measure` with `@warlock.js/ai-tools`.                                     |
+| `compactJsonSchema(schema, options?)` | Strip annotation keywords (`description`, `title`, `examples`, `default`, …) and collapse const unions to `enum`; `keepDescriptions` keeps descriptions. `extractJsonSchema(schema, { compact })` applies it. |
+| `ToolCall`                            | One recorded tool call — `{ name, input, output, error?, tripIndex, duration, startedAt, endedAt }`.                                                                                                          |
+| `ToolMode`                            | `"feedback"                                                                                                                                                                                                   | "silent"`. |
 
 ## Streaming structured output
 
@@ -348,17 +353,19 @@ The output/input-modality track — image, speech, and transcription verbs that 
 
 ## SDK / model contracts
 
-| Export               | What it is                                                                                                                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SDKAdapterContract` | Interface every provider adapter implements — `model()`, `embedder?()`.                                                                                                                                                                                        |
-| `ModelContract`      | Returned by `sdk.model({...})`. Owns `complete`, `stream`, `capabilities`, `pricing`.                                                                                                                                                                          |
-| `ModelCapabilities`  | `{ structuredOutput?, vision?, reasoning?, promptCaching?, audio?, ... }` — feature flags the agent reads before forwarding options.                                                                                                                           |
-| `ModelCallOptions`   | Per-call options forwarded to the model — `temperature`, `maxTokens`, plus `reasoning?: { effort?, maxTokens? }`, `cacheControl?: { breakpoints?, ttl? }` and `providerOptions?: { [format]: {...} }` (each adapter reads only its own key, e.g. `anthropic`). |
-| `ReasoningEffort`    | `"low"                                                                                                                                                                                                                                                         | "medium" | "high" | "none"`. `"none"`runs the model without reasoning (OpenAI emits`reasoning_effort: "none"` — the mode that lets gpt-5 / o-series accept function tools). |
-| `ModelResponse`      | Shape returned by `model.complete` — `{ content, finishReason, usage, toolCalls?, blocks? }`.                                                                                                                                                                  |
-| `ModelPricing`       | `{ input, output, cachedInput?, cachedOutput?, reasoning? }` — USD per 1M tokens, per channel.                                                                                                                                                                 |
-| `Usage`              | `{ input, output, total, cachedTokens?, cacheWriteTokens?, reasoningTokens?, cost? }`.                                                                                                                                                                         |
-| `CostBreakdown`      | `{ input, output, cachedInput?, cachedOutput? }` — USD.                                                                                                                                                                                                        |
+| Export                                     | What it is                                                                                                                                                                                                                                                     |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SDKAdapterContract`                       | Interface every provider adapter implements — `model()`, `embedder?()`.                                                                                                                                                                                        |
+| `ModelContract`                            | Returned by `sdk.model({...})`. Owns `complete`, `stream`, `capabilities`, `pricing`.                                                                                                                                                                          |
+| `ModelCapabilities`                        | `{ structuredOutput?, vision?, reasoning?, promptCaching?, audio?, ... }` — feature flags the agent reads before forwarding options.                                                                                                                           |
+| `ModelCallOptions`                         | Per-call options forwarded to the model — `temperature`, `maxTokens`, plus `reasoning?: { effort?, maxTokens? }`, `cacheControl?: { breakpoints?, ttl? }` and `providerOptions?: { [format]: {...} }` (each adapter reads only its own key, e.g. `anthropic`). |
+| `ReasoningEffort`                          | `"low"                                                                                                                                                                                                                                                         | "medium" | "high" | "none"`. `"none"`runs the model without reasoning (OpenAI emits`reasoning_effort: "none"` — the mode that lets gpt-5 / o-series accept function tools). |
+| `ModelResponse`                            | Shape returned by `model.complete` — `{ content, finishReason, usage, toolCalls?, blocks? }`. First-party adapters set `usage.cost` when the model is priced.                                                                                                  |
+| `ModelPricing`                             | `{ input, output, cachedInput?, cacheWrite?, cacheWrite1h?, reasoning?, cachedOutput? }` — USD per 1M tokens, per channel. `cachedOutput` is the deprecated alias of `cacheWrite`.                                                                             |
+| `Usage`                                    | `{ input, output, total, cachedTokens?, cacheWriteTokens?, cacheWrite1hTokens?, inputIncludesCache?, reasoningTokens?, cost? }`. `inputIncludesCache: false` (Anthropic, Bedrock) means `input` excludes the cache tokens.                                     |
+| `CostBreakdown`                            | `Usage.cost`, the `ModelPricing` shape in USD: `{ input, output, cachedInput?, cacheWrite?, reasoning? }`.                                                                                                                                                     |
+| `computeCost` / `attachCost` / `totalCost` | Price a `Usage` against a `ModelPricing` (provider cache semantics included); set it on `usage.cost` in place; sum a breakdown into one USD number (`undefined` when unpriced).                                                                                |
+| `estimateInputTokens` / `countInputTokens` | Offline input-token **estimate** (characters ÷ `charsPerToken`, plus per-message / per-attachment allowances); native count via `model.countTokens` with the estimate as fallback, returning `{ tokens, source: "native" \| "estimate" }`.                     |
 
 ## Middleware
 
@@ -451,6 +458,8 @@ Turn any streaming primitive (agent / supervisor / orchestrator) into a `node:ht
 
 All extend `AIError`. Stable `code` strings listed in [Handle errors](/v/latest/ai/reliability/handle-errors/).
 
+Every `ProviderError` (and subclass) also carries `status?` (the HTTP status), `billed` (`true`, `false` or `"unknown"` — whether the failed call cost money) and `retryable`.
+
 | Class                        | Code                        | Category         |
 | ---------------------------- | --------------------------- | ---------------- |
 | `AIError`                    | (base)                      | varies           |
@@ -466,6 +475,7 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](/v/latest/
 | `RoutingError`               | `WORKFLOW_INVALID_GOTO`     | `routing`        |
 | `ProviderError`              | `PROVIDER_ERROR`            | `provider`       |
 | `ProviderRateLimitError`     | `PROVIDER_RATE_LIMIT`       | `rate-limit`     |
+| `ProviderOverloadedError`    | `PROVIDER_OVERLOADED`       | `provider`       |
 | `QuotaExceededError`         | `PROVIDER_QUOTA_EXCEEDED`   | `quota`          |
 | `ProviderTimeoutError`       | `PROVIDER_TIMEOUT`          | `timeout`        |
 | `ContextLengthExceededError` | `CONTEXT_LENGTH_EXCEEDED`   | `context-length` |

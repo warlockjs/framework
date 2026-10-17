@@ -160,10 +160,12 @@ Every response reports token `usage` derived from Ollama's eval counts
 `total`). Because Ollama runs locally with no prompt cache, there is no
 `cachedTokens`.
 
-Local Ollama is free, so pricing is usually unset. The `pricing`
-registry still exists for parity — hosted Ollama, internal chargeback —
-keyed by model name, in USD per million tokens, SDK-level or per-model
-(per-model wins).
+Local Ollama is free, so the adapter ships no price table and pricing is
+usually unset (`usage.cost` stays `undefined`). The `pricing` registry
+still exists for parity — hosted Ollama, internal chargeback — keyed by
+model name, in USD per million tokens, SDK-level or per-model (per-model
+wins). When set, `usage.cost` is attached to every `model.complete()` and
+streaming `done` usage as well as to agent reports.
 
 ```ts
 const ollama = new OllamaSDK({

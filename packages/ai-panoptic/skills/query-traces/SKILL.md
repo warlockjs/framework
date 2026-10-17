@@ -102,17 +102,14 @@ const stats = store.aggregate({ sessionId: "session-42" });
 
 console.log(`${stats.traces} runs, ${stats.usage.total} tokens, ${stats.failed} failed`);
 
-const totalUsd =
-  (stats.cost?.input ?? 0) +
-  (stats.cost?.output ?? 0) +
-  (stats.cost?.cachedInput ?? 0) +
-  (stats.cost?.cachedOutput ?? 0);
+// totalCost from @warlock.js/ai sums every channel (cache reads + writes included).
+const totalUsd = totalCost(stats.cost) ?? 0;
 ```
 
 Notes that matter when reading the numbers:
 
 - **`usage`** sums each trace's _root_ `Usage` (already a rollup of own cost + children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
-- **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number), merged with the framework's own cost-rollup logic — an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
+- **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number; `cacheWrite` holds cache-write spend), merged with the framework's own cost-rollup logic — an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
 - **`completed` + `failed` + `cancelled` need not equal `traces`** — non-terminal statuses (`awaiting-input`, `max-iterations`) count toward `traces` but none of the three headline counters.
 - An empty match returns a zeroed aggregate (`usage` all `0`, `cost` `undefined`, `totalDuration` `0`).
 

@@ -1,6 +1,6 @@
 ---
 name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), built-in Claude list prices (ANTHROPIC_MODEL_PRICING, anthropicPricingFor, withAnthropicCacheWriteRates), cost-truth usage (inputIncludesCache: false, cachedTokens/cacheWriteTokens/cacheWrite1hTokens, usage.cost on complete()), ProviderOverloadedError for 529, no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `cacheWrite1hTokens`, `inputIncludesCache`, `ANTHROPIC_MODEL_PRICING`, `ProviderOverloadedError`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -47,35 +47,72 @@ Explicit config always wins (`structuredOutput`, `vision`, `reasoning`, `thinkin
 
 ## Pricing & cost
 
-Pricing is opt-in. Supply USD-per-million-token rates and every report this SDK's models produce carries `Usage.cost`; omit them and `cost` stays `undefined` (honest absence, never a false zero). Two declaration sites:
+Every model is priced out of the box from the built-in Claude list prices; supply your own rates to override them. Pricing reaches `Usage.cost` on every agent report **and** on the `usage` of a direct `model.complete()` / the streaming `done` chunk, so side calls outside an agent are costed too. Unknown ids stay unpriced (`cost` is `undefined` — honest absence, never a false zero).
+
+Resolution at `model()` time: per-model `pricing` > SDK registry entry for that name > built-in `ANTHROPIC_MODEL_PRICING` (alias or dated snapshot id) > `undefined`.
 
 ```ts
-// SDK-level registry — one source of truth, keyed by model name:
+import {
+  ANTHROPIC_MODEL_PRICING,
+  AnthropicSDK,
+  anthropicPricingFor,
+  withAnthropicCacheWriteRates,
+} from "@warlock.js/ai-anthropic";
+
 const anthropic = new AnthropicSDK({
-  apiKey,
-  pricing: {
-    "claude-haiku-4-5": { input: 1, output: 5, cachedInput: 0.1 },
-    "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3 },
-  },
+  apiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  // SDK-level registry — wins over the built-in table, keyed by model name.
+  pricing: { "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3 } },
 });
 
-// Per-model override (multi-tenant / contract-specific rates):
-anthropic.model({ name: "claude-sonnet-4-6", pricing: { input: 3, output: 15 } });
+anthropic.model({ name: "claude-opus-5-5" }).pricing; // built-in: { input: 4, output: 20, cachedInput: 0.2, cacheWrite: 5, cacheWrite1h: 8 }
+anthropic.model({ name: "claude-sonnet-4-6" }).pricing; // registry entry + write rates filled: cacheWrite 3.75, cacheWrite1h 6
+anthropic.model({ name: "claude-haiku-4-5", pricing: { input: 1, output: 5 } }); // per-model override
+
+anthropicPricingFor("claude-haiku-4-5-20251001"); // dated snapshot → the alias entry
+withAnthropicCacheWriteRates({ input: 2, output: 10 }); // { input: 2, output: 10, cacheWrite: 2.5, cacheWrite1h: 4 }
+Object.keys(ANTHROPIC_MODEL_PRICING); // the priced ids
 ```
 
-Resolution at `model()` time: per-model `pricing` > SDK registry entry for that name > `undefined`. `ModelPricing` is `{ input, output, cachedInput?, cachedOutput? }`.
+- **Source.** `ANTHROPIC_MODEL_PRICING` holds the "Model pricing" table of https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-10-17): input, output, cache read (`cachedInput`), 5-minute write (`cacheWrite`) and 1-hour write (`cacheWrite1h`), USD per 1M tokens, standard global routing.
+- **Write rates are filled for you.** Anthropic charges 1.25x input for a 5-minute cache write and 2x for a 1-hour write on every Claude model, so any entry without `cacheWrite` / `cacheWrite1h` (your own `{ input, output }` included) gets them from those multipliers (`withAnthropicCacheWriteRates`, exported with `ANTHROPIC_CACHE_WRITE_MULTIPLIER` / `ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER`). The read rate differs per model (0.1x, 0.05x on Opus 5.5 / Sonnet 5.5, 0.025x on Fable 5.1), so it is never derived — set `cachedInput` yourself when you supply pricing, or cache reads bill at the full input rate.
+- **Deliberately unpriced** (pass `pricing` yourself): Claude Haiku 5.5 (priced by prompt length — higher rates above 100,000 prompt tokens, which a flat rate cannot express), US-only inference (`inference_geo: "us"`, 1.1x), fast mode, the Batch API, limited-availability and retired models, and Claude on Bedrock / Vertex (partner-priced — see `@warlock.js/ai-bedrock`).
 
 ## Tokens & usage accounting
 
-Every `ModelResponse.usage` (and the streaming terminal `done`) is normalized to the neutral `Usage` shape. Anthropic reports `input_tokens` / `output_tokens` separately with no pre-summed total, so `total` is computed (`input + output`). The two cache channels are surfaced only when non-zero:
+Every `ModelResponse.usage` (and the streaming terminal `done`) is normalized to the neutral `Usage` shape. Anthropic's `input_tokens` is the **uncached remainder only** — cache reads and writes come on top of it — so the adapter marks the usage `inputIncludesCache: false` and `computeCost` bills each channel exactly once. `total` is computed (`input + output`); the full prompt size is `input + cachedTokens + cacheWriteTokens`.
 
-| Neutral field            | Anthropic source              | Meaning / billing                                                                                                                             |
-| ------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `usage.cachedTokens`     | `cache_read_input_tokens`     | Subset of input served from the prompt cache. Bills at `cachedInput` (falls back to `input` when unset).                                      |
-| `usage.cacheWriteTokens` | `cache_creation_input_tokens` | Input tokens **written** to the cache on this call (the ~1.25x write surcharge). Bills at `cachedOutput` when set.                            |
-| `usage.reasoningTokens`  | — _(not reported separately)_ | Anthropic bills extended-thinking tokens **inside** `output_tokens`, so this stays unset — populating it would double-count against `output`. |
+| Neutral field              | Anthropic source                           | Meaning / billing                                                                                                                                         |
+| -------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usage.input`              | `input_tokens`                             | Uncached input. Bills at `input`.                                                                                                                         |
+| `usage.inputIncludesCache` | — (always `false`)                         | Tells `computeCost` not to subtract cache tokens from `input`.                                                                                            |
+| `usage.cachedTokens`       | `cache_read_input_tokens`                  | Tokens read from the prompt cache. Bills at `cachedInput` (falls back to `input` when unset).                                                             |
+| `usage.cacheWriteTokens`   | `cache_creation_input_tokens`              | Tokens **written** to the cache. Bills at `cacheWrite` (5-minute, 1.25x input).                                                                           |
+| `usage.cacheWrite1hTokens` | `cache_creation.ephemeral_1h_input_tokens` | The 1-hour share of the writes. Bills at `cacheWrite1h` (2x input). Without the breakdown, all writes count as 1-hour when every marker asked for `"1h"`. |
+| `usage.reasoningTokens`    | `output_tokens_details.thinking_tokens`    | The thinking subset of `output_tokens`, informational; billed inside `output`.                                                                            |
+| `usage.cost`               | computed                                   | Per-channel USD (`input`, `output`, `cachedInput`, `cacheWrite`) when the model is priced. Sum with `totalCost(usage.cost)` from `@warlock.js/ai`.        |
 
-In streaming, `cachedTokens` / `cacheWriteTokens` are seeded from `message_start` and then **overwritten by the cumulative counts on `message_delta`** when those are present and non-zero, so the terminal `done` carries the final tally.
+```ts
+import { totalCost } from "@warlock.js/ai";
+import { AnthropicSDK } from "@warlock.js/ai-anthropic";
+
+const model = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" }).model({
+  name: "claude-sonnet-4-6",
+});
+
+const { usage } = await model.complete([{ role: "user", content: "Summarise this thread." }]);
+
+// 100 uncached + 50,000 read + 20,000 written + 500 output is billed as
+// 100×3 + 50,000×0.3 + 20,000×3.75 + 500×15 (USD per 1M tokens).
+console.log(
+  usage.inputIncludesCache,
+  usage.cachedTokens,
+  usage.cacheWriteTokens,
+  totalCost(usage.cost),
+);
+```
+
+In streaming, the cache counters are seeded from `message_start` (including the 1-hour breakdown) and then **overwritten by the cumulative counts on `message_delta`** when present and non-zero, so the terminal `done` carries the final tally and its `cost`.
 
 ## `max_tokens` is required
 
@@ -255,8 +292,30 @@ Raw SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. 
 - `rate_limit_error` / 429 → `ProviderRateLimitError` (+`retryAfter` from `retry-after`)
 - `billing_error` → `QuotaExceededError`
 - `invalid_request_error` with "prompt is too long" → `ContextLengthExceededError`, else `InvalidRequestError`
-- 5xx / overloaded → `ProviderError`
+- `overloaded_error` / 529 → `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`, `retryAfter` from `retry-after`). Also raised for an `overloaded_error` delivered mid-stream as an SSE `error` event, which has no `status`.
+- other 5xx → `ProviderError` (`retryable: true`)
 - Connection timeouts → `ProviderTimeoutError`
+
+Every wrapped error carries `status` (the HTTP status, when there was one), `retryable`, and `billed`: `false` for 401 / 402 / 403 (the request never reached a billable account), `"unknown"` otherwise — Anthropic publishes no rule for failed requests, so treat them as possibly billed when you settle a budget. `fallbackModel` fails over on `PROVIDER_OVERLOADED` by default.
+
+```ts
+import { ai, ProviderOverloadedError } from "@warlock.js/ai";
+import { AnthropicSDK } from "@warlock.js/ai-anthropic";
+
+const anthropic = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" });
+const agent = ai.agent({ model: anthropic.model({ name: "claude-sonnet-4-6" }) });
+
+const result = await agent.execute("hi");
+
+if (result.error instanceof ProviderOverloadedError) {
+  console.log(
+    result.error.status,
+    result.error.retryable,
+    result.error.billed,
+    result.error.retryAfter,
+  );
+}
+```
 
 ## Build and send an audited request
 

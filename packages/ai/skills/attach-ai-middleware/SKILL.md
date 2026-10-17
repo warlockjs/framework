@@ -1,6 +1,6 @@
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -44,14 +44,49 @@ Cumulative token / USD cap across all trips of one execution.
 ai.middleware.budget({
   maxTokens: 50_000,
   maxCostUSD: 0.5,
-  pricing: { "gpt-4o": { inputPer1K: 0.005, outputPer1K: 0.015 } },
+  // ModelPricing (USD / 1M, cache rates included) or the legacy { inputPer1K, outputPer1K }
+  pricing: { "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 } },
   onExceeded: "abort", // or "warn"
 });
 ```
 
 Breach → `BudgetExceededError` on `result.error`. Inspect `error.unit` (`"tokens" | "usd"`), `error.limit`, `error.actual`. Warn mode logs and continues — useful for measuring before enforcing.
 
-USD only fires when both `maxCostUSD` AND a matching `pricing[modelName]` entry exist.
+USD pricing resolves from the `pricing[modelName]` entry, else the model's own `ModelPricing` (per-model, SDK registry, or built-in list price). Unpriced + `maxCostUSD` fails closed before the first call unless `onUnpriced: "allow"`.
+
+### Reserve-then-commit — `budget({ reserve })`
+
+Without it, usage is booked after each trip, so the trip that crosses the cap still runs. With `reserve`, each trip's worst case (input tokens + `outputTokens`, priced as uncached input) is reserved **before** the call; a trip that would cross `maxTokens` / `maxCostUSD` / an `"abort"` contract cap / the `scoped` ledger is never sent. After the call the reservation is replaced by actual usage; a failed call releases it. Scoped ledgers take the reservation atomically, so concurrent runs can't jointly overspend.
+
+```ts
+import { ai, BudgetExceededError, countInputTokens } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY ?? "" });
+const model = openai.model({ name: "gpt-4o", maxTokens: 4_096 });
+
+const agent = ai.agent({
+  model,
+  middleware: [
+    ai.middleware.budget({
+      maxCostUSD: 0.25,
+      reserve: {
+        outputTokens: 4_096, // = the model's maxTokens, the most one trip can generate
+        // optional — default is estimateInputTokens(ctx.messages), an offline estimate
+        inputTokens: async (ctx) => (await countInputTokens(model, [...ctx.messages])).tokens,
+      },
+    }),
+  ],
+});
+
+const result = await agent.execute("Summarize the filing.");
+
+if (result.error instanceof BudgetExceededError && result.error.context?.reason === "reservation") {
+  // refused before anything was spent
+}
+```
+
+`estimateInputTokens(messages, { tools?, charsPerToken? })` is an offline **estimate**; `countInputTokens(model, messages, options)` uses `model.countTokens` when present and returns `{ tokens, source: "native" | "estimate" }`.
 
 ### SLO / cost contract — `budget({ contract })`
 
@@ -59,7 +94,7 @@ On top of the legacy caps, declare a run-level SLO as data with one global react
 
 ```ts
 ai.middleware.budget({
-  pricing: { "gpt-4o": { inputPer1K: 0.005, outputPer1K: 0.015 } },
+  pricing: { "gpt-4o": { input: 2.5, output: 10 } },
   contract: {
     maxTokens: 40_000,
     maxCostUSD: 0.05,

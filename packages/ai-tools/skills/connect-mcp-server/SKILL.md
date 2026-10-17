@@ -1,6 +1,6 @@
 ---
 name: connect-mcp-server
-description: 'Connect a @warlock.js/ai agent to an external Model Context Protocol (MCP) server and adapt its tools as native agent tools (Direction A) with `ai.mcp(server)`. Triggers: `ai.mcp(`, `ai.mcp.serve` (the other direction), `mcp(`, `McpClient`, `McpClientOptions`, `McpTransport`, `client.tools()`, `client.close()`, `namePrefix`, `filter`, `McpTransportError`, `{ type: "stdio" }`, `{ type: "http" }`, `tools/list`, `tools/call`, `jsonSchemaToStandard`, `@modelcontextprotocol/sdk`, `ajv`; ''consume an MCP server'', ''use an external MCP server''s tools in my agent'', ''connect to the GitHub/Slack/Filesystem MCP server'', ''adapt MCP tools as agent tools'', ''bridge my agent to the MCP ecosystem'', ''run an MCP server over stdio/http''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: exposing YOUR agent/tools AS an MCP server (the reverse direction) — the `expose-as-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
+description: 'Connect a @warlock.js/ai agent to an external Model Context Protocol (MCP) server and adapt its tools as native agent tools (Direction A) with `ai.mcp(server)`. Triggers: `signal`, `ai.mcp(`, `ai.mcp.serve` (the other direction), `mcp(`, `McpClient`, `McpClientOptions`, `McpTransport`, `client.tools()`, `client.close()`, `namePrefix`, `filter`, `McpTransportError`, `{ type: "stdio" }`, `{ type: "http" }`, `tools/list`, `tools/call`, `jsonSchemaToStandard`, `@modelcontextprotocol/sdk`, `ajv`; ''consume an MCP server'', ''use an external MCP server''s tools in my agent'', ''connect to the GitHub/Slack/Filesystem MCP server'', ''adapt MCP tools as agent tools'', ''bridge my agent to the MCP ecosystem'', ''run an MCP server over stdio/http''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: exposing YOUR agent/tools AS an MCP server (the reverse direction) — the `expose-as-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Connect to an external MCP server (Direction A)
@@ -50,7 +50,28 @@ ai.mcp(server, {
   namePrefix: "github.", // prepended to every remote tool name
   filter: (name) => name.startsWith("issues_"), // only adapt tools whose name passes
   timeoutMs: 30_000, // per tools/call deadline (default 30s)
+  signal: controller.signal, // optional: close the client when this aborts
 });
+```
+
+- **`signal`** binds the client's lifetime to a run: on abort the client closes its transport (kills the stdio child / ends the HTTP session), in-flight requests reject, and later `tools()` / tool calls fail with `McpTransportError` type `"closed"` without sending anything. Each `tools/call` honors it together with the per-call `ctx.signal` — whichever aborts first. `close()` stays idempotent.
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai, type ModelContract } from "@warlock.js/ai";
+
+export async function triage(model: ModelContract): Promise<void> {
+  const controller = new AbortController();
+  const github = ai.mcp(
+    { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] },
+    { namePrefix: "github.", signal: controller.signal },
+  );
+
+  const agent = ai.agent({ model, tools: [...(await github.tools())] });
+  await agent.execute("Triage the open issues", { signal: controller.signal });
+
+  controller.abort(); // ends the run AND shuts the MCP server down
+}
 ```
 
 - **`namePrefix`** is the collision mitigation — there is **no runtime tool-name collision guard** (the agent resolves a tool by first name match), so the author owns uniqueness. Prefix remote tools to keep them distinct from local ones.

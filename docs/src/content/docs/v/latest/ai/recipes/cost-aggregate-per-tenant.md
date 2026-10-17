@@ -61,18 +61,14 @@ async function answerForTenant(tenantId: string, question: string) {
 
 ## Read the cost breakdown off the result
 
-`Usage.cost` mirrors `ModelPricing` — `input`, `output`, and the optional `cachedInput` / `cachedOutput` channels. The token sub-channels (`cachedTokens`, `reasoningTokens`, `cacheWriteTokens`) are separate counters, present only when the provider meters them. There is no single scalar total: sum the populated cost fields, treating `undefined` as `0`.
+`Usage.cost` mirrors `ModelPricing` — `input`, `output`, and the optional `cachedInput` (cache reads), `cacheWrite` (cache writes) and `reasoning` channels. The token sub-channels (`cachedTokens`, `cacheWriteTokens`, `cacheWrite1hTokens`, `reasoningTokens`) are separate counters, present only when the provider meters them. `totalCost(cost)` sums every channel into one USD scalar and returns `undefined` for an unpriced run.
 
 ```ts
-import type { AgentResult, ModelPricing } from "@warlock.js/ai";
+import { totalCost, type AgentResult, type ModelPricing } from "@warlock.js/ai";
 
-/** Sum a per-channel cost breakdown into one USD scalar. */
+/** Sum a per-channel cost breakdown into one USD scalar (0 when unpriced). */
 function totalUSD(cost: ModelPricing | undefined): number {
-  if (!cost) {
-    return 0;
-  }
-
-  return cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
+  return totalCost(cost) ?? 0;
 }
 
 async function recordSpend(tenantId: string, result: AgentResult): Promise<void> {

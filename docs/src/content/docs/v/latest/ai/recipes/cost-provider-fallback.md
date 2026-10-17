@@ -45,15 +45,16 @@ const agent = ai.agent({
 
 With no `retryOn`, the chain advances only on the built-in transient set:
 
-| Code                       | Falls over? | Why                                      |
-| -------------------------- | ----------- | ---------------------------------------- |
-| `PROVIDER_RATE_LIMIT`      | yes         | 429 — the backup likely has headroom     |
-| `PROVIDER_TIMEOUT`         | yes         | slow upstream — try a different one      |
-| `PROVIDER_ERROR`           | yes         | generic 5xx / network failure            |
-| `PROVIDER_AUTH`            | **no**      | a bad key fails identically downstream   |
-| `CONTEXT_LENGTH_EXCEEDED`  | **no**      | an oversized prompt fails on every model |
-| `CONTENT_FILTER`           | **no**      | a blocked prompt is blocked everywhere   |
-| `PROVIDER_INVALID_REQUEST` | **no**      | a malformed request fails everywhere     |
+| Code                       | Falls over? | Why                                       |
+| -------------------------- | ----------- | ----------------------------------------- |
+| `PROVIDER_RATE_LIMIT`      | yes         | 429 — the backup likely has headroom      |
+| `PROVIDER_OVERLOADED`      | yes         | 529 / 503 overload — the provider is busy |
+| `PROVIDER_TIMEOUT`         | yes         | slow upstream — try a different one       |
+| `PROVIDER_ERROR`           | yes         | generic 5xx / network failure             |
+| `PROVIDER_AUTH`            | **no**      | a bad key fails identically downstream    |
+| `CONTEXT_LENGTH_EXCEEDED`  | **no**      | an oversized prompt fails on every model  |
+| `CONTENT_FILTER`           | **no**      | a blocked prompt is blocked everywhere    |
+| `PROVIDER_INVALID_REQUEST` | **no**      | a malformed request fails everywhere      |
 
 Non-transient failures re-throw immediately with their original typed `AIError` — falling over on them only burns the backup's budget on input that fails the same way.
 

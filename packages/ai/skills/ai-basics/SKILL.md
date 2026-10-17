@@ -38,7 +38,7 @@ Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working 
 10. **`name` on agents is optional.** Anonymous agents get a deterministic `anon_<provider>_<model>` fingerprint.
 11. **Every report carries lineage** — `rootRunId` + `parentRunId` + `reportSchemaVersion: 1`.
 12. **`version` is dev-curated, `sessionId` is caller-supplied** — both propagate through nested reports.
-13. **Cost is computed at emit time as a per-channel breakdown.** Set `pricing` on the model adapter; `Usage.cost` carries `{ input, output, cachedInput?, cachedOutput? }` per trip, rolled up bottom-up.
+13. **Cost is computed at emit time as a per-channel breakdown.** Adapters ship built-in list prices for flat-priced models; `pricing` on the SDK or model overrides them. `Usage.cost` carries `{ input, output, cachedInput?, cacheWrite?, reasoning? }` per trip (also on `model.complete()` results), rolled up bottom-up; `totalCost(usage.cost)` gives one number. `Usage.inputIncludesCache: false` (Anthropic, Bedrock) means `input` excludes the cache tokens.
 14. **Every `AIError` carries a coarse `category`** for retry-policy dispatch (`rate-limit`, `auth`, `content-filter`, `schema`, etc.).
 
 ## 30-second example

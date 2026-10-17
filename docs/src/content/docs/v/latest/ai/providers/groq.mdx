@@ -128,15 +128,23 @@ define `image()` — `groq.image(...)` is a compile-time error.
 ## Pricing and usage
 
 `pricing` is a registry keyed by model name, rates in **USD per 1,000,000
-tokens** (`input`, `output`, optional `cachedInput` / `cachedOutput`). The
-adapter ships built-in default rates for the known Groq models as the final
-fallback:
+tokens** (`input`, `output`, optional `cachedInput`). The adapter ships
+built-in default rates (`GROQ_DEFAULT_PRICING`) as the final fallback,
+taken from [Groq's model list](https://console.groq.com/docs/models),
+fetched 2026-10-17: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`,
+`openai/gpt-oss-safeguard-20b` and `qwen/qwen3.8-27b`. Cached input is
+50% of the input rate on the gpt-oss models — the only ones Groq caches,
+automatically and with no write charge. The Llama models have no public
+price ("Enterprise – Contact Sales"), so they are unpriced unless you
+pass a rate:
 
 ```ts
+import { GroqSDK } from "@warlock.js/ai-groq";
+
 const groq = new GroqSDK({
-  apiKey: process.env.GROQ_API_KEY!,
+  apiKey: process.env.GROQ_API_KEY ?? "",
   pricing: {
-    "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 }, // USD per 1M tokens
+    "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 }, // your contract rate
   },
 });
 
@@ -148,15 +156,19 @@ const model = groq.model({
 ```
 
 Resolution at `model()` time: per-model `pricing` > SDK `pricing[name]` >
-adapter built-in default for the id > `undefined` (no cost computed).
-Built-in defaults exist for `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`,
-`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, and
-`deepseek-r1-distill-llama-70b`; supply your own for anything else.
+`GROQ_DEFAULT_PRICING` > `undefined` (no cost computed).
 
-Every response reports token `usage`, and with pricing set the cost rolls up
-through every node of the `AgentReport`. Need an offline estimate before a
-call? `groq.count(text)` returns a fast character-heuristic approximation —
-good for budgeting and quota guards, not for billing.
+Every response reports token `usage` (with `cachedTokens` inside `input`,
+`inputIncludesCache: true`) — on `model.complete()` and the streaming
+`done` chunk too, with `usage.cost` when priced. Groq takes no cache
+hint, so `promptCacheKey` is never sent. Need an offline estimate before
+a call? `groq.count(text)` returns a fast character-heuristic
+approximation — good for budgeting and quota guards, not for billing.
+
+An overloaded endpoint (HTTP 503) surfaces as `ProviderOverloadedError`
+(`code: "PROVIDER_OVERLOADED"`, `retryable: true`); every provider error
+carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403,
+otherwise `"unknown"`).
 
 ## OpenAI-compatible wire behavior
 

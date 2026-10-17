@@ -80,18 +80,13 @@ await observe.collect(turn.report);
 A dashboard is a handful of `aggregate` / `query` calls. `aggregate(filter?)` rolls usage + cost + status counts over whatever the filter selects; `query(filter?)` returns the matching traces newest-started-first for the per-run table.
 
 ```ts
+import { totalCost } from "@warlock.js/ai";
 import type { TraceAggregate, TraceQuery } from "@warlock.js/ai-panoptic";
 import { totalCostUsd } from "@warlock.js/ai-panoptic";
 
 /** Collapse an aggregate's per-channel cost into one USD scalar. */
 function aggregateCostUsd(stats: TraceAggregate): number {
-  const cost = stats.cost;
-
-  if (!cost) {
-    return 0;
-  }
-
-  return cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
+  return totalCost(stats.cost) ?? 0;
 }
 
 /** Top-line numbers for any slice (a week, a session, a status). */

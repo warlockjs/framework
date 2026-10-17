@@ -132,33 +132,41 @@ type AgentReport = {
 
 ```ts
 type Usage = {
-  input: number; // prompt tokens (includes cachedTokens)
+  input: number; // prompt tokens as the provider reports them — see inputIncludesCache
   output: number; // completion tokens (includes reasoningTokens)
   total: number;
-  cachedTokens?: number; // input served from the provider's prompt cache (read hits)
-  cacheWriteTokens?: number; // input WRITTEN to the cache this call (Anthropic cache_creation)
+  cachedTokens?: number; // prompt tokens served from the provider's prompt cache (read hits)
+  cacheWriteTokens?: number; // prompt tokens WRITTEN to the cache this call
+  cacheWrite1hTokens?: number; // the 1-hour-lifetime share of cacheWriteTokens
+  inputIncludesCache?: boolean; // false on Anthropic / Bedrock: input excludes the cache tokens
   reasoningTokens?: number; // the reasoning/thinking subset of output (priced separately when the model does)
   cost?: {
     // computed at emit time from tokens × the model's declared pricing
-    input?: number;
-    output?: number;
-    cachedInput?: number;
-    cachedOutput?: number;
+    input: number;
+    output: number;
+    cachedInput?: number; // cache reads
+    cacheWrite?: number; // cache writes (both lifetimes)
+    reasoning?: number; // only when reasoning is priced apart from output
   };
 };
 ```
 
-`cost` is captured as a **historical fact** at emit time — stored reports stay accurate even after the upstream pricing table changes. It's `undefined` when no pricing is available (legacy adapters, unknown model names). For one scalar total, sum the populated fields:
+`cost` is captured as a **historical fact** at emit time — stored reports stay accurate even after the upstream pricing table changes. It's `undefined` when no pricing is available (unknown model names, models the adapter ships no list price for). For one scalar total use `totalCost`:
 
 ```ts
-const total =
-  (usage.cost?.input ?? 0) +
-  (usage.cost?.output ?? 0) +
-  (usage.cost?.cachedInput ?? 0) +
-  (usage.cost?.cachedOutput ?? 0);
+import { totalCost } from "@warlock.js/ai";
+
+const total = totalCost(result.usage.cost); // number | undefined
 ```
 
-All five provider adapters report this surface. See the [cost tracking recipe](/v/latest/ai/recipes/cost-tracking/) for rolling it up across a report tree.
+Every first-party adapter reports this surface, and attaches `usage.cost` to `model.complete()` and the streaming `done` chunk as well, so side calls made outside an agent are costed the same way.
+
+**Schema tokens.** Tool schemas are sent on every trip. `toolSchemas: "compact"` (agent config, or per `execute()` call) sends them without descriptions, titles, examples and defaults — validation is unchanged:
+
+````ts
+const lean = ai.agent({ model, tools: [searchTool], toolSchemas: "compact" });
+await lean.execute("find the warlock docs", { toolSchemas: "full" }); // per-call override
+``` See the [cost tracking recipe](/v/latest/ai/recipes/cost-tracking/) for rolling it up across a report tree.
 
 ### Reasoning and prompt caching
 
@@ -171,7 +179,7 @@ await myAgent.execute(input, {
     cacheControl: { breakpoints: 1 }, // honored when capabilities.promptCaching
   },
 });
-```
+````
 
 `reasoning.effort` maps to the provider-native control (OpenAI `reasoning_effort`); `reasoning.maxTokens` caps the thinking budget. `cacheControl.breakpoints` translates into provider prompt-cache breakpoints. The resulting reasoning / cache token counts flow back through `usage`.
 

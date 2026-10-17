@@ -127,11 +127,26 @@ your deployment. Use `await cascadeScopedBudgetStore({ model })` or
 `await cascadeScopedBudgetStore({ table })` for a Cascade ledger; its table
 needs a unique `(key, windowStart, unit)` index. Cascade is optional and lazy
 loaded, so applications that do not use this store do not need the package. A scope rejection produces `ScopedBudgetExceededError` with
-`key`, `window`, `limit`, and `used`. Current providers expose no portable
-preflight usage estimate, so the middleware atomically books measured usage at
-each completed trip; stores also expose `commit` / `refund` for future
-estimate-aware integrations. Cascade storage awaits Cascade's atomic upsert
-API.
+`key`, `window`, `limit`, and `used`. By default the middleware atomically
+books measured usage at each completed trip. Add `reserve: { outputTokens }`
+to reserve each trip's worst case in the ledger **before** the call (the store's
+atomic `reserve`), settle it to the actual usage with `commit` afterwards and
+`refund` it when the call fails — concurrent runs sharing the key then cannot
+jointly start more work than the cap allows:
+
+```ts
+import { budget, memoryScopedBudgetStore } from "@warlock.js/ai";
+
+const sharedCap = budget({
+  scoped: {
+    key: "tenant:acme",
+    window: "day",
+    maxTokens: 1_000_000,
+    store: memoryScopedBudgetStore(),
+  },
+  reserve: { outputTokens: 4_096 }, // the model's maxTokens
+});
+```
 
 ## Result shape — `AgentResult<T>`
 
@@ -142,7 +157,7 @@ type AgentResult<T> = {
   text?: string; // raw final LLM text
   blocks?: ProviderContentBlock[]; // final trip's raw provider blocks (thinking, compaction…)
   report: AgentReport; // trips, toolCalls, status, timing
-  usage: Usage; // aggregated token usage + cost breakdown
+  usage: Usage; // aggregated token usage + cost breakdown — totalCost(usage.cost) for one number
   error?: AIError;
 };
 
@@ -338,6 +353,13 @@ const concierge = ai.agent({
 ```
 
 `.asTool()` still works and takes precedence when you need a custom name / schema per use. A supervisor/orchestrator needs `inputSchema` on its config to drop straight into `tools: []`. See the `define-ai-tool` topic.
+
+**Schema tokens.** `toolSchemas: "compact"` (agent config, or per `execute()` call — the call wins) sends tool schemas without descriptions / titles / examples / defaults; validation still uses the full schema. Measure the saving with `measureTools(tools, { model, mode: "compact" })` (the `define-ai-tool` topic).
+
+```ts
+const lean = ai.agent({ model, tools: [lookupTool], toolSchemas: "compact" });
+await lean.execute("where is order A-1?", { toolSchemas: "full" }); // per-call override
+```
 
 ## `agent.eval(options)` — score the agent against a suite
 

@@ -1,6 +1,6 @@
 ---
 name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `providerOptions`, `GoogleCallOptions`, `countTokens`, `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent loop the `run-ai-agent` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `providerOptions`, `GoogleCallOptions`, `countTokens`, `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `inputIncludesCache`, `GOOGLE_MODEL_PRICING`, `googlePricingFor`, `ProviderOverloadedError`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent loop the `run-ai-agent` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
 ---
 
 # `@warlock.js/ai-google`
@@ -172,7 +172,24 @@ Wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. Gemini has no machi
 - 400 with token/context phrasing → `ContextLengthExceededError`, else `InvalidRequestError`
 - 404 / any other 4xx → `InvalidRequestError`
 - 504 / `DEADLINE_EXCEEDED` / `ETIMEDOUT` / `ECONNABORTED` / `AbortError` → `ProviderTimeoutError`
+- 503 / `UNAVAILABLE` / "overloaded" → `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`) — Gemini documents 503 as "temporarily overloaded or down" (https://ai.google.dev/gemini-api/docs/api-errors)
 - anything else (5xx and status-less) → `ProviderError`
+
+Every wrapped error carries `status`, `retryable` and `billed`. Google states "If your request fails with a 400 or 500 error, you won't be charged for the tokens used" (https://ai.google.dev/gemini-api/docs/billing, checked 2026-10-17), so a 400 or 500 is `billed: false`; 401 / 403 are `false` too (never reached a billable account); everything else is `"unknown"`.
+
+```ts
+import { ai, ProviderError, ProviderOverloadedError } from "@warlock.js/ai";
+import { GoogleSDK } from "@warlock.js/ai-google";
+
+const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY ?? "" });
+const result = await ai.agent({ model: google.model({ name: "gemini-2.5-flash" }) }).execute("hi");
+
+if (result.error instanceof ProviderOverloadedError) {
+  console.log(result.error.status, result.error.retryable); // 503, true — retry or fall back
+} else if (result.error instanceof ProviderError) {
+  console.log(result.error.billed); // false for a 400 / 500
+}
+```
 
 Timeout is checked first, so an aborted/`AbortError` request always classifies as `ProviderTimeoutError` regardless of status. `AIError` instances pass through unwrapped (no double-wrap).
 
@@ -200,25 +217,34 @@ Gemini's `thinkingBudget` semantics (for direct `maxTokens` use): `0` disables t
 
 ## Token usage
 
-`complete()` / `stream()` map Gemini's `usageMetadata` into the neutral `Usage` (`{ input, output, total }`): `promptTokenCount` → `input`, `candidatesTokenCount` → `output`, `totalTokenCount` → `total` (falling back to `input + output` when absent). `cachedContentTokenCount`, when > 0, is surfaced as `usage.cachedTokens`; `thoughtsTokenCount` (a reasoning model's thinking-phase tokens), when > 0, as `usage.reasoningTokens`. Both are omitted when zero/absent. Embeddings have no usage (see above).
+`complete()` / `stream()` map Gemini's `usageMetadata` into the neutral `Usage` (`{ input, output, total }`): `promptTokenCount` → `input`, `candidatesTokenCount` → `output`, `totalTokenCount` → `total` (falling back to `input + output` when absent). `cachedContentTokenCount`, when > 0, is surfaced as `usage.cachedTokens`; `thoughtsTokenCount` (a reasoning model's thinking-phase tokens), when > 0, as `usage.reasoningTokens`. Both are omitted when zero/absent. `promptTokenCount` "includes the number of tokens in the cached content" (https://ai.google.dev/api/generate-content#UsageMetadata), so the usage is marked `inputIncludesCache: true` and cost bills cached tokens out of `input` once. When the model is priced, `usage.cost` is attached on `complete()` and the streaming `done` chunk. Embeddings have no usage (see above).
 
 ## Pricing
 
-Optional USD pricing flows in two ways, resolved per `model()` call:
+Resolution per `model()` call: per-model `pricing` > SDK-level registry entry > built-in `GOOGLE_MODEL_PRICING` > `undefined` (no cost computed). The resolved `ModelPricing` is attached to the produced model, and each response's `usage.cost` is computed from it.
 
 ```ts
-// SDK-level registry, keyed by model name:
+import { totalCost } from "@warlock.js/ai";
+import { GOOGLE_MODEL_PRICING, GoogleSDK, googlePricingFor } from "@warlock.js/ai-google";
+
 const google = new GoogleSDK({
-  apiKey,
-  pricing: { "gemini-2.5-flash": { input: 0.3, output: 2.5 } },
+  apiKey: process.env.GEMINI_API_KEY ?? "",
+  pricing: { "gemini-2.5-flash": { input: 0.3, output: 2.5, cachedInput: 0.03 } }, // text-input rate
 });
 
-google.model({ name: "gemini-2.5-flash" });               // → inherits the registry entry
-google.model({ name: "gemini-2.5-flash", pricing: {...} }); // → per-model pricing wins
-google.model({ name: "gemini-2.5-pro" });                  // → no entry → pricing undefined (no cost computed)
+google.model({ name: "gemini-2.5-flash" }); // → the registry entry
+google.model({ name: "gemini-3.5-flash-lite" }).pricing; // → built-in { input: 0.3, output: 2.5, cachedInput: 0.03 }
+google.model({ name: "gemini-2.5-pro" }).pricing; // → undefined (prompt-length tiers; pass pricing yourself)
+googlePricingFor("gemini-3.5-flash-lite"); // the same built-in entry
+Object.keys(GOOGLE_MODEL_PRICING); // the priced ids
+
+const { usage } = await google
+  .model({ name: "gemini-3.5-flash-lite" })
+  .complete([{ role: "user", content: "hi" }]);
+console.log(totalCost(usage.cost));
 ```
 
-Resolution order: per-model `pricing` > SDK-level registry entry > `undefined`. The resolved `ModelPricing` is attached to the produced model so the agent runtime can compute cost from usage.
+`GOOGLE_MODEL_PRICING` comes from https://ai.google.dev/gemini-api/docs/pricing (paid tier, Standard), fetched 2026-10-17. Only models with a single flat token price are listed. Deliberately unpriced: the Pro models (priced by prompt length, split at 200k prompt tokens), models whose audio input bills higher than text (`Usage` does not split input by modality — price them with the text rate yourself only if you send no audio), and models with a scheduled price change. The hourly context-cache storage charge is not a per-token rate and is never included.
 
 ## Provider config options and input-token counts
 

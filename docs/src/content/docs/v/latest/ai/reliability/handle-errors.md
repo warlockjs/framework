@@ -122,6 +122,7 @@ AIError  (base — code, category, message, cause?, context?)
 │   └── PlannerCancelledError    PLANNER_CANCELLED          — cancelled
 ├── ProviderError                PROVIDER_ERROR  (base + catch-all)
 │   ├── ProviderRateLimitError   PROVIDER_RATE_LIMIT        { retryAfter? } — transient
+│   ├── ProviderOverloadedError  PROVIDER_OVERLOADED        { retryAfter? } — provider busy, retryable
 │   ├── QuotaExceededError       PROVIDER_QUOTA_EXCEEDED    — NOT retryable (billing cap)
 │   ├── ProviderTimeoutError     PROVIDER_TIMEOUT
 │   ├── ContextLengthExceededError CONTEXT_LENGTH_EXCEEDED  { limit?, actual?, modelName? }
@@ -142,13 +143,51 @@ AIError  (base — code, category, message, cause?, context?)
 
 Typed fields (`retryAfter`, `toolName`, `issues`, `stepName`, etc.) are first-class consumer surface.
 
+### Provider facts: `status`, `billed`, `retryable`
+
+Every `ProviderError` (and subclass) carries three more fields, so a host never has to parse a provider body:
+
+- `status?: number` — the HTTP status of the failed response (also in `context.status`); `undefined` for transport failures and errors raised mid-stream.
+- `billed: true | false | "unknown"` — whether the failed call cost money. It **fails closed**: `false` only where that is certain — 401 / 402 / 403 (the request was never authenticated, funded or authorized), and Gemini 400 / 500, which Google documents as not charged. Everything else (rate limits, overloads, 5xx, timeouts, errors after streaming began) is `"unknown"`: treat it as possibly billed when you settle a budget.
+- `retryable: boolean` — `true` for rate limits, overloads, timeouts and 5xx / 408 / 409 / 429 responses; `false` for auth, quota, invalid-request, context-length and content-filter failures.
+
+```ts
+import { ProviderError, ProviderOverloadedError } from "@warlock.js/ai";
+
+const result = await agent.execute(input);
+
+if (result.error instanceof ProviderError) {
+  ledger.recordFailure({ status: result.error.status, billed: result.error.billed });
+
+  if (result.error instanceof ProviderOverloadedError) {
+    await sleep(result.error.retryAfter ?? 2_000); // or fall back to another model
+  } else if (result.error.retryable) {
+    await sleep(1_000);
+  }
+}
+```
+
+### Overloaded providers
+
+`ProviderOverloadedError` (`PROVIDER_OVERLOADED`, category `provider`) means the provider is temporarily too busy — not a problem with the account or the request. Each adapter maps its own signal:
+
+| Adapter                                                                  | Signal                                                                          |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Anthropic                                                                | HTTP 529 / `overloaded_error` (also a mid-stream `error` event, with no status) |
+| OpenAI and the OpenAI-compatible wrappers (DeepSeek, xAI, Groq, Mistral) | HTTP 503 / `server_is_overloaded`                                               |
+| Google Gemini                                                            | HTTP 503 `UNAVAILABLE`                                                          |
+| Bedrock                                                                  | `ServiceUnavailableException` (503)                                             |
+
+It is always `retryable`, and `ai.fallbackModel` fails over on it by default.
+
 ## Retry strategy
 
 | Error family                                                                      | Retryable?                                                                     |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `ProviderRateLimitError`                                                          | Yes — back off by `retryAfter` ms                                              |
+| `ProviderOverloadedError`                                                         | Yes — back off (`retryAfter` when sent) or fail over to another model          |
 | `ProviderTimeoutError`                                                            | Yes — short delay                                                              |
-| `ProviderError` (generic)                                                         | Maybe — depends on `cause`                                                     |
+| `ProviderError` (generic)                                                         | Read `error.retryable` (true for 5xx / 408 / 409)                              |
 | `QuotaExceededError`                                                              | **No** — needs human intervention                                              |
 | `ProviderAuthError`                                                               | **No** — fix config / rotate key                                               |
 | `ContextLengthExceededError`                                                      | Only after truncating input                                                    |

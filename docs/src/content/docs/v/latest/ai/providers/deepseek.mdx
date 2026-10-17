@@ -166,30 +166,48 @@ detail, including the `responseFormat` override modes.
 
 ## Pricing and usage
 
-Every response reports token `usage` (`input`, `output`, `total`); DeepSeek
-prompt-cache hits surface as `cachedTokens`. The adapter ships **built-in
-DeepSeek pricing defaults** (USD per million tokens, from DeepSeek's published
-table), so `usage.cost` is computed out of the box:
+Every response reports token `usage` (`input`, `output`, `total`) — on
+`model.complete()` and the streaming `done` chunk too. DeepSeek's
+`prompt_tokens` is cache hits plus misses, so hits surface as
+`cachedTokens` inside `input` (`inputIncludesCache: true`) and bill at
+`cachedInput`. DeepSeek caches automatically and takes no request hint.
+
+The adapter ships **built-in DeepSeek pricing defaults**
+(`DEEPSEEK_DEFAULT_PRICING`, USD per million tokens) from
+[DeepSeek's pricing page](https://api-docs.deepseek.com/quick_start/pricing),
+fetched 2026-10-17, for `deepseek-flash`, `deepseek-v4-flash` (its legacy
+name) and `deepseek-v4-pro`. DeepSeek bills by time of day — peak hours
+(01:00–04:00 and 06:00–10:00 UTC, Monday to Friday) cost twice the
+off-peak rate — so the defaults are the **peak** rates, an upper bound
+that keeps USD budgets safe. Opt into `DEEPSEEK_OFF_PEAK_PRICING` when you
+run off-peak. `deepseek-chat` / `deepseek-reasoner` are no longer on the
+price list and are unpriced.
 
 ```ts
-const deepseek = new DeepSeekSDK({ apiKey: process.env.DEEPSEEK_API_KEY! });
-// deepseek-chat → { input: 0.14, output: 0.28, cachedInput: 0.0028 }
-```
+import { DEEPSEEK_OFF_PEAK_PRICING, DeepSeekSDK } from "@warlock.js/ai-deepseek";
 
-Override per SDK or per model exactly like the OpenAI adapter. Resolution at
-`model()` time: per-model `pricing` > SDK `pricing` registry > built-in
-DeepSeek default > `undefined`.
+// Peak-rate defaults: deepseek-flash → { input: 0.3, output: 1.2, cachedInput: 0.006 }
+const deepseek = new DeepSeekSDK({ apiKey: process.env.DEEPSEEK_API_KEY ?? "" });
 
-```ts
-const deepseek = new DeepSeekSDK({
-  apiKey: process.env.DEEPSEEK_API_KEY!,
-  pricing: { "deepseek-reasoner": { input: 0.55, output: 2.19 } },
+// Off-peak batch jobs:
+const offPeak = new DeepSeekSDK({
+  apiKey: process.env.DEEPSEEK_API_KEY ?? "",
+  pricing: DEEPSEEK_OFF_PEAK_PRICING,
 });
 ```
 
-Need an offline token estimate before a call? `deepseek.count(text)` returns
-a fast character-heuristic approximation — good for budgeting and quota
-guards, not for billing.
+Override per SDK or per model exactly like the OpenAI adapter. Resolution
+at `model()` time: per-model `pricing` > SDK `pricing` registry >
+built-in DeepSeek default > `undefined`.
+
+DeepSeek documents 503 as "Server Overloaded"; it surfaces as
+`ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`,
+`retryable: true`). Every provider error carries `status`, `retryable`
+and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`).
+
+Need an offline token estimate before a call? `deepseek.count(text)`
+returns a fast character-heuristic approximation — good for budgeting and
+quota guards, not for billing.
 
 ## Embeddings and images
 

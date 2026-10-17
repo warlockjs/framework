@@ -270,22 +270,54 @@ cost-truth, `GeneratedImage`).
 
 ## Pricing and usage
 
-Every response reports token `usage` (`input`, `output`, `total`);
-cached-content tokens surface as `cachedTokens` when present.
+Every response reports token `usage` (`input`, `output`, `total`), on
+`model.complete()` and the streaming `done` chunk as well as on agent
+reports. Gemini's `promptTokenCount` "includes the number of tokens in
+the cached content" ([UsageMetadata](https://ai.google.dev/api/generate-content#UsageMetadata)),
+so the usage is marked `inputIncludesCache: true` and cached-content
+tokens (`cachedTokens`) are billed out of `input` once, at `cachedInput`.
+Thinking tokens surface as `reasoningTokens`. When the model is priced,
+`usage.cost` holds the per-channel USD breakdown.
 
 Attach a `pricing` registry — keyed by model name, in USD per million
-tokens — to turn tokens into money. SDK-level or per-model (per-model
-wins). With pricing set, cost rolls up through every node of the
-`AgentReport`.
+tokens — to turn tokens into money. Resolution: per-model `pricing` >
+SDK `pricing` registry > built-in `GOOGLE_MODEL_PRICING` > unpriced.
 
 ```ts
+import { totalCost } from "@warlock.js/ai";
+import { GoogleSDK } from "@warlock.js/ai-google";
+
 const google = new GoogleSDK({
-  apiKey: process.env.GEMINI_API_KEY!,
+  apiKey: process.env.GEMINI_API_KEY ?? "",
   pricing: {
-    "gemini-2.5-flash": { input: 0.3, output: 2.5 },
+    // Text / image / video input rate; audio input bills higher on this model.
+    "gemini-2.5-flash": { input: 0.3, output: 2.5, cachedInput: 0.03 },
   },
 });
+
+const { usage } = await google
+  .model({ name: "gemini-2.5-flash" })
+  .complete([{ role: "user", content: "hi" }]);
+console.log(totalCost(usage.cost));
 ```
+
+**Built-in list prices.** `GOOGLE_MODEL_PRICING` (lookup:
+`googlePricingFor(name)`) comes from the
+[Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing)
+(paid tier, Standard), fetched 2026-10-17. Only models with one flat
+token price are built in — today `gemini-3.5-flash-lite`
+(`{ input: 0.3, output: 2.5, cachedInput: 0.03 }`). Left out on purpose:
+the Pro models (priced by prompt length, split at 200k prompt tokens),
+models whose audio input costs more than text (`Usage` does not split
+input by modality), and models with a scheduled price change. The hourly
+context-cache storage charge is not a token rate and is never included.
+
+Errors carry `status`, `retryable` and `billed`. Google states that a
+request failing with a 400 or 500 error is not charged
+([billing](https://ai.google.dev/gemini-api/docs/billing)), so those are
+`billed: false`; other failures are `"unknown"`. A 503 `UNAVAILABLE`
+("temporarily overloaded or down") surfaces as `ProviderOverloadedError`
+(`code: "PROVIDER_OVERLOADED"`, `retryable: true`).
 
 Need an offline token estimate? `google.count(text)` returns a fast
 character-heuristic approximation — Gemini's `countTokens` is a network

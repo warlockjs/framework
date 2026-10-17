@@ -351,6 +351,26 @@ const archiveInvoice = ai.tool({
 
 > This is the same lazy-peer discipline the framework's own drivers use for optional SDKs. Cache the client across calls (hoist it to a module-scoped `let`, initialized on first use) so you pay the construction cost once, not per call — but keep the `import()` itself inside `execute` so the dependency stays off the boot path. The payoff is a tools module you can import anywhere without dragging every provider SDK along with it.
 
+## Budget the schemas — measure, then go compact where names speak for themselves
+
+Every tool's schema is re-sent on every trip. Twenty tools with paragraph-long field descriptions can cost more than the conversation itself, on every single call. Measure before you trim, and trim where the names already carry the meaning.
+
+**Do this — measure the list, then send compact schemas.** `measureTools` counts natively when the model can (`source: "native"`), estimates otherwise, and reports each tool's share; `toolSchemas: "compact"` strips annotations from what the model reads while validation keeps the full schema.
+
+```ts
+import { measureTools } from "@warlock.js/ai";
+
+const tools = [lookupOrder, applyDiscount, archiveInvoice];
+
+const before = await measureTools(tools, { model });
+const after = await measureTools(tools, { model, mode: "compact" });
+console.log(`${before.tokens} → ${after.tokens} tokens per call (${before.source})`);
+
+const agent = ai.agent({ model, tools, toolSchemas: "compact" });
+```
+
+**Avoid this — hiding instructions in field descriptions, then going compact.** Compact mode drops every `description` inside the schema. A rule like "amounts are in cents" that lives only in a field description silently disappears — put it in the tool's `description` (always sent), name the field `amountCents`, or keep descriptions with `compactJsonSchema(schema, { keepDescriptions: true })`.
+
 ## Avoid list
 
 The short version of everything above — the tool-design mistakes that let a non-deterministic model break your system:
@@ -362,6 +382,7 @@ The short version of everything above — the tool-design mistakes that let a no
 - **Don't assume `execute` runs once.** The model retries — key any external side effect (charge, email, webhook) on the input so a second call is a no-op.
 - **Don't swallow errors.** Returning a fake success tells the model the tool worked when it didn't. Throw a clear, specific message so the agent can recover.
 - **Don't import heavy SDKs at module top.** `await import(...)` inside `execute` keeps the dependency off the boot path of processes that never call the tool.
+- **Don't guess what your tool list costs.** `measureTools` gives the per-call token cost per tool; go `toolSchemas: "compact"` when field names speak for themselves.
 
 ## See also
 

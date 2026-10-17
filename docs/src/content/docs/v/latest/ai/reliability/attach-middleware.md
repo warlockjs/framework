@@ -45,19 +45,24 @@ Cumulative token / USD cap across all trips of one execution.
 ai.middleware.budget({
   maxTokens: 50_000,
   maxCostUSD: 0.5,
-  pricing: { "gpt-4o": { inputPer1K: 0.005, outputPer1K: 0.015 } },
+  // ModelPricing (USD per 1M, cache rates included); the legacy
+  // { inputPer1K, outputPer1K } shape is still accepted.
+  pricing: { "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 } },
   onExceeded: "abort", // or "warn"
+  reserve: { outputTokens: 4_096 }, // optional: refuse a trip before it is sent
 });
 ```
 
 Breach → `BudgetExceededError` on `result.error`. Inspect `error.unit` (`"tokens" | "usd"`), `error.limit`, `error.actual`. Warn mode logs and continues — useful for measuring before enforcing.
+
+With `reserve`, each trip's worst case (an input-token estimate plus `outputTokens`) is reserved before the call: a trip that would cross a cap is never sent and fails with `context.reason: "reservation"`; after the call the reservation is replaced by the actual usage, and a failed call releases it. With `scoped`, the reservation is taken atomically in the shared ledger. See [Budgets and SLOs](/v/latest/ai/recipes/cost-budgets-and-slo/).
 
 ### USD pricing is fail-closed
 
 When you set `maxCostUSD`, the middleware resolves pricing in this order:
 
 1. The explicit `budget({ pricing })` entry for the running model.
-2. The model's resolved `ModelPricing`, whether it came from `sdk.model({ pricing })` or SDK-level pricing.
+2. The model's resolved `ModelPricing`, whether it came from `sdk.model({ pricing })`, SDK-level pricing, or the adapter's built-in list prices.
 
 An explicit budget entry takes precedence over model/SDK pricing. If neither source resolves a price, the run fails **before its first model call** with `BudgetExceededError`; the error names the unpriced model and tells you to configure pricing or opt out. This prevents a dollar cap from silently becoming unenforced.
 

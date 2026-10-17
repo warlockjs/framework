@@ -123,13 +123,13 @@ if (result.error?.message.toLowerCase().includes("rate limit")) {
 }
 ```
 
-> The retryability of each code is part of the taxonomy, not a judgement call: `rate-limit` and `timeout` are transient (retry with backoff); `auth`, `quota`, `content-filter`, and the various `drift` / `config` / `cancelled` codes are _not_ retryable — retrying only delays the inevitable. The [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) has the full code → retryable table.
+> The retryability of each code is part of the taxonomy, not a judgement call — and every `ProviderError` states it as `error.retryable`, next to `error.status` and `error.billed` (`true`, `false` or `"unknown"`: whether the failed call cost money, failing closed to `"unknown"` wherever the provider publishes no rule). `rate-limit`, `timeout` and `PROVIDER_OVERLOADED` (Anthropic 529, OpenAI / Gemini / Bedrock 503) are transient (retry with backoff); `auth`, `quota`, `content-filter`, and the various `drift` / `config` / `cancelled` codes are _not_ retryable — retrying only delays the inevitable. The [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) has the full code → retryable table.
 
 ## Wrap the model in `ai.fallbackModel` for provider failover — it's a failover, not a default
 
 When OpenAI has a regional incident and starts returning 429s and timeouts, every extraction fails for the duration. `ai.fallbackModel` wraps an ordered model list and advances to the next model only on a _transient_ provider error, so a provider blip degrades to the backup instead of failing the user. The trap is reaching for it as a cost or quality lever — it does nothing on the happy path, where the primary always answers.
 
-**Do this — order it primary-first, and let the default transient set decide failover.** The first model serves every healthy request; the backup exists for the minutes the primary is down. With no `retryOn`, the chain advances only on rate-limit, timeout, and generic 5xx — exactly the failures a different provider can plausibly absorb.
+**Do this — order it primary-first, and let the default transient set decide failover.** The first model serves every healthy request; the backup exists for the minutes the primary is down. With no `retryOn`, the chain advances only on rate-limit, overload, timeout, and generic 5xx — exactly the failures a different provider can plausibly absorb.
 
 ```ts
 // Tries OpenAI first; on a transient provider error, fails over to Anthropic.

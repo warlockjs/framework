@@ -44,25 +44,98 @@ const customModel = openai.model({
 
 `undefined` pricing → `usage.cost` is `undefined`. Honest absence over false zero.
 
+Resolution order: per-model `pricing` > the SDK `pricing` registry > the adapter's **built-in list prices** > `undefined`. The Anthropic, OpenAI, Google, Bedrock, Mistral, Groq and DeepSeek adapters ship tables taken from each vendor's pricing page, with the source and date recorded next to them. Models whose price depends on the prompt length, the time of day or the input modality are left out on purpose — pass `pricing` for those. Each provider page lists what its table covers.
+
 ## The shape of `usage.cost`
 
-```ts
-type CostBreakdown = {
-  input: number; // USD
-  output: number;
-  cachedInput?: number;
-  cachedOutput?: number;
-};
+`ModelPricing` (USD per 1M tokens):
 
-type Usage = {
-  input: number; // tokens
+```ts
+type ModelPricing = {
+  input: number;
   output: number;
-  total: number;
-  cost?: CostBreakdown;
+  cachedInput?: number; // cache reads (falls back to `input`)
+  cacheWrite?: number; // default-lifetime cache writes (falls back to `cachedOutput`, then `input`)
+  cacheWrite1h?: number; // 1-hour cache writes (falls back to `cacheWrite`)
+  reasoning?: number; // only when reasoning tokens are priced apart from output
+  /** @deprecated use cacheWrite */
+  cachedOutput?: number;
 };
 ```
 
+`usage.cost` has the same shape, in USD per channel:
+
+```ts
+type Usage = {
+  input: number; // tokens, as the provider reports them
+  output: number;
+  total: number;
+  cachedTokens?: number; // prompt tokens read from the cache
+  cacheWriteTokens?: number; // prompt tokens written to the cache
+  cacheWrite1hTokens?: number; // the 1-hour share of cacheWriteTokens
+  inputIncludesCache?: boolean; // does `input` already contain the cache tokens?
+  reasoningTokens?: number;
+  cost?: ModelPricing; // { input, output, cachedInput?, cacheWrite?, reasoning? } in USD
+};
+```
+
+For one number, use `totalCost(usage.cost)` from `@warlock.js/ai` — it sums every channel (including the legacy `cachedOutput` of reports stored before 5.31) and returns `undefined` for an unpriced run.
+
 Every report node carries `usage`. Cost rolls up the tree — a workflow's `result.usage.cost` is the sum of every agent call inside it.
+
+## Cache reads and writes, per provider
+
+Providers disagree on whether `input` counts the cached part of the prompt, and every adapter says which through `usage.inputIncludesCache`:
+
+| Provider                                     | `input` contains the cache tokens?                              | `inputIncludesCache` |
+| -------------------------------------------- | --------------------------------------------------------------- | -------------------- |
+| OpenAI, Gemini, DeepSeek, xAI, Groq, Mistral | yes — cache reads (and OpenAI cache writes) are part of `input` | `true`               |
+| Anthropic, Bedrock Converse                  | no — `input` is the uncached remainder                          | `false`              |
+
+`computeCost` bills each token once at its own rate: fresh input at `input`, cache reads at `cachedInput`, cache writes at `cacheWrite` (the 1-hour share at `cacheWrite1h`), output at `output`. An adapter that leaves the flag unset gets the OpenAI reading.
+
+A worked Anthropic example — `input_tokens: 100`, `cache_read_input_tokens: 50_000`, `cache_creation_input_tokens: 20_000` (5-minute writes), `output_tokens: 500` on `claude-sonnet-4-6` (input $3, cache read $0.30, 5-minute write $3.75, output $15 per 1M):
+
+```ts
+import { computeCost, totalCost } from "@warlock.js/ai";
+
+const cost = computeCost(
+  {
+    input: 100,
+    output: 500,
+    total: 600,
+    cachedTokens: 50_000,
+    cacheWriteTokens: 20_000,
+    inputIncludesCache: false,
+  },
+  { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75, cacheWrite1h: 6 },
+);
+// { input: 0.0003, output: 0.0075, cachedInput: 0.015, cacheWrite: 0.075 }
+
+totalCost(cost); // 0.0978
+```
+
+The Anthropic adapter fills the cache-write rates from Anthropic's multipliers (5-minute 1.25x, 1-hour 2x the input rate) when your `pricing` entry leaves them out, and reads the 1-hour share from `usage.cache_creation`.
+
+## Cost of side calls
+
+`model.complete()` and the streaming `done` chunk carry `usage.cost` too when the model is priced, so a summary or classifier call made outside an agent is costed the same way:
+
+```ts
+import { totalCost } from "@warlock.js/ai";
+import { AnthropicSDK } from "@warlock.js/ai-anthropic";
+
+const anthropic = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" });
+const model = anthropic.model({ name: "claude-haiku-4-5" }); // built-in list price
+
+const { content, usage } = await model.complete([
+  { role: "user", content: "Summarize this thread in one line: ..." },
+]);
+
+console.log(content, usage.total, totalCost(usage.cost) ?? "unpriced");
+```
+
+Writing your own adapter? Call `attachCost(usage, this.pricing)` on the usage you return — it sets `usage.cost` when priced and leaves it absent otherwise.
 
 ## Stamp every run with a sessionId
 
@@ -79,7 +152,7 @@ The framework stamps `sessionId` onto every report node produced by the run. Use
 The cleanest pattern is a small middleware that fires on every `execute` completion:
 
 ```ts
-import type { AgentMiddleware } from "@warlock.js/ai";
+import { totalCost, type AgentMiddleware } from "@warlock.js/ai";
 import { spendsRepo } from "./repos";
 
 const costTracker: AgentMiddleware = {
@@ -97,11 +170,7 @@ const costTracker: AgentMiddleware = {
         outputTokens: result.usage.output,
         inputUSD: result.usage.cost.input,
         outputUSD: result.usage.cost.output,
-        totalUSD:
-          result.usage.cost.input +
-          result.usage.cost.output +
-          (result.usage.cost.cachedInput ?? 0) +
-          (result.usage.cost.cachedOutput ?? 0),
+        totalUSD: totalCost(result.usage.cost) ?? 0,
         startedAt: result.report.startedAt,
         endedAt: result.report.endedAt,
         duration: result.report.duration,
@@ -135,7 +204,9 @@ ai.agent({
 });
 ```
 
-For session-level caps (across many executes), enforce at the application layer — read the running spend from your DB before kicking off the next call, return early when over budget.
+Add `reserve: { outputTokens }` to refuse a call **before** it is sent when its worst case would cross the cap, instead of noticing after the trip — see [Cost budgets and SLO contracts](/v/latest/ai/recipes/cost-budgets-and-slo/).
+
+For session-level caps (across many executes), use `budget({ scoped })` with a shared ledger, or enforce at the application layer — read the running spend from your DB before kicking off the next call, return early when over budget.
 
 ## Group dashboards by category
 

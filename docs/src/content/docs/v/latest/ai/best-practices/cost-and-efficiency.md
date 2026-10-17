@@ -158,9 +158,16 @@ const supportAgent = ai.agent({
 
 const result = await supportAgent.execute("Where's my order A-7711?");
 
-// Confirm the discount actually landed.
-const cached = result.usage.cachedTokens ?? 0;
-console.log(`${cached} of ${result.usage.input} input tokens served from cache`);
+// Confirm the discount actually landed. Anthropic and Bedrock report `input`
+// WITHOUT the cache tokens (`inputIncludesCache: false`); OpenAI-style
+// providers include them.
+const { usage } = result;
+const cached = usage.cachedTokens ?? 0;
+const prompt =
+  usage.inputIncludesCache === false
+    ? usage.input + cached + (usage.cacheWriteTokens ?? 0)
+    : usage.input;
+console.log(`${cached} of ${prompt} prompt tokens served from cache`);
 ```
 
 **Avoid this — a system prompt that changes every turn.** Interpolating volatile values into the system prompt body defeats the prefix cache: each turn presents a different prefix, so the provider re-reads (and re-bills) the whole thing at full rate.
@@ -172,7 +179,32 @@ systemPrompt: ai.systemPrompt()
   .instruction("Answer the customer's question."),
 ```
 
-> `cacheControl.breakpoints` is a _write_-placement hint and only matters on adapters whose `capabilities.promptCaching` is true (Anthropic). The read-side discount — `Usage.cachedTokens` billed at `ModelPricing.cachedInput` — flows automatically on providers that meter cache hits, with no option at all. Either way, the prerequisite is the same: a stable prefix. The breakpoint just tells the provider where the cacheable section ends.
+> `cacheControl.breakpoints` is a _write_-placement hint and only matters on adapters whose `capabilities.promptCaching` is true (Anthropic, Bedrock — which marks tools, system and the last message, with `cacheControl.ttl: "1h"` on the models that accept it). The read-side discount — `Usage.cachedTokens` billed at `ModelPricing.cachedInput` — flows automatically on providers that meter cache hits, with no option at all. Cache **writes** are billed too: `Usage.cacheWriteTokens` at `ModelPricing.cacheWrite` (Anthropic 1.25x input for the 5-minute cache, 2x for the 1-hour share in `cacheWrite1hTokens`), so a breakpoint on a prefix that is never read again is a pure surcharge. On OpenAI, xAI and Mistral, `model({ promptCacheKey })` routes requests that share a prefix to the same cache. Either way, the prerequisite is the same: a stable prefix. The breakpoint just tells the provider where the cacheable section ends.
+
+## Measure the tool schemas — then send them compact
+
+Tool schemas ride along on every trip, and for a tool-heavy agent they are often the largest fixed part of the prompt. Measure them before guessing:
+
+```ts
+import { measureTools } from "@warlock.js/ai";
+
+const full = await measureTools([lookupOrder, checkRefund], { model: strong });
+const compact = await measureTools([lookupOrder, checkRefund], { model: strong, mode: "compact" });
+
+console.log(full.source, full.tokens, "→", compact.tokens, full.perTool);
+```
+
+With a model that has a native count endpoint (`countTokens`: Anthropic, Google, Bedrock, OpenAI Responses) the numbers are exact; otherwise `source` is `"estimate"`. `ai.tools.measure` is the same function once `@warlock.js/ai-tools` is loaded.
+
+**Do this — send compact schemas when the field names speak for themselves.** `toolSchemas: "compact"` strips descriptions, titles, examples and defaults from the schemas the model reads and collapses const unions into `enum`; validation is untouched. Keep anything the model must know in the tool's `description`, which is always sent.
+
+```ts
+const leanAgent = ai.agent({
+  model: strong,
+  tools: [lookupOrder, checkRefund],
+  toolSchemas: "compact",
+});
+```
 
 ## Add a semantic cache for FAQ repeats — skip the LLM entirely
 
@@ -270,18 +302,22 @@ Tiering, caching, and bounded context lower the _expected_ cost. A budget guardr
 **Do this — declare the SLO as data and react once.** A hard cap aborts on breach; the contract adds wall-clock latency and an `onViolation` policy.
 
 ```ts
-import { BudgetExceededError } from "@warlock.js/ai";
+import { BudgetExceededError, totalCost } from "@warlock.js/ai";
 
 const guardedAgent = ai.agent({
   name: "support",
   model: strong,
   middleware: [
     ai.middleware.budget({
-      // BudgetPricing is USD per 1K tokens — note the per-1K shape, NOT per-1M.
-      // This is the budget's own cost math, separate from SDK ModelPricing.
+      // A ModelPricing entry (USD per 1M, cache rates included). The legacy
+      // { inputPer1K, outputPer1K } shape is still accepted but ignores cache.
+      // Omit `pricing` to use the model's own pricing.
       pricing: {
-        "gpt-4o": { inputPer1K: 0.0025, outputPer1K: 0.01 },
+        "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 },
       },
+      // Refuse a trip BEFORE it is sent when its worst case (input estimate +
+      // 4,096 output tokens) would cross a cap; settle to the actual after.
+      reserve: { outputTokens: 4_096 },
       contract: {
         maxCostUSD: 0.05,
         maxLatencyMs: 8_000,
@@ -299,18 +335,17 @@ if (result.error instanceof BudgetExceededError) {
   console.warn(`budget breach: ${result.error.actual} ${result.error.unit}`);
 }
 
-// On a clean run, read the rolled-up spend off the result. Usage.cost has no
-// single scalar total — sum the populated channels, treating undefined as 0.
-const cost = result.usage.cost;
-if (cost) {
-  const totalUSD = cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
+// On a clean run, read the rolled-up spend off the result. `totalCost` sums
+// every channel and is undefined for an unpriced run.
+const totalUSD = totalCost(result.usage.cost);
+if (totalUSD !== undefined) {
   metrics.gauge("ai.turn.cost_usd", totalUSD);
 }
 ```
 
 **Avoid this — shipping a model loop with no ceiling.** An agent with tools and no budget has one failure mode that costs real money: a tool loop that keeps re-asking the model. Without a cap, the first time it happens in production you find out from the invoice, not from an alert.
 
-> Roll a budget out in `warn` mode first: `onExceeded: "warn"` logs once on the first breach and lets the run finish, so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the _next_ turn to a cheaper agent. The budget is per-execution, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets and SLO recipe](/v/latest/ai/recipes/cost-budgets-and-slo/).
+> Roll a budget out in `warn` mode first: `onExceeded: "warn"` logs once on the first breach and lets the run finish, so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the _next_ turn to a cheaper agent. The budget is per-execution, not per-session — for a daily or tenant-wide cap, add `scoped` with a shared ledger (with `reserve`, concurrent runs reserve atomically and cannot jointly overspend). See the [budgets and SLO recipe](/v/latest/ai/recipes/cost-budgets-and-slo/).
 
 ## Batch the offline work — don't pay interactive latency for bulk jobs
 

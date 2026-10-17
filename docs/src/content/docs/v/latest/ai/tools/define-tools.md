@@ -65,6 +65,49 @@ const tool = ai.tool({
 
 The agent calls `input["~standard"].validate(rawArgs)` before invoking `execute`. Validation failures **do not throw**: the error is recorded on the `ToolCall`, fed back to the model as a tool-error message, and the model gets a chance to correct itself within `maxTrips`.
 
+## Schema size — measure it, send it compact
+
+The JSON schema of every tool is sent on every trip, so a long tool list is a fixed cost on each call. Measure it, per tool and in total:
+
+```ts
+import { measureTools } from "@warlock.js/ai";
+
+const report = await measureTools([weatherTool, searchTool], { model, mode: "full" });
+// { tokens, perTool: [{ name, tokens }], overhead, source: "native" | "estimate", mode }
+```
+
+- **Native** — when `model` has a count endpoint (`countTokens`: Anthropic, Google, Bedrock, OpenAI Responses), the counts are exact for that model. It makes `tools.length + 2` count calls (no tools, all tools, and each tool left out), so `perTool` is each tool's marginal cost and `overhead` is what the provider adds once whenever any tool is present.
+- **Estimate** — otherwise each tool's schema JSON at `charsPerToken` (default 4) characters per token; `source` is `"estimate"` and `overhead` is `0`.
+
+`ai.tools.measure(tools, options)` is the same function once `@warlock.js/ai-tools` is loaded.
+
+To shrink the bill, send the schemas compact — per agent, or per call:
+
+```ts
+const lean = ai.agent({ model, tools: [weatherTool, searchTool], toolSchemas: "compact" });
+await lean.execute("weather in Cairo?", { toolSchemas: "full" }); // per-call override
+```
+
+Compact mode (`compactJsonSchema`) drops `description`, `title`, `examples`, `example`, `default`, `$comment`, `deprecated`, `readOnly`, `writeOnly` and `$schema` at every level, and collapses an `anyOf` / `oneOf` of bare `const` branches into one `enum`. Validation keywords and property names are untouched, so strict-mode providers accept it as they accept the full schema, and the tool still validates against its original schema. The trade-off: the model loses per-field guidance — give fields self-explanatory names and keep essential instructions in the tool's `description`, which is always sent.
+
+The same helpers are available directly:
+
+```ts
+import { compactJsonSchema, compactToolSchemas, extractJsonSchema } from "@warlock.js/ai";
+
+const compactSchema = extractJsonSchema(weatherTool.input, { compact: true });
+const withDescriptions = extractJsonSchema(weatherTool.input, {
+  compact: { keepDescriptions: true },
+});
+const tools = compactToolSchemas([weatherTool, searchTool]); // for model.complete(messages, { tools })
+const fromJson = compactJsonSchema({
+  type: "string",
+  description: "City name",
+  examples: ["Cairo"],
+});
+// { type: "string" }
+```
+
 ## What gets sent back to the model
 
 Whatever `execute` resolves with is `JSON.stringify`'d and sent back as the next trip's `tool` message — a plain string is serialized too, so a returned `"hi"` reaches the model as `"hi"` (quotes included). Throw (or return a rejected promise) to signal failure — the agent records the error and tells the model what went wrong.
@@ -141,6 +184,18 @@ ai.tool({
 Under a supervisor: the bag starts empty per iteration, accumulates across tool calls in that iteration, and merges into state when the iteration ends (auto-spread by default; configurable via `finalizeArtifacts`). See [Run supervisor](/v/latest/ai/orchestration/run-supervisor/).
 
 Standalone (no supervisor): the framework supplies `{ artifacts: {} }`. Mutations are harmless no-ops — useful if the same tool gets used in both contexts.
+
+Calling a tool yourself — from a script, a test, an HTTP handler — and need to pass a `signal` or read back what it wrote? Build the context with `createToolContext` instead of faking the `artifacts` bag:
+
+```ts
+import { createToolContext } from "@warlock.js/ai";
+
+const controller = new AbortController();
+const ctx = createToolContext({ signal: controller.signal }); // { artifacts: {}, signal }
+
+const { data, error } = await searchCatalog.invoke({ query: "lamps" }, ctx);
+console.log(data, error, ctx.artifacts.blocks);
+```
 
 ## Typed artifacts under a supervisor
 

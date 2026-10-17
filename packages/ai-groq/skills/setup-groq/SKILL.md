@@ -1,6 +1,6 @@
 ---
 name: setup-groq
-description: 'Wire @warlock.js/ai-groq — new GroqSDK({apiKey, baseURL?, provider?, pricing?}) for Groq-hosted open models on LPU hardware (llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b/20b, deepseek-r1-distill-llama-70b). Thin wrapper over @warlock.js/ai-openai — uses the OpenAI-compatible endpoint https://api.groq.com/openai/v1, delegating transport/streaming/structured-output/errors to OpenAISDK while injecting Groqs OWN vision/reasoning inference + default pricing. .model({name, vision?, reasoning?, structuredOutput?}) for ModelContract. Triggers: `GroqSDK`, `groq.model`, `groq.count`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss`, `deepseek-r1-distill`, `groq vision`, `groq reasoning`, `reasoning_effort`, `https://api.groq.com/openai/v1`, OpenAI-compatible Groq, LPU, fast inference; "wire groq into a warlock agent", "use llama 3.3 on groq", "run gpt-oss / deepseek reasoning on groq", "point warlock at the groq endpoint"; import `import { GroqSDK } from "@warlock.js/ai-groq"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; the wrapped adapter `@warlock.js/ai-openai` (`setup-openai`); embeddings (Groq has none — use openai/google); siblings `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `groq-sdk` / `openai` SDK.'
+description: 'Wire @warlock.js/ai-groq — new GroqSDK({apiKey, baseURL?, provider?, pricing?}) for Groq-hosted open models on LPU hardware (llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b/20b, deepseek-r1-distill-llama-70b). Thin wrapper over @warlock.js/ai-openai — uses the OpenAI-compatible endpoint https://api.groq.com/openai/v1, delegating transport/streaming/structured-output/errors to OpenAISDK while injecting Groqs OWN vision/reasoning inference + default pricing. .model({name, vision?, reasoning?, structuredOutput?}) for ModelContract. Triggers: `GroqSDK`, `GROQ_DEFAULT_PRICING`, `groq.model`, `groq.count`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss`, `deepseek-r1-distill`, `groq vision`, `groq reasoning`, `reasoning_effort`, `https://api.groq.com/openai/v1`, OpenAI-compatible Groq, LPU, fast inference; "wire groq into a warlock agent", "use llama 3.3 on groq", "run gpt-oss / deepseek reasoning on groq", "point warlock at the groq endpoint"; import `import { GroqSDK } from "@warlock.js/ai-groq"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; the wrapped adapter `@warlock.js/ai-openai` (`setup-openai`); embeddings (Groq has none — use openai/google); siblings `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `groq-sdk` / `openai` SDK.'
 ---
 
 # `@warlock.js/ai-groq`
@@ -74,18 +74,32 @@ There is also no image-generation API on Groq, so `GroqSDK` intentionally does *
 
 ## Pricing — per-model registry + built-in defaults
 
-`pricing` is a registry keyed by model name, rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput` / `cachedOutput`). The adapter ships **built-in default rates** for the known Groq models as the final fallback.
+`pricing` is a registry keyed by model name, rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput`). The adapter ships **built-in default rates** (`GROQ_DEFAULT_PRICING`) as the final fallback.
 
 ```ts
+import { totalCost } from "@warlock.js/ai";
+import { GROQ_DEFAULT_PRICING, GroqSDK } from "@warlock.js/ai-groq";
+
 const groq = new GroqSDK({
-  apiKey,
+  apiKey: process.env.GROQ_API_KEY ?? "",
   pricing: {
-    "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 }, // USD per 1M tokens
+    // No public price for Llama on Groq — use your contract rate.
+    "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 },
   },
 });
+
+GROQ_DEFAULT_PRICING["openai/gpt-oss-120b"]; // { input: 0.15, output: 0.6, cachedInput: 0.075 }
+
+const { usage } = await groq
+  .model({ name: "openai/gpt-oss-120b" })
+  .complete([{ role: "user", content: "hi" }]);
+console.log(totalCost(usage.cost));
 ```
 
-Resolution at `model()` time: per-model `pricing` (`groq.model({ name, pricing })`) > SDK `pricing[name]` > adapter built-in default for the id > `undefined` (no cost computed). Built-in defaults exist for `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, and `deepseek-r1-distill-llama-70b`; supply your own for anything else.
+Resolution at `model()` time: per-model `pricing` (`groq.model({ name, pricing })`) > SDK `pricing[name]` > `GROQ_DEFAULT_PRICING` > `undefined` (no cost computed).
+
+- **Source.** https://console.groq.com/docs/models (groq.com/pricing now redirects to the home page), fetched 2026-10-17: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `openai/gpt-oss-safeguard-20b`, `qwen/qwen3.8-27b`. Cached input is 50% of the input rate for the gpt-oss models, the only ones Groq caches — automatically, with no write charge and no request hint (https://console.groq.com/docs/prompt-caching).
+- **Unpriced:** the Llama models (listed as "Enterprise – Contact Sales", no public price) and anything else not listed — supply your own rate.
 
 ## Token counting
 
@@ -97,7 +111,7 @@ Good for budgeting; not for billing.
 
 ## Errors
 
-Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the inner OpenAI adapter's error wrapper (dispatch keys on `status + code`). See the `handle-ai-errors` topic of the `warlock-js-ai` skill. Note Groq's documented OpenAI-compat gaps — `n` must be `1`, and `logprobs` / `logit_bias` / `top_logprobs` / `messages[].name` are unsupported.
+Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the inner OpenAI adapter's error wrapper (dispatch keys on `status + code`). See the `handle-ai-errors` topic of the `warlock-js-ai` skill. HTTP 503 maps to `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`); every wrapped error carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`). Note Groq's documented OpenAI-compat gaps — `n` must be `1`, and `logprobs` / `logit_bias` / `top_logprobs` / `messages[].name` are unsupported.
 
 ## When NOT to use this skill
 
