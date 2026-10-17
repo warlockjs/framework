@@ -189,7 +189,7 @@ router.directory(
 router.file("/price-list.pdf", rootPath("storage/price-list.pdf"), 300, { rateLimit: true });
 ```
 
-Pages and API routes stay under the global limiter whatever these settings say.
+Pages and API routes stay under the global limiter whatever these settings say, unless a route opts out with its own `rateLimit: false`.
 
 ## Step 2 — Override per route
 
