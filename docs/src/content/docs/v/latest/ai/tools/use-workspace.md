@@ -25,7 +25,7 @@ const ws = ai.workspace({
 
 ## A policy jail, NOT OS isolation
 
-This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an _allowed_ process does once it runs. Real isolation (container / microVM) is a later phase.
+This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an _allowed_ process does once it runs. For an untrusted agent, run the workspace inside a container, a microVM or as a separate unprivileged user, and treat this policy as a second layer (see [Shell mode is a policy layer, not a sandbox](#shell-mode-is-a-policy-layer-not-a-sandbox)).
 
 ## The policy surface
 
@@ -130,6 +130,16 @@ Before the line runs it is **parsed**, and every simple command in it is checked
 - **Windows** parses a stricter `cmd.exe` subset: `&&`, `||`, `|`, `&` (sequential in cmd) and simple redirections; `%`, `!`, `^`, parentheses, `;` and `,` are refused.
 
 > **Pair shell mode with an exhaustive `allow` list.** With only `deny`, the policy is a best-effort filter: an allowed program can still do anything it is able to (`node -e`, a build script). The jail is a guardrail for a trusted agent, not OS isolation.
+
+### Shell mode is a policy layer, not a sandbox
+
+Shell mode checks a command line **before** `/bin/sh` runs it. It is defence in depth: a parser that reads the line the way the shell will, and refuses what it cannot read. It is **not** an operating-system sandbox, and it cannot be one:
+
+- `/bin/sh` differs between systems (bash, dash, busybox ash), and between versions of each. The parser refuses the constructs where they disagree, but a check that runs before the shell can never be stronger than the shell's own reading of the line.
+- Once an allowed program runs, the policy no longer sees what it does. An allowed `node`, `npm`, `make` or `git` hook can start any process and touch any file the operating-system user can.
+- Symlinked redirection targets are re-checked just before the line runs, but the filesystem can change between that check and the write.
+
+For an agent you do not fully trust (one that reads untrusted repositories, issues, web pages or tool output), run the whole workspace under real OS isolation: a container or microVM with only the project mounted, or at least a separate unprivileged user that owns nothing else, without network access it does not need. Use the shell policy on top of that, never instead of it. Argv mode (`interpreter: "none"`, the default) gives the agent far less surface than shell mode; prefer it when the agent does not need pipes or redirections.
 
 ### Refusal reasons
 

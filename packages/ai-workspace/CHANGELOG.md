@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `shell.deny` matches executable names case-insensitively, so `RM` on a case-insensitive filesystem no longer slips past `deny: ["rm"]`.
 - A model-supplied `timeoutMs` on `run_shell` can now only lower `shell.timeoutMs`, as documented, never raise it.
 - Shell mode removes `ENV`, `BASH_ENV`, `SHELLOPTS`, `BASHOPTS`, `CDPATH`, `IFS`, `PS4`, `GLOBIGNORE` and `BASH_FUNC_*` from the spawned environment, refuses assignments to such variables, refuses `&` (use background commands), and refuses arithmetic-evaluating constructs (`$(( ))`, array subscripts in builtins) that bash can use to run hidden commands.
+- The docs, README and skill now state plainly that shell mode is a policy layer checked before `/bin/sh` runs the line (defence in depth), not an OS sandbox, and recommend running untrusted agents in a container, microVM or as a separate unprivileged user.
 - Killing a background command, a timeout and `dispose()` signal only the process tree the workspace spawned (its own process group on POSIX, `taskkill /T` on its PID on Windows).
 
 ## 5.30.0 - 2026-10-16

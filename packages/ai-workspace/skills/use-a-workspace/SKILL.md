@@ -22,7 +22,9 @@ const ws = ai.workspace({
 
 ## A policy jail, NOT OS isolation
 
-This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an _allowed_ process does once it runs. Real isolation (container / microVM) is a later phase.
+This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an _allowed_ process does once it runs.
+
+**Shell mode (`interpreter: "sh"`) is a policy layer (defence in depth), not an OS sandbox.** It parses the line before `/bin/sh` runs it and refuses what it cannot read, but `/bin/sh` differs between systems (bash, dash, busybox ash), an allowed program (`node`, `npm`, `make`, a git hook) can still start anything the OS user can, and a symlink can change between the jail re-check and the write. For an untrusted agent (one that reads untrusted repos, issues, web pages or tool output), run the workspace in a container or microVM with only the project mounted, or at least as a separate unprivileged user, and keep the policy as a second layer. Prefer argv mode (the default) when the agent does not need pipes or redirections.
 
 ## The policy surface
 
