@@ -11,8 +11,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Scaffolder source formatting and tests use the workspace Oxfmt configuration, including standalone installs; template formatting continues to use each generated app toolchain.
 
 - Group feature selection preserves explicit unticks when selecting the remaining group, and returns the category cursor to the group last edited.
-- Oxc scaffolds configure VS Code format-on-save and lint fixes with the official Oxc extension and recommend installing it. Prettier/ESLint editor settings remain in default scaffolds. Every flag reference and headless error example now includes `--lint`.
-
 - The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback. Wrapped values align under their labels, and the summary retains its label, command and link styling.
 
 ### Changed
@@ -21,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Opt-in `--lint=oxc` / `--lint oxc` flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating `lint:check` and `format:check` scripts.
+- Opt-in `--lint=oxc` / `--lint oxc` flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating `lint:check` and `format:check` scripts. Oxc projects configure and recommend the official VS Code extension for format-on-save and lint fixes; default projects retain their Prettier/ESLint editor settings. Help and headless diagnostics include `--lint`.
 - Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys.
 
 ## 5.30.0 - 2026-10-16

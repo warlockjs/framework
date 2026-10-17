@@ -89,6 +89,19 @@ unchanged.
 
 A scaffold failure surfaces the error and halts — there is no automatic rollback of partially-written files.
 
+### Oxc tooling
+
+`--lint=oxc` installs pinned Oxlint 1.88.0 and Oxfmt 0.73.0, generates
+`.oxlintrc.json` and `.oxfmtrc.json`, and provides `lint`/`format` plus
+non-mutating `lint:check`/`format:check` scripts. It enables the Oxlint dev-server
+checker, disables the ESLint checker and keeps TypeScript checks enabled.
+
+Oxc scaffolds also write VS Code settings that select the official
+[Oxc extension](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode)
+for format-on-save (`editor.defaultFormatter: "oxc.oxc-vscode"`) and lint fixes
+(`source.fixAll.oxc`), and recommend it in `.vscode/extensions.json`. The default
+ESLint toolchain retains its existing Prettier/ESLint editor settings.
+
 ## Scaffolding without a database
 
 Not every app needs a database. Pick **None** in the wizard's database step — or pass `--db=none` (`--no-db` is a shorthand) — and the scaffold leaves the database out entirely: no driver is selected, no driver package is installed, and the template's `src/config/database.ts` is removed. Warlock's database connector is gated on that config file, so the app boots cleanly with no database wired.
@@ -119,9 +132,3 @@ Inside an existing pnpm workspace the app gets neither: the parent workspace's s
 - **Full walkthrough** → [Core · Installation](/v/latest/core/getting-started/02-installation/) — every question, the scaffolded file tree, and booting the dev server, step by step.
 - **Your first endpoint** → [Core · Getting Started](/v/latest/core/getting-started/01-introduction/) — from a fresh project to a working route.
 - **Scaffold as you build** → [Core · Generators](/v/latest/core/cli/generators/) — `warlock generate.module`, `generate.controller`, and the rest of the family.
-
-Oxc scaffolds also write VS Code settings that select the official
-[Oxc extension](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode)
-for format-on-save (`editor.defaultFormatter: "oxc.oxc-vscode"`) and lint fixes
-(`source.fixAll.oxc`), and recommend it in `.vscode/extensions.json`. The default
-ESLint toolchain retains its existing Prettier/ESLint editor settings.
