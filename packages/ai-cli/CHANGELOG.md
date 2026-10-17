@@ -25,3 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Cancellation (`signal`, `cancel()`) and `timeoutMs` kill the CLI's whole process tree. On POSIX this is its own process group, with SIGTERM then SIGKILL; on Windows, `taskkill /T /F` on its PID.
 - `agent.model(config)` / `cliModel(agent, config)` wraps a CLI agent as a `ModelContract`, so `ai.agent` and its budget, guardrail, observer and fallback middleware can drive a CLI.
 - `createCliAgent(adapter, options)` / `cli.custom(adapter)` and the documented `CliAdapter` interface let apps add vendors. The building blocks are exported: `jsonLinesParser`, `createClaudeStreamParser`, `mcpServersJson`, `toToml`, `mapEffort`, `requirePrivateHome` and more.
+
+### Fixed
+
+- `session.cancel()`, or aborting the run's `signal`, after the run has finished no longer signals the CLI's old process group. Once the CLI's pipes close, cancellation is a no-op, so a `finally { session.cancel() }` cannot reach an unrelated process that reused the pid. The abort listener is also removed when the run settles.

@@ -45,6 +45,9 @@ export function startSession(input: StartSessionInput): CliSession {
   let stderr = "";
   let timedOut = false;
   let cancelled = false;
+  // Every pipe has closed: the process group is gone and its id may be
+  // reused by an unrelated process, so nothing may signal it any more.
+  let closed = false;
   let spawnError: Error | undefined;
 
   const emit = (events: CliParsedEvent[]): void => {
@@ -85,7 +88,7 @@ export function startSession(input: StartSessionInput): CliSession {
   };
 
   const onAbort = (): void => {
-    if (timedOut || cancelled) {
+    if (closed || timedOut || cancelled) {
       return;
     }
 
@@ -142,6 +145,7 @@ export function startSession(input: StartSessionInput): CliSession {
       }
 
       input.signal?.removeEventListener("abort", onAbort);
+      controller.signal.removeEventListener("abort", onAbort);
       splitter.end();
       parse(() => input.parser.end());
       aggregator.finish();
@@ -215,6 +219,7 @@ export function startSession(input: StartSessionInput): CliSession {
       // Only a failed spawn ends the session here; any other 'error' (a
       // failed kill) is followed by the real 'close'.
       if (child.pid === undefined) {
+        closed = true;
         spawnError = error;
         void settle(null, null);
       }
@@ -222,7 +227,9 @@ export function startSession(input: StartSessionInput): CliSession {
 
     child.on("close", (code, signal) => {
       // Every pipe is closed: the tree is gone, so the delayed SIGKILL for
-      // this process group must not fire.
+      // this process group must not fire, and a later cancel() or abort
+      // must not signal it (the pid may already belong to someone else).
+      closed = true;
       cancelPendingKill?.();
       void settle(code, signal);
     });
