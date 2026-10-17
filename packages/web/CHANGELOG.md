@@ -22,6 +22,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 - Locale context reuse after development edits is covered by a real Vite dev-server/HMR regression: a retained provider continues to serve refreshed locale and translation hooks after repeated filesystem edits. An unshared-context control reproduces the missing-provider HTTP failure.
 
+- `<Form>`'s `onSettled` documentation says that a form unmounting drops only independent submissions (the form's `independent` prop or a `data-independent` submit button); other in-flight submissions are not aborted by an unmount. Regression tests cover `onSettled` running once when `onSuccess` throws and a `data-independent` button's submission being aborted on unmount.
+
 ### Added
 
 - Skills include complete examples for viewport metadata, typed Link wrappers, runtime route-name checks and independent form submissions with query parameters. Settled-outcome guidance handles action errors and dropped submissions separately from completed requests.

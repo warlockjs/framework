@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Usage includes server-side compaction: the `compaction` entries of `usage.iterations`, which the top-level token counts leave out, are added to `input`, `output` and the cache counts (completions and streams).
 
 - `complete()` always builds a non-streaming request, including when an indexed `stream` option is supplied.
+- A request that fails to build in `complete()`, `stream()` or `countTokens()` (a reserved `providerOptions.anthropic.body` key, or a `body` value `structuredClone` cannot copy, such as a function) is logged like a send failure and rejects with an `AIError`; errors that are not already one become an `InvalidRequestError` carrying the original as `cause`. Before, the raw error escaped unlogged. `buildRequest()` itself still throws the raw error.
+- The debug log line for a streaming request reads "Starting streaming call to messages.create" again; non-streaming requests keep "Starting call to messages.create".
+- The provider docs and `setup-anthropic` skill say that `send()` passes `betas` only to the `"beta.messages"` endpoint.
 
 ### Added
 

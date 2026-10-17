@@ -63,7 +63,7 @@ import {
   safeJsonParse,
   stampReportLineage,
 } from "../utils";
-import { compactAgentMessages, validateCompaction } from "./compaction";
+import { compactAgentMessages, isUserMessageIndex, validateCompaction } from "./compaction";
 import type { AgentCompactionRecord } from "./compaction.type";
 import type { AgentConfig } from "./agent-config.type";
 import { JUDGE_DEFAULT_REPAIR_ATTEMPTS, type JudgeConfig } from "./judge-config.type";
@@ -655,8 +655,11 @@ class Execution<TOutput> {
     // stays empty, so the non-durable path is byte-for-byte unchanged.
     if (resumeFrom) {
       this.messages.push(...resumeFrom.messages);
-      this.inputMessageIndex =
-        resumeFrom.inputMessageIndex ?? findExecutionInputIndex(this.messages, this.input);
+      // A persisted index is trusted only while it still points at a user
+      // message; otherwise re-derive it as for snapshots that predate it.
+      this.inputMessageIndex = isUserMessageIndex(this.messages, resumeFrom.inputMessageIndex)
+        ? resumeFrom.inputMessageIndex
+        : findExecutionInputIndex(this.messages, this.input);
       this.trips.push(...resumeFrom.trips);
       this.continuations = resumeFrom.trips.filter((trip) => trip.finishReason === "length").length;
       this.compactions.push(...(resumeFrom.compactions ?? []));

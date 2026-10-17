@@ -263,8 +263,10 @@ App, layout, and page middleware run before every action, so a page's auth guard
 ### Observe every submission outcome
 
 `onSettled` runs after `onSuccess` or `onError` for every enhanced submission,
-including network failures and submissions dropped after cancellation, unmount,
-or a newer navigation. Native browser submissions have no enhanced outcome.
+including network failures and submissions dropped after cancellation, a newer
+navigation, or (for independent submissions only) the form unmounting. It still
+runs when `onSuccess` or `onError` throws. Native browser submissions have no
+enhanced outcome.
 The exported `ActionSubmitOutcome` union is:
 
 | `type`       | Other fields                                    | Existing callback     |

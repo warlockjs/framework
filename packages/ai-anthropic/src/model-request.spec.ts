@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { InvalidRequestError, type Message, type ModelCallOptions } from "@warlock.js/ai";
-import { describe, expect, it, vi } from "vitest";
+import { AIError, InvalidRequestError, type Message, type ModelCallOptions } from "@warlock.js/ai";
+import { log } from "@warlock.js/logger";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AnthropicModel,
   fromProviderBlocks,
@@ -153,6 +154,99 @@ describe("Anthropic built requests", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  it("sends a messages-endpoint request without betas, even when betas were edited in", async () => {
+    const { model, create } = setup();
+    const request = model.buildRequest(messages);
+    request.betas.push("hand-edited");
+    await model.send(request);
+    expect(request.endpoint).toBe("messages");
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[0]).toEqual(request.body);
+    expect(create.mock.calls[0]?.[0]).not.toHaveProperty("betas");
+  });
+});
+
+function silenceLogs() {
+  return {
+    debug: vi.spyOn(log, "debug").mockImplementation(() => Promise.resolve() as never),
+    error: vi.spyOn(log, "error").mockImplementation(() => Promise.resolve() as never),
+  };
+}
+
+describe("Anthropic request logging", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // A function cannot be structured-cloned, so building this request throws.
+  const uncloneable: ModelCallOptions = {
+    providerOptions: { anthropic: { body: { metadata: { fn: () => 1 } } } },
+  };
+
+  it("logs and wraps a build failure from complete()", async () => {
+    const { model, create } = setup();
+    const { error } = silenceLogs();
+    const rejection = model.complete(messages, uncloneable);
+    await expect(rejection).rejects.toBeInstanceOf(InvalidRequestError);
+    await expect(rejection).rejects.toBeInstanceOf(AIError);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("logs and wraps a build failure from stream()", async () => {
+    const { model, create } = setup();
+    const { error } = silenceLogs();
+    const chunks: unknown[] = [];
+    const drain = async () => {
+      for await (const chunk of model.stream(messages, uncloneable)) chunks.push(chunk);
+    };
+    await expect(drain()).rejects.toBeInstanceOf(InvalidRequestError);
+    expect(chunks).toEqual([]);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("logs and wraps a build failure from countTokens()", async () => {
+    const { model } = setup();
+    const { error } = silenceLogs();
+    await expect(model.countTokens(messages, uncloneable)).rejects.toBeInstanceOf(
+      InvalidRequestError,
+    );
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes a reserved-key error through unchanged and logs it", async () => {
+    const { model } = setup();
+    const { error } = silenceLogs();
+    const rejection = model.complete(messages, {
+      providerOptions: { anthropic: { body: { messages: [] } } },
+    });
+    await expect(rejection).rejects.toBeInstanceOf(InvalidRequestError);
+    await expect(rejection).rejects.toMatchObject({
+      message: expect.stringMatching(/^providerOptions\.anthropic\.body cannot set "messages"/),
+      context: { fields: ["messages"] },
+    });
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it("names streaming calls in the request log line", async () => {
+    const { model } = setup();
+    const { debug } = silenceLogs();
+    await model.complete(messages);
+    const chunks: unknown[] = [];
+    for await (const chunk of model.stream(messages)) chunks.push(chunk);
+    expect(chunks).toContainEqual({ type: "delta", content: "hello" });
+    const requestLines = debug.mock.calls
+      .filter((call) => call[1] === "request")
+      .map((call) => call[2]);
+    expect(requestLines).toEqual([
+      "Starting call to messages.create",
+      "Starting streaming call to messages.create",
+    ]);
+  });
+});
+
+describe("Anthropic converters", () => {
   it("exports converters with the assistant-block replay security checks", () => {
     const thinking = { type: "thinking", thinking: "", signature: "signed" };
     const blocks = toProviderBlocks([thinking]);

@@ -116,6 +116,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The `upgrade-from-5-29` skill covers the 5.31 AI workspace changes: the larger `tools.all()` set, the new `WorkspaceOps` / `Workspace` methods, nested-command refusals and `dispose()`.
 - Static file serving loads `@fastify/static` on the first file request instead of at boot, including existing public folders and `router.directory` mounts. The directory globber loads at boot only for `wildcard: false`. Concurrent first requests share initialization; upstream headers, ranges, listings, decorators and exact routes for `wildcard: false` are preserved.
 
+- Request-log privacy rules (`http.logging.private`) are prepared once per configured array instead of on every log snapshot: each string prefix is normalised a single time, and a regex rule's need for a fresh copy (global or sticky flags) is decided once. Setting a new array applies its rules; editing the existing array in place is no longer picked up. The logging docs and `configure-app` skill now also say that a route pattern containing a `%` that does not decode withholds body and query on every request to that route.
+
 - **BREAKING:** Node.js 22.15 or newer is required (`engines.node: ">=22.15"`): the `warlock` CLI loads TypeScript through `module.registerHooks`, which Node added in 22.15.
 
 ## 5.30.0 - 2026-10-16

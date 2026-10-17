@@ -218,6 +218,35 @@ describe("buildRequestLogSnapshot", () => {
     expect(buildRequestLogSnapshot({ ...source, url: "/api/private-extra" }).body).toBeDefined();
   });
 
+  it("normalises a config array's prefixes once across many snapshots", () => {
+    let pathReads = 0;
+    const rule = {
+      get path() {
+        pathReads++;
+        return "/api/private";
+      },
+      body: false as const,
+      query: false as const,
+    };
+    config.set("http.logging", { private: [rule] });
+    for (let i = 0; i < 100; i++) {
+      const url = i % 2 === 0 ? "/api/private?note=sentinel" : "/api/public?note=x";
+      const snapshot = buildRequestLogSnapshot({ ...source, url });
+      expect(snapshot.body === undefined).toBe(i % 2 === 0);
+    }
+    expect(pathReads).toBe(1);
+  });
+
+  it("applies a replaced private-rule array", () => {
+    config.set("http.logging", { private: [{ path: "/api/private", body: false, query: false }] });
+    expect(buildRequestLogSnapshot({ ...source, url: "/api/other" }).body).toBeDefined();
+    config.set("http.logging", { private: [{ path: "/api/other", body: false, query: false }] });
+    const snapshot = buildRequestLogSnapshot({ ...source, url: "/api/other?note=sentinel" });
+    expect(snapshot.body).toBeUndefined();
+    expect(snapshot.query).toBeUndefined();
+    expect(buildRequestLogSnapshot({ ...source, url: "/api/private" }).body).toBeDefined();
+  });
+
   it("withholds input when a private-policy URL cannot be decoded", () => {
     config.set("http.logging", { private: [{ path: "/api/private", body: false, query: false }] });
     const snapshot = buildRequestLogSnapshot({ ...source, url: "/api%2Fprivate%ZZ?note=sentinel" });

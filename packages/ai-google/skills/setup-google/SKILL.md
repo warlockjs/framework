@@ -56,6 +56,15 @@ Gemini content roles must be `"user"` or `"model"` — there is no `"system"` ro
 - Neutral `assistant` → Gemini `"model"`; `user` stays `"user"`.
 - Assistant tool calls → `"model"` content: optional leading `{ text }` + one `{ functionCall: { name, args } }` part per call (`id` deliberately omitted — see below).
 - Tool results (`role: "tool"`) → a `"user"` content with one `{ functionResponse: { name, response } }` part. `response` must be a JSON object, so a stringified-JSON tool result is parsed back to an object; a non-object result is wrapped as `{ result: <raw> }`.
+- Adjacent contents with the same role merge into one, parts kept in order: parallel tool results become ONE `"user"` content with several `functionResponse` parts in call order (as `@google/genai`'s automatic function calling sends them), and an agent compaction summary merges with a same-role neighbour (user-framed summary + input; assistant summary + the next tool-call turn, text part first, each `functionCall` keeping its `thoughtSignature`). Roles therefore alternate `user`/`model`; `countTokens()` uses the same builder.
+
+Neutral history and the `contents` the adapter sends for it:
+
+```text
+user "look both up"              → { role: "user",  parts: [{ text }] }
+assistant toolCalls [a, b]       → { role: "model", parts: [{ functionCall: a }, { functionCall: b }] }
+tool a, tool b                   → { role: "user",  parts: [{ functionResponse: a }, { functionResponse: b }] }
+```
 
 **Gemini matches a result to its call by name, not id** — the Developer API assigns no function-call ids. The adapter sets neutral `id` = tool name so `toolCallId` is non-empty. The wire `id` is omitted from both `functionCall` and `functionResponse` (echoing an empty/synthetic id is rejected by Gemini). **Limitation:** two parallel calls to the same tool in one turn share an id — inherent to the Developer API's id-less design.
 

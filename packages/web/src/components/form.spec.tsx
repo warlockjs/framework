@@ -134,6 +134,71 @@ describe("<Form>", () => {
     expect(onSettled).toHaveBeenCalledExactlyOnceWith({ type: "dropped" });
   });
 
+  it("settles once when onSuccess throws", async () => {
+    connectActionSubmitter(async () => ({ type: "success" }));
+    const onSettled = vi.fn();
+    const { container } = mount(
+      <Form
+        onSuccess={() => {
+          throw new Error("boom");
+        }}
+        onSettled={onSettled}
+      />,
+    );
+    // The async submit handler turns the throw into a rejected promise that
+    // nothing awaits; hold the process's rejection listeners aside so the
+    // test sees it instead of the runner.
+    const runnerListeners = process.rawListeners("unhandledRejection");
+    const rejections: unknown[] = [];
+    const capture = (reason: unknown) => rejections.push(reason);
+
+    process.removeAllListeners("unhandledRejection");
+    process.on("unhandledRejection", capture);
+
+    try {
+      await submit(container);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      process.off("unhandledRejection", capture);
+
+      for (const listener of runnerListeners) {
+        process.on("unhandledRejection", listener as (...args: unknown[]) => void);
+      }
+    }
+
+    expect(onSettled).toHaveBeenCalledExactlyOnceWith({ type: "success" });
+    expect(rejections).toEqual([expect.objectContaining({ message: "boom" })]);
+  });
+
+  it("aborts a data-independent button's submission when the form unmounts", async () => {
+    const submitter = vi.fn(
+      (_url: string, _data: FormData, options?: { signal?: AbortSignal }) =>
+        new Promise<ActionSubmitOutcome>((resolve) => {
+          options?.signal?.addEventListener("abort", () => resolve({ type: "dropped" }), {
+            once: true,
+          });
+        }),
+    );
+    connectActionSubmitter(submitter);
+    const onSettled = vi.fn();
+    const { container, root } = mount(
+      <Form onSettled={onSettled}>
+        <button>Start</button>
+        <button data-independent>Cancel</button>
+      </Form>,
+    );
+    await act(async () => container.querySelectorAll("button").item(1).click());
+    const options = submitter.mock.calls.at(0)?.[2] as {
+      independent: boolean;
+      signal: AbortSignal;
+    };
+    expect(options.independent).toBe(true);
+    expect(options.signal.aborted).toBe(false);
+    await act(async () => root.unmount());
+    expect(options.signal.aborted).toBe(true);
+    expect(onSettled).toHaveBeenCalledExactlyOnceWith({ type: "dropped" });
+  });
+
   it("does not settle submissions left to the native browser", async () => {
     const onSettled = vi.fn();
     const { container } = mount(<Form onSettled={onSettled} />);

@@ -457,17 +457,27 @@ export default {
 } satisfies HttpConfigurations;
 ```
 
-String paths match a prefix at a segment boundary. Regexes match the decoded,
-pathname candidates: raw, decoded, and decoded with dot segments resolved, each
-with repeated/trailing slashes collapsed. Any match suppresses input; normalization
-never narrows a raw-path match. The matched route pattern is checked too. These rules apply even when no route
-matches. Matching rules combine and only remove input; a route cannot re-enable
-fields they suppress. `query: false` also removes the logged URL's query string.
-With private policies configured, an undecodable path withholds both body and
-query. An undecodable configured prefix suppresses its selected fields for all
-requests. Rules assume case-sensitive routing defaults; with case-insensitive
-routing, use a regex with `i` and include any custom semicolon delimiters in the
-matcher. The URL's original path spelling is retained in the snapshot.
+String paths match a prefix at a segment boundary. Both string and regex rules
+are checked against several pathname candidates: the raw path, the decoded path,
+and the decoded path with dot segments resolved, each with repeated and trailing
+slashes collapsed. Any match suppresses input, so normalization never narrows a
+raw-path match. The matched route pattern is checked too, and the rules apply
+even when no route matches. Matching rules combine and only remove input; a
+route cannot re-enable fields they suppress. `query: false` also removes the
+logged URL's query string.
+
+With private policies configured, a request path that does not decode withholds
+both body and query. The same holds for the matched route pattern: a route
+pattern containing a `%` that does not decode (such as `/files/100%`) withholds
+body and query on every request to that route. An undecodable configured prefix
+suppresses its selected fields for all requests. Rules assume case-sensitive
+routing defaults; with case-insensitive routing, use a regex with `i` and
+include any custom semicolon delimiters in the matcher. The URL's original path
+spelling is retained in the snapshot.
+
+The rules are prepared once per `private` array. To change them at runtime, set
+a new array (`config.set("http.logging.private", [...])`) rather than editing the
+existing one in place.
 
 When upgrading from 5.29, update redaction censors that inspect `context.request`:
 it is a `RequestLogSnapshot`, with `url` and `route` (a string), rather than a

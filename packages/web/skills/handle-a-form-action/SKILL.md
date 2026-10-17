@@ -222,8 +222,9 @@ split the browser-safe constraints into a shared schema.
 `onSettled` receives the exported `ActionSubmitOutcome` after existing success/error
 callbacks: `{ type: "success" }`, `{ type: "redirected", url }`,
 `{ type: "error", actionData }`, `{ type: "failed", reason }`, or `{ type: "dropped" }`.
-It runs for enhanced submissions, including cancellation and unmount; native
-browser submissions do not call it. A submit button with `data-independent`
+It runs for enhanced submissions, including cancellation, and unmount for
+independent submissions (an unmount aborts only those); it still runs when
+`onSuccess` or `onError` throws. Native browser submissions do not call it. A submit button with `data-independent`
 opts only that submission into independent mode. Unmarked buttons follow the
 form's `independent` prop.
 

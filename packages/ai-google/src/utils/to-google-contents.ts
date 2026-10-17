@@ -27,6 +27,12 @@ export type GoogleContents = {
  * 4. **Tool calls are `functionCall` parts.** An assistant message
  *    with `toolCalls` becomes a `"model"` content: an optional leading
  *    `text` part followed by one `functionCall` part per call.
+ * 5. **Adjacent same-role turns merge.** Consecutive contents with the
+ *    same role become one content with their parts in order, so the
+ *    results of parallel tool calls travel as one `user` turn (as the
+ *    `@google/genai` SDK's own automatic function calling sends them)
+ *    and a compaction summary next to a same-role turn does not break
+ *    the user/model alternation.
  *
  * @example
  * const { systemInstruction, contents } = toGoogleContents([
@@ -113,8 +119,40 @@ export function toGoogleContents(messages: Message[]): GoogleContents {
 
   return {
     systemInstruction: systemParts.length > 0 ? systemParts.join("\n\n") : undefined,
-    contents,
+    contents: mergeAdjacentContents(contents),
   };
+}
+
+/**
+ * Join consecutive contents that share a role into one, keeping part
+ * order: parallel `functionResponse` parts stay in their `functionCall`
+ * order, and each `functionCall` keeps its own `thoughtSignature`.
+ * Returns new content objects; the input contents are not modified.
+ *
+ * Source for the single-turn shape: `@google/genai` 2.19.0
+ * `Models.generateContent` (automatic function calling) sends every
+ * function response of one model turn as a single `{ role: "user",
+ * parts }` content, in call order.
+ */
+function mergeAdjacentContents(contents: Content[]): Content[] {
+  const merged: Content[] = [];
+
+  for (const content of contents) {
+    const previous = merged.at(-1);
+
+    if (previous && previous.role === content.role) {
+      merged[merged.length - 1] = {
+        ...previous,
+        parts: [...(previous.parts ?? []), ...(content.parts ?? [])],
+      };
+
+      continue;
+    }
+
+    merged.push(content);
+  }
+
+  return merged;
 }
 
 /**

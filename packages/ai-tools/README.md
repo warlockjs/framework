@@ -39,7 +39,7 @@ npm install @warlock.js/ai-tools
 ```
 
 `@warlock.js/ai` is the only required runtime peer. Everything heavy — a search provider, the
-readability scraper, the MCP SDK, and a JSON-Schema validator — is an **optional peer**, lazily
+readability scraper, and a JSON-Schema validator — is an **optional peer**, lazily
 `import()`ed only when the relevant path runs; a missing one surfaces a curated `npm install` string
 rather than crashing at import time. Beyond `@warlock.js/ai` the package uses only Node built-ins and
 the global `fetch` (Node 18+). Import the package once for its side effect so the surface is

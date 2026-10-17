@@ -39,7 +39,8 @@ export type FormProps = Omit<
   /**
    * Called after every enhanced submission outcome, after onSuccess/onError:
    * success, redirected (url), error (actionData), failed (reason), or dropped
-   * (superseded, aborted, navigated away, or unmounted). Native submissions do not call it.
+   * (superseded, aborted, navigated away, or unmounted (independent submissions
+   * only)). Native submissions do not call it.
    */
   onSettled?: (outcome: ActionSubmitOutcome) => void;
 };

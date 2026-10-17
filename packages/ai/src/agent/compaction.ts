@@ -37,6 +37,21 @@ function estimateInput(messages: Message[], options: ModelCallOptions): number {
   );
 }
 
+/**
+ * Whether `index` can be the execution input's position in `messages`: an
+ * integer in range that points at a `user` message. A persisted index that
+ * fails this (a corrupted or hand-edited snapshot) must not be trusted.
+ */
+export function isUserMessageIndex(messages: readonly Message[], index: unknown): index is number {
+  return (
+    typeof index === "number" &&
+    Number.isInteger(index) &&
+    index >= 0 &&
+    index < messages.length &&
+    messages[index]?.role === "user"
+  );
+}
+
 /** Pick a settled range without splitting tool groups or replacing protected user inputs. */
 function selectRange(
   messages: Message[],
@@ -112,7 +127,10 @@ export async function compactAgentMessages(
     const before = await count(messages);
     record.inputTokens = before;
     if (options.signal?.aborted || before < config.afterTokens) return {};
-    if (inputMessageIndex === undefined) return { record: { ...record, reason: "no-safe-range" } };
+    // Without a trustworthy input position nothing can be protected, so
+    // nothing is summarised.
+    if (!isUserMessageIndex(messages, inputMessageIndex))
+      return { record: { ...record, reason: "no-safe-range" } };
     const range = selectRange(messages, config.keep ?? 8, inputMessageIndex);
     if (!range) return { record: { ...record, reason: "no-safe-range" } };
     // Signed reasoning (Anthropic thinking, Gemini thought signatures) in a
