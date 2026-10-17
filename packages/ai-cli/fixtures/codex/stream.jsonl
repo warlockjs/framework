@@ -1,0 +1,8 @@
+{"type":"thread.started","thread_id":"019a2f3e-7c41-7b20-9d1e-5f6a7b8c9d0e"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"**Listing files**\n\nI'll run ls in the workspace."}}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"I'll list the files in this directory."}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"/bin/bash -lc ls","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/bin/bash -lc ls","aggregated_output":"README.md\npackage.json\nsrc\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"The directory has README.md, package.json and src."}}
+{"type":"turn.completed","usage":{"input_tokens":24763,"cached_input_tokens":24448,"cache_write_input_tokens":0,"output_tokens":122,"reasoning_output_tokens":64}}

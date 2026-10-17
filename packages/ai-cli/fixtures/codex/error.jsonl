@@ -1,0 +1,7 @@
+{"type":"thread.started","thread_id":"019a2f3e-7c41-7b20-9d1e-5f6a7b8c9d0f"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"model rerouted: gpt-a -> gpt-b (Unavailable)"}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/bin/bash -lc 'rm -rf build'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/bash -lc 'rm -rf build'","aggregated_output":"rm: cannot remove 'build': Read-only file system\n","exit_code":1,"status":"failed"}}
+{"type":"error","message":"stream disconnected before completion: 401 Unauthorized"}
+{"type":"turn.failed","error":{"message":"stream disconnected before completion: 401 Unauthorized"}}

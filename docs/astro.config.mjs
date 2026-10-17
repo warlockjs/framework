@@ -104,6 +104,8 @@ const aiSections = [
   { label: "Architecture Concepts", dir: "architecture-concepts", collapsed: true },
   { label: "Agents", dir: "agents", collapsed: false },
   { label: "Tools & Capabilities", dir: "tools", collapsed: true },
+  // @warlock.js/ai-cli is new in 5.31, so the frozen v4 sidebar leaves it out.
+  { label: "CLI Agents", dir: "cli-agents", collapsed: true, latestOnly: true },
   { label: "Orchestration", dir: "orchestration", collapsed: true },
   { label: "Prompts", dir: "prompts", collapsed: true },
   { label: "RAG & Knowledge", dir: "rag", collapsed: true },
@@ -462,6 +464,7 @@ const topics = [
       // original section order.
       ...aiSections
         .map((s) => ({
+          latestOnly: s.latestOnly,
           label: s.label,
           collapsed: s.collapsed,
           items: [{ autogenerate: { directory: `v/latest/ai/${s.dir}` } }],
@@ -500,6 +503,22 @@ function buildTopics(/** @type {string} */ version) {
       ? topicsForVersion
       : JSON.parse(JSON.stringify(topicsForVersion).replaceAll("v/latest", `v/${version}`));
 
+  /** Drop groups that exist only in the latest docs, and the marker itself. */
+  const withoutLatestOnly = (/** @type {unknown[]} */ items) =>
+    items
+      .filter(
+        (item) =>
+          version === "latest" ||
+          !(item && typeof item === "object" && "latestOnly" in item && item.latestOnly),
+      )
+      .map((item) => {
+        if (item && typeof item === "object" && "latestOnly" in item) {
+          const { latestOnly: _latestOnly, ...rest } = item;
+          return rest;
+        }
+        return item;
+      });
+
   return versionedTopics.map(
     (/** @type {{ link: string, label: string, items: unknown[] }} */ topic) => ({
       ...topic,
@@ -510,7 +529,7 @@ function buildTopics(/** @type {string} */ version) {
               { label: "Upgrade to v5", link: "/v/latest/core/upgrade-to-v5/" },
               ...topic.items.slice(1),
             ]
-          : topic.items,
+          : withoutLatestOnly(topic.items),
       id: `${version}-${topic.link.split("/").filter(Boolean).at(-1)}`,
     }),
   );

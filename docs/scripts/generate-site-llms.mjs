@@ -60,6 +60,7 @@ const PACKAGE_ORDER = [
   "ai-live",
   "ai-tools",
   "ai-workspace",
+  "ai-cli",
   "ai-panoptic",
   "create-warlock",
 ];

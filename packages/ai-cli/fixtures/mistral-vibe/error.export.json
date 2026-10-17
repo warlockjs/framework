@@ -1,0 +1,25 @@
+{
+  "outcome": "config_error",
+  "stop_reason": null,
+  "error": {
+    "message": "Missing MISTRAL_API_KEY environment variable for mistral provider. Set the environment variable (e.g. in ~/.vibe/.env or your shell), or run `vibe --setup` once interactively.",
+    "code": null
+  },
+  "session_id": null,
+  "usage": null,
+  "cost_usd": null,
+  "steps": null,
+  "config": null,
+  "schema_version": 1,
+  "vibe_version": "2.26.1",
+  "journal_dir": null,
+  "started_at": "2026-10-17T19:11:40.000000Z",
+  "ended_at": "2026-10-17T19:11:40.120000Z",
+  "limits": {
+    "max_turns": null,
+    "max_price": null,
+    "max_tokens": null,
+    "time_limit_s": null
+  },
+  "exit_code": 1
+}
