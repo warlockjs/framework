@@ -473,7 +473,14 @@ describe("AnthropicModel provider options", () => {
 });
 
 describe("AnthropicModel Claude 5-family thinking", () => {
-  const models = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"] as const;
+  const models = [
+    "claude-opus-5-5",
+    "claude-opus-5",
+    "claude-sonnet-5-5",
+    "claude-sonnet-5",
+    "claude-haiku-5-5",
+    "claude-fable-5-1",
+  ] as const;
 
   /** Expected `output_config.effort` for each effort that keeps thinking on. */
   const thinkingOn: Array<[ReasoningEffort | undefined, string]> = [
@@ -543,6 +550,79 @@ describe("AnthropicModel Claude 5-family thinking", () => {
       expect(JSON.stringify(body)).not.toContain("disabled");
     },
   );
+
+  /** The exact wire fields `effort: "none"` produces on each 5-family model. */
+  const noReasoning: Array<[string, Record<string, unknown> | undefined, unknown]> = [
+    ["claude-sonnet-5-5", { type: "between_tools" }, undefined],
+    ["claude-sonnet-5", { type: "disabled" }, undefined],
+    ["claude-haiku-5-5", { type: "disabled" }, undefined],
+    ["claude-opus-5", { type: "adaptive" }, { effort: "low" }],
+    ["claude-opus-5-5", undefined, undefined],
+    ["claude-fable-5-1", undefined, undefined],
+    ["claude-fable-5", undefined, undefined],
+  ];
+
+  it.each(noReasoning)(
+    "%s with effort 'none' sends thinking %j and output_config %j",
+    async (name, thinking, outputConfig) => {
+      const { client, calls } = makeClient({});
+      const model = new AnthropicModel(client, { name, temperature: 0.3 });
+
+      await model.complete([{ role: "user", content: "hi" }], {
+        reasoning: { effort: "none" },
+      });
+
+      const { body } = only(calls);
+
+      expect(body.thinking).toEqual(thinking);
+      expect(body.output_config).toEqual(outputConfig);
+      expect(JSON.stringify(body)).not.toContain("budget_tokens");
+      expect(body).not.toHaveProperty("temperature");
+    },
+  );
+
+  it("sends disabled thinking alone on Sonnet 5 and Haiku 5.5, without display", async () => {
+    const { client, calls } = makeClient({ streamEvents: [] });
+
+    for (const name of ["claude-sonnet-5", "claude-haiku-5-5", "anthropic.claude-haiku-5-5"]) {
+      const model = new AnthropicModel(client, { name });
+
+      await drain(
+        model.stream([{ role: "user", content: "hi" }], {
+          reasoning: { effort: "none", maxTokens: 20000 },
+          providerOptions: { anthropic: { thinkingDisplay: "summarized" } },
+        }),
+      );
+    }
+
+    expect(calls.map((call) => call.body.thinking)).toEqual([
+      { type: "disabled" },
+      { type: "disabled" },
+      { type: "disabled" },
+    ]);
+    // Haiku 5.5 accepts `disabled` only at effort `high` or below: no
+    // effort is sent, so its default (`medium`) applies.
+    expect(calls.every((call) => call.body.output_config === undefined)).toBe(true);
+  });
+
+  it("keeps Opus 5 on adaptive thinking at the lowest effort for 'none', display included", async () => {
+    const { client, calls } = makeClient({});
+
+    for (const name of ["claude-opus-5", "us.anthropic.claude-opus-5", "claude-opus-5-20260301"]) {
+      const model = new AnthropicModel(client, { name });
+
+      await model.complete([{ role: "user", content: "hi" }], {
+        reasoning: { effort: "none" },
+        providerOptions: { anthropic: { thinkingDisplay: "summarized" } },
+      });
+    }
+
+    for (const call of calls) {
+      expect(call.body.thinking).toEqual({ type: "adaptive", display: "summarized" });
+      expect(call.body.output_config).toEqual({ effort: "low" });
+      expect(JSON.stringify(call.body)).not.toContain("disabled");
+    }
+  });
 
   it("sends between_tools on a streaming Sonnet 5.5 request and by Bedrock id", async () => {
     const { client, calls } = makeClient({ streamEvents: [] });

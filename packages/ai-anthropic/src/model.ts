@@ -23,10 +23,10 @@ import type {
 } from "./request.type";
 import { inferVisionCapability } from "./known-vision-models";
 import {
-  acceptsBetweenTools,
   acceptsTemperature,
   inferThinkingMode,
   type AnthropicThinkingMode,
+  noReasoningForm,
 } from "./thinking-mode";
 import {
   mapStopReason,
@@ -818,12 +818,18 @@ export class AnthropicModel implements ModelContract {
    *   `messages.d.ts:1084`), so the budget is floored at that minimum.
    *
    * The neutral `effort: "none"` ("run without reasoning") is mapped per
-   * model:
-   * - Claude Sonnet 5.5 (`acceptsBetweenTools`): `thinking: { type:
-   *   "between_tools" }`, its only thinking-off form. It is sent alone —
-   *   no `output_config.effort` (the model default, `high`, is within the
-   *   `high`-or-below range it requires) and no `display`, both of which
-   *   the API rejects alongside it.
+   * model by `noReasoningForm` (see `thinking-mode.ts` for the sources):
+   * - Claude Sonnet 5.5: `thinking: { type: "between_tools" }`, its only
+   *   thinking-off form. It is sent alone — no `output_config.effort` (the
+   *   model default, `high`, is within the `high`-or-below range it
+   *   requires) and no `display`, both of which the API rejects alongside it.
+   * - Claude Sonnet 5 and Claude Haiku 5.5: `thinking: { type: "disabled" }`
+   *   with no effort and no `display`. Haiku 5.5 accepts `disabled` only at
+   *   effort `high` or below; its default (`medium`) applies.
+   * - Claude Opus 5: adaptive thinking at `output_config.effort: "low"`.
+   *   Opus 5 accepts `disabled`, but with it the model can write a tool call
+   *   as plain text (the call never runs) and leak thinking tags; the lowest
+   *   effort is the documented alternative.
    * - Opus 5.5 and Fable 5/5.1: no `thinking` field. These models have no
    *   thinking-off form (`disabled` and `budget_tokens` are a 400 at every
    *   effort), so thinking still runs at the model's default effort. Pass
@@ -835,12 +841,11 @@ export class AnthropicModel implements ModelContract {
       return {};
     }
 
-    // `effort: "none"` is an explicit "run without reasoning". Sonnet 5.5
-    // turns thinking off only through `between_tools`; elsewhere we omit
-    // the `thinking` block. (This also short-circuits the
+    // `effort: "none"` is an explicit "run without reasoning", in the form
+    // this model accepts. (This also short-circuits the
     // `EFFORT_THINKING_BUDGET["none"]` → `undefined` → `NaN` budget path.)
     if (reasoning.effort === "none") {
-      return acceptsBetweenTools(this.name) ? { thinking: { type: "between_tools" } } : {};
+      return this.buildNoReasoning();
     }
 
     if (reasoning.maxTokens === undefined && reasoning.effort === undefined) {
@@ -865,6 +870,27 @@ export class AnthropicModel implements ModelContract {
       thinking: { type: "enabled", budget_tokens: budget },
       reservedTokens: budget,
     };
+  }
+
+  /**
+   * The thinking settings for `reasoning: { effort: "none" }`, per
+   * `noReasoningForm(this.name)` (documented on `buildThinking`).
+   */
+  private buildNoReasoning(): ThinkingRequest {
+    switch (noReasoningForm(this.name)) {
+      case "between_tools":
+        return { thinking: { type: "between_tools" } };
+      case "disabled":
+        return { thinking: { type: "disabled" } };
+      case "lowest-effort":
+        return {
+          thinking: { type: "adaptive" },
+          effort: EFFORT_TO_OUTPUT_EFFORT.low,
+          reservedTokens: EFFORT_THINKING_BUDGET.low,
+        };
+      case "omit":
+        return {};
+    }
   }
 
   /**

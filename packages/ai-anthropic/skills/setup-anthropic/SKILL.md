@@ -113,7 +113,7 @@ Adaptive models reject `budget_tokens` with a 400, so the shape matters.
 
 - **Adaptive:** `reasoning.effort` (`"low" | "medium" | "high"`) → `output_config.effort` of the same name. With only `reasoning.maxTokens` set, effort is `"medium"`; `maxTokens` then only sizes the reserved `max_tokens` room, it is not sent as a budget.
 - **Budget:** `reasoning.maxTokens` → `budget_tokens` verbatim; `reasoning.effort` → a tiered budget (`1024` / `4096` / `12000`) when no `maxTokens` is given. Any resolved budget is floored at Anthropic's `1024` minimum.
-- `reasoning` with neither `effort` nor `maxTokens`, or `effort: "none"`, emits nothing — except `effort: "none"` on Claude Sonnet 5.5, which sends `thinking: { type: "between_tools" }` (see below).
+- `reasoning` with neither `effort` nor `maxTokens` emits nothing. `effort: "none"` emits nothing either, except on the Claude 5 models listed below (Sonnet 5.5, Sonnet 5, Haiku 5.5, Opus 5), which each get their own form.
 
 ### `thinkingMode` override
 
@@ -144,14 +144,33 @@ await model.complete(messages, { reasoning: { maxTokens: 8000 } });
 // adaptive model: effort "medium"; budget model: budget_tokens 8000
 ```
 
-**Claude 5 family (Opus 5.5, Sonnet 5.5, Fable 5 / 5.1):** thinking is always on. These models reject `thinking: { type: "disabled" }` and `budget_tokens` with a 400, so the adapter never sends either: they are adaptive and `reasoning.maxTokens` only sizes `max_tokens`. `effort: "none"` is mapped per model:
+**Claude 5 family:** adaptive thinking runs by default and `budget_tokens` is a 400, so `reasoning.maxTokens` only sizes `max_tokens`. `effort: "none"` is mapped per model:
 
 | Model                   | `effort: "none"` sends                                                                 | Result                                                                                                                                 |
 | ----------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Sonnet 5.5              | `thinking: { type: "between_tools" }`, alone (no `output_config.effort`, no `display`) | Thinking off. `between_tools` takes no other field and needs effort `high` or below; the model default, `high`, applies.               |
+| Sonnet 5, Haiku 5.5     | `thinking: { type: "disabled" }`, alone (no `output_config.effort`, no `display`)      | Thinking off. Haiku 5.5 accepts `disabled` only at effort `high` or below; its default, `medium`, applies.                             |
+| Opus 5                  | `thinking: { type: "adaptive" }` + `output_config.effort: "low"`                       | Thinking stays on at the lowest effort: with `disabled`, Opus 5 can emit a tool call as plain text (never run) and leak thinking tags. |
 | Opus 5.5, Fable 5 / 5.1 | no `thinking` field                                                                    | No thinking-off form exists, so the model still thinks at its default effort (Opus 5.5: `medium`). Pass `effort: "low"` to think less. |
 
-`thinkingDisplay` is applied only to adaptive thinking, never beside `between_tools`.
+`thinkingDisplay` is applied only to adaptive thinking, never beside `between_tools` or `disabled`.
+
+```ts
+import { AnthropicSDK } from "@warlock.js/ai-anthropic";
+
+const anthropic = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY! });
+const messages = [{ role: "user" as const, content: "Classify: great product!" }];
+
+// Sonnet 5 / Haiku 5.5 → thinking: { type: "disabled" }
+await anthropic.model({ name: "claude-haiku-5-5" }).complete(messages, {
+  reasoning: { effort: "none" },
+});
+
+// Opus 5 → thinking: { type: "adaptive" }, output_config: { effort: "low" }
+await anthropic.model({ name: "claude-opus-5" }).complete(messages, {
+  reasoning: { effort: "none" },
+});
+```
 
 `thinking.display` is set with `providerOptions.anthropic.thinkingDisplay` (`"summarized"` for readable summaries; the 5-family default is `"omitted"`, empty thinking text). It is applied whenever the adapter sends `thinking` to an adaptive model, so pair it with a `reasoning` option.
 

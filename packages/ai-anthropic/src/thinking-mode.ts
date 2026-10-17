@@ -160,8 +160,88 @@ const BETWEEN_TOOLS_RELEASE_ROOTS = ["claude-sonnet-5-5"];
  * acceptsBetweenTools("claude-opus-5-5");   // → false
  */
 export function acceptsBetweenTools(modelName: string): boolean {
+  return matchesAnyRelease(modelName, BETWEEN_TOOLS_RELEASE_ROOTS);
+}
+
+/**
+ * Whether the model id — lower-cased, with any platform prefix
+ * (`anthropic.`, `us.anthropic.` on Bedrock) removed — is one of these
+ * releases, dated or tagged, but not a later minor release.
+ */
+function matchesAnyRelease(modelName: string, roots: readonly string[]): boolean {
   const normalized = modelName.toLowerCase();
   const id = normalized.slice(normalized.lastIndexOf(".") + 1);
 
-  return BETWEEN_TOOLS_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root));
+  return roots.some((root) => matchesReleaseRoot(id, root));
+}
+
+/**
+ * How a model is asked to run without reasoning when the caller passes the
+ * neutral `reasoning: { effort: "none" }`.
+ *
+ * - `"between_tools"` — send `thinking: { type: "between_tools" }` alone.
+ * - `"disabled"` — send `thinking: { type: "disabled" }` with no effort.
+ * - `"lowest-effort"` — keep adaptive thinking on and send the lowest
+ *   `output_config.effort` (`"low"`).
+ * - `"omit"` — send no `thinking` field at all.
+ */
+export type AnthropicNoReasoningForm = "between_tools" | "disabled" | "lowest-effort" | "omit";
+
+/**
+ * Releases that accept `thinking: { type: "disabled" }` and run reliably
+ * with it. Source: claude-api ref, "Thinking & Effort" per-model table
+ * (cached 2026-10-06): Claude Sonnet 5 accepts `disabled`; Claude Haiku 5.5
+ * accepts it at effort `low`, `medium` and `high` (a 400 at `xhigh` /
+ * `max`). No effort is sent alongside it, so Haiku 5.5 runs at its default,
+ * `medium`, which is inside the accepted range.
+ */
+const DISABLED_THINKING_RELEASE_ROOTS = ["claude-sonnet-5", "claude-haiku-5-5"];
+
+/**
+ * Releases that accept `disabled` but are kept on adaptive thinking at the
+ * lowest effort instead. Claude Opus 5 accepts `disabled` at effort `high`
+ * or below, but the claude-api ref ("Two failure modes when thinking is
+ * disabled", cached 2026-10-06) documents that with thinking disabled it
+ * occasionally writes a tool call into its visible text instead of a
+ * `tool_use` block — the call never runs and no error is raised — and can
+ * leak `<thinking>` tags into the response. The ref's primary
+ * recommendation is to keep thinking on and lower `effort`, so the adapter
+ * does exactly that.
+ */
+const LOWEST_EFFORT_RELEASE_ROOTS = ["claude-opus-5"];
+
+/**
+ * The wire form for `reasoning: { effort: "none" }` on this model:
+ *
+ * | Model                                  | Form              |
+ * |----------------------------------------|-------------------|
+ * | Claude Sonnet 5.5                      | `between_tools`   |
+ * | Claude Sonnet 5, Claude Haiku 5.5      | `disabled`        |
+ * | Claude Opus 5                          | `lowest-effort`   |
+ * | Opus 5.5, Fable 5/5.1, everything else | `omit`            |
+ *
+ * Opus 5.5 and Fable 5/5.1 have no thinking-off form (`disabled` and
+ * `budget_tokens` are a 400 at every effort), so nothing is sent and the
+ * model runs at its default effort; older models run without thinking when
+ * the field is absent.
+ *
+ * @example
+ * noReasoningForm("claude-sonnet-5");   // → "disabled"
+ * noReasoningForm("claude-opus-5");     // → "lowest-effort"
+ * noReasoningForm("claude-opus-5-5");   // → "omit"
+ */
+export function noReasoningForm(modelName: string): AnthropicNoReasoningForm {
+  if (acceptsBetweenTools(modelName)) {
+    return "between_tools";
+  }
+
+  if (matchesAnyRelease(modelName, DISABLED_THINKING_RELEASE_ROOTS)) {
+    return "disabled";
+  }
+
+  if (matchesAnyRelease(modelName, LOWEST_EFFORT_RELEASE_ROOTS)) {
+    return "lowest-effort";
+  }
+
+  return "omit";
 }
