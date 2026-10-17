@@ -16,10 +16,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Group feature selection preserves explicit unticks when selecting the remaining group, and returns the category cursor to the group last edited.
 - The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback. Wrapped values align under their labels, and the summary retains its label, command and link styling.
+- On terminals narrower than 50 columns the project-ready heading keeps its bold green styling, as in the boxed layout.
+- The ESLint-toolchain `lint`, `format` and `tsc` scripts call the local `eslint`, `prettier` and `tsc` binaries instead of `npx`, matching `lint:check`/`format:check` and the Oxc scripts. `format` now quotes its glob, so Prettier formats nested files under `src/` rather than relying on the shell's expansion.
 
 ### Changed
 
 - **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs. In an existing app, `warlock upgrade --to 5.31` raises `engines.node`, `.nvmrc` and `.node-version` (codemod `node-22-15`).
+- `--lint=oxc` projects sort imports on `format`: the generated `.oxfmtrc.json` sets `"sortImports": { "newlinesBetween": false }`, keeping imports in one block as `prettier-plugin-organize-imports` does in the ESLint toolchain. Oxfmt does not remove unused imports; Oxlint reports them.
 
 ### Added
 

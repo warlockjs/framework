@@ -121,6 +121,7 @@ describe("generated toolchains", () => {
       "warlock.configs.recommended",
     );
     expect(pkg.devDependencies.oxlint).toBeUndefined();
+    expect(pkg.scripts.lint).toBe("eslint --fix ./src --max-warnings=0");
     expect(pkg.scripts["lint:check"]).toContain("eslint ./src");
     expect(pkg.scripts["format:check"]).toContain("prettier --check");
     expect(existsSync(path.join(appPath, "eslint.config.js"))).toBe(true);
@@ -168,6 +169,10 @@ describe("generated toolchains", () => {
     );
     for (const name of [".oxlintrc.json", ".oxfmtrc.json"])
       expect(existsSync(path.join(appPath, name))).toBe(true);
+    const format = JSON.parse(readFileSync(path.join(appPath, ".oxfmtrc.json"), "utf8"));
+    expect(format.sortImports).toEqual({ newlinesBetween: false });
+    for (const script of ["lint", "lint:check", "format", "format:check"])
+      expect(pkg.scripts[script]).toMatch(/^ox(lint|fmt) /);
     for (const name of ["eslint.config.js", ".prettierrc.json", ".prettierignore"])
       expect(existsSync(path.join(appPath, name))).toBe(false);
     const config = readFileSync(path.join(appPath, "warlock.config.ts"), "utf8");
@@ -240,5 +245,33 @@ describe("generated toolchains", () => {
     assertPass(run(oxfmt, appPath, ["--config", ".oxfmtrc.json", "--write", fixture]));
     assertPass(run(oxfmt, appPath, ["--config", ".oxfmtrc.json", "--check", fixture]));
     expect(readFileSync(fixture, "utf8")).toContain('from "node:fs";');
+  });
+
+  it.skipIf(!hasOxc)("sorts imports into one block on format", () => {
+    const { appPath } = scaffold("oxc");
+    const fixture = path.join(appPath, "src", "sort-proof.ts");
+    writeFileSync(
+      fixture,
+      [
+        'import { z } from "zod";',
+        'import { local } from "./local";',
+        'import { readFile } from "node:fs";',
+        'import { config } from "app/config";',
+        "export const values = [z, local, readFile, config];",
+        "",
+      ].join("\n"),
+    );
+    expect(run(oxfmt, appPath, ["--config", ".oxfmtrc.json", "--check", fixture]).status).toBe(1);
+    assertPass(run(oxfmt, appPath, ["--config", ".oxfmtrc.json", "--write", fixture]));
+    expect(readFileSync(fixture, "utf8")).toBe(
+      [
+        'import { readFile } from "node:fs";',
+        'import { config } from "app/config";',
+        'import { z } from "zod";',
+        'import { local } from "./local";',
+        "export const values = [z, local, readFile, config];",
+        "",
+      ].join("\n"),
+    );
   });
 });

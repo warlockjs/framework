@@ -456,5 +456,18 @@ describe("optional Oxc toolchain templates", () => {
     ]) {
       expect(format[key]).toEqual(prettier[key]);
     }
+    // Prettier sorts imports through prettier-plugin-organize-imports; oxfmt
+    // sorts them itself, kept to one block like organize-imports does.
+    expect(prettier.plugins).toContain("prettier-plugin-organize-imports");
+    expect(format.sortImports).toEqual({ newlinesBetween: false });
+  });
+
+  it("runs every package script through the local binary, never npx", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.scripts.lint).toBe("eslint --fix ./src --max-warnings=0");
+    expect(pkg.scripts["lint:check"]).toBe("eslint ./src --max-warnings=0");
+    for (const [name, script] of Object.entries<string>(pkg.scripts)) {
+      expect(script, name).not.toMatch(/(^|&&\s*|\|\|\s*)npx\s/);
+    }
   });
 });

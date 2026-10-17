@@ -7,5 +7,6 @@
   "arrowParens": "always",
   "trailingComma": "all",
   "endOfLine": "lf",
+  "sortImports": { "newlinesBetween": false },
   "ignorePatterns": ["node_modules/", "dist/"]
 }

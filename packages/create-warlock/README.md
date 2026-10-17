@@ -196,9 +196,11 @@ ESLint/Prettier editor settings remain the default for the ESLint toolchain.
 
 The Oxlint config preserves the template's unused-variable/import checks,
 explicit class accessibility and type-import style. Oxfmt uses the same 100-column,
-double-quote, semicolon and trailing-comma settings. It does not run
-`prettier-plugin-organize-imports`' semantic import sorting/removal; maintain
-import order and let the linter report unused imports. See the
+double-quote, semicolon and trailing-comma settings, and sorts imports with
+`"sortImports": { "newlinesBetween": false }` — built-ins, packages, then relative
+paths, in one block like `prettier-plugin-organize-imports`. Oxfmt does not delete
+unused imports; Oxlint reports them. Every generated script calls the local binary
+(`eslint`, `oxlint`, `prettier`, `oxfmt`, `tsc`) rather than `npx`. See the
 [Oxlint config reference](https://oxc.rs/docs/guide/usage/linter/config-file-reference)
 and [Oxfmt config reference](https://oxc.rs/docs/guide/usage/formatter/config-file-reference)
 when adding project rules.

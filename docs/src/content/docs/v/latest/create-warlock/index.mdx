@@ -111,6 +111,19 @@ projects do not include the plugin.
 non-mutating `lint:check`/`format:check` scripts. It enables the Oxlint dev-server
 checker, disables the ESLint checker and keeps TypeScript checks enabled.
 
+`.oxfmtrc.json` turns on Oxfmt's import sorting with
+`"sortImports": { "newlinesBetween": false }`, the counterpart of the ESLint
+toolchain's `prettier-plugin-organize-imports`: `format` reorders imports by group
+(Node built-ins, packages, then relative paths) and keeps them in one block without
+blank lines between groups. Unlike organize-imports it does not delete unused
+imports; Oxlint's `no-unused-vars` reports them instead. See the
+[Oxfmt config reference](https://oxc.rs/docs/guide/usage/formatter/config-file-reference)
+for the `sortImports` options.
+
+In both toolchains the package scripts call the local binaries directly
+(`eslint --fix ./src`, `oxlint --fix ./src`, `tsc --noEmit`), so they behave the
+same under npm, pnpm and yarn without going through `npx`.
+
 Oxc scaffolds also write VS Code settings that select the official
 [Oxc extension](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode)
 for format-on-save (`editor.defaultFormatter: "oxc.oxc-vscode"`) and lint fixes
