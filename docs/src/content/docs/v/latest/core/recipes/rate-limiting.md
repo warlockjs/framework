@@ -14,11 +14,49 @@ As of the HTTP middleware suite, `@warlock.js/core` ships a `middleware.rateLimi
 
 By the end you'll have sensible global limits, a tight cap on `/login`, a higher quota for authed users than anonymous, and a localized 429 response that tells the client when to come back.
 
+## Upgrading to 5.31
+
+**BREAKING:** global and per-route limits now apply to production application
+routes. Previous releases through 5.30.0 missed these production registrations;
+development already enforced per-route limits. Web page routes also participate
+in the global quota.
+
+The default is 60 requests per minute per IP, in one shared bucket across
+application routes, pages and static assets. Requests to different URLs consume
+the same quota. Review `http.rateLimit.max` before upgrading a busy site.
+
+`http.trustProxy` defaults to `false`. Behind a reverse proxy, all clients can
+therefore share the proxy's IP and exhaust one quota for the whole site.
+Configure the specific proxy addresses you trust, or supply a `keyGenerator`
+that derives an appropriate client identity. See the
+[trusted proxy guidance](../digging-deeper/security.md#trustproxy-shapes).
+
+To keep blanket quotas off while retaining explicit per-route limits:
+
+```ts
+// src/config/http.ts
+export default {
+  rateLimit: { global: false },
+};
+```
+
+Built-in health/readiness probes are exempt by default, even after application
+traffic exhausts its quota. `health: { rateLimit: true }` opts them back into the
+global policy when global limiting is enabled; renamed probe paths follow the
+same setting.
+
+Production also accepts `serverOptions: { config: { rateLimit: false } }` to
+exempt an individual route. Development's wildcard dispatcher currently still
+applies the global quota to that route. For consistent selective limiting in
+both modes, use `global: false` and declare `rateLimit` on protected routes.
+
 ## How rate limiting works in Warlock
 
 HTTP plugins finish registration before the connector scans application routes.
-Global limits therefore cover application routes, health endpoints, the public
-folder and `router.directory()` mounts in production and development. With
+Global limits therefore cover application routes, web page routes, the public
+folder and `router.directory()` mounts in production and development. Built-in
+`/health` and `/ready` probes are exempt by default; set
+`http.health.rateLimit: true` to include them in the global policy. With
 `http.rateLimit: { max: 2, timeWindow: 60_000 }`, the third request in the same
 bucket returns HTTP 429 with rate-limit and retry headers. Per-route settings and
 `global: false` still control which routes participate.

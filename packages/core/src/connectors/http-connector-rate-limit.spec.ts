@@ -1,4 +1,5 @@
 import config from "@mongez/config";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -86,7 +87,6 @@ describe("HTTP connector global rate limiting", () => {
         "/public/asset.txt",
         "/assets/asset.txt",
         "/exact/asset.txt",
-        "/health",
       ]) {
         const statuses: number[] = [];
         for (let attempt = 0; attempt < 4; attempt++) {
@@ -99,6 +99,127 @@ describe("HTTP connector global rate limiting", () => {
         }
         expect(statuses, url).toEqual([200, 200, 429, 429]);
       }
+      for (const url of ["/health", "/ready"]) {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const response = await fetch(baseUrl + url);
+          expect(response.status).toBe(url === "/health" ? 200 : 503);
+          expect(response.headers.get("x-ratelimit-limit")).toBeNull();
+          await response.text();
+        }
+      }
     },
   );
 });
+
+async function bootConnector(
+  strategy: "production" | "development",
+  options: Record<string, unknown> = {},
+) {
+  process.env.WARLOCK_ROLES = "api";
+  resetRolesCacheForTests();
+  Application.setRuntimeStrategy(strategy);
+  config.set("http", {
+    port: 0,
+    host: "127.0.0.1",
+    rateLimit: { max: 2, timeWindow: 60_000 },
+    ...options,
+  });
+  config.set("app.baseUrl", "http://127.0.0.1");
+  config.set("storage.publicRoot", false);
+  routerState.routes = [];
+  routerState.staticDirectories = [];
+  const connector = new HttpConnector();
+  await connector.boot();
+  return connector;
+}
+
+function boundUrl(): string {
+  const address = getHttpServer().server.address() as { port: number };
+  return `http://127.0.0.1:${address.port}`;
+}
+
+for (const strategy of ["production", "development"] as const) {
+  it(`keeps probes outside the shared page/API client quota in ${strategy}`, async () => {
+    const connector = await bootConnector(strategy);
+    router.get("/api", ({ response }) => response.send("api"));
+    // Web pages register directly on the shared Fastify server too.
+    getHttpServer().get("/page", (_request: FastifyRequest, reply: FastifyReply) =>
+      reply.type("text/html").send("<p>Page</p>"),
+    );
+    await connector.start();
+    const baseUrl = boundUrl();
+    const page = await fetch(baseUrl + "/page");
+    expect(page.status).toBe(200);
+    expect(page.headers.get("x-ratelimit-remaining")).toBe("1");
+    await page.text();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      for (const url of ["/health", "/ready"]) {
+        const probe = await fetch(baseUrl + url);
+        expect(probe.status).toBe(url === "/health" ? 200 : 503);
+        expect(probe.headers.get("x-ratelimit-limit")).toBeNull();
+        await probe.text();
+      }
+    }
+    const api = await fetch(baseUrl + "/api");
+    expect(api.status).toBe(200);
+    expect(api.headers.get("x-ratelimit-remaining")).toBe("0");
+    await api.text();
+    const exhausted = await fetch(baseUrl + "/page");
+    expect(exhausted.status).toBe(429);
+    await exhausted.text();
+    for (const url of ["/health", "/ready"]) {
+      const probe = await fetch(baseUrl + url);
+      expect(probe.status).toBe(url === "/health" ? 200 : 503);
+      await probe.text();
+    }
+  });
+
+  it(`lets renamed health probes opt back into the global quota in ${strategy}`, async () => {
+    const connector = await bootConnector(strategy, {
+      health: { path: "/live", readinessPath: "/readiness", rateLimit: true },
+    });
+    router.get("/api", ({ response }) => response.send("api"));
+    await connector.start();
+    const baseUrl = boundUrl();
+    const liveness = await fetch(baseUrl + "/live");
+    expect(liveness.status).toBe(200);
+    expect(liveness.headers.get("x-ratelimit-remaining")).toBe("1");
+    await liveness.text();
+    const readiness = await fetch(baseUrl + "/readiness");
+    expect(readiness.status).toBe(503);
+    expect(readiness.headers.get("x-ratelimit-remaining")).toBe("0");
+    await readiness.text();
+    for (const url of ["/live", "/readiness", "/api"]) {
+      const response = await fetch(baseUrl + url);
+      expect(response.status).toBe(429);
+      await response.text();
+    }
+  });
+
+  it(`global:false keeps blanket quotas off and explicit route limits on in ${strategy}`, async () => {
+    const connector = await bootConnector(strategy, {
+      rateLimit: { global: false, max: 1, timeWindow: 60_000 },
+      health: { rateLimit: true },
+    });
+    router.get("/limited", ({ response }) => response.send("limited"), {
+      rateLimit: { max: 1, timeWindow: 60_000 },
+    });
+    router.get("/unlimited", ({ response }) => response.send("unlimited"));
+    getHttpServer().get("/page", async () => "page");
+    await connector.start();
+    const baseUrl = boundUrl();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      for (const url of ["/unlimited", "/page", "/health"]) {
+        const response = await fetch(baseUrl + url);
+        expect(response.status).toBe(200);
+        expect(response.headers.get("x-ratelimit-limit")).toBeNull();
+        await response.text();
+      }
+    }
+    for (const status of [200, 429]) {
+      const response = await fetch(baseUrl + "/limited");
+      expect(response.status).toBe(status);
+      await response.text();
+    }
+  });
+}

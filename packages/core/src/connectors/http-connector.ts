@@ -139,13 +139,19 @@ export class HttpConnector extends BaseConnector {
     const livenessPath = healthConfig?.path ?? "/health";
     const readinessPath = healthConfig?.readinessPath ?? "/ready";
 
-    this.http.get(livenessPath, async (_request: any, reply: any) => {
+    // Infrastructure probes must stay reachable after client quotas are spent.
+    // Opting in inherits the configured global policy and its shared bucket.
+    const routeOptions = {
+      config: { rateLimit: healthConfig?.rateLimit === true ? undefined : false },
+    };
+
+    this.http.get(livenessPath, routeOptions, async (_request: any, reply: any) => {
       const result = health.liveness();
 
       return reply.code(result.status === "ok" ? 200 : 503).send(result);
     });
 
-    this.http.get(readinessPath, async (_request: any, reply: any) => {
+    this.http.get(readinessPath, routeOptions, async (_request: any, reply: any) => {
       const result = await health.readiness();
 
       return reply.code(result.status === "ok" ? 200 : 503).send(result);

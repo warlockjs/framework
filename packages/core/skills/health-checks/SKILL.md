@@ -34,11 +34,22 @@ const httpConfigurations: HttpConfigurations = {
     enabled: true, // default; set false to remove both endpoints
     path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
+    rateLimit: false, // exempt probes from global client quotas (default)
   },
 };
 
 export default httpConfigurations;
 ```
+
+Built-in liveness and readiness routes bypass `http.rateLimit` by default,
+including renamed probe paths. Application traffic cannot consume their quota,
+and probe traffic does not consume the application's quota. Their normal
+liveness/readiness status still applies.
+
+Set `http.health.rateLimit: true` to opt both probes into the global policy and
+shared client bucket. This requires the rate-limit plugin to be enabled and
+`http.rateLimit.global` to remain enabled; exhausted quotas can then return 429
+for probes too. Disabling global limits leaves opted-in probes unlimited.
 
 ## Readiness checks
 

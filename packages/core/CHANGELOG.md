@@ -10,9 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
-- Fixed global HTTP rate-limit hooks being missed by application and health routes when registration ran before queued plugins completed (affects 5.30.0 and earlier releases with this registration order). HTTP plugin initialization now completes before route scanning in production and development; lazy static mounts queue their routes after limiter hooks too.
+- In every release up to and including 5.30.0, the global `http.rateLimit` did not apply to application routes or `/health` in production, and per-route `rateLimit` options had no effect in production (development enforced them). 5.31 enforces both. Built-in liveness and readiness routes are exempt by default; `http.health.rateLimit: true` opts them into the global policy.
 
 ### Upgrading
+
+- **BREAKING:** rate limits now apply to production application routes and web page routes. The default is 60 requests/minute per IP, in one bucket shared across application routes, pages and static assets. Review `http.rateLimit.max`; behind a proxy configure trusted `http.trustProxy` addresses or a suitable `keyGenerator` so clients do not share the proxy's quota. Set `http.rateLimit.global: false` to keep blanket quotas off while retaining explicit per-route limits. Built-in `/health` and `/ready` are exempt unless `http.health.rateLimit: true` opts them back in.
 
 - **BREAKING:** upgrade development and production runtimes to Node.js 22.15 or newer before running the CLI.
 

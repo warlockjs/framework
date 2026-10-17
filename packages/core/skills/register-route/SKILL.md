@@ -192,6 +192,19 @@ again on the first request, which can be noticeable for large directories. The p
 keeps `decorateReply: false` for additional mounts. Initialization failures reach
 the application's normal error handler.
 
+Global rate limits now apply to production application routes and web page
+routes too. Defaults are 60 requests/minute per IP in one shared bucket across
+routes, pages and static assets. Behind a reverse proxy, configure trusted
+`http.trustProxy` addresses or a suitable `http.rateLimit.keyGenerator`, and
+review `max` before upgrading. `http.rateLimit.global: false` disables blanket
+quotas while retaining explicit route limits. Built-in health/readiness probes
+are exempt unless `http.health.rateLimit: true` opts them into the global policy.
+
+Production supports individual exemptions via
+`serverOptions: { config: { rateLimit: false } }`. Development's wildcard
+currently still applies its global quota to those routes. Use `global: false`
+with explicit `rateLimit` declarations for consistent selective limits.
+
 ## Gotchas
 
 - **Never import `routes.ts`.** The framework auto-loads it. Importing causes a double-registration error.

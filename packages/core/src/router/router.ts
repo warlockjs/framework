@@ -1113,8 +1113,8 @@ export class Router {
     // wildcard is switched off so the HEAD wildcard owns it (the registry falls
     // back to the GET route, exactly as production's implicit HEAD does).
     // `@fastify/cors` registers its own OPTIONS "*" catch-all whenever
-    // preflight is on. Plugins load after this runs, so `hasRoute` cannot see
-    // it yet: decide from the same options the cors plugin receives.
+    // preflight is on. Use the plugin's options as well as hasRoute so this
+    // dispatcher works both after HTTP plugin boot and before queued plugins.
     const corsOwnsPreflight = buildCorsOptions().preflight !== false;
 
     for (const method of DEV_DISPATCH_METHODS) {

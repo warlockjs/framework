@@ -470,6 +470,13 @@ export interface HttpConfigurations {
      * @default "/ready"
      */
     readinessPath?: string;
+    /**
+     * Include built-in liveness/readiness probes in the global rate-limit policy.
+     * Leave false so client traffic cannot exhaust infrastructure probe quotas.
+     *
+     * @default false
+     */
+    rateLimit?: boolean;
   };
   /**
    * Host
