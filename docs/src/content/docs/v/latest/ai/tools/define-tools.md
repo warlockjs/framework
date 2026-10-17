@@ -207,6 +207,10 @@ const agent = ai.agent({ model, tools: [wrapped] });
 
 Workflow errors surface as `ToolExecutionError` with `cause` pointing at the original `WorkflowError` subclass.
 
+## Provider-defined tools
+
+A provider's own tools (Anthropic `web_search` / `bash`, OpenAI Responses `web_search`, Gemini `googleSearch`, …) are declared with `ai.providerTool({ provider, definition })` and sit in the same `tools` list. See [Provider-defined tools](/v/latest/ai/tools/provider-tools/).
+
 ## Related
 
 - [Run agent](/v/latest/ai/agents/run-agent/) — how tools plug into the trip loop.

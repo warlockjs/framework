@@ -330,3 +330,13 @@ if (model.countTokens) {
   const inputTokens = await model.countTokens(messages, options);
 }
 ```
+
+## Built-in tools and streamed thoughts
+
+Gemini's own tools — `{ googleSearch: {} }`, `{ codeExecution: {} }`, `{ urlContext: {} }` — go in `tools` through `ai.providerTool({ provider: "google", definition })`; each is sent verbatim as its own `Tool` entry after the function declarations. See [Provider-defined tools](/v/latest/ai/tools/provider-tools/).
+
+```ts
+const search = ai.providerTool({ provider: "google", definition: { googleSearch: {} } });
+```
+
+With `streamChunks` (on by default under `agent.stream()`), `stream()` also yields `reasoning` for thought parts (they are only sent with `providerOptions: { google: { body: { thinkingConfig: { includeThoughts: true } } } }`) and `usage` for every chunk carrying `usageMetadata`. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/).

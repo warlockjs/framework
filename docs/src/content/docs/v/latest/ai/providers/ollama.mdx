@@ -206,3 +206,7 @@ so include any neutral sampling settings you want to retain in that object.
 
 Ollama's chat transport has no native preflight token-count endpoint, so its
 model has no `countTokens` method. `sdk.count(text)` remains an offline estimate.
+
+## Streamed thinking and provider tools
+
+With `streamChunks` (on by default under `agent.stream()`), `stream()` yields `reasoning` for each `message.thinking` piece when `think` is on. Ollama's chat API has no built-in tools: an `ai.providerTool()` naming another provider is left out of the request with a warning. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/) and [Provider-defined tools](/v/latest/ai/tools/provider-tools/).

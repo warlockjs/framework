@@ -96,7 +96,7 @@ for await (const event of stream) {
 const result = await stream.result;
 ```
 
-The same lifecycle events fire whether you call `execute` or `stream` — streaming adds per-token deltas on top. The final envelope on `stream.result` is identical to what `execute` would resolve with.
+The same lifecycle events fire whether you call `execute` or `stream` — streaming adds per-token deltas on top, plus reasoning deltas (`agent.trip.reasoning`), tool-argument deltas (`agent.tool.streaming`) and mid-stream usage (`agent.trip.usage`) where the provider streams them — see [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/). The final envelope on `stream.result` is identical to what `execute` would resolve with.
 
 ## The result envelope
 
@@ -327,6 +327,7 @@ No implicit persistence. No automatic history. Just a string that rides along.
 Names:
 
 - `agent.starting`, `agent.trip.started`, `agent.trip.streaming`, `agent.trip.completed`
+- `agent.trip.reasoning`, `agent.trip.usage`, `agent.tool.streaming` — `agent.stream()` only
 - `agent.tool.calling`, `agent.tool.called`, `agent.tool.failed`
 - `agent.completed`, `agent.error`
 
