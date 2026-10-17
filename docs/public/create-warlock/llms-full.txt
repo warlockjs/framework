@@ -224,6 +224,15 @@ scripts. Oxc projects also configure VS Code format-on-save with the official
 that extension. The ESLint toolchain retains its Prettier/ESLint editor settings.
 Oxc config enables `devServer.healthCheckers: { eslint: false, oxlint: true }` and
 leaves TypeScript health checks enabled. Style matches the template's 100-column,
-double-quote, semicolon and trailing-comma settings. Oxfmt does not perform
-`prettier-plugin-organize-imports`' semantic import sorting/removal, so maintain
-import order and remove unused imports based on lint diagnostics.
+double-quote, semicolon and trailing-comma settings. Import sorting is on in
+`.oxfmtrc.json`, kept to one block like the ESLint toolchain's
+`prettier-plugin-organize-imports`:
+
+```json
+{ "sortImports": { "newlinesBetween": false } }
+```
+
+`format` (`oxfmt --write ./src`) orders built-ins, then packages, then relative
+imports. Oxfmt does not delete unused imports, so remove them from Oxlint's
+`no-unused-vars` diagnostics. Scripts in both toolchains call local binaries
+(`eslint --fix ./src --max-warnings=0`, `tsc --noEmit`), never `npx`.

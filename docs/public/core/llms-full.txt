@@ -1127,6 +1127,35 @@ The `ConfigRegistry` interface is augmented by generated typings — once you ad
 
 That's the contract. Filename → config key. No registration, no manifest, no side effects.
 
+### Validate a config file at boot: `configSchema`
+
+Export a `configSchema` next to the default export. The value is validated
+before it is registered (dev boot, each hot reload, production start); every
+problem in every config file is reported in one `InvalidConfigError`, naming
+the env variable to set. Values are never printed; an invalid config never
+reaches its special handler; a bad hot reload keeps the previous value.
+
+```ts
+// src/config/payments.ts
+import { defineConfigSchema, env, type ConfigOf } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+export const configSchema = defineConfigSchema(
+  v.object({ apiKey: v.string(), webhookSecret: v.string() }),
+  { env: { apiKey: "PAYMENTS_API_KEY", webhookSecret: "PAYMENTS_WEBHOOK_SECRET" } },
+);
+
+const paymentsConfig: ConfigOf<typeof configSchema> = {
+  apiKey: env("PAYMENTS_API_KEY"),
+  webhookSecret: env("PAYMENTS_WEBHOOK_SECRET"),
+};
+
+export default paymentsConfig;
+```
+
+Nested keys use dotted paths in the `env` map (`"smtp.password"`). Files
+without a `configSchema` load as before.
+
 ## Special handlers
 
 Some subsystems need to do extra work when their config loads (e.g. set the active locale, register a driver). Those have a special handler attached internally — for the most part you don't see them. The takeaway: changing a config file at dev time fires the handler again automatically.
@@ -1192,7 +1221,7 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 ## Multi-server settings (5.20.0)
 
-- `http.rateLimit` — `@fastify/rate-limit` options (`nameSpace`, ...); `store: "cache"` counts in `@warlock.js/cache` so every server shares the limit (per-route `middleware.rateLimit()` follows it; `skipOnError` defaults to `true`, so a cache outage fails open; the `null` and `file` cache drivers are refused); `redis` needs an ioredis client; `enabled: false` disables.
+- `http.rateLimit` — `@fastify/rate-limit` options (`nameSpace`, ...); `store: "cache"` counts in `@warlock.js/cache` so every server shares the limit (per-route `middleware.rateLimit()` follows it; `skipOnError` defaults to `true`, so a cache outage fails open; the `null` and `file` cache drivers are refused); `redis` needs an ioredis client; `enabled: false` disables. Static files (public folder, `router.directory()` mounts, `router.file()` routes, web build assets) are exempt unless `staticFiles: true`.
 - `socket.adapter` — adapter factory for cross-server broadcast.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
@@ -1293,17 +1322,27 @@ export default {
 } satisfies HttpConfigurations;
 ```
 
-String paths match a prefix at a segment boundary. Regexes match the decoded,
-pathname candidates: raw, decoded, and decoded with dot segments resolved, each
-with repeated/trailing slashes collapsed. Any match suppresses input; normalization
-never narrows a raw-path match. The matched route pattern is checked too. These rules apply even when no route
-matches. Matching rules combine and only remove input; a route cannot re-enable
-fields they suppress. `query: false` also removes the logged URL's query string.
-With private policies configured, an undecodable path withholds both body and
-query. An undecodable configured prefix suppresses its selected fields for all
-requests. Rules assume case-sensitive routing defaults; with case-insensitive
-routing, use a regex with `i` and include any custom semicolon delimiters in the
-matcher. The URL's original path spelling is retained in the snapshot.
+String paths match a prefix at a segment boundary. Both string and regex rules
+are checked against several pathname candidates: the raw path, the decoded path,
+and the decoded path with dot segments resolved, each with repeated and trailing
+slashes collapsed. Any match suppresses input, so normalization never narrows a
+raw-path match. The matched route pattern is checked too, and the rules apply
+even when no route matches. Matching rules combine and only remove input; a
+route cannot re-enable fields they suppress. `query: false` also removes the
+logged URL's query string.
+
+With private policies configured, a request path that does not decode withholds
+both body and query. The same holds for the matched route pattern: a route
+pattern containing a `%` that does not decode (such as `/files/100%`) withholds
+body and query on every request to that route. An undecodable configured prefix
+suppresses its selected fields for all requests. Rules assume case-sensitive
+routing defaults; with case-insensitive routing, use a regex with `i` and
+include any custom semicolon delimiters in the matcher. The URL's original path
+spelling is retained in the snapshot.
+
+The rules are prepared once per `private` array. To change them at runtime, set
+a new array (`config.set("http.logging.private", [...])`) rather than editing the
+existing one in place.
 
 When upgrading from 5.29, update redaction censors that inspect `context.request`:
 it is a `RequestLogSnapshot`, with `url` and `route` (a string), rather than a
@@ -1650,7 +1689,7 @@ npx warlock generate.module products            # full CRUD bootstrap (default �
 npx warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
 ```
 
-Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
+Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. Every generator takes `--dry-run` (write nothing, list the plan) and `--json` (one machine-readable report on stdout). To add one endpoint from its request schema — controller, service, resource, route, locale key and an HTTP test — use `warlock make endpoint` (the `make-endpoint` topic). The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
 
 ## What the generator creates
 
@@ -2480,18 +2519,44 @@ npx warlock generate.openapi --out docs/openapi.json --title "Shop API" --server
 
 ## What is documented
 
-| Part                  | Source                                                                                                                                                                                                                                                                                                                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Paths                 | `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head).                                                                                                                                                                                                                                                                          |
-| `operationId`         | The route `name` (`name.<verb>` when an `all` route expands), else `<verb>_<path_slug>`. Duplicates are renamed with a warning.                                                                                                                                                                                                                                                                   |
-| Tag                   | The first static path segment (`/users/:id` is tagged `users`).                                                                                                                                                                                                                                                                                                                                   |
-| Summary / description | The route `label`; the route or handler `description`, plus a line about required user types and the cookie CSRF rule when the route is guarded.                                                                                                                                                                                                                                                  |
-| Path parameters       | `validation.params` gives typed ones; a path segment with no schema is a required `string`.                                                                                                                                                                                                                                                                                                       |
-| Request body / query  | `validation.schema`, converted with the Seal schema's JSON Schema output. It is the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request.                                                                                                                                                                   |
-| Responses             | `handler.responseSchema`, one response per declared status (see below). A route with no 2xx declared gets a `200` description only.                                                                                                                                                                                                                                                               |
-| `422`                 | Added when the route has `validation.schema`, shaped by `validation.response` (`errors`, `inputKey`, `inputError`, `status`; `Response.failedSchema` defaults to 422). Stored once as `components.schemas.ValidationFailed`. A route with only `validation.params` gets none.                                                                                                                     |
-| `401`                 | Added when the route is guarded, as `{ error: string }` (`components.schemas.Unauthorized`). A status you declare yourself is kept.                                                                                                                                                                                                                                                               |
-| Security              | `authMiddleware()` tags the middleware it returns with a `Symbol.for("warlock.auth")` descriptor (`{ sources, userTypes }`); core reads it without importing auth. A header source is `bearerAuth` (HTTP bearer), a cookie source is `cookieAuth` (API key in that cookie); header plus cookie is an OR. Only the schemes a route uses are emitted. Middleware without a descriptor adds nothing. |
+| Part                  | Source                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Paths                 | `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head).                                                                                                                                                                                                                                                                                                                   |
+| `operationId`         | The route `name` (`name.<verb>` when an `all` route expands), else `<verb>_<path_slug>`. Duplicates are renamed with a warning.                                                                                                                                                                                                                                                                                                            |
+| Tag                   | The first static path segment (`/users/:id` is tagged `users`).                                                                                                                                                                                                                                                                                                                                                                            |
+| Summary / description | The route `label`; the route or handler `description`, plus a line about required user types and the cookie CSRF rule when the route is guarded.                                                                                                                                                                                                                                                                                           |
+| Path parameters       | `validation.params` gives typed ones; a path segment with no schema is a required `string`.                                                                                                                                                                                                                                                                                                                                                |
+| Request body / query  | `validation.schema`, converted with the Seal schema's JSON Schema output. It is the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request.                                                                                                                                                                                                            |
+| Responses             | `handler.responseSchema`, one response per declared status (see below). A route with no 2xx declared gets a `200` description only.                                                                                                                                                                                                                                                                                                        |
+| `422`                 | Added when the route has `validation.schema`, shaped by `validation.response` (`errors`, `inputKey`, `inputError`, `status`; `Response.failedSchema` defaults to 422). Stored once as `components.schemas.ValidationFailed`. A route with only `validation.params` gets none. A custom failure body (`validation.onFailure`, `validation.response.body`) is documented from the `responseSchema` entry for its status instead (see below). |
+| `401`                 | Added when the route is guarded, as `{ error: string }` (`components.schemas.Unauthorized`). A status you declare yourself is kept.                                                                                                                                                                                                                                                                                                        |
+| Security              | `authMiddleware()` tags the middleware it returns with a `Symbol.for("warlock.auth")` descriptor (`{ sources, userTypes }`); core reads it without importing auth. A header source is `bearerAuth` (HTTP bearer), a cookie source is `cookieAuth` (API key in that cookie); header plus cookie is an OR. Only the schemes a route uses are emitted. Middleware without a descriptor adds nothing.                                          |
+
+### Custom validation failure bodies
+
+When a route shapes its own failure body, declare that status in `responseSchema`; the generator documents it instead of `ValidationFailed`:
+
+```ts title="src/app/imports/controllers/create-import.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+const importSchema = v.object({ name: v.string().required() });
+
+export const createImportController: RequestHandler = async ({ response }) =>
+  response.successCreate({ id: "import-1" });
+
+createImportController.validation = {
+  schema: importSchema,
+  onFailure: () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } }),
+};
+
+createImportController.responseSchema = {
+  201: { body: { id: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+Undeclared, the configured failure status (`validation.response.status`, default 422) gets a description-only response, and a route-level `onFailure` also produces a warning. Any declared 4xx entry on a route with `onFailure` is trusted as its failure response.
 
 ### Responses from `responseSchema`
 
@@ -2841,6 +2906,10 @@ shared client bucket. This requires the rate-limit plugin to be enabled and
 `http.rateLimit.global` to remain enabled; exhausted quotas can then return 429
 for probes too. Disabling global limits leaves opted-in probes unlimited.
 
+Static files are exempt the same way (public folder, `router.directory()` mounts,
+`router.file()` routes, the web build's assets); `http.rateLimit.staticFiles:
+true` counts them. Pages and API routes always share the global bucket.
+
 ## Readiness checks
 
 Readiness is `isBooted && !isShuttingDown` plus every registered check. Register a check from a connector, a `main.ts`, or anywhere:
@@ -2980,6 +3049,216 @@ It's the **same esbuild transform the production `tsx`/build path uses**, so a f
 - The `test-service` topic — `setupTest()` bootstrap for unit-testing services/models once the harness loads.
 - The `test-http` topic — integration tests over the real HTTP server.
 - The `write-migration` topic of the `warlock-js-cascade` skill — the decorated models this plugin lets you load.
+
+
+## make-endpoint  `@warlock.js/core/make-endpoint/SKILL.md`
+
+---
+name: make-endpoint
+description: 'Generate one endpoint spec-first with `warlock make endpoint <module>/<name>` — request schema (from `--schema`), service, resource, a single controller using `request.validated()` with an OpenAPI `responseSchema`, the route (guarded by default, `public: true` with `--public`), a locale key, and a test that hits the real HTTP stack. Also: `--dry-run` and `--json` on every `make` / `generate.*` / `add` command. Triggers: `warlock make endpoint`, `make.endpoint`, `generate.endpoint`, `warlock make`, `--schema`, `--resource`, `--public`, `--auth`, `--dry-run`, `--json`, `public: true`, `GenerationReport`; "scaffold an endpoint", "add a POST route with validation and a test", "preview what a generator writes", "machine-readable generator output". Skip: a whole CRUD module — the `create-module` topic; controller shape by hand — the `create-controller` topic.'
+---
+
+# Warlock — make an endpoint
+
+Write the request schema, then let the generator write everything around it in the framework's conventions.
+
+## 1. The spec
+
+```ts title="post.spec-input.ts"
+import { type Infer, v } from "@warlock.js/seal";
+
+export const postInput = v.object({
+  title: v.string().min(3),
+  views: v.int().min(1).optional(),
+});
+
+export type PostInput = Infer<typeof postInput>;
+```
+
+The file may live anywhere. Outside `src/` it is copied into the module (relative imports re-pointed); under `src/` it is imported where it lives. The export is found by the conventional name (`createPostSchema`), else the only `v.object(...)` export, else the default export.
+
+## 2. Preview, then generate
+
+```bash
+warlock make endpoint posts/create-post --schema ./post.spec-input.ts --dry-run --json
+warlock make endpoint posts/create-post --schema ./post.spec-input.ts
+warlock make endpoint posts/update-post --method patch --schema ./post.spec-input.ts
+warlock make endpoint contact/send-message --schema ./message.ts --public
+```
+
+Options: `--method get|post|put|patch|delete` (default `post`), `--path` (default `/<module>`, or `/<module>/:id` for put/patch/delete), `--resource <Name>` (default: the module's singular), `--auth` (default) or `--public`, `--force`, `--dry-run`, `--json`. `warlock generate.endpoint` and `warlock make.endpoint` are the same command.
+
+## 3. What it writes (`src/app/posts/`)
+
+- `schema/create-post.schema.ts` — `createPostSchema` and its `CreatePostSchema` type.
+- `services/create-post.service.ts` — `createPostService(input)`; validated input only, never the request. Fill it in.
+- `resources/post.resource.ts` — `PostResource` shaped from the schema fields (skipped when it exists).
+- `controllers/create-post.controller.ts` — one handler:
+
+```ts
+export const createPostController: GuardedRequestHandler<CreatePostSchema> = async ({
+  request,
+  response,
+}) => {
+  const post = await createPostService(request.validated());
+
+  return response.successCreate({
+    message: t("posts.createPostSuccess"),
+    post: new PostResource(post),
+  });
+};
+
+createPostController.validation = { schema: createPostSchema };
+
+createPostController.responseSchema = {
+  201: { body: { message: "string", post: PostResource } },
+};
+```
+
+- `routes.ts` — appended: `guarded(() => { router.post("/posts", createPostController); })`, or with `--public`: `router.post("/posts", createPostController, { public: true });`.
+- `utils/locales.json` — `createPostSuccess` merged in (existing keys win).
+- `tests/create-post.test.ts` — a valid request derived from the schema expecting `201` and the resource, a request missing a required field expecting a 4xx, and for guarded routes an anonymous `401` plus a signed-in case through `actingAs()`.
+
+Existing files are skipped and reported (never overwritten without `--force`); a controller already in `routes.ts` is not registered twice.
+
+## 4. Run its test
+
+```bash
+warlock test --related src/app/posts/tests/create-post.test.ts
+```
+
+The test needs `warlock add test`. Signed-in cases create a user through `auth.userType.user` (a test database); adjust its fields if your user model requires more. A required file field turns the happy path into an `it.todo` (JSON cannot carry files).
+
+## `--dry-run` and `--json` everywhere
+
+Every `generate.*` command, `make`, and `add` take both. `--dry-run` writes (and for `add`, installs) nothing. `--json` prints exactly one report on stdout — also on failure — and sends everything else to stderr:
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "make endpoint",
+  "dryRun": true,
+  "ok": true,
+  "written": ["src/app/posts/controllers/create-post.controller.ts"],
+  "skipped": [
+    {
+      "path": "src/app/posts/resources/post.resource.ts",
+      "reason": "exists (pass --force to overwrite)"
+    }
+  ],
+  "files": [{ "path": "src/app/posts/routes.ts", "type": "update" }],
+  "details": { "endpoint": { "method": "POST", "path": "/posts", "access": "guarded" } },
+  "messages": []
+}
+```
+
+`files[].type`: `create`, `overwrite`, `update`, `unchanged`, `skip`. On failure `ok: false` and `error` says why. `add --list --json` puts the feature catalog in `details.features`.
+
+## `public: true`
+
+`RouteOptions.public` changes nothing at runtime; it records that a route deliberately has no auth guard, so a mutating route without one reads as a decision. Lint rules and route tooling read it.
+
+## See also
+
+- The `create-module` topic — a whole CRUD module.
+- The `test-http` topic — the HTTP helpers the generated test uses.
+- The `generate-openapi` topic — what `responseSchema` documents.
+
+
+## model-factories  `@warlock.js/core/model-factories/SKILL.md`
+
+---
+name: model-factories
+description: 'Deterministic model factories for tests and seeders — `defineFactory(Model, (seed) => attributes)` with `make()`, `makeMany(n)`, `create()`, `create(n)`, `createMany(n)`, named states via `.state()` / `.with()`, and a faker-free seed (`seed.text`, `seed.email`, `seed.uuid`, `seed.date`, `seed.number`, `seed.pick`). Triggers: `defineFactory`, `Factory`, `FactorySeed`, `resetFactorySequences`, `userFactory`; "test fixtures", "create test users", "factory states", "deterministic test data", "build a request body for a test". Typical import `import { defineFactory } from "@warlock.js/core/tests"`. Skip: seeding a real database for development — the `write-seeder` topic; fakes — the `test-fakes` topic.'
+---
+
+# Warlock — model factories
+
+A factory turns a sequence number into attributes. The n-th record a factory builds is the same on every run — no faker, no randomness — so snapshots and assertions stay stable.
+
+## Define one per model
+
+```ts title="src/app/users/tests/user.factory.ts"
+import { Model } from "@warlock.js/cascade";
+import { defineFactory } from "@warlock.js/core/tests";
+
+// Your model; in an app this is `import { User } from "app/users/models/user"`.
+type UserSchema = { name: string; email: string; password: string; emailVerifiedAt?: Date };
+
+export class User extends Model<UserSchema> {
+  public static table = "users";
+}
+
+export const userFactory = defineFactory(User, (seed) => ({
+  name: seed.text("User"), // "User 1", "User 2", ...
+  email: seed.email(), // "user1@example.test", ...
+  password: "test-password",
+}))
+  .state("unverified", () => ({ emailVerifiedAt: undefined }))
+  .state("named", (seed) => ({ name: `Named ${seed.sequence}` }));
+```
+
+Attributes are typed by the model's schema (`Partial` of it, as `Model.create()` takes). Keep factories next to the module's tests.
+
+## Use it
+
+```ts
+// with: import { expectJson, testPost } from "@warlock.js/core/tests";
+//       import { userFactory } from "./user.factory";
+it("registers a user from a factory-built body", async () => {
+  const body = userFactory.make({ email: "ada@example.test" }); // attributes only, no database
+
+  const response = await testPost("/auth/register", body);
+
+  expect((await expectJson<{ user: { email: string } }>(response, 201)).user.email).toBe(
+    "ada@example.test",
+  );
+});
+
+it("lists users", async () => {
+  await userFactory.create(3); // three saved users, in order
+  await userFactory.with("unverified", "named").create();
+});
+```
+
+| Call                        | Returns            | Database |
+| --------------------------- | ------------------ | -------- |
+| `make(overrides?)`          | attributes         | no       |
+| `makeMany(n, overrides?)`   | attributes[]       | no       |
+| `create(overrides?)`        | `Promise<Model>`   | yes      |
+| `create(n, overrides?)`     | `Promise<Model[]>` | yes      |
+| `createMany(n, overrides?)` | `Promise<Model[]>` | yes      |
+| `with(...states)`           | a derived factory  | —        |
+| `state(name, fn)`           | the same factory   | —        |
+| `resetSequence()`           | —                  | —        |
+
+`create()` goes through the model's own `create()`, so casts, defaults, hooks and events run exactly as in the app. Overrides are a partial or a function of the seed: `make((seed) => ({ name: `Custom ${seed.sequence}` }))`. States apply in order on top of the definition, then the overrides. A derived factory shares the base sequence.
+
+## The seed
+
+| Member               | Value                                                  |
+| -------------------- | ------------------------------------------------------ |
+| `sequence`           | 1 for the first record the factory builds, then 2, ... |
+| `index`              | position within the current `makeMany` / `createMany`  |
+| `text(prefix?)`      | `"<prefix> <sequence>"`                                |
+| `email(prefix?)`     | `"<prefix><sequence>@example.test"` (default `user`)   |
+| `uuid()`             | `00000000-0000-4000-8000-<sequence, 12 digits>`        |
+| `date(offsetDays?)`  | 2026-01-01T00:00:00Z plus `offsetDays` days            |
+| `number(min?, max?)` | an integer in `[min, max]`, cycling with the sequence  |
+| `pick(values)`       | one of `values`, cycling with the sequence             |
+
+`resetFactorySequences()` restarts every factory — call it in `beforeEach` when a test asserts exact values.
+
+## Gotchas
+
+- **Unique columns.** `seed.email()` is unique per factory sequence, not across test files; a database shared between files needs cleanup or `resetFactorySequences()` plus truncation, otherwise a second file collides on `user1@example.test`.
+- **`make()` never touches the database.** It returns attributes, not a model instance — use it for request bodies and pure-logic tests.
+- **An unknown state throws** and lists the defined ones.
+
+## See also
+
+- The `test-fakes` topic — fakes for mail, queue, cache, storage, clock and ids.
+- The `write-seeder` topic — seeding a development database.
 
 
 ## process-image  `@warlock.js/core/process-image/SKILL.md`
@@ -3261,6 +3540,15 @@ router.prefix("/products", () => {
 
 If `guarded` doesn't exist in your project yet, see the shared utility convention in the `warlock-conventions` topic.
 
+### A mutating route with no guard — say so with `public: true`
+
+```ts
+// src/app/contact/routes.ts
+router.post("/api/contact", contactController, { public: true });
+```
+
+`public: true` changes nothing at runtime; it records that the missing guard is deliberate, so reviewers, lint rules and route tooling can tell a decision from an omission. `warlock make endpoint --public` writes it (the `make-endpoint` topic).
+
 ## RESTful resource chain
 
 For a standard CRUD resource, `router.route(path)` returns a builder with five named slots:
@@ -3305,14 +3593,45 @@ guarded(() => {
 
 ```ts
 router.prefix("/auth", () => {
-  router.post("/login", loginController);
-  router.post("/register", registerController);
+  router.post("/login", loginController, { public: true });
+  router.post("/register", registerController, { public: true });
   guarded(() => {
     router.post("/logout", logoutController);
     router.get("/me", meController);
   });
 });
 ```
+
+### Mutating routes: guard them or say `public: true`
+
+Every POST/PUT/PATCH/DELETE route either runs auth middleware (on the route, its
+builder, or an enclosing group such as `guarded()`) or is marked `public: true`.
+`warlock dev` warns once per route about mutating routes with neither; the
+`@warlock.js/require-route-guard` lint rule reports the same at edit time.
+
+```ts
+import { markAuthGuard, router, type Middleware, type RequestHandler } from "@warlock.js/core";
+
+const stripeWebhookController: RequestHandler = async ({ response }) =>
+  response.success({ received: true });
+const importController: RequestHandler = async ({ response }) => response.success({ queued: true });
+
+// Open on purpose: a webhook signed by the provider.
+router.group({ prefix: "/webhooks", public: true }, () => {
+  router.post("/stripe", stripeWebhookController);
+});
+
+// A hand-written guard whose name has no "auth"/"guard" in it.
+const requireApiKey: Middleware = markAuthGuard(async ({ request, response }) => {
+  if (request.headers["x-api-key"] !== process.env.API_KEY) return response.unauthorized();
+});
+
+router.post("/imports", importController, { middleware: [requireApiKey] });
+```
+
+`public` changes nothing at runtime. `authMiddleware()` marks itself (its
+`{ optional: true }` form does not count). Silence the warning app-wide with
+`http.warnUnguardedRoutes: false`; page routes are never reported.
 
 ### Multiple paths on one handler
 
@@ -3336,8 +3655,7 @@ Request log entries otherwise include the body as received (before validation), 
 router.directory({ root: Application.publicPath, prefix: "/assets/" });
 ```
 
-Static routes are queued at scan time after HTTP plugin hooks, so global
-`http.rateLimit` covers public and directory mounts along with application routes. `@fastify/static` itself loads only on
+Static routes are queued at scan time after HTTP plugin hooks. `@fastify/static` itself loads only on
 the first static file request, even with an existing public folder; concurrent
 first requests share initialization. The upstream sender retains ranges, caching,
 listings, precompressed files, `allowedPath` and `setHeaders` behavior. The
@@ -3353,18 +3671,37 @@ again on the first request, which can be noticeable for large directories. The p
 keeps `decorateReply: false` for additional mounts. Initialization failures reach
 the application's normal error handler.
 
-Global rate limits now apply to production application routes and web page
-routes too. Defaults are 60 requests/minute per IP in one shared bucket across
-routes, pages and static assets. Behind a reverse proxy, configure trusted
+Global rate limits apply to application routes and web page routes in
+production and development. Defaults are 60 requests/minute per IP in one shared
+bucket across routes and pages. Behind a reverse proxy, configure trusted
 `http.trustProxy` addresses or a suitable `http.rateLimit.keyGenerator`, and
 review `max` before upgrading. `http.rateLimit.global: false` disables blanket
 quotas while retaining explicit route limits. Built-in health/readiness probes
 are exempt unless `http.health.rateLimit: true` opts them into the global policy.
 
-Production supports individual exemptions via
-`serverOptions: { config: { rateLimit: false } }`. Development's wildcard
-currently still applies its global quota to those routes. Use `global: false`
-with explicit `rateLimit` declarations for consistent selective limits.
+Static files are exempt from the global limiter by default: the public folder,
+every `router.directory()` mount and `router.file()` / `cachedFile()` / `files()` /
+`cachedFiles()` routes (and the web build's assets). `http.rateLimit.staticFiles:
+true` counts them all; a mount can decide for itself:
+
+```ts
+import { rootPath, router } from "@warlock.js/core";
+
+router.directory({ root: rootPath("storage/exports"), prefix: "/exports/" }, { rateLimit: true });
+router.directory(
+  { root: rootPath("storage/reports"), prefix: "/reports/" },
+  { rateLimit: { max: 20, timeWindow: 60_000 } },
+);
+router.file("/price-list.pdf", rootPath("storage/price-list.pdf"), 300, { rateLimit: true });
+```
+
+Exempt one application route with `rateLimit: false` (or
+`serverOptions: { config: { rateLimit: false } }`); development's wildcard
+dispatcher honours both exactly as production does:
+
+```ts
+router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
+```
 
 ## Gotchas
 
@@ -4049,7 +4386,7 @@ const result = await measure("publish-event", () =>
 
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`, `detectJavaScriptRuntime`, `assertNodeOnlyCommand`, Bun, Deno, `bun dist/app.js`, `deno run -A`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use", "run on Bun", "run on Deno", "supported runtimes"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -4215,7 +4552,7 @@ Install `oxlint` in the app (`npm install --save-dev oxlint`) and add `.oxlintrc
 }
 ```
 
-`warlock dev` then checks changed JavaScript/TypeScript files in an isolated worker and reports rule ids, line/column spans, errors and warnings. It reads saved files from disk, honors the app's Oxlint ignore/config rules, and uses the app-resolved CLI package. A missing package or config skips the checker. Large file lists run in sequential batches within platform command-line limits, using paths relative to the app. Tool/config errors include the CLI output and are reported without stopping the dev server. CLI children are stopped during worker shutdown.
+`warlock dev` then checks changed JavaScript/TypeScript files in an isolated worker and reports rule ids, line/column spans, errors and warnings. It reads saved files from disk, honors the app's Oxlint ignore/config rules, and uses the app-resolved CLI package. A missing package or config skips the checker. Large file lists run in sequential batches of at most 500 files within platform command-line limits, using paths relative to the app; a batch whose report overflows the 8 MiB buffer is split and retried, and a single path the OS refuses as too long is reported as an unchecked warning instead of failing the scan. Tool/config errors include the CLI output and are reported without stopping the dev server. On worker shutdown CLI children get SIGTERM, then SIGKILL after 250 ms; the interrupted check is cancelled quietly ("the development server is shutting down") rather than reported as a timeout.
 
 ```ts
 import { defineConfig } from "@warlock.js/core";
@@ -4464,6 +4801,50 @@ Three consequences worth knowing:
 
 If you need the same fact inside the app, use `Application.onceBooted()` / `Application.whenBooted()` — the signal and your listeners fire from the same latch.
 
+## Runtimes — Node, Bun, Deno
+
+| Command              | Node.js 22.15+     | Bun 1.4.3                     | Deno 2.9.7                    |
+| -------------------- | ------------------ | ----------------------------- | ----------------------------- |
+| `warlock dev`        | supported          | refused (exit 1, clear error) | refused (exit 1, clear error) |
+| `warlock build`      | supported          | runs with a notice — use Node | runs with a notice — use Node |
+| `warlock start`      | supported          | supported                     | supported                     |
+| built entry directly | `node dist/app.js` | `bun dist/app.js`             | `deno run -A dist/app.js`     |
+
+Build on Node, then start the same `dist/` (plus `node_modules` and `.env`) on any of the three:
+
+```bash
+npx warlock build                                                          # Node
+NODE_ENV=production bun dist/app.js                                        # Bun, direct
+NODE_ENV=production bun node_modules/@warlock.js/core/bin/warlock.js start # Bun, via the CLI (--role works)
+NODE_ENV=production deno run -A dist/app.js                                # Deno, direct
+NODE_ENV=production deno run -A node_modules/@warlock.js/core/bin/warlock.js start
+```
+
+- `warlock start` spawns the server with the runtime the CLI runs on (`process.execPath`), so the server runs on Bun/Deno whenever the CLI does. `bun --bun run start` works; plain `bun run start` runs the CLI on Node.
+- Deno needs no npm-compat flag — it reads `node_modules` through the app's `package.json`. `-A` is what CI verifies.
+- Pages render on Bun and Deno: both resolve `react-dom/server` to a build without `renderToPipeableStream`, so `@warlock.js/web` loads `react-dom/server.node` in that case (no change on Node).
+- The versions above are pinned in `.github/workflows/runtimes.yml`; `packages/core/tests/acceptance/run-runtime-acceptance.mjs --runtimes=node,bun,deno` repeats the CI check locally.
+
+A custom Node-only command can reuse the same guard:
+
+```ts title="src/app/tools/commands/profile.command.ts"
+import { assertNodeOnlyCommand, command, detectJavaScriptRuntime } from "@warlock.js/core";
+
+export const profileCommand = command({
+  name: "profile",
+  description: "Capture a CPU profile (uses node:inspector)",
+  preAction: () => {
+    // Prints "warlock profile runs on Node.js only — this process is Bun 1.4.3." and exits 1 on Bun/Deno.
+    assertNodeOnlyCommand("profile");
+  },
+  action: () => {
+    const runtime = detectJavaScriptRuntime(); // { type: "node", version: "22.15.0" }
+
+    console.log(`profiling on ${runtime.type} ${runtime.version}`);
+  },
+});
+```
+
 ## Picking which mode you're in
 
 `Application.environment` and `Application.runtimeStrategy` are separate axes:
@@ -4583,6 +4964,7 @@ NODE_OPTIONS=--max-old-space-size=4096 npx warlock start
 - **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
 - **`sourcemap: false` cascades to `start`.** Stack traces lose `.ts` precision. Keep sourcemaps on unless artifact size is a hard constraint.
 - **`NODE_ENV` is not set by these commands.** The deployment env (your Dockerfile, CI, hosting provider) sets it. Forget it on a production server and `Application.isProduction` returns `false`, which flips cookie security, CORS, logging — silently. Always set `NODE_ENV=production` in production deployments.
+- **`warlock dev` is Node only.** On Bun or Deno it exits 1 before doing anything; develop on Node and run only the production build on Bun/Deno.
 - **`prestart` runs once on dev boot, not on reload.** If you're seeding test data in `src/app/prestart.ts`, it fires on `warlock dev` startup only. HMR reloads don't re-run it.
 
 ## See also
@@ -5085,6 +5467,23 @@ return response.redirect("/login"); // 302
 return response.redirect("/new-home", 301); // permanent
 ```
 
+A target from the request (`?next=`, `returnTo`) goes through `safeRedirect()`:
+same-origin paths and allow-listed origins pass, anything else (`//evil.com`,
+`javascript:`) becomes the fallback.
+
+```ts
+import { safeRedirect, type RequestHandler } from "@warlock.js/core";
+
+export const afterLoginController: RequestHandler = async ({ request, response }) => {
+  return response.redirect(
+    safeRedirect(request.input("next"), {
+      allowedOrigins: ["https://app.example.com"],
+      fallback: "/dashboard",
+    }),
+  );
+};
+```
+
 ## Files
 
 ```ts
@@ -5099,6 +5498,27 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 ```
 
 `SendFileOptions` lets you set `cacheTime`, `immutable`, `inline`, `filename` (download attachment name).
+
+Conditional requests are handled for you (RFC 9110): `If-None-Match` compares weakly (`W/"a"` matches `"a"`) and answers 304 on GET/HEAD; `If-Match` compares strongly (a `W/` tag never passes) and answers 412. For your own ETags, use the same helper:
+
+```ts
+import { evaluateConditionalRequest, type RequestHandler } from "@warlock.js/core";
+
+export const showDocumentController: RequestHandler = async ({ request, response }) => {
+  const etag = `"doc-42-v7"`;
+  const outcome = evaluateConditionalRequest({
+    method: request.method,
+    etag,
+    ifMatch: request.header("if-match"),
+    ifNoneMatch: request.header("if-none-match"),
+  });
+
+  if (outcome === "not-modified") return response.setStatusCode(304).send();
+  if (outcome === "precondition-failed") return response.setStatusCode(412).send();
+
+  return response.header("ETag", etag).success({ id: 42 });
+};
+```
 
 `response.xml(string | XMLable, statusCode?)` sends `application/xml` — pass a raw XML string, or anything with a `toXML(): string` method (structural, so core never depends on `@warlock.js/sitemap`). This is for BOUNDED values only: a raw string, or a single `@warlock.js/sitemap` `Sitemap` under the sitemaps.org 50,000-URL / 50MB ceiling. `SitemapIndex` has no `toXML()` — it is the streaming path for larger URL sets and does not fit in one response body. It writes shards plus a master index as FILES via `saveTo`/`publish`, and those files are served directly rather than passed through `xml()`. In Warlock web this is the `web.sitemap` config: `enabled`, `outputDir` (default `storagePath("sitemap")`), and `path` (default `/sitemap.xml`) — the app serves the generated files from `outputDir` at that route, it never builds a `SitemapIndex` response inline.
 
@@ -5261,6 +5681,24 @@ is unset — every existing app is unaffected until it opts in.
 A route can still override it — call `response.header("Content-Security-Policy", ...)`
 from a controller or middleware that runs after the funnel, and your value
 wins, same as any other header.
+
+### Header values from user input
+
+`escapeHeaderValue(value)` removes CR/LF and other control characters (tabs
+stay) and replaces non-Latin-1 characters with `?`, so input can neither split
+a header nor make Node throw a 500:
+
+```ts
+import { escapeHeaderValue, type RequestHandler } from "@warlock.js/core";
+
+export const exportController: RequestHandler = async ({ request, response }) => {
+  response.header("X-Export-Name", escapeHeaderValue(request.input("name")));
+  return response.success({ ok: true });
+};
+```
+
+SSE `event`/`id` fields are already single-lined by `response.sse()`
+(`toSingleLineSseField()` is exported for custom writers).
 
 ## Common patterns
 
@@ -5597,6 +6035,22 @@ storage.url("uploads/photo.jpg"); // public URL (sync)
 await storage.temporaryUrl("private/doc.pdf", 3600); // signed URL, expires in seconds
 ```
 
+## Private-address check without the framework — `@warlock.js/core/net`
+
+`putFromUrl` refuses private, loopback, link-local and cloud-metadata hosts. Its classifier is also a side-effect-free subpath that loads only `node:net`, so workers, CLIs and standalone agent processes can reuse the rules without booting Core:
+
+```ts
+import { isPrivateOrReservedIp } from "@warlock.js/core/net";
+
+const address = "10.0.0.1";
+
+if (isPrivateOrReservedIp(address)) {
+  throw new Error(`Refusing private address ${address}`);
+}
+```
+
+Same function as the root `@warlock.js/core` export.
+
 ## Switching drivers — `storage.use(name)`
 
 For a single call against a non-default driver, scope it:
@@ -5614,13 +6068,13 @@ console.log(localFile.url);
 
 ## Cached image variants follow their source
 
-On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears the disk's whole derivative cache. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
+On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears that disk's derivative cache — or, when `uploads.images.cacheDirectory` is set (shared by every local disk), every disk's derivatives. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
 
-Give derivatives a dedicated cache folder, even when it sits beneath a storage root. Full and per-file purges delete recognized image, source-manifest and temporary files in the generated shard/source/generation layout; they retain directories, unrelated files and symlinks. Eviction validates the same directory layout. Per-file purges and stale-generation pruning also reject symlinked shard/source directories. Pruning removes only recognized files from older generation-shaped folders, retaining current-generation files and unrelated entries. Reserve generated-looking paths for derivatives and reclaim files from older cache layouts manually.
+Give derivatives a dedicated cache folder, even when it sits beneath a storage root. Full and per-file purges delete recognized image, source-manifest and temporary files in the generated shard/source/generation layout; they retain directories, unrelated files and symlinks. Eviction validates the same directory layout; it may remove empty generated generation directories, while user folders and unrelated entries are never touched. Per-file purges and stale-generation pruning also reject symlinked shard/source directories. Pruning removes only recognized files from older generation-shaped folders, retaining current-generation files and unrelated entries. Reserve generated-looking paths for derivatives and reclaim files from older cache layouts manually.
 
 ### Bound the cache and render remote disks
 
-Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules background cleanup, coalesced and throttled to at most once per minute; hits never walk the cache. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal.
+Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules a coalesced background check, at most once per minute; hits never walk the cache. The check walks the cache only on the first check after boot, when the byte estimate is over budget, when the oldest retained derivative has expired, or once per `maxCacheAge`. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. It also removes writer temporaries older than an hour (left by a crashed write), and a generation directory left without derivatives loses its `source.json` and then the empty directory once it is older than five minutes, which reclaims old object-storage generations after ETag changes. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal, as does a cache or root that cannot be resolved (`ENOTDIR`, `EACCES`, `ELOOP`; the original error is its `cause`). The guard result is remembered per cache, disk root and configured local roots; a newly registered disk is checked again.
 
 ```ts
 import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";
@@ -5853,11 +6307,138 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 - The `send-response` topic — `response.sendFile(absPath)` for serving local files.
 
 
+## test-fakes  `@warlock.js/core/test-fakes/SKILL.md`
+
+---
+name: test-fakes
+description: 'The test fakes Warlock installs by default in the test environment — `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake` — and their assertions (`assertSent`, `assertPushed`, `assertHas`, `assertExists`, `travel`), plus how to opt out (`tests.fakes`, `setupTest({ fakes })`). Triggers: `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake`, `installTestFakes`, `restoreTestFakes`, `tests.fakes`, `FakeAssertionError`, `clock.now`, `ids.uuid`, `setDispatchInterceptor`; "assert an email was sent", "assert a job was dispatched", "freeze time in a test", "deterministic ids", "tests without Redis", "keep the real cache driver in tests". Typical import `import { mailFake, queueFake } from "@warlock.js/core/tests"`. Skip: HTTP request helpers — the `test-http` topic; fixtures — the `model-factories` topic.'
+---
+
+# Warlock — test fakes
+
+In the test environment six fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
+
+| Fake          | Replaces                                                        |
+| ------------- | --------------------------------------------------------------- |
+| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured         |
+| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed     |
+| `cacheFake`   | The cache's current driver: a fresh in-memory driver            |
+| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory  |
+| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z |
+| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens        |
+
+## Assert what your code did
+
+```ts
+// with: import { cacheFake, mailFake, queueFake, storageFake } from "@warlock.js/core/tests";
+//       plus your job (buildReport) and service (requestReportService)
+beforeEach(() => {
+  mailFake.clear();
+  queueFake.clear();
+});
+
+it("queues the report, mails the requester and caches the request", async () => {
+  await requestReportService({ reportId: "r-1", email: "ada@example.test" });
+
+  mailFake.assertSent({ to: "ada@example.test", subject: /report requested/i });
+  mailFake.assertSentCount(1);
+  queueFake.assertPushed(buildReport, { reportId: "r-1" });
+  queueFake.assertNotPushed("reports.cleanup");
+  await cacheFake.assertHas("reports.r-1.status");
+  await storageFake.assertMissing("reports/r-1.pdf");
+});
+```
+
+- **mail** — `assertSent(matcher?)` returns the first match; `assertNotSent`, `assertSentCount(n, matcher?)`, `assertNothingSent()`, `sent(matcher?)`, `clear()`. Matcher: a predicate or `{ to, subject, from, contains }` (`to` matches to/cc/bcc, `subject` a string or RegExp, `contains` the HTML or text body).
+- **queue** — `assertPushed(jobOrName, payloadSubset?)`, `assertNotPushed`, `assertPushedCount(n, job?)`, `assertNothingPushed()`, `pushed(job?, matcher?)`. Each record has `id`, `name`, `queue`, `payload`, `options` (`delay`, `priority`, `jobId`) and `pushedAt`. An explicit `jobId` stays idempotent and `job.find(id)` answers from the record. Jobs are not run — call the handler to test it.
+- **cache** — `assertHas(key)`, `assertMissing(key)`, `assertStored(key, value)` (deep equality), `driver()`, `clear()`. TTLs, tags, namespaces and locks are the real memory driver's.
+- **storage** — `assertExists(path, driver?)`, `assertMissing(path, driver?)`, `files(driver?)`, `root()`. Each configured driver name gets a folder under one temp root, shared with the HTTP test server through `WARLOCK_TEST_STORAGE_ROOT`; the process that created it deletes it.
+- A failed assertion throws `FakeAssertionError` listing what was recorded.
+
+## Time and ids
+
+```ts
+import { clock, ids } from "@warlock.js/core";
+import { clockFake, idsFake } from "@warlock.js/core/tests";
+import { expect, it } from "vitest";
+
+it("is deterministic", () => {
+  expect(clock.now().toISOString()).toBe("2026-01-01T00:00:00.000Z");
+
+  clockFake.travel(90_000); // +1m30s
+  clockFake.travelTo("2030-05-05T10:00:00Z");
+
+  expect(ids.uuid()).toBe("00000000-0000-4000-8000-000000000001");
+  expect(ids.uuid()).toBe(idsFake.uuid(2));
+});
+```
+
+Only `clock` and `ids` are faked — `Date`, `setTimeout` and drivers keep real time, so nothing stalls. In app code, read time through `clock.now()` / `clock.timestamp()` and make identifiers with `ids.uuid()` / `ids.token(length)` wherever a test needs to control them; outside tests they are the system clock and `node:crypto`.
+
+## Where a fake records
+
+A fake records in the process that runs the code. A request served by the shared `startHttpTestServer()` runs in Vitest's main process, so its mail is captured there, not in your test. Serve it in the worker with `createTestHttpServer()` (the `test-http` topic) and the worker's fakes see it:
+
+```ts
+import { createTestHttpServer, mailFake } from "@warlock.js/core/tests";
+import { it } from "vitest";
+
+it("mails the requester", async () => {
+  const app = await createTestHttpServer({
+    loadAppModules: true,
+    importModule: (file) => import(file),
+  });
+
+  try {
+    await app.post("/reports", { reportId: "r-1", email: "ada@example.test" });
+    mailFake.assertSent({ to: "ada@example.test" });
+  } finally {
+    await app.close();
+  }
+});
+```
+
+## Opting out
+
+Precedence: the `fakes` option > `tests.fakes` in `src/config/tests.ts` > all on.
+
+```ts title="src/config/tests.ts"
+const testsConfigurations = {
+  fakes: { cache: false }, // keep the configured cache driver; `fakes: false` keeps every real driver
+};
+
+export default testsConfigurations;
+```
+
+```ts title="src/test-setup.ts"
+import { setupTest, teardownTest } from "@warlock.js/core/tests";
+import { afterAll } from "vitest";
+
+await setupTest({ importModule: (file) => import(file), fakes: { storage: false } });
+
+afterAll(teardownTest);
+```
+
+An unknown fake name or a non-boolean value fails setup with the list of known fakes. Without `setupTest()`, call `installTestFakes(selection?)` / `restoreTestFakes()` yourself.
+
+## Gotchas
+
+- **Recorded state lives for the test file.** Call `clear()` in `beforeEach` when tests in one file must not see each other's mails or jobs.
+- **Real deliveries in tests need an opt-out.** A test that relied on a real SMTP sink, a Redis cache shared between the HTTP server and the workers, or a real bucket now gets the fake — set that fake to `false`.
+- **The queue seam is public.** `setDispatchInterceptor({ dispatch, find? })` from `@warlock.js/queue` replaces the broker for every job in the process; `queueFake` is built on it.
+
+## See also
+
+- The `test-service` topic — `setupTest()` and its lifecycle.
+- The `test-http` topic — `createTestHttpServer()` and the HTTP helpers.
+- The `model-factories` topic — deterministic fixtures.
+
+
 ## test-http  `@warlock.js/core/test-http/SKILL.md`
 
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `startHttpTestServer({ port: 0 })`, `stopHttpTestServer`, `createTestHttpServer`, `TestHttpServer`, `createTestRequestClient`, `snapshotResponse`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up", "ephemeral test port", "test with the real Fastify plugins", "assert mail sent by a request", "response snapshot"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
@@ -5993,22 +6574,74 @@ startHttpTestServer({ port: 2032 }).
 
 This runs whether or not you passed a port, so a collision never reaches you as a bare `EADDRINUSE` from inside Fastify. The failure is a `PortInUseError` carrying `port` and `host`. The same check is available on its own — `assertPortIsAvailable(port, host)` throws it, `isPortAvailable(port, host)` returns a boolean.
 
-### Port `0` is refused
+### Port `0` — let the OS pick
 
-`port: 0` — "let the OS pick one" — is not supported, and says so rather than half-working:
-
-```
-startHttpTestServer() cannot run on port 0. Pass an explicit port — e.g.
-startHttpTestServer({ port: 3999 }) — or set `http.port` in your config. Test workers
-are separate processes that resolve the server's URL from the port published at
-startup, and an OS-assigned port is not knowable to them.
+```ts
+await startHttpTestServer({ port: 0 });
 ```
 
-The reason is the worker handoff described above: the port the OS assigns is never recorded anywhere the workers can read, so `getTestServerUrl()` would resolve `0` and send every request to `http://host:0`.
+`port: 0` binds whatever free port the OS hands out — what `warlock add test` generates. There is nothing to preflight; once the HTTP connector has bound, the port it actually took is published as `WARLOCK_TEST_SERVER_PORT`, so `testGet()`, `actingAs()` and friends follow it. If the connector bound nothing (no `src/config/http.ts`, or a worker-only role), startup fails saying so instead of publishing `0`. A negative port is refused.
+
+⚠ **Changed in 5.31.0.** `port: 0` used to be refused, because the bound port was not recorded anywhere the workers could read. `HttpConnector.start()` now records the port `listen()` returned, and that is what gets published.
 
 ### If startup fails, nothing is left behind
 
 `startHttpTestServer()` owns the connectors it starts. A failure part-way through — a bad config, a connector that won't boot — tears down whatever came up, withdraws the published port, and **rethrows the original error**; a failure during that cleanup is logged but never replaces the cause. `stopHttpTestServer()` withdraws the port and resets its state even when the shutdown itself throws, and still surfaces that failure.
+
+## In the worker, with the production plugins — `createTestHttpServer()`
+
+The shared server runs in Vitest's main process, so the test fakes in a worker never see what a request did there. `createTestHttpServer()` serves requests inside the worker instead, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
+
+```ts
+import { createTestHttpServer, mailFake, type TestHttpServer } from "@warlock.js/core/tests";
+import { afterEach, expect, it } from "vitest";
+
+let app: TestHttpServer | undefined;
+
+afterEach(async () => {
+  await app?.close();
+});
+
+it("answers through the real plugins and lets the fakes see the handler", async () => {
+  app = await createTestHttpServer({
+    routes: (router) =>
+      router.post("/echo", ({ request, response }) =>
+        response.success({ name: request.input("name") }),
+      ),
+  });
+
+  const response = await app.post("/echo", { name: "Ada" });
+
+  expect(response.status).toBe(200);
+  mailFake.assertNothingSent();
+});
+```
+
+- `loadAppModules: true` (with `importModule: (file) => import(file)`, as `setupTest()` takes it) serves every app route; modules load once per process. Needs `setupTest()` to have run in the worker.
+- `routes: (router) => …` registers routes for this server only; `close()` removes them.
+- It returns `url`, `port`, `server` (Fastify, for `inject()`), the request helpers, `actingAs(user)` bound to it, and `close()`.
+- `createTestRequestClient(baseUrl)` gives the same helpers bound to any URL.
+
+## Response snapshots — `snapshotResponse()`
+
+```ts
+import { snapshotResponse, testPost } from "@warlock.js/core/tests";
+import { expect, it } from "vitest";
+
+it("creates a post", async () => {
+  const response = await testPost("/posts", { title: "Hello" });
+
+  expect(
+    await snapshotResponse(response, { redact: ["post.id", "post.createdAt"] }),
+  ).toMatchSnapshot();
+});
+```
+
+The snapshot is `{ status, contentType, body }`; redacted paths read `"[redacted]"`, and `*` matches any key or index (`"posts.*.id"`). It consumes the body.
+
+## Fakes in the server process
+
+`startHttpTestServer()` installs the test fakes too (mail, queue, cache, storage, clock, ids — see the `test-fakes` topic), honouring `tests.fakes` and its own `fakes` option. They record in the main process, so assert on request side effects with `createTestHttpServer()`; the storage fake's temp root is shared with the workers (`WARLOCK_TEST_STORAGE_ROOT`).
 
 ## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
 
@@ -6020,7 +6653,7 @@ The reason is the worker handoff described above: the port the OS assigns is nev
 import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
-  await startHttpTestServer();
+  await startHttpTestServer({ port: 0 });
 }
 
 export async function teardown() {
@@ -6245,7 +6878,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 ## Gotchas
 
 - **`globalSetup` must export `setup` and `teardown`.** Vitest reads them by name. A typo in the export gets you a confusing "server not running" error on the first `testGet` call.
-- **Port conflicts.** If `http.port` matches your running dev server, the preflight fails with a `PortInUseError` naming the port. Either stop the dev server or pass a free one: `startHttpTestServer({ port: 3999 })`.
+- **Port conflicts.** If `http.port` matches your running dev server, the preflight fails with a `PortInUseError` naming the port. Pass `startHttpTestServer({ port: 0 })` to let the OS pick, or a fixed free one: `startHttpTestServer({ port: 3999 })`.
 - **Auth tokens need a real user.** Generating a JWT with a non-existent `user_id` works — but the auth middleware's user-loading step will reject the request with 401 because it can't find the user in the DB.
 - **`expectJson` parses the body once.** If you call it twice on the same response, the second call gets an already-consumed stream error. Capture the result.
 - **The HTTP server's connection is NOT torn down between test files.** Data persists across files within a single `vitest` run. Either truncate in `afterEach` / `afterAll`, or design your tests to be order-independent.
@@ -6254,6 +6887,9 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 ## See also
 
 - The `test-service` topic — pure unit tests against services/repositories/models (no HTTP).
+- The `test-fakes` topic — mail, queue, cache, storage, clock and ids fakes and their assertions.
+- The `model-factories` topic — `defineFactory()` for deterministic fixtures.
+- The `make-endpoint` topic — `warlock make endpoint` writes an endpoint with its HTTP test.
 - The `create-controller` topic — the controller shape your HTTP tests are exercising.
 - The `warlock-conventions` topic — module layout, where `tests/*.test.ts` files live.
 - The `write-cli-command` topic — `warlock add test` scaffolds both global + worker setup files.
@@ -6263,7 +6899,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 
 ---
 name: test-service
-description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — the `test-http` topic; warlock add test scaffold — the `write-cli-command` topic; competing tooling: jest direct, `supertest`, `nock`.'
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `setupTest({ fakes })`, `tests.fakes`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`, `clock`, `ids`, `warlock test --changed`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests", "run only the tests my change affects", "deterministic time in a test"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — the `test-http` topic; warlock add test scaffold — the `write-cli-command` topic; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service
@@ -6578,6 +7214,38 @@ afterAll(async () => {
 
 **Option 2 is usually right, and option 1 is easy to get wrong.** Tearing down and re-bootstrapping costs a full framework startup — twice, once for your file and once for the next — to avoid a DB connection you were never going to use. **Reach for option 1 only when a connector's mere presence breaks the thing you're testing**, not to save setup time.
 
+## Fakes are on — `setupTest({ fakes })`
+
+Once its connectors are up, `setupTest()` installs the test fakes — mail, queue, cache, storage, clock and ids — and `teardownTest()` restores them first, while the real drivers are still connected. A service under test therefore sends no mail, pushes no job to Redis, uploads nothing and reads a frozen `clock`:
+
+```ts
+// with: import { clock } from "@warlock.js/core";
+//       import { clockFake, mailFake } from "@warlock.js/core/tests";
+//       plus your service (issueResetToken, isResetTokenValid)
+it("expires a reset token after 15 minutes", async () => {
+  const token = await issueResetToken("ada@example.test"); // expiresAt = clock.timestamp() + 15 min
+
+  clockFake.travel(16 * 60_000);
+
+  expect(await isResetTokenValid(token)).toBe(false);
+  expect(clock.now().toISOString()).toBe("2026-01-01T00:16:00.000Z");
+  mailFake.assertSent({ to: "ada@example.test" });
+});
+```
+
+Precedence is `explicit option > tests.fakes config > true`. Opt out in `src/config/tests.ts` (`fakes: false`, or `fakes: { cache: false }`) or per call (`setupTest({ importModule, fakes: false })`). The full assertion API is the `test-fakes` topic; deterministic fixtures are `model-factories`.
+
+## Running only what changed — `warlock test`
+
+```bash
+warlock test --changed                # tests affected by uncommitted changes
+warlock test --changed --since main   # ... by changes since main
+warlock test --related src/app/posts/services/create-post.service.ts
+warlock test --json                   # Vitest's JSON report on stdout
+```
+
+It runs the project's own Vitest with `NODE_ENV=test`; a change that affects no test passes (`--passWithNoTests`).
+
 ## Lifecycle and repeated calls
 
 `setupTest` / `teardownTest` are a pair. **The harness that calls one owns calling the other in the same context.**
@@ -6660,6 +7328,8 @@ child process exit status with its captured stderr before checking stdout.
 
 ## See also
 
+- The `test-fakes` topic — every fake and its assertions.
+- The `model-factories` topic — `defineFactory()`.
 - The `test-http` topic — integration tests via the real HTTP server (`startHttpTestServer` + `testGet` / `testPost` / `expectJson`).
 - The `warlock-conventions` topic — where tests live in a module (`tests/*.test.ts`).
 - The `write-cli-command` topic — `warlock add test` for the initial scaffold.
@@ -6685,6 +7355,17 @@ description: 'Keep a project current with `warlock update` — bump every `@warl
 # Warlock — update the framework
 
 `warlock update` upgrades a project's Warlock packages in one step, and `warlock dev` tells you when an upgrade is available. Because the whole `@warlock.js/*` family ships in **lockstep** — every package shares one version — keeping them in sync is the normal case, and this command does exactly that.
+
+## `warlock update` vs `warlock upgrade`
+
+`warlock update` moves the packages to the latest versions and nothing else.
+When a release has breaking changes, use
+`warlock upgrade --from <current> --to <version>` (`--dry-run` first), e.g.
+`warlock upgrade --from 5.30 --to 5.31.0`: it moves the packages to that release
+AND applies the code edits its breaking changes need, listing the rest with
+`file:line`. Pass `--from`: the command ships with the new release, so once it
+is installed the detected `@warlock.js/core` is already the target. See the
+`upgrade-from-5-29` topic.
 
 ## `warlock update`
 
@@ -6816,7 +7497,7 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 
 ---
 name: upgrade-from-5-29
-description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, cut-off AI agent answers, auth throttle resets, image derivative caches, the Head viewport, production rate limits and test fakes on by default. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -6825,6 +7506,32 @@ Read the installed packages' changelogs and keep the `@warlock.js/*` family on t
 same release. Apply only the changes used by the application, then run its type
 check and targeted tests. These minors can contain breaking changes; do not rely
 on a major version boundary to find them.
+
+## Start with `warlock upgrade`
+
+Run the codemods first; they make the mechanical edits below and list every
+other place to review with `file:line`:
+
+```bash
+warlock upgrade --from 5.30 --to 5.31.0 --dry-run   # diff + review list, nothing written
+warlock upgrade --from 5.30 --to 5.31.0             # apply; then install, type-check, test
+warlock upgrade --from 5.30 --to 5.31.0 --json      # same result as JSON
+```
+
+Pass `--from`. The command ships in 5.31, so it runs after the new
+`@warlock.js/core` is installed, and without `--from` it reads that installed
+version, the target itself, as the starting point and stops. An app still on
+5.29 passes `--from 5.29` so the 5.30 codemods run too.
+
+It removes `await` before log calls, rewrites custom log channels' snapshot
+reads, drops a duplicate default viewport tag, raises `engines.node`/`.nvmrc`
+and moves every `@warlock.js/*` dependency to the target. It lists, without
+editing, `.then()` on log calls, non-snapshot channel reads, `validate()` data
+read without `isValid`, agents with tools and no `toolDispatch`, reserved
+`providerOptions.anthropic.body` keys, `finishReason` switches, a missing
+`http.rateLimit`, `.refine()`, container `.catch()`, `v.union()` and incomplete
+`compaction`. It needs `ts-morph` (it prints the install command when missing).
+Work through the review list with the sections below.
 
 For a target of 5.31, use Node.js 22.15 or newer in development, CI and production.
 The minimum is required before the CLI can load the app. See the `run-app` topic
@@ -6941,7 +7648,9 @@ initial render load. Reclaim old cache files manually from their dedicated
 folder once the rollout is complete. In 5.31, `purgeImageVariants()` removes only
 recognized files in the current shard/source/generation layout and retains the
 cache root, unrelated files and symlinks. Purging is an operational action, not a
-prerequisite for successful requests.
+prerequisite for successful requests. When `uploads.images.cacheDirectory` is set,
+every local disk shares it, so a path-less `purgeImageVariants()` clears every
+local disk's derivatives, not only the default disk's.
 In particular, 5.31 `purgeImageVariants()` does not remove those legacy two-level
 files; the suggestion to use it in the 5.30 changelog does not apply in 5.31.
 
@@ -6969,6 +7678,14 @@ defaults, stripped keys and explicit `undefined`. Read raw request input before
 validation if the app needs both forms. Audit callbacks that previously assumed
 unparsed input or side effects after validation failure; see Seal's `seal-basics`
 and `compose-schemas` topics for the exact typing and output-transform caveats.
+
+`v.union(...)` now tries every member whose type matches, so a union of object
+schemas accepts a value matching a later member. When every member fails, the
+closest member's errors are reported at their own paths (`actor.id`, not `actor`)
+with type `union`; `firstErrorOnly: false` lists each of them instead of one
+`;`-joined message. Update code that maps union errors by path or splits that
+message; a custom `v.union([...], "message")` still reports one error at the
+union's path.
 
 ## AI finish reasons, provider bodies and resumed output
 
@@ -7010,17 +7727,157 @@ trip's output/blocks for replay. It does not replace application retention polic
 ## 5.30 to 5.31 production rate limits
 
 5.31 makes global and per-route rate limits apply to production and development application
-routes, including web page routes and static assets (`/public`, `/assets`). Each
-page load's asset requests use the same bucket. The default global limit is 60
-requests per minute per IP, shared across routes. Check `max` before deployment; configure
-`trustProxy` or `keyGenerator` behind a proxy so clients do not share the proxy's
-single key. Set `http.rateLimit.global: false` to retain the previous global
-behaviour and enable individual route limits deliberately.
+routes, including web page routes. The default global limit is 60 requests per
+minute per IP, in one bucket shared by pages and API routes. Check `max` before
+deployment; configure `trustProxy` or `keyGenerator` behind a proxy so clients do
+not share the proxy's single key. Set `http.rateLimit.global: false` to retain the
+previous global behaviour and enable individual route limits deliberately.
 
-Built-in `/health` and `/ready` routes are exempt by default; set
+Static files are exempt by default, so a page load's assets do not spend that
+quota: the public folder, `router.directory()` mounts, `router.file()` routes and
+the web build's `/assets/*` and public files. `http.rateLimit.staticFiles: true`
+counts them again; `router.directory(options, { rateLimit: true })` counts one
+mount. Built-in `/health` and `/ready` routes are exempt by default too; set
 `http.health.rateLimit: true` to opt them into the limiter (see `health-checks`).
-Development wildcard dispatch has separate
-per-route handling; check route overrides in both environments.
+Files served by a route handler, such as
+`router.get("/uploads/*", createUploadedFileController())`, are not static mounts
+and count against the limit; pass `rateLimit: false` (or a route limit) there if
+pages embed many of them.
+
+To exempt one route, pass `rateLimit: false` in its options (or the
+`serverOptions: { config: { rateLimit: false } }` pass-through). Development's
+wildcard dispatcher now honours both, the same as production:
+
+```ts title="src/app/status/routes.ts"
+import { router } from "@warlock.js/core";
+
+router.get("/status", ({ response }) => response.success({ status: "ok" }), {
+  rateLimit: false,
+});
+```
+
+## 5.30 to 5.31 daily log file names
+
+`FileLog` and `JSONFileLog` now name dated files by sortable ISO date: a daily
+chunk writes `2026-10-17.log` instead of `17-10-2026.log`, an hourly chunk
+`2026-10-17-14.log`, and rotated archives use `YYYY-MM-DD` in the middle. Update
+log shippers, cron cleanups or scripts that look for the old names. To keep them:
+
+```ts
+new FileLog({
+  chunk: "daily",
+  fileName: "{DD}-{MM}-{YYYY}", // 17-10-2026.log, as before 5.31
+  rotateFileName: "{DD}-{MM}-{YYYY}",
+});
+```
+
+`rotateFileName` is a `{YYYY}`-style pattern or a function, not a Day.js format.
+To replace a custom pruning job, use `retention: { maxFiles, maxAgeDays }` (see the
+Logger `pick-log-channel` topic); it never removes files with another name pattern,
+such as files written under the old names.
+
+## 5.30 to 5.31 cut-off agent answers
+
+In 5.31 an agent run whose final response hit the output cap (`length`) or the
+context window (`context_exceeded`) no longer succeeds with empty or partial
+text: `result.error` is an `AgentIncompleteError` (`AGENT_INCOMPLETE`,
+`reason: "output_limit" | "context_window"`, `tripIndex`) and
+`report.status` is `"incomplete"`. A tool call cut off mid-input is never run.
+Remove `trips.at(-1).finishReason === "length"` checks that treated it as a
+success, handle the error, or let the agent continue cut-off output:
+
+```ts
+import { ai, AgentIncompleteError, type ModelContract, type ToolContract } from "@warlock.js/ai";
+
+export async function runWorker(model: ModelContract, tools: ToolContract[], task: string) {
+  const worker = ai.agent({ name: "worker", model, tools, continueOnOutputLimit: 2 });
+  const result = await worker.execute(task);
+
+  if (result.error instanceof AgentIncompleteError) {
+    throw new Error(`worker answer cut off (${result.error.reason})`, { cause: result.error });
+  }
+
+  return result.text;
+}
+```
+
+Dashboards that switch on `report.status` need the `incomplete` case. The
+Anthropic adapter's default `max_tokens` rose from 4096 to the model's max
+output when streaming and 16384 otherwise; set `maxTokens` to keep a lower cap.
+`agent.execute/stream(input, { modelOptions })` now applies per-run model options.
+
+## 5.30 to 5.31 MCP serving
+
+`ai.mcp.serve()` now throws `McpServeError` (`type: "collision"`) when two
+exposed tools share a name; before, both were listed and calls reached only one.
+Rename one tool, or serve `{ groups: { a: toolsA, b: toolsB } }` with
+`prefixToolNames: true`. `{ type: "http" }` now binds a real endpoint
+(`127.0.0.1` by default) and `start()` resolves `{ url, close }`; a
+non-loopback `host` needs `auth`. Code implementing `McpServer` itself must
+return that handle from `start()`.
+
+## 5.30 to 5.31 AI workspace
+
+`ws.tools.all()` now also vends `multi_edit`, `list_dir`, `todo_write` and
+`todo_read` (and `shell_output` / `shell_kill` with `shell.background`); use
+`ws.tools.pick(...)` to keep the old set. Custom `WorkspaceOps` / `Workspace`
+implementations must add `multiEdit`, `listDir`, `startShell`, `shellOutput`,
+`shellKill`, `listShells`, `dispose` (and `readTodos` / `writeTodos`). With deny
+rules and no allowlist entry, `bash -c`, `eval`, `xargs`, `sudo` and similar
+runners are refused (`reason: "nested-command"`); `shell.deny` is
+case-insensitive. Branch on `WorkspacePolicyError.reason`, not the message text.
+Call `ws.dispose()` when a workspace with background commands is done.
+
+## 5.30 to 5.31 test fakes are on by default
+
+In 5.31 `setupTest()` and `startHttpTestServer()` install the test fakes once
+their connectors are up: mail is captured instead of sent, `@warlock.js/queue`
+dispatches are recorded instead of pushed to Redis, the cache uses a fresh
+in-memory driver, every storage driver writes to a temp directory, and the
+framework `clock` / `ids` are deterministic. A suite that relied on a real SMTP
+sink, a Redis cache shared between the HTTP test server and the workers, a real
+bucket or jobs actually processed by a worker opts out in `src/config/tests.ts`:
+
+```ts title="src/config/tests.ts"
+const testsConfigurations = {
+  fakes: false, // or only some: { cache: false, queue: false }
+};
+
+export default testsConfigurations;
+```
+
+Then use the assertions instead of probing real services (`mailFake.assertSent`,
+`queueFake.assertPushed`; see `test-fakes`). `startHttpTestServer({ port: 0 })`
+is now supported and is what `warlock add test` generates; an existing
+`src/test-global-setup.ts` keeps its port until you change it.
+
+## 5.30 to 5.31 AI cost, prices and provider errors
+
+5.31 bills prompt caching per provider. Anthropic and Bedrock usage is marked
+`inputIncludesCache: false`, cache writes are charged (in the new
+`cost.cacheWrite` channel, 1-hour writes at `cacheWrite1h`), so their reported
+costs rise to the correct figure. Replace hand-summed cost totals with
+`totalCost`, and set `cacheWrite` instead of the deprecated `cachedOutput` rate:
+
+```ts
+import { totalCost, type Usage } from "@warlock.js/ai";
+
+export function runCostUsd(usage: Usage): number | undefined {
+  return totalCost(usage.cost);
+}
+```
+
+Anthropic, OpenAI, Gemini and Claude-on-Bedrock models now ship verified list
+prices, so `usage.cost` appears and USD budgets enforce without configuration.
+Some old defaults were removed because the vendor no longer publishes a flat
+price: Groq's Llama models, DeepSeek's `deepseek-chat` / `deepseek-reasoner`,
+and Mistral's Pixtral / Magistral. A USD budget on those now rejects the run as
+unpriced; pass `pricing`. DeepSeek defaults to its peak rates.
+
+Provider overloads now throw `ProviderOverloadedError` (`PROVIDER_OVERLOADED`)
+instead of a plain `ProviderError`; update exhaustive `AIErrorCode` switches and
+custom `fallbackModel({ retryOn })` lists. Bedrock calls with a `cacheControl`
+breakpoint now also cache the system prompt and (Claude) tool definitions.
 
 ## Verify the application paths that changed
 
@@ -7031,6 +7888,26 @@ and custom shell results with required `cancelled`. `read.maxBytes` now really
 caps returned content, including line-number prefixes (`bytesCapped: true`);
 a window starting past EOF returns empty content. An aborted command resolves
 with `cancelled: true`; it does not throw solely because it was cancelled.
+
+## 5.30 to 5.31: `warlock dev` keeps a section of AGENTS.md
+
+5.31's `warlock dev` writes an app summary for coding agents into `AGENTS.md`
+at the project root — creating the file when it is missing, otherwise only
+between `<!-- warlock:generated:start -->` and `<!-- warlock:generated:end -->`
+(appended at the end the first time). Commit the file like any other agent
+guide, or turn the refresh off:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: { agentsMd: false },
+});
+```
+
+It also writes `.warlock/dev-server.json` (the server's address, for
+`warlock trace` and `warlock mcp`); `.warlock/` is already git-ignored by the
+starter. See the `warlock-agents-md` topic.
 
 
 ## upload-file  `@warlock.js/core/upload-file/SKILL.md`
@@ -9128,7 +10005,7 @@ description: 'Author seal schemas, attach them to controllers via `controller.va
 
 # Warlock — validate a request
 
-Validation is a three-file pattern: a seal schema, a `Request<Schema>` type alias, and the controller that attaches the schema via a static property. If validation fails, the framework returns a 400 with an `errors` payload — your handler never runs.
+Validation is a three-file pattern: a seal schema, a `Request<Schema>` type alias, and the controller that attaches the schema via a static property. If validation fails, the framework returns a 422 with an `errors` payload — your handler never runs (see "Your own failure body" to change it).
 
 ## The shape
 
@@ -9321,6 +10198,48 @@ The framework calls `response.failedSchema(result)` which sends `422` by default
 
 The key names (`errors`, `input`, `error`) come from `config.get("validation.response")` — change them globally if your wire format differs.
 
+### Your own failure body
+
+For a contract with stable error codes, set `onFailure` on the validation. It gets the seal result and `{ request, response, route }` and returns `{ status?, body }` (no `status` → `validation.response.status`, 422):
+
+```ts title="src/app/imports/controllers/create-import.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+const importSchema = v.object({ name: v.string().required() });
+
+export const createImportController: RequestHandler = async ({ response }) =>
+  response.successCreate({ id: "import-1" });
+
+createImportController.validation = {
+  schema: importSchema,
+  onFailure: () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } }),
+};
+
+// Declare the failure status so `warlock generate.openapi` documents the body.
+createImportController.responseSchema = {
+  201: { body: { id: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+The same `validation` object is accepted as a route option, merged over the handler's (route keys win): `router.post("/imports", createImportController, { validation: { onFailure } })`.
+
+For every route at once, configure a global hook; a route's `onFailure` still wins, and returning `undefined` from either falls through to the next:
+
+```ts title="src/config/validation.ts"
+import type { ValidationConfiguration } from "@warlock.js/core";
+
+const validationConfig: ValidationConfiguration = {
+  response: {
+    status: 400,
+    body: (result, route) => ({ error: `${route.name}.invalid`, fields: result.errors.length }),
+  },
+};
+
+export default validationConfig;
+```
+
 ## Scoping what's validated
 
 By default the validator merges `request.body + request.query` (everything but route params) and validates the merged object. To narrow:
@@ -9430,6 +10349,362 @@ updateProductController.validation = {
 - The `upload-file` topic — `v.file()` and how it interacts with multipart uploads.
 - The `send-response` topic — the 400 helper used internally by `failedSchema`.
 - The `warlock-conventions` topic — `Request<Schema>` type-alias convention.
+
+
+## warlock-agents-md  `@warlock.js/core/warlock-agents-md/SKILL.md`
+
+---
+name: warlock-agents-md
+description: 'Generate the app-specific section of AGENTS.md from the booted app with `warlock agents-md [--write] [--json]` — modules, a routes summary with unguarded writes flagged, models, the conventions `warlock check` enforces, the installed skills and the verify commands — between `<!-- warlock:generated:start -->` / `<!-- warlock:generated:end -->` markers so hand-written content is never touched; `warlock dev` refreshes it (opt out with `devServer.agentsMd: false`). Triggers: `warlock agents-md`, `AGENTS.md`, `warlock:generated:start`, `renderAgentsMdSection`, `writeAgentsMd`, `upsertGeneratedSection`, `listInstalledSkills`, `createAgentsMdRefresher`, `devServer.agentsMd`, `WL7501`; "give agents the app facts", "keep AGENTS.md up to date", "which skills apply to this app". Skip: the full machine-readable report — the `warlock-inspect` topic; verifying a change — the `warlock-check` topic.'
+---
+
+# Warlock — `warlock agents-md`
+
+Write the facts an agent needs about **this** app into `AGENTS.md`, from the booted registries, and keep them current.
+
+```bash
+npx warlock agents-md            # print the section
+npx warlock agents-md --write    # write it into AGENTS.md (created when missing)
+npx warlock agents-md --json     # { file, status, section }
+```
+
+It boots like `warlock inspect` (connectors booted, none started — no connection, no port).
+
+## What it writes
+
+Between two marker lines, appended at the end of an existing file without markers:
+
+```md
+# Notes written by hand — never touched
+
+<!-- warlock:generated:start -->
+
+## blog 1.2.0 — generated facts
+
+### Modules
+
+| Module | Routes | Models |
+...
+
+### Routes
+
+4 route(s): 2 GET, 1 POST, 1 PATCH.
+Mutating routes without an auth guard (confirm each is meant to be public): `POST /posts`.
+...
+<!-- warlock:generated:end -->
+```
+
+Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models per module), routes (counts, unguarded writes, a list capped at 60), models (table, module), conventions in force (`WL9001`–`WL9004` and the layout rules), installed skills (`node_modules/@warlock.js/*/skills/*/SKILL.md`, first sentence each), verify commands. No timestamps: an unchanged app regenerates the same bytes and nothing is written.
+
+## Rules
+
+- Only bytes between the markers change; a CRLF file stays CRLF.
+- Malformed markers (one missing, duplicated, end before start) → `WL7501`, nothing written. Fix by hand.
+- Put your own notes outside the markers; anything inside is replaced on the next refresh.
+
+## `warlock dev` keeps it fresh
+
+On boot and after reloads that change routes or modules (debounced). Opt out:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: { agentsMd: false },
+});
+```
+
+## From code
+
+```ts
+import {
+  createAgentsMdRefresher,
+  inspectApp,
+  listInstalledSkills,
+  renderAgentsMdSection,
+  upsertGeneratedSection,
+  writeAgentsMd,
+} from "@warlock.js/core/tooling";
+
+const report = await inspectApp({ sections: ["routes", "models", "packages"] });
+
+const section = renderAgentsMdSection(report, { skills: listInstalledSkills(process.cwd()) });
+const next = upsertGeneratedSection("# Hand notes\n", section); // pure: returns the new file content
+
+const { status } = writeAgentsMd({ report }); // "created" | "updated" | "unchanged"
+
+const refresher = createAgentsMdRefresher({
+  collect: () => inspectApp({ sections: ["routes", "models", "packages"] }),
+  debounceMs: 1000,
+  onError: (error) => console.warn(error),
+});
+
+refresher.schedule(); // debounced
+await refresher.flush(); // run now
+refresher.dispose();
+```
+
+## See also
+
+- The `warlock-inspect` topic — the report the section is built from.
+- The `warlock-check` topic — the verify command the section points at.
+- The `warlock-conventions` topic — the conventions listed in the section.
+
+
+## warlock-board  `@warlock.js/core/warlock-board/SKILL.md`
+
+---
+name: warlock-board
+description: 'Coordinate two coding agents (an implementer and a reviewer) through `warlock board`: work items with a review state machine (todo, in-progress, ready-for-review, changes-requested, approved, blocked), append-only numbered messages per recipient in the git-ignored `.warlock/board/`, `VERDICT: APPROVED` / `VERDICT: CHANGES REQUESTED` lines that move the item, and a blocking `watch` with a timeout; `--json` on every action. Triggers: `warlock board`, `board init`, `board add`, `board status`, `board send`, `board watch`, `--verdict`, `WARLOCK_AGENT`, `.warlock/board`, `to-reviewer/`, `initBoard`, `addBoardItem`, `moveBoardItem`, `sendBoardMessage`, `watchBoard`, `readBoardStatus`, `WL7401`, `WL7402`, `WL7403`, `WL7404`; "hand this to the reviewer agent", "wait for the review", "two agents working together", "request changes", "approve the item". Skip: verifying the code itself — the `warlock-check` topic; app facts — the `warlock-inspect` topic.'
+---
+
+# Warlock — `warlock board`
+
+A shared folder of plain files two agents use to hand work back and forth: **items** move through review states, **messages** are appended to the other agent's inbox, and `watch` blocks until something new arrives. Set `WARLOCK_AGENT` to your agent name so `--from` / `--by` default to it.
+
+```bash
+export WARLOCK_AGENT=implementer
+npx warlock board init
+npx warlock board add "Add the orders module" --assignee implementer --reviewer reviewer --json
+npx warlock board status --json
+```
+
+## The loop
+
+Implementer:
+
+```bash
+npx warlock board status 1 in-progress
+# write the code; loop on `npx warlock check --changed --json` until it is clean
+npx warlock board status 1 ready-for-review --note "check passes"
+npx warlock board send reviewer "Orders module ready" --item 1 --body @handoff.md
+npx warlock board watch implementer --timeout 1800 --json   # blocks for the verdict
+```
+
+Reviewer (`WARLOCK_AGENT=reviewer`):
+
+```bash
+npx warlock board watch reviewer --timeout 1800 --json
+# review the diff, run `npx warlock check --changed --json`
+npx warlock board send implementer "Review of orders" --item 1 --verdict changes-requested --body @review.md
+# or, when it is right:
+npx warlock board send implementer "Approved" --item 1 --verdict approved
+```
+
+On `changes-requested` the implementer moves the item back with `status 1 in-progress`, fixes, moves it to `ready-for-review` and sends a new message. The loop ends on `approved`.
+
+## States
+
+| From                | Allowed next                                   |
+| ------------------- | ---------------------------------------------- |
+| `todo`              | `in-progress`, `blocked`                       |
+| `in-progress`       | `ready-for-review`, `blocked`, `todo`          |
+| `ready-for-review`  | `approved`, `changes-requested`, `in-progress` |
+| `changes-requested` | `in-progress`, `blocked`                       |
+| `approved`          | `in-progress` (reopen)                         |
+| `blocked`           | `todo`, `in-progress`                          |
+
+Anything else fails with `WL7403`, and the message lists the allowed states. `npx warlock board status <id> --json` returns `{ item, next }`.
+
+## Reading what `watch` returns
+
+```json
+{
+  "ok": true,
+  "timedOut": false,
+  "agent": "implementer",
+  "cursor": 3,
+  "messages": [
+    {
+      "number": 3,
+      "file": ".warlock/board/to-implementer/0003-review-of-orders.md",
+      "from": "reviewer",
+      "to": "implementer",
+      "item": 1,
+      "subject": "Review of orders",
+      "at": "2026-10-17T09:12:44.512Z",
+      "body": "Wrap the list response in OrderResource.",
+      "verdict": "changes-requested"
+    }
+  ]
+}
+```
+
+- Every unread message comes back at once, oldest first, and the cursor moves past them. `--since 0` replays the inbox.
+- Timeout: exit code **3** and `{ "ok": false, "code": "WL7404", "timedOut": true }`. Just run `watch` again.
+- A message file ends with exactly `VERDICT: APPROVED` or `VERDICT: CHANGES REQUESTED` when it carries a verdict.
+
+## From code
+
+```ts
+import {
+  initBoard,
+  addBoardItem,
+  moveBoardItem,
+  sendBoardMessage,
+  watchBoard,
+} from "@warlock.js/core/tooling";
+
+initBoard();
+const item = addBoardItem({
+  title: "Add the orders module",
+  assignee: "implementer",
+  reviewer: "reviewer",
+});
+moveBoardItem(item.id, "in-progress", { by: "implementer" });
+moveBoardItem(item.id, "ready-for-review", { by: "implementer" });
+sendBoardMessage({
+  to: "reviewer",
+  from: "implementer",
+  subject: "Ready",
+  item: item.id,
+  body: "See the diff.",
+});
+
+const { messages } = await watchBoard({ agent: "implementer", timeoutMs: 30 * 60_000 });
+```
+
+## Gotchas
+
+- Run `init` first; every other action fails with `WL7401` until the board exists. `init` git-ignores `.warlock/board/`.
+- Messages are append-only and numbered per inbox; never edit or delete one by hand — send a new message.
+- A verdict naming an item moves it; if the item is not in `ready-for-review`, the send fails with `WL7403` and no message is written.
+- Agent names: lower-case letters, digits and dashes.
+- `@mongez/agent-kit` lives outside this repository; it integrates by calling these commands.
+
+## See also
+
+- The `warlock-check` topic — the verify command both agents loop on.
+- The `warlock-inspect` topic — the app's facts as JSON before you change it.
+
+
+## warlock-check  `@warlock.js/core/warlock-check/SKILL.md`
+
+---
+name: warlock-check
+description: 'Verify a change with one command: `warlock check [--changed] [--json]` runs an incremental typecheck, the app''s ESLint/oxlint, the tests affected by the change and framework convention checks, and reports one JSON object per problem `{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }` with exit 1 for problems in your code and 2 for problems with this machine (missing Redis/DB, busy port, Node version, missing tool). Also `warlock typecheck [--changed]`, `warlock explain <CODE>` and the stable `WL` error codes (`errorCodeOf`, `WarlockError`). Triggers: `warlock check`, `warlock typecheck`, `warlock explain`, `--changed`, `--base`, `runCheck`, `runTypecheck`, `CHECK_EXIT_CODES`, `ToolingProblem`, `WL7101`, `WL8003`, `errorCodeOf`, `explainErrorCode`, `WarlockError`, "verify my change", "run the checks", "is this failure my code or the machine", "what does WL3001 mean", "typecheck only changed files". Skip: app diagnostics at boot — the `warlock-doctor` topic; reading the app''s routes/models — the `warlock-inspect` topic; writing tests — the `test-http` / `test-service` topics.'
+---
+
+# Warlock — `warlock check`, `typecheck`, `explain`
+
+Run `warlock check` after every change and loop on it until it exits 0.
+
+```bash
+npx warlock check --changed --json    # inner loop: only what changed vs HEAD (+ untracked)
+npx warlock check --base main         # what changed since the branch left main
+npx warlock check                     # everything, before you finish
+npx warlock check --skip tests        # steps: environment, typecheck, lint, tests, conventions
+```
+
+## Exit codes
+
+| Exit | Meaning                                                 | What to do                                                                                                      |
+| ---- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `0`  | no errors (warnings allowed)                            | done                                                                                                            |
+| `1`  | problems **in your code**                               | fix each problem at `file:line:column`                                                                          |
+| `2`  | a problem with **this machine** — the run is incomplete | fix the environment (start Redis/DB, free the port, switch Node, install the tool); do **not** edit code for it |
+
+`2` wins when both kinds exist. Each problem's `category` (`code` / `environment`) says the same per problem.
+
+## One problem
+
+```json
+{
+  "code": "WL8003",
+  "category": "environment",
+  "severity": "error",
+  "source": "environment",
+  "file": "src/app/posts/publish.spec.ts",
+  "line": null,
+  "column": null,
+  "message": "Error: connect ECONNREFUSED 127.0.0.1:6379",
+  "hint": "Start the service named in the message (database, Redis, ...) or point the config at a running one.",
+  "skill": "warlock-check",
+  "docs": "https://warlock.js.org/v/latest/core/cli/error-codes/#wl8003",
+  "rule": "publish caches the post"
+}
+```
+
+```bash
+npx warlock check --changed --json > check.json; code=$?
+jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → \(.hint)"' check.json
+[ "$code" = 2 ] && echo "environment problem — fix the machine, not the code"
+```
+
+| Code                | Problem                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `WL7101`            | type error (`rule` = `TS2322`, …)                                                                             |
+| `WL7102`            | tsconfig missing/invalid                                                                                      |
+| `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                   |
+| `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                    |
+| `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                 |
+| `WL9002`            | relative import ends in `.js`                                                                                 |
+| `WL9003`            | relative import into another `src/app/<module>` — use `app/<module>/...`                                      |
+| `WL9004`            | `experimentalDecorators: true` in tsconfig                                                                    |
+| `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM |
+
+## `warlock typecheck`
+
+```bash
+npx warlock typecheck                 # whole program, incremental (.warlock/cache/typecheck.tsbuildinfo)
+npx warlock typecheck --changed       # changed files + the files importing them
+npx warlock typecheck --json --project tsconfig.app.json
+```
+
+`--changed` checks the changed files and their direct importers only; a full run (cheap after the first, it is incremental) catches anything further away.
+
+## `warlock explain`
+
+```bash
+npx warlock explain WL3001          # title, fix, skill, docs link
+npx warlock explain WL3001 --json   # the registry entry
+npx warlock explain                 # every code
+```
+
+## Error codes in code
+
+Framework errors carry a stable `code`; read any thrown value with `errorCodeOf()` (it also maps `ECONNREFUSED` → `WL8003`, `EADDRINUSE` / `PortInUseError` → `WL8004`, and follows `cause`):
+
+```ts
+import { errorCodeOf, explainErrorCode, WarlockError } from "@warlock.js/core";
+
+try {
+  router.getRoute("posts.show", {});
+} catch (error) {
+  const code = errorCodeOf(error); // "WL3003" (unknown route name) or "WL3004" (missing param)
+  console.error(code, code && explainErrorCode(code)?.fix);
+}
+
+// Throw a coded framework error from a connector or plugin:
+throw new WarlockError("WL2003", "search connector failed to boot: SEARCH_URL is not set");
+```
+
+## From code
+
+```ts
+import { CHECK_EXIT_CODES, runCheck, runTypecheck } from "@warlock.js/core/tooling";
+
+const report = await runCheck({ changed: true });
+
+if (report.exitCode === CHECK_EXIT_CODES.environment) {
+  // tell the user which service/tool is missing; don't touch the code
+}
+
+const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"] });
+```
+
+## Gotchas
+
+- `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
+- Lint runs only the linters the app configures (`eslint.config.*`; an oxlint config + the `oxlint` package). No config → the step is skipped, not failed.
+- Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
+- The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
+
+## See also
+
+- The `warlock-doctor` topic — boot-time diagnostics; `doctor --json` uses the same codes and fields.
+- The `warlock-inspect` topic — the app's routes, models and config as JSON.
+- The `warlock-conventions` topic — the rules behind `WL9001`–`WL9004`.
 
 
 ## warlock-conventions  `@warlock.js/core/warlock-conventions/SKILL.md`
@@ -9577,7 +10852,7 @@ Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasM
 
 ---
 name: warlock-doctor
-description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `warlock doctor --json`, `toDoctorJson`, `WL1001`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`
@@ -9598,6 +10873,36 @@ npx warlock doctor
 
 Summary: 5 ok, 1 warn, 0 fail
 ```
+
+## Error codes and `--json`
+
+Every `warn`/`fail` finding carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
+
+```bash
+npx warlock doctor --json | jq '.results[] | select(.status != "ok") | "\(.code) \(.detail)"'
+npx warlock explain WL1001
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "results": [
+    {
+      "name": "config",
+      "status": "fail",
+      "detail": "missing required config section(s): http",
+      "code": "WL1001",
+      "hint": "Add the missing file under src/config/ (for example src/config/app.ts) exporting the section.",
+      "skill": "configure-app",
+      "docs": "https://warlock.js.org/v/latest/core/cli/error-codes/#wl1001"
+    }
+  ],
+  "summary": { "ok": 0, "warn": 0, "fail": 1 },
+  "exitCode": 1
+}
+```
+
+A custom check sets `code` on its non-ok results the same way (`{ name, status: "fail", code: "WL2003", detail }`); `ok` results carry none.
 
 ## What it checks
 
@@ -9635,6 +10940,7 @@ type CheckResult = {
   name: string; // stable check name, e.g. "routes"
   status: CheckStatus;
   detail: string; // one-line, user-facing explanation
+  code?: WarlockErrorCode; // stable code of a warn/fail verdict, e.g. "WL1001"
 };
 
 type DoctorCheck = {
@@ -9713,6 +11019,270 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 - The `write-cli-command` topic — authoring a command + its `preload` plan, the shape `doctorCommand` is built from.
 - The `add-connector` topic — connector registration, which the `connectors` check enumerates.
 - The `warlock-conventions` topic — project layout the checks assume.
+- The `warlock-check` topic — `warlock check` / `typecheck` / `explain` and the error-code registry the findings use.
+- The `warlock-inspect` topic — `warlock inspect`, the same boot pass printed as a versioned JSON report of the app.
+
+
+## warlock-inspect  `@warlock.js/core/warlock-inspect/SKILL.md`
+
+---
+name: warlock-inspect
+description: 'Ask the app instead of grepping it: `warlock inspect --json` prints the facts of the booted app — routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys and types, event listeners, pages (layouts, loaders, actions), queue jobs, scheduled tasks and installed @warlock.js versions — as a versioned report (`schemaVersion: 1`) with a published JSON Schema; `inspectApp()` returns the same object. Triggers: `warlock inspect`, `--section`, `inspect_routes`, `inspectApp`, `bootForInspect`, `InspectReport`, `INSPECT_REPORT_JSON_SCHEMA`, `inspect-report.schema.json`, `@warlock.js/core/tooling`; "which routes are unguarded", "what does this app expose", "what models and columns exist", "which config keys are set", "list event listeners", "app facts as JSON for an agent". Skip: a route table for humans — the `warlock-routes` topic; health diagnostics — the `warlock-doctor` topic; verifying a change — the `warlock-check` topic; an OpenAPI file — the `generate-openapi` topic.'
+---
+
+# Warlock — `warlock inspect`
+
+Read the app's facts from its **booted registries**, not from source text. Run it before changing an app you do not know, and when you need a fact the code only implies (the effective rate limit of a route, whether a guard runs, which resource a model uses).
+
+```bash
+npx warlock inspect                                  # counts + a route list
+npx warlock inspect --json > app.json                # the full report
+npx warlock inspect --json --section routes,models   # only some sections
+```
+
+It boots like `warlock doctor`: connectors boot (routes register) but none starts — no database, cache or socket connection, no port. With `--json`, stdout is only the JSON.
+
+Sections: `routes`, `models`, `resources`, `config`, `events`, `pages`, `jobs`, `schedules`, `packages`. An unknown section fails before the app boots.
+
+## Answer questions with jq
+
+```bash
+# Mutating API routes without an auth guard
+npx warlock inspect --json --section routes \
+  | jq -r '.routes[] | select(.method != "GET" and .auth.required == false and .isPage == false) | "\(.method) \(.path)  \(.sourceFile)"'
+
+# Routes that log request bodies
+npx warlock inspect --json --section routes | jq -r '.routes[] | select(.logging.body) | .path'
+
+# A model's columns and relations
+npx warlock inspect --json --section models | jq '.models[] | select(.name == "User") | {columns: [.columns[].name], relations}'
+
+# Config keys (types only — values are never printed)
+npx warlock inspect --json --section config | jq -r '.config[] | "\(.key): \(.type)"'
+```
+
+## The route entry
+
+```json
+{
+  "method": "PATCH",
+  "path": "/posts/:id",
+  "name": "posts.update",
+  "sourceFile": "src/app/posts/routes.ts",
+  "handler": "updatePostController",
+  "middleware": ["authMiddleware"],
+  "auth": { "required": true, "sources": ["header"], "userTypes": ["user"] },
+  "csrf": true,
+  "rateLimit": { "source": "global", "max": 60, "timeWindow": 60000 },
+  "logging": { "body": true, "query": true, "privateRules": false },
+  "request": {
+    "parameters": [
+      { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+    ],
+    "body": {
+      "type": "object",
+      "properties": { "title": { "type": "string" } },
+      "required": ["title"]
+    },
+    "customValidation": false
+  },
+  "responses": {
+    "200": {
+      "description": "Successful response",
+      "schema": {
+        "type": "object",
+        "properties": { "post": { "$ref": "#/components/schemas/PostResource" } },
+        "required": ["post"]
+      }
+    }
+  }
+}
+```
+
+`$ref`s resolve against `components.schemas` in the same report. Request and response schemas come from the same code as `warlock generate.openapi`.
+
+## From code
+
+```ts
+import { inspectApp, type InspectReport } from "@warlock.js/core/tooling";
+
+// The app is already booted in this process (a dev-server hook, a test with setupTest()):
+const report: InspectReport = await inspectApp({ sections: ["routes", "models"] });
+const publicWrites = report.routes?.filter(
+  (route) => route.method !== "GET" && !route.auth.required,
+);
+```
+
+`inspectApp()` boots nothing. To boot first, the way the command does:
+
+```ts
+import { bootForInspect, inspectApp, inspectOptionsFromBoot } from "@warlock.js/core/tooling";
+
+const boot = await bootForInspect();
+const report = await inspectApp({ ...inspectOptionsFromBoot(boot) });
+```
+
+Validate a report with the published schema — `INSPECT_REPORT_JSON_SCHEMA` (draft 2020-12), also shipped as `node_modules/@warlock.js/core/schemas/inspect-report.schema.json`:
+
+```ts
+import Ajv2020 from "ajv/dist/2020";
+import { INSPECT_REPORT_JSON_SCHEMA, inspectApp } from "@warlock.js/core/tooling";
+
+const report = await inspectApp();
+const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA, report);
+```
+
+## Stability (schemaVersion 1)
+
+- Fields are only added; none is removed, renamed or retyped. Ignore keys you do not know.
+- A section you did not request is absent, not empty.
+- Warning and description text is not a contract; match on `code` fields.
+- A breaking change ships as `schemaVersion: 2`, listed under BREAKING in the changelog.
+
+## Agents: ask through MCP instead of shelling out
+
+`npx warlock mcp` serves the same report as tools — `inspect_app` for the counts, then `inspect_routes` (`filter`, `method`, `unguardedWrites`), `inspect_models`, `inspect_config`, … one per section, plus `db_schema` built from the `models` section. `npx warlock dev --mcp` serves them from the dev server, so they reflect the last hot reload. See the `warlock-mcp` topic.
+
+`warlock dev` also writes a summary of this report (modules, routes, unguarded writes, models, installed skills) into the generated section of `AGENTS.md` — see the `warlock-agents-md` topic.
+
+## Gotchas
+
+- `warnings` lists what could not be read — `WL2001` a module failed to import (its routes are missing from the report), `WL4001` a schema with no JSON Schema form. Run `npx warlock explain <code>`.
+- `events` lists listeners app modules registered on `@mongez/events` while loading; listeners added later at runtime, and `Model.events()` listeners, are not included.
+- `jobs` and `schedules` appear only when a loaded module (usually `worker.ts`) defined them through the app's `@warlock.js/queue` / `@warlock.js/scheduler`.
+- App modules are imported, so their import-time side effects run, as in `warlock dev`.
+
+## See also
+
+- The `warlock-check` topic — verify a change: typecheck, lint, tests, conventions, error codes.
+- The `warlock-mcp` topic — the same facts as MCP tools for a coding agent.
+- The `warlock-agents-md` topic — the app summary `warlock dev` keeps in AGENTS.md.
+- The `warlock-routes` topic — the human route table.
+- The `generate-openapi` topic — the same route schemas as an OpenAPI document.
+
+
+## warlock-mcp  `@warlock.js/core/warlock-mcp/SKILL.md`
+
+---
+name: warlock-mcp
+description: 'Serve the app to a coding agent over the Model Context Protocol: `warlock mcp` (stdio, or `--http` on loopback with a bearer token required off loopback) and `warlock dev --mcp` / `devServer.mcp` (live registries) expose `inspect_app` + `inspect_<section>` (routes, models, resources, config, events, pages, jobs, schedules, packages), `db_schema`, `docs_search` / `docs_read` (installed @warlock.js skills, READMEs and llms files only, offline), `explain`, `check_run`, `test_run`, `requests_recent` (devtools: timeline, queries with nPlusOne, logs) and `generate_make` / `generate_add` (a unified diff from a throw-away copy; writes only with `--allow-writes`). Read-only by default. Needs `@warlock.js/ai-tools` (optional peer). Triggers: `warlock mcp`, `--allow-writes`, `--http`, `WARLOCK_MCP_TOKEN`, `warlock dev --mcp`, `devServer.mcp`, `startWarlockMcpServer`, `createMcpContext`, `createWarlockMcpTools`, `runTests`, `sandboxBackend`, `WL7003`, `WL7004`, `WL7005`, `.mcp.json`; "connect Claude Code / Cursor to my Warlock app", "let the agent ask the app", "MCP server for this project", "preview what a generator writes". Skip: the JSON report itself — the `warlock-inspect` topic; serving YOUR OWN agent tools over MCP — the `expose-as-mcp-server` topic of @warlock.js/ai-tools; one request''s timeline from the terminal — the `warlock-trace` topic.'
+---
+
+# Warlock — `warlock mcp`
+
+One MCP server per app that answers what the app actually has and does — from its registries, its installed docs and its devtools — so an agent asks instead of grepping.
+
+```bash
+npm install -D @warlock.js/ai-tools @warlock.js/ai   # once: the MCP transport (optional peers)
+
+npx warlock mcp                       # stdio — what an MCP client spawns
+npx warlock mcp --http                # Streamable HTTP on 127.0.0.1, a free port (printed on stderr)
+npx warlock mcp --http --port 7333 --token "$WARLOCK_MCP_TOKEN"
+npx warlock mcp --allow-writes        # generate tools may write files
+npx warlock dev --mcp                 # inside the dev server: live registries after every reload
+```
+
+Register it with a client (Claude Code reads `.mcp.json` at the project root):
+
+```json
+{
+  "mcpServers": {
+    "warlock": { "command": "npx", "args": ["warlock", "mcp"] }
+  }
+}
+```
+
+## Tools
+
+| Tool                                                                                                                                                | What it returns                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `inspect_app`                                                                                                                                       | App name/version/Node, a count per section, inspect warnings. Start here.                                                                                                             |
+| `inspect_routes`                                                                                                                                    | Routes with middleware, guard, CSRF, rate limit, logging, JSON Schemas. `filter`, `method`, `unguardedWrites`.                                                                        |
+| `inspect_models`, `inspect_resources`, `inspect_config`, `inspect_events`, `inspect_pages`, `inspect_jobs`, `inspect_schedules`, `inspect_packages` | One `warlock inspect` section each, with `filter`.                                                                                                                                    |
+| `db_schema`                                                                                                                                         | Tables from the models: columns with type, required, primary key, `belongsTo` foreign keys, relations, timestamps. No database connection.                                            |
+| `docs_search` / `docs_read`                                                                                                                         | Ranked sections of `node_modules/@warlock.js/*/skills/**`, `README.md`, `llms*.txt` — the installed versions, offline.                                                                |
+| `explain`                                                                                                                                           | A `WL` code: meaning, your code vs this machine, fix, skill, docs link.                                                                                                               |
+| `check_run`                                                                                                                                         | The `warlock check` report (`changed`, `base`, `skip`). Exit code 2 = the machine, not the code.                                                                                      |
+| `test_run`                                                                                                                                          | vitest for `files` (tests run directly, sources via `vitest related`), `changed`, or the suite.                                                                                       |
+| `requests_recent`                                                                                                                                   | Recent requests from devtools: status, phases (each middleware, validation, handler), queries with `nPlusOne`, warnings, logs, timings. Needs `warlock dev` + `@warlock.js/devtools`. |
+| `generate_make`                                                                                                                                     | `generate.<module\|controller\|service\|use-case\|model\|repository\|resource\|migration>` → a unified diff per file.                                                                 |
+| `generate_add`                                                                                                                                      | `warlock add <features>` → the diff (package.json included; nothing installed).                                                                                                       |
+
+Names use `_`, not `.`: model APIs only accept `^[a-zA-Z0-9_-]{1,128}$` as a tool name.
+
+## Read-only by default
+
+Without `--allow-writes`, `generate_make` / `generate_add` have no `write` argument: the generator runs in a temporary copy of the project (root files and `src/`, `.env*` never copied, `node_modules` linked) and the tool returns what it would create or change:
+
+```json
+{
+  "ok": true,
+  "command": ["warlock", "generate.service", "posts/publish-post"],
+  "files": [
+    {
+      "path": "src/app/posts/services/publish-post.service.ts",
+      "status": "created",
+      "diff": "--- /dev/null\n+++ b/src/app/posts/services/publish-post.service.ts\n@@ -0,0 +1,5 @@\n+…"
+    }
+  ]
+}
+```
+
+A `write: true` sent to a read-only server is refused with `WL7005`. With `--allow-writes`, `write: true` runs the generator in the project and returns the same diff.
+
+## HTTP rules
+
+- Binds `127.0.0.1` by default. Any other `--host` needs `--token` (or `WARLOCK_MCP_TOKEN`), otherwise `WL7004` before anything boots.
+- Clients send `Authorization: Bearer <token>` when a token is set; foreign browser `Origin`s are refused (the `@warlock.js/ai-tools` HTTP transport).
+- `warlock dev --mcp` serves HTTP on loopback only and records the endpoint in `.warlock/dev-server.json` (`mcp.url`). Options in `warlock.config.ts`:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: {
+    mcp: { port: 7333, token: process.env.WARLOCK_MCP_TOKEN, allowWrites: false },
+  },
+});
+```
+
+## From code
+
+```ts
+import {
+  createMcpContext,
+  inspectApp,
+  runTests,
+  startWarlockMcpServer,
+} from "@warlock.js/core/tooling";
+
+// The app is already booted in this process.
+const context = createMcpContext({ inspect: (sections) => inspectApp({ sections }) });
+const server = await startWarlockMcpServer({ context, transport: { type: "http", port: 0 } });
+
+console.error(`MCP at ${server.url} — ${server.tools.length} tools`);
+
+const tests = await runTests({ files: ["src/app/posts/services/publish-post.service.ts"] });
+console.error(
+  tests.ok ? "tests pass" : tests.problems.map((problem) => problem.message).join("\n"),
+);
+
+await server.close();
+```
+
+## Gotchas
+
+- `warlock mcp` boots like `warlock inspect` (connectors booted, none started — no database connection, no app port) on the first tool call, and keeps that snapshot. After changing routes or models, restart it — or use `warlock dev --mcp`, which reads the live registries.
+- Over stdio, stdout is the JSON-RPC stream: `console.log` / `info` / `debug` are sent to stderr for the whole run.
+- `requests_recent` fails with `WL8008` when no dev server is recorded or reachable, and `WL8009` when devtools is not installed (`npx warlock add devtools`).
+- Missing `@warlock.js/ai-tools` / `@warlock.js/ai` → `WL7003` with the install line.
+
+## See also
+
+- The `warlock-inspect` topic — the report the `inspect_*` tools return.
+- The `warlock-check` topic — what `check_run` and `test_run` report.
+- The `warlock-trace` topic — send a request and read its timeline.
+- The `expose-as-mcp-server` topic of @warlock.js/ai-tools — the transport underneath.
 
 
 ## warlock-routes  `@warlock.js/core/warlock-routes/SKILL.md`
@@ -9853,6 +11423,91 @@ and exits non-zero.
 - The `register-route` topic — defining, naming, and grouping the routes this command lists.
 - The `run-app` topic — `warlock build`, the command that produces the snapshot `routes:diff` compares against.
 - The `write-cli-command` topic — the command + `preload` shape `routesCommand` is built from.
+
+
+## warlock-trace  `@warlock.js/core/warlock-trace/SKILL.md`
+
+---
+name: warlock-trace
+description: 'Verify runtime behaviour without a browser: `warlock trace <method> <url> [--body json|@file] [--header k:v] [--json]` sends one request to the running `warlock dev` server and prints what devtools recorded for it — middleware chain with timings, validation result and errors, handler time, queries with N+1 flags, logs, cache operations, captured mails, the response and timings — as a versioned report (`schemaVersion: 1`); `traceRequest()` returns the same object. Triggers: `warlock trace`, `traceRequest`, `TraceReport`, `buildTraceReport`, `x-request-id`, `.warlock/dev-server.json`, `WL8008`, `WL8009`, `WL5004`, `--id-header`; "did validation pass for this request", "which queries does this endpoint run", "is there an N+1 on this route", "what middleware runs on this route", "check the endpoint after my change", "request timeline as JSON". Skip: the devtools dashboard in a browser — the `devtools-overview` skill of @warlock.js/devtools; static route facts (guard, rate limit, schemas) — the `warlock-inspect` topic; typecheck/lint/tests — the `warlock-check` topic.'
+---
+
+# Warlock — `warlock trace`
+
+Send a real request to the running dev server and read back its devtools timeline. Use it after a change to confirm what the code actually does at runtime: the middleware that ran, whether validation refused the body, which queries ran and whether any is an N+1.
+
+Needs `warlock dev` running in the project and `@warlock.js/devtools` installed (`npx warlock add devtools`). The dev server records its address in `.warlock/dev-server.json`; `trace` reads it from there.
+
+```bash
+npx warlock trace GET /posts
+npx warlock trace POST /posts --body '{"title":"Hello"}' --json
+npx warlock trace PATCH /posts/1 --body @payload.json -H "authorization: Bearer $TOKEN" --json
+npx warlock trace GET /posts --url http://localhost:2030 --json   # explicit server
+```
+
+`--header` / `-H` repeats. A JSON `--body` is sent as `application/json` unless you pass a `content-type` header; `@file` reads the body from a file.
+
+## Answer questions with jq
+
+```bash
+# Validation verdict and errors
+npx warlock trace POST /posts --body '{"title":""}' --json | jq '.timeline.validation'
+# → { "ran": true, "durationMs": 0.6, "passed": false, "errors": [{ "input": "title", "error": "The title is required" }] }
+
+# N+1 queries with the line that issued them
+npx warlock trace GET /posts --json | jq '.queries[] | select(.nPlusOne) | {sql, caller}'
+
+# Middleware chain, in run order
+npx warlock trace GET /admin/users -H "authorization: Bearer $TOKEN" --json \
+  | jq -r '.timeline.middleware[] | "\(.index) \(.name) \(.durationMs)ms"'
+
+# Status and body
+npx warlock trace GET /posts/1 --json | jq '{status: .response.status, body: .response.body}'
+```
+
+## The report (schemaVersion 1)
+
+Top-level keys: `requestId`, `server`, `request` (method, url, headers with credentials `[redacted]`, body), `response` (status, headers, body — parsed JSON or text, cut at 64 KiB with `truncated`), `route`, `error`, `timeline` (`phases`, `routeMatch`, `middleware[]`, `validation`, `handler`), `queries[]` (each with `nPlusOne`), `warnings[]`, `logs[]`, `cache[]`, `mails[]`, `timings` (`totalMs` server, `clientMs` round trip, `phasesMs` per phase).
+
+`timeline.validation.passed`: `true` when the handler ran after validation, `false` when the request was answered with an error before the handler, `null` when the route validates nothing.
+
+## From code
+
+```ts
+import { traceRequest } from "@warlock.js/core/tooling";
+
+const report = await traceRequest({ method: "POST", url: "/posts", body: { title: "Hello" } });
+
+const slowQueries = report.queries.filter((query) => Number(query.durationMs) > 50);
+const nPlusOne = report.queries.some((query) => query.nPlusOne);
+```
+
+## How the request is matched
+
+`trace` sends a fresh UUID as `x-request-id`. Core adopts it as `request.id` and echoes it back; devtools keys its record by that id. If the app renamed the header (`http.requestId.header`), pass `--id-header <name>`. If it disabled it (`http.requestId.enabled: false`), no record can be matched.
+
+## Errors
+
+| Code     | Meaning                                                             | Exit |
+| -------- | ------------------------------------------------------------------- | ---- |
+| `WL8008` | No dev server recorded, or it does not answer — start `warlock dev` | 2    |
+| `WL8009` | Dev server up, devtools not mounted — `warlock add devtools`        | 2    |
+| `WL5004` | Devtools has no record of the request (request id disabled)         | 1    |
+
+Devtools is checked before anything is sent. With `--json` a failure prints `{ "ok": false, "code", "message" }`. Exit 2 means "this machine", not your code — start the server instead of editing code. `npx warlock explain <code>` prints the fix.
+
+## Gotchas
+
+- Run it on the same machine as the dev server: devtools answers loopback requests only, in development only.
+- Paths under the devtools prefix (`/__warlock`) are never recorded.
+- Devtools keeps the last 200 requests in memory; a restart of `warlock dev` clears them.
+- The request really runs: a `POST` writes to the development database.
+
+## See also
+
+- The `warlock-inspect` topic — the static facts of a route (guard, rate limit, schemas).
+- The `warlock-check` topic — typecheck, lint, tests and conventions in one run.
+- The `devtools-overview` skill of `@warlock.js/devtools` — the dashboard behind the timeline.
 
 
 ## wire-socket  `@warlock.js/core/wire-socket/SKILL.md`

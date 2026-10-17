@@ -8,7 +8,7 @@
 
 ---
 name: setup-bedrock
-description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain (no apiKey). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint, usage cachedTokens/cacheWriteTokens. Triggers: `providerOptions`, `BedrockCallOptions`, `countTokens`, `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
+description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, apiKey?, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain or an Amazon Bedrock API key (bearer). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint on tools (Claude), system and the last message, 1h TTL via promptCacheTtl, usage inputIncludesCache: false + cachedTokens/cacheWriteTokens/cacheWrite1hTokens, built-in Claude prices for global./us. profiles (BEDROCK_GLOBAL_PRICING, BEDROCK_US_PRICING, bedrockPricingFor), ServiceUnavailableException → ProviderOverloadedError. Triggers: `apiKey`, `AWS_BEARER_TOKEN_BEDROCK`, `providerOptions`, `BedrockCallOptions`, `countTokens`, `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `ai.providerTool`, `systemTool`, `nova_grounding`, `server_tool_use`, `streamChunks`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
 ---
 
 # `@warlock.js/ai-bedrock`
@@ -29,9 +29,15 @@ const bedrock2 = new BedrockSDK({
   credentials: { accessKeyId: "AKIA...", secretAccessKey: "..." },
   provider: "bedrock-eu",
 });
+
+// Amazon Bedrock API key (bearer auth, no AWS credentials):
+const bedrock3 = new BedrockSDK({
+  apiKey: process.env.BEDROCK_API_KEY!,
+  region: "us-east-1",
+});
 ```
 
-Bedrock authenticates via the **AWS credential chain, not an API key** — there is no `apiKey`. `region` is required; `credentials` is optional (omit to use the standard provider chain). The whole config object is forwarded to `BedrockRuntimeClient`, so any AWS client option (`endpoint`, `requestHandler`, retry config) is accepted. `provider` defaults to `"bedrock"`.
+Bedrock authenticates via the **AWS credential chain** or an **Amazon Bedrock API key**. `apiKey` sends `Authorization: Bearer <key>` instead of a SigV4 signature (the adapter sets the AWS SDK's `token` + `authSchemePreference: ["httpBearerAuth"]`); combining it with `credentials` or `token`, or passing an empty key, throws `InvalidRequestError`. Without `apiKey`, the AWS SDK still reads a key from `AWS_BEARER_TOKEN_BEDROCK` on its own. `region` is required; `credentials` is optional (omit to use the standard provider chain). The whole config object is forwarded to `BedrockRuntimeClient`, so any AWS client option (`endpoint`, `requestHandler`, retry config) is accepted. `provider` defaults to `"bedrock"`.
 
 ## Producing a model
 
@@ -47,14 +53,14 @@ Uses the model-agnostic **Converse / ConverseStream** API — one wire mapping c
 
 ## Capabilities — what's auto-set
 
-| Flag               | Default                                                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `structuredOutput` | `true` (via Converse `outputConfig.textFormat`)                                                                                                   |
-| `vision`           | Inferred from model id substring. `true` for Claude 3/3.5/3.7/4, Nova Lite/Pro/Premier, Llama 3.2-11B/90B, Llama 4.                               |
-| `reasoning`        | Inferred from model id. `true` for Claude 3.7 + Claude 4 (Sonnet/Opus/Haiku) — they expose a configurable thinking budget on Converse.            |
-| `promptCaching`    | Inferred from model id. `true` for Claude 3.5+/3.7/4 and Nova Micro/Lite/Pro/Premier — the families that honor Converse `cachePoint`.             |
-| `pdf`              | Inferred from model id. `true` for Claude 3+ and Nova Lite/Pro/Premier (Converse `document` blocks).                                              |
-| `audio`            | `false` by default — Converse does not accept audio blocks for the families this adapter targets. Pass `audio: true` for a confirmed audio model. |
+| Flag               | Default                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `structuredOutput` | `true` (via Converse `outputConfig.textFormat`)                                                                                                        |
+| `vision`           | Inferred from model id substring. `true` for Claude 3/3.5/3.7/4, Nova Lite/Pro/Premier, Llama 3.2-11B/90B, Llama 4.                                    |
+| `reasoning`        | Inferred from model id. `true` for Claude 3.7 + Claude 4 (Sonnet/Opus/Haiku) — they expose a configurable thinking budget on Converse.                 |
+| `promptCaching`    | Inferred from model id. `true` for Claude 3.5+/3.7/4/5 and Nova 2 Lite / Micro / Lite / Pro / Premier — the families that honor Converse `cachePoint`. |
+| `pdf`              | Inferred from model id. `true` for Claude 3+ and Nova Lite/Pro/Premier (Converse `document` blocks).                                                   |
+| `audio`            | `false` by default — Converse does not accept audio blocks for the families this adapter targets. Pass `audio: true` for a confirmed audio model.      |
 
 Explicit config always wins — every flag is overridable per model, e.g. `bedrock.model({ name, reasoning: false, promptCaching: true, pdf: false, audio: true })`.
 
@@ -76,13 +82,38 @@ A thinking budget below `1024` throws before the request. When thinking is enabl
 
 ## Prompt caching
 
-For a `promptCaching`-capable model, `ModelCallOptions.cacheControl.breakpoints` (any positive value) appends one Converse `cachePoint: { type: "default" }` block to the LAST message — Bedrock then caches the whole prefix up to that point:
+For a `promptCaching`-capable model, `ModelCallOptions.cacheControl.breakpoints` (any positive value) places a Converse `cachePoint` on every stable segment of the prefix, in the order Bedrock processes them (`tools` → `system` → `messages`, three of the four checkpoints it allows):
+
+| Segment  | Where the `cachePoint` goes             | Models                                               |
+| -------- | --------------------------------------- | ---------------------------------------------------- |
+| tools    | after the last `toolConfig.tools` entry | Claude only — Nova accepts no cache point in `tools` |
+| system   | after the system blocks                 | every caching-capable model                          |
+| messages | appended to the LAST message            | every caching-capable model                          |
+
+The lifetime is the per-call `cacheControl.ttl`, else the model's `promptCacheTtl`. `ttl: "1h"` is sent only to models that accept it — Claude Haiku 4.5, Sonnet / Opus 4.5+ and every Claude 5 family; any other model gets the 5-minute default, because AWS warns that the field "can result in a ValidationException" on 5-minute-only models.
 
 ```ts
-await model.complete(messages, { cacheControl: { breakpoints: 1 } });
+import { BedrockSDK } from "@warlock.js/ai-bedrock";
+
+const bedrock = new BedrockSDK({ region: "us-east-1" });
+const model = bedrock.model({ name: "global.anthropic.claude-sonnet-4-6", promptCacheTtl: "1h" });
+
+// tools + system + last message are cached for an hour:
+await model.complete(
+  [
+    { role: "system", content: "Long, stable instructions…" },
+    { role: "user", content: "First question" },
+  ],
+  { cacheControl: { breakpoints: 1 } },
+);
+
+// Per call, the TTL can be overridden:
+await model.complete([{ role: "user", content: "hi" }], {
+  cacheControl: { breakpoints: 1, ttl: "5m" },
+});
 ```
 
-Earlier turns are untouched; only the trailing message is marked. No-ops gracefully when the model is not caching-capable or no breakpoint was requested. Read-side accounting works without any breakpoint — see the usage section below.
+Source for the placement rules and TTL support: https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html (checked 2026-10-17). No-ops gracefully when the model is not caching-capable or no breakpoint was requested. Read-side accounting works without any breakpoint — see the usage section below.
 
 ## System prompt
 
@@ -112,6 +143,17 @@ Object-root `responseSchema` + `structuredOutput`-capable → `outputConfig.text
 - `contentBlockDelta.delta.text` → `{ type: "delta", content }`
 - `toolUse`: `contentBlockStart` opens an accumulator, `contentBlockDelta.delta.toolUse.input` fragments append, `contentBlockStop` emits one consolidated `{ type: "tool-call", ... }`
 - terminal `{ type: "done", finishReason, usage }` — usage from `metadata.usage` (a `TokenUsage`), including `cachedTokens` / `cacheWriteTokens` when reported (see the usage table below)
+- opt-in (`options.streamChunks`, set by `agent.stream()`): `{ type: "reasoning", delta }` per `reasoningContent.text` delta, `{ type: "tool-args", callId, name, delta }` per client `toolUse.input` delta; no `usage` chunk (usage arrives once at the end)
+
+**System tools:** `ai.providerTool({ provider: "bedrock", definition: { systemTool: { name: "nova_grounding" } } })` is appended to `toolConfig.tools` verbatim. `toolUse` blocks with `type: "server_tool_use"` are never dispatched as tool calls.
+
+```ts
+const grounding = ai.providerTool({
+  provider: "bedrock",
+  definition: { systemTool: { name: "nova_grounding" } },
+});
+ai.agent({ model: bedrock.model({ name: "us.amazon.nova-premier-v1:0" }), tools: [grounding] });
+```
 
 ## Finish-reason mapping
 
@@ -138,7 +180,10 @@ Raw AWS SDK exceptions are wrapped into the typed `@warlock.js/ai` `AIError` hie
 - `ServiceQuotaExceededException` → `QuotaExceededError`
 - `ValidationException` with "too long / context window" → `ContextLengthExceededError`, else `InvalidRequestError`
 - `ModelTimeoutException` / `ETIMEDOUT` → `ProviderTimeoutError`
-- 5xx / `ModelError` / `ServiceUnavailable` → `ProviderError`
+- `ServiceUnavailableException` / 503 → `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`) — the service is temporarily unable to serve the request
+- other 5xx / `ModelError` → `ProviderError`
+
+Every wrapped error carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"` — AWS publishes no rule for failed requests). `fallbackModel` fails over on `PROVIDER_OVERLOADED` by default.
 
 ## Token counting
 
@@ -148,42 +193,62 @@ await bedrock.count("some text"); // approximate heuristic, offline
 
 Per-model tokenizers differ across Bedrock families.
 
-## Pricing — per-model registry
+## Pricing — built-in Claude prices and registry
 
-`pricing` is an optional **registry keyed by Bedrock model id** — one entry per model, all rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput` / `cachedOutput`). Set it on the SDK so every model it produces inherits the rates:
+All rates are **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput`, `cacheWrite`, `cacheWrite1h`). Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricing })`) > SDK registry (exact id) > built-in profile price > `undefined` (no cost computed).
 
 ```ts
+import { ai, totalCost } from "@warlock.js/ai";
+import {
+  BEDROCK_GLOBAL_PRICING,
+  BedrockSDK,
+  bedrockPricingFor,
+  withClaudeCacheWriteRates,
+} from "@warlock.js/ai-bedrock";
+
 const bedrock = new BedrockSDK({
-  region: "us-east-1",
+  region: "eu-west-1",
   pricing: {
-    // USD per 1M tokens. Key = exact Bedrock model id / inference-profile id.
-    "anthropic.claude-sonnet-4-5-20250929-v1:0": { input: 3, output: 15 },
-    "us.amazon.nova-pro-v1:0": { input: 0.8, output: 3.2 },
+    // In-Region and non-US geographic ids are not built in — price them yourself.
+    "eu.anthropic.claude-sonnet-4-6": { input: 3.3, output: 16.5, cachedInput: 0.33 },
+    "amazon.nova-pro-v1:0": { input: 0.8, output: 3.2 }, // your own rates for unlisted models
   },
 });
 
+bedrock.model({ name: "global.anthropic.claude-sonnet-4-6" }).pricing; // built-in global rate
+bedrock.model({ name: "eu.anthropic.claude-sonnet-4-6" }).pricing; // registry + Claude write rates filled (cacheWrite 4.125, cacheWrite1h 6.6)
+bedrockPricingFor("us.anthropic.claude-haiku-4-5-20251001-v1:0"); // US geographic rate
+withClaudeCacheWriteRates("anthropic.claude-opus-4-8", { input: 5, output: 25 }); // + cacheWrite 6.25, cacheWrite1h 10
+Object.keys(BEDROCK_GLOBAL_PRICING); // the priced Claude model ids
+
 const { usage } = await ai
-  .agent({ model: bedrock.model({ name: "us.amazon.nova-pro-v1:0" }) })
+  .agent({ model: bedrock.model({ name: "global.anthropic.claude-sonnet-4-6" }) })
   .execute("hi");
-usage.cost; // per-channel USD breakdown of THIS run, computed from tokens × pricing[model]
+console.log(usage.cost, totalCost(usage.cost)); // per-channel USD breakdown of THIS run, and its sum
 ```
 
-Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricing })`) > SDK registry > `undefined` (no cost computed). When the same model id appears under a cross-region inference profile, list each id you actually invoke (`us.`, `eu.`, `apac.` prefixes are distinct keys). See the `pick-ai-provider` topic of the `warlock-js-ai` skill.
+- **Source.** https://aws.amazon.com/bedrock/pricing/ — the page's own price feed for "US East (N. Virginia)", fetched 2026-10-17; model ids from the prompt-caching guide. `BEDROCK_GLOBAL_PRICING` holds the `global.` cross-Region profile rates, `BEDROCK_US_PRICING` the `us.` geographic rates (10% above global for these models). Both are keyed by the bare model id; `bedrockPricingFor(id)` strips the profile prefix.
+- **Covered:** Claude Sonnet 5.5 / 5 / 4.6 / 4.5, Opus 5.5 / 5 / 4.8 / 4.7 / 4.6 / 4.5, Fable 5.1 / 5, Haiku 4.5 — with cache read, 5-minute write (1.25x input) and 1-hour write (2x input).
+- **Deliberately unpriced:** in-Region ids with no profile prefix and other geographies (`eu.`, `apac.`, …) — their rates vary by Region; Claude Haiku 5.5 (not verified); and every non-Claude model (Nova, Llama, Titan, …). Pass `pricing` for them.
+- **Claude write rates are filled.** Any Claude entry (your own included) without `cacheWrite` / `cacheWrite1h` gets 1.25x / 2x the input rate (`withClaudeCacheWriteRates`). Non-Claude entries are left as given; an unpriced cache write then bills at the input rate.
 
 ### Tokens & usage — cost truth
 
-Both `complete()` and `stream()` normalize Converse's `TokenUsage` into the neutral `Usage` shape:
+Both `complete()` and `stream()` normalize Converse's `TokenUsage` into the neutral `Usage` shape. With caching, `inputTokens` "represents only the non-cached input tokens" — total input is `inputTokens + cacheReadInputTokens + cacheWriteInputTokens` (AWS prompt-caching guide) — so the adapter marks the usage `inputIncludesCache: false` and cost bills each channel once:
 
-| Converse `TokenUsage` field | Neutral `Usage` field    | Notes                                                                    |
-| --------------------------- | ------------------------ | ------------------------------------------------------------------------ |
-| `inputTokens`               | `usage.input`            | Includes cached read tokens.                                             |
-| `outputTokens`              | `usage.output`           |                                                                          |
-| `totalTokens`               | `usage.total`            | Falls back to `input + output` when absent.                              |
-| `cacheReadInputTokens`      | `usage.cachedTokens`     | Only when `> 0`. Cache-hit reads — price at `pricing.cachedInput`.       |
-| `cacheWriteInputTokens`     | `usage.cacheWriteTokens` | Only when `> 0`. One-time cache write — price at `pricing.cachedOutput`. |
-| —                           | `usage.reasoningTokens`  | **Never set** — Converse exposes no reasoning-token count.               |
+| Converse `TokenUsage` field | Neutral `Usage` field      | Notes                                                                |
+| --------------------------- | -------------------------- | -------------------------------------------------------------------- |
+| `inputTokens`               | `usage.input`              | **Excludes** cache reads and writes. Bills at `pricing.input`.       |
+| —                           | `usage.inputIncludesCache` | Always `false` on Bedrock.                                           |
+| `outputTokens`              | `usage.output`             |                                                                      |
+| `totalTokens`               | `usage.total`              | Falls back to `input + output` when absent.                          |
+| `cacheReadInputTokens`      | `usage.cachedTokens`       | Only when `> 0`. Cache-hit reads — bills at `pricing.cachedInput`.   |
+| `cacheWriteInputTokens`     | `usage.cacheWriteTokens`   | Only when `> 0`. Cache writes — bills at `pricing.cacheWrite`.       |
+| `cacheDetails[ttl: "1h"]`   | `usage.cacheWrite1hTokens` | The 1-hour share of the writes — bills at `pricing.cacheWrite1h`.    |
+| —                           | `usage.reasoningTokens`    | **Never set** — Converse exposes no reasoning-token count.           |
+| —                           | `usage.cost`               | Attached on `complete()` and the streaming `done` chunk when priced. |
 
-Set `cachedInput` / `cachedOutput` in `ModelPricing` to have cache reads/writes billed at their distinct rates. Read-side accounting (`cachedTokens` / `cacheWriteTokens`) is populated whenever Bedrock reports it, independent of whether you sent a `cacheControl` breakpoint.
+Read-side accounting is populated whenever Bedrock reports it, independent of whether you sent a `cacheControl` breakpoint.
 
 ## Provider body options and input-token counts
 

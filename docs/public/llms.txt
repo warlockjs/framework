@@ -94,9 +94,15 @@ combined `llms-full.txt` below is the whole framework and is far larger.
 - [@warlock.js/ai-workspace](https://warlock.js.org/v/latest/ai/providers/workspace/): Policy-jailed filesystem + shell workspace for @warlock.js/ai agents
   - llms.txt: https://warlock.js.org/ai-workspace/llms.txt
   - llms-full.txt: https://warlock.js.org/ai-workspace/llms-full.txt
+- [@warlock.js/ai-cli](https://warlock.js.org/v/latest/ai/providers/cli/): Drive vendor coding-agent CLIs (Claude Code, Codex, Copilot, Cursor, …) as first-class @warlock.js/ai agents
+  - llms.txt: https://warlock.js.org/ai-cli/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-cli/llms-full.txt
 - [@warlock.js/ai-panoptic](https://warlock.js.org/v/latest/ai/observability/ai-panoptic/): Observability collector + exporters for @warlock.js/ai
   - llms.txt: https://warlock.js.org/ai-panoptic/llms.txt
   - llms-full.txt: https://warlock.js.org/ai-panoptic/llms-full.txt
+- [@warlock.js/eslint-plugin](https://warlock.js.org/v/latest/eslint-plugin/): ESLint rules for Warlock.js applications: validated request input, guarded mutating routes, safe redirects, redacted logs, bounded regexes and the framework's code conventions
+  - llms.txt: https://warlock.js.org/eslint-plugin/llms.txt
+  - llms-full.txt: https://warlock.js.org/eslint-plugin/llms-full.txt
 - [create-warlock](https://warlock.js.org/v/latest/create-warlock/): Project scaffolder for the Warlock.js framework — interactive wizard and non-interactive CLI for creating new apps.
   - llms.txt: https://warlock.js.org/create-warlock/llms.txt
   - llms-full.txt: https://warlock.js.org/create-warlock/llms-full.txt

@@ -8,7 +8,7 @@
 
 ---
 name: setup-mistral
-description: 'Wire @warlock.js/ai-mistral — new MistralSDK({apiKey, baseURL?, provider?, pricing?}) for Mistral AI, a thin wrapper over the OpenAI adapter that uses Mistral''s OpenAI-compatible endpoint (https://api.mistral.ai/v1). .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for a ModelContract with Mistral-aware capabilities (vision auto-inferred for the pixtral family, reasoning for the magistral family + hybrid mistral-small), .embedder({name, dimensions?}) for mistral-embed via /v1/embeddings. Triggers: `MistralSDK`, `mistral.model`, `mistral.embedder`, `pixtral`, `magistral`, `mistral-large`, `mistral-small`, `mistral-medium`, `ministral`, `mistral-embed`, `api.mistral.ai`, OpenAI-compatible Mistral, `reasoning_effort`, `responseFormat`, `pricing`; "use mistral", "wire mistral into a warlock agent", "configure mistral-large", "use magistral reasoning", "pixtral vision", "mistral embeddings with warlock". Skip: image generation (Mistral has no OpenAI-compatible image endpoint — `mistral.image()` does not exist); the wrapped adapter internals `@warlock.js/ai-openai`; agent wiring the `run-ai-agent` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-google`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@mistralai/mistralai`, Vercel `@ai-sdk/mistral`.'
+description: 'Wire @warlock.js/ai-mistral — new MistralSDK({apiKey, baseURL?, provider?, pricing?}) for Mistral AI, a thin wrapper over the OpenAI adapter that uses Mistral''s OpenAI-compatible endpoint (https://api.mistral.ai/v1). .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for a ModelContract with Mistral-aware capabilities (vision auto-inferred for the pixtral family, reasoning for the magistral family + hybrid mistral-small), .embedder({name, dimensions?}) for mistral-embed via /v1/embeddings. Triggers: `MistralSDK`, `mistral.model`, `mistral.embedder`, `pixtral`, `magistral`, `mistral-large`, `mistral-small`, `mistral-medium`, `ministral`, `mistral-embed`, `api.mistral.ai`, `MISTRAL_DEFAULT_PRICING`, `promptCacheKey`, OpenAI-compatible Mistral, `reasoning_effort`, `responseFormat`, `pricing`; "use mistral", "wire mistral into a warlock agent", "configure mistral-large", "use magistral reasoning", "pixtral vision", "mistral embeddings with warlock". Skip: image generation (Mistral has no OpenAI-compatible image endpoint — `mistral.image()` does not exist); the wrapped adapter internals `@warlock.js/ai-openai`; agent wiring the `run-ai-agent` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-google`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@mistralai/mistralai`, Vercel `@ai-sdk/mistral`.'
 ---
 
 # `@warlock.js/ai-mistral`
@@ -71,24 +71,47 @@ const { vectors } = await embedder.embedMany(["doc 1", "doc 2"]);
 
 ## Pricing — per-model registry
 
-The adapter ships a conservative default registry (`MISTRAL_DEFAULT_PRICING`, USD per 1,000,000 tokens) so cost truth works out of the box. Pass your own `pricing` to win per model id:
+The adapter ships a default registry (`MISTRAL_DEFAULT_PRICING`, USD per 1,000,000 tokens, with the 10%-of-input cache rate as `cachedInput`) so cost truth works out of the box, on agent reports and on each `model.complete()` / streaming `done` usage. Pass your own `pricing` to win per model id:
 
 ```ts
+import { totalCost } from "@warlock.js/ai";
+import { MISTRAL_DEFAULT_PRICING, MistralSDK } from "@warlock.js/ai-mistral";
+
 const mistral = new MistralSDK({
-  apiKey,
+  apiKey: process.env.MISTRAL_API_KEY ?? "",
   pricing: {
-    // USD per 1M tokens — billing-grade overrides.
-    "mistral-large-latest": { input: 2, output: 6 },
-    "magistral-medium-latest": { input: 2, output: 5 },
+    // USD per 1M tokens — contract rates win over the defaults.
+    "mistral-large-latest": { input: 0.45, output: 1.35, cachedInput: 0.045 },
   },
 });
+
+MISTRAL_DEFAULT_PRICING["mistral-small-latest"]; // { input: 0.15, output: 0.6, cachedInput: 0.015 }
+
+const { usage } = await mistral
+  .model({ name: "mistral-medium-latest" })
+  .complete([{ role: "user", content: "hi" }]);
+console.log(totalCost(usage.cost));
 ```
 
-Resolution at `model()` time: per-model `pricing` (`mistral.model({ name, pricing })`) > SDK-level `pricing` > `MISTRAL_DEFAULT_PRICING` > `undefined`. The defaults are list-price approximations — pass explicit rates for billing.
+Resolution at `model()` time: per-model `pricing` (`mistral.model({ name, pricing })`) > SDK-level `pricing` > `MISTRAL_DEFAULT_PRICING` > `undefined`.
+
+- **Source.** https://docs.mistral.ai/inference/pricing plus the model pages under https://docs.mistral.ai/models (API ids and aliases), fetched 2026-10-17. Covered: `mistral-large-latest` / `mistral-large-2512`, `mistral-medium-latest` / `mistral-medium-3-5`, `mistral-small-latest` / `mistral-small-2603`, `ministral-14b-latest` / `ministral-14b-2512`, `codestral-latest` / `codestral-2508`, `mistral-embed` / `mistral-embed-2312`.
+- **Not included:** Mistral Large 4 (public preview at a temporary sale price) and the retired Pixtral / Magistral models (no longer on the price list) — pass `pricing` if you still call them.
+
+## Prompt caching
+
+Mistral's Chat Completions accepts `prompt_cache_key` (https://docs.mistral.ai/studio/conversations/advanced/prompt-caching). Set `promptCacheKey` on the model to route related requests to the same cache; it is sent while the SDK keeps its default `"mistral"` provider label. Cached tokens come back as `usage.cachedTokens` (inside `prompt_tokens`, so `inputIncludesCache: true`) and bill at `cachedInput`.
+
+```ts
+import { MistralSDK } from "@warlock.js/ai-mistral";
+
+const mistral = new MistralSDK({ apiKey: process.env.MISTRAL_API_KEY ?? "" });
+const model = mistral.model({ name: "mistral-large-latest", promptCacheKey: "conversation:42" });
+```
 
 ## Errors
 
-Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped OpenAI adapter (dispatch keys on `APIError.status + code`) — see the `handle-ai-errors` topic of the `warlock-js-ai` skill.
+Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped OpenAI adapter (dispatch keys on `APIError.status + code`) — see the `handle-ai-errors` topic of the `warlock-js-ai` skill. HTTP 503 (and OpenAI's `server_is_overloaded` code) maps to `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`); every wrapped error carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`).
 
 ## When NOT to use this skill
 

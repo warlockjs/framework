@@ -8,7 +8,7 @@
 
 ---
 name: setup-xai
-description: 'Wire @warlock.js/ai-xai — new XaiSDK({apiKey, baseURL?, provider?, pricing?}) for xAI Grok, .model({name, vision?, reasoning?, structuredOutput?}) for a ModelContract, .embedder({name, dimensions?}) and .image({name, pricing?}) delegated to the OpenAI-compatible adapter. Thin wrapper over OpenAISDK: uses the xAI OpenAI-compatible endpoint (https://api.x.ai/v1) and injects xAI''s own vision/reasoning inference so Grok names resolve to the right capabilities. Triggers: `XaiSDK`, `grok`, `grok-4`, `grok-3`, `grok-3-mini`, `grok-2-vision`, `.model`, `x.ai`, `api.x.ai`, `XAI_API_KEY`, `reasoning_effort` on Grok, "wire xai/grok into a warlock agent", "configure grok-4", "use grok reasoning effort", "send an image to grok-4 / grok-2-vision"; typical import `import { XaiSDK } from "@warlock.js/ai-xai"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; the underlying OpenAI-compatible adapter and its full capability/streaming/error surface — the `setup-openai` topic of the `warlock-js-ai-openai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK pointed at x.ai by hand.'
+description: 'Wire @warlock.js/ai-xai — new XaiSDK({apiKey, baseURL?, provider?, pricing?}) for xAI Grok, .model({name, vision?, reasoning?, structuredOutput?}) for a ModelContract, .embedder({name, dimensions?}) and .image({name, pricing?}) delegated to the OpenAI-compatible adapter. Thin wrapper over OpenAISDK: uses the xAI OpenAI-compatible endpoint (https://api.x.ai/v1) and injects xAI''s own vision/reasoning inference so Grok names resolve to the right capabilities. Triggers: `XaiSDK`, `grok`, `grok-4`, `grok-3`, `grok-3-mini`, `grok-2-vision`, `.model`, `x.ai`, `api.x.ai`, `XAI_API_KEY`, `reasoning_effort` on Grok, `promptCacheKey`, `prompt_cache_key`, xai pricing, "wire xai/grok into a warlock agent", "configure grok-4", "use grok reasoning effort", "send an image to grok-4 / grok-2-vision"; typical import `import { XaiSDK } from "@warlock.js/ai-xai"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; the underlying OpenAI-compatible adapter and its full capability/streaming/error surface — the `setup-openai` topic of the `warlock-js-ai-openai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK pointed at x.ai by hand.'
 ---
 
 # `@warlock.js/ai-xai`
@@ -92,26 +92,42 @@ xAI does **not** currently expose a public embeddings endpoint. `embedder()` is 
 
 ## Pricing — per-model registry
 
-`pricing` is a registry keyed by model name, rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput` / `cachedOutput`). Resolution is delegated: per-model `pricing` > SDK registry > `undefined` (no cost computed).
+xAI ships **no built-in price table**: every Grok model on https://docs.x.ai/developers/pricing (checked 2026-10-17) bills all tokens at a higher long-context rate once the prompt reaches 200k tokens, which a flat `ModelPricing` cannot express. Pass the rates you use (USD per 1,000,000 tokens; `ModelPricing`: `input`, `output`, optional `cachedInput`). xAI has no cache-write charge. Resolution: per-model `pricing` > SDK registry > `undefined` (no cost computed).
 
 ```ts
+import { ai, totalCost } from "@warlock.js/ai";
+import { XaiSDK } from "@warlock.js/ai-xai";
+
 const xai = new XaiSDK({
-  apiKey,
+  apiKey: process.env.XAI_API_KEY ?? "",
   pricing: {
-    "grok-4": { input: 3, output: 15 },
-    "grok-3-mini": { input: 0.3, output: 0.5 },
+    // Below-200k rates from xAI's pricing page; long prompts cost more.
+    "grok-4.3": { input: 1.25, output: 2.5, cachedInput: 0.2 },
   },
 });
 
-const { usage } = await ai.agent({ model: xai.model({ name: "grok-4" }) }).execute("hi");
-usage.cost; // per-channel USD breakdown of THIS run, or undefined when unpriced
+const { usage } = await ai.agent({ model: xai.model({ name: "grok-4.3" }) }).execute("hi");
+console.log(totalCost(usage.cost)); // undefined when unpriced
 ```
 
-> Pricing numbers above are illustrative placeholders — set the current xAI rates yourself.
+`usage` follows OpenAI semantics (`prompt_tokens` includes the cached tokens, `inputIncludesCache: true`), and `usage.cost` is attached to every `model.complete()` / streaming `done` once the model is priced.
+
+## Prompt caching
+
+xAI's Chat Completions accepts `prompt_cache_key`, routed as the `x-grok-conv-id` cache key (https://docs.x.ai/developers/advanced-api-usage/prompt-caching/maximizing-cache-hits). Set `promptCacheKey` on the model — sent while the SDK keeps its default `"xai"` provider label — to keep a conversation's requests on the same cache:
+
+```ts
+import { XaiSDK } from "@warlock.js/ai-xai";
+
+const xai = new XaiSDK({ apiKey: process.env.XAI_API_KEY ?? "" });
+const model = xai.model({ name: "grok-4.3", promptCacheKey: "conversation:42" });
+```
+
+OpenAI's `prompt_cache_retention` and explicit breakpoints are never sent to xAI.
 
 ## Errors
 
-Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped adapter's error wrapper (dispatch keys on `APIError.status + code`). See the `handle-ai-errors` topic of the `warlock-js-ai` skill.
+Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped adapter's error wrapper (dispatch keys on `APIError.status + code`). See the `handle-ai-errors` topic of the `warlock-js-ai` skill. HTTP 503 (and OpenAI's `server_is_overloaded` code) maps to `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`); every wrapped error carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`).
 
 ## When NOT to use this skill
 

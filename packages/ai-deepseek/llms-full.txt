@@ -8,7 +8,7 @@
 
 ---
 name: setup-deepseek
-description: 'Wire @warlock.js/ai-deepseek — new DeepSeekSDK({apiKey, baseURL?, provider?, pricing?}) for DeepSeek''s OpenAI-compatible API, .model({name, reasoning?, vision?, structuredOutput?, responseFormat?}) for ModelContract. Thin wrapper over @warlock.js/ai-openai''s OpenAISDK pinned to https://api.deepseek.com with provider "deepseek"; injects DeepSeek-specific reasoning/vision inference + built-in pricing. Models: deepseek-chat (non-thinking), deepseek-reasoner (thinking/reasoning), deepseek-v4-flash, deepseek-v4-pro. Triggers: `DeepSeekSDK`, `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4`, `api.deepseek.com`, `DEEPSEEK_API_KEY`, reasoning effort on deepseek; "wire deepseek into a warlock agent", "use deepseek-reasoner", "configure deepseek-chat", "route a warlock agent through deepseek". Skip: OpenAI/Azure/OpenRouter — `@warlock.js/ai-openai`; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; raw deepseek HTTP / the `openai` SDK directly. Typical import `import { DeepSeekSDK } from "@warlock.js/ai-deepseek"`.'
+description: 'Wire @warlock.js/ai-deepseek — new DeepSeekSDK({apiKey, baseURL?, provider?, pricing?}) for DeepSeek''s OpenAI-compatible API, .model({name, reasoning?, vision?, structuredOutput?, responseFormat?}) for ModelContract. Thin wrapper over @warlock.js/ai-openai''s OpenAISDK pinned to https://api.deepseek.com with provider "deepseek"; injects DeepSeek-specific reasoning/vision inference + built-in pricing. Models: deepseek-flash / deepseek-v4-flash, deepseek-v4-pro, legacy deepseek-chat / deepseek-reasoner. Built-in peak-rate pricing (DEEPSEEK_DEFAULT_PRICING) and an opt-in off-peak table (DEEPSEEK_OFF_PEAK_PRICING). Triggers: `DeepSeekSDK`, `DEEPSEEK_DEFAULT_PRICING`, `DEEPSEEK_OFF_PEAK_PRICING`, `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4`, `api.deepseek.com`, `DEEPSEEK_API_KEY`, reasoning effort on deepseek; "wire deepseek into a warlock agent", "use deepseek-reasoner", "configure deepseek-chat", "route a warlock agent through deepseek". Skip: OpenAI/Azure/OpenRouter — `@warlock.js/ai-openai`; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; raw deepseek HTTP / the `openai` SDK directly. Typical import `import { DeepSeekSDK } from "@warlock.js/ai-deepseek"`.'
 ---
 
 # `@warlock.js/ai-deepseek`
@@ -85,21 +85,41 @@ await model.complete(messages, { reasoning: { effort: "high" } }); // → reason
 
 ## Pricing
 
-The adapter ships **built-in DeepSeek pricing defaults** (USD per 1M tokens, from DeepSeek's published table), so `usage.cost` is computed out of the box:
+The adapter ships **built-in DeepSeek pricing defaults** (`DEEPSEEK_DEFAULT_PRICING`, USD per 1M tokens; `cachedInput` is the cache-hit rate), so `usage.cost` is computed out of the box — on agent reports and on each `model.complete()` / streaming `done` usage.
+
+DeepSeek bills by time of day: peak hours (01:00–04:00 and 06:00–10:00 UTC, Monday to Friday) cost twice the off-peak rate. A flat `ModelPricing` cannot follow the clock, so the defaults are the **peak** rates — an upper bound that keeps USD budgets safe; off-peak calls really cost half. Opt into `DEEPSEEK_OFF_PEAK_PRICING` when you know you run off-peak.
 
 ```ts
-const deepseek = new DeepSeekSDK({ apiKey }); // deepseek-chat → { input: 0.14, output: 0.28, cachedInput: 0.0028 }
+import { totalCost } from "@warlock.js/ai";
+import {
+  DEEPSEEK_DEFAULT_PRICING,
+  DEEPSEEK_OFF_PEAK_PRICING,
+  DeepSeekSDK,
+} from "@warlock.js/ai-deepseek";
+
+const deepseek = new DeepSeekSDK({ apiKey: process.env.DEEPSEEK_API_KEY ?? "" });
+DEEPSEEK_DEFAULT_PRICING["deepseek-flash"]; // { input: 0.3, output: 1.2, cachedInput: 0.006 } — peak
+
+const offPeak = new DeepSeekSDK({
+  apiKey: process.env.DEEPSEEK_API_KEY ?? "",
+  pricing: DEEPSEEK_OFF_PEAK_PRICING, // { input: 0.15, output: 0.6, cachedInput: 0.003 } for flash
+});
+
+const { usage } = await offPeak
+  .model({ name: "deepseek-v4-pro" })
+  .complete([{ role: "user", content: "hi" }]);
+console.log(usage.cachedTokens, totalCost(usage.cost));
 ```
 
-Override per model or per SDK exactly like the OpenAI adapter. Resolution at `model()` time: per-model `pricing` > SDK `pricing` registry > built-in DeepSeek default > `undefined`.
+Resolution at `model()` time: per-model `pricing` > SDK `pricing` registry > built-in DeepSeek default > `undefined`.
 
-```ts
-new DeepSeekSDK({ apiKey, pricing: { "deepseek-reasoner": { input: 0.55, output: 2.19 } } });
-```
+- **Source.** https://api-docs.deepseek.com/quick_start/pricing, fetched 2026-10-17. Covered: `deepseek-flash`, `deepseek-v4-flash` (its legacy name, same rate) and `deepseek-v4-pro`.
+- **Unpriced:** `deepseek-chat` / `deepseek-reasoner` are gone from the price list (announced for discontinuation on 2026-07-24) — pass `pricing` if a gateway still serves them.
+- **Usage semantics.** DeepSeek's `prompt_tokens` equals cache hits + misses and `prompt_tokens_details.cached_tokens` mirrors `prompt_cache_hit_tokens`, so the usage is `inputIncludesCache: true` and hits bill at `cachedInput`. DeepSeek caches automatically on disk and takes no request hint, so `promptCacheKey` is never sent.
 
 ## Errors
 
-Raw errors surface through the wrapped OpenAI adapter's wrapper into the typed `@warlock.js/ai` `AIError` hierarchy — see the `handle-ai-errors` topic of the `warlock-js-ai` skill.
+Raw errors surface through the wrapped OpenAI adapter's wrapper into the typed `@warlock.js/ai` `AIError` hierarchy — see the `handle-ai-errors` topic of the `warlock-js-ai` skill. DeepSeek documents 503 as "Server Overloaded" (https://api-docs.deepseek.com/quick_start/error_codes); it maps to `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`). Every wrapped error carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`).
 
 ## When NOT to use this skill
 

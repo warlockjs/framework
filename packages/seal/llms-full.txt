@@ -534,13 +534,27 @@ v.tuple([v.literal("ok"), v.string()]); // type: ["ok", string]
 
 Each position has its own validator; the array length must match the tuple length. Pair with `v.literal` at position 0 for result-tuple patterns (`["ok", data]` vs `["error", message]`).
 
+Pass the validators as a literal list so each position keeps its own type, for input and validated output alike. A list typed `BaseValidator[]` (built at runtime) has no fixed positions, so its output is an array rather than a tuple.
+
 ## `v.union` — one of N validators (untagged)
 
 ```ts
 v.union([v.string(), v.int()]); // type: string | number
 ```
 
-The first type-matching validator wins, picked via each branch's `matchesType()`. Use for unions of **scalar** types (string vs number, etc.) where `matchesType` is enough to disambiguate. For object-vs-object unions, reach for `v.discriminatedUnion` instead — `matchesType` can't distinguish two object branches and you'll get errors from the wrong branch.
+Every branch whose type matches the value (`matchesType()`) is tried, in order, and the first that passes wins; the union returns that branch's validated output. `firstErrorOnly` limits the errors reported, never the branches tried, so a union of several object shapes accepts a value matching any of them:
+
+```ts
+const owner = v.object({ kind: v.literal("owner"), id: v.literal("__owner__") });
+const member = v.object({ kind: v.literal("member"), id: v.string() });
+
+await validate(v.union([owner, member]), { kind: "member", id: "x" });
+// → valid, data: { kind: "member", id: "x" }
+```
+
+When no branch passes, the union reports the **closest** failed branch, picked by: fewest mismatched `v.literal(...)` fields, then fewest errors, then the deepest error path, then declaration order. Its errors keep their own paths (`actor.id`, not `actor`) and have the type `"union"` — the first one by default, all of them with `firstErrorOnly: false`. A custom `errorMessage` (`v.union([...], "Unknown actor")`), or a value no branch can hold by type, gives a single error at the union's path.
+
+For object shapes that share a tag field, `v.discriminatedUnion` is still the better fit: it routes straight to one branch instead of trying each, and narrows exactly in TypeScript.
 
 ## `v.discriminatedUnion` — tagged unions (recommended for objects)
 
@@ -559,8 +573,8 @@ type Notif = Infer<typeof notif>;
 
 Routes payloads by reading the discriminator field (here `type`), looking it up in a key→branch map built at construction time, and delegating to the matching branch only. Benefits over plain `v.union`:
 
-- **Precise errors.** Failures come from the matched branch, not from every branch.
-- **O(1) routing** instead of trial-and-error.
+- **Precise errors.** Failures come from the branch the tag names, not from the closest guess.
+- **O(1) routing** instead of trying each branch.
 - **Exact TS inference** — discriminated union with narrowing inside `if (x.type === "email")` blocks.
 - **Cleaner JSON Schema** — `oneOf` with literal discriminators; OpenAI-strict accepts it.
 
@@ -1090,6 +1104,32 @@ receive that replacement. Omitting `data` preserves the current value; a present
 `data: undefined` explicitly clears it. This is also how a union preserves the
 selected branch's validated defaults, catches and child transformations.
 
+## Reporting several errors from one rule
+
+A failed rule result can carry `errors: [{ error, path }, ...]` to report more than
+one error, each at its own path; every entry gets the rule's `name` as its `type`.
+`v.union` uses this to relay the closest branch's errors. Return as many as fit the
+caller's `context.configurations?.firstErrorOnly` (default `true`: one).
+
+```ts
+import { invalidRule, type SchemaRule } from "@warlock.js/seal";
+
+const bothDates: SchemaRule = {
+  name: "bothDates",
+  async validate(value: { from?: unknown; to?: unknown }, context) {
+    const missing = (["from", "to"] as const).filter((key) => !value?.[key]);
+    if (missing.length === 0) return { isValid: true };
+
+    const failed = invalidRule(this, context);
+    const errors = missing.map((key) => ({
+      error: `The ${key} date is required`,
+      path: context.path ? `${context.path}.${key}` : key,
+    }));
+    return { ...failed, errors };
+  },
+};
+```
+
 
 ## generate-json-schema  `@warlock.js/seal/generate-json-schema/SKILL.md`
 
@@ -1325,6 +1365,8 @@ The `type` is the rule's own `name` field — not the method you called. Several
 | `instanceof`                                                                                                                  | `v.instanceof(Ctor)`                                                                                                      |
 | `equalsField`, `notEqualsField`                                                                                               | cross-field equality (`.sameAs` → `equalsField`; `.differentFrom` → `notEqualsField`)                                     |
 | `minDate`, `maxDate`, `beforeField`, `afterField`, `today`, `past`, `future`, `weekDay`, `weekend`, `businessDay`, `birthday` | date rules (`.min`/`.max` → `minDate`/`maxDate`; `.before`/`.after` → `beforeField`/`afterField`)                         |
+
+`v.union(...)` reports `union`: when no branch passes, it relays the closest branch's errors (fewest mismatched literals, then fewest errors, then deepest path) at their own paths, all typed `union`. A custom rule can do the same by returning `errors: [{ error, path }, ...]` with its failed result.
 
 If you write custom rules, the `type` name you set on the rule object is what shows up here. Pick stable, kebab-or-camel-case names — they become a public API.
 
