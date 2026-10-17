@@ -23,14 +23,23 @@ Releases run in GitHub Actions on this repository
    install/import/scaffold checks share one thirty-minute deadline, with
    exponential backoff from three to sixty seconds. Already-live packages are
    not re-polled; retries start with clean consumer and scaffold directories.
-   On exhaustion, the runner saves its recorded release commit in
-   `$LOGS/release-commit.bundle`, uploaded with `warlock-<version>-logs`.
+   On exhaustion, or when tagging or pushing fails after confirmation, the
+   runner saves its recorded release commit in `$LOGS/release-commit.bundle`,
+   uploaded with `warlock-<version>-logs`.
    Recovery output explains how to download that bundle and the
    `warlock-<version>-artifacts` upload, restore `build-provenance.json`, import
    the commit, check that the origin branch is its ancestor, push the recorded
    commit and tag, and dispatch the registry blog check. When release edits are
    a no-op, the recorded commit is the dispatched commit. Wait for every subject
    to be visible before recovery; do not republish.
+   The same steps are saved as `$LOGS/recover-release-v<version>.sh`: after
+   `gh run download <run_id> -n warlock-<version>-logs -D release-logs`, run
+   `bash release-logs/recover-release-v<version>.sh <run_id>` from the
+   repository root. The script uses `set -euo pipefail` and is safe to rerun
+   after a partial recovery: it skips present downloads, keeps a tag already at
+   the release commit and treats a tag already at origin as pushed. The printed
+   copy is wrapped in `( set -euo pipefail … )`, so pasting it stops at the
+   first failure without closing your shell.
 
 ```bash
 npm ci
