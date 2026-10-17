@@ -154,27 +154,29 @@ export class GroqSDK implements SDKAdapterContract {
 }
 
 /**
- * Built-in default USD-per-1,000,000-token rates for the current Groq
- * production models (mid-2026), used as the last fallback in `model()`'s
- * pricing resolution. A per-model or SDK-level `pricing` entry always
- * wins over these. Returns `undefined` for any unlisted id so cost stays
- * an honest absence rather than a false zero. Update when Groq revises
- * its public price list.
+ * Built-in default USD-per-1,000,000-token rates for the Groq models with
+ * a published price, used as the last fallback in `model()`'s pricing
+ * resolution. A per-model or SDK-level `pricing` entry always wins over
+ * these. Returns `undefined` for any unlisted id so cost stays an honest
+ * absence rather than a false zero.
  */
 function defaultPricingFor(name: string): ModelPricing | undefined {
   return GROQ_DEFAULT_PRICING[name];
 }
 
 /**
- * Default per-million-token USD rates for known Groq models. Kept inline
- * (not exported) so the public surface stays the inference helpers; a
- * caller who wants different numbers supplies `pricing` on the SDK or
- * per model.
+ * Default per-million-token USD rates for Groq models.
+ *
+ * Source: https://console.groq.com/docs/models (groq.com/pricing now
+ * redirects to the home page), fetched 2026-10-17. Cached input is 50%
+ * of the input rate for the gpt-oss models, the only ones Groq caches
+ * (https://console.groq.com/docs/prompt-caching; no write charge). The
+ * Llama models are listed as "Enterprise – Contact Sales" with no public
+ * price, so they stay unpriced — pass `pricing` for them.
  */
-const GROQ_DEFAULT_PRICING: Record<string, ModelPricing> = {
-  "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 },
-  "llama-3.1-8b-instant": { input: 0.05, output: 0.08 },
-  "openai/gpt-oss-120b": { input: 0.15, output: 0.75 },
-  "openai/gpt-oss-20b": { input: 0.1, output: 0.5 },
-  "deepseek-r1-distill-llama-70b": { input: 0.75, output: 0.99 },
+export const GROQ_DEFAULT_PRICING: Readonly<Record<string, ModelPricing>> = {
+  "openai/gpt-oss-120b": { input: 0.15, output: 0.6, cachedInput: 0.075 },
+  "openai/gpt-oss-20b": { input: 0.075, output: 0.3, cachedInput: 0.0375 },
+  "openai/gpt-oss-safeguard-20b": { input: 0.075, output: 0.3, cachedInput: 0.0375 },
+  "qwen/qwen3.8-27b": { input: 0.8, output: 4 },
 };

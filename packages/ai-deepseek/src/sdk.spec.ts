@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OpenAISDK } from "@warlock.js/ai-openai";
-import { DeepSeekSDK } from "./sdk";
+import { DEEPSEEK_OFF_PEAK_PRICING, DeepSeekSDK } from "./sdk";
 
 /**
  * Reach into the wrapped OpenAISDK's underlying `openai` client to read
@@ -106,15 +106,27 @@ describe("DeepSeekSDK", () => {
 describe("DeepSeekSDK pricing resolution", () => {
   it("applies the built-in DeepSeek pricing defaults by model name", () => {
     const sdk = new DeepSeekSDK({ apiKey: "k" });
-    expect(sdk.model({ name: "deepseek-chat" }).pricing).toEqual({
-      input: 0.14,
-      output: 0.28,
-      cachedInput: 0.0028,
+    // Peak rates — the upper bound of DeepSeek's time-of-day pricing.
+    expect(sdk.model({ name: "deepseek-flash" }).pricing).toEqual({
+      input: 0.3,
+      output: 1.2,
+      cachedInput: 0.006,
     });
     expect(sdk.model({ name: "deepseek-v4-pro" }).pricing).toEqual({
-      input: 0.435,
-      output: 0.87,
-      cachedInput: 0.003625,
+      input: 1.32,
+      output: 3.96,
+      cachedInput: 0.044,
+    });
+    // Discontinued ids are no longer on the price list.
+    expect(sdk.model({ name: "deepseek-chat" }).pricing).toBeUndefined();
+  });
+
+  it("accepts the off-peak table as an opt-in registry", () => {
+    const sdk = new DeepSeekSDK({ apiKey: "k", pricing: DEEPSEEK_OFF_PEAK_PRICING });
+    expect(sdk.model({ name: "deepseek-v4-flash" }).pricing).toEqual({
+      input: 0.15,
+      output: 0.6,
+      cachedInput: 0.003,
     });
   });
 
@@ -125,11 +137,7 @@ describe("DeepSeekSDK pricing resolution", () => {
     });
     expect(sdk.model({ name: "deepseek-chat" }).pricing).toEqual({ input: 1, output: 2 });
     // untouched model keeps the built-in default
-    expect(sdk.model({ name: "deepseek-reasoner" }).pricing).toEqual({
-      input: 0.14,
-      output: 0.28,
-      cachedInput: 0.0028,
-    });
+    expect(sdk.model({ name: "deepseek-v4-pro" }).pricing?.input).toBe(1.32);
   });
 
   it("per-model pricing wins over both the registry and the built-in default", () => {

@@ -77,6 +77,18 @@ describe("GoogleSDK", () => {
     expect(sdk.model({ name: "gemini-2.5-flash" }).pricing).toBeUndefined();
   });
 
+  it("model() falls back to the verified flat list price", () => {
+    const sdk = new GoogleSDK({ apiKey: "k" });
+
+    expect(sdk.model({ name: "gemini-3.5-flash-lite" }).pricing).toEqual({
+      input: 0.3,
+      output: 2.5,
+      cachedInput: 0.03,
+    });
+    // Prompt-length tiers cannot be expressed as one flat rate.
+    expect(sdk.model({ name: "gemini-2.5-pro" }).pricing).toBeUndefined();
+  });
+
   it("embedder() returns a fresh GoogleEmbedder per call", () => {
     const sdk = new GoogleSDK({ apiKey: "k" });
     const a = sdk.embedder({ name: "gemini-embedding-001" });
