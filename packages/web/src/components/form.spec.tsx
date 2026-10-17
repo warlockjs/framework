@@ -187,8 +187,11 @@ describe("<Form>", () => {
         <button data-independent>Cancel</button>
       </Form>,
     );
-    await act(async () => container.querySelectorAll("button")[1].click());
-    const options = submitter.mock.calls[0][2] as { independent: boolean; signal: AbortSignal };
+    await act(async () => container.querySelectorAll("button").item(1).click());
+    const options = submitter.mock.calls.at(0)?.[2] as {
+      independent: boolean;
+      signal: AbortSignal;
+    };
     expect(options.independent).toBe(true);
     expect(options.signal.aborted).toBe(false);
     await act(async () => root.unmount());
