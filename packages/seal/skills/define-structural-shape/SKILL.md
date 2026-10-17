@@ -57,7 +57,19 @@ Each position has its own validator; the array length must match the tuple lengt
 v.union([v.string(), v.int()]); // type: string | number
 ```
 
-The first type-matching validator wins, picked via each branch's `matchesType()`. Use for unions of **scalar** types (string vs number, etc.) where `matchesType` is enough to disambiguate. For object-vs-object unions, reach for `v.discriminatedUnion` instead — `matchesType` can't distinguish two object branches and you'll get errors from the wrong branch.
+Every branch whose type matches the value (`matchesType()`) is tried, in order, and the first that passes wins; the union returns that branch's validated output. `firstErrorOnly` limits the errors reported, never the branches tried, so a union of several object shapes accepts a value matching any of them:
+
+```ts
+const owner = v.object({ kind: v.literal("owner"), id: v.literal("__owner__") });
+const member = v.object({ kind: v.literal("member"), id: v.string() });
+
+await validate(v.union([owner, member]), { kind: "member", id: "x" });
+// → valid, data: { kind: "member", id: "x" }
+```
+
+When no branch passes, the union reports the **closest** failed branch, picked by: fewest mismatched `v.literal(...)` fields, then fewest errors, then the deepest error path, then declaration order. Its errors keep their own paths (`actor.id`, not `actor`) and have the type `"union"` — the first one by default, all of them with `firstErrorOnly: false`. A custom `errorMessage` (`v.union([...], "Unknown actor")`), or a value no branch can hold by type, gives a single error at the union's path.
+
+For object shapes that share a tag field, `v.discriminatedUnion` is still the better fit: it routes straight to one branch instead of trying each, and narrows exactly in TypeScript.
 
 ## `v.discriminatedUnion` — tagged unions (recommended for objects)
 
@@ -76,8 +88,8 @@ type Notif = Infer<typeof notif>;
 
 Routes payloads by reading the discriminator field (here `type`), looking it up in a key→branch map built at construction time, and delegating to the matching branch only. Benefits over plain `v.union`:
 
-- **Precise errors.** Failures come from the matched branch, not from every branch.
-- **O(1) routing** instead of trial-and-error.
+- **Precise errors.** Failures come from the branch the tag names, not from the closest guess.
+- **O(1) routing** instead of trying each branch.
 - **Exact TS inference** — discriminated union with narrowing inside `if (x.type === "email")` blocks.
 - **Cleaner JSON Schema** — `oneOf` with literal discriminators; OpenAI-strict accepts it.
 

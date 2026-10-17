@@ -184,3 +184,29 @@ A custom rule's success result can contain `data` to replace the current value:
 receive that replacement. Omitting `data` preserves the current value; a present
 `data: undefined` explicitly clears it. This is also how a union preserves the
 selected branch's validated defaults, catches and child transformations.
+
+## Reporting several errors from one rule
+
+A failed rule result can carry `errors: [{ error, path }, ...]` to report more than
+one error, each at its own path; every entry gets the rule's `name` as its `type`.
+`v.union` uses this to relay the closest branch's errors. Return as many as fit the
+caller's `context.configurations?.firstErrorOnly` (default `true`: one).
+
+```ts
+import { invalidRule, type SchemaRule } from "@warlock.js/seal";
+
+const bothDates: SchemaRule = {
+  name: "bothDates",
+  async validate(value: { from?: unknown; to?: unknown }, context) {
+    const missing = (["from", "to"] as const).filter((key) => !value?.[key]);
+    if (missing.length === 0) return { isValid: true };
+
+    const failed = invalidRule(this, context);
+    const errors = missing.map((key) => ({
+      error: `The ${key} date is required`,
+      path: context.path ? `${context.path}.${key}` : key,
+    }));
+    return { ...failed, errors };
+  },
+};
+```

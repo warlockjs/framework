@@ -9,6 +9,11 @@ export type RuleResult =
       error: string;
       input: string;
       path: string;
+      /**
+       * Report several errors for this rule, each at its own path. When set,
+       * it replaces `error`/`path` in the validation result.
+       */
+      errors?: Array<{ error: string; path: string }>;
     }
   | {
       isValid: true;

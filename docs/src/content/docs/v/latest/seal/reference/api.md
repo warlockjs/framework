@@ -204,6 +204,8 @@ v.tuple([v.string(), v.int()]); // type: [string, number]
 v.union([v.string(), v.int()]); // type: string | number
 ```
 
+Tries every branch whose type matches, in order; the first that passes wins and its output is returned. When none passes, the closest branch's errors are reported (fewest mismatched literals, then fewest errors, then deepest path) with type `"union"` at their own paths. `errorMessage` replaces them with one error at the union's path.
+
 ### `v.discriminatedUnion(key, branches)`
 
 ```ts

@@ -84,6 +84,8 @@ The `type` is the rule's own `name` field — not the method you called. Several
 | `equalsField`, `notEqualsField`                                                                                               | cross-field equality (`.sameAs` → `equalsField`; `.differentFrom` → `notEqualsField`)                                     |
 | `minDate`, `maxDate`, `beforeField`, `afterField`, `today`, `past`, `future`, `weekDay`, `weekend`, `businessDay`, `birthday` | date rules (`.min`/`.max` → `minDate`/`maxDate`; `.before`/`.after` → `beforeField`/`afterField`)                         |
 
+`v.union(...)` reports `union`: when no branch passes, it relays the closest branch's errors (fewest mismatched literals, then fewest errors, then deepest path) at their own paths, all typed `union`. A custom rule can do the same by returning `errors: [{ error, path }, ...]` with its failed result.
+
 If you write custom rules, the `type` name you set on the rule object is what shows up here. Pick stable, kebab-or-camel-case names — they become a public API.
 
 ## Customizing error messages

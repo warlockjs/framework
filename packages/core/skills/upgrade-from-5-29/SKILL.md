@@ -154,6 +154,14 @@ validation if the app needs both forms. Audit callbacks that previously assumed
 unparsed input or side effects after validation failure; see Seal's `seal-basics`
 and `compose-schemas` topics for the exact typing and output-transform caveats.
 
+`v.union(...)` now tries every member whose type matches, so a union of object
+schemas accepts a value matching a later member. When every member fails, the
+closest member's errors are reported at their own paths (`actor.id`, not `actor`)
+with type `union`; `firstErrorOnly: false` lists each of them instead of one
+`;`-joined message. Update code that maps union errors by path or splits that
+message; a custom `v.union([...], "message")` still reports one error at the
+union's path.
+
 ## AI finish reasons, provider bodies and resumed output
 
 5.30 adds `context_exceeded`, `pause_turn` and `refusal` to `FinishReason`; update
