@@ -290,6 +290,26 @@ const tempUrl = await storage.temporaryUrl("private/doc.pdf", 3600);
 
 For private files, prefer `temporaryUrl` over building your own URL — the signing/token machinery is already there.
 
+### Rate limits on served files
+
+Files served straight from disk by the HTTP layer — the public folder
+(`storage.publicRoot`, under `storage.publicPrefix`), `router.directory()` mounts
+and `router.file()` routes — are exempt from the global `http.rateLimit` quota by
+default, so a page's assets do not spend the client's budget. Set
+`http.rateLimit.staticFiles: true` to count them.
+
+A route you register with `uploadedFileController` is an application route: it
+can render image variants on demand, so it stays under the global limiter.
+Exempt it explicitly when that suits your traffic:
+
+```ts title="src/app/uploads/routes.ts"
+import { router, uploadedFileController } from "@warlock.js/core";
+
+router.get("/uploads/*", uploadedFileController, { rateLimit: false });
+```
+
+See [Rate limiting → Static files](../recipes/rate-limiting.md#static-files).
+
 ## Scoped storage — `storage.use(name)`
 
 For a single call against a non-default driver, scope to it:

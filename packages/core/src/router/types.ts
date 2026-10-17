@@ -120,6 +120,39 @@ export type RequestHandler<TRequest extends Request = Request> = {
   responseSchema?: ResponseSchema;
 };
 
+/**
+ * A route's own rate limit: its own bucket and quota instead of the global
+ * `http.rateLimit` policy.
+ */
+export type RouteRateLimitOptions = {
+  /**
+   * Max number of requests within the time window
+   */
+  max: number;
+  /**
+   * Time window in milliseconds
+   */
+  timeWindow: number;
+  /**
+   * Error message when rate limit is exceeded
+   */
+  errorMessage?: string;
+};
+
+/**
+ * Options for a static mount: `router.directory()`, `router.file()`,
+ * `router.cachedFile()`, `router.files()` and `router.cachedFiles()`.
+ */
+export type StaticMountOptions = {
+  /**
+   * How the rate limiter treats this mount. Leave it unset to follow
+   * `http.rateLimit.staticFiles` (exempt by default); `true` counts the
+   * mount against the global limiter, `false` exempts it, and an object
+   * gives it its own limit and bucket.
+   */
+  rateLimit?: RouteRateLimitOptions | boolean;
+};
+
 export interface RouteOptions {
   /**
    * Route middleware
@@ -180,22 +213,21 @@ export interface RouteOptions {
    */
   isPage?: boolean;
   /**
-   * Rate limit options for this route
+   * How the rate limiter treats this route.
+   *
+   * - an object: the route gets its own limit and bucket instead of the
+   *   global `http.rateLimit` policy;
+   * - `false`: the route is exempt from the global limiter (development and
+   *   production alike);
+   * - `true`: the route stays under the global limiter. This is the default
+   *   for application routes; it puts a `router.file()` route back under the
+   *   global limiter when static files are exempt.
+   *
+   * @example
+   * router.post("/login", login, { rateLimit: { max: 5, timeWindow: 60_000 } });
+   * router.get("/webhooks/status", status, { rateLimit: false });
    */
-  rateLimit?: {
-    /**
-     * Max number of requests within the time window
-     */
-    max: number;
-    /**
-     * Time window in milliseconds
-     */
-    timeWindow: number;
-    /**
-     * Error message when rate limit is exceeded
-     */
-    errorMessage?: string;
-  };
+  rateLimit?: RouteRateLimitOptions | boolean;
   /**
    * Opt this route OUT of the default core CSRF-Origin guard
    * (`../http/csrf-default-guard.ts`, SECURITY card 8a752ab2) by passing
@@ -305,6 +337,12 @@ export type Route = RouteOptions & {
    * Rate limit
    */
   rateLimit?: RouteOptions["rateLimit"];
+  /**
+   * Set by `router.file()`, `router.cachedFile()`, `router.files()` and
+   * `router.cachedFiles()`: the route serves a static file, so it follows
+   * `http.rateLimit.staticFiles` unless it sets `rateLimit` itself.
+   */
+  $staticFile?: boolean;
 };
 
 export type PartialPick<T, F extends keyof T> = Omit<T, F> & Partial<Pick<T, F>>;

@@ -1,3 +1,4 @@
+import config from "@mongez/config";
 import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
 import type { FastifyStaticOptions } from "@fastify/static";
 import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
@@ -21,7 +22,7 @@ import {
 } from "./positional-handler-diagnostics";
 import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
-import { buildRouteRateLimit } from "./build-route-rate-limit";
+import { resolveRouteRateLimit, resolveStaticRateLimit } from "./resolve-route-rate-limit";
 import { DEV_DISPATCH_METHODS, buildNotFoundBody, createDevRateLimiter } from "./dev-dispatch";
 import { RouteRegistry } from "./route-registry";
 import { routeNameMethodSuffix } from "./route-name-method-suffix";
@@ -39,6 +40,7 @@ import type {
   RouteResource,
   RouterGroupCallback,
   RouterStacks,
+  StaticMountOptions,
 } from "./types";
 
 /**
@@ -191,7 +193,10 @@ export class Router {
   /**
    * Static paths
    */
-  protected staticDirectories: FastifyStaticOptions[] = [];
+  protected staticDirectories: {
+    options: FastifyStaticOptions;
+    rateLimit: StaticMountOptions["rateLimit"];
+  }[] = [];
 
   /**
    * Event listeners
@@ -252,58 +257,118 @@ export class Router {
   }
 
   /**
-   * Server static folder
+   * Serve a static folder.
+   *
+   * Static mounts are exempt from the global rate limiter by default; set
+   * `http.rateLimit.staticFiles: true` to count every mount, or pass
+   * `{ rateLimit }` to decide for this mount alone: `true` counts it against
+   * the global limiter, `false` exempts it, and an object gives it its own
+   * limit and bucket.
+   *
+   * @example
+   * router.directory({ root: rootPath("docs"), prefix: "/docs/" });
+   * router.directory({ root: rootPath("exports"), prefix: "/exports/" }, { rateLimit: true });
    */
-  public directory(options: FastifyStaticOptions) {
-    this.staticDirectories.push(options);
+  public directory(options: FastifyStaticOptions, mountOptions: StaticMountOptions = {}) {
+    this.staticDirectories.push({ options, rateLimit: mountOptions.rateLimit });
 
     return this;
   }
 
   /** Declare static routes at boot; load the upstream sender on the first file request. */
   protected registerStaticDirectories(server: FastifyInstance) {
-    for (const directoryOptions of this.staticDirectories) {
-      registerLazyStatic(server, { ...directoryOptions, decorateReply: false });
+    for (const directory of this.staticDirectories) {
+      registerLazyStatic(
+        server,
+        { ...directory.options, decorateReply: false },
+        { rateLimit: resolveStaticRateLimit(directory.rateLimit) },
+      );
     }
+  }
+
+  /**
+   * Register a GET route that serves a static file. Like `directory()`, it is
+   * exempt from the global rate limiter unless `http.rateLimit.staticFiles`
+   * or its own `rateLimit` says otherwise.
+   */
+  protected addStaticFileRoute(
+    path: string,
+    handler: RequestHandler,
+    mountOptions: StaticMountOptions = {},
+  ) {
+    this.get(
+      path,
+      handler,
+      mountOptions.rateLimit === undefined ? {} : { rateLimit: mountOptions.rateLimit },
+    );
+
+    const routes = this.routeReplacementTransaction?.routes ?? this.routes;
+    const route = routes[routes.length - 1];
+
+    if (route) route.$staticFile = true;
+
+    return this;
   }
 
   /**
    * Serve file
    */
-  public file(path: string, location: string, cacheTime?: number) {
-    return this.get(path, ({ response }) => {
-      response.sendFile(location, cacheTime);
-    });
+  public file(
+    path: string,
+    location: string,
+    cacheTime?: number,
+    mountOptions: StaticMountOptions = {},
+  ) {
+    return this.addStaticFileRoute(
+      path,
+      ({ response }) => {
+        response.sendFile(location, cacheTime);
+      },
+      mountOptions,
+    );
   }
 
   /**
    * Serve cached file, it will cache the file to 1 year by default
    */
-  public cachedFile(path: string, location: string, cacheTime?: number) {
-    return this.get(path, ({ response }) => {
-      response.sendCachedFile(location, cacheTime);
-    });
+  public cachedFile(
+    path: string,
+    location: string,
+    cacheTime?: number,
+    mountOptions: StaticMountOptions = {},
+  ) {
+    return this.addStaticFileRoute(
+      path,
+      ({ response }) => {
+        response.sendCachedFile(location, cacheTime);
+      },
+      mountOptions,
+    );
   }
 
   /**
    * Serve list of files
    */
-  public files(files: Record<string, string>, cacheTime?: number) {
+  public files(
+    files: Record<string, string>,
+    cacheTime?: number,
+    mountOptions: StaticMountOptions = {},
+  ) {
     for (const [path, location] of Object.entries(files)) {
-      this.get(path, ({ response }) => {
-        response.sendFile(location, cacheTime);
-      });
+      this.file(path, location, cacheTime, mountOptions);
     }
   }
 
   /**
    * Serve list of cached files, it will cache the file to 1 year by default
    */
-  public cachedFiles(files: Record<string, string>, cacheTime?: number) {
+  public cachedFiles(
+    files: Record<string, string>,
+    cacheTime?: number,
+    mountOptions: StaticMountOptions = {},
+  ) {
     for (const [path, location] of Object.entries(files)) {
-      this.get(path, ({ response }) => {
-        response.sendCachedFile(location, cacheTime);
-      });
+      this.cachedFile(path, location, cacheTime, mountOptions);
     }
   }
 
@@ -971,7 +1036,8 @@ export class Router {
           explicitHeadPaths.has(route.path) && { exposeHeadRoute: false }),
         config: {
           ...route.serverOptions?.config,
-          ...(route.rateLimit && { rateLimit: buildRouteRateLimit(route.rateLimit) }),
+          // `undefined` keeps the global policy; `false` exempts the route.
+          rateLimit: resolveRouteRateLimit(route),
         },
       };
 
@@ -1006,7 +1072,10 @@ export class Router {
     let routeRegistry: RouteRegistry | undefined;
     let registryVersion = -1;
 
-    const applyDevRateLimit = createDevRateLimiter(server);
+    const applyDevRateLimit = createDevRateLimiter(
+      server,
+      config.get("http.rateLimit.global") !== false,
+    );
 
     // Rebuilt when the route table changes rather than per request. Building it
     // inside the handler re-registered every route on every hit — and `all`
@@ -1129,6 +1198,10 @@ export class Router {
         method,
         url: "*",
         ...(method === "GET" && { exposeHeadRoute: false }),
+        // The dispatcher limits each matched route itself (see
+        // `createDevRateLimiter`), so the plugin must not limit the wildcard:
+        // that would count exempt routes and unmatched URLs too.
+        config: { rateLimit: false },
         handler: wildcardHandler,
       });
     }

@@ -175,8 +175,7 @@ Request log entries otherwise include the body as received (before validation), 
 router.directory({ root: Application.publicPath, prefix: "/assets/" });
 ```
 
-Static routes are queued at scan time after HTTP plugin hooks, so global
-`http.rateLimit` covers public and directory mounts along with application routes. `@fastify/static` itself loads only on
+Static routes are queued at scan time after HTTP plugin hooks. `@fastify/static` itself loads only on
 the first static file request, even with an existing public folder; concurrent
 first requests share initialization. The upstream sender retains ranges, caching,
 listings, precompressed files, `allowedPath` and `setHeaders` behavior. The
@@ -192,18 +191,37 @@ again on the first request, which can be noticeable for large directories. The p
 keeps `decorateReply: false` for additional mounts. Initialization failures reach
 the application's normal error handler.
 
-Global rate limits now apply to production application routes and web page
-routes too. Defaults are 60 requests/minute per IP in one shared bucket across
-routes, pages and static assets. Behind a reverse proxy, configure trusted
+Global rate limits apply to application routes and web page routes in
+production and development. Defaults are 60 requests/minute per IP in one shared
+bucket across routes and pages. Behind a reverse proxy, configure trusted
 `http.trustProxy` addresses or a suitable `http.rateLimit.keyGenerator`, and
 review `max` before upgrading. `http.rateLimit.global: false` disables blanket
 quotas while retaining explicit route limits. Built-in health/readiness probes
 are exempt unless `http.health.rateLimit: true` opts them into the global policy.
 
-Production supports individual exemptions via
-`serverOptions: { config: { rateLimit: false } }`. Development's wildcard
-currently still applies its global quota to those routes. Use `global: false`
-with explicit `rateLimit` declarations for consistent selective limits.
+Static files are exempt from the global limiter by default: the public folder,
+every `router.directory()` mount and `router.file()` / `cachedFile()` / `files()` /
+`cachedFiles()` routes (and the web build's assets). `http.rateLimit.staticFiles:
+true` counts them all; a mount can decide for itself:
+
+```ts
+import { rootPath, router } from "@warlock.js/core";
+
+router.directory({ root: rootPath("storage/exports"), prefix: "/exports/" }, { rateLimit: true });
+router.directory(
+  { root: rootPath("storage/reports"), prefix: "/reports/" },
+  { rateLimit: { max: 20, timeWindow: 60_000 } },
+);
+router.file("/price-list.pdf", rootPath("storage/price-list.pdf"), 300, { rateLimit: true });
+```
+
+Exempt one application route with `rateLimit: false` (or
+`serverOptions: { config: { rateLimit: false } }`); development's wildcard
+dispatcher honours both exactly as production does:
+
+```ts
+router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
+```
 
 ## Gotchas
 

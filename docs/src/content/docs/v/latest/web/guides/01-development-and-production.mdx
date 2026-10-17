@@ -83,6 +83,17 @@ immediately before it.
 At production boot, the Web connector refuses to start without the page
 manifest instead of reporting healthy while serving only 404s.
 
+### Assets and the rate limiter
+
+Core's global rate limiter (`http.rateLimit`, 60 requests per minute per IP by
+default) counts page and API requests. The client bundle under `/assets/*` and
+the public files copied by the build are static files, so they are exempt by
+default: a page load's scripts, stylesheets, fonts and images do not spend the
+visitor's quota. Set `http.rateLimit.staticFiles: true` in `src/config/http.ts`
+to count them as well. In development Vite answers asset requests before any
+route runs, so they are never counted. See core's
+[rate-limiting recipe](/v/latest/core/recipes/rate-limiting/#static-files).
+
 Use `warlock routes:diff` to compare the current diagnostic route table with
 the last successful build:
 

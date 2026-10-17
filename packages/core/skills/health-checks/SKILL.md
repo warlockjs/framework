@@ -51,6 +51,10 @@ shared client bucket. This requires the rate-limit plugin to be enabled and
 `http.rateLimit.global` to remain enabled; exhausted quotas can then return 429
 for probes too. Disabling global limits leaves opted-in probes unlimited.
 
+Static files are exempt the same way (public folder, `router.directory()` mounts,
+`router.file()` routes, the web build's assets); `http.rateLimit.staticFiles:
+true` counts them. Pages and API routes always share the global bucket.
+
 ## Readiness checks
 
 Readiness is `isBooted && !isShuttingDown` plus every registered check. Register a check from a connector, a `main.ts`, or anywhere:

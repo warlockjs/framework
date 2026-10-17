@@ -57,6 +57,12 @@ shared client bucket. This requires the rate-limit plugin to be enabled and
 `http.rateLimit.global` to remain enabled; exhausted quotas can then return 429
 for probes too. Disabling global limits leaves opted-in probes unlimited.
 
+Static files follow the same rule: the public folder, `router.directory()`
+mounts, `router.file()` routes and the web package's built assets are exempt by
+default, and `http.rateLimit.staticFiles: true` counts them. Pages and API routes
+always share the global bucket. See
+[Rate limiting → Static files](../recipes/rate-limiting.md#static-files).
+
 ## Readiness checks
 
 Out of the box, readiness is `isBooted && !isShuttingDown`. Layer on dependency checks — a database ping, a cache round-trip, a downstream health call — and `/ready` only reports ready when they all pass:

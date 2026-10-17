@@ -10,15 +10,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
-- In every release up to and including 5.30.0, the global `http.rateLimit` did not apply to application routes or `/health` in production, and per-route `rateLimit` options had no effect in production (development enforced them). 5.31 enforces both. Built-in liveness and readiness routes are exempt by default; `http.health.rateLimit: true` opts them into the global policy.
+- In every release up to and including 5.30.0, the global `http.rateLimit` did not apply to application routes in production, and per-route `rateLimit` options had no effect in production (development enforced them). 5.31 enforces both: the shared bucket now covers pages and API routes. Static files (the public folder, `router.directory()` mounts, `router.file()` routes and the web build's assets) and the built-in liveness and readiness probes are exempt by default; `http.rateLimit.staticFiles: true` and `http.health.rateLimit: true` opt them into the global policy.
 
 ### Upgrading
 
-- **BREAKING:** rate limits now apply to production and development application routes and web page routes. The default is 60 requests/minute per IP, in one bucket shared across application routes, pages and static assets. Review `http.rateLimit.max`; behind a proxy configure trusted `http.trustProxy` addresses or a suitable `keyGenerator` so clients do not share the proxy's quota. Set `http.rateLimit.global: false` to keep blanket quotas off while retaining explicit per-route limits. Built-in `/health` and `/ready` are exempt unless `http.health.rateLimit: true` opts them back in.
+- **BREAKING:** rate limits now apply to production and development application routes and web page routes. The default is 60 requests/minute per IP, in one bucket shared by pages and API routes. Review `http.rateLimit.max`; behind a proxy configure trusted `http.trustProxy` addresses or a suitable `keyGenerator` so clients do not share the proxy's quota. Set `http.rateLimit.global: false` to keep blanket quotas off while retaining explicit per-route limits. Static files (the public folder, `router.directory()` mounts, `router.file()`/`cachedFile()`/`files()`/`cachedFiles()` routes and the web build's assets) are exempt unless `http.rateLimit.staticFiles: true` counts them, so a page load's assets do not spend the quota. Built-in `/health` and `/ready` are exempt unless `http.health.rateLimit: true` opts them back in. Exempt any other route with `rateLimit: false`.
 
 - **BREAKING:** upgrade development and production runtimes to Node.js 22.15 or newer before running the CLI.
 
 ### Added
+
+- `http.rateLimit.staticFiles` (default `false`) decides whether static files count against the global rate limiter. Each static mount can decide for itself: `router.directory(options, { rateLimit })` and a fourth `{ rateLimit }` argument on `router.file()`, `cachedFile()`, `files()` and `cachedFiles()` take `true` (global limiter), `false` (exempt) or `{ max, timeWindow, errorMessage? }` (own limit and bucket).
+- A route's `rateLimit` option also accepts `false` to exempt the route from the global limiter, and `true` to keep it under the global policy (the default for application routes).
 
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
 
@@ -41,10 +44,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The development wildcard dispatcher applies the global rate limiter per matched route instead of to every request, so a route exempted with `rateLimit: false` or `serverOptions: { config: { rateLimit: false } }`, a static file route and an unmatched URL are not counted, exactly as in production. Routes with a wildcard path share the global bucket in both modes.
+
 - React module-resolution regressions preserve the ESM package boundary in isolated fixtures and report child-process stderr before checking output, so missing and broken React installations are tested correctly under Node.js 22.15.
 - The TypeScript worker configured-root regression uses the framework's real source-worker bootstrap on Node.js 22.15, retaining its declaration, update and deletion checks instead of starting an unsupported direct `.ts` worker entry. The same assertions also run against a built `.mjs` worker without loader hooks.
 
-- Upgrade guidance names `AgentConfig.compaction`, covers sub-agent dispatch and blank/default validation changes, and includes static assets in production rate quotas. In 5.31, `purgeImageVariants()` preserves legacy two-level cache files; retire them manually, correcting the earlier 5.30 cleanup suggestion.
+- Upgrade guidance names `AgentConfig.compaction`, covers sub-agent dispatch and blank/default validation changes, and explains which routes the production rate quotas cover. In 5.31, `purgeImageVariants()` preserves legacy two-level cache files; retire them manually, correcting the earlier 5.30 cleanup suggestion.
 - Per-file image-cache purges refuse symlinked shard directories for local and object-storage disks. Stale-generation pruning now removes only recognized cache files from older generation-shaped folders, preserving current-generation files, unrelated entries, directories and symlinks.
 
 - The validation skill shows the HTTP 422 body as strict JSON that can be copied into a JSON parser.

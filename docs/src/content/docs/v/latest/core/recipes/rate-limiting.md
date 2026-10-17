@@ -22,8 +22,14 @@ development already enforced per-route limits. Web page routes also participate
 in the global quota.
 
 The default is 60 requests per minute per IP, in one shared bucket across
-application routes, pages and static assets. Requests to different URLs consume
-the same quota. Review `http.rateLimit.max` before upgrading a busy site.
+application routes and pages. Requests to different URLs consume the same quota.
+Review `http.rateLimit.max` before upgrading a busy site.
+
+Static files are exempt by default: the public folder, every
+`router.directory()` mount, `router.file()` / `router.cachedFile()` routes and
+the web package's built assets (`/assets/*` and the build's public files). A
+page load's stylesheets, scripts, fonts and images therefore do not spend the
+client's quota. See [Static files](#static-files) to count them.
 
 `http.trustProxy` defaults to `false`. Behind a reverse proxy, all clients can
 therefore share the proxy's IP and exhaust one quota for the whole site.
@@ -45,18 +51,17 @@ traffic exhausts its quota. `health: { rateLimit: true }` opts them back into th
 global policy when global limiting is enabled; renamed probe paths follow the
 same setting.
 
-Production also accepts `serverOptions: { config: { rateLimit: false } }` to
-exempt an individual route. Development's wildcard dispatcher currently still
-applies the global quota to that route. For consistent selective limiting in
-both modes, use `global: false` and declare `rateLimit` on protected routes.
+To exempt one route, pass `rateLimit: false` (or
+`serverOptions: { config: { rateLimit: false } }`). Development and production
+treat it the same way.
 
 ## How rate limiting works in Warlock
 
 HTTP plugins finish registration before the connector scans application routes.
-Global limits therefore cover application routes, web page routes, the public
-folder and `router.directory()` mounts in production and development. Built-in
-`/health` and `/ready` probes are exempt by default; set
-`http.health.rateLimit: true` to include them in the global policy. With
+Global limits therefore cover application routes and web page routes in
+production and development. Static files and the built-in `/health` and `/ready`
+probes are exempt by default; `http.rateLimit.staticFiles: true` and
+`http.health.rateLimit: true` include them in the global policy. With
 `http.rateLimit: { max: 2, timeWindow: 60_000 }`, the third request in the same
 bucket returns HTTP 429 with rate-limit and retry headers. Per-route settings and
 `global: false` still control which routes participate.
@@ -131,6 +136,61 @@ Some rules of thumb that survive contact with reality:
 
 260/min as a global default in the reference project is a good ceiling — high enough that real users never hit it, low enough that an unauthenticated scraper does.
 
+## Static files
+
+One page load can fetch 15–30 static files. Counting them against a 60/minute
+quota would lock a visitor out after a couple of pages, so static files are
+exempt from the global limiter by default:
+
+- the public folder (`storage.publicRoot`, served under `storage.publicPrefix`);
+- every `router.directory()` mount;
+- `router.file()`, `router.cachedFile()`, `router.files()` and
+  `router.cachedFiles()` routes;
+- the web package's production client bundle (`/assets/*`) and the public files
+  copied by `warlock build`.
+
+Exempt responses carry no `x-ratelimit-*` headers and leave the client's quota
+untouched. In development, Vite serves the client modules itself, before any
+route runs, so they never count either.
+
+Put every static file back under the global limiter with `staticFiles: true`:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfigurations: HttpConfigurations = {
+  rateLimit: {
+    max: 600,
+    duration: 60 * 1000,
+    staticFiles: true,
+  },
+};
+
+export default httpConfigurations;
+```
+
+Or decide per mount. `rateLimit: true` counts that mount against the global
+limiter, `false` exempts it whatever `staticFiles` says, and an object gives it
+its own limit and bucket:
+
+```ts title="src/app/downloads/routes.ts"
+import { rootPath, router } from "@warlock.js/core";
+
+// Large exports: count them with the rest of the client's traffic.
+router.directory({ root: rootPath("storage/exports"), prefix: "/exports/" }, { rateLimit: true });
+
+// Its own quota, separate from pages and API calls.
+router.directory(
+  { root: rootPath("storage/reports"), prefix: "/reports/" },
+  { rateLimit: { max: 20, timeWindow: 60_000 } },
+);
+
+// Single files take the same option as their fourth argument.
+router.file("/price-list.pdf", rootPath("storage/price-list.pdf"), 300, { rateLimit: true });
+```
+
+Pages and API routes stay under the global limiter whatever these settings say.
+
 ## Step 2 — Override per route
 
 Tight limits on login. Looser ones on read-only public endpoints. The `RouteOptions.rateLimit` block sits next to the handler:
@@ -169,11 +229,13 @@ The shape:
 ```ts
 type RouteOptions = {
   // ...other fields
-  rateLimit?: {
-    max: number;
-    timeWindow: number;
-    errorMessage?: string;
-  };
+  rateLimit?:
+    | {
+        max: number;
+        timeWindow: number;
+        errorMessage?: string;
+      }
+    | boolean; // false: exempt from the global limiter; true: the global limiter (default)
 };
 ```
 
@@ -352,11 +414,11 @@ export function userRateLimit(options: UserRateLimitOptions): Middleware {
 }
 ```
 
-For exempting from the fastify plugin-level rate limit, the cleanest path is route-level overrides — give monitoring endpoints an absurdly high `max`:
+To exempt a route from the plugin-level global limit, pass `rateLimit: false`. Development and production treat it the same way:
 
 ```ts
 router.get("/metrics", metricsController, {
-  rateLimit: { max: 1_000_000, timeWindow: 60_000 },
+  rateLimit: false,
   middleware: [internalOnlyMiddleware],
 });
 ```
