@@ -46,19 +46,20 @@ function windowValue(value: unknown): number | string | null {
 }
 
 /**
- * The limiter a route runs under: its own `rateLimit` option, else the global
+ * The limiter a route runs under: its own `rateLimit` options, else the global
  * `http.rateLimit` limiter (built with the same defaults the HTTP connector
- * uses), else none.
+ * uses), else none. `rateLimit: false` exempts the route from the global
+ * limiter; `rateLimit: true` keeps it under the global policy.
  */
 function readRateLimit(
   route: Route,
   global: Record<string, unknown> | null,
 ): InspectRouteRateLimit {
-  if (route.rateLimit) {
+  if (typeof route.rateLimit === "object" && route.rateLimit !== null) {
     return { source: "route", max: route.rateLimit.max, timeWindow: route.rateLimit.timeWindow };
   }
 
-  if (!global) {
+  if (!global || route.rateLimit === false) {
     return { source: "none", max: null, timeWindow: null };
   }
 
