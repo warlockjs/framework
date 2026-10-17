@@ -6,6 +6,7 @@ packages:
   - packages/ai
   - packages/ai-anthropic
   - packages/ai-bedrock
+  - packages/ai-cli
   - packages/ai-deepseek
   - packages/ai-google
   - packages/ai-groq

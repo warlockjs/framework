@@ -1,0 +1,209 @@
+reasonix — a config- and plugin-driven coding agent (multi-model)
+
+Usage:
+  reasonix [--model NAME] [-c|--continue] [-r|--resume [QUERY]] [--permission-mode MODE] [--effort LEVEL] [--add-dir PATH]   interactive session (the terminal UI, same as reasonix tui)
+  reasonix -p|--print [--model NAME] [--output-format text|json|stream-json] [--allowed-tools RULES] [--add-dir PATH] <task>
+  reasonix run [--model NAME] [--max-steps N] [-c|--continue] [--resume PATH] [--copy] [--output-format FORMAT] <task>
+  reasonix run --events-jsonl [--model NAME] <task>      emit redacted structured events as JSONL
+  reasonix review [--base BRANCH] [--commit SHA] [--model NAME]  AI-powered code review on local diffs
+  reasonix web [--model NAME] [--addr HOST:PORT] [--no-open]  start the local Web UI and open it in the default browser
+  reasonix serve [--model NAME] [--addr HOST:PORT] [--auth none|token|password] [--token STR] [--password STR] [--hash-password]  serve over HTTP+SSE (with optional auth)
+  reasonix acp [--model NAME]                           serve Agent Client Protocol over stdio (also: reasonix --acp)
+  reasonix setup [path]                                 interactive config wizard; writes reasonix.toml (+ .env)
+  reasonix config reasoning-language [auto|zh|en]        configure visible reasoning language
+  reasonix config compact-ratio [--local] [PERCENT]       configure automatic compaction threshold
+  reasonix config telemetry [auto|on|off]                configure content-free CLI usage metrics
+  reasonix report [list|show|send|delete] [ID]           review and explicitly send local CLI crash reports
+  reasonix mcp <add|remove|list|import>                 manage MCP servers in reasonix.toml
+  reasonix login | whoami | logout                      sign in to reasonix.io (forum and crash follow-ups only)
+  reasonix subagent <list|create|edit|delete|try|run>   manage and run isolated subagent profiles
+  reasonix init                                         show how to generate project memory (AGENTS.md)
+  reasonix doctor [--json]                              print redacted local diagnostics
+  reasonix doctor session <branch-id> [--zip] [--out PATH]  export a session conflict diagnostic zip
+  reasonix session list --json [--dir PATH]             list redacted sessions for machine clients
+  reasonix session show|status <machine-session-id> --json [--dir PATH]  query one redacted session
+  reasonix session recovery [<machine-session-id>] --json [--dir PATH]  query redacted recovery state
+  reasonix hook list|status --json [--dir PATH]         inspect redacted hook state
+  reasonix trust [--dir PATH] [--yes|--revoke]          review and approve programs this project runs
+  reasonix task list|show|status|events|stop|cancel|monitor|tmux --json [--dir PATH]
+                                                         inspect or control redacted tasks
+  reasonix upgrade [--check] [--force]                   update to the latest official release (also: reasonix update)
+  reasonix completion bash|zsh|fish                     print a shell completion script to stdout
+  reasonix version [--verbose|--json]                   print version (single line) or build metadata
+  reasonix --version | -v                               single-line version (script-safe)
+  reasonix help
+
+Examples:
+  reasonix web
+  reasonix run "implement the TODOs in main.go"
+  reasonix run --model mimo-pro "add unit tests for this function"
+  reasonix -p "summarize this repository" --output-format json
+  reasonix subagent run review "review the current changes"
+  echo "explain this code" | reasonix run
+
+Configuration:
+  Resolution: flag > ./reasonix.toml > <Reasonix home>/config.toml > built-in defaults
+  Secrets come from the environment via api_key_env (e.g. DEEPSEEK_API_KEY).
+  Run 'reasonix setup' to scaffold a config; see docs/SPEC.md.
+===== reasonix run --help
+Usage of run:
+      --ablate string                  benchmark arm: comma-separated subsystems to switch off (evidence, planner, subagent, retrieval, compaction, upstream, recall-search; none|all)
+      --add-dir stringArray            allow tool access to an additional directory (repeatable)
+      --allowed-tools stringArray      comma or space-separated permission rules to allow
+      --allowedTools stringArray       alias for --allowed-tools
+  -y, --auto                           explicitly auto-approve ordinary writer fallbacks (alias for --permission-mode auto)
+  -c, --continue                       resume the most recent saved session, or start a fresh one when none exists
+      --copy                           with --resume/--continue: duplicate the session and continue in the copy (escape hatch when the original is held by another Reasonix process)
+      --dangerously-skip-permissions   alias for --yolo
+      --debug                          write diagnostic logs (assembly timing, cache state) to stderr
+      --dir string                     change to this directory first (project root); config, sandbox and file tools resolve from here
+      --effort string                  session reasoning effort override
+      --events-jsonl                   emit a redacted structured event stream as JSONL
+      --fail-on-unverified             exit 3 when the model finished but the host could not verify the result (final readiness unmet, or edits and commands refused because the folder is not trusted)
+      --fold-index string              benchmark arm: how much of the model-visible fold index to keep (default|half|quarter|off)
+      --max-steps int                  one-off max tool-call rounds (0 = automatic)
+      --metrics string                 write a JSON token/cache/cost summary of the run to this path
+      --model string                   provider name (default: config default_model)
+      --output-format string           output format: text | json | stream-json (default "text")
+      --permission-mode string         permission mode: read-only | manual | ask | auto | acceptEdits | dontAsk | bypassPermissions (default: auto where the OS sandbox confines writes and the folder is trusted, otherwise ask)
+      --preset string                  agent execution setting: balanced | delivery (default "balanced")
+  -p, --print                          print only the final response
+      --profile string                 deprecated: use --preset (economy|balanced|delivery)
+      --resume string                  resume by session file path, session ID, or machine session ID (takes precedence over --continue)
+      --show-thinking                  show thinking text instead of the collapsed thinking marker
+      --takeover                       with --resume/--continue: accepted for 1.x command lines; a session another Reasonix process holds is still refused
+      --trajectory string              append a timestamped JSONL trajectory of the run's full event stream (tool calls, reasoning, decisions) to this path
+      --yolo                           skip approval prompts; the sandbox, network policy and deny rules still apply (alias for --permission-mode bypassPermissions)
+[rc=0]
+===== reasonix -p --help
+Usage of run:
+      --ablate string                  benchmark arm: comma-separated subsystems to switch off (evidence, planner, subagent, retrieval, compaction, upstream, recall-search; none|all)
+      --add-dir stringArray            allow tool access to an additional directory (repeatable)
+      --allowed-tools stringArray      comma or space-separated permission rules to allow
+      --allowedTools stringArray       alias for --allowed-tools
+  -y, --auto                           explicitly auto-approve ordinary writer fallbacks (alias for --permission-mode auto)
+  -c, --continue                       resume the most recent saved session, or start a fresh one when none exists
+      --copy                           with --resume/--continue: duplicate the session and continue in the copy (escape hatch when the original is held by another Reasonix process)
+      --dangerously-skip-permissions   alias for --yolo
+      --debug                          write diagnostic logs (assembly timing, cache state) to stderr
+      --dir string                     change to this directory first (project root); config, sandbox and file tools resolve from here
+      --effort string                  session reasoning effort override
+      --events-jsonl                   emit a redacted structured event stream as JSONL
+      --fail-on-unverified             exit 3 when the model finished but the host could not verify the result (final readiness unmet, or edits and commands refused because the folder is not trusted)
+      --fold-index string              benchmark arm: how much of the model-visible fold index to keep (default|half|quarter|off)
+      --max-steps int                  one-off max tool-call rounds (0 = automatic)
+      --metrics string                 write a JSON token/cache/cost summary of the run to this path
+      --model string                   provider name (default: config default_model)
+      --output-format string           output format: text | json | stream-json (default "text")
+      --permission-mode string         permission mode: read-only | manual | ask | auto | acceptEdits | dontAsk | bypassPermissions (default: auto where the OS sandbox confines writes and the folder is trusted, otherwise ask)
+      --preset string                  agent execution setting: balanced | delivery (default "balanced")
+  -p, --print                          print only the final response
+      --profile string                 deprecated: use --preset (economy|balanced|delivery)
+      --resume string                  resume by session file path, session ID, or machine session ID (takes precedence over --continue)
+      --show-thinking                  show thinking text instead of the collapsed thinking marker
+      --takeover                       with --resume/--continue: accepted for 1.x command lines; a session another Reasonix process holds is still refused
+      --trajectory string              append a timestamped JSONL trajectory of the run's full event stream (tool calls, reasoning, decisions) to this path
+      --yolo                           skip approval prompts; the sandbox, network policy and deny rules still apply (alias for --permission-mode bypassPermissions)
+[rc=0]
+===== reasonix --print --help
+Usage of run:
+      --ablate string                  benchmark arm: comma-separated subsystems to switch off (evidence, planner, subagent, retrieval, compaction, upstream, recall-search; none|all)
+      --add-dir stringArray            allow tool access to an additional directory (repeatable)
+      --allowed-tools stringArray      comma or space-separated permission rules to allow
+      --allowedTools stringArray       alias for --allowed-tools
+  -y, --auto                           explicitly auto-approve ordinary writer fallbacks (alias for --permission-mode auto)
+  -c, --continue                       resume the most recent saved session, or start a fresh one when none exists
+      --copy                           with --resume/--continue: duplicate the session and continue in the copy (escape hatch when the original is held by another Reasonix process)
+      --dangerously-skip-permissions   alias for --yolo
+      --debug                          write diagnostic logs (assembly timing, cache state) to stderr
+      --dir string                     change to this directory first (project root); config, sandbox and file tools resolve from here
+      --effort string                  session reasoning effort override
+      --events-jsonl                   emit a redacted structured event stream as JSONL
+      --fail-on-unverified             exit 3 when the model finished but the host could not verify the result (final readiness unmet, or edits and commands refused because the folder is not trusted)
+      --fold-index string              benchmark arm: how much of the model-visible fold index to keep (default|half|quarter|off)
+      --max-steps int                  one-off max tool-call rounds (0 = automatic)
+      --metrics string                 write a JSON token/cache/cost summary of the run to this path
+      --model string                   provider name (default: config default_model)
+      --output-format string           output format: text | json | stream-json (default "text")
+      --permission-mode string         permission mode: read-only | manual | ask | auto | acceptEdits | dontAsk | bypassPermissions (default: auto where the OS sandbox confines writes and the folder is trusted, otherwise ask)
+      --preset string                  agent execution setting: balanced | delivery (default "balanced")
+  -p, --print                          print only the final response
+      --profile string                 deprecated: use --preset (economy|balanced|delivery)
+      --resume string                  resume by session file path, session ID, or machine session ID (takes precedence over --continue)
+      --show-thinking                  show thinking text instead of the collapsed thinking marker
+      --takeover                       with --resume/--continue: accepted for 1.x command lines; a session another Reasonix process holds is still refused
+      --trajectory string              append a timestamped JSONL trajectory of the run's full event stream (tool calls, reasoning, decisions) to this path
+      --yolo                           skip approval prompts; the sandbox, network policy and deny rules still apply (alias for --permission-mode bypassPermissions)
+[rc=0]
+===== reasonix mcp --help
+Manage MCP servers (global installs use config.toml; project entries stay in project config).
+
+Usage:
+  reasonix mcp list
+  reasonix mcp get <name>
+  reasonix mcp install <registry-name> [--as <name>]
+  reasonix mcp add -- <command> [args...]            stdio argv (no shell)
+  reasonix mcp add <name> -- <command> [args...]
+  reasonix mcp add <name> <command> [args...]        legacy stdio form
+  reasonix mcp add https://example.com/mcp           remote HTTP
+  reasonix mcp add <name> --http <url> [--header K=V]
+  reasonix mcp add <name> --sse  <url>
+  reasonix mcp enable <name>
+  reasonix mcp disable <name>
+  reasonix mcp retry <name>
+  reasonix mcp trust <name> [--digest <hex>]    accept tool definitions held back as changed
+  reasonix mcp auth <name>                          remote OAuth (opens browser)
+  reasonix mcp update <name>
+  reasonix mcp browse [query] [--limit N] [--json]
+  reasonix mcp import
+  reasonix mcp remove <name>
+
+Flags for add:
+  --http <url> | --sse <url>   remote transport (omit for a stdio command)
+  --env K=V                    set an environment variable (repeatable, stdio)
+  --header K=V                 set an HTTP header (repeatable, remote)
+
+Examples:
+  reasonix mcp add fs npx -y @modelcontextprotocol/server-filesystem .
+  reasonix mcp add stripe --http https://mcp.stripe.com --header "Authorization=Bearer $STRIPE_KEY"
+
+CLI config changes take effect on the next session. Inside a running chat, use
+/mcp add to save and connect a server immediately. Installing a server is also
+its launch authorization; there is no separate trust step. Remote OAuth, when
+requested by the server, is completed with reasonix mcp auth <name> and stored
+in Reasonix-private MCP state.
+
+Servers declared by project reasonix.toml or .mcp.json are trusted configuration
+and need no separate launch confirmation. Project entries override same-name
+global entries; within a project, reasonix.toml overrides .mcp.json. Writer or
+destructive annotations never trigger per-call approval. Explicit deny rules
+still win; Plan Mode and strict read-only subagents may filter which tools are
+available.
+[rc=0]
+===== reasonix session --help
+{"schema_version":1,"command":"session.--help","error":{"code":"unknown_command","message":"unknown session operation"}}
+[rc=0]
+===== reasonix version --json
+{
+  "version": "v2.43.0",
+  "git_commit": "2b3b7c4d0c82",
+  "build_time_utc": "2026-10-17T06:13:10Z",
+  "build_target": "linux/amd64",
+  "go": "go1.26.9 linux/amd64"
+}
+[rc=0]
+===== reasonix acp --help
+Usage of acp:
+  -model string
+    	provider name (default: config default_model)
+  -planner string
+    	planner policy: auto | off (default "auto")
+  -profile string
+    	runtime profile: economy | balanced | delivery (default "balanced")
+  -sandbox-bash string
+    	bash sandbox policy: auto | enforce (default "auto")
+  -sandbox-network string
+    	sandbox network policy: auto | on | off (default "auto")
+  -workspace-only
+    	ignore configured extra write roots and confine writes to the session cwd
+[rc=0]

@@ -1,0 +1,2 @@
+{"type":"retry","subtype":"starting","session_id":"c6b62c6f-7ead-4fd6-9922-e952131177ff","timestamp_ms":1760700002000,"attempt":1,"is_resume":false}
+{"type":"connection","subtype":"reconnecting","session_id":"c6b62c6f-7ead-4fd6-9922-e952131177ff","timestamp_ms":1760700002100,"attempt":1}

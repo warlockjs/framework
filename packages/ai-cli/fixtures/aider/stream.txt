@@ -1,0 +1,21 @@
+Aider v0.86.2
+Main model: claude-sonnet-4-5 with diff edit format, prompt cache, infinite output
+Weak model: claude-haiku-4-5
+Git repo: .git with 4 files
+Repo-map: using 4096 tokens, auto refresh
+Added src/greet.ts to the chat.
+
+I'll add a `greet` function that returns a greeting.
+
+src/greet.ts
+```typescript
+<<<<<<< SEARCH
+=======
+export function greet(name: string): string {
+  return `Hello, ${name}!`;
+}
+>>>>>>> REPLACE
+```
+
+Tokens: 2.4k sent, 61 received. Cost: $0.0081 message, $0.0081 session.
+Applied edit to src/greet.ts

@@ -1,0 +1,4 @@
+{"type":"tool.execution_complete","data":{"toolCallId":"call_def456","success":false,"error":{"code":"denied","message":"Permission denied and could not request permission from user"}},"id":"e0a1b2c3-0002-4000-8000-000000000001","timestamp":"2026-10-17T22:11:00.000Z","parentId":null}
+{"type":"session.error","data":{"errorType":"authentication","message":"No authentication information found.","statusCode":401},"id":"e0a1b2c3-0002-4000-8000-000000000002","timestamp":"2026-10-17T22:11:00.100Z","parentId":"e0a1b2c3-0002-4000-8000-000000000001"}
+{"type":"result","timestamp":"2026-10-17T22:11:00.200Z","sessionId":"0cb916db-26aa-40f2-86b5-1ba81b225fd3","exitCode":1,"usage":{"premiumRequests":0,"totalApiDurationMs":0,"sessionDurationMs":400,"codeChanges":{"linesAdded":0,"linesRemoved":0,"filesModified":[]}}}
+{"type":"error","message":"Failed to serialize or redact JSON output"}

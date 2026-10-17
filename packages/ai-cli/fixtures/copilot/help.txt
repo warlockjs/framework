@@ -1,0 +1,1215 @@
+===== $ @github/copilot --help 
+Usage: copilot [OPTIONS] [COMMAND]
+
+GitHub Copilot CLI - An AI-powered coding assistant.
+
+Start an interactive session to chat with Copilot, or use -p/--prompt for
+non-interactive scripting. Copilot can edit files, run shell commands, search
+your codebase, and more — all with configurable permissions.
+
+Run `copilot <command> --help` for details on any subcommand.
+
+Commands:
+  app          Open the GitHub Copilot app
+  login        Authenticate with Copilot
+  help         Display help information
+  init         Initialize Copilot instructions
+  config       Manage configuration settings
+  update       Download the latest version
+  version      Display version information
+  workflow     Run dynamic workflows
+  sessions     Manage saved sessions
+  memories     Manage memories
+  plugin       Manage plugins
+  mcp          Manage MCP servers
+  skill        Manage skills
+  instruction  Inspect instruction sources
+  lsp          Inspect language server configuration
+  sandbox      Manage command sandboxing
+  completion   Generate a shell completion script
+
+Options:
+  -v, --version
+          show version information
+  -i, --interactive <prompt>
+          Start interactive mode and automatically execute this prompt
+      --fleet
+          Run the prompt in fleet mode (parallel subagent
+          orchestration); combine with -i, -p, or piped stdin
+  -p, --prompt <text>
+          Execute a prompt in non-interactive mode (exits after
+          completion)
+  -s, --silent
+          Output only the agent response (no stats), useful for
+          scripting with -p
+      --enable-memory
+          Enable memory in prompt mode (disabled by default)
+      --model <model>
+          Set the AI model to use (use 'auto' to let Copilot pick
+          automatically)
+      --reasoning-effort <level>
+          Set the reasoning effort level [possible values: none, minimal, low, medium, high, xhigh, max]
+      --context <tier>
+          Set the context window tier (overrides persisted setting) [possible values: default, long_context]
+      --auto-tier <preference>
+          Set the Auto routing profile (validated against the available catalog)
+      --agent <agent>
+          Specify a custom agent to use
+  -r, --resume [<value>]
+          Resume from a previous session (optionally specify existing
+          session ID, task ID, ID prefix, or name; name matching is
+          exact, case-insensitive)
+      --continue
+          Resume the most recent session
+  -n, --name <name>
+          Set a name for the new session
+      --session-id <id>
+          Resume an existing session or task by ID, or set the UUID
+          for a new session
+      --connect [<sessionId>]
+          Connect directly to a remote session (optionally specify
+          session ID or task ID)
+      --allow-all-tools
+          Allow all tools to run automatically without confirmation;
+          required for non-interactive mode. Run `copilot help environment`
+          for what COPILOT_ALLOW_ALL accepts and what exact "true" grants [env: COPILOT_ALLOW_ALL=]
+      --allow-all-paths
+          Disable file path verification and allow access to any path
+      --disallow-temp-dir
+          Prevent automatic access to the system temporary directory
+      --banner
+          Show the startup banner
+      --screen-reader
+          Enable screen reader optimizations
+      --plain-diff
+          Disable rich diff rendering (syntax highlighting via diff
+          tool specified by git config)
+  -C <directory>
+          Change working directory before doing anything else
+      --log-dir <directory>
+          Set log file directory (default: ~/.copilot/logs/)
+      --extension-sdk-path <directory>
+          Override the bundled @github/copilot-sdk injected into
+          extension subprocesses with a local `copilot-sdk/` folder.
+          Invalid paths fall back to the bundled SDK.
+      --log-level <level>
+          Set the log level [possible values: none, error, warning, info, debug, all, default]
+      --stream <mode>
+          Enable or disable streaming mode [possible values: on, off]
+      --output-format <format>
+          Output format: 'text' (default) or 'json' (JSONL, one JSON
+          object per line) [possible values: text, json]
+      --share [<path>]
+          Share session to markdown file after completion in
+          non-interactive mode (default: ./copilot-session-<id>.md)
+      --share-gist
+          Share session to a secret GitHub gist after completion in
+          non-interactive mode
+      --add-dir <directory>
+          Allow file access to a directory and load its .github/skills
+          and .github/agents as trusted configuration (can be used
+          multiple times). A relative path resolves against the
+          session working directory (the --resume/--worktree/-C
+          directory), whatever order the options appear in
+      --attachment <path>
+          Attach a file (image or native document) to the initial
+          prompt; only valid in non-interactive mode (can be used
+          multiple times)
+      --disable-mcp-server <server-name>
+          Disable a specific MCP server (can be used multiple times)
+      --disable-builtin-mcps
+          Disable all built-in MCP servers (currently:
+          github-mcp-server, githubiq)
+      --enable-all-github-mcp-tools
+          Enable all GitHub MCP server tools instead of the default
+          CLI subset. Overrides --add-github-mcp-toolset and
+          --add-github-mcp-tool options.
+      --add-github-mcp-toolset <toolset>
+          Add a toolset to enable for the GitHub MCP server instead of
+          the default CLI subset (can be used multiple times). Use
+          "all" for all toolsets.
+      --add-github-mcp-tool <tool>
+          Add a tool to enable for the GitHub MCP server instead of
+          the default CLI subset (can be used multiple times). Use "*"
+          for all tools.
+      --plugin-dir <directory>
+          Load a plugin from a local directory (can be used multiple
+          times). A relative path resolves against the session working
+          directory (the --resume/--worktree/-C directory), whatever
+          order the options appear in
+      --additional-mcp-config <json>
+          Additional MCP servers configuration as JSON string or file
+          path (prefix with @) (can be used multiple times; augments
+          config from ~/.copilot/mcp-config.json for this session). A
+          relative @ path resolves against the session working
+          directory (the --resume/--worktree/-C directory) and a
+          leading ~/ expands to your home directory
+      --mcp-github-auth <server=origin>
+          Send the signed-in GitHub account credential only to this
+          explicit --additional-mcp-config server and approved origin.
+          HTTPS is required except for literal loopback HTTP. Never
+          put a token in this argument. Can be used multiple times.
+      --allow-all-mcp-server-instructions
+          Include initialization instructions from all MCP servers in
+          the system prompt instead of only allowlisted servers
+      --allow-tool [<tools>...]
+          Tools the CLI has permission to use; will not prompt for
+          permission
+      --deny-tool [<tools>...]
+          Tools the CLI does not have permission to use; will not
+          prompt for permission
+      --available-tools [<tools>...]
+          Only these tools will be available to the model
+      --excluded-tools [<tools>...]
+          These tools will not be available to the model
+      --secret-env-vars [<vars>...]
+          Environment variable names whose values are stripped from
+          shell and MCP server environments and redacted from output
+          (e.g., --secret-env-vars=MY_KEY,OTHER_KEY)
+      --allow-url [<urls>...]
+          Allow access to specific URLs or domains
+      --deny-url [<urls>...]
+          Deny access to specific URLs or domains, takes precedence
+          over --allow-url
+      --allow-all-urls
+          Allow access to all URLs without confirmation
+      --allow-all
+          Enable all permissions (equivalent to --allow-all-tools
+          --allow-all-paths --allow-all-urls)
+      --yolo
+          Enable all permissions (equivalent to --allow-all-tools
+          --allow-all-paths --allow-all-urls)
+      --max-autopilot-continues <count>
+          Maximum number of continuation messages in autopilot mode [default: 5]
+      --mode <mode>
+          Set the initial agent mode [possible values: interactive, plan, autopilot]
+      --autopilot
+          Start in autopilot mode
+      --plan
+          Start in plan mode (combine with --mode autopilot to
+          auto-approve the plan and implement it autonomously)
+      --experimental
+          Enable experimental features
+      --bash-env [<value>]
+          Enable BASH_ENV support for bash shells (on|off)
+      --mouse [<value>]
+          Enable mouse support in alt screen mode (on|off)
+      --acp
+          Start as Agent Client Protocol server
+      --remote
+          Enable remote control of your session from GitHub web and
+          mobile
+      --remote-export
+          Export your session to GitHub web and mobile (read-only;
+          does not enable remote control)
+      --dynamic-retrieval <category=on|off>
+          Enable or disable embeddings-based dynamic retrieval per
+          category and persist the choice (category: skills).
+          Repeatable, e.g. --dynamic-retrieval skills=off
+      --enable-mcp-server <server-name>
+          Enable an MCP server disabled in settings for this run only;
+          nothing is persisted (can be used multiple times)
+      --max-ai-credits <credits>
+          Set max AI credits for this session
+      --assisted-approval
+          Review tool permission requests with the assisted-approval
+          safety judge instead of approving them outright. The judge
+          is probabilistic and not a security boundary. Equivalent
+          to the `assisted` mode of /permissions. Takes precedence
+          over --allow-all-tools when the judge engages; requires
+          --experimental or enabledFeatureFlags.AUTO_APPROVAL. (env:
+          COPILOT_ASSISTED_APPROVAL)
+      --usage-output-file <file>
+          Write final usage statistics as JSON to the specified file
+      --no-custom-instructions
+          Disable loading of custom instructions from AGENTS.md and
+          related files
+      --no-auto-update
+          Disable downloading CLI updates automatically. Copilot then
+          runs the version bundled in the executable you launched
+          rather than a newer previously downloaded one
+      --no-ask-user
+          Disable the ask_user tool (agent works autonomously without
+          asking questions)
+      --no-color
+          Disable all color output
+      --no-experimental
+          Disable experimental features
+      --no-bash-env
+          Disable BASH_ENV support for bash shells
+      --no-mouse
+          Disable mouse support in alt screen mode
+      --no-remote
+          Disable remote control of your session from GitHub web and
+          mobile
+      --no-remote-export
+          Disable exporting your session to GitHub web and mobile
+          (also disables remote control)
+      --no-eager-powershell-resolution
+          Disable background PowerShell prompt resolution on Windows
+  -h, --help
+          Print help
+
+Help Topics:
+  billing      AI credit usage
+  commands     Interactive Mode Commands
+  config       Configuration Settings
+  environment  Environment Variables
+  limits       Session Limits Controls
+  logging      Logging
+  monitoring   Monitoring with OpenTelemetry
+  permissions  Permissions
+  providers    Custom Model Providers (BYOK)
+  sandbox      Command Sandboxing
+
+Examples:
+  # Start interactive mode
+  $ copilot
+
+  # Start interactive mode and automatically execute a prompt
+  $ copilot -i "Fix the bug in main.js"
+
+  # Execute a prompt in non-interactive mode (exits after completion)
+  $ copilot -p "Fix the bug in main.js" --allow-all-tools
+
+  # Enable all permissions with a single flag
+  $ copilot -p "Fix the bug in main.js" --allow-all
+  $ copilot -p "Fix the bug in main.js" --yolo
+
+  # Start with a specific model
+  $ copilot --model gpt-5.4
+
+  # Resume the most recent session
+  $ copilot --continue
+
+  # Resume a previous session using session picker
+  $ copilot --resume
+
+  # Resume a specific session by ID
+  $ copilot --resume=<session-id>
+
+  # Name a new session
+  $ copilot --name="my feature"
+
+  # Start a new session with a specific UUID
+  $ copilot --session-id=0cb916db-26aa-40f2-86b5-1ba81b225fd2
+
+  # Resume or attach to an existing session or task by ID
+  $ copilot --session-id=<session-or-task-id>
+
+  # Resume a session by name
+  $ copilot --resume="my feature"
+
+  # Resume a session by ID prefix (7+ hex chars)
+  $ copilot --resume=0cb916d
+
+  # Resume with auto-approval
+  $ copilot --allow-all-tools --resume
+
+  # Allow access to additional directory
+  $ copilot --add-dir /home/user/projects
+
+  # Allow multiple directories
+  $ copilot --add-dir ~/workspace --add-dir /tmp
+
+  # Disable path verification (allow access to any path)
+  $ copilot --allow-all-paths
+
+  # Allow all git commands except git push
+  $ copilot --allow-tool='shell(git:*)' --deny-tool='shell(git push)'
+
+  # Allow all file editing
+  $ copilot --allow-tool='write'
+
+  # Allow all but one specific tool from MCP server with name "MyMCP"
+  $ copilot --deny-tool='MyMCP(denied_tool)' --allow-tool='MyMCP'
+
+  # Allow GitHub API access (defaults to HTTPS)
+  $ copilot --allow-url=github.com
+
+  # Deny access to specific domain over HTTPS
+  $ copilot --deny-url=https://malicious-site.com
+  $ copilot --deny-url=malicious-site.com
+
+  # Allow all URLs without confirmation
+  $ copilot --allow-all-urls
+
+  # Initialize Copilot instructions for a repository
+  $ copilot init
+
+Learn More:
+  Use `copilot <command> --help` for more information about a command.
+  Read the documentation at https://docs.github.com/copilot/how-tos/copilot-cli
+[exit=0]
+
+===== $ @github/copilot help 
+Usage: copilot [OPTIONS] [COMMAND]
+
+GitHub Copilot CLI - An AI-powered coding assistant.
+
+Start an interactive session to chat with Copilot, or use -p/--prompt for
+non-interactive scripting. Copilot can edit files, run shell commands, search
+your codebase, and more — all with configurable permissions.
+
+Run `copilot <command> --help` for details on any subcommand.
+
+Commands:
+  app          Open the GitHub Copilot app
+  login        Authenticate with Copilot
+  help         Display help information
+  init         Initialize Copilot instructions
+  config       Manage configuration settings
+  update       Download the latest version
+  version      Display version information
+  workflow     Run dynamic workflows
+  sessions     Manage saved sessions
+  memories     Manage memories
+  plugin       Manage plugins
+  mcp          Manage MCP servers
+  skill        Manage skills
+  instruction  Inspect instruction sources
+  lsp          Inspect language server configuration
+  sandbox      Manage command sandboxing
+  completion   Generate a shell completion script
+
+Options:
+  -v, --version
+          show version information
+  -i, --interactive <prompt>
+          Start interactive mode and automatically execute this prompt
+      --fleet
+          Run the prompt in fleet mode (parallel subagent
+          orchestration); combine with -i, -p, or piped stdin
+  -p, --prompt <text>
+          Execute a prompt in non-interactive mode (exits after
+          completion)
+  -s, --silent
+          Output only the agent response (no stats), useful for
+          scripting with -p
+      --enable-memory
+          Enable memory in prompt mode (disabled by default)
+      --model <model>
+          Set the AI model to use (use 'auto' to let Copilot pick
+          automatically)
+      --reasoning-effort <level>
+          Set the reasoning effort level [possible values: none, minimal, low, medium, high, xhigh, max]
+      --context <tier>
+          Set the context window tier (overrides persisted setting) [possible values: default, long_context]
+      --auto-tier <preference>
+          Set the Auto routing profile (validated against the available catalog)
+      --agent <agent>
+          Specify a custom agent to use
+  -r, --resume [<value>]
+          Resume from a previous session (optionally specify existing
+          session ID, task ID, ID prefix, or name; name matching is
+          exact, case-insensitive)
+      --continue
+          Resume the most recent session
+  -n, --name <name>
+          Set a name for the new session
+      --session-id <id>
+          Resume an existing session or task by ID, or set the UUID
+          for a new session
+      --connect [<sessionId>]
+          Connect directly to a remote session (optionally specify
+          session ID or task ID)
+      --allow-all-tools
+          Allow all tools to run automatically without confirmation;
+          required for non-interactive mode. Run `copilot help environment`
+          for what COPILOT_ALLOW_ALL accepts and what exact "true" grants [env: COPILOT_ALLOW_ALL=]
+      --allow-all-paths
+          Disable file path verification and allow access to any path
+      --disallow-temp-dir
+          Prevent automatic access to the system temporary directory
+      --banner
+          Show the startup banner
+      --screen-reader
+          Enable screen reader optimizations
+      --plain-diff
+          Disable rich diff rendering (syntax highlighting via diff
+          tool specified by git config)
+  -C <directory>
+          Change working directory before doing anything else
+      --log-dir <directory>
+          Set log file directory (default: ~/.copilot/logs/)
+      --extension-sdk-path <directory>
+          Override the bundled @github/copilot-sdk injected into
+          extension subprocesses with a local `copilot-sdk/` folder.
+          Invalid paths fall back to the bundled SDK.
+      --log-level <level>
+          Set the log level [possible values: none, error, warning, info, debug, all, default]
+      --stream <mode>
+          Enable or disable streaming mode [possible values: on, off]
+      --output-format <format>
+          Output format: 'text' (default) or 'json' (JSONL, one JSON
+          object per line) [possible values: text, json]
+      --share [<path>]
+          Share session to markdown file after completion in
+          non-interactive mode (default: ./copilot-session-<id>.md)
+      --share-gist
+          Share session to a secret GitHub gist after completion in
+          non-interactive mode
+      --add-dir <directory>
+          Allow file access to a directory and load its .github/skills
+          and .github/agents as trusted configuration (can be used
+          multiple times). A relative path resolves against the
+          session working directory (the --resume/--worktree/-C
+          directory), whatever order the options appear in
+      --attachment <path>
+          Attach a file (image or native document) to the initial
+          prompt; only valid in non-interactive mode (can be used
+          multiple times)
+      --disable-mcp-server <server-name>
+          Disable a specific MCP server (can be used multiple times)
+      --disable-builtin-mcps
+          Disable all built-in MCP servers (currently:
+          github-mcp-server, githubiq)
+      --enable-all-github-mcp-tools
+          Enable all GitHub MCP server tools instead of the default
+          CLI subset. Overrides --add-github-mcp-toolset and
+          --add-github-mcp-tool options.
+      --add-github-mcp-toolset <toolset>
+          Add a toolset to enable for the GitHub MCP server instead of
+          the default CLI subset (can be used multiple times). Use
+          "all" for all toolsets.
+      --add-github-mcp-tool <tool>
+          Add a tool to enable for the GitHub MCP server instead of
+          the default CLI subset (can be used multiple times). Use "*"
+          for all tools.
+      --plugin-dir <directory>
+          Load a plugin from a local directory (can be used multiple
+          times). A relative path resolves against the session working
+          directory (the --resume/--worktree/-C directory), whatever
+          order the options appear in
+      --additional-mcp-config <json>
+          Additional MCP servers configuration as JSON string or file
+          path (prefix with @) (can be used multiple times; augments
+          config from ~/.copilot/mcp-config.json for this session). A
+          relative @ path resolves against the session working
+          directory (the --resume/--worktree/-C directory) and a
+          leading ~/ expands to your home directory
+      --mcp-github-auth <server=origin>
+          Send the signed-in GitHub account credential only to this
+          explicit --additional-mcp-config server and approved origin.
+          HTTPS is required except for literal loopback HTTP. Never
+          put a token in this argument. Can be used multiple times.
+      --allow-all-mcp-server-instructions
+          Include initialization instructions from all MCP servers in
+          the system prompt instead of only allowlisted servers
+      --allow-tool [<tools>...]
+          Tools the CLI has permission to use; will not prompt for
+          permission
+      --deny-tool [<tools>...]
+          Tools the CLI does not have permission to use; will not
+          prompt for permission
+      --available-tools [<tools>...]
+          Only these tools will be available to the model
+      --excluded-tools [<tools>...]
+          These tools will not be available to the model
+      --secret-env-vars [<vars>...]
+          Environment variable names whose values are stripped from
+          shell and MCP server environments and redacted from output
+          (e.g., --secret-env-vars=MY_KEY,OTHER_KEY)
+      --allow-url [<urls>...]
+          Allow access to specific URLs or domains
+      --deny-url [<urls>...]
+          Deny access to specific URLs or domains, takes precedence
+          over --allow-url
+      --allow-all-urls
+          Allow access to all URLs without confirmation
+      --allow-all
+          Enable all permissions (equivalent to --allow-all-tools
+          --allow-all-paths --allow-all-urls)
+      --yolo
+          Enable all permissions (equivalent to --allow-all-tools
+          --allow-all-paths --allow-all-urls)
+      --max-autopilot-continues <count>
+          Maximum number of continuation messages in autopilot mode [default: 5]
+      --mode <mode>
+          Set the initial agent mode [possible values: interactive, plan, autopilot]
+      --autopilot
+          Start in autopilot mode
+      --plan
+          Start in plan mode (combine with --mode autopilot to
+          auto-approve the plan and implement it autonomously)
+      --experimental
+          Enable experimental features
+      --bash-env [<value>]
+          Enable BASH_ENV support for bash shells (on|off)
+      --mouse [<value>]
+          Enable mouse support in alt screen mode (on|off)
+      --acp
+          Start as Agent Client Protocol server
+      --remote
+          Enable remote control of your session from GitHub web and
+          mobile
+      --remote-export
+          Export your session to GitHub web and mobile (read-only;
+          does not enable remote control)
+      --dynamic-retrieval <category=on|off>
+          Enable or disable embeddings-based dynamic retrieval per
+          category and persist the choice (category: skills).
+          Repeatable, e.g. --dynamic-retrieval skills=off
+      --enable-mcp-server <server-name>
+          Enable an MCP server disabled in settings for this run only;
+          nothing is persisted (can be used multiple times)
+      --max-ai-credits <credits>
+          Set max AI credits for this session
+      --assisted-approval
+          Review tool permission requests with the assisted-approval
+          safety judge instead of approving them outright. The judge
+          is probabilistic and not a security boundary. Equivalent
+          to the `assisted` mode of /permissions. Takes precedence
+          over --allow-all-tools when the judge engages; requires
+          --experimental or enabledFeatureFlags.AUTO_APPROVAL. (env:
+          COPILOT_ASSISTED_APPROVAL)
+      --usage-output-file <file>
+          Write final usage statistics as JSON to the specified file
+      --no-custom-instructions
+          Disable loading of custom instructions from AGENTS.md and
+          related files
+      --no-auto-update
+          Disable downloading CLI updates automatically. Copilot then
+          runs the version bundled in the executable you launched
+          rather than a newer previously downloaded one
+      --no-ask-user
+          Disable the ask_user tool (agent works autonomously without
+          asking questions)
+      --no-color
+          Disable all color output
+      --no-experimental
+          Disable experimental features
+      --no-bash-env
+          Disable BASH_ENV support for bash shells
+      --no-mouse
+          Disable mouse support in alt screen mode
+      --no-remote
+          Disable remote control of your session from GitHub web and
+          mobile
+      --no-remote-export
+          Disable exporting your session to GitHub web and mobile
+          (also disables remote control)
+      --no-eager-powershell-resolution
+          Disable background PowerShell prompt resolution on Windows
+  -h, --help
+          Print help
+
+Help Topics:
+  billing      AI credit usage
+  commands     Interactive Mode Commands
+  config       Configuration Settings
+  environment  Environment Variables
+  limits       Session Limits Controls
+  logging      Logging
+  monitoring   Monitoring with OpenTelemetry
+  permissions  Permissions
+  providers    Custom Model Providers (BYOK)
+  sandbox      Command Sandboxing
+
+Examples:
+  # Start interactive mode
+  $ copilot
+
+  # Start interactive mode and automatically execute a prompt
+  $ copilot -i "Fix the bug in main.js"
+
+  # Execute a prompt in non-interactive mode (exits after completion)
+  $ copilot -p "Fix the bug in main.js" --allow-all-tools
+
+  # Enable all permissions with a single flag
+  $ copilot -p "Fix the bug in main.js" --allow-all
+  $ copilot -p "Fix the bug in main.js" --yolo
+
+  # Start with a specific model
+  $ copilot --model gpt-5.4
+
+  # Resume the most recent session
+  $ copilot --continue
+
+  # Resume a previous session using session picker
+  $ copilot --resume
+
+  # Resume a specific session by ID
+  $ copilot --resume=<session-id>
+
+  # Name a new session
+  $ copilot --name="my feature"
+
+  # Start a new session with a specific UUID
+  $ copilot --session-id=0cb916db-26aa-40f2-86b5-1ba81b225fd2
+
+  # Resume or attach to an existing session or task by ID
+  $ copilot --session-id=<session-or-task-id>
+
+  # Resume a session by name
+  $ copilot --resume="my feature"
+
+  # Resume a session by ID prefix (7+ hex chars)
+  $ copilot --resume=0cb916d
+
+  # Resume with auto-approval
+  $ copilot --allow-all-tools --resume
+
+  # Allow access to additional directory
+  $ copilot --add-dir /home/user/projects
+
+  # Allow multiple directories
+  $ copilot --add-dir ~/workspace --add-dir /tmp
+
+  # Disable path verification (allow access to any path)
+  $ copilot --allow-all-paths
+
+  # Allow all git commands except git push
+  $ copilot --allow-tool='shell(git:*)' --deny-tool='shell(git push)'
+
+  # Allow all file editing
+  $ copilot --allow-tool='write'
+
+  # Allow all but one specific tool from MCP server with name "MyMCP"
+  $ copilot --deny-tool='MyMCP(denied_tool)' --allow-tool='MyMCP'
+
+  # Allow GitHub API access (defaults to HTTPS)
+  $ copilot --allow-url=github.com
+
+  # Deny access to specific domain over HTTPS
+  $ copilot --deny-url=https://malicious-site.com
+  $ copilot --deny-url=malicious-site.com
+
+  # Allow all URLs without confirmation
+  $ copilot --allow-all-urls
+
+  # Initialize Copilot instructions for a repository
+  $ copilot init
+
+Learn More:
+  Use `copilot <command> --help` for more information about a command.
+  Read the documentation at https://docs.github.com/copilot/how-tos/copilot-cli
+[exit=0]
+
+===== $ @github/copilot help environment 
+Environment Variables:
+
+  `COPILOT_ALLOW_ALL`: allow all tools to run automatically without confirmation. Accepts "true", "1", "yes", "on", or "y", case-insensitively and ignoring surrounding whitespace; "false", "0", "no", "off", "n", or an empty value turn it off. Setting it to exactly "true" additionally trusts the working directory without prompting, which loads that directory's skills, plugins, MCP servers, and hooks, including hooks that run shell commands; the other truthy spellings only auto-approve tools.
+
+  `COPILOT_AUTO_TIER`: optionally set the Auto routing profile to "efficiency", "balance", or "intelligence", or a server-advertised profile when dynamic Auto tiers are enabled. "fast" is rejected, because the CLI cannot run on that profile. Requires the effective model to be Auto and is overridden by --auto-tier or persisted configuration.
+
+  `COPILOT_AUTO_UPDATE`: set to "false" to disable downloading updated CLI versions automatically. Can also be disabled with the --no-auto-update flag. Auto-update is enabled by default, except in CI environments (detected via `CI`, `BUILD_NUMBER`, `RUN_ID`, or `SYSTEM_COLLECTIONURI` environment variables), where it is disabled by default. Standalone development builds run their bundled package by default and do not offer or install CLI updates unless release-style package behavior is selected with a canonical semantic version in `COPILOT_CLI_VERSION`. `COPILOT_CLI_DIST_DIR` and `--prefer-version` select an explicit package but do not enable updates for a development-identity package. On other standalone-binary installations, disabling it this way or with --no-auto-update also makes launches ignore any newer version already in the package cache and run the version built into the installed binary.
+
+  `COPILOT_CLI_VERSION`: override the CLI version used for update comparisons. On standalone development builds, a canonical semantic version also opts into release-style cached-package selection and CLI updates, but does not pin cache selection to that exact version or change the version displayed by `--version`; use `--prefer-version` for an exact cached package. An empty or non-canonical value is treated as unset for package selection and updates.
+
+  `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`: comma-separated list of additional directories to search for custom instructions files (in addition to git root and current working directory).
+
+  `COPILOT_EDITOR`, `VISUAL`, `EDITOR` (in order of precedence): command used to interactively edit a file (e.g., the plan).
+
+  `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN` (in order of precedence): an authentication token that takes precedence over previously stored credentials. Exception: in Codespaces, the auto-injected `GITHUB_TOKEN` (a user-to-server token) does not take precedence over a `/login` account. An explicitly exported `GITHUB_TOKEN`, `COPILOT_GITHUB_TOKEN`, or `GH_TOKEN` still takes precedence.
+
+  `COPILOT_HOME`: override the directory where configuration and state files are stored; defaults to `$HOME/.copilot`.
+
+  `COPILOT_MODEL`: optionally set the agent model. Can be overridden by the --model command line option or the /model command.
+
+  `COPILOT_MULTIPLEXER`: override which terminal multiplexer the CLI believes it is running directly inside. One of "tmux", "herdr", or "none"; unrecognized values are ignored. "none" declares that no multiplexer wraps this pane; it does not restore env-derived host-terminal identity inside a herdr pane, whose inherited `TERM_PROGRAM`/`WT_SESSION`-style markers describe the terminal that started the herdr server and stay untrusted. Detection is otherwise automatic from the environment. Set this when it guesses wrong — most often `COPILOT_MULTIPLEXER=tmux` for tmux running nested inside a herdr pane, because herdr panes inherit whatever `TMUX` the herdr server itself was started with.
+
+  `COPILOT_OFFLINE`: set to "true" to enable offline mode. When active, the CLI skips all network access: GitHub authentication, telemetry, web tools, GitHub MCP server, and auto-update are disabled. Requires a local model provider (COPILOT_PROVIDER_BASE_URL).
+
+  `COPILOT_PROVIDER_BASE_URL`: API endpoint URL for a custom model provider (BYOK). When set, the CLI uses this provider instead of GitHub Copilot's model routing. GitHub authentication is not required. For type "azure", use a host URL or a full project URL, including its `/api/projects/<project>` path.
+
+  `COPILOT_PROVIDER_TYPE`: provider type when using BYOK. One of "openai" (default), "azure", or "anthropic". Use "openai" for OpenAI-compatible endpoints including Ollama, vLLM, and Foundry Local.
+
+  `COPILOT_PROVIDER_API_KEY`: API key for the custom provider. Optional for local providers like Ollama.
+
+  `COPILOT_PROVIDER_API_KEY_COMMAND`: shell command that prints a fresh API key for each provider request. Takes precedence over COPILOT_PROVIDER_API_KEY.
+
+  `COPILOT_PROVIDER_BEARER_TOKEN`: bearer token for custom provider authentication. Takes precedence over COPILOT_PROVIDER_API_KEY.
+
+  `COPILOT_PROVIDER_WIRE_API`: API format for the custom provider. One of "completions" (default) or "responses". Use "responses" for GPT-5 series models.
+
+  `COPILOT_PROVIDER_TRANSPORT`: transport for the custom provider. One of "http" (default) or "websockets". Use with `COPILOT_PROVIDER_WIRE_API=responses` to use OpenAI Responses over WebSocket.
+
+  `COPILOT_PROVIDER_AZURE_API_VERSION`: Azure API version when using type "azure". When omitted, uses the GA versionless v1 route. Set explicitly (e.g. "2024-10-21") to use the legacy versioned deployment route.
+
+  `COPILOT_PROVIDER_MODEL_ID`: well-known model ID used for agent configuration and token limits. Defaults to COPILOT_MODEL.
+
+  `COPILOT_PROVIDER_WIRE_MODEL`: model name sent to the provider API for inference. Defaults to COPILOT_MODEL.
+
+  `COPILOT_PROVIDER_MAX_PROMPT_TOKENS`: maximum prompt tokens for the BYOK model. Overrides both catalog and default values.
+
+  `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS`: maximum output tokens for the BYOK model. Overrides both catalog and default values.
+
+  `COPILOT_PROVIDER_HEADERS`: custom HTTP headers sent only to the BYOK provider endpoint (not to GitHub Copilot services). Newline-separated "Name: Value" pairs; a literal "\n" also separates entries in a double-quoted shell string. Useful for gateway keys, tenant IDs, or routing headers.
+
+  `GH_HOST`: GitHub hostname for authentication and API requests; defaults to "github.com". Set this to your GitHub Enterprise Cloud with data residency hostname (e.g., "mycompany.ghe.com"). Use when both GitHub CLI and Copilot CLI should target the same host.
+
+  `COPILOT_GH_HOST`: GitHub hostname used only by Copilot CLI for authentication and API requests, overriding GH_HOST when set. Useful when GH_HOST points to a GitHub Enterprise Server instance but Copilot CLI needs to authenticate against github.com or a GitHub Enterprise Cloud with data residency hostname instead.
+
+  `HTTP_PROXY`, `HTTPS_PROXY` (case-insensitive): proxy server URL for outgoing HTTP and HTTPS connections respectively (e.g., "http://proxy.example.com:8080").
+
+  `NO_COLOR`: when set (to any value), disables color output. See https://no-color.org/ for details.
+
+  `NO_PROXY` (case-insensitive): comma-separated list of hostnames or patterns that should bypass the proxy (e.g., "localhost,127.0.0.1,.example.com").
+
+  `PLAIN_DIFF`: when set to "true", disables rich diff rendering (syntax highlighting via diff tool specified by git config). Can also be set with the --plain-diff flag.
+
+  `USE_BUILTIN_RIPGREP`: when set to "false", uses the ripgrep binary from PATH instead of the bundled version.
+
+  `USE_TGREP`: when set to "true", enables tgrep indexed search regardless of repository size, and also overrides the automatic-start checks described here. tgrep starts even outside a git repository, indexing the working directory itself (so avoid forcing it somewhere large, such as a home directory or filesystem root), and even on a virtualized or network filesystem (for example a VFS for Git checkout, or an SMB or 9p mount). Forcing tgrep also bypasses the Windows cloud-sync safety check, even if detection fails; indexing cloud-sync folders can download cloud-only files. When set to "false", disables tgrep and uses ripgrep. When unset, tgrep is enabled automatically only inside a git repository whose root is neither the user's home directory nor a filesystem root, on a non-virtualized filesystem, and at or above the file-count threshold (50,000 files with the current configuration); Windows cloud-sync folders and detection failures still disable automatic tgrep startup, and ripgrep is used otherwise.
+
+  Automatic startup skips Git roots that are the user's home directory or a filesystem root (including Windows drive and network-share roots) before counting files or reserving a server slot, even when the session starts in one of their subdirectories. If the home directory cannot be determined, automatic startup is also skipped. Separate repositories beneath these directories remain eligible, with or without a Git remote. `USE_TGREP=true` explicitly permits indexing these otherwise-excluded roots.
+
+  Copilot processes sharing a cache directory admit only one managed tgrep server at a time. Sessions on the same worktree can reuse its running server; other worktrees use ripgrep without waiting for the slot. `USE_TGREP=true` does not bypass this limit. The slot is released when the owning server shuts down; already-running sessions that skipped startup are not queued to acquire it. Servers launched manually or by older Copilot versions do not participate in this limit, and borrowing one does not reserve a managed-server slot.
+
+  `TGREP_FILE_COUNT_THRESHOLD`: minimum file count for automatic tgrep indexed search. Accepts a non-negative integer, ignoring surrounding whitespace. Defaults to 10,000 on Windows and 50,000 on other platforms. Invalid values log a warning and use the platform default. Automatic sessions must meet this threshold before reusing an existing index and recheck it before taking over its server. Setting it to 0 removes only the file-count requirement; all other automatic-start checks still apply. `USE_TGREP=true` bypasses this threshold, and `USE_TGREP=false` still disables tgrep.
+
+  `USE_TGREP_WARM_START`: when set to "true", blocks Copilot CLI startup until the tgrep index is ready when tgrep starts. It does not enable tgrep on its own; pair with `USE_TGREP=true` to force indexing and wait for readiness. Useful for evaluating tgrep search against a warm index.
+
+  OpenTelemetry / Monitoring:
+
+  `COPILOT_OTEL_ENABLED`: set to "true" to explicitly enable OpenTelemetry instrumentation.
+
+  `OTEL_EXPORTER_OTLP_ENDPOINT`: OTLP endpoint URL. Setting this automatically enables OTel.
+
+  `COPILOT_OTEL_EXPORTER_TYPE`: Copilot exporter backend; "otlp-http" (default) or "file" for local JSON-lines output.
+
+  `OTEL_EXPORTER_OTLP_PROTOCOL`: OTLP HTTP protocol for the "otlp-http" exporter; "http/json" (default) or "http/protobuf". Use `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` or `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` to override per signal.
+
+  `COPILOT_OTEL_FILE_EXPORTER_PATH`: file path for JSON-lines output. Setting this automatically enables OTel.
+
+  `COPILOT_OTEL_SOURCE_NAME`: instrumentation scope name for tracer and meter; defaults to "github.copilot".
+
+  `OTEL_SERVICE_NAME`: service name in resource attributes; defaults to "github-copilot".
+
+  `OTEL_RESOURCE_ATTRIBUTES`: extra resource attributes as comma-separated key=value pairs.
+
+  `OTEL_EXPORTER_OTLP_HEADERS`: authentication headers for the OTLP exporter (e.g., "Authorization=Bearer token").
+
+  `OTEL_EXPORTER_OTLP_CERTIFICATE`: path to a PEM file with extra CA certificate(s) to trust for the OTLP endpoint (e.g., a private/corporate CA). Merged with the OS trust store. Per-signal: `OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE`, `OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE`.
+
+  `OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE` / `OTEL_EXPORTER_OTLP_CLIENT_KEY`: paths to the client certificate and (unencrypted) private key PEM files for mutual TLS (mTLS). Both must be set together. Per-signal variants are supported.
+
+  `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`: set to "true" to capture full prompt/response content.
+
+  `OTEL_LOG_LEVEL`: OTel diagnostic log level (not the CLI --log-level). One of: NONE, ERROR, WARN, INFO, DEBUG, VERBOSE, ALL.
+
+  See `copilot help monitoring` for detailed configuration and examples.
+[exit=0]
+
+===== $ @github/copilot help config 
+Configuration Settings:
+
+  Change these settings with `copilot config`, using dot notation for nested keys:
+    $ copilot config footer.showQuota off
+    $ copilot config allowedUrls github.com         # adds an item to a list setting
+    $ copilot config allowedUrls
+    $ copilot config --rm allowedUrls github.com    # removes one item from a list setting
+    $ copilot config --list
+  Use --repo or --local to change .github/copilot/settings.json or settings.local.json.
+
+  `allowedUrls`: list of URLs or domains that are allowed to be accessed without prompting.
+    Supports exact URLs (e.g., "https://github.com"), domain patterns (e.g., "github.com"),
+    and wildcard subdomains (e.g., "*.github.com").
+
+  `autoUpdate`: whether to automatically download updated CLI versions; defaults to `true`.
+    On standalone-binary installations, downloads run in the background and a downloaded
+    version applies at your next launch of the CLI, unless that launch opts out with
+    `--no-auto-update`, `--prefer-version`, or `COPILOT_AUTO_UPDATE=false`; `/restart`
+    applies it in the CLI you already have open. Setting this to `false` only stops
+    further downloads - it does not stop an already downloaded version from applying.
+    Installations run from npm/JavaScript only report that a newer version is available -
+    installing it stays a manual `npm install`.
+
+  `banner`: frequency of showing animated banner; defaults to "once".
+    - "always" displays it every time
+    - "never" disables it
+    - "once" displays it the first time
+
+  `bannerStyle`: which artwork the startup banner uses; defaults to "mona".
+    - "mona" is the two-Mona pixel-art hi-five
+    - "classic" is the COPILOT wordmark with the goggled mascot
+    - Ignored when `banner` resolves to "never"
+
+  `bashEnv`: whether to enable BASH_ENV support for bash shells; defaults to `false`.
+    - Can also be set with --bash-env or --no-bash-env
+    - Using either flag persists the preference to config
+
+  `beep`: whether to beep when user attention is required; defaults to `false`.
+
+  `beepOnSchedule`: whether to beep when a scheduled `/every` (or `/after`) run finishes; defaults to `true`.
+    - Only applies when `beep` is enabled; set to `false` to silence completion beeps for scheduled runs.
+
+  `notifications`: whether to show OS notifications when user attention is required and when the agent finishes; defaults to `false`.
+    - Set to `true` to enable desktop toasts. Toasts are suppressed while the terminal window already has focus.
+    - Clicking a toast attempts to focus the terminal window that raised it where supported; multi-tab terminals (e.g. Windows Terminal) can't switch to the specific tab.
+
+  `terminalNotifications`: whether to prefer terminal-owned OSC 777 notifications; defaults to `false`.
+    - Requires `notifications` to be enabled.
+    - Used for recognized, active Ghostty and WezTerm sessions. Herdr uses its own notification path; tmux, GNU screen, Zellij, unsupported terminals, and rejected writes try the OS notification backend when available.
+
+  `powershellFlags`: list of flags passed to PowerShell (pwsh) on startup; defaults to `["-NoProfile", "-NoLogo"]`.
+    - Overrides the default flags when set; only applies on Windows
+    - Examples: `["-NoProfile"]` to keep the logo, `[]` to load your profile and show the logo,
+      `["-NoProfile", "-NoLogo", "-ExecutionPolicy", "Bypass"]` for locked-down environments
+    - Use caution: flags that change execution semantics (`-Command`, `-File`, `-NoExit`,
+      `-NonInteractive`, `-EncodedCommand`, `-InputFormat`, `-OutputFormat`) will break
+      the runtime. See the settings documentation for details.
+
+  `compactPaste`: whether to collapse large pasted content into compact tokens; defaults to `true`.
+    - When `true` (default), pastes with more than 10 lines are displayed as `[Paste #N - X lines]`
+    - When `false`, all pasted content is displayed directly in the input
+
+  `copyOnSelect`: whether selecting text in alt screen mode automatically copies it to the system clipboard; defaults to `true` on macOS, `false` elsewhere.
+    - When `true`, text is copied to the system clipboard as soon as the mouse button is released after a selection
+    - When `false` (default), use Ctrl+C or right-click to copy selected text to the system clipboard
+    - On Linux, the X11 primary selection is always updated on selection regardless of this setting
+
+  `commandHistoryMaxSize`: maximum number of recent prompts kept for Ctrl+R command-history search and up/down history navigation; defaults to `50`.
+    - History is newest-first and deduplicated; entries beyond this many are dropped
+    - Must be an integer between `1` and `1000`; out-of-range or invalid values fall back to `50`
+    - Lowering it trims the in-memory history immediately and persists on the next submitted prompt
+
+  `customAgents.defaultLocalOnly`: whether to default to only use local custom agents (no remote org/enterprise); defaults to `false`.
+
+  `deniedUrls`: list of URLs or domains that are denied access. Denial rules take precedence
+    over allow rules.
+
+  `proxyKerberosServicePrincipal`: service principal name (SPN) for Kerberos/Negotiate proxy
+    authentication; overrides the derived `HTTP/<proxy-host>`. Mirrors VS Code's
+    `http.proxyKerberosServicePrincipal`.
+    - The `COPILOT_PROXY_KERBEROS_SPN` environment variable, when set, takes precedence
+    - Changing this requires a restart to take effect
+
+  `proxyUrl`: proxy URL for HTTP(S) requests (e.g. `http://proxy.corp.example:3128`).
+    - Can be overridden by the `HTTP_PROXY` / `HTTPS_PROXY` environment variables (any casing,
+      including lowercase `http_proxy` / `https_proxy`); if either is set in the environment,
+      it takes precedence and this setting is ignored
+    - `NO_PROXY` from the environment is still honored
+    - Changing this requires a restart to take effect
+
+  `experimental`: whether to enable experimental features; defaults to `false`.
+    - Can be enabled with --experimental flag, /settings experimental on, or /experimental (deprecated)
+
+  `memory`: whether to enable agentic memory (cross-session fact recall); defaults to `true`.
+    - Toggle with `/memory on|off` (writes this setting)
+    - When `false`, the agent will not store or recall memories
+
+  `includeCoAuthoredBy`: whether to instruct the agent to add a Co-authored-by trailer to git commits; defaults to `true`.
+
+  `keepAlive`: keep-alive mode applied at CLI startup; prevents the system from sleeping while the session is active. Defaults to `"off"`.
+    - `"off"` (default): system sleeps normally.
+    - `"on"`: keep-alive is enabled for the duration of the session.
+    - `"busy"`: keep-alive is enabled only while the agent is working on a turn.
+    - Can also be set interactively with `/keep-alive [on|off|busy|<duration>]`.
+
+  `companyAnnouncements`: list of messages to display in the banner on startup.
+    - One message is randomly selected each time the CLI starts
+    - Useful for team announcements or reminders
+
+  `continueOnAutoMode`: whether to automatically switch to auto mode when rate-limited; defaults to `false`.
+    - When `true`, eligible rate limit errors (per-model, weekly, or integration limits) trigger an automatic switch to auto mode and retry
+    - Does not apply to global rate limits, generic 429s, or BYOK providers
+
+  `stayInAutopilot`: whether to stay in autopilot mode after an autopilot task completes; defaults to `true`.
+    - When `true` (default), the CLI remains in autopilot mode after the agent calls `task_complete` instead of exiting to interactive mode
+    - Set to `false` to revert to interactive mode after each completed task
+
+  `defaultMode`: agent mode new interactive sessions start in; defaults to "interactive".
+    - One of "interactive", "plan", or "autopilot"
+    - `--mode`, `--autopilot`, and `--plan` still win when passed
+    - Resumed sessions keep their own persisted mode, and it does not apply to `-p`/`--prompt`, `--server`, or `--acp` runs
+
+  `defaultPermissionMode`: permission mode new interactive sessions start in; defaults to "manual" unless an eligible organization targets Assisted.
+    - `"manual"` (default): write and command requests are prompted; read-only requests are auto-approved
+    - `"assisted"`: a probabilistic LLM review reduces prompts by auto-approving requests it judges safe and prompting otherwise; it is not a hard security boundary, so use managed rules, sandboxing, least-privilege credentials, and egress controls for enforceable restrictions
+    - `"allow-all"`: auto-approves everything, equivalent to launching with `--allow-all`; ignored when policy disables bypass-permissions mode
+    - Any value is ignored on resumed sessions, outside interactive runs, and when `--allow-all`/`--yolo` already elevated the session
+    - Pairs with `defaultMode: "autopilot"` to skip the autopilot permission confirmation entirely
+
+  `logLevel`: log level for CLI; defaults to "default". Set to "all" for debug logging.
+
+  `model`: AI model to use for Copilot CLI; can be changed with /model command or --model flag option.
+    - "claude-sonnet-5.5"
+    - "claude-sonnet-5"
+    - "claude-fable-5.1"
+    - "claude-fable-5"
+    - "claude-opus-5.5"
+    - "claude-opus-5"
+    - "claude-opus-4.8"
+    - "claude-opus-4.8-fast"
+    - "claude-sonnet-4.6"
+    - "claude-haiku-5.5"
+    - "claude-haiku-4.5"
+    - "gpt-6.1-sol"
+    - "gpt-6-sol"
+    - "gpt-6-luna"
+    - "gpt-6-astra"
+    - "gpt-5.6-sol"
+    - "gpt-5.6-terra"
+    - "gpt-5.6-luna"
+    - "gpt-5.5"
+    - "gpt-5.4"
+    - "gpt-5.4-mini"
+    - "gpt-5.3-codex"
+    - "gpt-5-mini"
+    - "mai-code-1.1-flash"
+    - "gemini-4-argon"
+    - "gemini-3.8-flash"
+    - "gemini-3.7-flash"
+    - "grok-4.7"
+    - "grok-4.6"
+    - "grok-4.5"
+    - "kimi-k3"
+
+  `contextTier`: context window tier for tiered-pricing models (e.g., "default" or "long_context").
+    - Can also be set with --context flag (overrides persisted setting)
+    - Can be changed with /model command (context tier picker appears for eligible models)
+
+  `autoTier`: routing profile used when the selected model is Auto. Normally "efficiency", "balance", or "intelligence"; server-advertised profiles are also accepted when dynamic Auto tiers are enabled. A stored "fast" profile is still read, for compatibility with other Copilot clients and with settings older CLI versions wrote, but the CLI cannot run on it and uses "balance" instead.
+    - Can also be set with --auto-tier (overrides the persisted setting)
+    - Configured interactively with /config model when Auto preferences are available
+
+  `subagents.agents.<agent-name>`: per-subagent model, effortLevel, and contextTier selection.
+    - Each field can be set to "inherit" to use the parent session's effective value
+    - Configure interactively with the /subagents command
+
+  Session limits are opt-in. They apply across the current conversation; /clear and /new reset used AI credits but keep the configured limit until you unset it.
+    - Run /limits with no arguments to open the interactive limits dialog
+    - Use /limits set max-ai-credits <credits> to set the AI credit limit
+    - Use --max-ai-credits to set an initial AI credit limit when starting the session
+    - The minimum AI credit limit is 30; lower values are too small for a useful CLI turn
+    - AI credit usage is known only after a model call returns, so one call can exceed the limit before the CLI blocks
+      the next model call
+
+  `mouse`: whether to enable mouse support in alt screen mode; defaults to `true`.
+    - Can also be set with --mouse or --no-mouse
+    - Using either flag persists the preference to config
+    - When disabled, scroll wheel and click events are not captured by the CLI
+
+  `renderMarkdown`: whether to render markdown in the terminal; defaults to `true`.
+
+  `inlineImages`: whether to render images inline using the Kitty graphics protocol; defaults to `true`.
+    - Only takes effect on terminals that support Kitty graphics (e.g. Ghostty, kitty, WezTerm), and inside tmux with passthrough enabled
+    - In a herdr pane, images are off by default: herdr draws them itself rather than passing them through, which additionally requires `experimental.kitty_graphics = true` in herdr's own config and cannot be detected from inside a pane. Set `COPILOT_INLINE_IMAGES_HERDR=1` to opt in once that setting is on
+    - When disabled, image attachments show a text placeholder instead
+
+  `inlineImageLiveWindow`: maximum number of inline images kept resident in the terminal at once (the most-recent N by timeline order); defaults to `50`.
+    - Images beyond N render as a text caption and have their data freed from the terminal, bounding its image memory in long, image-heavy sessions
+    - Set to `0` to disable the cap (keep every inline image resident)
+    - The `COPILOT_INLINE_IMAGE_LIMIT` environment variable overrides this setting
+
+  `scrollbar`: whether to show the scrollbar in scrollable views; defaults to `true`.
+    - When `false`, the scrollbar is hidden and its gutter is reclaimed so content uses the full terminal width.
+
+  `respectGitignore`: whether to exclude gitignored files from the `@` file mention picker; defaults to `true`.
+    - When `false`, the `@` picker includes files that are normally excluded by `.gitignore`
+    - Useful when sub-repositories or vendor directories are gitignored but still need to be referenced
+
+  `screenReader`: whether to enable screen reader optimizations; defaults to `false`.
+
+  `showTipsOnStartup`: whether to show a random command tip when the CLI starts; defaults to `true`.
+
+  `stream`: whether to enable streaming mode; defaults to `true`.
+
+  `streamerMode`: whether to enable streamer mode; defaults to `false`.
+    - Hides preview model names and quota details (useful for streaming or screen sharing)
+    - Toggle with the staff-only /streamer-mode command (persists across sessions)
+    - Note: this setting is not exposed via /settings because /streamer-mode is staff-gated
+
+  `statusLine`: configuration for a custom status line displayed below the input.
+    - `type`: optional; when set, must be "command"
+    - `command`: path to an executable script or a shell command that generates status line content.
+      Supports `~` (home directory) and environment variables (`$HOME`, `${HOME}`, `${VAR:-default}`).
+      Plain commands are run with the platform shell (`/bin/sh` on Unix-like systems, `cmd.exe` on Windows).
+      The command receives the current session status as JSON on stdin and should print the status line to stdout.
+    - `padding`: optional number of spaces to pad each line on the left
+    - `refreshInterval`: optional integer number of seconds between command re-runs (minimum `1`, maximum `2147483`); omit to refresh only on events
+
+  `tabs`: configuration for the home screen navigation tab bar (Session, Agents, Issues, Pull requests, Gists).
+    - `enabled`: whether to show the tab bar; defaults to `true`. Set to `false` to hide it entirely.
+    - `sort`: array of tab identifiers controlling display order. Accepted identifiers (case-insensitive): `copilot` (Session), `agents`, `issues`, `pull-requests`, `gists`. Tabs not listed keep their default order after the listed ones; unknown identifiers are ignored.
+    - `hide`: array of tab identifiers to hide (same identifiers as `sort`). Unknown identifiers are ignored; the `copilot` (Session) tab cannot be hidden.
+
+  `terminalProgress`: whether to emit terminal progress indicators (OSC 9;4) while the agent is working; defaults to `true`.
+    - Shows an indeterminate progress indicator in the terminal title bar or tab on supported emulators (Windows Terminal, iTerm2, Ghostty, ConEmu)
+    - Set to `false` to suppress these escape sequences on terminals that render them as visible artifacts
+
+  `theme`: color palette / theme for output; defaults to "github".
+    - One of: "default", "github", "dim", "high-contrast", "colorblind"
+    - Set via /settings theme <value>, or /theme <value> (deprecated)
+    - `colorMode` is a legacy alias for `theme` and still works for now
+
+  `trustedFolders`: list of folders where permission to read or execute files has been granted.
+
+  `updateTerminalTitle`: whether to update the terminal tab/window title with current intent; defaults to `true`.
+    - Shows what the agent is currently working on in the terminal title bar
+    - Only works on supported terminal emulators (xterm, iTerm, Windows Terminal, etc.)
+    - Can also be disabled via the `COPILOT_DISABLE_TERMINAL_TITLE` environment variable
+
+  `disableAllHooks`: whether to disable all hooks (repo-level and user-level); defaults to `false`.
+
+  `hooks`: inline hook definitions, keyed by event name (same schema as .github/hooks/*.json).
+    - In the user settings.json these act as user-level hooks; in repo settings.json they act as repo-level hooks
+
+  `ide.autoConnect`: whether to automatically connect to an IDE workspace on startup; defaults to `true`.
+    - When `false`, the CLI will not auto-connect to IDEs or watch for new IDE lock files
+    - You can still manually connect using the /ide command
+
+  `ide.openDiffOnEdit`: whether to open file edit diffs in the connected IDE for approval; defaults to `true`.
+    - When `false`, file edit approvals are shown only in the terminal
+    - The IDE connection is unaffected; diagnostics and selection features still work
+
+[exit=0]
+
+===== $ @github/copilot help permissions 
+Permissions:
+
+  The GitHub Copilot CLI provides granular control over tool, URL, and path permissions to ensure safe
+  operation. By default, the CLI restricts certain actions and prompts for user confirmation when necessary.
+  You can customize these permissions using the available command line options.
+
+  Tool Permissions:
+
+  Tool availability is controlled via the --available-tools and --excluded-tools options. The --available-tools option
+  disables all other tools; the --excluded-tools option disables only the specified tools. These filters decide which
+  tools the model can see.
+
+  Tool permissions are managed via --allow-tool, --deny-tool, and --allow-all-tools. Denial rules always take
+  precedence over allow rules, even --allow-all-tools. These flags control approval prompts and do not expose tools
+  that were filtered out by --available-tools/--excluded-tools.
+
+  The --allow-tool and --deny-tool parameters take a permission pattern of form kind(argument) where the argument
+  is optional and dependent on the kind. The following kinds are supported:
+
+    shell(command:*?)
+        Exactly matches a specific shell command to be run. If the command is omitted, all shell commands are allowed.
+        In most cases, this will be an exact match against the command name. To match prefixes, use the :* suffix.
+        This is particularly useful for git and gh commands, where approval is performed on a first-level subcommand
+        basis, e.g. "git push" or "gh pr create". To match all git commands, use "shell(git:*)". Wildcard matching is
+        performed on the stem of the command, so "shell(git:*)" will match "git push" but not "gitea".
+
+    write(path?)
+        Matches tools that create and modify files, except shell tool invocations. If the path is omitted, matches
+        all such writes. A relative path matches by trailing path components, so "write(.env)" matches a file named
+        ".env" in any directory, not only the one in the current working directory; use an absolute path such as
+        "write(/path/to/.env)" to scope the rule to a single location. To allow all shell redirections, set
+        --allow-all-tools.
+
+    <mcp-server-name>(tool-name?)
+        Exactly matches a specific tool from a specific MCP server, or all tools from that server if omitted.
+        The server name is the name of the MCP server as configured in your environment (e.g. "MyMCP").
+        The tool name is the name of the tool as registered with the MCP server (e.g. "my_tool").
+
+    url(domain-or-url?)
+        Matches URL access requests. Applies to the shell and web-fetch tools. If omitted, matches all URLs.
+        Supports exact URLs: "url(https://github.com)"
+        Supports protocol + domain patterns: "url(https://github.com)" or "url(https://*.github.com)"
+        Note: All patterns are protocol-aware. Domains without a protocol default to https://.
+
+  URL Permissions:
+
+  The --allow-url and --deny-url parameters accept URLs or protocol + domain patterns.
+  All URL permissions are protocol-aware - approving https://example.com does NOT allow http://example.com.
+  Patterns without an explicit protocol default to https://.
+
+    # Allow GitHub API access via HTTPS (default)
+    $ copilot --allow-url=github.com
+
+    # Allow HTTP access explicitly
+    $ copilot --allow-url=http://example.com
+
+    # Deny access to specific domain over HTTPS
+    $ copilot --deny-url=https://malicious-site.com
+
+    # Allow all URLs
+    $ copilot --allow-all-urls
+
+  Path Permissions:
+
+  By default, file access is restricted to paths within the current working directory and its subdirectories,
+  plus the system temporary directory. The --allow-all-paths flag disables this verification and allows access
+  to any path on the filesystem. The --disallow-temp-dir flag prevents automatic access to the system temporary
+  directory.
+
+    # Allow access to any path on the filesystem
+    $ copilot --allow-all-paths
+
+    # Prevent automatic access to the system temporary directory
+    $ copilot --disallow-temp-dir
+
+  Enabling All Permissions:
+
+  The --allow-all and --yolo flags are equivalent shortcuts that enable all permissions at once. They are
+  equivalent to specifying --allow-all-tools --allow-all-paths --allow-all-urls together. These flags are
+  useful for non-interactive scripts or when you want to run without any confirmation prompts.
+
+    # Enable all permissions with a single flag
+    $ copilot --allow-all
+    $ copilot --yolo
+
+    # Equivalent to:
+    $ copilot --allow-all-tools --allow-all-paths --allow-all-urls
+
+  It is expected that these permissions will be extended in the very near future to support wildcard matching and other richer functionality.
+[exit=0]
+
+===== $ @github/copilot help logging 
+Log Levels:
+
+  none     No logging output
+  error    Only error messages
+  warning  Error and warning messages
+  info     Error, warning, and info messages
+  debug    All messages including debug
+  all      Same as debug
+  default  Error, warning, and info messages (same as info)
+
+Examples:
+  # Set logging to ./logs
+  $ copilot --log-dir ./logs
+
+  # Enable debug level logging
+  $ copilot --log-level debug
+
+Note: For OpenTelemetry diagnostic logging (OTEL_LOG_LEVEL), see `copilot help monitoring`.
+
+[exit=0]
+
+===== $ @github/copilot mcp --help 
+Usage: copilot mcp <COMMAND>
+
+Manage MCP server configuration.
+
+MCP (Model Context Protocol) servers extend Copilot with additional tools
+and capabilities. Servers can be local (stdio) processes or remote (HTTP/SSE)
+endpoints.
+
+Configuration is loaded from multiple sources:
+  User       ~/.copilot/mcp-config.json
+  Workspace  .mcp.json or .github/mcp.json
+  Plugin     Installed plugins with MCP servers
+
+Use `copilot mcp list` to see all configured servers,
+or `copilot mcp get <name>` for details about a specific server.
+
+Commands:
+  list     List configured MCP servers
+  get      Show server details
+  add      Add an MCP server
+  remove   Remove an MCP server
+  enable   Enable an MCP server
+  disable  Disable an MCP server
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+[exit=0]
+
+===== $ @github/copilot sessions --help 
+Usage: copilot sessions <COMMAND>
+
+Manage saved sessions
+
+Commands:
+  import  Import a semantic session from JSONL
+
+Options:
+  -h, --help  Print help
+[exit=0]
+

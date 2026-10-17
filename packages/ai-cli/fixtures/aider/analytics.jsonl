@@ -1,0 +1,4 @@
+{"event": "launched", "properties": {}, "user_id": "3f6e2b1c-8d4a-4f7e-9c21-5b0a7d9e4f13", "time": 1792264300}
+{"event": "message_send_starting", "properties": {}, "user_id": "3f6e2b1c-8d4a-4f7e-9c21-5b0a7d9e4f13", "time": 1792264301}
+{"event": "message_send", "properties": {"main_model": "claude-sonnet-4-5", "weak_model": "claude-haiku-4-5", "editor_model": "claude-sonnet-4-5", "edit_format": "diff", "prompt_tokens": 2412, "completion_tokens": 61, "total_tokens": 2473, "cost": 0.008151, "total_cost": 0.008151}, "user_id": "3f6e2b1c-8d4a-4f7e-9c21-5b0a7d9e4f13", "time": 1792264304}
+{"event": "exit", "properties": {"reason": "Completed --message"}, "user_id": "3f6e2b1c-8d4a-4f7e-9c21-5b0a7d9e4f13", "time": 1792264304}
