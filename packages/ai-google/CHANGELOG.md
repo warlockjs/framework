@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Usage is marked `inputIncludesCache: true` (`promptTokenCount` includes cached content), and `complete()` / the streaming `done` chunk attach `usage.cost` when priced.
+
+- A built-in list price for `gemini-3.5-flash-lite` (`GOOGLE_MODEL_PRICING`, `googlePricingFor`), from the Gemini API pricing page as of 2026-10-17. Models priced by prompt length, by input modality, or with a scheduled price change stay unpriced.
+
+- 503 `UNAVAILABLE` throws `ProviderOverloadedError`. 400 and 500 failures are marked `billed: false`, as Google's billing docs state.
+
 - `providerOptions.google.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight. Vertex counts system instructions and tools; unsupported Developer API system/tool and cached-content counts fail explicitly.
 

@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Chat calls inherit `providerOptions.openai.body` from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native `countTokens` remains absent; `sdk.count(text)` is an offline estimate.
 
+### Fixed
+
+- `GROQ_DEFAULT_PRICING` (now exported) matches Groq's published prices (2026-10-17): `openai/gpt-oss-120b` output is 0.60, the gpt-oss models get their 50% cache-read rate, and `qwen/qwen3.8-27b` is added.
+
+### Upgrading
+
+- **BREAKING** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` and `deepseek-r1-distill-llama-70b` no longer have built-in prices (Groq publishes none), so a USD budget on them rejects the run as unpriced. Pass `pricing` for them.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed

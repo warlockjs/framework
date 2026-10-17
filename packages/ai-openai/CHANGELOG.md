@@ -14,8 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Built-in OpenAI list prices (`OPENAI_MODEL_PRICING`, `openAIPricingFor`) for flat-priced models, from OpenAI's pricing page as of 2026-10-17, applied only on the `"openai"` provider label and exact ids. Models priced by prompt length stay unpriced.
+
+- Usage is marked `inputIncludesCache: true`, reports Chat Completions `prompt_tokens_details.cache_write_tokens`, and `complete()` / the streaming `done` chunk attach `usage.cost` when priced.
+
+- 503 / `server_is_overloaded` throws `ProviderOverloadedError`; wrapped errors carry `status`, `billed` and `retryable`.
+
 - `providerOptions.openai.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Responses models expose native input-token preflight through `countTokens()`; Chat Completions keeps offline estimates separate.
+
+### Changed
+
+- `promptCacheKey` is sent as `prompt_cache_key` for the `"xai"` and `"mistral"` provider labels as well, since both endpoints document the field. `prompt_cache_retention` and explicit cache breakpoints stay OpenAI-only; other labels receive no cache fields.
 
 ## 5.30.0 - 2026-10-16
 

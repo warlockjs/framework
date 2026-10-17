@@ -8,12 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Usage is marked `inputIncludesCache: false` (Anthropic's `input_tokens` excludes cache reads and writes), and 1-hour cache writes are reported in `cacheWrite1hTokens` from `cache_creation.ephemeral_1h_input_tokens` — or, when the breakdown is missing, from a request whose every cache marker asked for `ttl: "1h"`. Cost now bills reads and writes once each, at their own rates.
+
+- Caller pricing that omits cache-write rates gets Anthropic's documented multipliers (5-minute writes 1.25x input, 1-hour writes 2x) instead of billing writes at nothing.
+
 - `complete()` always builds a non-streaming request, including when an indexed `stream` option is supplied.
 
 ### Added
 
+- Built-in Claude API list prices (`ANTHROPIC_MODEL_PRICING`, `anthropicPricingFor`, `withAnthropicCacheWriteRates`), from Anthropic's pricing page as of 2026-10-17, used when neither the model nor the SDK registry is priced. Dated snapshot ids resolve to their alias. Claude Haiku 5.5 (priced by prompt length) is left unpriced.
+
+- `complete()` and the streaming `done` chunk attach `usage.cost` when the model is priced.
+
+- 529 / `overloaded_error` responses and mid-stream overload events throw `ProviderOverloadedError`; every wrapped error carries `status`, `billed` and `retryable`.
+
 - `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
 - Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.
+
+### Upgrading
+
+- Claude models are now priced by default, so `Usage.cost` appears and USD budgets enforce on them without extra configuration. Pass `pricing` to keep contract rates.
 
 ## 5.30.0 - 2026-10-16
 

@@ -12,15 +12,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `computeCost` bills Anthropic and Bedrock prompt caching correctly. Their `input` excludes cache reads and writes, so cache reads are no longer subtracted from it (which could floor fresh input at 0), and cache writes are now charged: at `ModelPricing.cacheWrite`, with the 1-hour share at `cacheWrite1h`. OpenAI-style usage, where `input` includes cached tokens, is billed as before.
+
+- Batch, planner and fallback-model usage rollups use the shared `mergeUsage`, so they keep every usage channel and the cache semantics flag.
+
 - Automatic compaction preserves the original execution input during output repair and durable resume, records its updated snapshot index, and frames a first-turn summary as user context. Legacy snapshots with missing or ambiguous input skip compaction safely.
 
 ### Upgrading
+
+- **BREAKING** `AIErrorCode` gained `PROVIDER_OVERLOADED`, and provider overloads (Anthropic 529, OpenAI and compatible 503, Gemini 503, Bedrock `ServiceUnavailableException`) now throw `ProviderOverloadedError` instead of a plain `ProviderError` with `PROVIDER_ERROR`. It still extends `ProviderError`; code that matches on `PROVIDER_ERROR` for these cases, or switches exhaustively over `AIErrorCode`, needs the new case. Custom `fallbackModel({ retryOn: [...] })` lists should add it.
+
+- Cost totals now include cache writes, in the new `cost.cacheWrite` channel. Replace hand-written sums such as `cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0)` with `totalCost(cost)`. Anthropic and Bedrock runs report higher, correct, costs. Set `cacheWrite` instead of the deprecated `cachedOutput` rate.
 
 - When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.
 
 - Sub-agents also use the concurrent tool default introduced in 5.30. Callers upgrading from 5.29 whose tools need ordered side effects can now set `spawnSubAgent({ toolDispatch: "sequential", ... })`.
 
 ### Added
+
+- `Usage.inputIncludesCache` says whether `input` contains the cache counters (set by each first-party adapter; absent reads as `true`), and `Usage.cacheWrite1hTokens` counts 1-hour cache writes. Usage merged across providers with different semantics is normalised to `true`.
+
+- `ModelPricing.cacheWrite` and `cacheWrite1h` (USD per 1M tokens written to the cache, default and 1-hour lifetime). Cost breakdowns carry cache-write spend in `cost.cacheWrite`; `computeCost` also bills `reasoningTokens` at `ModelPricing.reasoning` when that rate is set.
+
+- `totalCost(cost)` sums every channel of a cost breakdown; `attachCost(usage, pricing)` attaches it to a usage. First-party adapters now attach `usage.cost` to `model.complete()` and the streaming `done` chunk when the model is priced, so side calls outside an agent are costed.
+
+- `ProviderError.status` (HTTP status), `.billed` (`true | false | "unknown"`, failing closed to `"unknown"` unless the call never reached a billable account or the provider documents the status as free) and `.retryable`. `ProviderErrorOptions` and `ProviderBilled` are exported.
+
+- `ProviderOverloadedError` with code `PROVIDER_OVERLOADED` (always retryable) for provider overloads; `fallbackModel` fails over on it by default.
+
+- `estimateInputTokens(messages, options)` — an offline estimate of a call's input tokens (text, tool calls, tool schemas, response schema) — and `countInputTokens(model, messages, options)`, which uses the model's native `countTokens` when it has one and reports `source: "native" | "estimate"`.
+
+- `budget({ reserve: { outputTokens, inputTokens? } })`: reserve each trip's worst case before the call, commit the actual usage after it, release the reservation when the call fails. Applies to the run caps and, atomically through the store, to `scoped` ledgers, so concurrent runs cannot jointly overspend. `BudgetPricing` entries may now be a `ModelPricing` (cache rates included) besides `{ inputPer1K, outputPer1K }`.
+
+- `measureTools(tools, { model, mode })` reports the input tokens a tool list adds per call, per tool and in total, counted natively when the model can and estimated otherwise. Registered as `ai.tools.measure` by `@warlock.js/ai-tools`.
+
+- Compact tool schemas: `compactJsonSchema()`, `extractJsonSchema(schema, { compact })`, `withCompactJsonSchema()`, `compactToolSchemas()` and the `toolSchemas: "full" | "compact"` option on `ai.agent()` and `execute()`. Compact schemas drop annotations (descriptions, titles, examples, defaults) and collapse const unions to `enum`; validation is unchanged.
+
+- `createToolContext({ artifacts?, signal? })` builds the `ToolContext` for invoking a tool outside the agent loop.
 
 - Regression fixtures assert required model and identifier segments before reading them under stricter indexed-access checks; the compiler error budget falls by ten.
 

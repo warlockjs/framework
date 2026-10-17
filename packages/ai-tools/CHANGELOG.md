@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Added
+
+- `ai.mcp(server, { signal })` binds the client to a run: when the signal aborts the client closes its transport, and later handshakes and tool calls fail with an `McpTransportError` of type `"closed"`. Every `tools/call` honors both the client signal and the per-call `ctx.signal`.
+
+- `ai.tools.measure(tools, { model, mode })` — the `measureTools` helper from `@warlock.js/ai` — measures the input tokens a tool list costs per call.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed

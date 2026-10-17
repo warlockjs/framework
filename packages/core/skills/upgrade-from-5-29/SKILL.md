@@ -206,6 +206,34 @@ Built-in `/health` and `/ready` routes are exempt by default; set
 Development wildcard dispatch has separate
 per-route handling; check route overrides in both environments.
 
+## 5.30 to 5.31 AI cost, prices and provider errors
+
+5.31 bills prompt caching per provider. Anthropic and Bedrock usage is marked
+`inputIncludesCache: false`, cache writes are charged (in the new
+`cost.cacheWrite` channel, 1-hour writes at `cacheWrite1h`), so their reported
+costs rise to the correct figure. Replace hand-summed cost totals with
+`totalCost`, and set `cacheWrite` instead of the deprecated `cachedOutput` rate:
+
+```ts
+import { totalCost, type Usage } from "@warlock.js/ai";
+
+export function runCostUsd(usage: Usage): number | undefined {
+  return totalCost(usage.cost);
+}
+```
+
+Anthropic, OpenAI, Gemini and Claude-on-Bedrock models now ship verified list
+prices, so `usage.cost` appears and USD budgets enforce without configuration.
+Some old defaults were removed because the vendor no longer publishes a flat
+price: Groq's Llama models, DeepSeek's `deepseek-chat` / `deepseek-reasoner`,
+and Mistral's Pixtral / Magistral. A USD budget on those now rejects the run as
+unpriced; pass `pricing`. DeepSeek defaults to its peak rates.
+
+Provider overloads now throw `ProviderOverloadedError` (`PROVIDER_OVERLOADED`)
+instead of a plain `ProviderError`; update exhaustive `AIErrorCode` switches and
+custom `fallbackModel({ retryOn })` lists. Bedrock calls with a `cacheControl`
+breakpoint now also cache the system prompt and (Claude) tool definitions.
+
 ## Verify the application paths that changed
 
 Run the app's type check, its logger channel tests, any tools with ordered side

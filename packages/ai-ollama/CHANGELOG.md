@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `complete()` and the streaming `done` chunk attach `usage.cost` when the model is given `pricing`.
+
 - `providerOptions.ollama.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 
 ## 5.30.0 - 2026-10-16

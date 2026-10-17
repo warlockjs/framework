@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Usage is marked `inputIncludesCache: false` (Converse `inputTokens` excludes cache reads and writes) and reports 1-hour cache writes from `cacheDetails` in `cacheWrite1hTokens`, so cost bills each cache token once at its own rate.
+
 - Converse conversion compiles with strict indexed-access checks while preserving empty and system-only histories.
 
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
@@ -16,8 +18,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- With a `cacheControl` breakpoint, a `cachePoint` is also placed after the system prompt and, for Claude, after the tool definitions — the prefix segments Bedrock caches in `tools` → `system` → `messages` order. `ttl: "1h"` (per call, or the new `promptCacheTtl` model option) is sent only to models that accept it.
+
+- Built-in Claude prices for `global.` and `us.` inference profiles (`BEDROCK_GLOBAL_PRICING`, `BEDROCK_US_PRICING`, `bedrockPricingFor`), from AWS's Bedrock price list as of 2026-10-17; caller pricing for Claude models gets the 1.25x / 2x cache-write rates filled (`withClaudeCacheWriteRates`). `complete()` and the streaming `done` chunk attach `usage.cost` when priced.
+
+- Claude 5 families and Nova 2 Lite are recognised as prompt-caching capable.
+
+- `ServiceUnavailableException` throws `ProviderOverloadedError`; wrapped errors carry `status`, `billed` and `retryable`.
+
 - `providerOptions.bedrock.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight using the generation request's Converse conversation, tools and additional model fields.
+
+### Upgrading
+
+- Calls that ask for `cacheControl` breakpoints now also write the system prompt and (Claude) tool definitions to the cache. Writes cost more than plain input on the first call; repeated prefixes then read at the cache rate.
 
 ## 5.30.0 - 2026-10-16
 

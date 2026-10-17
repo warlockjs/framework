@@ -70,6 +70,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The `upgrade-from-5-29` skill covers the 5.31 AI cost changes: per-provider cache billing, `totalCost`, the new built-in model prices and removed defaults, and `ProviderOverloadedError`.
+
 - Static file serving loads `@fastify/static` on the first file request instead of at boot, including existing public folders and `router.directory` mounts. The directory globber loads at boot only for `wildcard: false`. Concurrent first requests share initialization; upstream headers, ranges, listings, decorators and exact routes for `wildcard: false` are preserved.
 
 - **BREAKING:** Node.js 22.15 or newer is required (`engines.node: ">=22.15"`): the `warlock` CLI loads TypeScript through `module.registerHooks`, which Node added in 22.15.

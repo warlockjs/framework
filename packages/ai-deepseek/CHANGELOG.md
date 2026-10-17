@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Chat calls inherit `providerOptions.openai.body` from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native `countTokens` remains absent; `sdk.count(text)` is an offline estimate.
 
+### Fixed
+
+- `DEEPSEEK_DEFAULT_PRICING` (now exported) matches DeepSeek's price list (2026-10-17) for `deepseek-flash`, `deepseek-v4-flash` and `deepseek-v4-pro`. DeepSeek bills by time of day; the defaults are the peak rates, an upper bound, and `DEEPSEEK_OFF_PEAK_PRICING` holds the off-peak rates.
+
+### Upgrading
+
+- **BREAKING** `deepseek-chat` and `deepseek-reasoner` (discontinued by DeepSeek) no longer have built-in prices, so a USD budget on them rejects the run as unpriced. Reported costs for the remaining models rise to the peak rates; pass `pricing: DEEPSEEK_OFF_PEAK_PRICING` when you run off-peak.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed
