@@ -6651,6 +6651,12 @@ In both cases the guard's scope matches the resource's scope, which is the point
 
 ## Gotchas
 
+When a unit test copies TypeScript source into a temporary directory for a fresh
+Node process, preserve the source package's module mode. ESM fixtures need a
+`package.json` with `"type": "module"`; otherwise `tsx` can load the copy as
+CommonJS and named exports fail before the behavior under test runs. Assert the
+child process exit status with its captured stderr before checking stdout.
+
 - **`setupTest` runs per test file, not per worker** — every version of this skill through 4.13.0 said otherwise. **You pay one framework bootstrap per test file**, which is what 4.13.0 already cost; the difference is that it is now a chosen lifetime rather than a side effect of a module flag resetting.
 - ⛔ **Never delete the `afterAll(teardownTest)` from your setup file.** Without it nothing closes what `setupTest` opened, and the connectors outlive the file that started them.
 - ⛔ **You can't swap the connector set by calling `setupTest` again — it rejects now.** Through 4.13.0 the second call was silently ignored. Tear down first, or don't call it.
