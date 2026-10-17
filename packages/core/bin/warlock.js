@@ -96,8 +96,7 @@ async function bootFromSource() {
     process.exit(1);
   }
 
-  const { readFileSync } = await import("node:fs");
-  const { transformSync } = await import("esbuild");
+  const { register } = await import("node:module");
   const { getTsconfig, resolvePathAlias } = await import("get-tsconfig");
 
   // Same target the dev loader and the production builder pin, so a file
@@ -105,8 +104,6 @@ async function bootFromSource() {
   // get anywhere else in the toolchain. Drifting from it would make the CLI a
   // third, subtly different dialect.
   const TRANSPILE_TARGET = "node22";
-  const TS_FILE = /\.(ts|tsx|mts|cts)$/;
-  const VERSION_QUERY = /\?v=\d+$/;
 
   // Read from cwd, not from core: `jsx`, `experimentalDecorators` and friends
   // are the *app's* call, and this is the same source of truth the dev
@@ -117,51 +114,38 @@ async function bootFromSource() {
   });
 
   /**
-   * Handover switch. Verified behaviour: in-thread hooks run *before*
-   * `register()` worker hooks and delegate down the chain. So once the dev
-   * server registers its own loader, these hooks would still intercept every
-   * `.ts` first and short-circuit — silently bypassing the dev loader's
-   * transpile cache and, worse, its `?v=N` HMR stamping.
+   * Handover switch for the in-thread `resolve` hook below. Verified
+   * behaviour: in-thread hooks run *before* `register()` worker hooks and
+   * delegate down the chain, so once the dev server registers its own loader
+   * this hook would still resolve every `.ts` first and short-circuit,
+   * bypassing the dev loader's `?v=N` HMR stamping.
    *
-   * Setting `active = false` makes both hooks pure pass-throughs, handing the
-   * TypeScript path over intact. `registerLoader()` should flip it just before
-   * it calls `register()`; until it does, these hooks stay in charge, which is
-   * the correct default for every non-dev command.
+   * Setting `active = false` makes it a pure pass-through. `registerLoader()`
+   * should flip it just before it calls `register()`; until it does, this
+   * hook stays in charge, which is the correct default for every non-dev
+   * command. (The `load` hook needs no switch: it is a worker hook, and the
+   * dev loader's worker hooks, registered later, run before it.)
    */
   const bootstrapLoader = { active: true };
   globalThis.__warlockBootstrapLoader = bootstrapLoader;
 
   /**
-   * `load` hook. In-thread (`registerHooks`) rather than the worker-thread
-   * `register()`, which is what lets stage 2 below exist at all: a worker hook
-   * could not hand a transpiled function back to this thread.
+   * `load` hook — transpiles TypeScript with esbuild. It runs on Node's
+   * loader worker thread (`register()`), NOT in this thread
+   * (`registerHooks()`): on Node 22.15 an in-thread `load` hook makes a
+   * CommonJS package that `require()`s a file which an ES module also imports
+   * receive that file's empty, not-yet-run `exports`, which crashed every
+   * booting command inside `dayjs.extend`. See `source-load-hook.mjs`.
    */
-  function load(url, context, nextLoad) {
-    const cleanUrl = url.replace(VERSION_QUERY, "");
-
-    // Not TypeScript → not ours. npm `.js`, `node:`, JSON all fall through.
-    if (!bootstrapLoader.active || !TS_FILE.test(cleanUrl)) return nextLoad(url, context);
-
-    const absolutePath = fileURLToPath(cleanUrl);
-    const { code } = transformSync(readFileSync(absolutePath, "utf8"), {
-      loader: absolutePath.endsWith(".tsx") ? "tsx" : "ts",
-      format: "esm",
-      target: TRANSPILE_TARGET,
-      sourcefile: absolutePath,
-      sourcemap: "inline",
-      tsconfigRaw,
-    });
-
-    return { format: "module", source: code, shortCircuit: true };
-  }
-
-  registerHooks({ load });
+  register(pathToFileURL(path.join(binDir, "source-load-hook.mjs")).href, {
+    data: { target: TRANSPILE_TARGET, tsconfigRaw },
+  });
 
   // Stage 2 — the reuse. With `load` live, core's own resolver can be pulled
   // in as TypeScript. It is imported by exact absolute path on purpose: it is
   // a leaf module whose only import is `node:url`, so it needs no extension
   // probing to load, which is precisely the thing we don't have yet.
-  const { ownResolve } = await import(
+  const { ownResolve, probeFile } = await import(
     pathToFileURL(path.join(binDir, "..", "src", "dev-server", "loader", "own-resolver.ts")).href
   );
 
@@ -176,6 +160,14 @@ async function bootFromSource() {
    * `null` for (bare npm, `node:`, `file:`) falls through to Node's default,
    * which keeps `exports`/`node_modules` semantics intact.
    *
+   * One fallback on top: a bare subpath of a package consumed as source, such
+   * as `@warlock.js/core/net` (imported by `@warlock.js/ai`). Core declares no
+   * `exports` map in source form, so Node's default resolver lands on the
+   * `net/` directory and refuses it (`ERR_UNSUPPORTED_DIR_IMPORT`); the
+   * published package maps the subpath to its built entry instead. The
+   * directory's `index.ts` is what TypeScript and vitest resolve the same
+   * specifier to, so that is what this resolves it to as well.
+   *
    * The dev loader's version of this also stamps `?v=N` for HMR. That is
    * deliberately absent: the CLI process has no watcher, and the dev server
    * registers its own full loader when it boots.
@@ -188,7 +180,30 @@ async function bootFromSource() {
     // Producing the URL ourselves means `nextResolve` was never called, so the
     // chain has to be short-circuited explicitly or Node raises
     // ERR_LOADER_CHAIN_INCOMPLETE.
-    return owned ? { url: owned, shortCircuit: true } : nextResolve(specifier, context);
+    if (owned) return { url: owned, shortCircuit: true };
+
+    try {
+      return nextResolve(specifier, context);
+    } catch (error) {
+      const index = bootstrapLoader.active ? directoryIndexOf(error) : null;
+
+      if (index) return { url: index, shortCircuit: true };
+
+      throw error;
+    }
+  }
+
+  /**
+   * The `index.ts` (or `.tsx`/`.js`/`.jsx`) inside the directory Node refused
+   * to import, as a `file:` URL, or `null` when the error is anything else.
+   */
+  function directoryIndexOf(error) {
+    if (error?.code !== "ERR_UNSUPPORTED_DIR_IMPORT" || typeof error.url !== "string") return null;
+
+    const directory = fileURLToPath(error.url).replace(/\\/g, "/").replace(/\/$/, "");
+    const hit = probeFile(`${directory}/index`, existsSync);
+
+    return hit ? pathToFileURL(hit).href : null;
   }
 
   registerHooks({ resolve });

@@ -64,6 +64,24 @@ When present, `tools/release/sources/@warlock.js/**` holds copies of package sou
 - **Reject a bad value; never quietly repair it.**
 - Watch for **silent** failure modes specifically: synchronous `events.trigger` swallowing async rejections, `process.exit(0)` erasing them, esbuild silently dropping CSS imports, a test run that finds zero files and still exits 0.
 
+## Running the `warlock` CLI against a fixture app
+
+With no `esm/` build next to it, `packages/core/bin/warlock.js` runs core from TypeScript source. That is the supported way to try a command (`inspect`, `doctor`, `routes`, `mcp`, `dev`) against a throwaway app:
+
+```sh
+fx=$(mktemp -d)                        # outside the repository
+mkdir -p "$fx/src/app/ping" "$fx/node_modules/@warlock.js"
+echo '{"name":"fx","private":true,"type":"module"}' > "$fx/package.json"
+printf 'import { defineConfig } from "@warlock.js/core";\nexport default defineConfig({});\n' > "$fx/warlock.config.ts"
+printf 'import { router } from "@warlock.js/core";\nrouter.get("/ping", () => ({ ok: true }));\n' > "$fx/src/app/ping/routes.ts"
+for p in core cache logger; do ln -s "$PWD/packages/$p" "$fx/node_modules/@warlock.js/$p"; done
+(cd "$fx" && node "$OLDPWD/packages/core/bin/warlock.js" inspect --json)
+```
+
+- Symlinks are enough: each linked package resolves its own dependencies from this repository's `node_modules`. Link every `@warlock.js/*` package the app's own files import.
+- **Test on Node 22.15**, the floor, not only on the newest Node. Loader-hook behaviour differs between them: an in-thread `load` hook (`module.registerHooks`) broke every booting command on 22.15 with `TypeError: t is not a function` from `dayjs.extend`, and the same code ran on 26.3. The bin's TypeScript `load` hook lives in a `module.register()` worker (`bin/source-load-hook.mjs`) for that reason; keep it there.
+- `tests/integration/cli/source-cli-boot.test.ts` builds this fixture and runs `inspect --json` against it.
+
 ## Repo conventions
 
 - **No `.js` extensions in import paths.**

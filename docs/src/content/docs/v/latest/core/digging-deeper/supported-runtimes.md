@@ -94,6 +94,22 @@ node packages/core/tests/acceptance/run-runtime-acceptance.mjs --runtimes=node,b
 
 Database drivers, Redis, queues, sockets and native add-ons such as `sharp` are not part of the fixture. They go through the same compatibility layers, but they have not been verified on Bun or Deno.
 
+## Running the CLI from a source checkout
+
+The published `@warlock.js/core` ships compiled JavaScript, and `bin/warlock.js` loads it with no loader at all. A checkout of the framework repository has only TypeScript, so there the bin compiles the CLI on the fly: it resolves TypeScript paths in the main thread and transpiles `.ts` files with esbuild in a `module.register()` loader worker. That needs Node.js 22.15 or newer and is refused on Bun and Deno.
+
+To run a checkout's CLI against an app, link the packages into the app's `node_modules` (or use `pnpm link`), then call the bin from the app directory:
+
+```bash
+mkdir -p node_modules/@warlock.js
+ln -s /path/to/framework/packages/core node_modules/@warlock.js/core
+ln -s /path/to/framework/packages/cache node_modules/@warlock.js/cache
+ln -s /path/to/framework/packages/logger node_modules/@warlock.js/logger
+node /path/to/framework/packages/core/bin/warlock.js inspect --json
+```
+
+Bare subpaths such as `@warlock.js/core/net` resolve to the package's `net/index.ts`, the same file TypeScript and Vitest use.
+
 ## See also
 
 - [Deployment & production](./deployment.md) — what `warlock build` emits and how `warlock start` runs it.
