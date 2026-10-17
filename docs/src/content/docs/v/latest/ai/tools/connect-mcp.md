@@ -1,6 +1,6 @@
 ---
 title: "Connect MCP"
-description: ai.mcp from @warlock.js/ai-tools — consume any MCP server's tools as agent tools, and expose a Warlock agent AS an MCP server.
+description: ai.mcp from @warlock.js/ai-tools — consume any MCP server's tools as agent tools, and expose a Warlock agent AS an MCP server over stdio or authenticated Streamable HTTP.
 sidebar:
   order: 3
   label: "Connect MCP"
@@ -123,9 +123,10 @@ try {
 
 ## Direction B — expose a Warlock primitive AS an MCP server
 
-`ai.mcp.serve(source, options)` turns a local set of `ToolContract`s into a Model Context Protocol server — so Cursor, Claude Desktop, or any MCP client can call your Warlock tools / agent over the wire.
+`ai.mcp.serve(source, options)` turns a local set of `ToolContract`s into a Model Context Protocol server — so Cursor, Claude Desktop, or any MCP client can call your Warlock tools / agent over the wire. It serves over **stdio** (the default) or the MCP **Streamable HTTP** transport.
 
 ```ts
+// stdio — for a client that spawns your process
 const server = ai.mcp.serve([ai.tools.calculator(), ai.tools.dateTime()], {
   name: "warlock-utils",
   transport: { type: "stdio" },
@@ -136,7 +137,21 @@ await server.start();
 await server.stop();
 ```
 
-### The `source` — array or anything with `tools()`
+```ts
+// http — a loopback endpoint guarded by a bearer token
+const { url, close } = await ai.mcp
+  .serve([ai.tools.calculator(), ai.tools.dateTime()], {
+    name: "warlock-utils",
+    transport: { type: "http", auth: { bearer: process.env.MCP_TOKEN ?? "" } },
+  })
+  .start();
+
+console.log(url); // http://127.0.0.1:53211/mcp — port 0 (the default) picks a free port
+
+await close(); // drains in-flight calls, then frees the port
+```
+
+### The `source` — array, anything with `tools()`, or named groups
 
 ```ts
 // A literal array of contracts:
@@ -144,9 +159,30 @@ ai.mcp.serve([calc, dt], { name: "utils" });
 
 // Anything that can enumerate its ToolContracts — e.g. a workspace:
 ai.mcp.serve({ tools: () => ws.tools.all() }, { name: "acme-workspace" });
+
+// Several named tool sets:
+ai.mcp.serve({ groups: { github: githubAgent, files: [readFile, writeFile] } }, { name: "dev" });
 ```
 
-The tools are snapshotted at construction (`source.tools()` is called once), so a stable surface is advertised for the life of the server.
+The tools are snapshotted when `serve()` is called (`source.tools()` runs once), so a stable surface is advertised for the life of the server.
+
+### Tool-name collisions
+
+Every exposed tool name must be unique. Two tools with the same name throw `McpServeError` (`type: "collision"`) **when `serve()` is called** — nothing is served with an ambiguous name. To serve same-named tools from different sets, use a grouped source and opt into prefixing:
+
+```ts
+ai.mcp.serve(
+  { groups: { prod: [searchTool], staging: [searchTool] } },
+  { name: "search", prefixToolNames: true }, // exposes prod_search and staging_search
+);
+
+ai.mcp.serve(
+  { groups: { github: githubAgent } },
+  { name: "dev", prefixToolNames: (group, tool) => `${group}.${tool}` }, // github.create_issue
+);
+```
+
+`prefixToolNames` on an ungrouped source throws `McpServeError` (`type: "config"`). Duplicate resource URIs and prompt names are collisions too.
 
 ### Serve options
 
@@ -154,8 +190,11 @@ The tools are snapshotted at construction (`source.tools()` is called once), so 
 ai.mcp.serve(source, {
   name: "warlock-utils", // advertised in the initialize response (required)
   version: "1.0.0", // default: the package version
-  transport: { type: "stdio" }, // default: stdio
+  transport: { type: "stdio" }, // default: stdio — or { type: "http", … } below
   schemaTarget: "draft-2020-12", // JSON-Schema dialect for each tool's inputSchema
+  prefixToolNames: false, // grouped sources only — see above
+  resources: [], // optional — see "Resources and prompts"
+  prompts: [], // optional
 });
 ```
 
@@ -163,29 +202,146 @@ ai.mcp.serve(source, {
 
 ### How the protocol maps
 
-- **`initialize`** → advertises `{ name, version }` and `capabilities: { tools: {} }`.
-- **`tools/list`** → one descriptor per contract; each tool's `inputSchema` is produced by `extractJsonSchema(contract.input, { target: schemaTarget })`.
+- **`initialize`** → advertises `{ name, version }` and `capabilities: { tools: {} }` (plus `resources` / `prompts` when configured). The protocol version is negotiated: the client's requested version is echoed when the server speaks it (`2025-11-25`, `2025-06-18`, `2025-03-26` — exported as `SUPPORTED_PROTOCOL_VERSIONS`), otherwise the newest is offered.
+- **`tools/list`** → one descriptor per tool; each `inputSchema` is produced by `extractJsonSchema(contract.input, { target: schemaTarget })`.
 - **`tools/call`** → routes to the named contract's `invoke()` and maps the **never-throwing** result: `data` becomes a `{ type: "text" }` content block (a string is sent verbatim, anything else is JSON-stringified), and `error` becomes an `isError: true` result. So a failing tool surfaces as a normal MCP tool error — the server never crashes on it. An unknown tool name answers with a JSON-RPC error.
+- **`ping`** → `{}`.
 
-### Transport — stdio is auto-pumped; HTTP is host-owned
+### Serving over HTTP
 
 ```ts
-{ type: "stdio" }            // default — reads JSON-RPC lines from process.stdin, writes to stdout
-{ type: "http", port: 8080 } // accepted in options, but start() does NOT bind a socket
+const server = ai.mcp.serve(tools, {
+  name: "session-tools",
+  transport: {
+    type: "http",
+    host: "127.0.0.1", // default — loopback only
+    port: 0, // default — a free ephemeral port
+    path: "/mcp", // default — the single MCP endpoint
+    auth: { bearer: sessionToken }, // required off loopback
+    allowedOrigins: ["https://app.example.com"], // browser origins besides loopback
+    maxBodyBytes: 1_048_576, // default 1 MiB — larger bodies get 413
+    drainTimeoutMs: 5_000, // how long close() waits for in-flight calls
+  },
+});
+
+const { url, close } = await server.start();
 ```
 
-`start()` over `stdio` wires a `node:readline` line reader on `process.stdin` and writes one-line JSON-RPC responses to `process.stdout` (notifications without an `id` are ignored). **Serving over HTTP is left to a server you own** — `start()` rejects an `http` transport. For that path, drive the pure protocol core yourself with `createServeHandler`:
+`start()` resolves once the port is bound with `{ url, close }`; calling it again while running resolves the same handle. `close()` (or `server.stop()`) stops accepting connections, lets in-flight calls finish, and frees the port. A call still running after `drainTimeoutMs` sees its `ctx.signal` aborted and its connection is dropped. The server can be started again afterwards.
+
+Each server is one endpoint, so a host can give every agent session its own loopback URL and token:
+
+```ts
+const token = randomBytes(32).toString("hex");
+const session = await ai.mcp
+  .serve(sessionTools, { name: "session", transport: { type: "http", auth: { bearer: token } } })
+  .start();
+
+spawnAgentCli({ mcpUrl: session.url, mcpToken: token });
+// on session end:
+await session.close();
+```
+
+The transport follows the [MCP Streamable HTTP specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and is **stateless**: each POST carries one JSON-RPC message and a request is answered with `application/json`; notifications and responses get `202 Accepted`; no `MCP-Session-Id` is issued, so `GET` (server-initiated stream) and `DELETE` answer `405`. JSON-RPC batches get `400`, an unsupported `MCP-Protocol-Version` header gets `400`, a non-JSON `Content-Type` gets `415`. It is built on `node:http` and needs no extra dependency. Any MCP client works — including the official SDK's `StreamableHTTPClientTransport` and this package's own `ai.mcp({ type: "http", url, headers })`.
+
+### Authentication
+
+```ts
+// Bearer token(s) — several tokens allow rotation without downtime
+transport: { type: "http", auth: { bearer: ["current-token", "previous-token"] } }
+
+// A custom check — return true to allow
+transport: {
+  type: "http",
+  auth: { authorize: async (request) => sessions.isValid(request.headers["x-session-id"]) },
+}
+```
+
+- `bearer` matches `Authorization: Bearer <token>`. Tokens are compared in constant time over SHA-256 digests with `crypto.timingSafeEqual`, so neither a token's content nor its length leaks through timing. Empty tokens are refused at `start()`.
+- `authorize(request)` receives `{ method, path, headers, remoteAddress }` (lower-cased header names). A hook that throws denies the request.
+- With both set, a request must pass both.
+- A failed check answers `401` (with `WWW-Authenticate: Bearer` when a bearer token is configured) before the body is read.
+
+### Tools see the request headers
+
+Over HTTP every tool call receives the inbound request on `ctx.request` — useful for a per-user token, a tenant id or a trace id the tool forwards downstream. Nothing on `ctx.request` reaches the model.
+
+```ts
+const lookup = ai.tool({
+  name: "lookup_order",
+  description: "Find an order",
+  input: v.object({ id: v.string() }),
+  execute: async ({ id }, ctx) => {
+    const tenant = ctx?.request?.headers["x-tenant-id"];
+    return orders.find(tenant, id);
+  },
+});
+```
+
+Tools see every header the client sent, including `authorization`. Over stdio `ctx.request` is absent.
+
+### Resources and prompts
+
+Resources and prompts are optional. Configuring either turns on its MCP capability:
+
+```ts
+ai.mcp.serve(tools, {
+  name: "handbook",
+  resources: [
+    {
+      uri: "docs://handbook",
+      name: "handbook",
+      mimeType: "text/markdown",
+      read: () => readFile("handbook.md", "utf8"), // string → text, Uint8Array → base64 blob
+    },
+  ],
+  prompts: [
+    {
+      name: "review",
+      description: "Review a diff",
+      arguments: [{ name: "diff", required: true }],
+      get: ({ diff }) => `Review this diff:\n${diff}`, // a string becomes one user message
+    },
+  ],
+});
+```
+
+`resources/list`, `resources/read` (unknown URI → `-32002`), an empty `resources/templates/list`, `prompts/list` and `prompts/get` (unknown prompt or missing required argument → `-32602`) are served. `read()` and `get()` receive the same `{ request, signal }` context as tools.
+
+### Driving the protocol yourself
+
+`createServeHandler` exposes the pure protocol core, with no I/O — feed it a JSON-RPC request, get the response. It is the cleanest seam for unit tests, or for mounting MCP inside a server you already run:
 
 ```ts
 import { createServeHandler } from "@warlock.js/ai-tools";
 
 const handler = createServeHandler([calc, dt], { name: "warlock-utils" });
 
-// In your own HTTP handler:
-const response = await handler.handle(jsonRpcRequest); // request → response, no I/O
+const response = await handler.handle(jsonRpcRequest, {
+  request: { method: "POST", path: "/mcp", headers }, // optional — reaches tools as ctx.request
+});
 ```
 
-`createServeHandler` is also the cleanest seam for unit tests: feed it a JSON-RPC request, assert the response — no real transport needed.
+If you mount it yourself, you own the transport's security: validate `Origin`, authenticate, and cap body size.
+
+### Security notes
+
+- **Loopback by default.** The HTTP transport binds `127.0.0.1` unless you set `host`. Binding anything else (`0.0.0.0`, a LAN address) **requires** `auth`; `start()` throws `McpServeError` (`type: "config"`) otherwise.
+- **DNS-rebinding guards.** Every request's `Origin` is checked, as the MCP specification requires: loopback origins and `allowedOrigins` pass, any other origin (including `null`) gets `403`. Requests without an `Origin` (non-browser clients) pass this check. While bound to loopback the `Host` header must be `localhost`, `127.0.0.1` or `[::1]` (plus `allowedHosts`), so a rebound domain name is refused even without an `Origin`.
+- **Body limit.** Bodies over `maxBodyBytes` get `413` and the connection is closed.
+- **Tokens.** Use long random tokens (for example `randomBytes(32).toString("hex")`), one per session, and keep them out of logs. The transport is plain HTTP: put TLS in front of it (a reverse proxy) before exposing it beyond the machine.
+
+### Serve errors
+
+`McpServeError` covers server construction and start-up:
+
+| `type`        | When                                                                                          |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `"collision"` | two tools, resources or prompts share a name — thrown by `serve()`                            |
+| `"config"`    | non-loopback bind without `auth`, empty token, bad `path` / `port`, misused `prefixToolNames` |
+| `"listen"`    | the port could not be bound (in use, permission denied)                                       |
+
+Bad requests never throw: they get an HTTP status or a JSON-RPC error. Tool-level failures come back as `isError: true` results, exactly as MCP expects.
 
 ## The JSON-Schema ↔ Standard-Schema bridge
 
@@ -213,6 +369,8 @@ MCP's wire vocabulary uses `kind` in some content / capability descriptors. The 
 ## Optional peers
 
 The MCP client lazily imports `@modelcontextprotocol/sdk` (the protocol SDK) and `ajv` (runtime JSON-Schema validation) — both optional peers. A missing one surfaces a curated `npm install` string at first use, never a raw module-resolution crash at import time. The stdio transport itself needs no dependency.
+
+`ai.mcp.serve` needs no peer at all: both its stdio and HTTP transports run on Node built-ins (`node:readline`, `node:http`, `node:crypto`).
 
 ## See also
 

@@ -142,6 +142,15 @@ Under a supervisor: the bag starts empty per iteration, accumulates across tool 
 
 Standalone (no supervisor): the framework supplies `{ artifacts: {} }`. Mutations are harmless no-ops — useful if the same tool gets used in both contexts.
 
+When a server transport runs the tool for a remote client — `ai.mcp.serve` over HTTP from `@warlock.js/ai-tools` — `ctx.request` carries the inbound request's `headers` (lower-cased names) and `remoteAddress`. Read a per-user token or a tenant header there; like `artifacts`, it never reaches the model. In-process dispatch leaves it unset. See [Connect MCP](/v/latest/ai/tools/connect-mcp/).
+
+```ts
+execute: async (input, ctx) => {
+  const tenant = ctx?.request?.headers["x-tenant-id"];
+  return searchItems(input.query, { tenant });
+},
+```
+
 ## Typed artifacts under a supervisor
 
 A supervisor declares `artifactsSchema` and tools registered to it inherit typed `ctx.artifacts.*`:

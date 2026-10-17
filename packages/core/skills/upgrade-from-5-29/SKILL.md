@@ -206,6 +206,16 @@ Built-in `/health` and `/ready` routes are exempt by default; set
 Development wildcard dispatch has separate
 per-route handling; check route overrides in both environments.
 
+## 5.30 to 5.31 MCP serving
+
+`ai.mcp.serve()` now throws `McpServeError` (`type: "collision"`) when two
+exposed tools share a name; before, both were listed and calls reached only one.
+Rename one tool, or serve `{ groups: { a: toolsA, b: toolsB } }` with
+`prefixToolNames: true`. `{ type: "http" }` now binds a real endpoint
+(`127.0.0.1` by default) and `start()` resolves `{ url, close }`; a
+non-loopback `host` needs `auth`. Code implementing `McpServer` itself must
+return that handle from `start()`.
+
 ## Verify the application paths that changed
 
 Run the app's type check, its logger channel tests, any tools with ordered side

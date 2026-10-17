@@ -124,6 +124,18 @@ await server.start();
 await server.stop();
 ```
 
+Over Streamable HTTP, `start()` binds a loopback endpoint and resolves `{ url, close }`. A
+non-loopback `host` requires `auth`; `Origin` is validated and bodies are size-capped:
+
+```ts
+const { url, close } = await ai.mcp
+  .serve([ai.tools.calculator()], {
+    name: "session-tools",
+    transport: { type: "http", auth: { bearer: sessionToken } }, // 127.0.0.1, free port, /mcp
+  })
+  .start();
+```
+
 ## Errors flow as data, not throws
 
 Every tool follows the framework's errors-as-data contract: a guardrail rejection or a failed call is
