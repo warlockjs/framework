@@ -442,7 +442,7 @@ a manual `npm publish`.**
    summary paragraph and the `releases.json` field.
 
    `none` skips the matrix and **nothing else** — the local registry is still
-   owned, all 31 tarballs are still staged, and every member is still confirmed
+   owned, all 33 tarballs are still staged, and every member is still confirmed
    installable. Skipping the matrix is not skipping the gate.
 
 ### Exact invocation (verified 5.9.0)
@@ -514,7 +514,7 @@ The runner must perform these steps in order:
 5. Start an owned Verdaccio instance on a verified-free loopback port with
    isolated temporary storage and an npm uplink for third-party packages.
    Explicitly set and assert the registry URL, cache, environment, port, and
-   temporary roots. Stage all 31 exact tarballs there; do not rebuild them.
+   temporary roots. Stage all 33 exact tarballs there; do not rebuild them.
 6. Against that registry, run the complete zero-edit generator gate below:
    derive the feature list from the installed CLI, run every isolated
    `warlock add <feature>` path and the composed path, require exact pins and a
