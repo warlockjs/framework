@@ -280,6 +280,129 @@ describe("toGoogleContents", () => {
     const { systemInstruction, contents } = toGoogleContents(messages);
 
     expect(systemInstruction).toBe("sys");
-    expect(contents.map((content) => content.role)).toEqual(["user", "model", "user", "user"]);
+    // The tool result and the following user turn share a role, so they merge.
+    expect(contents.map((content) => content.role)).toEqual(["user", "model", "user"]);
+    expect(contents[2]?.parts).toEqual([
+      { functionResponse: { name: "tc", response: { result: "done" } } },
+      { text: "u2" },
+    ]);
+  });
+});
+
+describe("toGoogleContents adjacent same-role turns", () => {
+  it("sends consecutive tool results as one user turn, in order", () => {
+    const messages: Message[] = [
+      { role: "user", content: "look both up" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "first", name: "first", input: {} },
+          { id: "second", name: "second", input: {} },
+        ],
+      },
+      { role: "tool", toolCallId: "first", content: '{"a":1}' },
+      { role: "tool", toolCallId: "second", content: '{"b":2}' },
+    ];
+
+    const { contents } = toGoogleContents(messages);
+
+    expect(contents.map((content) => content.role)).toEqual(["user", "model", "user"]);
+    expect(contents[2]).toEqual({
+      role: "user",
+      parts: [
+        { functionResponse: { name: "first", response: { a: 1 } } },
+        { functionResponse: { name: "second", response: { b: 2 } } },
+      ],
+    });
+  });
+
+  it("merges a user-framed compaction summary with the following user input", () => {
+    const messages: Message[] = [
+      {
+        role: "user",
+        content: "Summary of earlier conversation:\nmemo",
+        compaction: "summary",
+      },
+      { role: "user", content: "the task" },
+    ];
+
+    expect(toGoogleContents(messages).contents).toEqual([
+      {
+        role: "user",
+        parts: [{ text: "Summary of earlier conversation:\nmemo" }, { text: "the task" }],
+      },
+    ]);
+  });
+
+  it("merges an assistant summary with a following signed tool call, text first", () => {
+    const toolCall: ModelToolCallRequest = {
+      id: "lookup",
+      name: "lookup",
+      input: { q: "x" },
+      providerMetadata: { thoughtSignature: "sig-1" },
+    };
+    const messages: Message[] = [
+      { role: "user", content: "go" },
+      { role: "assistant", content: "memo", compaction: "summary" },
+      { role: "assistant", content: "", toolCalls: [toolCall] },
+    ];
+
+    expect(toGoogleContents(messages).contents).toEqual([
+      { role: "user", parts: [{ text: "go" }] },
+      {
+        role: "model",
+        parts: [
+          { text: "memo" },
+          { thoughtSignature: "sig-1", functionCall: { name: "lookup", args: { q: "x" } } },
+        ],
+      },
+    ]);
+  });
+
+  it("does not modify the caller's messages", () => {
+    const messages: Message[] = [
+      { role: "user", content: [{ type: "text", text: "a" }] },
+      { role: "user", content: "b" },
+      { role: "tool", toolCallId: "t1", content: "1" },
+      { role: "tool", toolCallId: "t2", content: "2" },
+    ];
+    const before = structuredClone(messages);
+
+    const first = toGoogleContents(messages);
+    const second = toGoogleContents(messages);
+
+    expect(messages).toEqual(before);
+    expect(first).toEqual(second);
+    expect(first.contents).toHaveLength(1);
+  });
+
+  it("keeps strictly alternating roles across a multi-trip compacted history", () => {
+    const messages: Message[] = [
+      { role: "system", content: "sys" },
+      {
+        role: "user",
+        content: "Summary of earlier conversation:\nmemo",
+        compaction: "summary",
+      },
+      { role: "user", content: "task" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "a", name: "a", input: {} },
+          { id: "b", name: "b", input: {} },
+        ],
+      },
+      { role: "tool", toolCallId: "a", content: "1" },
+      { role: "tool", toolCallId: "b", content: "2" },
+      { role: "assistant", content: "memo two", compaction: "summary" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c", name: "c", input: {} }] },
+      { role: "tool", toolCallId: "c", content: "3" },
+    ];
+
+    const roles = toGoogleContents(messages).contents.map((content) => content.role);
+
+    expect(roles).toEqual(["user", "model", "user", "model", "user"]);
   });
 });

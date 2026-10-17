@@ -129,6 +129,16 @@ google.embedder({ name: "gemini-embedding-001", dimensions: 768 });
   function declarations; calls round-trip as `functionCall` /
   `functionResponse` parts. (Thinking models' opaque `thoughtSignature`
   is carried through automatically so follow-up turns don't 400.)
+- **One turn per role** — consecutive messages that map to the same
+  Gemini role are sent as one content, with their parts in order. The
+  results of parallel tool calls travel as a single `user` turn of
+  `functionResponse` parts in call order (the shape the `@google/genai`
+  SDK's own automatic function calling sends), and an agent compaction
+  summary next to a same-role turn (a user-framed summary before the
+  input, or an assistant summary before a tool-call turn) merges into it,
+  so the history keeps alternating `user` and `model`. Each signed
+  `functionCall` keeps its own `thoughtSignature`. `countTokens()` builds
+  the same contents, so counts match what is sent.
 - **Streaming** — `stream()` runs `generateContentStream` and yields
   text `delta`s, a `tool-call` per function call (Gemini emits a
   fully-formed call, not partial JSON), and a terminal `done` with the

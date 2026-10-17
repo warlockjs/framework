@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
+- Consecutive messages that map to the same Gemini role are sent as one content with their parts in order. The results of parallel tool calls now travel as a single `user` turn of `functionResponse` parts in call order instead of one turn per result, and an agent compaction summary next to a same-role turn merges into it, so requests keep alternating `user` and `model` turns. Each `functionCall` keeps its own `thoughtSignature`, and `countTokens()` counts the same contents.
 
 ### Added
 
