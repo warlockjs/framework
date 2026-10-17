@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: How Warlock tests work — the two-worlds model (per-worker bootstrap + one global HTTP server), `setupTest` for unit tests, `startHttpTestServer` for integration tests, and the helpers that make HTTP assertions readable.
+description: How Warlock tests work — the two-worlds model (per-worker bootstrap + one global HTTP server), `setupTest` for unit tests, `startHttpTestServer` for integration tests, fakes that are on by default, model factories, an in-process server with the production plugins, and `warlock test --changed`.
 sidebar:
   order: 1
   label: "Testing"
@@ -268,6 +268,142 @@ describe("Products API", () => {
 
 For the full HTTP-test playbook, see `test-http/SKILL.md`.
 
+## The test kit
+
+Everything below ships in `@warlock.js/core/tests`, next to `setupTest` and the HTTP helpers.
+
+### Fakes — on by default
+
+In the test environment `setupTest()` (per test file) and `startHttpTestServer()` (in `globalSetup`) install six fakes once their connectors are up, and restore them on teardown:
+
+| Fake          | Replaces                                                         | Assertions                                                                                                        |
+| ------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `mailFake`    | Mail delivery — `sendMail()` / `Mail` capture instead of send    | `assertSent(matcher?)`, `assertNotSent`, `assertSentCount(n, matcher?)`, `assertNothingSent`, `sent()`            |
+| `queueFake`   | `@warlock.js/queue` dispatch — recorded, never pushed to Redis   | `assertPushed(job, payload?)`, `assertNotPushed`, `assertPushedCount(n, job?)`, `assertNothingPushed`, `pushed()` |
+| `cacheFake`   | The cache's current driver — a fresh in-memory driver            | `assertHas(key)`, `assertMissing(key)`, `assertStored(key, value)`                                                |
+| `storageFake` | Every storage driver (local, S3, R2, Spaces) — a temp directory  | `assertExists(path, driver?)`, `assertMissing(path, driver?)`, `files(driver?)`                                   |
+| `clockFake`   | `clock` from `@warlock.js/core` — frozen at 2026-01-01T00:00:00Z | `travel(ms)`, `travelTo(date)`, `freeze(date?)`, `now()`                                                          |
+| `idsFake`     | `ids` from `@warlock.js/core` — numbered UUIDs and tokens        | `uuid(n)` (the n-th UUID), `reset()`                                                                              |
+
+```ts title="src/app/users/tests/register-user.service.test.ts"
+import { mailFake, queueFake } from "@warlock.js/core/tests";
+import { beforeEach, expect, it } from "vitest";
+import { sendWelcomeSeries } from "../jobs/send-welcome-series.job";
+import { registerUserService } from "../services/register-user.service";
+
+beforeEach(() => {
+  mailFake.clear();
+  queueFake.clear();
+});
+
+it("welcomes a new user and schedules the follow-up mails", async () => {
+  const user = await registerUserService({ name: "Ada", email: "ada@example.test" });
+
+  mailFake.assertSent({ to: "ada@example.test", subject: /welcome/i });
+  queueFake.assertPushed(sendWelcomeSeries, { userId: user.id });
+});
+```
+
+A matcher is a predicate or an object of fields that must all match (`{ to, subject, from, contains }` for mail; a payload subset for jobs). A failing assertion lists what was actually recorded.
+
+Jobs are recorded, not run — call the job's handler directly to test what it does. The clock and ids fakes replace only the framework's `clock` and `ids`; `Date`, `setTimeout` and drivers keep real time, so nothing stalls. Read the time through `clock.now()` / `clock.timestamp()` and generate identifiers through `ids.uuid()` / `ids.token()` where a test needs to control them.
+
+**A fake records in the process that runs the code.** Mail sent while the shared HTTP server (Vitest's main process) handles a request is captured there, not in the test worker that sent the request. To assert on what a request did, serve it in the worker with [`createTestHttpServer()`](#in-process-server-with-the-production-plugins). The storage fake is the exception: its temp root is shared with the workers, so a file an HTTP request stored is visible to the test.
+
+#### Opting out
+
+Precedence is the `fakes` option > `tests.fakes` in `src/config/tests.ts` > all on.
+
+```ts title="src/config/tests.ts"
+const testsConfigurations = {
+  // keep the real drivers for every fake:
+  // fakes: false,
+  // or only for some:
+  fakes: { cache: false, storage: false },
+};
+
+export default testsConfigurations;
+```
+
+```ts
+await setupTest({ importModule: (file) => import(file), fakes: false });
+await startHttpTestServer({ port: 0, fakes: { queue: false } });
+```
+
+An unknown fake name or a non-boolean value fails setup with the list of known fakes. Tests that relied on real deliveries, a real Redis cache shared between the HTTP server and the workers, or real buckets need `fakes: false` (or the matching per-fake `false`).
+
+### Model factories
+
+`defineFactory(Model, (seed) => attributes)` builds deterministic records — no faker, no randomness. The n-th record a factory builds is the same on every run.
+
+```ts title="src/app/users/tests/user.factory.ts"
+import { defineFactory } from "@warlock.js/core/tests";
+import { User } from "app/users/models/user";
+
+export const userFactory = defineFactory(User, (seed) => ({
+  name: seed.text("User"), // "User 1", "User 2", ...
+  email: seed.email(), // "user1@example.test", ...
+  password: "test-password",
+})).state("admin", () => ({ role: "admin" }));
+```
+
+```ts
+const body = userFactory.make({ name: "Ada" }); // attributes only, no database
+const users = await userFactory.create(3); // three saved users
+const admin = await userFactory.with("admin").create();
+```
+
+`make()` / `makeMany(n)` return attributes without touching the database — use them for request bodies. `create()` saves through the model's own `create()`, so casts, defaults, hooks and events run; `create(n)` / `createMany(n)` save `n` in order. The seed offers `sequence`, `index`, `text(prefix)`, `email(prefix)`, `uuid()`, `date(offsetDays)`, `number(min, max)` and `pick(values)`. Overrides may be a partial or a function of the seed. `resetFactorySequences()` restarts every factory.
+
+### In-process server with the production plugins
+
+`createTestHttpServer()` starts an HTTP server inside the test worker, built the way production builds it: the same Fastify setup, every plugin production registers (rate limit with its cache store, CORS, multipart, cookies) and the router's real route registration, listening on an OS-assigned port. Tests cannot drift from real request shapes, and the fakes see what the handler did.
+
+```ts
+import { createTestHttpServer, mailFake } from "@warlock.js/core/tests";
+import { afterAll, beforeAll, expect, it } from "vitest";
+
+let app: Awaited<ReturnType<typeof createTestHttpServer>>;
+
+beforeAll(async () => {
+  // every app route; pass the same importer setupTest() takes
+  app = await createTestHttpServer({ loadAppModules: true, importModule: (file) => import(file) });
+});
+
+afterAll(() => app.close());
+
+it("mails the support inbox", async () => {
+  const response = await app.post("/api/contact", {
+    name: "Ada",
+    email: "ada@example.test",
+    message: "Hi",
+  });
+
+  expect(response.status).toBe(200);
+  mailFake.assertSent({ to: "support@example.test" });
+});
+```
+
+It returns `url`, `port`, the Fastify `server`, the request helpers (`request`, `get`, `post`, `put`, `patch`, `delete`), `actingAs(user)` bound to it, and `close()`. Pass `routes: (router) => …` instead of (or as well as) `loadAppModules` to register routes for one test; `close()` removes them. App modules load once per process.
+
+### Ephemeral ports
+
+`startHttpTestServer({ port: 0 })` lets the OS pick a free port and publishes the bound one to the workers, so the suite never collides with `warlock dev` or another suite. `warlock add test` generates `src/test-global-setup.ts` with it. `createTestHttpServer()` always uses an OS-assigned port.
+
+### Response snapshots
+
+`snapshotResponse(response, { redact })` reduces a response to `{ status, contentType, body }` with the values that change every run replaced by `"[redacted]"`:
+
+```ts
+const response = await testPost("/posts", { title: "Hello" });
+
+expect(
+  await snapshotResponse(response, { redact: ["post.id", "post.createdAt"] }),
+).toMatchSnapshot();
+```
+
+`*` matches any key or array index (`"posts.*.id"`). It consumes the body — call it instead of `response.json()`.
+
 ## Picking the right mode
 
 | You're testing                                              | Mode                          |
@@ -319,6 +455,17 @@ pnpm test create-product           # files matching "create-product"
 pnpm test -t "creates a product"   # test name pattern
 ```
 
+`warlock test` runs the project's own Vitest and can run only what a change affects — the fast loop while you work:
+
+```bash
+warlock test --changed                 # tests affected by uncommitted changes
+warlock test --changed --since main    # ... by changes since main
+warlock test --related src/app/posts/services/create-post.service.ts
+warlock test --json                    # machine-readable results on stdout
+```
+
+See [CLI commands](../cli/cli-commands.md#test-filters) for every flag.
+
 ## Caveats and trade-offs
 
 When a unit test copies TypeScript source into a temporary directory for a fresh
@@ -330,7 +477,7 @@ child process exit status with its captured stderr before checking stdout.
 - **The two-worlds connection split is intentional.** Don't fight it by trying to share connections — it would deadlock test parallelism. Instead, design tests so the worker write commits before the HTTP read.
 - **Test data persists across files unless you clean it up.** Vitest doesn't wrap test files in transactions. Use `afterEach` truncates or design idempotent fixtures.
 - **The HTTP server is started in dev mode (`runtimeStrategy: development`).** That's so routes get re-resolved properly under the framework's dev orchestrator. It's still a real server with real routing — just not the production builder pipeline.
-- **No mocks shipped.** No `mockMail`, no `mockHttp`. The mail subsystem has its own [test mailbox](../digging-deeper/mail.md) (`setMailMode("test")` + helpers); for everything else, you're calling real implementations. If you need mocks for an external API (OpenAI, Stripe), vitest's `vi.mock(...)` works fine.
+- **Fakes, not mocks.** Mail, queue, cache, storage, clock and ids are faked by default ([the test kit](#the-test-kit)); everything else runs for real. For an external API (OpenAI, Stripe), vitest's `vi.mock(...)` works fine.
 
 ## See also
 

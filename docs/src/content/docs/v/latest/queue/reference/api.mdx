@@ -132,6 +132,15 @@ type JobSnapshot<TPayload = unknown, TResult = unknown> = {
 };
 ```
 
+### `setDispatchInterceptor(interceptor)` / `getDispatchInterceptor()`
+
+Replace the broker for every job in the process: with an interceptor set,
+`dispatch()` calls `interceptor.dispatch({ name, queue, payload, options })`
+and returns its `DispatchedJob`, and `find()` calls `interceptor.find?.({ name, queue, id })`.
+Nothing connects to Redis. Pass `undefined` to restore the broker. It is the
+seam `queueFake` (`@warlock.js/core/tests`) is built on; the slot lives on
+`globalThis`, so every copy of the package in a process shares it.
+
 ## Failed jobs
 
 ### `failedJobs(options?)`

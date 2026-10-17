@@ -99,6 +99,27 @@ const job = await sendInvoice.find(id);
 `state` is one of `"waiting" | "delayed" | "prioritized" | "active" |
 "completed" | "failed" | "waiting-children" | "unknown"`.
 
+## Test what was dispatched
+
+In the test environment `@warlock.js/core/tests` installs `queueFake`: dispatches
+are recorded instead of pushed to Redis (no broker needed), and `find()` answers
+from the record.
+
+```ts
+import { queueFake } from "@warlock.js/core/tests";
+
+await placeOrder(order);
+
+queueFake.assertPushed(sendInvoice, { invoiceId: order.invoiceId });
+queueFake.assertPushedCount(1);
+```
+
+Jobs are recorded, not run: call the handler directly to test what it does.
+Opt out with `tests.fakes: { queue: false }` in `src/config/tests.ts`. Other
+fakes can use the same seam: `setDispatchInterceptor({ dispatch, find? })`
+replaces the broker for every job in the process until it is set back to
+`undefined`.
+
 ## Rules
 
 - A dispatched job whose name has no handler registered in the worker

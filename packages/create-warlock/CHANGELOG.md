@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Added
+
+- The starter's `src/config/tests.ts` documents the test fakes that are on by default and how to opt out (`fakes: false`, or per fake such as `{ cache: false }`).
+
 ### Fixed
 
 - Scaffolder source formatting and tests use the workspace Oxfmt configuration, including standalone installs; template formatting continues to use each generated app toolchain.

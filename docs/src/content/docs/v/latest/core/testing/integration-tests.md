@@ -98,6 +98,16 @@ export async function setup() {
 }
 ```
 
+Or let the OS pick a free one — what `warlock add test` generates:
+
+```ts title="src/test-global-setup.ts"
+export async function setup() {
+  await startHttpTestServer({ port: 0 });
+}
+```
+
+With `port: 0` there is nothing to preflight; once the server has bound, the port it took is published to the workers.
+
 The explicit port wins over `HTTP_PORT` in `.env`. It has to be passed here — `startHttpTestServer()` bootstraps the app itself and that bootstrap re-reads `.env`, so setting `process.env.HTTP_PORT` before the call has no effect.
 
 `testGet` and friends follow automatically — the bound port is published to the test workers, so `getTestServerUrl()` targets the server that is actually listening.

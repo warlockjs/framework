@@ -1,6 +1,6 @@
 ---
 name: define-jobs
-description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — the `configure-queue` topic; failed jobs — the `manage-failed-jobs` topic.'
+description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `setDispatchInterceptor`, `queueFake`, `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — the `configure-queue` topic; failed jobs — the `manage-failed-jobs` topic.'
 ---
 
 # Define and dispatch jobs
@@ -62,6 +62,23 @@ setQueueContext(
 - Jobs dispatched from a restored handler capture the same context.
 - `defineJob({ context: false })` opts a job out.
 - Throw `UnrecoverableJobError` from a handler or `restore` to fail the job without retries.
+
+## Test dispatches without Redis
+
+In the test environment `queueFake` from `@warlock.js/core/tests` is installed by default: dispatches are recorded, not pushed, and `find()` answers from the record.
+
+```ts
+// with: import { queueFake } from "@warlock.js/core/tests";
+//       plus your job (sendInvoice) and service (placeOrderService)
+it("queues the invoice", async () => {
+  const order = await placeOrderService({ items: ["pen"] });
+
+  queueFake.assertPushed(sendInvoice, { invoiceId: order.invoiceId });
+  expect(queueFake.pushed(sendInvoice)).toHaveLength(1);
+});
+```
+
+Jobs are not run — call the handler to test it. Opt out with `tests.fakes: { queue: false }`. The seam is `setDispatchInterceptor({ dispatch, find? })`: while set, every job's `dispatch()` / `find()` goes to it instead of BullMQ; set it back to `undefined` to restore the broker.
 
 ## Rules
 

@@ -396,6 +396,7 @@ warlock add auth mail storage
 warlock add --list                           # see what's available
 warlock add auth --package-manager yarn
 warlock add auth --no-install                # record deps, run setup, skip the install
+warlock add test --dry-run --json            # preview files and dependencies as JSON
 ```
 
 | Positional      | Description                                                |
@@ -407,6 +408,8 @@ warlock add auth --no-install                # record deps, run setup, skip the 
 | `--package-manager` | Package manager to use (auto-detected if omitted).                                                                                                                                                                                                      |
 | `--list, -l`        | List every available feature.                                                                                                                                                                                                                           |
 | `--no-install`      | Record the dependencies in `package.json` and run the setup (eject configs, add scripts, run setup hooks) without invoking the package manager install. Pass it last, after the feature list. Used by scaffolders that run a single install afterwards. |
+| `--dry-run`         | Install nothing and write nothing; list the files that would be written and the ones that would be skipped because they exist.                                                                                                                          |
+| `--json`            | Print one JSON report on stdout (files written, files skipped, dependencies, scripts); everything else goes to stderr. See [Generators](./generators.md#--dry-run-and---json-on-every-generator).                                                       |
 
 The command installs the npm package(s), runs their post-install hooks (configuration files, migrations, etc.), and updates your `warlock.config.ts` where needed.
 
@@ -573,18 +576,44 @@ Requires a prior `warlock build`. See the [`routes:diff` section](./routes.md#wa
 
 The whole `generate.*` family lives in [Generators](./generators.md) — that page covers what each one produces, naming transformations, and best practices. The quick reference:
 
-| Command                               | Alias     | What it generates                                                        |
-| ------------------------------------- | --------- | ------------------------------------------------------------------------ |
-| `generate <generator> [args...]`      | `g`       | Master dispatch — `warlock g module products`.                           |
-| `generate.module <name>`              | `gen.m`   | A new module folder with the standard subfolders.                        |
-| `generate.controller <module>/<name>` | `gen.c`   | A controller, optionally with a validation schema (`--with-validation`). |
-| `generate.service <module>/<name>`    | `gen.s`   | A service.                                                               |
-| `generate.model <module>/<name>`      | `gen.md`  | A Cascade model with its migration file.                                 |
-| `generate.repository <module>/<name>` | `gen.r`   | A `RepositoryManager` subclass.                                          |
-| `generate.resource <module>/<name>`   | `gen.rs`  | A `Resource` subclass.                                                   |
-| `generate.migration <model-path>`     | `gen.mig` | A migration file with add/drop/rename DSL support.                       |
+| Command                               | Alias           | What it generates                                                                            |
+| ------------------------------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| `generate <generator> [args...]`      | `g`             | Master dispatch — `warlock g module products`.                                               |
+| `make <generator> [args...]`          |                 | The same dispatch — `warlock make endpoint posts/create-post`.                               |
+| `generate.endpoint <module>/<name>`   | `make.endpoint` | Route, controller, schema, service, resource, locale key, OpenAPI response and an HTTP test. |
+| `generate.module <name>`              | `gen.m`         | A new module folder with the standard subfolders.                                            |
+| `generate.controller <module>/<name>` | `gen.c`         | A controller, optionally with a validation schema (`--with-validation`).                     |
+| `generate.service <module>/<name>`    | `gen.s`         | A service.                                                                                   |
+| `generate.model <module>/<name>`      | `gen.md`        | A Cascade model with its migration file.                                                     |
+| `generate.repository <module>/<name>` | `gen.r`         | A `RepositoryManager` subclass.                                                              |
+| `generate.resource <module>/<name>`   | `gen.rs`        | A `Resource` subclass.                                                                       |
+| `generate.migration <model-path>`     | `gen.mig`       | A migration file with add/drop/rename DSL support.                                           |
 
-See [Generators](./generators.md) for the full surface.
+Every generator accepts `--dry-run` and `--json`. See [Generators](./generators.md) for the full surface.
+
+## `test [filters...]`
+
+Run the project's tests through its own Vitest (from `node_modules`, never a global or `npx`), with `NODE_ENV=test`.
+
+```bash
+warlock test                                    # everything, once
+warlock test --changed                          # tests affected by uncommitted changes
+warlock test --changed --since main             # ... by changes since a git ref
+warlock test --related src/app/posts/services/create-post.service.ts
+warlock test src/app/posts -t "creates a post"  # a folder, filtered by test name
+warlock test --json                             # Vitest's JSON report on stdout
+```
+
+| Flag                      | Description                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `--changed`               | Only tests affected by uncommitted changes (`vitest run --changed`).              |
+| `--since <ref>`           | With `--changed`, compare against this git ref instead.                           |
+| `--related <files>`       | Comma-separated source files: only the tests that import them (`vitest related`). |
+| `--watch, -w`             | Re-run on change instead of running once.                                         |
+| `--test-name-pattern, -t` | Only tests whose name matches.                                                    |
+| `--json`                  | Vitest's JSON reporter on stdout.                                                 |
+
+`--changed`, `--since` and `--related` add `--passWithNoTests`: a change that affects no test is a pass. The exit code is Vitest's.
 
 ---
 

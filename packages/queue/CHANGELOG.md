@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Added
+
+- `setDispatchInterceptor({ dispatch, find? })` / `getDispatchInterceptor()`: while an interceptor is set, every job's `dispatch()` and `find()` go to it instead of BullMQ, so nothing connects to Redis. The slot is process-wide. `queueFake` in `@warlock.js/core/tests` is built on it.
+
 ### Fixed
 
 - Local Redis integration tests skip with a clear service message when Redis is unavailable; CI and explicitly requested integration runs fail instead. Unit cases remain runnable without Redis.

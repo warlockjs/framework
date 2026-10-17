@@ -14,7 +14,7 @@ npx warlock generate.module products            # full CRUD bootstrap (default �
 npx warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
 ```
 
-Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
+Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. Every generator takes `--dry-run` (write nothing, list the plan) and `--json` (one machine-readable report on stdout). To add one endpoint from its request schema — controller, service, resource, route, locale key and an HTTP test — use `warlock make endpoint` (the `make-endpoint` topic). The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
 
 ## What the generator creates
 

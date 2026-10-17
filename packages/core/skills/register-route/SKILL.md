@@ -100,6 +100,15 @@ router.prefix("/products", () => {
 
 If `guarded` doesn't exist in your project yet, see the shared utility convention in the `warlock-conventions` topic.
 
+### A mutating route with no guard — say so with `public: true`
+
+```ts
+// src/app/contact/routes.ts
+router.post("/api/contact", contactController, { public: true });
+```
+
+`public: true` changes nothing at runtime; it records that the missing guard is deliberate, so reviewers, lint rules and route tooling can tell a decision from an omission. `warlock make endpoint --public` writes it (the `make-endpoint` topic).
+
 ## RESTful resource chain
 
 For a standard CRUD resource, `router.route(path)` returns a builder with five named slots:

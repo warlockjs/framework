@@ -2,6 +2,10 @@
 
 ## 5.31.0
 
+### Added
+
+- The zero-edit generator matrix has a generators row: a fresh scaffold with the test kit runs `warlock make endpoint --json` for a public and a guarded endpoint, is proved by the generated-output oracle (typecheck, development and production boot, new routes requested), then runs the generated tests with the app's own Vitest. It runs in every full matrix and with `--only generators`; a failed `make` report, a missing test or a failing generated test fails it.
+
 ### Fixed
 
 - Shared formatter config changes trigger standalone scaffolder checks; temporary coverage scratch output is ignored and its stale tracked snapshot removed.

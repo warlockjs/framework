@@ -170,6 +170,23 @@ vi.advanceTimersByTime(1000);
 
 A test that sleeps is a test that's slow and flaky. Stub the clock.
 
+Code that reads time through `clock.now()` / `clock.timestamp()` from `@warlock.js/core` gets a frozen clock in tests already (`clockFake.travel(ms)` moves it), with no fake timers involved.
+
+### 4.5 Mail, queue, cache, storage — fakes are already on
+
+In the test environment `setupTest()` installs fakes for mail, queue, cache, storage, clock and ids. Assert on them instead of mocking the drivers:
+
+```typescript
+import { mailFake, queueFake } from "@warlock.js/core/tests";
+
+const order = { id: 42 }; // what the code under test placed
+
+mailFake.assertSent({ to: "ada@example.test" });
+queueFake.assertPushed("invoices.send", { orderId: order.id });
+```
+
+Fixtures come from `defineFactory()` (deterministic, no faker). Opt out of a fake in `src/config/tests.ts` (`fakes: { cache: false }`). `warlock test --changed` runs only the tests a change affects. See the `test-fakes` and `model-factories` skills of `@warlock.js/core`.
+
 ---
 
 ## 5. AAA structure

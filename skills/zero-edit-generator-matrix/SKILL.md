@@ -129,6 +129,15 @@ installed, built, booted, and exercised.
 - **1 baseline row** — a plain app with no features added.
 - **28 isolated rows** — one per feature (`auth`, `cache`, `herald`, `seal`,
   `web`, …), each with **exactly one** feature turned on.
+- **1 generators row** — a fresh scaffold plus `warlock add test`, then
+  `warlock make endpoint --json` for a public and a guarded endpoint from a
+  schema spec file. The generated-output oracle proves it (typecheck, dev and
+  production boot, every new route requested), then the generated tests run
+  with the app's own Vitest: the public endpoint's whole file, the guarded
+  endpoint's anonymous case (its signed-in cases need a database, and rows are
+  scaffolded with `--no-db`). A `make` report with `ok: false`, a missing
+  test file or a failing generated test fails the row. Name it with
+  `--only generators`; it runs in every full matrix.
 - **1 composed row** — every feature at once.
 
 **Why one feature per row:** when a row fails, the failing row names the culprit.
@@ -187,8 +196,9 @@ node tools/release/scripts/release-family.ts gate --version <x.y.z> --matrix sub
 
 - All three scopes emit a publish handoff. What none of them may do is go
   unstated — see **How the runner enforces it** above.
-- `--only` always runs the **baseline** too. The **composed** row is skipped
-  unless you pass `--only composed` explicitly.
+- `--only` always runs the **baseline** too. The **composed** and
+  **generators** rows are skipped unless you name them (`--only composed`,
+  `--only generators`).
 - `--reuse-artifacts` re-hashes every recorded tarball and checks git HEAD plus
   the dirty set before trusting them. It refuses if anything moved.
 - Never launch the gate through `npx` or `pnpm exec` (canon `50608334`).
