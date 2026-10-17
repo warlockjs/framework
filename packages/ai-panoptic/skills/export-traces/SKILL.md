@@ -40,7 +40,7 @@ collector.use(consoleExporter({ tree: true })); // full indented span tree
 collector.use(consoleExporter({ streaming: true })); // also print each span as it finalizes
 ```
 
-Failed/cancelled spans route to `console.error`; everything else to `console.log`. Inject a sink (`{ console: mySink }`) to redirect or to capture in tests.
+Failed/cancelled/incomplete spans route to `console.error`; everything else to `console.log`. Inject a sink (`{ console: mySink }`) to redirect or to capture in tests.
 
 ## File
 
@@ -75,9 +75,9 @@ Each `TraceSpan` becomes one OTel span with the source start/end times and paren
 - `gen_ai.conversation.id` (from the span's `sessionId`)
 - `gen_ai.system` / `gen_ai.request.model` / `gen_ai.operation.name` — **never invented**: these appear only when the span's free-form `attributes` bag already carried that exact key. `otelExporter`'s `system` option backfills `gen_ai.system` when the span supplied none (and never overrides one it did).
 - `warlock.report.type` / `warlock.version` / `warlock.duration_ms` / `warlock.cost.usd`
-- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
+- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `tool.callId`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
 
-Failed/cancelled spans get OTel `ERROR` status plus a recorded exception.
+Failed/cancelled/incomplete spans get OTel `ERROR` status plus a recorded exception.
 
 ## Langfuse
 

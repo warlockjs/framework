@@ -373,7 +373,9 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
         break;
       }
 
-      case "failed": {
+      // An incomplete agent run (its answer was cut off) errored.
+      case "failed":
+      case "incomplete": {
         aggregate.failed += 1;
         break;
       }

@@ -54,7 +54,7 @@ ok agent "router" — 2103ms, 1820 tok, $0.0094
   ERR tool "fetch-page" — 90ms, 0 tok [HttpError: timeout]
 ```
 
-Each line is routed independently: a `failed`/`cancelled` span goes to `console.error`, every other span to `console.log` — so a single bad leaf surfaces at error severity without dragging the whole tree onto the error stream.
+Each line is routed independently: a `failed`/`cancelled`/`incomplete` span goes to `console.error`, every other span to `console.log` — so a single bad leaf surfaces at error severity without dragging the whole tree onto the error stream.
 
 > `{ streaming: true }` adds the optional `exportSpan` hook, which prints the **same** `formatSpanLine` output (always at `log` level, depth 0) the moment each span finalizes, ahead of the per-trace summary.
 
@@ -212,7 +212,7 @@ What lands, and the rules behind it:
 
 ### Failures — `ERROR` status plus a recorded exception
 
-A `failed` or `cancelled` span gets OTel `ERROR` status, and the normalized error is also recorded as a span exception:
+A `failed`, `cancelled` or `incomplete` span gets OTel `ERROR` status, and the normalized error is also recorded as a span exception:
 
 ```text
 span: "fetch-page"
@@ -233,7 +233,7 @@ The Langfuse exporter maps the trace tree onto Langfuse's own object model:
 - **A token-producing span (`usage.total > 0`) becomes a `generation`** — created with `parent.generation(...)` and carrying a Langfuse `usage` block `{ input, output, total, unit: "TOKENS" }`.
 - **A pure tool/callback span (`usage.total === 0`) becomes a plain `span`** — created with `parent.span(...)`, with **no** `usage` block.
 - **Children nest under their parent observation** — a generation's or span's children are created via that observation's own `.generation(...)` / `.span(...)`, preserving the execution tree.
-- **Status maps to a level** — `failed`/`cancelled` spans become level `ERROR` with the error message as `statusMessage`; everything else is level `DEFAULT`.
+- **Status maps to a level** — `failed`/`cancelled`/`incomplete` spans become level `ERROR` with the error message as `statusMessage`; everything else is level `DEFAULT`.
 
 For the `checkout` workflow above, the emitted Langfuse objects are:
 
