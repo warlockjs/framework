@@ -11,20 +11,74 @@ import type {
   LogLevel,
   LogMessage,
 } from "../types";
+import {
+  escapeRegExp,
+  fileNamePatternSource,
+  renderFileName,
+  type FileNameOption,
+} from "./file-name-pattern";
 
-// TODO: Add max messages per file before rotation
+export type { FileNameOption } from "./file-name-pattern";
+
+/** Default file name of a `daily` chunk: sortable ISO date. */
+export const DAILY_FILE_NAME = "{YYYY}-{MM}-{DD}";
+
+/** Default file name of an `hourly` chunk: sortable ISO date and hour. */
+export const HOURLY_FILE_NAME = "{YYYY}-{MM}-{DD}-{HH}";
+
+/** Default date part of a size-rotated file's name. */
+export const ROTATE_FILE_NAME = "{YYYY}-{MM}-{DD}";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Which old log files `FileLog` removes, on boot and whenever it starts a new
+ * file (a size rotation or a dated name rolling over). Only files in the log
+ * directory (each group directory with `groupBy`) whose names match the
+ * channel's file name pattern are considered; the file being written is
+ * always kept.
+ */
+export type FileLogRetention = {
+  /**
+   * Keep at most this many matching files per directory, newest (by
+   * modification time) first, counting the file being written.
+   */
+  maxFiles?: number;
+  /**
+   * Remove matching files last modified more than this many days ago.
+   */
+  maxAgeDays?: number;
+  /**
+   * Which file names (with extension) belong to this channel. Defaults to one
+   * derived from `fileName` and `rotateFileName`; required when `fileName` is
+   * a function.
+   */
+  match?: RegExp;
+};
 
 export type FileLogConfig = BasicLogConfigurations & {
   storagePath?: string;
   /**
-   * File name, without extension
+   * Base name, without extension: the file name of a `single` chunk and the
+   * `{name}` token of a `fileName` pattern.
+   *
+   * @default app
    */
   name?: string;
   /**
-   * chunk mode
-   * If set to `single`, the logs will be created in a single file, unless the rotate is set to true
-   * If set to `daily`, the logs will be created in a daily file, unless the rotate is set to true
-   * If set to `hourly`, the logs will be created in an hourly file, unless the rotate is set to true
+   * The file name, without extension: a pattern such as
+   * `"app-{YYYY}-{MM}-{DD}"` (tokens `{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}`
+   * `{name}`, local time) or a function of the current date. Evaluated at
+   * every write, so a dated name starts a new file when it changes.
+   *
+   * @default by chunk: `single` → name, `daily` → `{YYYY}-{MM}-{DD}`, `hourly` → `{YYYY}-{MM}-{DD}-{HH}`
+   */
+  fileName?: FileNameOption;
+  /**
+   * chunk mode: picks the default `fileName`.
+   * `single` writes one file named `name`, `daily` one file per day
+   * (`YYYY-MM-DD`), `hourly` one per hour (`YYYY-MM-DD-HH`). Size rotation
+   * applies to each.
    * @default single
    */
   chunk?: "single" | "daily" | "hourly";
@@ -41,17 +95,26 @@ export type FileLogConfig = BasicLogConfigurations & {
    */
   extension?: string;
   /**
-   * If rotate is set, the rotate name will be added to the file name suffixed with `-`
+   * Middle part of a size-rotated file's name:
+   * `<file name>-<rotateFileName>-<epoch ms>.<extension>`. Same forms as
+   * `fileName` (a token pattern or a function of the rotation date); text
+   * without tokens is used as is.
    *
-   * @default DD-MM-YYYY
+   * @default {YYYY}-{MM}-{DD}
    */
-  rotateFileName?: string;
+  rotateFileName?: FileNameOption;
   /**
    * Max file size before rotating the file
    *
    * @default 10MB
    */
   maxFileSize?: number;
+  /**
+   * Remove old log files on boot and whenever a new file is started.
+   *
+   * @default none (nothing is removed)
+   */
+  retention?: FileLogRetention;
   /**
    * Set the max messages that needs to be added before writing to the file
    *
@@ -109,9 +172,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     maxMessagesToWrite: 100,
     filter: () => true,
     maxFileSize: 10 * 1024 * 1024, // 10MB
-    get rotateFileName() {
-      return dayjs().format("DD-MM-YYYY");
-    },
+    rotateFileName: ROTATE_FILE_NAME,
     dateFormat: {
       date: "DD-MM-YYYY",
       time: "HH:mm:ss",
@@ -136,6 +197,36 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   protected flushIntervalHandle?: NodeJS.Timeout;
 
   /**
+   * Set when a size rotation started a new file, so the next write prunes.
+   */
+  protected retentionDue = false;
+
+  /**
+   * File name of the last write, to notice a dated name rolling over.
+   */
+  protected lastFileName?: string;
+
+  /**
+   * The running (or last) prune, so prunes never overlap.
+   */
+  protected pruning?: Promise<void>;
+
+  /**
+   * Whether the "function `fileName` needs `retention.match`" error was
+   * already reported.
+   */
+  protected missingMatchReported = false;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected setConfigurations(configurations: FileLogConfig) {
+    assertRetention(configurations.retention);
+
+    return super.setConfigurations(configurations);
+  }
+
+  /**
    * Check file size for file rotation
    */
   protected async checkAndRotateFile(filePath = this.filePath) {
@@ -144,7 +235,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     try {
       const stats = await fs.promises.stat(filePath);
       if (stats.size >= this.config("maxFileSize")!) {
-        await this.rotateLogFile();
+        await this.rotateLogFile(filePath);
       }
     } catch (error: any) {
       // ENOENT is expected when the file hasn't been created yet — there is
@@ -156,18 +247,32 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   }
 
   /**
-   * Rotate log file
+   * Rotate the given log file (the active one by default) aside as
+   * `<file name>-<rotateFileName>-<epoch ms>.<extension>` in its directory.
    */
-  protected async rotateLogFile() {
-    const fileName = `${this.fileName}-${this.config("rotateFileName")}-${Date.now()}`;
-
+  protected async rotateLogFile(filePath = this.filePath) {
+    const now = new Date();
     const extension = this.extension;
+    const baseName = path.basename(filePath, `.${extension}`);
+    const rotateName = renderFileName(
+      this.config("rotateFileName") ?? ROTATE_FILE_NAME,
+      now,
+      this.baseName,
+    );
 
-    const rotatedFilePath = path.join(this.storagePath, `${fileName}.${extension}`);
+    const rotatedFilePath = path.join(
+      path.dirname(filePath),
+      `${baseName}-${rotateName}-${now.getTime()}.${extension}`,
+    );
 
-    await fs.promises.rename(this.filePath, rotatedFilePath).catch((error) => {
-      console.error("Error rotating file:", error);
-    });
+    await fs.promises.rename(filePath, rotatedFilePath).then(
+      () => {
+        this.retentionDue = true;
+      },
+      (error) => {
+        console.error("Error rotating file:", error);
+      },
+    );
   }
 
   /**
@@ -224,20 +329,41 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   }
 
   /**
-   * Get file name
+   * The configured `name` option.
    */
-  public get fileName(): string {
-    const debugLevel = this.config("chunk")!;
+  protected get baseName(): string {
+    return this.config("name") ?? "app";
+  }
 
-    switch (debugLevel) {
+  /**
+   * The `fileName` option, or the chunk's default. `undefined` means the
+   * plain `name` of a `single` chunk, used as is (braces included).
+   */
+  protected get fileNamePattern(): FileNameOption | undefined {
+    const configured = this.config("fileName");
+
+    if (configured !== undefined) return configured;
+
+    switch (this.config("chunk")) {
+      case "daily":
+        return DAILY_FILE_NAME;
+      case "hourly":
+        return HOURLY_FILE_NAME;
       case "single":
       default:
-        return this.config("name")!;
-      case "daily":
-        return dayjs().format("DD-MM-YYYY");
-      case "hourly":
-        return dayjs().format("DD-MM-YYYY-HH-00-00-a");
+        return undefined;
     }
+  }
+
+  /**
+   * Current file name, without extension
+   */
+  public get fileName(): string {
+    const pattern = this.fileNamePattern;
+
+    return pattern === undefined
+      ? this.baseName
+      : renderFileName(pattern, new Date(), this.baseName);
   }
 
   /**
@@ -270,6 +396,212 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     await ensureDirectoryAsync(logsDirectory);
 
     this.initMessageFlush();
+
+    await this.prune();
+  }
+
+  /**
+   * Remove old log files as configured by `retention`. Runs on boot and
+   * whenever a new file is started; call it yourself to prune on demand.
+   * Never rejects: failures go to the channel error handler.
+   */
+  public prune(): Promise<void> {
+    const run = (this.pruning ?? Promise.resolve()).then(() => this.pruneFiles());
+
+    this.pruning = run;
+
+    return run;
+  }
+
+  /**
+   * Prune once a write started a new file: after a size rotation, or when a
+   * dated file name rolled over. Never throws.
+   */
+  protected async afterWrite(): Promise<void> {
+    let fileName: string;
+
+    try {
+      fileName = this.fileName;
+    } catch {
+      return;
+    }
+
+    const rolledOver = this.lastFileName !== undefined && this.lastFileName !== fileName;
+
+    this.lastFileName = fileName;
+
+    if (!rolledOver && !this.retentionDue) return;
+
+    this.retentionDue = false;
+
+    await this.prune();
+  }
+
+  /**
+   * Apply `retention` to every directory this channel writes to.
+   */
+  protected async pruneFiles(): Promise<void> {
+    const retention = this.config("retention");
+
+    if (!retention || (retention.maxFiles === undefined && retention.maxAgeDays === undefined)) {
+      return;
+    }
+
+    try {
+      const matcher = this.retentionMatcher(retention);
+
+      if (!matcher) return;
+
+      const activeFile = `${this.fileName}.${this.extension}`;
+
+      for (const directory of await this.retentionDirectories()) {
+        await this.pruneDirectory(directory, matcher, retention, activeFile);
+      }
+    } catch (error) {
+      this.reportRetentionError(error, this.storagePath);
+    }
+  }
+
+  /**
+   * The expression a file name must match to be pruned, or `undefined` when
+   * none can be derived (a function `fileName` without `retention.match`).
+   */
+  protected retentionMatcher(retention: FileLogRetention): RegExp | undefined {
+    if (retention.match) {
+      // Drop `g`/`y`: their `lastIndex` would make `test()` stateful.
+      return new RegExp(retention.match.source, retention.match.flags.replace(/[gy]/g, ""));
+    }
+
+    const pattern = this.fileNamePattern;
+
+    if (typeof pattern === "function") {
+      if (!this.missingMatchReported) {
+        this.missingMatchReported = true;
+        this.reportRetentionError(
+          new Error(
+            "FileLog retention needs `retention.match` when `fileName` is a function; no files were pruned",
+          ),
+          this.storagePath,
+        );
+      }
+
+      return undefined;
+    }
+
+    const name = this.baseName;
+    const fileSource =
+      pattern === undefined ? escapeRegExp(name) : fileNamePatternSource(pattern, name);
+    const rotateName = this.config("rotateFileName") ?? ROTATE_FILE_NAME;
+    const rotateSource =
+      typeof rotateName === "function" ? ".+" : fileNamePatternSource(rotateName, name);
+
+    return new RegExp(
+      `^${fileSource}(?:-${rotateSource}-\\d{13,})?\\.${escapeRegExp(this.extension)}$`,
+    );
+  }
+
+  /**
+   * The log directory, or each group directory when `groupBy` is set.
+   */
+  protected async retentionDirectories(): Promise<string[]> {
+    let directories = [this.storagePath];
+    const depth = this.config("groupBy")?.length ?? 0;
+
+    for (let level = 0; level < depth; level++) {
+      const next: string[] = [];
+
+      for (const directory of directories) {
+        const entries = await fs.promises
+          .readdir(directory, { withFileTypes: true })
+          .catch((error: NodeJS.ErrnoException) => {
+            if (error.code !== "ENOENT") this.reportRetentionError(error, directory);
+            return [];
+          });
+
+        for (const entry of entries) {
+          if (entry.isDirectory()) next.push(path.join(directory, entry.name));
+        }
+      }
+
+      directories = next;
+    }
+
+    return directories;
+  }
+
+  /**
+   * Remove the matching files of one directory that `retention` no longer
+   * keeps. Each failure is reported and the rest still run.
+   */
+  protected async pruneDirectory(
+    directory: string,
+    matcher: RegExp,
+    retention: FileLogRetention,
+    activeFile: string,
+  ): Promise<void> {
+    let names: string[];
+
+    try {
+      names = await fs.promises.readdir(directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        this.reportRetentionError(error, directory);
+      }
+      return;
+    }
+
+    const candidates: Array<{ filePath: string; name: string; modifiedAt: number }> = [];
+
+    for (const name of names) {
+      if (name === activeFile || !matcher.test(name)) continue;
+
+      const filePath = path.join(directory, name);
+
+      try {
+        const stats = await fs.promises.stat(filePath);
+
+        if (stats.isFile()) candidates.push({ filePath, name, modifiedAt: stats.mtimeMs });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          this.reportRetentionError(error, filePath);
+        }
+      }
+    }
+
+    // Newest first; the name breaks ties so the order is stable.
+    candidates.sort((a, b) => b.modifiedAt - a.modifiedAt || (a.name < b.name ? 1 : -1));
+
+    // The file being written counts toward `maxFiles` and is never removed.
+    const keep =
+      retention.maxFiles === undefined
+        ? Infinity
+        : retention.maxFiles - (names.includes(activeFile) ? 1 : 0);
+    const oldestKept =
+      retention.maxAgeDays === undefined ? -Infinity : Date.now() - retention.maxAgeDays * DAY_MS;
+
+    for (const [index, candidate] of candidates.entries()) {
+      if (index < keep && candidate.modifiedAt >= oldestKept) continue;
+
+      try {
+        await fs.promises.unlink(candidate.filePath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          this.reportRetentionError(error, candidate.filePath);
+        }
+      }
+    }
+  }
+
+  /**
+   * Send a retention failure to the channel error handler.
+   */
+  protected reportRetentionError(error: unknown, target: string): void {
+    this.reportError(error, {
+      type: "error",
+      module: "logger",
+      action: "retention",
+      message: `Log retention failed for ${target}`,
+    });
   }
 
   /**
@@ -401,16 +733,20 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
       return await this.writeGroupedMessagesToFile();
     }
 
-    await this.checkAndRotateFile(); // Ensure we check file size before writing
-
     try {
-      await this.write(this.filePath, this.content);
+      const filePath = this.filePath;
+
+      await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
+      await this.write(filePath, this.content);
       this.onSave();
     } catch (error) {
       console.error("Failed to write log:", error);
       // Implement fallback logic here
       this.isWriting = false;
+      return;
     }
+
+    await this.afterWrite();
   }
 
   /**
@@ -424,15 +760,15 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
       const directoryPath = path.join(this.storagePath, key);
 
-      await ensureDirectoryAsync(directoryPath);
-
-      const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
-
-      await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
-
-      const content = groupMessages.map((message) => message.content).join(EOL) + EOL;
-
       try {
+        await ensureDirectoryAsync(directoryPath);
+
+        const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
+
+        await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
+
+        const content = groupMessages.map((message) => message.content).join(EOL) + EOL;
+
         await this.write(filePath, content);
       } catch (error) {
         console.error("Failed to write log:", error);
@@ -441,6 +777,8 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
 
     this.onSave();
     this.isWriting = false;
+
+    await this.afterWrite();
   }
 
   /**
@@ -473,5 +811,26 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
         }
       });
     });
+  }
+}
+
+/**
+ * Reject a `retention` that could never keep or remove anything sensibly.
+ */
+function assertRetention(retention: FileLogRetention | undefined): void {
+  if (!retention) return;
+
+  const { maxFiles, maxAgeDays, match } = retention;
+
+  if (maxFiles !== undefined && (!Number.isInteger(maxFiles) || maxFiles < 1)) {
+    throw new TypeError("FileLog retention.maxFiles must be a positive integer");
+  }
+
+  if (maxAgeDays !== undefined && (!Number.isFinite(maxAgeDays) || maxAgeDays <= 0)) {
+    throw new TypeError("FileLog retention.maxAgeDays must be a positive number");
+  }
+
+  if (match !== undefined && !(match instanceof RegExp)) {
+    throw new TypeError("FileLog retention.match must be a RegExp");
   }
 }

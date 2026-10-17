@@ -214,6 +214,26 @@ Built-in `/health` and `/ready` routes are exempt by default; set
 Development wildcard dispatch has separate
 per-route handling; check route overrides in both environments.
 
+## 5.30 to 5.31 daily log file names
+
+`FileLog` and `JSONFileLog` now name dated files by sortable ISO date: a daily
+chunk writes `2026-10-17.log` instead of `17-10-2026.log`, an hourly chunk
+`2026-10-17-14.log`, and rotated archives use `YYYY-MM-DD` in the middle. Update
+log shippers, cron cleanups or scripts that look for the old names. To keep them:
+
+```ts
+new FileLog({
+  chunk: "daily",
+  fileName: "{DD}-{MM}-{YYYY}", // 17-10-2026.log, as before 5.31
+  rotateFileName: "{DD}-{MM}-{YYYY}",
+});
+```
+
+`rotateFileName` is a `{YYYY}`-style pattern or a function, not a Day.js format.
+To replace a custom pruning job, use `retention: { maxFiles, maxAgeDays }` (see the
+Logger `pick-log-channel` topic); it never removes files with another name pattern,
+such as files written under the old names.
+
 ## Verify the application paths that changed
 
 Run the app's type check, its logger channel tests, any tools with ordered side

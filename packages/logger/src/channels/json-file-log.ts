@@ -112,13 +112,23 @@ export class JSONFileLog extends FileLog implements LogContract {
       return await this.writeGroupedMessagesToFile();
     }
 
-    await this.checkAndRotateFile(); // Ensure file rotation is handled
+    let filePath: string;
+
+    try {
+      filePath = this.filePath;
+    } catch (error) {
+      console.error("Failed to write log:", error);
+      this.isWriting = false;
+      return;
+    }
+
+    await this.checkAndRotateFile(filePath); // Ensure file rotation is handled
 
     let fileContents = { messages: [] as any[] };
 
-    if (await fileExistsAsync(this.filePath)) {
+    if (await fileExistsAsync(filePath)) {
       try {
-        fileContents = (await getJsonFileAsync(this.filePath)) as { messages: any[] };
+        fileContents = (await getJsonFileAsync(filePath)) as { messages: any[] };
       } catch (error) {
         console.error("Error reading log file, reinitializing:", error);
         fileContents = { messages: [] }; // Reinitialize the file if corrupted
@@ -130,20 +140,33 @@ export class JSONFileLog extends FileLog implements LogContract {
     fileContents.messages.push(...this.messages);
 
     try {
-      await fs.promises.writeFile(this.filePath, safeJsonStringify(fileContents, 2));
+      await fs.promises.writeFile(filePath, safeJsonStringify(fileContents, 2));
 
       this.onSave();
     } catch (error) {
       console.error("Failed to write log:", error);
       // Implement fallback logic here
       this.isWriting = false;
+      return;
     }
+
+    await this.afterWrite();
   }
 
   /**
    * Write grouped messages to the file
    */
   protected async writeGroupedMessagesToFile(): Promise<void> {
+    let fileName: string;
+
+    try {
+      fileName = this.fileName;
+    } catch (error) {
+      console.error("Failed to write log:", error);
+      this.isWriting = false;
+      return;
+    }
+
     // first step, is to group the messages
     this.prepareGroupedMessages();
 
@@ -153,7 +176,7 @@ export class JSONFileLog extends FileLog implements LogContract {
 
       await ensureDirectoryAsync(directoryPath);
 
-      const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
+      const filePath = path.join(directoryPath, `${fileName}.${this.extension}`);
 
       await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
 
@@ -180,5 +203,7 @@ export class JSONFileLog extends FileLog implements LogContract {
     }
 
     this.onSave();
+
+    await this.afterWrite();
   }
 }

@@ -85,7 +85,7 @@ export class Logger {
    * Add a new channel
    */
   public addChannel(channel: LogChannel) {
-    this.channels.push(channel);
+    this.channels.push(this.attachChannel(channel));
 
     return this;
   }
@@ -101,7 +101,7 @@ export class Logger {
     onChannelError?: ChannelErrorHandler;
   }) {
     if (config.channels) {
-      this.channels = config.channels;
+      this.setChannels(config.channels);
     }
 
     if (config.autoFlushOn) {
@@ -189,7 +189,23 @@ export class Logger {
   public setChannels(channels: LogChannel[]) {
     this.channels = channels;
 
+    for (const channel of channels) {
+      this.attachChannel(channel);
+    }
+
     return this;
+  }
+
+  /**
+   * Route a channel's own failures (outside `log()`, such as file retention)
+   * to this logger's channel error handler.
+   */
+  private attachChannel(channel: LogChannel): LogChannel {
+    if (typeof channel.setErrorReporter === "function") {
+      channel.setErrorReporter((error, entry) => this.reportChannelError(error, channel, entry));
+    }
+
+    return channel;
   }
 
   /**
