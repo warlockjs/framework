@@ -362,9 +362,16 @@ for await (const chunk of model.send(streamingRequest, { signal })) {
 ```
 
 `send()` uses the built endpoint, body and beta flags without rebuilding the
-conversation or applying new defaults. Transport cancellation stays separate from
-the audited body. `complete()` and `stream()` use this same build/send path and always select their
-respective non-streaming and streaming request modes.
+conversation or applying new defaults. It passes `betas` only when `endpoint` is
+`"beta.messages"`: a request whose `endpoint` is `"messages"` is sent without
+them, even if `betas` was edited by hand. Transport cancellation stays separate
+from the audited body. `complete()`, `stream()` and `countTokens()` use this same
+build path and always select their respective request modes. `buildRequest()`
+throws build failures raw (an `InvalidRequestError` for a reserved `body` key, a
+`DataCloneError` for a `body` value `structuredClone` cannot copy, such as a
+function); `complete()`, `stream()` and `countTokens()` log them like send
+failures and reject with an `AIError`, wrapping anything else in an
+`InvalidRequestError`.
 Treat the snapshot as read-only after hashing it; SDK JSON serialization and beta
 header handling still apply.
 

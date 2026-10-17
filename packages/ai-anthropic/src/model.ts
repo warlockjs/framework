@@ -1,4 +1,5 @@
 import {
+  AIError,
   InvalidRequestError,
   resolveStreamChunks,
   safeJsonParse,
@@ -268,7 +269,7 @@ export class AnthropicModel implements ModelContract {
    * instance's `ModelConfig` defaults for this call only.
    */
   public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
-    return this.send(this.buildRequest(messages, { ...options, stream: false }), {
+    return this.send(this.buildLoggedRequest(messages, { ...options, stream: false }), {
       signal: options?.signal,
     });
   }
@@ -297,6 +298,43 @@ export class AnthropicModel implements ModelContract {
     return { endpoint: betas.length > 0 ? "beta.messages" : "messages", body, betas };
   }
 
+  /**
+   * `buildRequest()` for the adapter's own calls: a build failure (a reserved
+   * body key, a `providerOptions.anthropic.body` value `structuredClone`
+   * cannot copy) is logged like a send failure and rejects as an `AIError`.
+   * Errors that are not already an `AIError` become an `InvalidRequestError`,
+   * since nothing reached Anthropic and retrying cannot help.
+   */
+  private buildLoggedRequest(
+    messages: Message[],
+    options: ModelCallOptions & { stream: true },
+  ): AnthropicStreamingRequest;
+  private buildLoggedRequest(
+    messages: Message[],
+    options: ModelCallOptions & { stream: false },
+  ): AnthropicNonStreamingRequest;
+  private buildLoggedRequest(
+    messages: Message[],
+    options: ModelCallOptions & { stream: boolean },
+  ): AnthropicRequest;
+  private buildLoggedRequest(
+    messages: Message[],
+    options: ModelCallOptions & { stream: boolean },
+  ): AnthropicRequest {
+    try {
+      return this.buildRequest(messages, options);
+    } catch (thrown) {
+      throw this.logAndWrap(
+        thrown instanceof AIError
+          ? thrown
+          : new InvalidRequestError(
+              `Could not build the Anthropic request: ${thrown instanceof Error ? thrown.message : String(thrown)}`,
+              { cause: thrown },
+            ),
+      );
+    }
+  }
+
   /** Send a built request without rebuilding its body or applying model defaults. */
   public send(
     request: AnthropicNonStreamingRequest,
@@ -314,7 +352,11 @@ export class AnthropicModel implements ModelContract {
     request: AnthropicRequest,
     options?: AnthropicRequestOptions,
   ): Promise<ModelResponse> | AsyncIterable<ModelStreamChunk> {
-    this.logger.debug(LOG_MODULE, "request", "Starting call to messages.create", {
+    const message = request.body.stream
+      ? "Starting streaming call to messages.create"
+      : "Starting call to messages.create";
+
+    this.logger.debug(LOG_MODULE, "request", message, {
       model: request.body.model,
       messageCount: Array.isArray(request.body.messages) ? request.body.messages.length : 0,
       streaming: request.body.stream,
@@ -369,7 +411,10 @@ export class AnthropicModel implements ModelContract {
    * const tokens = await model.countTokens(messages, { tools });
    */
   public async countTokens(messages: Message[], options?: ModelCallOptions): Promise<number> {
-    const request = this.buildRequest(messages, options);
+    const request = this.buildLoggedRequest(messages, {
+      ...options,
+      stream: options?.stream === true,
+    });
     const body = request.body;
     const countBody: Record<string, unknown> = {};
 
@@ -410,7 +455,7 @@ export class AnthropicModel implements ModelContract {
     messages: Message[],
     options?: ModelCallOptions,
   ): AsyncIterable<ModelStreamChunk> {
-    yield* this.send(this.buildRequest(messages, { ...options, stream: true }), {
+    yield* this.send(this.buildLoggedRequest(messages, { ...options, stream: true }), {
       signal: options?.signal,
       streamChunks: options?.streamChunks,
     });
