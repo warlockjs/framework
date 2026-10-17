@@ -26,6 +26,7 @@
  * built-in names, so this cannot fall out of step with what the manager
  * actually registered.
  */
+import { WarlockError } from "../errors/warlock-error";
 import { connectorsManager } from "./connectors-manager";
 import type { Connector } from "./types";
 
@@ -41,7 +42,8 @@ export function assertNoReservedConnectorNames(connectors: Connector[]): void {
   const subject = unique.length === 1 ? "name is" : "names are";
   const object = unique.length === 1 ? "it" : "one of them";
 
-  throw new Error(
+  throw new WarlockError(
+    "WL1009",
     `The following connector ${subject} reserved by a framework built-in connector: [${names}].\n` +
       "Every connector name must be unique, and the framework already registers a built-in connector under " +
       `${unique.length === 1 ? "that name" : "those names"}, so a custom connector carrying ${object} ` +

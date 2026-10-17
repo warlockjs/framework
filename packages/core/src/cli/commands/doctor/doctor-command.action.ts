@@ -2,7 +2,9 @@ import type { CommandActionData } from "../../../commands/types";
 import { bootForDiagnostics } from "./boot-for-diagnostics";
 import { defaultDoctorChecks } from "./checks";
 import { fixLocaleSources } from "./checks/locales-ts-deprecated.check";
-import { printReport } from "./format-report";
+import { flushAndExit } from "../../flush-and-exit";
+import { withConsoleOnStderr } from "../routes/with-console-on-stderr";
+import { printReport, toDoctorJson } from "./format-report";
 import { runChecks } from "./run-checks";
 
 /**
@@ -26,22 +28,36 @@ import { runChecks } from "./run-checks";
  * banner and exits zero — which also disposes of the handles the boot pass
  * left open (a Fastify instance, a Vite dev server for `web` apps).
  *
- * @param data Parsed CLI args, including the optional safe migration flag.
+ * With `--json` the report is printed as JSON (see `toDoctorJson`): every
+ * finding carries its stable `WL` code, `hint`, `skill` and `docs`.
+ *
+ * @param data Parsed CLI args: the optional safe migration flag and `--json`.
  */
 export async function doctorCommandAction(data: CommandActionData): Promise<void> {
+  const json = data.options.json === true;
+
+  // With `--json`, stdout carries the report alone: the fix log and the boot's
+  // progress lines go to stderr.
+  const log = json ? console.error : console.log;
+
   if (data.options.fix === true) {
     for (const result of fixLocaleSources()) {
       const file = result.file.replace(process.cwd(), ".").replaceAll("\\", "/");
-      console.log(`${result.convertible ? "converted" : "manual"} ${file}: ${result.reason}`);
+      log(`${result.convertible ? "converted" : "manual"} ${file}: ${result.reason}`);
     }
   }
-  const context = await bootForDiagnostics();
+
+  const context = json ? await withConsoleOnStderr(bootForDiagnostics) : await bootForDiagnostics();
 
   const report = await runChecks(defaultDoctorChecks, context);
 
-  printReport(report);
+  if (json) {
+    console.log(JSON.stringify(toDoctorJson(report), null, 2));
+  } else {
+    printReport(report);
+  }
 
   if (report.hasFailures) {
-    process.exit(report.exitCode);
+    await flushAndExit(report.exitCode);
   }
 }

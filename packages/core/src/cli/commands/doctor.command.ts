@@ -30,6 +30,11 @@ export const doctorCommand = command({
       description: "Convert safely auto-convertible legacy utils/locales.ts files to locales.json",
       type: "boolean",
     },
+    {
+      text: "--json, -j",
+      description: "Print the report as JSON, each finding with its stable error code",
+      type: "boolean",
+    },
   ],
   preload: {
     runtimeStrategy: "development",

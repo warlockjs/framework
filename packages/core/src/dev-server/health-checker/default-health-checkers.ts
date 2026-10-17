@@ -9,7 +9,8 @@ import type {
 } from "./file-health-checker.contract";
 import { findOxlint } from "./oxlint-runner";
 
-function hasEslint(cwd: string): boolean {
+/** Whether the app has an ESLint flat config at its root. */
+export function hasEslint(cwd: string): boolean {
   // ESLint is a core dependency, so an app needs only its configuration.
   return ["js", "mjs", "cjs", "ts", "mts", "cts"].some((extension) =>
     existsSync(path.join(cwd, `eslint.config.${extension}`)),

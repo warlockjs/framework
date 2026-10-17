@@ -21,6 +21,7 @@
  * refuses it; if an EARLIER CALL configured it, the registration skip treats it
  * as idempotency on purpose — neither validator claims that case.
  */
+import { WarlockError } from "../errors/warlock-error";
 import type { Connector } from "./types";
 
 export function assertUniqueConnectorNames(connectors: Connector[]): void {
@@ -41,7 +42,8 @@ export function assertUniqueConnectorNames(connectors: Connector[]): void {
   const names = [...duplicated].map((name) => JSON.stringify(name)).join(", ");
   const subject = duplicated.size === 1 ? "name is" : "names are";
 
-  throw new Error(
+  throw new WarlockError(
+    "WL1009",
     `The same connector ${subject} listed more than once in \`connectors\`: [${names}].\n` +
       "Every connector in `warlock.config.ts > connectors` must have a unique name. " +
       "The build prepares artifacts per ENTRY — it drains the build contribution of each one, so a repeated name contributes twice — " +

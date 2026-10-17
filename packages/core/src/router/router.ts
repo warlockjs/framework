@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
+import { WarlockError } from "../errors/warlock-error";
 import type { FastifyStaticOptions } from "@fastify/static";
 import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
@@ -23,6 +24,7 @@ import {
 import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
 import { resolveRouteRateLimit, resolveStaticRateLimit } from "./resolve-route-rate-limit";
+import { RouteNameTakenError } from "./route-name-taken-error";
 import { DEV_DISPATCH_METHODS, buildNotFoundBody, createDevRateLimiter } from "./dev-dispatch";
 import { RouteRegistry } from "./route-registry";
 import { routeNameMethodSuffix } from "./route-name-method-suffix";
@@ -443,7 +445,8 @@ export class Router {
       const [controller, action] = handler;
 
       if (typeof controller[action] !== "function") {
-        throw new Error(
+        throw new WarlockError(
+          "WL3002",
           `Invalid controller action "${action}" for controller "${controller.constructor.name}"`,
         );
       }
@@ -486,7 +489,8 @@ export class Router {
       if (route) {
         // check again if the route name exists with the same method
         if (route.method === routeData.method) {
-          throw new Error(
+          throw new RouteNameTakenError(
+            routeData.name,
             `Route name "${routeData.name}" is already taken.\n` +
               `  already registered: ${describeRouteClaimant(route)}\n` +
               `  now being added:    ${describeRouteClaimant(routeData)}\n` +
@@ -1218,7 +1222,7 @@ export class Router {
     const route = this.routes.find((route) => route.name === name);
 
     if (!route) {
-      throw new Error(`Route name "${name}" not found`);
+      throw new WarlockError("WL3003", `Route name "${name}" not found`);
     }
 
     const used = new Set<string>();
@@ -1229,7 +1233,7 @@ export class Router {
       if (value === undefined || value === null) {
         if (optional) return "";
 
-        throw new Error(`Route "${name}" is missing the "${key}" param`);
+        throw new WarlockError("WL3004", `Route "${name}" is missing the "${key}" param`);
       }
 
       used.add(key);

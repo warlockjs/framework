@@ -22,9 +22,14 @@ export type OxlintFileResult = OxlintFile & {
 
 const CONFIG_FILES = [".oxlintrc.json", ".oxlintrc.jsonc", "oxlint.config.ts", "oxlint.config.mts"];
 
+/** Whether the app has an oxlint config file at its root. */
+export function hasOxlintConfig(cwd: string): boolean {
+  return CONFIG_FILES.some((name) => existsSync(path.join(cwd, name)));
+}
+
 /** Resolve the app's optional CLI package, without using global PATH binaries. */
 export function findOxlint(cwd: string): string | undefined {
-  if (!CONFIG_FILES.some((name) => existsSync(path.join(cwd, name)))) return undefined;
+  if (!hasOxlintConfig(cwd)) return undefined;
   try {
     const require = createRequire(path.join(cwd, "package.json"));
     const packagePath = require.resolve("oxlint/package.json");

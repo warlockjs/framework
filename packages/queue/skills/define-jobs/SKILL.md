@@ -47,6 +47,16 @@ const job = await sendInvoice.find(id);
 // { id, name, queue, state, payload, progress, attemptsMade, result, failedReason, createdAt, finishedAt }
 ```
 
+## List the defined jobs
+
+`registeredJobs()` returns every definition `defineJob()` registered in this process, and `queueOf(definition)` the queue it runs on. Neither touches Redis; `warlock inspect --section jobs` prints the same list for a whole app.
+
+```ts
+import { queueOf, registeredJobs } from "@warlock.js/queue";
+
+const jobs = registeredJobs().map((job) => ({ name: job.name, queue: queueOf(job) }));
+```
+
 ## Carry request context into jobs
 
 ```ts

@@ -62,9 +62,9 @@
     "@react-email/render": "^2.0.5",
     "@warlock.js/access": "*",
     "@warlock.js/ai": "*",
+    "@warlock.js/devtools": "*",
     "@warlock.js/herald": "*",
     "@warlock.js/notifications": "*",
-    "@warlock.js/devtools": "*",
     "nodemailer": "^8.0.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -148,6 +148,7 @@
     "@warlock.js/auth": "workspace:^",
     "@warlock.js/herald": "workspace:^",
     "@warlock.js/notifications": "workspace:^",
+    "ajv": "^8.20.0",
     "vitest": "4.1.10"
   },
   "packageManager": "pnpm@11.24.0"

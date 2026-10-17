@@ -44,6 +44,8 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 ## CLI & operations
 
 - `warlock-doctor` — `warlock doctor`: read-only diagnostics (routes/config/connectors/optional-peers/health/release-hygiene) with a pass/warn/fail report and non-zero exit on failure.
+- `warlock-inspect` — `warlock inspect [--json] [--section ...]`: the app's routes, models, resources, config keys, events, pages, jobs, schedules and package versions from the booted registries, as a versioned JSON report; `inspectApp()` from `@warlock.js/core/tooling`.
+- `warlock-check` — `warlock check` / `typecheck` / `explain`: one verify command (typecheck, lint, affected tests, conventions) with one JSON object per problem, stable `WL` error codes, and exit 1 for your code vs 2 for this machine.
 - `warlock-routes` — `warlock routes`: list the registered HTTP routes as a verb-colored table (method/path/name/action/middleware/source); filter by method/path/name or emit JSON. Read-only, no connectors.
 - `write-cli-command` — author a custom `warlock <cmd>` via the `command()` factory, or inspect built-in `warlock add` feature scaffolding such as the Web starter.
 - `generate-openapi` — `warlock generate.openapi`: an OpenAPI 3.1 document from the routes (validation, `responseSchema`, auth), plus the dev-only API docs page.

@@ -165,6 +165,7 @@ export const optionalPeersCheck: DoctorCheck = {
       return {
         name: "optional-peers",
         status,
+        code: "WL2007",
         detail:
           `${missing.length} configured feature(s) have no driver installed:\n` +
           missing.map((peer) => `  - ${peer.package} — required by ${peer.because}`).join("\n"),

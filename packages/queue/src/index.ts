@@ -8,6 +8,7 @@ export { defineJob } from "./define-job";
 export { toMilliseconds } from "./duration";
 export * from "./errors";
 export * from "./failed-jobs";
+export { queueOf, registeredJobs, type RegisteredJob } from "./job-registry";
 export * from "./queue-connector";
 export {
   defineQueueContext,

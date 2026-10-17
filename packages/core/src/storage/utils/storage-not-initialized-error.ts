@@ -12,6 +12,9 @@
  * `null`. This error names that cause and the fix directly instead.
  */
 export class StorageNotInitializedError extends Error {
+  /** Stable Warlock error code; `warlock explain WL2006` prints the fix. */
+  public readonly code = "WL2006";
+
   public constructor(options?: { cause?: unknown }) {
     super(
       "Storage is not initialized in this process. This happens when the `storage` " +

@@ -25,6 +25,7 @@ function makeContext(overrides: Partial<DoctorBootContext> = {}): DoctorBootCont
     appRoutes: 42,
     totalRoutes: 42,
     moduleFailures: [],
+    modelModules: [],
     connectors: {
       registered: ["logger", "http", "database"],
       configured: [],

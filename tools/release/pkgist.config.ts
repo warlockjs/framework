@@ -176,6 +176,11 @@ export default defineConfig({
             // processes can guard outbound requests without loading the root
             // barrel. Same shared-chunk arrangement as `errors`.
             "net/index.ts",
+            // `@warlock.js/core/tooling` (5.31): `inspectApp`, `runCheck`,
+            // `runTypecheck` — the functions behind `warlock inspect`, `check` and
+            // `typecheck`. Its own entry because it pulls in the TypeScript
+            // compiler and ESLint, which must stay out of the root barrel.
+            "tooling/index.ts",
             // The build-time route registration collector runs in an isolated
             // Node child. It is a separate entry because the parent resolves
             // the compiled child by a runtime path rather than importing it.
@@ -188,6 +193,9 @@ export default defineConfig({
           formats: ["esm"],
           clone: [
             "bin",
+            // The JSON Schema of the `warlock inspect --json` report, as
+            // `@warlock.js/core/schemas/inspect-report.schema.json`.
+            "schemas",
             "README.md",
             "LICENSE",
             "CHANGELOG.md",

@@ -8,6 +8,9 @@
  * opaque low-level error from deep inside the bundler.
  */
 export class EsbuildBinaryMissingError extends Error {
+  /** Stable Warlock error code; `warlock explain WL8005` prints the fix. */
+  public readonly code = "WL8005";
+
   public constructor(options?: { cause?: unknown }) {
     super(
       "esbuild's native binary is not installed or linked for this platform, so " +

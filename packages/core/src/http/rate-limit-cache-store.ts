@@ -34,6 +34,9 @@ const UNSUPPORTED_DRIVERS = new Set(["null", "file"]);
  * Thrown when `store: "cache"` runs on a cache driver that cannot count.
  */
 export class UnsupportedRateLimitDriverError extends Error {
+  /** Stable Warlock error code; `warlock explain WL1003` prints the fix. */
+  public readonly code = "WL1003";
+
   public constructor(driverName: string) {
     super(
       `Rate limiting with store: "cache" cannot use the "${driverName}" cache driver: ` +

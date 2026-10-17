@@ -27,12 +27,18 @@ describe("doctorCommand definition", () => {
     expect(doctorCommand.commandPreload?.connectors).toBeUndefined();
   });
 
-  it("defines an action and exposes the safe locale migration option", () => {
+  it("defines an action and exposes the safe locale migration and JSON options", () => {
     expect(doctorCommand.commandAction).toBeTypeOf("function");
-    expect(doctorCommand.commandOptions).toHaveLength(1);
+    expect(doctorCommand.commandOptions).toHaveLength(2);
     expect(doctorCommand.commandOptions[0]).toMatchObject({
       text: "--fix",
       description: "Convert safely auto-convertible legacy utils/locales.ts files to locales.json",
+      type: "boolean",
+    });
+    expect(doctorCommand.commandOptions[1]).toMatchObject({
+      text: "--json, -j",
+      name: "json",
+      alias: "j",
       type: "boolean",
     });
   });
