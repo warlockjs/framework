@@ -11,6 +11,7 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Fixed
 
 - Sitemap routes compare `If-Match` strongly and answer 412 when it does not name the exact strong ETag; `If-None-Match` keeps weak comparison and both use core's RFC 9110 precondition evaluation. The `W/` weakness prefix is matched case-sensitively, as the RFC defines it.
+- Pages render on Bun and Deno. Both runtimes resolve a bare `react-dom/server` import through their own export conditions to a React build without `renderToPipeableStream`, so every page request on a built app failed with "renderToPipeableStream is not a function" (HTTP 500). The page renderer now loads React's Node server build, `react-dom/server.node`, when the selected build cannot stream. Node keeps the module it selected before.
 
 - The server-page-cache test fixture explicitly disables unrelated HTTP throttling and restores its previous configuration on teardown, so repeated cache requests exercise cache behavior after production rate-limit enforcement was corrected.
 

@@ -114,6 +114,17 @@ built `dist` is therefore not relocatable: run `warlock start` with the app
 root as the working directory. Copying `dist` elsewhere without the app root
 means the client assets, Vite manifest, and copied public files are not found.
 
+## Serving pages on Bun and Deno
+
+A build made with Node serves pages on Bun and Deno too (`bun dist/app.js`,
+`deno run -A dist/app.js`, or `warlock start` run with either runtime). Both
+runtimes resolve a bare `react-dom/server` import to a build without
+`renderToPipeableStream` (Bun's `"bun"` export condition and Deno's `"deno"`
+condition), so the page renderer loads React's Node server build,
+`react-dom/server.node`, when that happens. On Node nothing changes. The
+verified versions and commands are on core's
+[Supported runtimes](/v/latest/core/digging-deeper/supported-runtimes/) page.
+
 ## Dev: app modules can load twice
 
 In `warlock dev`, page loaders import app modules through Vite SSR, while HTTP

@@ -7,6 +7,7 @@ export * from "./npm-registry";
 export * from "./paths";
 export * from "./promise-all-object";
 export * from "./queue";
+export * from "./runtime";
 export * from "./sleep";
 export * from "./sluggable";
 export * from "./to-json";
