@@ -3,7 +3,7 @@ import { readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { agent } from "@warlock.js/ai";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createCliAgent, currentHost } from "./cli-agent";
 import type { CliEvent } from "./contracts";
 import { CliError } from "./errors";
@@ -251,6 +251,31 @@ posixOnly("createCliAgent (real processes, fake CLI)", () => {
     const grandchild = Number(await readFile(pidFile, "utf8"));
 
     await waitFor(() => !isAlive(grandchild));
+  });
+
+  it("never signals the old process group once the run has finished", async () => {
+    const cli = createCliAgent(fakeAdapter(fake.file), { killGraceMs: 50 });
+    const controller = new AbortController();
+    const session = await cli.run("x", { signal: controller.signal });
+    const result = await session.done();
+
+    expect(result.status).toBe("completed");
+
+    // Record (never send) every signal from here on: the finished run's pid
+    // may already belong to an unrelated process.
+    const kill = vi.spyOn(process, "kill").mockImplementation(() => true);
+
+    try {
+      session.cancel();
+      controller.abort();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      expect(kill).not.toHaveBeenCalled();
+    } finally {
+      kill.mockRestore();
+    }
+
+    expect((await session.done()).status).toBe("completed");
   });
 
   it("never spawns for an already-aborted signal", async () => {

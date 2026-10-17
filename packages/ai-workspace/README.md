@@ -18,9 +18,12 @@ are gated by an executable allow/deny list; and `process.env` is **never** inher
 wholesale (a command can't even find `node`/`npm` unless the policy opts in via
 `shell.inheritEnv: ["PATH"]`). What it does **not** do is contain what an _allowed_
 process does once it runs — an allowed `node` can still open a socket or read a file
-its own user can reach. For untrusted code you want real isolation (a container /
-microVM backend), which is a later phase. Treat this as least-privilege guardrails
-for a **trusted** agent, not a security boundary around a hostile one.
+its own user can reach. Shell mode (`interpreter: "sh"`) is likewise a policy layer
+checked before `/bin/sh` runs the line — defence in depth, not a sandbox. For an
+untrusted agent, run the workspace inside a container or microVM with only the
+project mounted, or at least as a separate unprivileged user, and keep this policy
+as a second layer. Treat it as least-privilege guardrails for a **trusted** agent,
+not a security boundary around a hostile one.
 
 ## Install
 

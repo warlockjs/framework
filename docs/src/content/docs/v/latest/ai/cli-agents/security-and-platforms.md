@@ -67,6 +67,8 @@ Coding CLIs start shells, language servers and MCP servers, so killing the direc
 
 A run whose `signal` is already aborted never spawns. After `cancel()`, an abort or a timeout, `session.done()` resolves with `status` `cancelled` or `timeout`.
 
+Once the CLI's pipes have closed, the run is over: `cancel()` and aborting its `signal` do nothing, and the result keeps its real status. The old process group is never signalled again, because its id may already belong to an unrelated process. Calling `session.cancel()` in a `finally` block is therefore safe.
+
 ## Exit codes and errors
 
 The session ends `failed` on any of these:

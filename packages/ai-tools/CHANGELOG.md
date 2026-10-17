@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `McpServer.start()` resolves a handle (`{ url?, close }`) instead of `void`. The http transport's `port` is optional.
 - `@modelcontextprotocol/sdk` is no longer listed as an optional peer dependency. The MCP client never imported it: it speaks MCP's JSON-RPC itself over a child process (stdio) and `fetch` (http). The SDK is now a development dependency, used only by the interoperability test against the official client. The MCP docs, README and `connect-mcp-server` skill now say so, and name `ajv` as the client's only optional peer.
 
+### Fixed
+
+- The stdio transport of `ai.mcp.serve()` no longer crashes the process when a line is JSON but not a request object (`null`, a number, an array): it answers a JSON-RPC "Invalid Request" error (`-32600`, `id: null`). A failure while answering a line is answered as an internal error and can no longer become an unhandled rejection.
+
 ### Security
 
 - The HTTP transport binds loopback by default and refuses to start on any non-loopback host without `auth` (`McpServeError`, `type: "config"`).
