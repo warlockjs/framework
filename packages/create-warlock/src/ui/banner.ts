@@ -99,7 +99,11 @@ export function getSuccessScreen(
   );
   let summary: string[];
   if (narrow) {
-    summary = [...wrapText(heading, contentWidth), "", ...rows];
+    summary = [
+      ...wrapText(heading, contentWidth).map((line) => colors.bold(colors.green(line))),
+      "",
+      ...rows,
+    ];
   } else {
     const innerWidth = Math.max(visibleWidth(heading), ...rows.map(visibleWidth)) + 6;
     const border = (left: string, right: string) =>

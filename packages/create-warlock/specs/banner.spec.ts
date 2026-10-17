@@ -116,6 +116,47 @@ describe("getSuccessScreen", () => {
     },
   );
 
+  it.each([32, 20])(
+    "keeps the heading bold green on a narrow %s-column screen",
+    async (columns) => {
+      // Colour support is detected when @mongez/copper loads, so swap in an
+      // always-on palette and load a fresh copy of the banner module against it.
+      vi.resetModules();
+      vi.doMock("@mongez/copper", async (importOriginal) => {
+        const copper = await importOriginal<typeof import("@mongez/copper")>();
+        return { ...copper, colors: copper.createColors(true) };
+      });
+      try {
+        const banner = await import("../src/ui/banner");
+        const lines = banner
+          .getSuccessScreen(
+            { projectName: "app", database: "MongoDB", features: [], packageManager: "npm" },
+            columns,
+          )
+          .split("\n")
+          .slice(1);
+        const headingLines = lines.slice(
+          0,
+          lines.findIndex((line) => visible(line) === ""),
+        );
+        expect(headingLines.length).toBeGreaterThan(0);
+        expect(headingLines.map(visible).join(" ")).toContain("YOUR PROJECT IS READY");
+        for (const line of headingLines) {
+          expect(line).toContain("\x1b[1m");
+          expect(line).toContain("\x1b[32m");
+          const width = [...visible(line)].reduce(
+            (total, char) => total + (/\p{Extended_Pictographic}/u.test(char) ? 2 : 1),
+            0,
+          );
+          expect(width, line).toBeLessThanOrEqual(columns);
+        }
+      } finally {
+        vi.doUnmock("@mongez/copper");
+        vi.resetModules();
+      }
+    },
+  );
+
   it("aligns wrapped features beneath the value and keeps command indentation", () => {
     const screen = visible(
       getSuccessScreen(
