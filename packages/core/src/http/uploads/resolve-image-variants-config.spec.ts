@@ -1,7 +1,14 @@
+import config from "@mongez/config";
+import fsSync from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { storage } from "../../storage";
 import type { UploadsImagesConfigurations } from "../uploads-types";
+import { resetVariantCacheOverlapChecks } from "./image-variant-cache";
 import { ImageVariantsConfigError } from "./image-variants-config-error";
+import { purgeImageVariants } from "./purge-image-variants";
 import { resolveImageVariantsConfig } from "./resolve-image-variants-config";
 
 const root = path.resolve("/srv/storage");
@@ -104,5 +111,90 @@ describe("resolveImageVariantsConfig", () => {
     expect(() => resolve({ variants: { hero: { width: 99999 } } })).toThrow(
       /uploads\.images\.variants\.hero\.width/,
     );
+  });
+});
+
+describe("cache directory resolution on disk", () => {
+  let workspace: string;
+  let disk: string;
+
+  beforeEach(async () => {
+    storage.reset();
+    resetVariantCacheOverlapChecks();
+    workspace = await fs.mkdtemp(path.join(os.tmpdir(), "variant-config-"));
+    disk = path.join(workspace, "disk");
+    await fs.mkdir(disk);
+    config.set("storage", {
+      default: "primary",
+      drivers: { primary: { driver: "local", root: disk } },
+    });
+    vi.spyOn(storage, "root").mockReturnValue(disk);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    storage.reset();
+    config.set("storage", {});
+    config.set("uploads", {});
+    resetVariantCacheOverlapChecks();
+    await fs.rm(workspace, { recursive: true, force: true });
+  });
+
+  it("reports a cache directory beneath a regular file as a configuration error", async () => {
+    const file = path.join(workspace, "not-a-directory");
+    await fs.writeFile(file, "plain file");
+    const images = { variants: { thumb: { width: 10 } }, cacheDirectory: path.join(file, "cache") };
+
+    const thrown = (() => {
+      try {
+        resolveImageVariantsConfig(images, disk);
+      } catch (error) {
+        return error;
+      }
+    })();
+    expect(thrown).toBeInstanceOf(ImageVariantsConfigError);
+    expect((thrown as Error).message).toMatch(
+      /could not be resolved: .*not-a-directory.*\(ENOTDIR\)/,
+    );
+    expect(((thrown as Error).cause as NodeJS.ErrnoException).code).toBe("ENOTDIR");
+
+    config.set("uploads.images", images);
+    const purge = purgeImageVariants().then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    const purgeError = await purge;
+    expect(purgeError).toBeInstanceOf(ImageVariantsConfigError);
+    expect(((purgeError as Error).cause as NodeJS.ErrnoException).code).toBe("ENOTDIR");
+  });
+
+  it("resolves each path once for repeated resolutions of the same configuration", () => {
+    const images = {
+      variants: { thumb: { width: 10 } },
+      cacheDirectory: path.join(workspace, "cache"),
+    };
+    const realpath = vi.spyOn(fsSync, "realpathSync");
+
+    resolveImageVariantsConfig(images, disk);
+    const firstCalls = realpath.mock.calls.length;
+    expect(firstCalls).toBeGreaterThan(0);
+    resolveImageVariantsConfig(images, disk);
+    expect(realpath.mock.calls).toHaveLength(firstCalls);
+  });
+
+  it("checks again when a disk registered afterwards overlaps the cache", () => {
+    const cacheDirectory = path.join(workspace, "cache");
+    const images = { variants: { thumb: { width: 10 } }, cacheDirectory };
+    expect(resolveImageVariantsConfig(images, disk)?.cacheDirectory).toBe(cacheDirectory);
+
+    config.set("storage.drivers", {
+      primary: { driver: "local", root: disk },
+      tenant: { driver: "local", root: path.join(cacheDirectory, "tenant") },
+    });
+    expect(() => resolveImageVariantsConfig(images, disk)).toThrow(
+      /must not equal or contain the storage root/,
+    );
+    // The refusal is remembered too, and still thrown.
+    expect(() => resolveImageVariantsConfig(images, disk)).toThrow(ImageVariantsConfigError);
   });
 });

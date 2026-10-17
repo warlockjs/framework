@@ -5,8 +5,8 @@
  * on the first image instead of producing unbounded or surprising derivatives.
  */
 export class ImageVariantsConfigError extends Error {
-  public constructor(message: string) {
-    super(`Invalid uploads.images configuration: ${message}`);
+  public constructor(message: string, options?: ErrorOptions) {
+    super(`Invalid uploads.images configuration: ${message}`, options);
 
     this.name = "ImageVariantsConfigError";
   }
