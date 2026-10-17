@@ -5,6 +5,11 @@ export * from "./config";
 export * from "./dashboard";
 export { DEFAULT_DASHBOARD_PATH, mountQueueDashboard } from "./dashboard-boot";
 export { defineJob } from "./define-job";
+export {
+  getDispatchInterceptor,
+  setDispatchInterceptor,
+  type DispatchInterceptor,
+} from "./dispatch-interceptor";
 export { toMilliseconds } from "./duration";
 export * from "./errors";
 export * from "./failed-jobs";

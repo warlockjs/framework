@@ -1,5 +1,6 @@
 import type { Job, JobsOptions } from "bullmq";
 import { getQueueConfig } from "./config";
+import { getDispatchInterceptor } from "./dispatch-interceptor";
 import { toMilliseconds } from "./duration";
 import { InvalidJobDefinitionError } from "./errors";
 import { getQueueContext, unwrapPayload, wrapPayload } from "./queue-context";
@@ -46,6 +47,13 @@ export function defineJob<TPayload, TResult = unknown>(
     },
     async dispatch(payload, options = {}) {
       const queueName = queueOf(definition);
+      const interceptor = getDispatchInterceptor();
+
+      // A test fake stands in for the broker: record, never touch Redis.
+      if (interceptor) {
+        return interceptor.dispatch({ name: definition.name, queue: queueName, payload, options });
+      }
+
       // Capture synchronously, in the caller's async context.
       const captured = definition.context === false ? undefined : getQueueContext()?.capture();
       const job = await getQueue(queueName).add(
@@ -57,6 +65,18 @@ export function defineJob<TPayload, TResult = unknown>(
       return { id: String(job.id), name: definition.name, queue: queueName };
     },
     async find(id) {
+      const interceptor = getDispatchInterceptor();
+
+      if (interceptor) {
+        const found = await interceptor.find?.({
+          name: definition.name,
+          queue: queueOf(definition),
+          id,
+        });
+
+        return found as JobSnapshot<TPayload, TResult> | undefined;
+      }
+
       const queue = getQueue(queueOf(definition));
       const initialJob = await queue.getJob(id);
 

@@ -41,7 +41,7 @@ export function getTestServerUrl(): string {
  * Uses native fetch - lightweight, no extra dependencies
  */
 export async function testRequest(path: string, options: RequestInit = {}): Promise<Response> {
-  return sendRequest(path, options, false);
+  return sendRequest(getTestServerUrl(), path, options, false);
 }
 
 /**
@@ -53,11 +53,11 @@ export async function testRequest(path: string, options: RequestInit = {}): Prom
  * labelling it `application/json` produces a request no server can parse.
  */
 async function sendRequest(
+  baseUrl: string,
   path: string,
   options: RequestInit,
   serializedJson: boolean,
 ): Promise<Response> {
-  const baseUrl = getTestServerUrl();
   const url = path.startsWith("/") ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
 
   // Normalised through `Headers` rather than object-spread: `RequestInit.headers`
@@ -85,11 +85,48 @@ function jsonBody(body: unknown): string | undefined {
   return body === undefined ? undefined : JSON.stringify(body);
 }
 
+/** The request helpers, bound to one server. */
+export type TestRequestClient = {
+  request(path: string, options?: RequestInit): Promise<Response>;
+  get(path: string, options?: RequestInit): Promise<Response>;
+  post(path: string, body?: unknown, options?: RequestInit): Promise<Response>;
+  put(path: string, body?: unknown, options?: RequestInit): Promise<Response>;
+  patch(path: string, body?: unknown, options?: RequestInit): Promise<Response>;
+  delete(path: string, options?: RequestInit): Promise<Response>;
+};
+
+/**
+ * Request helpers bound to `baseUrl` (a string, or a function read on every
+ * request). `testGet()` and friends are this, bound to the shared test server;
+ * `createTestHttpServer()` returns one bound to its own port.
+ *
+ * @example
+ * const client = createTestRequestClient("http://127.0.0.1:4100");
+ * await client.post("/posts", { title: "Hello" });
+ */
+export function createTestRequestClient(baseUrl: string | (() => string)): TestRequestClient {
+  const base = () => (typeof baseUrl === "function" ? baseUrl() : baseUrl);
+  const send = (method: string, path: string, body: unknown, options: RequestInit = {}) =>
+    sendRequest(base(), path, { ...options, method, body: jsonBody(body) }, body !== undefined);
+
+  return {
+    request: (path, options = {}) => sendRequest(base(), path, options, false),
+    get: (path, options = {}) => sendRequest(base(), path, { ...options, method: "GET" }, false),
+    post: (path, body, options) => send("POST", path, body, options),
+    put: (path, body, options) => send("PUT", path, body, options),
+    patch: (path, body, options) => send("PATCH", path, body, options),
+    delete: (path, options = {}) =>
+      sendRequest(base(), path, { ...options, method: "DELETE" }, false),
+  };
+}
+
+const sharedServer = createTestRequestClient(getTestServerUrl);
+
 /**
  * GET request helper
  */
 export async function testGet(path: string, options: RequestInit = {}): Promise<Response> {
-  return testRequest(path, { ...options, method: "GET" });
+  return sharedServer.get(path, options);
 }
 
 /**
@@ -100,11 +137,7 @@ export async function testPost(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return sendRequest(
-    path,
-    { ...options, method: "POST", body: jsonBody(body) },
-    body !== undefined,
-  );
+  return sharedServer.post(path, body, options);
 }
 
 /**
@@ -115,14 +148,14 @@ export async function testPut(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return sendRequest(path, { ...options, method: "PUT", body: jsonBody(body) }, body !== undefined);
+  return sharedServer.put(path, body, options);
 }
 
 /**
  * DELETE request helper
  */
 export async function testDelete(path: string, options: RequestInit = {}): Promise<Response> {
-  return testRequest(path, { ...options, method: "DELETE" });
+  return sharedServer.delete(path, options);
 }
 
 /**
@@ -133,11 +166,7 @@ export async function testPatch(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return sendRequest(
-    path,
-    { ...options, method: "PATCH", body: jsonBody(body) },
-    body !== undefined,
-  );
+  return sharedServer.patch(path, body, options);
 }
 
 /**

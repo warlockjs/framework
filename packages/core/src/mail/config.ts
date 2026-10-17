@@ -59,6 +59,23 @@ export function setMailMode(mode: MailMode): void {
 }
 
 /**
+ * The mode set with {@link setMailMode}, or `undefined` when the mode is
+ * derived from the environment.
+ */
+export function getExplicitMailMode(): MailMode | undefined {
+  return explicitMode;
+}
+
+/**
+ * Forget a mode set with {@link setMailMode}, so the mode is derived from the
+ * environment again. Unlike {@link resetMailConfig}, the configured mailers
+ * are kept.
+ */
+export function resetMailMode(): void {
+  explicitMode = undefined;
+}
+
+/**
  * Get the current mail mode
  */
 export function getMailMode(): MailMode {

@@ -29,6 +29,8 @@ import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../connectors";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { installTestFakes, restoreTestFakes } from "./fakes/test-fakes";
+import type { TestFakesSelection } from "./fakes/test-fakes";
 import {
   describeConnectorsSelection,
   isSameConnectorsSelection,
@@ -69,6 +71,16 @@ export type TestSetupOptions = {
    * fails. Defaults to native import.
    */
   importModule?: AppModuleImporter;
+  /**
+   * Which test fakes to install once the connectors are up: mail, queue,
+   * cache, storage, clock and ids (see `installTestFakes`).
+   *
+   * Precedence is `explicit option > tests.fakes config > true`, so every fake
+   * is on unless the project or this call opts out. `false` keeps the real
+   * drivers; `{ cache: false }` keeps only the real cache. Teardown restores
+   * them.
+   */
+  fakes?: TestFakesSelection;
 };
 
 const IMPORT_MODULE_WARNED_KEY = Symbol.for("warlock.core.importModuleWarned");
@@ -167,7 +179,7 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
   setAppModuleImporter(options?.importModule);
 
   try {
-    return await startTestRuntime(requested);
+    return await startTestRuntime(requested, options?.fakes);
   } finally {
     setAppModuleImporter(undefined);
   }
@@ -366,7 +378,10 @@ async function awaitSetupWithinBound(
 /**
  * Open a new setup attempt and publish it before it runs.
  */
-function startTestRuntime(requested: RequestedTestConnectors): Promise<void> {
+function startTestRuntime(
+  requested: RequestedTestConnectors,
+  fakes: TestFakesSelection | undefined,
+): Promise<void> {
   const registry = getTestLifecycleRegistry();
 
   let publishEffectiveSelection: (selection: TestConnectorsSelection) => void = () => undefined;
@@ -385,7 +400,13 @@ function startTestRuntime(requested: RequestedTestConnectors): Promise<void> {
   const bound = armSetupBound(registry);
 
   const attempt = Promise.resolve().then(() =>
-    runTestRuntimeStartup(requested, publishEffectiveSelection, failEffectiveSelection, bound),
+    runTestRuntimeStartup(
+      requested,
+      publishEffectiveSelection,
+      failEffectiveSelection,
+      bound,
+      fakes,
+    ),
   );
 
   // The attempt outlives a bound that beat it, and by then `completion` has
@@ -416,6 +437,7 @@ async function runTestRuntimeStartup(
   publishEffectiveSelection: (selection: TestConnectorsSelection) => void,
   failEffectiveSelection: (error: unknown) => void,
   bound: SetupBound,
+  fakes: TestFakesSelection | undefined,
 ): Promise<void> {
   const registry = getTestLifecycleRegistry();
 
@@ -452,6 +474,10 @@ async function runTestRuntimeStartup(
     publishEffectiveSelection(effectiveSelection);
 
     await startSelectedConnectors(effectiveSelection);
+
+    // After the connectors, so the cache and storage fakes replace drivers
+    // that are already configured instead of being replaced by them.
+    await installTestFakes(fakes);
 
     if (!bound.hasExpired()) {
       registry.state = "ready";
@@ -506,6 +532,7 @@ async function unwindPartialStartup(): Promise<void> {
   // with it and leave every connector up. Both calls are idempotent, so running
   // the hooks on their own first costs nothing and means neither failure can
   // skip the other step.
+  await attemptCleanupStep("test fakes", () => restoreTestFakes());
   await attemptCleanupStep("application shutdown hooks", () => Application.runShutdownHooks());
   await attemptCleanupStep("connectors shutdown", () => connectorsManager.shutdown());
 }
@@ -536,6 +563,16 @@ async function runTestRuntimeShutdown(): Promise<void> {
     // application shutdown hooks, and the manager runs those first (see
     // `connectors-manager.ts` — `Application.runShutdownHooks()` is its first
     // line). Skipping the call to "match" an empty selection would leak them.
+    //
+    // Fakes go first, while the real drivers they put back are still
+    // connected. A fake that fails to restore is reported, never allowed to
+    // keep the connectors open.
+    try {
+      await restoreTestFakes();
+    } catch (error) {
+      console.error("[vitest-setup] Restoring the test fakes did not complete:", error);
+    }
+
     await connectorsManager.shutdown();
 
     shutdownSucceeded = true;

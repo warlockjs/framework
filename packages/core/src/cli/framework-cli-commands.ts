@@ -24,6 +24,7 @@ import { routesCommand, routesDiffCommand } from "./commands/routes.command";
 import { seedCommand } from "./commands/seed.command";
 import { startProductionCommand } from "./commands/start-production.command";
 import { storagePutCommand } from "./commands/storage-put.command";
+import { testCommand } from "./commands/test.command";
 import { typingsGeneratorCommand } from "./commands/typings-generator.command";
 import { updateCommand } from "./commands/update.command";
 
@@ -33,6 +34,9 @@ export const frameworkCommands = [
   typingsGeneratorCommand,
   openApiGeneratorCommand,
   postmanGeneratorCommand,
+
+  // testing commands
+  testCommand,
 
   // diagnostics commands
   doctorCommand,
