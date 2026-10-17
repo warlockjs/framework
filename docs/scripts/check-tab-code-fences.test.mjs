@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { checkTabCodeFences, findCollapsedTabItemFences } from "./check-tab-code-fences.mjs";
+import {
+  checkTabCodeFences,
+  findCollapsedTabItemFences,
+  findForeignPackageManagerCommands,
+} from "./check-tab-code-fences.mjs";
 
 const workspaceRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -48,6 +52,57 @@ test("scans MDX files and reports the actual path and line", async (t) => {
     violations: 1,
   });
   assert.match(reports[0], /^broken\.mdx:3:/);
+});
+
+test("flags another package manager's command inside a package-manager tab", () => {
+  const source = [
+    '<Tabs syncKey="pm">',
+    '  <TabItem label="npm">',
+    "",
+    "```bash",
+    "npm install example",
+    "npx warlock migrate",
+    "```",
+    "",
+    "  </TabItem>",
+    '  <TabItem label="yarn">',
+    "",
+    "```bash",
+    "pnpm add example",
+    "  pnpm warlock migrate",
+    "```",
+    "",
+    "  </TabItem>",
+    '  <TabItem label="pnpm">',
+    "",
+    "```bash",
+    "pnpm add example",
+    "```",
+    "",
+    "  </TabItem>",
+    "</Tabs>",
+    "",
+    "pnpm add outside-any-tab",
+  ].join("\n");
+  assert.deepEqual(findForeignPackageManagerCommands(source), [
+    { line: 13, label: "yarn", command: "pnpm" },
+    { line: 14, label: "yarn", command: "pnpm" },
+  ]);
+});
+
+test("reports foreign package-manager commands with path and line", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "warlock-tab-pm-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(
+    join(root, "install.mdx"),
+    '<TabItem label="yarn">\n\n```bash\npnpm add example\n```\n\n</TabItem>\n',
+  );
+  const reports = [];
+  assert.deepEqual(await checkTabCodeFences(root, (line) => reports.push(line)), {
+    files: 1,
+    violations: 1,
+  });
+  assert.match(reports[0], /^install\.mdx:4: the "yarn" TabItem runs a pnpm command/);
 });
 
 test("wire-response and locale snippets are parseable JSON", async () => {
