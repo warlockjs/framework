@@ -321,6 +321,12 @@ pnpm test -t "creates a product"   # test name pattern
 
 ## Caveats and trade-offs
 
+When a unit test copies TypeScript source into a temporary directory for a fresh
+Node process, preserve the source package's module mode. ESM fixtures need a
+`package.json` with `"type": "module"`; otherwise `tsx` can load the copy as
+CommonJS and named exports fail before the behavior under test runs. Assert the
+child process exit status with its captured stderr before checking stdout.
+
 - **The two-worlds connection split is intentional.** Don't fight it by trying to share connections — it would deadlock test parallelism. Instead, design tests so the worker write commits before the HTTP read.
 - **Test data persists across files unless you clean it up.** Vitest doesn't wrap test files in transactions. Use `afterEach` truncates or design idempotent fixtures.
 - **The HTTP server is started in dev mode (`runtimeStrategy: development`).** That's so routes get re-resolved properly under the framework's dev orchestrator. It's still a real server with real routing — just not the production builder pipeline.

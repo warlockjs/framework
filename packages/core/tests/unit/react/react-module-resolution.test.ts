@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -44,26 +44,20 @@ function toFileUrl(target: string): string {
 }
 
 /**
- * Run a snippet in a fresh Node ESM process and return its exit code + output.
+ * Run a snippet in a fresh Node ESM process, asserting its exit before inspecting output.
  */
 function runInFreshProcess(source: string) {
-  try {
-    const stdout = execFileSync(
-      process.execPath,
-      ["--import", "tsx", "--input-type=module", "--eval", source],
-      { cwd: repoRoot, stdio: "pipe", encoding: "utf8" },
-    );
+  const result = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "--eval", source],
+    { cwd: repoRoot, stdio: "pipe", encoding: "utf8" },
+  );
+  expect(
+    result.status,
+    `React module probe failed before its output assertions.\n${result.error?.message ?? ""}\n${result.stderr}`,
+  ).toBe(0);
 
-    return { code: 0, stdout, stderr: "" };
-  } catch (error) {
-    const failure = error as { status?: number; stdout?: string; stderr?: string };
-
-    return {
-      code: failure.status ?? 1,
-      stdout: failure.stdout ?? "",
-      stderr: failure.stderr ?? "",
-    };
-  }
+  return { stdout: result.stdout, stderr: result.stderr };
 }
 
 const sandboxes: string[] = [];
@@ -80,6 +74,12 @@ function sandbox(packages: Record<string, Record<string, string>>): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-react-resolution-"));
   sandboxes.push(dir);
 
+  // Preserve core's ESM package boundary. Without it tsx treats the copied
+  // .ts source as CommonJS, so named imports fail before resolution is tested.
+  fs.writeFileSync(
+    path.join(dir, "package.json"),
+    JSON.stringify({ private: true, type: "module" }),
+  );
   fs.copyFileSync(reactSource, path.join(dir, "react-module.ts"));
 
   for (const [name, files] of Object.entries(packages)) {
@@ -150,7 +150,6 @@ describe("renderReact — react resolution is synchronous", () => {
 
     expect(result.stderr).not.toMatch(/Cannot read properties of undefined/);
     expect(result.stdout).toContain("HTML:<div>ok</div>");
-    expect(result.code).toBe(0);
   }, 60_000);
 
   it("surfaces the original error when react is present but unloadable", () => {
@@ -158,7 +157,6 @@ describe("renderReact — react resolution is synchronous", () => {
 
     expect(result.stdout).toContain("react-missing-transitive");
     expect(result.stdout).not.toMatch(/react is not installed/);
-    expect(result.code).toBe(0);
   }, 60_000);
 
   it("surfaces the original error on the second call too, not a fallback lie", () => {
@@ -170,14 +168,12 @@ describe("renderReact — react resolution is synchronous", () => {
     expect(calls[1]).toContain("react-missing-transitive");
     expect(calls[1]).not.toMatch(/react is not installed/);
     expect(calls[1]).toBe(calls[0]?.replace("CALL 1", "CALL 2"));
-    expect(result.code).toBe(0);
   }, 60_000);
 
   it("reports genuinely absent react with the install instructions", () => {
     const result = runInFreshProcess(callAndReportError(sandbox({})));
 
     expect(result.stdout).toContain("react is not installed.");
-    expect(result.code).toBe(0);
   }, 60_000);
 
   it("names react-dom/server, not react, when react-dom/server is what failed", () => {
@@ -188,6 +184,5 @@ describe("renderReact — react resolution is synchronous", () => {
     expect(result.stdout).toContain("react-dom-missing-transitive");
     expect(result.stdout).toContain("react-dom/server");
     expect(result.stdout).not.toMatch(/^CALL \d+ ERROR: react is not installed/m);
-    expect(result.code).toBe(0);
   }, 60_000);
 });
