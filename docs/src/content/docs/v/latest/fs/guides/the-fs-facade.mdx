@@ -22,7 +22,8 @@ const digest = await fs.hash.file("bundle.js"); // hashing
 <Aside type="note" title="Async by design">
   Every facade method returns a `Promise`. Synchronous callers (CLI tools, code generators) drop to
   the [low-level primitives](../reference/api#low-level-primitives-sync--async) — that's the one
-  escape hatch. And `fs` never sandboxes paths; containment is the storage layer's job.
+  escape hatch. And `fs.files.*` / `fs.dirs.*` never sandbox paths; to read a folder you do not
+  control, use [`fs.confined(root)`](./read-a-folder-confined).
 </Aside>
 
 ## Files — `fs.files.*`

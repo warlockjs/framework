@@ -67,8 +67,9 @@ await manifest.putJson({ version: 1 });
 `fs.dir(root).file("..", "..", "etc/passwd")` will happily resolve outside
 `root`. The facade builds and normalizes paths; it does **not** contain them.
 If you're resolving _untrusted_ segments (an upload name, a user-supplied key),
-put your storage layer in front — sandboxing a base directory is its job, not
-the fs facade's.
+put your storage layer in front, or read through
+[`fs.confined(root)`](../guides/read-a-folder-confined), which refuses
+escapes and symlinks.
 :::
 
 ## Inside a Warlock.js app

@@ -29,7 +29,7 @@ Skip if your code path is one-off and bare `node:fs/promises` is already importe
 
 ## Skills index
 
-Four task skills cover the surface. Load the one that matches what you're trying to do — don't load all four unless you're touring the package.
+The task skills below cover the surface. Load the one that matches what you're trying to do — don't load them all unless you're touring the package.
 
 ### `read-and-write-files`
 
@@ -73,6 +73,12 @@ Load when fingerprinting for cache invalidation, content-addressable storage, ch
 The ergonomic, **async** shorthand over all the primitives: `fs.files.*` (file ops), `fs.dirs.*` (directory ops), lazy `fs.file(path)` / `fs.dir(path)` handles (`File` / `Directory`), and `fs.exists`. Adds what the flat primitives lack — `append`/`appendLine`/`appendJsonLine`, `size`/`isEmpty`/`count`, `ensure`(ensureFile)/`touch`/`empty`(emptyDir), EXDEV-safe `move`, `walk` + recursive `list*`, `readLines`, `edit`/`editJson`/`mergeJson`/`ensureJson`, schema-validated `getJson`, directory `hash`.
 
 Load when you want the grouped/OO surface, a read-modify-write (patch a file or JSON, merge a config), recursive listing/walking, or `File`/`Directory` handles. (Sync/one-shot code stays on the bare primitives above.)
+
+### `read-a-folder-confined`
+
+Read a folder you do not control without leaving it: `fs.confined(root, { followLinks, maxFileBytes, maxEntries, maxDepth })` / `createConfinedReader` with `readText`, `readBuffer`, `readJson`, `stat`, `exists`, `list`, `walk`. Refuses `..` and absolute paths, symlinks at any component, files swapped between check and open; caps size and entry count. Typed `FsPathEscapeError` / `FsLinkRefusedError` / `FsLimitExceededError`.
+
+Load when importing from a user-chosen folder, an extracted upload or any directory someone else can write to.
 
 ## What this package deliberately doesn't do
 

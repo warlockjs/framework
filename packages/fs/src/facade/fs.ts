@@ -1,3 +1,4 @@
+import { createConfinedReader, type ConfinedReader, type ConfinedReaderOptions } from "../confined";
 import { pathExistsAsync } from "../exists";
 import { hashBuffer, hashFileAsync, hashString, type HashAlgorithm } from "../hash";
 import { Directory } from "./directory";
@@ -52,6 +53,15 @@ export const fs = {
   /** A lazy handle to a file path (no IO until a method is called). */
   file(path: string): File {
     return new File(path);
+  },
+
+  /**
+   * A reader confined to `root`: paths cannot leave it, symbolic links are
+   * refused at every component, and reads are bounded in size and count.
+   * See {@link createConfinedReader}.
+   */
+  confined(root: string, options?: ConfinedReaderOptions): ConfinedReader {
+    return createConfinedReader(root, options);
   },
 
   /** A lazy handle to a directory path (no IO until a method is called). */

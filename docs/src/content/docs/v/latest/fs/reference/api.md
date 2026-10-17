@@ -30,7 +30,8 @@ handles, and `fs.hash.*` / `fs.exists()` for the odds and ends. Every method is
 async by design; synchronous callers drop to the
 [primitives](#low-level-primitives-sync--async).
 
-The facade does **not** sandbox paths — containment is the storage layer's job.
+`fs.files.*` and `fs.dirs.*` do **not** sandbox paths. For a folder you do not
+control, read through [`fs.confined(root)`](#fsconfinedroot-options-confinedreader).
 
 ### `fs.files.*` — file operations
 
@@ -201,6 +202,53 @@ stats() / size() / hash(algorithm?)
 list(options?) / listFiles(options?): Promise<File[]>   listDirs(options?): Promise<Directory[]>
 walk(options?): AsyncIterable<WalkEntry>
 copy(to: string): Promise<Directory>   move(to: string): Promise<Directory>
+```
+
+### `fs.confined(root, options?): ConfinedReader`
+
+A reader that cannot leave `root` — see [Read a folder confined](../guides/read-a-folder-confined).
+Also exported as `createConfinedReader(root, options?)`. The root is resolved
+with `realpath` once, synchronously, when the reader is created.
+
+```ts
+type ConfinedReaderOptions = {
+  followLinks?: boolean; // default false — refuse every link
+  allowSymlinkedRoot?: boolean; // default false
+  maxFileBytes?: number; // default 16 MiB (CONFINED_DEFAULT_MAX_FILE_BYTES)
+  maxEntries?: number; // default 100_000 (CONFINED_DEFAULT_MAX_ENTRIES)
+  maxDepth?: number; // default 64 (CONFINED_DEFAULT_MAX_DEPTH)
+};
+
+reader.root: string // canonical root
+reader.readText(path, { encoding?, maxFileBytes? }): Promise<string>
+reader.readBuffer(path, { maxFileBytes? }): Promise<Buffer>
+reader.readJson<T>(path, { schema?, maxFileBytes? }): Promise<T>
+reader.stat(path): Promise<ConfinedStats>   // { path, name, type: "file" | "directory" | "other", size, lastModified }
+reader.exists(path): Promise<boolean>        // false only for ENOENT / ENOTDIR
+reader.list(path?, { maxEntries? }): Promise<ConfinedEntry[]>
+reader.walk(path?, { maxEntries?, maxDepth? }): AsyncGenerator<ConfinedEntry>
+
+type ConfinedEntry = {
+  path: string; // root-relative, "/"-separated
+  name: string;
+  type: "file" | "directory" | "symlink" | "other";
+  depth: number;
+};
+
+class FsPathEscapeError extends Error {
+  type: "path-escape"; path: string; root: string;
+  reason: "absolute" | "parent-traversal" | "invalid" | "link-escape";
+}
+class FsLinkRefusedError extends Error {
+  type: "link-refused"; path: string; root: string; linkPath: string;
+  reason: "symlink" | "root-symlink" | "identity-changed";
+}
+class FsLimitExceededError extends Error {
+  type: "limit-exceeded"; path: string;
+  limit: "maxFileBytes" | "maxEntries" | "maxDepth"; max: number; actual: number;
+}
+
+isPathInside(child: string, root: string): boolean // segment-wise containment of two absolute paths
 ```
 
 ### `fs.exists` · `fs.hash.*`
@@ -379,5 +427,6 @@ hashBuffer(content: Buffer | Uint8Array, algorithm?: HashAlgorithm): string    /
 - [Write atomically](../guides/write-atomically) — the atomic-write deep dive.
 - [Manage directories](../guides/manage-directories) — directory operations end to end.
 - [Hash files](../guides/hash-files) — hashing strings, buffers, files, and trees.
+- [Read a folder confined](../guides/read-a-folder-confined) — `fs.confined` and its guarantees.
 
 Source: [`@warlock.js/fs/src/`](https://github.com/warlockjs/core/tree/main/%40warlock.js/fs/src)
