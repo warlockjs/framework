@@ -160,6 +160,12 @@ export type AgentExecuteOptions<TOutput = unknown> = {
    * observability identity is shared.
    */
   sessionId?: string;
+  /**
+   * Per-call override of `AgentConfig.captureMessages`: `true` puts the
+   * assembled conversation on `report.messages` for this run only (what
+   * `ai.session()` uses to persist a turn), `false` leaves it off.
+   */
+  captureMessages?: boolean;
 };
 
 /**

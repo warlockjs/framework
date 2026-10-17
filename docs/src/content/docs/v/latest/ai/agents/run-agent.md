@@ -73,6 +73,7 @@ agent.execute(input, {
   repair, // { maxAttempts } — re-ask on validation failure
   signal, // AbortSignal
   sessionId, // stamped onto every report node
+  captureMessages, // per-call override of the factory's captureMessages
   streamingToolGuard, // per-call override
   on, // per-call event handlers
 });
@@ -320,7 +321,7 @@ await myAgent.execute("what's my order?", { sessionId });
 await myAgent.execute("cancel it", { sessionId });
 ```
 
-No implicit persistence. No automatic history. Just a string that rides along.
+No implicit persistence. No automatic history. Just a string that rides along. For a stored conversation, use [`ai.session()`](/v/latest/ai/agents/conversation-sessions/).
 
 ## Events
 
@@ -476,6 +477,38 @@ const worker = ai.agent({
 });
 ```
 
+### The built-in summarizer
+
+`ai.compaction.summarize({ model })` builds the callback for you. It renders the
+replaced slice as a tagged transcript (text, tool calls and tool results; signed
+reasoning blocks are opaque and left out), sends it to `model` with Anthropic's
+published client-side compaction prompt, and uses the text inside the reply's
+`<summary></summary>` tags. Use a cheaper model than the agent's:
+
+```ts
+const worker = ai.agent({
+  model,
+  tools,
+  compaction: {
+    afterTokens: 120_000,
+    keep: 2,
+    summarize: ai.compaction.summarize({
+      model: cheapModel,
+      maxTokens: 4_000,
+      // instructions: "…", // replaces the default prompt
+      onUsage: (usage) => ledger.add(usage), // the summary call is not in the agent's usage
+    }),
+  },
+});
+```
+
+A reply that is truncated (`length`), refused or empty throws, so the agent
+records a `callback-error` skip and keeps the conversation as it was.
+`DEFAULT_COMPACTION_INSTRUCTIONS` and `renderTranscript` are exported if you
+write your own callback.
+
+### The callback contract
+
 The `summarize` callback reuses the existing `SummarizeCallback` result shape:
 `CompactionResult`. It receives a detached old slice, and must replace the whole
 slice with a non-empty assistant text summary. Its second argument contains
@@ -493,17 +526,42 @@ when present and when its endpoint can count the entire request.
 Original system messages, the original execution input and the latest user
 message remain intact, including during output repair. `keep` defaults
 to eight recent messages and expands to preserve complete assistant/tool-result
-groups. The agent skips compaction when the retained conversation contains
-provider blocks or tool-call replay metadata, since modifying earlier turns can
-invalidate signed thinking. It also skips unsafe ranges, summaries that do not
+groups. The agent skips unsafe ranges, summaries that do not
 reduce the counted input, and callback/counter failures. Generation continues
 with the original conversation after a skipped decision; cancellation stops the
 run before generation.
 
+### Compaction with thinking
+
+Thinking runs compact too. The range always ends before the open tool round:
+the latest assistant turn and the tool results that answer it go back verbatim,
+signed thinking blocks included, because a provider needs that turn's reasoning
+to finish the round (and budget-mode thinking requires the last assistant turn
+to begin with its thinking block). With `keep: 1` everything before that round
+is summarized; a larger `keep` retains more recent turns verbatim.
+
+When kept turns after the range carry signed reasoning (thinking blocks, thought
+signatures), the summary is framed as user context (`Summary of earlier
+conversation:`) so a kept assistant turn still starts with its own reasoning,
+and each such turn is marked `compaction: "retained"` (the summary is marked
+`compaction: "summary"`). The markers travel with `report.messages`, durable
+snapshots and `ai.session()` history. Turns before the range are untouched: the
+conversation before them did not change.
+
+Whether retained reasoning is still valid is the provider's rule. Models that
+bind thinking to the exact history before it (Anthropic's preserved thinking on
+Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5) can't use reasoning
+produced before a client-written summary; the Anthropic adapter replays those
+turns without their thinking blocks, so the model reasons afresh from the
+summary. Older models accept the kept blocks as they are. See [Anthropic →
+Preserved thinking and client-side compaction](/v/latest/ai/providers/anthropic/#preserved-thinking-and-client-side-compaction);
+on those models, server-side compaction (`serverCompaction`) keeps more of the
+model's own reasoning.
+
 `report.compactions` records threshold-crossing decisions and counter failures as `type: "applied"`
 or `"skipped"`, with the trip index, counting method, input count and either the
 applied `CompactionResult` (indices in the live conversation before replacement)
-or a reason: `no-safe-range`, `provider-replay`, `not-smaller`, `callback-error`.
+or a reason: `no-safe-range`, `not-smaller`, `callback-error`.
 The input count is absent when the counter failed before producing one.
 No field is added when compaction is disabled or the threshold is never reached.
 After an applied compaction, `result.blocks` is absent even for one generation

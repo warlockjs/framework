@@ -44,6 +44,10 @@ Text-to-image with ai.image({ model: sdk.image({ name }), prompt }) — the imag
 
 Typed AIError hierarchy with stable code strings + coarse category for retry-policy dispatch. execute() never throws — errors surface via result.error. Load when inspecting result.error, branching on error.code / error.category, designing retry / fallback logic, or wrapping framework errors in HTTP errors.
 
+### `keep-agent-conversations`
+
+Persisted multi-turn chat with one agent — `ai.session({ id, store, agent })` with send / stream / history / fork / truncate / resume / clear over `ai.snapshot.file({ dir })` or `ai.snapshot.sqlite({ path })`. Stores whole turns (tool rounds, signed thinking and compaction blocks, attachments), serializes sends per session id, and keeps failed runs out of the history. Load when storing chat history, persisting a conversation to disk or SQLite, branching a conversation, or keeping thinking blocks valid across turns.
+
 ### `log-ai-calls`
 
 Framework logging delegated to @warlock.js/logger — every primitive emits via the log singleton, configure channels / levels / redaction once at boot. Four-arg call convention (module, action, message, context). Load when configuring AI logging, masking prompts / API keys / PII, picking which events surface, or filtering by module / action.

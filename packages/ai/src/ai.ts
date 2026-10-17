@@ -49,7 +49,15 @@ import { spawnSubAgent } from "./agent/spawn-sub-agent";
 import { skills } from "./skills";
 import { prompt } from "./prompt";
 import { vcr } from "./vcr";
-import { snapshotMemory, snapshotPg, snapshotRedis } from "./snapshot";
+import { summarizeCompaction } from "./agent/compaction-summarizer";
+import { session } from "./session";
+import {
+  snapshotFile,
+  snapshotMemory,
+  snapshotPg,
+  snapshotRedis,
+  snapshotSqlite,
+} from "./snapshot";
 import { fanOut, router } from "./supervisor";
 import { supervisor } from "./supervisor/supervisor";
 import { team } from "./team/team";
@@ -155,6 +163,15 @@ export interface Ai {
     memory: typeof snapshotMemory;
     pg: typeof snapshotPg;
     redis: typeof snapshotRedis;
+    file: typeof snapshotFile;
+    sqlite: typeof snapshotSqlite;
+  };
+  /** A persisted multi-turn conversation with one agent (send / stream / fork / truncate). */
+  session: typeof session;
+  /** Helpers for `AgentConfig.compaction`. */
+  compaction: {
+    /** A ready-made `compaction.summarize` callback backed by a (cheaper) model. */
+    summarize: typeof summarizeCompaction;
   };
   /**
    * Human-in-the-loop tool approval (interrupt / resume).
@@ -202,7 +219,9 @@ export interface Ai {
  * - `ai.eval.{exact,contains,predicate,judge}(...)` — built-in scorer factories for `agent.eval(...)`.
  * - `ai.mockRouter(decisions, opts?)` — deterministic supervisor `route` callback for tests.
  * - `ai.checkpoint.{memory,pg,redis}()` — durable orchestrator session checkpoint stores.
- * - `ai.snapshot.{memory,pg,redis}()` — supervisor-run snapshot stores for `iterate: true` resume.
+ * - `ai.snapshot.{memory,pg,redis,file,sqlite}()` — snapshot stores for supervisor resume, durable agent runs and sessions.
+ * - `ai.session({ id, store, agent })` — a persisted multi-turn conversation with one agent.
+ * - `ai.compaction.summarize({ model })` — a ready-made summary callback for `compaction`.
  * - `ai.human.approval(...)` / `ai.human.resume(...)` / `ai.human.interrupt.{memory,pg,redis}()` — human-in-the-loop tool approval (interrupt / resume).
  * - `ai.guardrail(options)` + `ai.guardrail.{pii,topic,injection,moderation}(...)` — content-intelligence guardrails (moderation / PII / injection / topic).
  * - `ai.openai.model(...)` / `ai.anthropic.model(...)` / ... once the adapter SDK is registered.
@@ -290,6 +309,12 @@ export const ai = {
     memory: snapshotMemory,
     pg: snapshotPg,
     redis: snapshotRedis,
+    file: snapshotFile,
+    sqlite: snapshotSqlite,
+  },
+  session,
+  compaction: {
+    summarize: summarizeCompaction,
   },
   human,
   guardrail: guardrailSuite,

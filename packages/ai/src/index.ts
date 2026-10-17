@@ -105,6 +105,7 @@ export * from "./rag";
 export * from "./security";
 export * from "./serve";
 export * from "./skills";
+export * from "./session";
 export * from "./snapshot";
 export * from "./supervisor";
 // Team — sugar over the supervisor (manager + role members + quality gate).

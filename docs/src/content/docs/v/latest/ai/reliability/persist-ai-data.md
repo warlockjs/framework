@@ -88,8 +88,20 @@ Each store factory ships three tiers, mirroring the cache drivers:
 | `memory` | `ai.snapshot.memory()` / `ai.checkpoint.memory()`                   | Process-local `Map`, volatile | Dev / tests / single-process |
 | `redis`  | `ai.snapshot.redis({ client })` / `ai.checkpoint.redis({ client })` | Durable, cross-process        | Production                   |
 | `pg`     | `ai.snapshot.pg({ client })` / `ai.checkpoint.pg({ client })`       | Durable, cross-process        | Production                   |
+| `file`   | `ai.snapshot.file({ dir })`                                         | Durable, single host          | Local-first apps, CLIs       |
+| `sqlite` | `ai.snapshot.sqlite({ path })` / `ai.snapshot.sqlite({ database })` | Durable, single host          | Local-first apps, desktop    |
 
 You pass your own `pg` / `redis` client in — `@warlock.js/ai` takes no peer dependency on either; the same pool can back both the cache and these stores. **Schema is never auto-migrated** — each store exposes `.schema()`, a DDL string you run through your own migration tool.
+
+The two local snapshot stores need no server. `ai.snapshot.file({ dir })` writes one JSON file per key (the URI-encoded key plus `.json`, so a key can't name a path outside `dir`), through a temporary file and a rename, so a crash mid-write keeps the previous snapshot. `ai.snapshot.sqlite({ path })` keeps one row per key in an embedded database opened with Node's built-in `node:sqlite` (Node 22.5+; on Node 22.13+ it needs no flag and prints an experimental-feature warning). Because an embedded file has no separate migration step, it runs its `CREATE TABLE IF NOT EXISTS` on first use; pass `createTable: false` to manage the table yourself. On a runtime without `node:sqlite`, pass an open database with the same `exec` / `prepare` surface — `better-sqlite3` fits — and the store never loads the built-in:
+
+```ts
+import Database from "better-sqlite3";
+
+const store = ai.snapshot.sqlite({ database: new Database("./data/agent.db") });
+```
+
+Both serve every snapshot consumer: `durable` agents and planners, workflow and supervisor snapshots, and [`ai.session()`](/v/latest/ai/agents/conversation-sessions/) conversations. Both are single-host: several processes on one file race at write time, so give each process its own store or use `pg` / `redis`.
 
 For the semantic-cache and memory vector store, pick a `@warlock.js/cache` driver instead:
 
