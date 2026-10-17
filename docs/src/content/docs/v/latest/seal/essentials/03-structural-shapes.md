@@ -110,6 +110,8 @@ v.tuple([v.literal("ok"), v.string()]); // type: ["ok", string]
 
 Each position has its own validator. The array length must match the tuple length. Pair with `v.literal` at position 0 for result-tuple patterns (`["ok", data]` vs `["error", message]`).
 
+Pass the validators as a literal list so each position keeps its own type, for input and validated output alike. A list typed `BaseValidator[]` (built at runtime) has no fixed positions, so its output is an array rather than a tuple.
+
 ## `v.union` — one of N validators (untagged)
 
 ```ts
