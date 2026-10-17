@@ -459,7 +459,9 @@ export function parseGenerationReport(stdout: string, label: string): Generation
   try {
     parsed = JSON.parse(stdout.trim());
   } catch (error) {
-    throw new Error(`${label} --json did not print one JSON report: ${String(error)}\n${tail(stdout)}`);
+    throw new Error(
+      `${label} --json did not print one JSON report: ${String(error)}\n${tail(stdout)}`,
+    );
   }
   if (!isRecord(parsed) || parsed.schemaVersion !== 1 || !Array.isArray(parsed.written)) {
     throw new Error(`${label} --json printed an unrecognised report: ${tail(stdout)}`);

@@ -122,6 +122,8 @@ describe("generated modules follow the lint rules apps run", () => {
   });
 
   it("registers the CRUD routes inside a guarded group", () => {
-    expect(crudRoutesStub(pluralName("post"))).toMatch(/guarded\(\(\) => \{\n  router\n    \.route/);
+    expect(crudRoutesStub(pluralName("post"))).toMatch(
+      /guarded\(\(\) => \{\n  router\n    \.route/,
+    );
   });
 });

@@ -485,7 +485,14 @@ describe("zero-edit generator matrix", () => {
     assert.deepEqual(
       makes.map((command) => command.args.slice(2)),
       [
-        ["endpoint", "reports/create-report", "--schema", "./report.spec-input.ts", "--public", "--json"],
+        [
+          "endpoint",
+          "reports/create-report",
+          "--schema",
+          "./report.spec-input.ts",
+          "--public",
+          "--json",
+        ],
         [
           "endpoint",
           "reports/update-report",
