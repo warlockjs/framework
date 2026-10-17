@@ -80,6 +80,18 @@ missing `handle`, or a non-integer `attempts < 1`. See
 | `removeOnComplete?` | `JobRetention` | `boolean \| number` — `true` removes at once, a number keeps the newest N |
 | `removeOnFail?`     | `JobRetention` | Same shape, for failed jobs                                               |
 
+### `registeredJobs()` / `queueOf(definition)`
+
+**New in 5.31.** `registeredJobs()` returns every definition `defineJob()` registered in this process; `queueOf(definition)` the queue it runs on (its `queue`, else `queue.defaultQueue`). Neither touches Redis. `warlock inspect` reads them for its `jobs` section.
+
+```ts
+import { queueOf, registeredJobs } from "@warlock.js/queue";
+
+for (const job of registeredJobs()) {
+  console.log(job.name, queueOf(job));
+}
+```
+
 ### `QueueJob<TPayload, TResult>`
 
 | Member                        | Type                                                   | Notes                                                                   |
