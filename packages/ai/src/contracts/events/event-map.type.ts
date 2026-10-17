@@ -1,13 +1,16 @@
 import type {
   AgentCompletedPayload,
   AgentErrorPayload,
+  AgentReasoningPayload,
   AgentStartingPayload,
   AgentStreamingPayload,
   AgentToolCalledPayload,
   AgentToolCallingFailedPayload,
   AgentToolCallingPayload,
+  AgentToolStreamingPayload,
   AgentTripCompletedPayload,
   AgentTripStartedPayload,
+  AgentTripUsagePayload,
 } from "./agent-events.type";
 import type { EventIdentity } from "./event-identity.type";
 import type {
@@ -66,7 +69,10 @@ export type AgentEventMap = WithIdentity<{
   "agent.starting": AgentStartingPayload;
   "agent.trip.started": AgentTripStartedPayload;
   "agent.trip.streaming": AgentStreamingPayload;
+  "agent.trip.reasoning": AgentReasoningPayload;
+  "agent.trip.usage": AgentTripUsagePayload;
   "agent.trip.completed": AgentTripCompletedPayload;
+  "agent.tool.streaming": AgentToolStreamingPayload;
   "agent.tool.calling": AgentToolCallingPayload;
   "agent.tool.called": AgentToolCalledPayload;
   "agent.tool.failed": AgentToolCallingFailedPayload;

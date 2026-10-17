@@ -8,6 +8,7 @@ import type {
   ModelStreamChunk,
 } from "../contracts/model.contract";
 import type { ModelPricing } from "../contracts/result/model-pricing.type";
+import { resolveStreamChunks } from "../model/stream-chunks";
 import type { MockModelResponse } from "./mock-config.type";
 
 type RecordedCall = {
@@ -150,7 +151,10 @@ export class MockModel implements ModelContract {
    * sequence of stream chunks: the scripted `deltas` when the entry
    * supplies them, otherwise content split word-by-word, as `delta`
    * chunks, each scripted tool call as a `tool-call` chunk, and finally a
-   * `done` chunk with finish reason + usage. Throws eagerly if the scripted
+   * `done` chunk with finish reason + usage. With `streamChunks` opted in
+   * it also emits the scripted `reasoning` first, one `tool-args` chunk
+   * (the whole argument JSON) before each tool call, and a `usage` chunk
+   * before `done`. Throws eagerly if the scripted
    * entry carries an `error`.
    */
   public async *stream(
@@ -168,6 +172,14 @@ export class MockModel implements ModelContract {
       throw mock.error;
     }
 
+    const want = resolveStreamChunks(options);
+
+    if (want.reasoning) {
+      for (const delta of mock.reasoning ?? []) {
+        yield { type: "reasoning", delta };
+      }
+    }
+
     const chunks = mock.deltas ?? mock.content.split(" ").map((word) => word + " ");
 
     for (const chunk of chunks) {
@@ -178,6 +190,15 @@ export class MockModel implements ModelContract {
     if (mock.toolCalls) {
       for (const toolCall of mock.toolCalls) {
         throwIfAborted(signal);
+        if (want.toolArgs) {
+          yield {
+            type: "tool-args",
+            callId: toolCall.id,
+            name: toolCall.name,
+            delta: JSON.stringify(toolCall.input ?? {}),
+          };
+        }
+
         yield {
           type: "tool-call",
           id: toolCall.id,
@@ -190,6 +211,9 @@ export class MockModel implements ModelContract {
     const response = this.buildResponse(mock);
 
     throwIfAborted(signal);
+    if (want.usage) {
+      yield { type: "usage", usage: response.usage };
+    }
 
     yield {
       type: "done",

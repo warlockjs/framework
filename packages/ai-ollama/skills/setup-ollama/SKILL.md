@@ -1,6 +1,6 @@
 ---
 name: setup-ollama
-description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `providerOptions`, `OllamaCallOptions`, `countTokens`, `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings core — the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
+description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `providerOptions`, `OllamaCallOptions`, `countTokens`, `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `streamChunks`, `message.thinking`, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings core — the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
 ---
 
 # `@warlock.js/ai-ollama`
@@ -82,6 +82,16 @@ A multipart user message collapses to a single `content` string + an `images` ar
 ## Streaming
 
 `model.stream()` drains `chat({ stream: true })` (an `AbortableAsyncIterator`). Each chunk's `message.content` → `{ type: "delta" }`; `message.tool_calls` are emitted as `{ type: "tool-call" }` **fully formed**. Terminal `{ type: "done", finishReason, usage }` — usage from the final (`done: true`) chunk's `prompt_eval_count` / `eval_count`.
+
+Opt-in (`options.streamChunks`, set by `agent.stream()`): `{ type: "reasoning", delta }` per `message.thinking` piece when `think` is on:
+
+```ts
+for await (const chunk of model.stream(messages, { reasoning: { effort: "high" }, streamChunks: { reasoning: true } })) {
+  if (chunk.type === "reasoning") process.stderr.write(chunk.delta);
+}
+```
+
+Ollama's chat API has no built-in tools: an `ai.providerTool()` for another provider is left out with a warning.
 
 **`options.signal` is honored** on `stream()` and `complete()`: a pre-aborted signal rejects without sending, and aborting mid-call cancels the HTTP request. The `ollama` client has no per-request signal, so `OllamaSDK` wraps its `fetch` (yours, when you pass `fetch`) to apply each call's signal from async context; the stream iterator's `abort()` is called too.
 

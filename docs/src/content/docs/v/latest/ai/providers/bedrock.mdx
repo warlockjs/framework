@@ -263,3 +263,17 @@ as user context when it replaces the first non-system turn.
 
 Adjacent-turn normalization preserves empty histories and separate system prompts
 without inserting synthetic conversation turns.
+
+## System tools and streamed reasoning
+
+Bedrock system tools go in `tools` through `ai.providerTool({ provider: "bedrock", definition })`; the definition is a whole Converse `Tool` member, appended to `toolConfig.tools` after the function tool specs. A `server_tool_use` block in the response is never dispatched as a tool call. See [Provider-defined tools](/v/latest/ai/tools/provider-tools/).
+
+```ts
+// Nova web grounding (US cross-region profiles only).
+const grounding = ai.providerTool({
+  provider: "bedrock",
+  definition: { systemTool: { name: "nova_grounding" } },
+});
+```
+
+With `streamChunks` (on by default under `agent.stream()`), `stream()` also yields `reasoning` for `reasoningContent.text` deltas and `tool-args` for client `toolUse.input` deltas. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/).

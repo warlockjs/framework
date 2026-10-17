@@ -1,13 +1,16 @@
 export type {
   AgentCompletedPayload,
   AgentErrorPayload,
+  AgentReasoningPayload,
   AgentStartingPayload,
   AgentStreamingPayload,
   AgentToolCalledPayload,
   AgentToolCallingFailedPayload,
   AgentToolCallingPayload,
+  AgentToolStreamingPayload,
   AgentTripCompletedPayload,
   AgentTripStartedPayload,
+  AgentTripUsagePayload,
   ToolEventMeta,
 } from "./agent-events.type";
 export type { AgentEventMap, SupervisorEventMap, WorkflowEventMap } from "./event-map.type";

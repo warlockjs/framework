@@ -1,6 +1,6 @@
 ---
 name: define-ai-tool
-description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`; ''define a tool'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
+description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`, `ai.providerTool`, `ProviderTool`, `providerTools`, `isProviderTool`, `web_search`, `code_execution`, `text_editor`, `googleSearch`, `nova_grounding`; ''define a tool'', ''enable the provider's web search'', ''use Claude's bash / text editor tool'', ''built-in provider tools'',, ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
 ---
 
 # `ai.tool()` — typed tool factory
@@ -168,6 +168,34 @@ Tool dispatches are child `BaseReport` nodes on `report.children` (not a separat
 - `agent.tool.failed` — `{ tool, input, error, tripIndex }`
 
 Subscribe at factory / instance / per-call.
+
+## Provider-defined tools — `ai.providerTool()`
+
+A provider's own tools (Anthropic `web_search` / `web_fetch` / `code_execution` / `bash` / `text_editor` / `memory`, OpenAI Responses `web_search` / `file_search` / `code_interpreter`, Gemini `googleSearch` / `codeExecution` / `urlContext`, Bedrock `systemTool`s) take the provider's own JSON. `definition` is sent **verbatim** to the provider named by `provider`; every other adapter skips it and logs one `providerTool.skipped` warning, so one list serves a fallback chain.
+
+```ts
+// Server-run: the provider executes it inside the response. No execute.
+const webSearch = ai.providerTool({
+  provider: "anthropic",
+  definition: { type: "web_search_20250305", name: "web_search", max_uses: 5 },
+});
+const grounding = ai.providerTool({ provider: "google", definition: { googleSearch: {} } });
+
+// Client-run with a provider schema: the model calls it like any tool, your code runs it.
+const bash = ai.providerTool({
+  provider: "anthropic",
+  definition: { type: "bash_20250124", name: "bash" },
+  execute: async (input: { command?: string; restart?: boolean }) => sandbox.run(input),
+});
+
+const assistant = ai.agent({ model, tools: [webSearch, grounding, bash, lookupOrder] });
+```
+
+- `provider`: the adapter wire format (`"anthropic"`, `"openai"` — Responses API, `"google"`, `"bedrock"`, `"ollama"`) or an OpenAI-compatible model's provider label (`"groq"`, `"xai"`, …).
+- The agent sends provider tools as `ModelCallOptions.providerTools`, never as function tools. Direct model calls: `model.complete(messages, { providerTools: [{ provider, definition }] })`.
+- `name` defaults to `definition.name` → `definition.type` → the single key (`googleSearch`) or nested name (`nova_grounding`).
+- Anthropic server-tool result blocks round-trip through `Message.blocks`. OpenAI Responses hosted-tool items are not replayed (`store: false`); client-run OpenAI built-ins (`shell`, `apply_patch`, `computer`, `custom`) throw `InvalidRequestError`.
+- `providerOptions.<adapter>.body` still may not set `tools`.
 
 ## Pattern — workflow as a tool
 

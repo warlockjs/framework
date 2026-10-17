@@ -8,3 +8,7 @@ export type {
   FallbackModelOptions,
   FallbackRetryPredicate,
 } from "../contracts/fallback-model.contract";
+
+// Optional stream chunk opt-in, resolved for adapters.
+export { resolveStreamChunks } from "./stream-chunks";
+export type { ResolvedStreamChunks } from "./stream-chunks";

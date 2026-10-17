@@ -18,12 +18,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The streaming agent loop reads the finish reason and usage only from the `done` chunk and ignores chunk types it does not know, instead of treating any other chunk as `done`. `fallbackModel().stream()` still falls over after a model emitted only a `usage` chunk.
+
 - Automatic compaction preserves the original execution input during output repair and durable resume, records its updated snapshot index, and frames a first-turn summary as user context. Legacy snapshots with missing or ambiguous input skip compaction safely.
 
 ### Upgrading
 
 - Tests that script `toolCalls` on a `MockModel` response without a `finishReason` and expect `"stop"` now get `"tool_calls"`; set `finishReason: "stop"` explicitly to keep the old ending. Tests that pass an already-aborted `signal` to a mock model now see the call reject.
 - Hosts that treated an empty or partial `result.text` with no `result.error` as a finished run must handle `AgentIncompleteError` / `report.status === "incomplete"` instead (and can drop their own `trips.at(-1).finishReason === "length"` checks). Exhaustive switches over `ReportStatus` or `ErrorCategory` need the new `"incomplete"` member. To recover automatically from the output cap, set `continueOnOutputLimit`; otherwise raise `maxTokens` or split the task.
+- `agent.stream()` now emits `agent.trip.reasoning`, `agent.tool.streaming` and `agent.trip.usage` in addition to the existing events, and `MockModel` produces them under `agent.stream()` (one `agent.tool.streaming` per scripted tool call, one `agent.trip.usage` per trip). A test that asserts the exact list of streamed event types should filter for the types it checks, or set `modelOptions: { streamChunks: false }` to keep the previous list. Code that calls `model.stream()` directly sees no change unless it passes `streamChunks`.
 
 - When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.
 
@@ -36,6 +39,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `agent.execute(input, { modelOptions })` and `agent.stream(input, { modelOptions })` set model call options (reasoning effort, `maxTokens`, `cacheControl`, `providerOptions`, …) for that run only, shallow-merged over `AgentConfig.modelOptions`; the agent is not changed. `tools`, `signal` and `responseSchema` in the per-call object are ignored.
 - Tool events carry the provider's tool-call id as `callId`: `agent.tool.calling`, `agent.tool.called` and `agent.tool.failed` (event payloads and stream events), the `ToolCall` record (`report.children[].callId`), the tool middleware context (`ctx.callId`), and the human-approval `PolicyContext` / `ApprovalRequestContext`. Concurrent calls to the same tool in one trip can now be told apart. Tool log lines include it.
 - `AgentIncompleteError`, `AgentIncompleteErrorOptions` and `AgentIncompleteReason` are exported; `AIErrorCode` gains `AGENT_INCOMPLETE`, `ErrorCategory` and `ReportStatus` gain `incomplete`, and `LLMTrip` gains `truncatedToolCalls`.
+- `agent.stream()` emits `agent.trip.reasoning` (reasoning / thinking text), `agent.tool.streaming` (`{ callId, name, delta }` pieces of a tool call's arguments while the model writes them) and `agent.trip.usage` (running token counts for the trip) wherever the provider streams them. `execute()` is unchanged; `modelOptions.streamChunks` turns them down.
+- `ModelStreamChunk` gains `reasoning`, `tool-args` and `usage` chunks. They are opt-in on `model.stream()` through `ModelCallOptions.streamChunks` (`true` or `{ reasoning?, toolArgs?, usage? }`), so existing chunk consumers see exactly the old `delta` / `tool-call` / `done` sequence. `resolveStreamChunks(options)` resolves the option for adapters; `MockModel` emits all three (scripted `reasoning`, the tool input as `tool-args`, a final `usage`) when asked.
+- `ai.providerTool({ provider, definition, execute? })` declares a provider-defined tool (web search, code execution, bash, text editor, search grounding, …). The agent sends it as `ModelCallOptions.providerTools`; only the named provider receives the definition, verbatim, and every other adapter skips it with one `providerTool.skipped` warning. Client-run provider tools dispatch to `execute` by name. Also exported: `isProviderTool`, `selectProviderTools` (adapter helper), `ProviderTool`, `ProviderToolDefinition`.
 
 - Regression fixtures assert required model and identifier segments before reading them under stricter indexed-access checks; the compiler error budget falls by ten.
 

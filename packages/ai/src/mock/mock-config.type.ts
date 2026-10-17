@@ -65,6 +65,12 @@ export type MockModelResponse = {
    */
   deltas?: string[];
   /**
+   * Reasoning text `stream()` emits as `reasoning` chunks before the
+   * content, one chunk per entry — only when the call opts in through
+   * `streamChunks` (as a real adapter would). Ignored by `complete()`.
+   */
+  reasoning?: string[];
+  /**
    * Simulate a delay in ms before resolving. Aborting the call's `signal`
    * during the delay rejects the call immediately.
    */

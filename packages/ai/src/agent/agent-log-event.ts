@@ -70,7 +70,10 @@ export function logAgentEvent<K extends keyof AgentEventMap>(
       return;
     }
 
-    case "agent.trip.streaming": {
+    case "agent.trip.streaming":
+    case "agent.trip.reasoning":
+    case "agent.trip.usage":
+    case "agent.tool.streaming": {
       // Deltas are too high-volume to log at token granularity.
       // Skipped on purpose; debug level still fires on trip boundaries.
       return;

@@ -13,13 +13,16 @@ import type { ToolConfig } from "../contracts/tool.contract";
  * only joins the hash when it carries at least one provider's options, so a
  * recording made without it keeps its hash. `cacheControl` (breakpoints and
  * `ttl`) only changes billing and cache placement, never the output, and
- * stays out.
+ * stays out. `providerTools` (provider-defined tool definitions) is hashed
+ * for the same reason; it is absent on calls without provider tools, so
+ * their recordings keep their hash.
  */
 export const DEFAULT_HASH_OPTIONS: readonly string[] = [
   "temperature",
   "maxTokens",
   "responseSchema",
   "tools",
+  "providerTools",
   "reasoning",
   "providerOptions",
 ];

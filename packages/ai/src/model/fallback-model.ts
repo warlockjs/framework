@@ -238,7 +238,8 @@ class FallbackRun {
   /**
    * Try each model's `stream()` in order. Fall-over is only attempted
    * while no chunk has been emitted yet for the current model — once the
-   * consumer has seen a `delta` / `tool-call`, a mid-stream failure
+   * consumer has seen a `delta` / `tool-call` (or a `reasoning` /
+   * `tool-args` chunk), a mid-stream failure
    * propagates instead of restarting (partial output cannot be un-sent).
    * The aggregated usage replaces the `done` chunk's usage so the caller
    * sees the chain total.
@@ -263,7 +264,11 @@ class FallbackRun {
               return;
             }
 
-            emitted = true;
+            // A mid-stream usage snapshot is bookkeeping, not output the
+            // consumer acted on — it does not pin the chain to this model.
+            if (chunk.type !== "usage") {
+              emitted = true;
+            }
 
             yield chunk;
           }

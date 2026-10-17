@@ -1,6 +1,8 @@
 import {
   InvalidRequestError,
+  resolveStreamChunks,
   safeJsonParse,
+  selectProviderTools,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -38,6 +40,9 @@ import {
 } from "./utils";
 
 const LOG_MODULE = "ai.anthropic";
+
+/** `provider` value of `ai.providerTool()` entries this adapter sends verbatim. */
+const ANTHROPIC_WIRE_FORMAT = "anthropic";
 
 /**
  * Anthropic requires `max_tokens` on every request (unlike OpenAI,
@@ -386,6 +391,11 @@ export class AnthropicModel implements ModelContract {
    * arguments have fully accumulated, and a terminal `done` carrying the
    * final finish reason + usage totals. Callers consume it with
    * `for await`.
+   *
+   * With `options.streamChunks` it also yields `reasoning` for every
+   * non-empty `thinking_delta`, `tool-args` for every `input_json_delta`
+   * of a client `tool_use` block, and `usage` after `message_start` and
+   * each `message_delta` (whose counts are cumulative).
    */
   public async *stream(
     messages: Message[],
@@ -393,6 +403,7 @@ export class AnthropicModel implements ModelContract {
   ): AsyncIterable<ModelStreamChunk> {
     yield* this.send(this.buildRequest(messages, { ...options, stream: true }), {
       signal: options?.signal,
+      streamChunks: options?.streamChunks,
     });
   }
 
@@ -414,6 +425,7 @@ export class AnthropicModel implements ModelContract {
 
     let rawStopReason: string | null = null;
     const usage: Usage = { input: 0, output: 0, total: 0 };
+    const want = resolveStreamChunks(options);
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
     const thinkingBlocks = new Map<number, AnthropicThinkingBlock>();
     // Every content block of the turn, by index, so the full ordered turn
@@ -445,6 +457,10 @@ export class AnthropicModel implements ModelContract {
             usage.cacheWriteTokens = cacheWrite;
           }
 
+          if (want.usage) {
+            yield { type: "usage", usage: { ...usage, total: usage.input + usage.output } };
+          }
+
           continue;
         }
 
@@ -470,12 +486,28 @@ export class AnthropicModel implements ModelContract {
 
             if (accumulator) {
               accumulator.json += event.delta.partial_json;
+
+              // Only client `tool_use` blocks: a `server_tool_use` input
+              // (e.g. a web search query) never becomes a `tool-call`.
+              if (want.toolArgs && event.delta.partial_json !== "") {
+                yield {
+                  type: "tool-args",
+                  callId: accumulator.id,
+                  name: accumulator.name,
+                  delta: event.delta.partial_json,
+                };
+              }
             }
           } else if (event.delta.type === "thinking_delta") {
             const thinking = thinkingBlocks.get(event.index);
 
             if (thinking?.type === "thinking") {
               thinking.thinking += event.delta.thinking;
+            }
+
+            // `display: "omitted"` streams one empty `thinking_delta`.
+            if (want.reasoning && event.delta.thinking !== "") {
+              yield { type: "reasoning", delta: event.delta.thinking };
             }
           } else if (event.delta.type === "signature_delta") {
             const thinking = thinkingBlocks.get(event.index);
@@ -533,6 +565,12 @@ export class AnthropicModel implements ModelContract {
 
           if (cacheWrite !== null && cacheWrite !== undefined && cacheWrite > 0) {
             usage.cacheWriteTokens = cacheWrite;
+          }
+
+          // `message_delta.usage` counts are cumulative (Anthropic streaming
+          // docs), so this is the running total so far.
+          if (want.usage) {
+            yield { type: "usage", usage: { ...usage, total: usage.input + usage.output } };
           }
         }
       }
@@ -747,7 +785,7 @@ export class AnthropicModel implements ModelContract {
       ...this.buildAutomaticCacheControl(options?.cacheControl),
       ...this.buildSystem(system, options?.cacheControl),
       ...(sendTemperature ? { temperature } : {}),
-      ...this.buildTools(options?.tools, options?.cacheControl),
+      ...this.buildTools(options, options?.cacheControl),
       ...this.buildOutputConfig(options?.responseSchema, thinking.effort),
       ...(thinking.thinking ? { thinking: thinking.thinking } : {}),
     };
@@ -947,13 +985,24 @@ export class AnthropicModel implements ModelContract {
    * with no reads.
    */
   private buildTools(
-    tools: ModelCallOptions["tools"],
+    options: ModelCallOptions | undefined,
     cacheControl: ModelCallOptions["cacheControl"],
-  ): { tools?: Anthropic.Tool[] } {
+  ): { tools?: Anthropic.ToolUnion[] } {
+    const { tools, definitions } = selectProviderTools(options, {
+      // The wire format, plus the provider label when a gateway sets one.
+      accepts: [ANTHROPIC_WIRE_FORMAT, this.provider],
+      module: LOG_MODULE,
+      model: this.name,
+      logger: this.logger,
+    });
     const mapped = toAnthropicTools(tools);
+    // Provider-defined tools (`web_search_20250305`, `bash_20250124`, …) go
+    // first and verbatim; the cache breakpoint stays on the last function
+    // tool so it still covers every definition before it.
+    const providerDefined = definitions as unknown as Anthropic.ToolUnion[];
 
     if (!mapped) {
-      return {};
+      return providerDefined.length > 0 ? { tools: providerDefined } : {};
     }
 
     if (this.config.promptCaching && mapped.length > 0) {
@@ -965,7 +1014,7 @@ export class AnthropicModel implements ModelContract {
       }
     }
 
-    return { tools: mapped };
+    return { tools: [...providerDefined, ...mapped] };
   }
 
   /**

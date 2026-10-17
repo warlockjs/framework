@@ -33,6 +33,21 @@ export function agentEventToStreamEvent<K extends keyof AgentEventMap>(
       return { type: "agent.trip.streaming", delta, tripIndex };
     }
 
+    case "agent.trip.reasoning": {
+      const { delta, tripIndex } = payload as AgentEventMap["agent.trip.reasoning"];
+      return { type: "agent.trip.reasoning", delta, tripIndex };
+    }
+
+    case "agent.trip.usage": {
+      const { usage, tripIndex } = payload as AgentEventMap["agent.trip.usage"];
+      return { type: "agent.trip.usage", usage, tripIndex };
+    }
+
+    case "agent.tool.streaming": {
+      const { callId, name, delta, tripIndex } = payload as AgentEventMap["agent.tool.streaming"];
+      return { type: "agent.tool.streaming", callId, name, delta, tripIndex };
+    }
+
     case "agent.tool.calling": {
       const { tool, callId, input, tripIndex } = payload as AgentEventMap["agent.tool.calling"];
       return { type: "agent.tool.calling", tool, callId, input, tripIndex };

@@ -56,6 +56,7 @@ import { team } from "./team/team";
 import { instruction } from "./system-prompt/instruction";
 import { persona } from "./system-prompt/persona";
 import { systemPrompt } from "./system-prompt/system-prompt";
+import { providerTool } from "./tool/provider-tool";
 import { tool } from "./tool/tool";
 import { step } from "./workflow/step";
 import { workflow } from "./workflow/workflow";
@@ -70,6 +71,7 @@ import { workflow } from "./workflow/workflow";
 export interface Ai {
   config: typeof setAIConfig;
   tool: typeof tool;
+  providerTool: typeof providerTool;
   agent: typeof agent;
   systemPrompt: typeof systemPrompt;
   persona: typeof persona;
@@ -186,6 +188,7 @@ export interface Ai {
  *
  * Factories:
  * - `ai.tool(...)` — wrap an async function with a schema-validated input.
+ * - `ai.providerTool(...)` — a provider-defined tool (web search, code execution, …) sent verbatim to that provider.
  * - `ai.agent(...)` — build an executable agent from model + tools + prompt.
  * - `ai.systemPrompt(...)` — compose a layered persona + instructions prompt.
  * - `ai.persona(text)` — reusable persona block (can be passed to `systemPrompt`).
@@ -226,6 +229,7 @@ export interface Ai {
 export const ai = {
   config: setAIConfig,
   tool,
+  providerTool,
   agent,
   systemPrompt,
   persona,

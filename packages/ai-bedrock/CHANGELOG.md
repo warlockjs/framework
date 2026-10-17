@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A `toolUse` block with `type: "server_tool_use"` (a system tool run by Bedrock) is no longer returned as a tool call for the agent to dispatch.
+
 - Converse conversion compiles with strict indexed-access checks while preserving empty and system-only histories.
 
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
@@ -18,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `new BedrockSDK({ apiKey, region })` authenticates with an Amazon Bedrock API key: requests carry `Authorization: Bearer <apiKey>` instead of a SigV4 signature and the AWS credential chain is not consulted (the adapter sets the AWS SDK's `token` and `authSchemePreference: ["httpBearerAuth"]`). An empty key, or a key combined with `credentials` or `token`, throws `InvalidRequestError`.
 - An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` and cancels the HTTP/2 request.
+- With `streamChunks`, `stream()` yields `reasoning` for `reasoningContent.text` deltas and `tool-args` for client `toolUse.input` deltas.
+- `ai.providerTool({ provider: "bedrock", definition })` appends a Converse `Tool` member such as `{ systemTool: { name: "nova_grounding" } }` verbatim; other providers' tools are skipped with a warning.
+
 - `providerOptions.bedrock.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight using the generation request's Converse conversation, tools and additional model fields.
 
