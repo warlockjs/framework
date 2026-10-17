@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `complete()` now honours `signal`: the `ollama` client takes no per-request signal, so `OllamaSDK` wraps the client's `fetch` (the caller's own `fetch` option included) to apply each call's signal. Aborting cancels the HTTP request before or after the response starts, on `complete()` and `stream()`, and a call with an already-aborted signal rejects without sending a request. An adapter contract test covers both calls.
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
 
 ### Added

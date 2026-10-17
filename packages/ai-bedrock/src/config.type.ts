@@ -4,11 +4,13 @@ import type { BedrockRuntimeClientConfig } from "@aws-sdk/client-bedrock-runtime
 /**
  * Configuration for the AWS Bedrock SDK adapter.
  *
- * Bedrock authenticates via the AWS credential chain, not an API key.
- * `region` is required by the runtime client; `credentials` is optional
- * — when omitted, the standard AWS provider chain (env vars, shared
- * config, IAM role, SSO) resolves them, exactly like every other AWS
- * SDK client. The whole object is forwarded to `BedrockRuntimeClient`,
+ * Bedrock authenticates either with AWS credentials (SigV4) or with an
+ * Amazon Bedrock API key (bearer). `region` is required by the runtime
+ * client. Pass `apiKey` to use a Bedrock API key; otherwise `credentials`
+ * is optional — when omitted, the standard AWS provider chain (env vars,
+ * shared config, IAM role, SSO) resolves them, exactly like every other
+ * AWS SDK client. (With neither, the AWS SDK also picks up a key from the
+ * `AWS_BEARER_TOKEN_BEDROCK` environment variable on its own.) The whole object is forwarded to `BedrockRuntimeClient`,
  * so any additional client option (custom `requestHandler`, `endpoint`,
  * retry config) is accepted as-is.
  *
@@ -25,6 +27,10 @@ import type { BedrockRuntimeClientConfig } from "@aws-sdk/client-bedrock-runtime
  * new BedrockSDK({ region: "us-east-1" });
  *
  * @example
+ * // Amazon Bedrock API key (bearer auth):
+ * new BedrockSDK({ apiKey: process.env.BEDROCK_API_KEY!, region: "us-east-1" });
+ *
+ * @example
  * // Explicit static credentials:
  * new BedrockSDK({
  *   region: "us-east-1",
@@ -36,6 +42,15 @@ import type { BedrockRuntimeClientConfig } from "@aws-sdk/client-bedrock-runtime
  */
 export type BedrockSDKConfig = BedrockRuntimeClientConfig & {
   provider?: string;
+  /**
+   * An Amazon Bedrock API key. Sent as `Authorization: Bearer <apiKey>`
+   * on every request instead of a SigV4 signature, so no AWS credentials
+   * are needed. Cannot be combined with `credentials` or `token` (the
+   * constructor throws `InvalidRequestError`). Bedrock API keys cover the
+   * Bedrock and Bedrock Runtime APIs (Converse, ConverseStream,
+   * InvokeModel, CountTokens) but not `InvokeModelWithBidirectionalStream`.
+   */
+  apiKey?: string;
   /**
    * Per-model USD pricing registry, keyed by Bedrock model id.
    * Surfaced onto every `BedrockModel` produced by `model()`;

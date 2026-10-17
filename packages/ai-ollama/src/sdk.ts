@@ -9,6 +9,7 @@ import { approximateTokenCount } from "@warlock.js/ai";
 import type { OllamaEmbedderConfig, OllamaModelConfig, OllamaSDKConfig } from "./config.type";
 import { OllamaEmbedder } from "./embedder";
 import { OllamaModel } from "./model";
+import { signalAwareFetch } from "./utils";
 
 /**
  * Ollama-backed implementation of `SDKAdapterContract`.
@@ -41,7 +42,13 @@ export class OllamaSDK implements SDKAdapterContract {
   public constructor(config: OllamaSDKConfig = {}) {
     const { provider, pricing, ...clientConfig } = config;
 
-    this.client = new Ollama(clientConfig);
+    // Route every request through a fetch that honours the current call's
+    // `ModelCallOptions.signal` — the `ollama` client takes no per-request
+    // signal of its own (see `utils/call-signal.ts`).
+    this.client = new Ollama({
+      ...clientConfig,
+      fetch: signalAwareFetch(clientConfig.fetch ?? globalThis.fetch),
+    });
     this.provider = provider ?? "ollama";
     this.pricing = pricing;
   }

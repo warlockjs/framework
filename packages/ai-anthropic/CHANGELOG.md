@@ -6,12 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Changed
+
+- `reasoning: { effort: "none" }` now turns thinking off on Claude Sonnet 5 and Claude Haiku 5.5 with `thinking: { type: "disabled" }` (sent alone, so Haiku 5.5 stays at its default effort, inside the range where `disabled` is accepted). Previously no `thinking` field was sent and both models ran adaptive thinking by default.
+- `reasoning: { effort: "none" }` on Claude Opus 5 now sends adaptive thinking at `output_config.effort: "low"` instead of omitting `thinking` (which ran at the default `high`). Opus 5 is deliberately not sent `disabled`: with thinking off it can write a tool call as plain text that never runs, and leak thinking tags. Claude Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 are unchanged.
+
 ### Fixed
 
 - `complete()` always builds a non-streaming request, including when an indexed `stream` option is supplied.
 
 ### Added
 
+- An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` on the model and cancels the HTTP request.
 - `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
 - Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.
 

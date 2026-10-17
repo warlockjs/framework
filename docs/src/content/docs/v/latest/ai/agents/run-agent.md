@@ -307,7 +307,7 @@ if (report.status === "cancelled") {
 }
 ```
 
-Between-trip abort is guaranteed. Mid-trip is best-effort — the provider SDK decides whether the in-flight request can be cut. `report.status === "cancelled"` and `error.category === "cancelled"` are stable signals.
+Between-trip abort is guaranteed, and so is mid-trip abort on every first-party adapter: honouring `signal` is part of the model adapter contract, so aborting rejects the in-flight model call and cancels its HTTP request (the provider stops generating). `report.status === "cancelled"` and `error.category === "cancelled"` are stable signals. A host racing streams against its own abort is no longer needed.
 
 ## Sessions
 

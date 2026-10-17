@@ -78,6 +78,19 @@ if (!ok) throw new Error(`fetch failed: ${status}`);
 
 Each call site passes its own `policy` (or `{}` for the strict defaults) — there is no global policy singleton, so tune per source (e.g. `hostAllowlist` for a known-good docs domain vs. an open web crawl).
 
+## Private-address classifier and standalone processes
+
+`isPrivateOrReservedIp(address)` (exported from `@warlock.js/ai`) is Core's classifier. `@warlock.js/ai` imports it from the side-effect-free `@warlock.js/core/net` subpath, never the Core root, so a standalone agent process does not load Core's HTTP server, database or cache modules. Code outside `ai` can import it from either place:
+
+```ts
+import { isPrivateOrReservedIp } from "@warlock.js/core/net";
+
+isPrivateOrReservedIp("169.254.169.254"); // true (cloud metadata)
+isPrivateOrReservedIp("93.184.216.34"); // false
+```
+
+`src/security/core-import-graph.spec.ts` resolves the package's import graph statically and fails if anything reachable from `@warlock.js/ai` imports the `@warlock.js/core` root.
+
 ## Testing
 
 Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting the network — every consumer above accepts `policy.fetch` all the way through. Regression coverage lives in `src/security/outbound-policy.spec.ts` (redirect-to-metadata/loopback/private block, off-allowlist redirect block, hop cap, credential stripping, clean-redirect follow).

@@ -158,10 +158,14 @@ Per call, `cacheControl: { ttl: "1h" }` overrides the model's `promptCacheTtl` f
 
 ## Thinking on Claude 5 models
 
-Claude Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 always think. They reject `thinking: { type: "disabled" }` and `budget_tokens` with a 400, so the adapter never sends either to them: a `reasoning` option becomes `thinking: { type: "adaptive" }` plus `output_config.effort`. `effort: "none"` depends on the model:
+Claude 5 models run adaptive thinking by default and reject `budget_tokens` with a 400, so a `reasoning` option becomes `thinking: { type: "adaptive" }` plus `output_config.effort`. `effort: "none"` depends on the model:
 
-- **Sonnet 5.5** turns thinking off with `thinking: { type: "between_tools" }`, so the adapter sends exactly that, with no `output_config.effort` and no `display` (the API rejects either beside it; the model default effort, `high`, is within the range it allows).
-- **Opus 5.5 and Fable 5 / 5.1** have no thinking-off form. The adapter leaves `thinking` out and the model still thinks at its default effort, so pass `effort: "low"` to spend less.
+| Model                   | `effort: "none"` sends                                           | Why                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sonnet 5.5              | `thinking: { type: "between_tools" }` alone                      | Its only thinking-off form. No `output_config.effort` and no `display` — the API rejects either beside it; the model default effort, `high`, is within the range it allows.                                                                                                                          |
+| Sonnet 5, Haiku 5.5     | `thinking: { type: "disabled" }`, no effort, no `display`        | Both accept `disabled`. Haiku 5.5 accepts it only at effort `high` or below, so no effort is sent and its default, `medium`, applies.                                                                                                                                                                |
+| Opus 5                  | `thinking: { type: "adaptive" }` + `output_config.effort: "low"` | Opus 5 accepts `disabled`, but with thinking off it can write a tool call into its visible text instead of a `tool_use` block (the call never runs, no error is raised) and leak thinking tags. Anthropic recommends lowering effort instead, so the adapter keeps thinking on at the lowest effort. |
+| Opus 5.5, Fable 5 / 5.1 | no `thinking` field                                              | No thinking-off form exists (`disabled` is a 400 at every effort), so the model still thinks at its default effort. Pass `effort: "low"` to spend less.                                                                                                                                              |
 
 Thinking text is empty by default on these models. Ask for readable summaries with `thinkingDisplay`:
 

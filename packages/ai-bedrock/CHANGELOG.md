@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `new BedrockSDK({ apiKey, region })` authenticates with an Amazon Bedrock API key: requests carry `Authorization: Bearer <apiKey>` instead of a SigV4 signature and the AWS credential chain is not consulted (the adapter sets the AWS SDK's `token` and `authSchemePreference: ["httpBearerAuth"]`). An empty key, or a key combined with `credentials` or `token`, throws `InvalidRequestError`.
+- An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` and cancels the HTTP/2 request.
 - `providerOptions.bedrock.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight using the generation request's Converse conversation, tools and additional model fields.
 

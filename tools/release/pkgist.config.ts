@@ -171,6 +171,11 @@ export default defineConfig({
             // Shared with `index.ts` through a common chunk, so `instanceof` holds
             // across both entries.
             "errors/index.ts",
+            // `@warlock.js/core/net` (5.31): the network helpers (the SSRF IP
+            // classifier) alone, so `@warlock.js/ai` and other standalone
+            // processes can guard outbound requests without loading the root
+            // barrel. Same shared-chunk arrangement as `errors`.
+            "net/index.ts",
             // The build-time route registration collector runs in an isolated
             // Node child. It is a separate entry because the parent resolves
             // the compiled child by a runtime path rather than importing it.

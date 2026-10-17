@@ -112,7 +112,12 @@ The trade-off is you lose reasoning. For tool-heavy agent work (function calls p
 
 The budget-based adapters honor the same intent natively: Anthropic and Bedrock emit no `thinking` block, Gemini sends `thinkingBudget: 0`, and Ollama sends `think: false`. So `effort: "none"` means "no reasoning" on every provider that can turn it off.
 
-Some Claude models can't. Claude Sonnet 5.5 turns thinking off only through `thinking: { type: "between_tools" }`, which the Anthropic adapter sends for `effort: "none"`. Claude Opus 5.5 and Fable 5 / 5.1 have no thinking-off form at all: the adapter leaves `thinking` out and they still think at their default effort, so use `effort: "low"` there to spend the least.
+The Claude 5 family needs a per-model form, which the Anthropic adapter picks for `effort: "none"`:
+
+- **Claude Sonnet 5.5** turns thinking off only through `thinking: { type: "between_tools" }`.
+- **Claude Sonnet 5 and Claude Haiku 5.5** get `thinking: { type: "disabled" }`, with no effort alongside (Haiku 5.5 accepts `disabled` only at effort `high` or below; its default, `medium`, applies).
+- **Claude Opus 5** stays on adaptive thinking at the lowest effort (`output_config.effort: "low"`). It accepts `disabled`, but with thinking off it can write a tool call into its visible text instead of making the call — the call never runs and no error is raised — and can leak thinking tags into the reply. Anthropic's guidance is to keep thinking on and lower the effort instead.
+- **Claude Opus 5.5 and Fable 5 / 5.1** have no thinking-off form at all: the adapter leaves `thinking` out and they still think at their default effort, so use `effort: "low"` there to spend the least.
 
 ## When the model isn't reasoning-capable
 

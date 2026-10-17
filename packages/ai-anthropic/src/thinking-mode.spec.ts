@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { acceptsBetweenTools, acceptsTemperature, inferThinkingMode } from "./thinking-mode";
+import {
+  acceptsBetweenTools,
+  acceptsTemperature,
+  inferThinkingMode,
+  noReasoningForm,
+} from "./thinking-mode";
 
 describe("inferThinkingMode", () => {
   it("returns 'adaptive' for the models that reject budget_tokens", () => {
@@ -100,6 +105,33 @@ describe("acceptsBetweenTools", () => {
       "claude-some-future-model",
     ]) {
       expect(acceptsBetweenTools(name), name).toBe(false);
+    }
+  });
+});
+
+describe("noReasoningForm", () => {
+  it("maps each Claude 5-family release to its thinking-off form", () => {
+    const expected: Array<[string, ReturnType<typeof noReasoningForm>]> = [
+      ["claude-sonnet-5-5", "between_tools"],
+      ["claude-sonnet-5", "disabled"],
+      ["claude-sonnet-5-20260301", "disabled"],
+      ["anthropic.claude-sonnet-5", "disabled"],
+      ["claude-haiku-5-5", "disabled"],
+      ["Claude-Haiku-5-5", "disabled"],
+      ["us.anthropic.claude-haiku-5-5", "disabled"],
+      ["claude-opus-5", "lowest-effort"],
+      ["claude-opus-5@20260301", "lowest-effort"],
+      ["claude-opus-5-5", "omit"],
+      ["claude-fable-5-1", "omit"],
+      ["claude-fable-5", "omit"],
+      ["claude-opus-4-8", "omit"],
+      ["claude-haiku-4-5", "omit"],
+      ["claude-sonnet-5-6", "omit"],
+      ["claude-haiku-5", "omit"],
+    ];
+
+    for (const [name, form] of expected) {
+      expect(noReasoningForm(name), name).toBe(form);
     }
   });
 });

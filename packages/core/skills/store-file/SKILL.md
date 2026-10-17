@@ -163,6 +163,22 @@ storage.url("uploads/photo.jpg"); // public URL (sync)
 await storage.temporaryUrl("private/doc.pdf", 3600); // signed URL, expires in seconds
 ```
 
+## Private-address check without the framework — `@warlock.js/core/net`
+
+`putFromUrl` refuses private, loopback, link-local and cloud-metadata hosts. Its classifier is also a side-effect-free subpath that loads only `node:net`, so workers, CLIs and standalone agent processes can reuse the rules without booting Core:
+
+```ts
+import { isPrivateOrReservedIp } from "@warlock.js/core/net";
+
+const address = "10.0.0.1";
+
+if (isPrivateOrReservedIp(address)) {
+  throw new Error(`Refusing private address ${address}`);
+}
+```
+
+Same function as the root `@warlock.js/core` export.
+
 ## Switching drivers — `storage.use(name)`
 
 For a single call against a non-default driver, scope it:

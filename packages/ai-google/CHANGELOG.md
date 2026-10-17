@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` on the model and cancels the HTTP request.
 - `providerOptions.google.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight. Vertex counts system instructions and tools; unsupported Developer API system/tool and cached-content counts fail explicitly.
 

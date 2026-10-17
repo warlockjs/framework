@@ -13,7 +13,7 @@ the model-agnostic surface — so one wire mapping covers every
 Bedrock-hosted family (Anthropic Claude, Amazon Nova, Meta Llama,
 Mistral, Cohere) and hands it all back as a vendor-neutral
 `ModelContract`. Auth uses your AWS credentials, exactly like any other
-AWS SDK call.
+AWS SDK call, or an Amazon Bedrock API key.
 
 ## Install
 
@@ -69,6 +69,30 @@ const bedrock = new BedrockSDK({
   credentials: { accessKeyId: "AKIA...", secretAccessKey: "..." },
 });
 ```
+
+### Bedrock API keys
+
+Bedrock also accepts [Amazon Bedrock API keys](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-use.html),
+which are bearer tokens rather than AWS credentials. Pass one as `apiKey`:
+
+```ts
+const bedrock = new BedrockSDK({
+  apiKey: process.env.BEDROCK_API_KEY!,
+  region: "us-east-1",
+});
+```
+
+Every request then carries `Authorization: Bearer <apiKey>` instead of a SigV4
+signature, and the AWS credential chain is never consulted. The adapter sets
+the AWS SDK's `token` and `authSchemePreference: ["httpBearerAuth"]` for you.
+
+- `apiKey` cannot be combined with `credentials` or `token` — the constructor
+  throws `InvalidRequestError` rather than guess which one should sign. An empty
+  key throws too.
+- Without `apiKey` or `credentials`, the AWS SDK itself still picks up a key
+  from the `AWS_BEARER_TOKEN_BEDROCK` environment variable.
+- API keys cover the Bedrock and Bedrock Runtime APIs this adapter calls
+  (Converse, ConverseStream, InvokeModel for embeddings, CountTokens).
 
 ## First call
 
