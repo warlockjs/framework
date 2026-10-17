@@ -1,5 +1,10 @@
 import { colors } from "@mongez/copper";
-import { ensureDirectoryAsync, fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
+import {
+  ensureDirectoryAsync,
+  fileExistsAsync,
+  getFileAsync,
+  putFileAsync,
+} from "../generation-fs";
 import type { CommandActionData } from "../../commands/types";
 import { srcPath } from "../../utils";
 import {

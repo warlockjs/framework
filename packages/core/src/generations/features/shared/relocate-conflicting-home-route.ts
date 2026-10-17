@@ -1,4 +1,4 @@
-import { getFileAsync, putFileAsync } from "@warlock.js/fs";
+import { getFileAsync, putFileAsync } from "../../generation-fs";
 import glob from "fast-glob";
 import { srcPath } from "../../../utils";
 

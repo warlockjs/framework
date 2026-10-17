@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, putFileAsync } from "@warlock.js/fs";
+import { fileExistsAsync, putFileAsync, recordSkippedFile } from "../generation-fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
 import type { FeatureDefinition } from "./types";
@@ -18,11 +18,15 @@ async function completeTestInstallation(options: CommandActionData) {
  *
  * Runs ONCE before all test workers.
  * Starts the HTTP server for integration tests.
+ *
+ * port: 0 lets the OS pick a free port, so tests run while \`warlock dev\`
+ * holds the configured one; the test helpers (testGet, actingAs, ...) are
+ * told the bound port automatically.
  */
 import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
-  await startHttpTestServer();
+  await startHttpTestServer({ port: 0 });
 }
 
 export async function teardown() {
@@ -31,6 +35,8 @@ export async function teardown() {
 `,
     );
     console.log(`${colors.green("✓")} Created src/test-global-setup.ts`);
+  } else {
+    recordSkippedFile(testGlobalSetupPath, "exists");
   }
 
   // Create test-setup.ts (runs before EVERY test file)
@@ -68,6 +74,8 @@ afterAll(teardownTest);
 `,
     );
     console.log(`${colors.green("✓")} Created src/test-setup.ts`);
+  } else {
+    recordSkippedFile(testSetupPath, "exists");
   }
 
   // Create vite.config.ts
@@ -97,6 +105,8 @@ export default defineConfig({
 `,
     );
     console.log(`${colors.green("✓")} Created vite.config.ts`);
+  } else {
+    recordSkippedFile(viteConfigPath, "exists");
   }
 }
 

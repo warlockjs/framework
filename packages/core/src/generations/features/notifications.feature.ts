@@ -6,7 +6,8 @@ import {
   fileExistsAsync,
   getFileAsync,
   putFileAsync,
-} from "@warlock.js/fs";
+  recordSkippedFile,
+} from "../generation-fs";
 import type { CommandActionData } from "../../commands/types";
 import { srcPath } from "../../utils";
 import {
@@ -73,6 +74,7 @@ async function writeModuleFile(relativePath: string, content: string, skipped: s
 
   if (await fileExistsAsync(path)) {
     skipped.push(relativePath);
+    recordSkippedFile(path, "exists");
     return;
   }
 

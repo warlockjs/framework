@@ -7,6 +7,7 @@ import { dropTablesCommand } from "./commands/drop-tables.command";
 import {
   generateCommand,
   generateControllerCommand,
+  generateEndpointCommand,
   generateMigrationCommand,
   generateModelCommand,
   generateModuleCommand,
@@ -14,6 +15,7 @@ import {
   generateResourceCommand,
   generateServiceCommand,
   generateUseCaseCommand,
+  makeCommand,
 } from "./commands/generate/generate.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { openApiGeneratorCommand } from "./commands/openapi-generator.command";
@@ -53,6 +55,8 @@ export const frameworkCommands = [
 
   // scaffolding commands
   generateCommand,
+  makeCommand,
+  generateEndpointCommand,
   generateModuleCommand,
   generateControllerCommand,
   generateServiceCommand,

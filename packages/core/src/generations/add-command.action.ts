@@ -5,7 +5,9 @@ import {
   getJsonFileAsync,
   putFileAsync,
   putJsonFileAsync,
-} from "@warlock.js/fs";
+  recordSkippedFile,
+} from "./generation-fs";
+import { isGenerationDryRun, setGenerationDetail } from "./generation-run";
 import { execSync } from "node:child_process";
 import type { CommandActionData } from "../commands/types";
 import {
@@ -93,6 +95,14 @@ export async function addCommandAction(options: CommandActionData) {
   const { packageManager, list, noInstall } = options.options;
 
   if (list) {
+    setGenerationDetail(
+      "features",
+      allowedFeatures.map((feature) => ({
+        name: feature,
+        description: featuresMap[feature]?.description ?? "",
+      })),
+    );
+
     console.log("Available Features:");
 
     for (const feature of allowedFeatures) {
@@ -164,7 +174,18 @@ export async function addCommandAction(options: CommandActionData) {
     }
   }
 
-  if (noInstall) {
+  setGenerationDetail("features", resolvedFeatures);
+  setGenerationDetail("dependencies", { ...dependencies });
+  setGenerationDetail("devDependencies", { ...devDependencies });
+
+  if (isGenerationDryRun()) {
+    // A preview installs nothing; package.json is "edited" in the overlay so
+    // the report lists it, and later steps read the previewed manifest.
+    console.log(
+      `Dry run: would install ${colors.magenta(Object.keys({ ...dependencies, ...devDependencies }).join(", ") || "nothing")}`,
+    );
+    await recordDependencies(dependencies, devDependencies);
+  } else if (noInstall) {
     await recordDependencies(dependencies, devDependencies);
   } else {
     const resolvedPackageManager =
@@ -181,6 +202,7 @@ export async function addCommandAction(options: CommandActionData) {
 
   for (const [name, config] of Object.entries(ejectConfigs)) {
     if (await fileExistsAsync(srcPath(`config/${name}.ts`))) {
+      recordSkippedFile(srcPath(`config/${name}.ts`), "exists");
       console.log(`${colors.yellowBright(name)} config already exists, skipping...`);
       continue;
     }
@@ -200,6 +222,8 @@ export async function addCommandAction(options: CommandActionData) {
       await featurePackages.onExecuting(options);
     }
   }
+
+  setGenerationDetail("scripts", { ...scripts });
 
   if (Object.keys(scripts).length > 0) {
     console.log(`Adding scripts ${colors.magenta(Object.keys(scripts).join(", "))}`);
@@ -339,7 +363,7 @@ async function recordDependencies(
   const recorded = [...Object.keys(dependencies), ...Object.keys(devDependencies)];
 
   console.log(
-    `Recorded ${colors.green(recorded.join(", "))} in package.json (install skipped via --no-install)`,
+    `Recorded ${colors.green(recorded.join(", "))} in package.json (${isGenerationDryRun() ? "dry run: nothing installed" : "install skipped via --no-install"})`,
   );
 }
 

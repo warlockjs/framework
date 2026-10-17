@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { ensureDirectoryAsync, fileExistsAsync, putFileAsync } from "@warlock.js/fs";
+import { ensureDirectoryAsync, fileExistsAsync, putFileAsync } from "../generation-fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath } from "../../utils";
 import { patchTsconfigInclude } from "./shared/patch-tsconfig-include";

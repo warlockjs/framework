@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
+import { fileExistsAsync, getFileAsync, putFileAsync } from "../../generation-fs";
 import { rootPath } from "../../../utils";
 
 /** What {@link insertIncludeEntry} did, or could not do, to the source it was given. */
