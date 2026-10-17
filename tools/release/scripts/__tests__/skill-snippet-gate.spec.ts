@@ -310,6 +310,43 @@ describe("compileSkill — real compilation against real declarations, with a re
     );
   });
 
+  it("honours explicit package exports without exposing existing internal source files", async () => {
+    const root = await fixtureRoot();
+    const pkg = await writeFixturePackage(
+      root,
+      "widgets",
+      "@fixture/widgets",
+      "export const widget = 1;\n",
+    );
+    await writeFile(
+      path.join(pkg.absPath, "package.json"),
+      JSON.stringify({
+        name: pkg.name,
+        exports: { ".": { types: "./src/index.ts" }, "./public": "./src/public.ts" },
+      }),
+    );
+    await writeFile(path.join(pkg.absPath, "src", "public.ts"), "export const published = 1;\n");
+    await writeFile(path.join(pkg.absPath, "src", "internal.ts"), "export const secret = 1;\n");
+    const skillFile = path.join(pkg.absPath, "skills", "SKILL.md");
+    await writeFile(
+      skillFile,
+      '```ts\nimport { widget } from "@fixture/widgets";\nimport { published } from "@fixture/widgets/public";\nconsole.log(widget, published);\n```',
+    );
+    const skill = skillFor(pkg, "exports", skillFile);
+    assert.deepEqual(
+      compileSkill(skill, [pkg], path.join(root, ".gate-tmp")).files[0].diagnostics,
+      [],
+    );
+    await writeFile(
+      skillFile,
+      '```ts\nimport { secret } from "@fixture/widgets/internal";\nconsole.log(secret);\n```',
+    );
+    const broken = compileSkill(skill, [pkg], path.join(root, ".gate-tmp"));
+    assert.ok(
+      broken.files[0].diagnostics.some((diagnostic) => /Cannot find module/.test(diagnostic)),
+    );
+  });
+
   it("keeps application declaration merging isolated to the skill that declares it", async () => {
     const root = await fixtureRoot();
     const pkg = await writeFixturePackage(

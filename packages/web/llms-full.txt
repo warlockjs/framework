@@ -4641,7 +4641,7 @@ test: {
 
 Two consequences for page specs:
 
-- **That `include` does not match page specs.** Files under `src/web/` and any `.tsx` spec are never collected. Widen it (for example add `"src/web/**/*.test.{ts,tsx}"`), or keep the unit specs in a second config that has no setup files and no server, which is also faster:
+- **That `include` does not match page specs.** Files under `src/web/` and any `.tsx` spec are never collected. Widen it (for example add `"src/web/**/*.{test,spec}.{ts,tsx}"`), or keep the unit specs in a second config that has no setup files and no server, which is also faster:
 
   ```ts title="vitest.web.config.ts"
   import { defineConfig } from "vitest/config";

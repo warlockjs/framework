@@ -347,6 +347,27 @@ export function planSkillCompileUnit(
 function buildPackagePaths(packages: WorkspacePackage[]): Record<string, string[]> {
   const paths: Record<string, string[]> = {};
   for (const pkg of packages) {
+    const manifest = JSON.parse(readFileSync(path.join(pkg.absPath, "package.json"), "utf8"));
+    if (Object.prototype.hasOwnProperty.call(manifest, "exports")) {
+      const exports = manifest.exports;
+      const entries =
+        exports &&
+        typeof exports === "object" &&
+        !Array.isArray(exports) &&
+        Object.keys(exports).some((key) => key.startsWith("."))
+          ? Object.entries(exports)
+          : [[".", exports]];
+      for (const [subpath, target] of entries) {
+        if (typeof subpath !== "string" || (subpath !== "." && !subpath.startsWith("./"))) continue;
+        const source = exportSource(target);
+        if (source) {
+          paths[subpath === "." ? pkg.name : `${pkg.name}/${subpath.slice(2)}`] = [
+            toPosix(path.resolve(pkg.absPath, source)),
+          ];
+        }
+      }
+      continue;
+    }
     const entry = path.join(pkg.absPath, "src", "index.ts");
     if (existsSync(entry)) {
       paths[pkg.name] = [toPosix(entry)];
@@ -359,6 +380,24 @@ function buildPackagePaths(packages: WorkspacePackage[]): Record<string, string[
     }
   }
   return paths;
+}
+
+/** Follow the declaration/import conditions without exposing unexported source files. */
+function exportSource(target: unknown): string | undefined {
+  if (typeof target === "string") return target.startsWith("./") ? target : undefined;
+  if (Array.isArray(target)) {
+    for (const entry of target) {
+      const source = exportSource(entry);
+      if (source) return source;
+    }
+  } else if (target && typeof target === "object") {
+    const conditions = target as Record<string, unknown>;
+    for (const condition of ["types", "import", "default"]) {
+      const source = exportSource(conditions[condition]);
+      if (source) return source;
+    }
+  }
+  return undefined;
 }
 
 function toPosix(p: string): string {
