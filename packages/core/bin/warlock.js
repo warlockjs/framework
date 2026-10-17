@@ -10,6 +10,35 @@ if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 15)) {
   process.exit(1);
 }
 
+// Bun and Deno report the Node version they emulate in `process.versions.node`
+// and add their own entry, so the check above passes on both. `warlock dev` is
+// the one command that cannot run there (it is built on Node's module loader
+// hooks), and it is refused here, before anything loads, so the refusal reads
+// the same whether the CLI runs from published output or from source. The
+// `dev` command repeats this check for callers that bypass this file.
+const foreignRuntimeName = process.versions.bun
+  ? "Bun"
+  : process.versions.deno
+    ? "Deno"
+    : undefined;
+
+if (foreignRuntimeName && process.argv[2] === "dev") {
+  const foreignRuntime = `${foreignRuntimeName} ${process.versions.bun ?? process.versions.deno}`;
+  const start = process.versions.bun ? "bun dist/app.js" : "deno run -A dist/app.js";
+
+  console.error(
+    [
+      `✖ warlock dev runs on Node.js only — this process is ${foreignRuntime}.`,
+      "  The development server compiles TypeScript and hot-reloads modules through Node's module loader hooks.",
+      "  Run it with Node.js 22.15 or newer: npx warlock dev",
+      `  ${foreignRuntimeName} can run the production build: build it with Node (npx warlock build),`,
+      `  then start it with ${start}.`,
+      "  Supported runtimes: https://warlock.js.org/v/latest/core/digging-deeper/supported-runtimes/",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 const binDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
@@ -55,6 +84,18 @@ async function bootFromSource() {
   }
 
   const { registerHooks } = await import("node:module");
+
+  // Bun has no `module.registerHooks`. Only a source checkout reaches this
+  // path (published packages ship compiled output), so say what is missing
+  // instead of failing on "registerHooks is not a function".
+  if (typeof registerHooks !== "function") {
+    console.error(
+      "[warlock] Running @warlock.js/core from TypeScript source needs Node's module.registerHooks " +
+        "(Node 22.15 or newer); this runtime does not provide it. Use Node, or install the published package.",
+    );
+    process.exit(1);
+  }
+
   const { readFileSync } = await import("node:fs");
   const { transformSync } = await import("esbuild");
   const { getTsconfig, resolvePathAlias } = await import("get-tsconfig");

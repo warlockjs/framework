@@ -47,6 +47,8 @@ warlock dev --skip-typings           # skip background type generation
 warlock dev --skip-health            # skip health checkers
 ```
 
+`dev` runs on Node.js only. Started on Bun or Deno it exits `1` with an error that names the runtime and points at the production start commands instead — see [Supported runtimes](../digging-deeper/supported-runtimes.md).
+
 | Flag                  | Type    | Description                                                                      |
 | --------------------- | ------- | -------------------------------------------------------------------------------- |
 | `--fresh, -f`         | boolean | Delete `.warlock/manifest.json` before starting (force full re-parse from disk). |
@@ -193,6 +195,8 @@ Bundle the application for production. Reads `warlock.config.ts > build` for esb
 warlock build
 ```
 
+Build on Node.js. On Bun or Deno the command still runs, but prints a notice on stderr that only the Node build is verified.
+
 No flags. Output lands in `dist/` (or wherever `warlock.config.ts > build.outDir` points). See [How it works](../architecture-concepts/how-it-works.md) for the bundler story.
 
 The build is all-or-nothing: it writes into a hidden sibling temp directory and promotes it into `outdir` with a rename only on success. A successful build therefore leaves no stale files from a previous one, and a failed build leaves `outdir` untouched rather than half-written. The promoted directory carries a `.warlock-build.json` success marker that `start` checks. See [Deployment](../digging-deeper/deployment).
@@ -221,7 +225,7 @@ Start the production server from the build output.
 warlock start
 ```
 
-Persistent. Reads `warlock.config.ts` to resolve the entry path and source-map flag, then `spawn`s `node` with the right arguments. Forwards `SIGTERM` / `SIGINT` to the child cleanly — Ctrl+C does what you expect.
+Persistent. Reads `warlock.config.ts` to resolve the entry path and source-map flag, then `spawn`s the runtime the CLI is running on (`process.execPath` — normally `node`) with the right arguments. Run the CLI with Bun (`bun node_modules/@warlock.js/core/bin/warlock.js start`) or Deno (`deno run -A node_modules/@warlock.js/core/bin/warlock.js start`) to serve the build there; see [Supported runtimes](../digging-deeper/supported-runtimes.md). Forwards `SIGTERM` / `SIGINT` to the child cleanly — Ctrl+C does what you expect.
 
 It refuses an output directory that no successful `warlock build` produced — missing, unreadable or non-success `.warlock-build.json` — naming that as the reason and exiting `1` before spawning anything:
 
