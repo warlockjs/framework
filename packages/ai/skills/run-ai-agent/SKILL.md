@@ -201,6 +201,10 @@ const nestedAgents = report.children.filter((c) => c.type === "agent");
 
 ```ts
 import { AgentIncompleteError, ai } from "@warlock.js/ai";
+import type { ModelContract, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const writeFile: ToolContract; // a file-writing tool
 
 const writer = ai.agent({ model, tools: [writeFile], continueOnOutputLimit: 2 });
 const result = await writer.execute("Write src/report.ts");
@@ -227,7 +231,11 @@ if (error) {
 ## Pattern — structured output
 
 ```ts
+import type { AgentContract } from "@warlock.js/ai";
 import { v, type Infer } from "@warlock.js/seal";
+
+declare const myAgent: AgentContract;
+declare const input: string;
 
 const summarySchema = v.object({
   summary: v.string(),
@@ -436,6 +444,13 @@ Each case runs through `execute(input)`; scorer precedence is per-case `scorers`
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ModelContract, ToolContract } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+declare const model: ModelContract;
+declare const extractEntitiesTool: ToolContract;
+
+const companiesSchema = v.object({ companies: v.array(v.string()) });
 
 const result = await ai.spawnSubAgent({
   name: "extract-entities",

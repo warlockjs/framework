@@ -93,7 +93,9 @@ const dataUrl = await image.toDataUrl(); // → "data:image/webp;base64,..."
 ### Resize an uploaded avatar to two sizes
 
 ```ts
-import { Image } from "@warlock.js/core";
+import { Image, type UploadedFile } from "@warlock.js/core";
+
+declare const uploadedAvatar: UploadedFile; // e.g. request.validated().avatar
 
 const buffer = await uploadedAvatar.buffer();
 

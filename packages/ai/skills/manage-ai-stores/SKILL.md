@@ -20,12 +20,17 @@ description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() 
 ## Wiring
 
 ```ts
-import { ai } from "@warlock.js/ai";
+import { ai, END } from "@warlock.js/ai";
+import type { AgentContract, PgClientLike } from "@warlock.js/ai";
+
+declare const triage: AgentContract;
+declare const resolver: AgentContract;
+declare const pgPool: PgClientLike; // a live pg.Pool
 
 const orch = ai.orchestrator({
   name: "support",
-  intents,
-  route,
+  intents: { triage, resolver },
+  route: (ctx) => (ctx.iteration === 0 ? "triage" : END),
   iterate: true,
   checkpointStore: ai.checkpoint.pg({ client: pgPool }),
   snapshotStore: ai.snapshot.pg({ client: pgPool }), // a single pg.Pool backs both
@@ -54,7 +59,12 @@ Resolution: explicit `checkpointStore` / `snapshotStore` on the config wins, els
 `@warlock.js/ai` takes **NO peer dependency** on `pg` or `redis` — you install the client, build it, and pass it in via `{ client }` (anything matching `PgClientLike` / `RedisClientLike`). The store never opens or closes the connection. A single `pg.Pool` can back the cache, the checkpoint store, and the snapshot store at once.
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { RedisClientLike } from "@warlock.js/ai";
 import { Pool } from "pg";
+
+declare const redisClient: RedisClientLike; // a connected redis client
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 ai.checkpoint.pg({ client: pool, table: "warlock_orchestrator_sessions", ttl: 86_400 });

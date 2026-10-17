@@ -1,6 +1,6 @@
 ---
 name: guard-input-output
-description: 'Build the composed guardrail middleware with @warlock.js/ai-guard and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail`) or `import { guard } from "@warlock.js/ai-guard"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
+description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
 ---
 
 # Guard agent input, output, and tool args
@@ -9,7 +9,9 @@ description: 'Build the composed guardrail middleware with @warlock.js/ai-guard 
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import "@warlock.js/ai-guard"; // registers ai.guardrail + ai.guardrail.pii/.topic/.injection/.moderation
+import type { ModelContract } from "@warlock.js/ai";
+
+declare const model: ModelContract; // any provider model
 
 const policy = ai.guardrail({
   name: "compliance",
@@ -23,7 +25,7 @@ const agent = ai.agent({ model, middleware: [policy] });
 A named-export form is available for callers who prefer not to rely on the augmented namespace:
 
 ```ts
-import { guard, topic, injection } from "@warlock.js/ai-guard";
+import { guard, topic, injection } from "@warlock.js/ai";
 const policy = guard({ input: [injection({ onMatch: "block" })] });
 ```
 

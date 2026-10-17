@@ -1,6 +1,6 @@
 ---
 name: escalate-block-to-human
-description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai-guard — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import "@warlock.js/ai-guard"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — the `guard-input-output` topic; PII/moderation detectors — the `detect-and-redact-pii` topic; durable suspend/resume human-step machinery (deferred) — not in this package.'
+description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai guardrails — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import { ai } from "@warlock.js/ai"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — the `guard-input-output` topic; PII/moderation detectors — the `detect-and-redact-pii` topic; durable suspend/resume human-step machinery (deferred) — not in this package.'
 ---
 
 # Escalate a block to a human
@@ -9,7 +9,12 @@ A `block` verdict can carry `escalate: true`. When it does, the guard `await`s y
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import "@warlock.js/ai-guard";
+import type { GuardrailBlockEvent, ModelContract } from "@warlock.js/ai";
+
+declare const model: ModelContract; // any provider model
+declare const reviewQueue: {
+  enqueue(item: Pick<GuardrailBlockEvent, "phase" | "reason">): Promise<void>;
+};
 
 const policy = ai.guardrail({
   output: [ai.guardrail.moderation({ blockOn: ["self-harm"] })],
@@ -48,7 +53,10 @@ const agent = ai.agent({ model, middleware: [policy] });
 The built-in detectors return ordinary `block` verdicts (no `escalate`). To escalate, author a tiny custom `GuardrailDetector` that sets `escalate: true` on its `block`:
 
 ```ts
-import type { GuardrailDetector } from "@warlock.js/ai-guard";
+import { ai } from "@warlock.js/ai";
+import type { GuardrailBlockEvent, GuardrailDetector } from "@warlock.js/ai";
+
+declare const approvals: { request(event: GuardrailBlockEvent): Promise<void> }; // your review surface
 
 const wirePolicy: GuardrailDetector = {
   name: "wire-transfer",
@@ -81,7 +89,7 @@ A `check()` may be sync or async (async = call an external service); the guard a
 
 ## A plain callback by design
 
-`escalation.onBlock` is a **plain callback** — `ai-guard` takes **no** dependency on the deferred durable human-step machinery (suspend/resume). The callback is the decoupling seam: inside it you wire your own review queue, and (where your stack supports it) a `workflow.resume(...)` loop. This package only emits the _signal_; it does not own durable suspension. When the typed human-step handoff ships, `onBlock` upgrades to it without a breaking change here.
+`escalation.onBlock` is a **plain callback** — the guardrail takes **no** dependency on the deferred durable human-step machinery (suspend/resume). The callback is the decoupling seam: inside it you wire your own review queue, and (where your stack supports it) a `workflow.resume(...)` loop. This package only emits the _signal_; it does not own durable suspension. When the typed human-step handoff ships, `onBlock` upgrades to it without a breaking change here.
 
 ## See also
 

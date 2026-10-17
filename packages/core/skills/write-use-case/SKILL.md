@@ -60,8 +60,19 @@ onExecuting → guards → schema → before → handler → after → onComplet
 
 ```ts
 import type { RetryOptions } from "@mongez/reinforcements";
+import type {
+  BenchmarkOptions,
+  UseCaseAfterMiddleware,
+  UseCaseBeforeMiddleware,
+  UseCaseContext,
+  UseCaseErrorResult,
+  UseCaseGuard,
+  UseCaseOnExecutingContext,
+  UseCaseResult,
+} from "@warlock.js/core";
+import type { ObjectValidator } from "@warlock.js/seal";
 
-type UseCase<Output, Input, Ctx = UseCaseContext> = {
+type UseCase<Output, Input, Ctx extends UseCaseContext = UseCaseContext> = {
   name: string;
   description?: string;
   handler: (data: Input, ctx: Ctx) => Promise<Output>;
@@ -74,7 +85,9 @@ type UseCase<Output, Input, Ctx = UseCaseContext> = {
   onError?: (ctx: UseCaseErrorResult) => void;
   retry?: RetryOptions; // from @mongez/reinforcements
   benchmark?: boolean | BenchmarkOptions;
-  broadcast?: boolean | { event?: string; output?: (output, result) => unknown };
+  broadcast?:
+    | boolean
+    | { event?: string; output?: (output: Output, result: UseCaseResult<Output>) => unknown };
 };
 ```
 
@@ -138,6 +151,7 @@ export const signupUseCase = useCase({
 
 ```ts
 // 2. Global config — the transport (HOW). src/config/use-cases.ts
+import type { UseCaseConfigurations } from "@warlock.js/core";
 import { heraldBroadcast } from "@warlock.js/herald";
 
 export default {

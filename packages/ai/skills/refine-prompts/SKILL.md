@@ -9,6 +9,12 @@ Humans write prompts as human text; models perform better on structured, model-t
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ModelContract } from "@warlock.js/ai";
+import type { CacheDriver } from "@warlock.js/cache";
+
+declare const model: ModelContract;
+declare const refinerModel: ModelContract; // a strong model that rewrites the template once
+declare const myCacheDriver: CacheDriver<any, any>; // where the refined pin is stored
 
 const support = ai
   .systemPrompt(

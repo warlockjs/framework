@@ -252,6 +252,9 @@ description: 'Wrap a function with `measure(name, fn, options?)` to time it and 
 ```ts
 import { measure } from "@warlock.js/core";
 
+declare const db: { users: { findOne(query: { id: number }): Promise<{ id: number } | null> } }; // your data layer
+declare const id: number;
+
 const result = await measure("db.findUser", () => db.users.findOne({ id }));
 
 if (result.success) {
@@ -359,6 +362,8 @@ For high-volume operations where you want p50/p95/p99 rather than per-call hooks
 ```ts
 import { BenchmarkProfiler, ConsoleChannel, measure } from "@warlock.js/core";
 
+declare const db: { users: { findOne(query: { id: number }): Promise<{ id: number } | null> } }; // your data layer
+
 const profiler = new BenchmarkProfiler({
   maxSamples: 1000, // ring buffer per operation name
   channels: [new ConsoleChannel()], // where stats go on flush()
@@ -385,6 +390,8 @@ Wire a profiler globally through `BenchmarkConfigurations.profiler` in `src/conf
 ```ts
 import type { BenchmarkChannel, BenchmarkStats } from "@warlock.js/core";
 
+declare const datadog: { gauge(metric: string, value: number): Promise<void> }; // your metrics client
+
 export class DatadogChannel implements BenchmarkChannel {
   public async onFlush(stats: Record<string, BenchmarkStats>): Promise<void> {
     for (const [name, operationStats] of Object.entries(stats)) {
@@ -402,6 +409,9 @@ When percentiles aren't enough — you need the actual failing inputs/errors for
 
 ```ts
 import { BenchmarkSnapshots, measure } from "@warlock.js/core";
+
+declare const stripe: { charge(payload: { amount: number }): Promise<{ id: string }> }; // your payment client
+declare const payload: { amount: number };
 
 const snapshots = new BenchmarkSnapshots({
   maxSnapshots: 100,
@@ -469,6 +479,9 @@ const result = await measure(
 ```ts
 import { measure } from "@warlock.js/core";
 import { retry } from "@mongez/reinforcements";
+
+declare const bus: { publish(event: unknown): Promise<void> }; // your event bus
+declare const event: { type: string };
 
 await measure("publish-event", () => retry(() => bus.publish(event), { attempts: 4, delay: 200 }));
 ```
@@ -2917,6 +2930,8 @@ Readiness is `isBooted && !isShuttingDown` plus every registered check. Register
 ```ts
 import { health } from "@warlock.js/core";
 
+declare const database: { isConnected(): boolean }; // your connection handle
+
 health.addCheck("db", async () => {
   return database.isConnected();
 });
@@ -3358,7 +3373,9 @@ const dataUrl = await image.toDataUrl(); // → "data:image/webp;base64,..."
 ### Resize an uploaded avatar to two sizes
 
 ```ts
-import { Image } from "@warlock.js/core";
+import { Image, type UploadedFile } from "@warlock.js/core";
+
+declare const uploadedAvatar: UploadedFile; // e.g. request.validated().avatar
 
 const buffer = await uploadedAvatar.buffer();
 
@@ -4048,11 +4065,12 @@ own extra guard — the check is already there.
 
 ```ts
 // src/config/http.ts
+import { env, type HttpConfigurations } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
 
 const SLOW_MS = 200;
 
-export default {
+const httpConfig: HttpConfigurations = {
   tracing: {
     enabled: env("TRACING_ENABLED") === "true",
     hooks: [
@@ -4073,6 +4091,8 @@ export default {
     ],
   },
 };
+
+export default httpConfig;
 ```
 
 ## Gotchas
@@ -4183,13 +4203,17 @@ const httpConfigFile = configPath("http.ts");
 ```ts
 import { uploadsPath } from "@warlock.js/core";
 
+declare const userId: string;
+
 const avatar = uploadsPath(`avatars/${userId}/profile.png`);
 ```
 
 ### Sanitize a user-supplied filename before joining
 
 ```ts
-import { sanitizePath, uploadsPath } from "@warlock.js/core";
+import { sanitizePath, uploadsPath, type Request } from "@warlock.js/core";
+
+declare const req: Request; // the current request
 
 const safe = sanitizePath(req.input("filename"));
 const dest = uploadsPath(`exports/${safe}`);
@@ -4285,6 +4309,9 @@ description: 'Wrap a flaky operation with `retry(fn, options)` — now provided 
 ```ts
 import { retry } from "@mongez/reinforcements";
 
+declare function fetchUser(id: string): Promise<{ id: string }>; // any flaky async call
+declare const id: string;
+
 const user = await retry(() => fetchUser(id), {
   attempts: 4, // TOTAL tries (initial + retries) — default 3
   delay: 200, // base ms between attempts
@@ -4347,6 +4374,9 @@ controller.abort(); // rejects promptly with signal.reason
 ```ts
 import { retryable } from "@mongez/reinforcements";
 
+declare function getUser(id: string): Promise<{ id: string }>; // any flaky async call
+declare const id: string;
+
 const fetchUser = retryable(getUser, { attempts: 4, backoff: "exponential" });
 await fetchUser(id);
 ```
@@ -4358,6 +4388,9 @@ await fetchUser(id);
 ```ts
 import { measure } from "@warlock.js/core";
 import { retry } from "@mongez/reinforcements";
+
+declare const bus: { publish(event: unknown): Promise<void> }; // your event bus
+declare const event: { type: string };
 
 const result = await measure("publish-event", () =>
   retry(() => bus.publish(event), { attempts: 4, delay: 200 }),
@@ -4527,7 +4560,7 @@ export default defineConfig({
     generateTypings: true,             // background type generation
     checkForUpdates: true,             // notify on a newer @warlock.js/core at dev start
     restartOnConfigChange: true,       // restart when warlock.config.ts / .env* changes
-    healthCheckers: [...] /* or false */,
+    healthCheckers: { typescript: true }, // built-in switches, custom checkers, or false
     transpileCacheDebug: false,        // name cache files <slug>.<hash>.js w/ // @source markers
     timings: false,                    // print a per-phase reload timing breakdown
   },
@@ -4573,6 +4606,8 @@ esbuild bundle of the app down to a single JS file in `dist/`. No flags — ever
 ### `build.*` config knobs
 
 ```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
 export default defineConfig({
   build: {
     outdir: "dist", // default — relative or absolute
@@ -4933,6 +4968,8 @@ npx warlock dev --skip-typings
 Or persist it:
 
 ```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
 export default defineConfig({
   devServer: {
     generateTypings: false,
@@ -5551,6 +5588,8 @@ import {
   HttpError, // base class — `new HttpError(status, message, payload?)` for arbitrary codes
 } from "@warlock.js/core";
 
+declare const id: string;
+
 throw new ResourceNotFoundError("product.notFound");
 throw new ForbiddenError("permission.denied", { resource: "product", id });
 throw new ConflictError("user.duplicateEmail");
@@ -5705,13 +5744,19 @@ SSE `event`/`id` fields are already single-lined by `response.sse()`
 ### Localized error
 
 ```ts
-import { t } from "@warlock.js/core";
+import { t, type RequestHandler } from "@warlock.js/core";
 
-if (!result) {
-  return response.unauthorized({ error: t("auth.invalidCredentials") });
-}
+declare function attemptLogin(email: string, password: string): Promise<{ token: string } | null>;
 
-return response.success(result);
+export const loginController: RequestHandler = async ({ request, response }) => {
+  const result = await attemptLogin(request.input("email"), request.input("password"));
+
+  if (!result) {
+    return response.unauthorized({ error: t("auth.invalidCredentials") });
+  }
+
+  return response.success(result);
+};
 ```
 
 ### Created with link header
@@ -5727,18 +5772,23 @@ return response.successCreate({ product });
 ### Streaming an LLM reply
 
 ```ts
-import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
+import { type RequestHandler } from "@warlock.js/core";
 
-const stream = response.stream("text/event-stream");
-const streamedAgent = await myAgent.stream(request.input("message"));
+declare const myAgent: AgentContract; // an ai.agent(...) instance
 
-for await (const event of streamedAgent.events) {
-  if (event.type === "text-delta") {
-    stream.send(`data: ${JSON.stringify({ delta: event.text })}\n\n`);
+export const chatController: RequestHandler = async ({ request, response }) => {
+  const stream = response.stream("text/event-stream");
+  const run = myAgent.stream(request.input("message"));
+
+  for await (const event of run) {
+    if (event.type === "agent.trip.streaming") {
+      stream.send(`data: ${JSON.stringify({ delta: event.delta })}\n\n`);
+    }
   }
-}
 
-stream.end();
+  stream.end();
+};
 ```
 
 (For the agent surface itself, see `@warlock.js/ai/skills/subskills/agent.md`.)
@@ -5884,6 +5934,8 @@ description: 'Read/write/delete files via the `storage` singleton — disks, dri
 ```ts
 import { storage } from "@warlock.js/core";
 
+declare const buffer: Buffer; // file contents
+
 const file = await storage.put(buffer, "uploads/photo.jpg");
 
 console.log(file.url); // public URL
@@ -5950,6 +6002,12 @@ The `storage` singleton (and any `storage.use(name)` scoped view) exposes the sa
 ### Writing
 
 ```ts
+import { createReadStream } from "node:fs";
+import { storage, type Request } from "@warlock.js/core";
+
+declare const buffer: Buffer; // file contents
+declare const request: Request; // the current request
+
 // From buffer
 const file = await storage.put(buffer, "uploads/photo.jpg");
 
@@ -5960,7 +6018,6 @@ await storage.put(buffer, "uploads/photo.jpg", {
 });
 
 // From stream (large files)
-import { createReadStream } from "node:fs";
 await storage.putStream(createReadStream("./video.mp4"), "uploads/video.mp4");
 
 // From a URL (downloads then stores)
@@ -5970,7 +6027,7 @@ await storage.putFromUrl("https://example.com/image.jpg", "uploads/image.jpg");
 await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/photo.png");
 
 // From an UploadedFile (multipart upload)
-await storage.put(request.file("image"), "uploads/avatar.jpg");
+await storage.put(request.file("image")!, "uploads/avatar.jpg"); // validate the upload first
 ```
 
 Every `put*` returns a `StorageFile`.
@@ -6077,7 +6134,7 @@ Give derivatives a dedicated cache folder, even when it sits beneath a storage r
 Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules a coalesced background check, at most once per minute; hits never walk the cache. The check walks the cache only on the first check after boot, when the byte estimate is over budget, when the oldest retained derivative has expired, or once per `maxCacheAge`. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. It also removes writer temporaries older than an hour (left by a crashed write), and a generation directory left without derivatives loses its `source.json` and then the empty directory once it is older than five minutes, which reclaims old object-storage generations after ETag changes. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal, as does a cache or root that cannot be resolved (`ENOTDIR`, `EACCES`, `ELOOP`; the original error is its `cause`). The guard result is remembered per cache, disk root and configured local roots; a newly registered disk is checked again.
 
 ```ts
-import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";
+import { createUploadedFileController, generateImageVariants, router } from "@warlock.js/core";
 
 router.get("/cloud-images/*", createUploadedFileController({ disk: "r2" }));
 const descriptor = await generateImageVariants("products/photo.jpg", {
@@ -6182,20 +6239,22 @@ await cloud.getRegion();
 Local storage signs URLs with an HMAC token (no presigned URL — there is no S3 here). Validate inbound tokens before serving:
 
 ```ts
-import { storage } from "@warlock.js/core";
+import { storage, type RequestHandler } from "@warlock.js/core";
 
-const result = await storage.validateTemporaryToken(token);
+export const temporaryFileController: RequestHandler = async ({ request, response }) => {
+  const result = await storage.validateTemporaryToken(String(request.input("token")));
 
-if (!result.valid) {
-  return response.forbidden({ error: result.error });
-}
+  if (!result.valid) {
+    return response.forbidden({ error: result.error });
+  }
 
-if (result.absolutePath) {
-  return response.sendFile(result.absolutePath);
-}
+  if (result.absolutePath) {
+    return response.sendFile(result.absolutePath);
+  }
 
-const stream = await result.getStream!();
-stream.pipe(response.raw);
+  const stream = await result.getStream!();
+  stream.pipe(response.raw);
+};
 ```
 
 Cloud drivers always return `{ valid: false }` from `validateTemporaryToken` — they validate via presigned URL on the cloud side.
@@ -6740,13 +6799,16 @@ All accept a relative path (leading `/` optional) and a standard `RequestInit`. 
 ```ts
 import { expectJson, parseJsonResponse } from "@warlock.js/core/tests";
 
+type MyShape = { id: number; name: string };
+declare const response: Response; // from testGet / testPost / fetch
+
 // Parse-only
-const body = await parseJsonResponse<MyShape>(response);
+const parsed = await parseJsonResponse<MyShape>(response);
 
 // Assert status + parse in one call
-const body = await expectJson<MyShape>(response); // expects 200
-const body = await expectJson<MyShape>(response, 201); // expects 201
-const body = await expectJson<MyShape>(response, 404); // expects 404 (testing error paths)
+const ok = await expectJson<MyShape>(response); // expects 200
+const created = await expectJson<MyShape>(response, 201); // expects 201
+const missing = await expectJson<MyShape>(response, 404); // expects 404 (testing error paths)
 ```
 
 `expectJson` throws with the actual status + response body when the assertion fails — no chasing "got 500" messages without context.
@@ -6799,10 +6861,10 @@ import { User } from "src/app/users/models/user";
 
 it("GET /me returns the current user", async () => {
   const user = await User.create({ email: "auth@e.com", password: "secret" });
-  const { accessToken } = await authService.generateTokens(user);
+  const { accessToken } = await authService.createTokenPair(user);
 
   const response = await testGet("/me", {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${accessToken.token}` },
   });
 
   const { user: me } = await expectJson<{ user: { email: string } }>(response);
@@ -6826,8 +6888,8 @@ export async function createUserAndToken(overrides: Partial<{ email: string }> =
     password: "test-secret",
   });
 
-  const { accessToken } = await authService.generateTokens(user);
-  return { user, accessToken, authHeader: { Authorization: `Bearer ${accessToken}` } };
+  const { accessToken } = await authService.createTokenPair(user);
+  return { user, accessToken, authHeader: { Authorization: `Bearer ${accessToken.token}` } };
 }
 ```
 
@@ -8347,6 +8409,8 @@ This is the right home for "warm a cache", "register a recurring job", "ping a r
 ```ts title="src/app/main.ts"
 import { Application } from "@warlock.js/core";
 
+declare function startQueueConsumer(): { stop(): Promise<void> }; // your long-running worker
+
 Application.onceBooted(() => {
   const consumer = startQueueConsumer();
 
@@ -8428,7 +8492,7 @@ export function setupChatSocket() {
 ```ts title="raw DataSource for an out-of-Cascade query"
 import { app } from "@warlock.js/core";
 
-const result = await app.database.client.query("SELECT NOW()");
+const result = await app.database?.driver.query("SELECT NOW()"); // { rows, rowCount }
 ```
 
 Reach for `app.*` as the escape hatch. If a typed framework primitive wraps the same thing (`router.get(...)` over `app.http.route(...)`, repository methods over raw `app.database` queries), prefer that — the typed surface keeps you on the rails the rest of the framework is designed around.
@@ -8439,9 +8503,14 @@ Reach for `app.*` as the escape hatch. If a typed framework primitive wraps the 
 
 ```ts title="src/config/log.ts"
 import { Application, type LogConfigurations } from "@warlock.js/core";
+import { ConsoleLog } from "@warlock.js/logger";
 
 const logConfig: LogConfigurations = {
-  level: Application.isProduction ? "info" : "debug",
+  channels: [
+    new ConsoleLog({
+      levels: Application.isProduction ? ["info", "warn", "error", "fatal"] : undefined, // undefined = all
+    }),
+  ],
 };
 
 export default logConfig;
@@ -9292,14 +9361,23 @@ The general-purpose computed-value helper. Use it when the value depends on the 
 
 ```ts
 import { useComputedModel } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
 
-slug: v.computed(useComputedModel((data, model, context) => {
-  // data    — the current schema-level input object
-  // model   — the Model instance being saved
-  // context — Seal's SchemaContext (allValues, rootContext, etc.)
+declare function slugify(text: string): string;
 
-  return `${data.category}-${slugify(data.title)}`;
-})),
+const productSchema = v.object({
+  title: v.string().required(),
+  category: v.string().required(),
+  slug: v.computed(
+    useComputedModel((data, model, context) => {
+      // data    — the current schema-level input object
+      // model   — the Model instance being saved
+      // context — Seal's SchemaContext (allValues, rootContext, etc.)
+
+      return `${data.category}-${slugify(data.title)}`;
+    }),
+  ),
+});
 ```
 
 `useComputedSlug` is implemented on top of `useComputedModel` — they share the same signature. Reach for `useComputedSlug` for the common slug case; reach for `useComputedModel` when you need to combine fields, branch on env, or call out to a service.
@@ -10260,6 +10338,9 @@ For background jobs, CLI commands, or anywhere outside the HTTP path, call `vali
 ```ts
 import { v } from "@warlock.js/seal";
 
+const createProductSchema = v.object({ name: v.string().required(), price: v.number().min(0) });
+declare const untrustedInput: unknown; // a queue payload, a webhook body, a CSV row…
+
 const result = await v.validate(createProductSchema, untrustedInput);
 
 if (!result.isValid) {
@@ -10666,7 +10747,7 @@ npx warlock explain                 # every code
 Framework errors carry a stable `code`; read any thrown value with `errorCodeOf()` (it also maps `ECONNREFUSED` → `WL8003`, `EADDRINUSE` / `PortInUseError` → `WL8004`, and follows `cause`):
 
 ```ts
-import { errorCodeOf, explainErrorCode, WarlockError } from "@warlock.js/core";
+import { errorCodeOf, explainErrorCode, router, WarlockError } from "@warlock.js/core";
 
 try {
   router.getRoute("posts.show", {});
@@ -12809,8 +12890,19 @@ onExecuting → guards → schema → before → handler → after → onComplet
 
 ```ts
 import type { RetryOptions } from "@mongez/reinforcements";
+import type {
+  BenchmarkOptions,
+  UseCaseAfterMiddleware,
+  UseCaseBeforeMiddleware,
+  UseCaseContext,
+  UseCaseErrorResult,
+  UseCaseGuard,
+  UseCaseOnExecutingContext,
+  UseCaseResult,
+} from "@warlock.js/core";
+import type { ObjectValidator } from "@warlock.js/seal";
 
-type UseCase<Output, Input, Ctx = UseCaseContext> = {
+type UseCase<Output, Input, Ctx extends UseCaseContext = UseCaseContext> = {
   name: string;
   description?: string;
   handler: (data: Input, ctx: Ctx) => Promise<Output>;
@@ -12823,7 +12915,7 @@ type UseCase<Output, Input, Ctx = UseCaseContext> = {
   onError?: (ctx: UseCaseErrorResult) => void;
   retry?: RetryOptions; // from @mongez/reinforcements
   benchmark?: boolean | BenchmarkOptions;
-  broadcast?: boolean | { event?: string; output?: (output, result) => unknown };
+  broadcast?: boolean | { event?: string; output?: (output: Output, result: UseCaseResult<Output>) => unknown };
 };
 ```
 
@@ -12887,6 +12979,7 @@ export const signupUseCase = useCase({
 
 ```ts
 // 2. Global config — the transport (HOW). src/config/use-cases.ts
+import type { UseCaseConfigurations } from "@warlock.js/core";
 import { heraldBroadcast } from "@warlock.js/herald";
 
 export default {

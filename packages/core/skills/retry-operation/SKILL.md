@@ -12,6 +12,9 @@ description: 'Wrap a flaky operation with `retry(fn, options)` — now provided 
 ```ts
 import { retry } from "@mongez/reinforcements";
 
+declare function fetchUser(id: string): Promise<{ id: string }>; // any flaky async call
+declare const id: string;
+
 const user = await retry(() => fetchUser(id), {
   attempts: 4, // TOTAL tries (initial + retries) — default 3
   delay: 200, // base ms between attempts
@@ -74,6 +77,9 @@ controller.abort(); // rejects promptly with signal.reason
 ```ts
 import { retryable } from "@mongez/reinforcements";
 
+declare function getUser(id: string): Promise<{ id: string }>; // any flaky async call
+declare const id: string;
+
 const fetchUser = retryable(getUser, { attempts: 4, backoff: "exponential" });
 await fetchUser(id);
 ```
@@ -85,6 +91,9 @@ await fetchUser(id);
 ```ts
 import { measure } from "@warlock.js/core";
 import { retry } from "@mongez/reinforcements";
+
+declare const bus: { publish(event: unknown): Promise<void> }; // your event bus
+declare const event: { type: string };
 
 const result = await measure("publish-event", () =>
   retry(() => bus.publish(event), { attempts: 4, delay: 200 }),

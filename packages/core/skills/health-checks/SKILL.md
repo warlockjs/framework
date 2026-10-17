@@ -62,6 +62,8 @@ Readiness is `isBooted && !isShuttingDown` plus every registered check. Register
 ```ts
 import { health } from "@warlock.js/core";
 
+declare const database: { isConnected(): boolean }; // your connection handle
+
 health.addCheck("db", async () => {
   return database.isConnected();
 });

@@ -350,9 +350,13 @@ Token-level streaming requires the dispatched agents to be streamed (supervisor 
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { SupervisorContract } from "@warlock.js/ai";
 import { cache } from "@warlock.js/cache";
 
-ai.config({ defaultStore: cache.driver("redis", { client }) });
+declare const supportBot: SupervisorContract;
+declare const message: string;
+
+ai.config({ defaultStore: await cache.driver("redis") }); // the redis driver from config/cache.ts
 
 await supportBot.execute(message, { runId: "support-7" }); // fresh
 await supportBot.resume("support-7"); // after crash

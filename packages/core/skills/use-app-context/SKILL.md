@@ -120,6 +120,8 @@ This is the right home for "warm a cache", "register a recurring job", "ping a r
 ```ts title="src/app/main.ts"
 import { Application } from "@warlock.js/core";
 
+declare function startQueueConsumer(): { stop(): Promise<void> }; // your long-running worker
+
 Application.onceBooted(() => {
   const consumer = startQueueConsumer();
 
@@ -201,7 +203,7 @@ export function setupChatSocket() {
 ```ts title="raw DataSource for an out-of-Cascade query"
 import { app } from "@warlock.js/core";
 
-const result = await app.database.client.query("SELECT NOW()");
+const result = await app.database?.driver.query("SELECT NOW()"); // { rows, rowCount }
 ```
 
 Reach for `app.*` as the escape hatch. If a typed framework primitive wraps the same thing (`router.get(...)` over `app.http.route(...)`, repository methods over raw `app.database` queries), prefer that — the typed surface keeps you on the rails the rest of the framework is designed around.
@@ -212,9 +214,14 @@ Reach for `app.*` as the escape hatch. If a typed framework primitive wraps the 
 
 ```ts title="src/config/log.ts"
 import { Application, type LogConfigurations } from "@warlock.js/core";
+import { ConsoleLog } from "@warlock.js/logger";
 
 const logConfig: LogConfigurations = {
-  level: Application.isProduction ? "info" : "debug",
+  channels: [
+    new ConsoleLog({
+      levels: Application.isProduction ? ["info", "warn", "error", "fatal"] : undefined, // undefined = all
+    }),
+  ],
 };
 
 export default logConfig;

@@ -17,12 +17,21 @@ The capstone of the 4-primitive ladder. An orchestrator is a **session-state man
 ```ts
 import { ai } from "@warlock.js/ai";
 import { END } from "@warlock.js/ai";
+import type { AgentContract, Message, PgClientLike } from "@warlock.js/ai";
 
 type SessionState = { category?: string; order?: { id: string }; reply?: string };
 
+declare const classify: AgentContract;
+declare const lookup: AgentContract;
+declare const processRefund: AgentContract;
+declare const compose: AgentContract;
+declare const pg: PgClientLike; // a live pg.Pool
+declare const message: string; // the user's new turn
+declare const history: Message[]; // prior turns, if you keep them yourself
+
 const supportBot = ai.orchestrator<SessionState>({
   name: "refund-support",
-  intents: { classify, lookup, process, compose },
+  intents: { classify, lookup, process: processRefund, compose },
   route: (ctx) => (ctx.iteration === 0 ? "classify" : END),
   iterate: true, // delegate each turn to a real supervisor
   historyWindow: { router: 5, agents: 20 },

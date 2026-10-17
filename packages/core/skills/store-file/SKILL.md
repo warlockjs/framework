@@ -12,6 +12,8 @@ description: 'Read/write/delete files via the `storage` singleton — disks, dri
 ```ts
 import { storage } from "@warlock.js/core";
 
+declare const buffer: Buffer; // file contents
+
 const file = await storage.put(buffer, "uploads/photo.jpg");
 
 console.log(file.url); // public URL
@@ -78,6 +80,12 @@ The `storage` singleton (and any `storage.use(name)` scoped view) exposes the sa
 ### Writing
 
 ```ts
+import { createReadStream } from "node:fs";
+import { storage, type Request } from "@warlock.js/core";
+
+declare const buffer: Buffer; // file contents
+declare const request: Request; // the current request
+
 // From buffer
 const file = await storage.put(buffer, "uploads/photo.jpg");
 
@@ -88,7 +96,6 @@ await storage.put(buffer, "uploads/photo.jpg", {
 });
 
 // From stream (large files)
-import { createReadStream } from "node:fs";
 await storage.putStream(createReadStream("./video.mp4"), "uploads/video.mp4");
 
 // From a URL (downloads then stores)
@@ -98,7 +105,7 @@ await storage.putFromUrl("https://example.com/image.jpg", "uploads/image.jpg");
 await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/photo.png");
 
 // From an UploadedFile (multipart upload)
-await storage.put(request.file("image"), "uploads/avatar.jpg");
+await storage.put(request.file("image")!, "uploads/avatar.jpg"); // validate the upload first
 ```
 
 Every `put*` returns a `StorageFile`.
@@ -205,7 +212,7 @@ Give derivatives a dedicated cache folder, even when it sits beneath a storage r
 Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules a coalesced background check, at most once per minute; hits never walk the cache. The check walks the cache only on the first check after boot, when the byte estimate is over budget, when the oldest retained derivative has expired, or once per `maxCacheAge`. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. It also removes writer temporaries older than an hour (left by a crashed write), and a generation directory left without derivatives loses its `source.json` and then the empty directory once it is older than five minutes, which reclaims old object-storage generations after ETag changes. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal, as does a cache or root that cannot be resolved (`ENOTDIR`, `EACCES`, `ELOOP`; the original error is its `cause`). The guard result is remembered per cache, disk root and configured local roots; a newly registered disk is checked again.
 
 ```ts
-import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";
+import { createUploadedFileController, generateImageVariants, router } from "@warlock.js/core";
 
 router.get("/cloud-images/*", createUploadedFileController({ disk: "r2" }));
 const descriptor = await generateImageVariants("products/photo.jpg", {
@@ -310,20 +317,22 @@ await cloud.getRegion();
 Local storage signs URLs with an HMAC token (no presigned URL — there is no S3 here). Validate inbound tokens before serving:
 
 ```ts
-import { storage } from "@warlock.js/core";
+import { storage, type RequestHandler } from "@warlock.js/core";
 
-const result = await storage.validateTemporaryToken(token);
+export const temporaryFileController: RequestHandler = async ({ request, response }) => {
+  const result = await storage.validateTemporaryToken(String(request.input("token")));
 
-if (!result.valid) {
-  return response.forbidden({ error: result.error });
-}
+  if (!result.valid) {
+    return response.forbidden({ error: result.error });
+  }
 
-if (result.absolutePath) {
-  return response.sendFile(result.absolutePath);
-}
+  if (result.absolutePath) {
+    return response.sendFile(result.absolutePath);
+  }
 
-const stream = await result.getStream!();
-stream.pipe(response.raw);
+  const stream = await result.getStream!();
+  stream.pipe(response.raw);
+};
 ```
 
 Cloud drivers always return `{ valid: false }` from `validateTemporaryToken` — they validate via presigned URL on the cloud side.

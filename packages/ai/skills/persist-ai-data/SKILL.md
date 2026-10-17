@@ -45,7 +45,7 @@ import { ai } from "@warlock.js/ai";
 import { cache } from "@warlock.js/cache";
 
 ai.config({
-  defaultStore: cache.driver("redis", { client: redisClient }),
+  defaultStore: await cache.driver("redis"), // the redis driver from config/cache.ts
 });
 ```
 
@@ -71,12 +71,20 @@ Brute-force memory drivers carry an `O(N)` similarity scan — fine up to a few 
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract, PgClientLike, RedisClientLike } from "@warlock.js/ai";
+
+declare const client: RedisClientLike; // a connected redis client
+declare const pgPool: PgClientLike; // a live pg.Pool
+declare const routerAgent: AgentContract;
+declare const triage: AgentContract;
+declare const billing: AgentContract;
+declare const resolver: AgentContract;
 
 ai.config({ defaultSnapshotStore: ai.snapshot.redis({ client }) });
 
 const wf = ai.workflow({
   name: "ticket-processor",
-  steps: [...],
+  steps: [ai.step({ name: "triage", agent: triage })],
   // snapshotStore optional — falls back to ai.config({ defaultSnapshotStore })
 });
 

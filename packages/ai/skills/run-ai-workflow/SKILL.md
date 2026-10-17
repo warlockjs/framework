@@ -18,6 +18,7 @@ Second rung of the 4-primitive ladder. A named, ordered set of steps with a stab
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 import { MemoryCacheDriver } from "@warlock.js/cache";
 import { v } from "@warlock.js/seal";
 
@@ -26,6 +27,9 @@ ai.config({ defaultStore: new MemoryCacheDriver() });
 type CatalogInput = { url: string };
 type CatalogOutput = { id: string };
 type CatalogState = { html?: string; catalogId?: string };
+
+declare const extractorAgent: AgentContract;
+const itemSchema = v.object({ id: v.string(), title: v.string() });
 
 const wf = ai.workflow<CatalogInput, CatalogOutput, CatalogState>({
   name: "catalog-item",

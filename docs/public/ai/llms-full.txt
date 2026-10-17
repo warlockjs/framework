@@ -60,8 +60,8 @@ const myAgent = ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) });
 
 const { data, text, report, usage, error } = await myAgent.execute("Hello");
 
-if (error) /* typed AIError */ ;
-console.log(text, usage.total, report.duration);
+if (error) console.error(error.code); // typed AIError
+else console.log(text, usage.total, report.duration);
 ```
 
 ## Pick a skill
@@ -214,7 +214,11 @@ The pure verdict functions (`matchConverge`, `matchOutputShape`, `matchPassStep`
 `ai.mockRouter(decisions, options?)` builds a deterministic `route` callback that replays a canned sequence — one decision per supervisor iteration — for testing supervisors without an LLM router:
 
 ```ts
-import { END } from "@warlock.js/ai";
+import { ai, END } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
+
+declare const writer: AgentContract;
+declare const critic: AgentContract;
 
 ai.supervisor({
   name: "draft-then-review",
@@ -237,7 +241,7 @@ A `MockModelResponse` with non-empty `toolCalls` and no `finishReason` finishes 
 ```ts
 import { MockSDK } from "@warlock.js/ai";
 
-const mock = new MockSDK({
+const mock = MockSDK({
   responses: [{ content: "", toolCalls: [{ id: "c1", name: "lookup", input: { sku: "A-1" } }] }],
 });
 const model = mock.model({ name: "mock" });
@@ -291,6 +295,10 @@ Read a recorded fallback signal in an outer middleware's `execute.after`:
 
 ```ts
 import { readBudgetFallbackSignal } from "@warlock.js/ai";
+import type { MiddlewareExecuteContext } from "@warlock.js/ai";
+
+declare const ctx: MiddlewareExecuteContext; // inside a middleware hook or callback
+declare function rerunOnCheaperModel(): Promise<void>;
 
 const signal = readBudgetFallbackSignal(ctx.state); // pass the middleware name as 2nd arg if non-default
 if (signal?.dimension === "cost") await rerunOnCheaperModel();
@@ -362,7 +370,12 @@ description: 'Gate an agent''s tool calls behind a human with `ai.human.approval
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ApprovalDecision, ApprovalRequest, ToolContract } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
+
+declare const refundCustomer: ToolContract;
+declare const lookupOrder: ToolContract;
+declare const ui: { prompt(request: ApprovalRequest): Promise<ApprovalDecision> }; // your operator surface
 
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -505,7 +518,7 @@ import { cache } from "@warlock.js/cache";
 
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
-ai.config({ defaultStore: cache.driver("redis", { client: redisClient }) });
+ai.config({ defaultStore: await cache.driver("redis") }); // the redis driver from config/cache.ts
 
 const myAgent = ai.agent({
   model: openai.model({ name: "gpt-4o" }),
@@ -822,7 +835,10 @@ Two forms supported: static string or function. Function form runs after input v
 Input is typed as `StandardSchemaV1<T>`. Recommended: `@warlock.js/seal`. Zod / Valibot / hand-rolled all interop.
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { v } from "@warlock.js/seal";
+
+declare function fetchDocs(query: string, limit: number): Promise<string[]>;
 
 const searchTool = ai.tool({
   name: "search",
@@ -1049,7 +1065,7 @@ Compact mode drops `description` / `title` / `examples` / `example` / `default` 
 
 ---
 name: detect-and-redact-pii
-description: 'Detect and redact PII (and run model-graded moderation) with @warlock.js/ai-guard detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail.pii` / `.moderation`) or `import { pii, moderation } from "@warlock.js/ai-guard"`. Skip: composing the guard / wiring it into an agent — the `guard-input-output` topic; routing a block to a human — the `escalate-block-to-human` topic.'
+description: 'Detect and redact PII (and run model-graded moderation) with the @warlock.js/ai guardrail detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail.pii` / `.moderation` ship in core) or `import { pii, moderation } from "@warlock.js/ai"`. Skip: composing the guard / wiring it into an agent — the `guard-input-output` topic; routing a block to a human — the `escalate-block-to-human` topic.'
 ---
 
 # Detect and redact PII (and moderate)
@@ -1058,7 +1074,6 @@ description: 'Detect and redact PII (and run model-graded moderation) with @warl
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import "@warlock.js/ai-guard";
 
 const policy = ai.guardrail({
   output: [ai.guardrail.pii({ onMatch: "redact", mask: "[REDACTED:{label}]" })],
@@ -1126,7 +1141,7 @@ const policy = ai.guardrail({
 
 ## Optional moderation peer — `ai.guardrail.moderation`
 
-For model-graded content (violence, self-harm, hate) beyond regex, the optional `moderation` detector calls OpenAI's moderation endpoint. The `openai` SDK is an **optional lazy peer** — importing `@warlock.js/ai-guard` never forces it to resolve; the detector throws a curated install string on first `check()` when the peer is absent (mirrors ai-panoptic's lazy Langfuse exporter).
+For model-graded content (violence, self-harm, hate) beyond regex, the optional `moderation` detector calls OpenAI's moderation endpoint. The `openai` SDK is an **optional lazy peer** — importing `@warlock.js/ai` never forces it to resolve; the detector throws a curated install string on first `check()` when the peer is absent (mirrors ai-panoptic's lazy Langfuse exporter).
 
 ```ts
 const policy = ai.guardrail({
@@ -1168,6 +1183,12 @@ Opt-in mid-run crash-resume for the two long-running primitives. Turn it on, giv
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ModelContract, PgClientLike, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const searchTool: ToolContract;
+declare const draftTool: ToolContract;
+declare const pgPool: PgClientLike; // a live pg.Pool
 
 const writer = ai.agent({
   name: "writer",
@@ -1247,6 +1268,9 @@ Every agent / planner carries a structural `signature` (`agent.signature` — co
 
 ```ts
 import { AgentDriftError } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
+
+declare const writer: AgentContract; // the durable agent above
 
 try {
   await writer.resume("run-42");
@@ -1310,6 +1334,11 @@ Interactive approval `await`s the operator in-process. **Durable** approval is f
 
 ```ts
 import { ai, InterruptSuspendedError } from "@warlock.js/ai";
+import type { ApprovalRequest, ModelContract, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const deleteAccount: ToolContract;
+declare const slack: { postApproval(request: ApprovalRequest): Promise<void> }; // your notifier
 
 const store = ai.human.interrupt.memory(); // swap for pg / redis in production
 
@@ -1343,7 +1372,8 @@ const result = await agent.execute("Delete account #88");
 
 // execute() never throws — the suspend rides result.error:
 if (result.error instanceof InterruptSuspendedError) {
-  return { status: "awaiting-approval", interruptId: result.error.interruptId };
+  // answer the caller now; the run continues later through ai.human.resume(...)
+  console.log({ status: "awaiting-approval", interruptId: result.error.interruptId });
 }
 ```
 
@@ -1353,6 +1383,11 @@ The middleware catches the **sentinel** (`instanceof InterruptSuspendedError`) a
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract, InterruptStore } from "@warlock.js/ai";
+
+declare const interruptId: string; // from the suspended run's error
+declare const store: InterruptStore;
+declare const agent: AgentContract;
 
 // Re-run the turn with the decision pre-seeded:
 const outcome = await ai.human.resume(
@@ -1402,21 +1437,23 @@ A second resume of an already-resolved (deleted) or never-raised interrupt retur
 | `ai.human.interrupt.redis(options)` | one namespaced JSON value + a self-maintained id index  | lazily imports the optional `redis` peer |
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import { Pool } from "pg";
+
 // Memory — dev / tests / single-process:
-const store = ai.human.interrupt.memory();
+const memoryStore = ai.human.interrupt.memory();
 
 // Postgres — pass a live pool (core never imports pg in that case):
-import { Pool } from "pg";
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const store = ai.human.interrupt.pg({ client: pool });
+const pgStore = ai.human.interrupt.pg({ client: pool });
 // Once, via your migration tool — the framework never auto-migrates:
-// await pool.query(store.schema());
+// await pool.query(pgStore.schema());
 
 // …or let the store build its own pool (lazily import("pg")):
-const store = ai.human.interrupt.pg({ connectionString: process.env.DATABASE_URL });
+const ownPoolStore = ai.human.interrupt.pg({ connectionString: process.env.DATABASE_URL });
 
 // Redis — pass a connected client, or a url:
-const store = ai.human.interrupt.redis({ url: process.env.REDIS_URL });
+const redisStore = ai.human.interrupt.redis({ url: process.env.REDIS_URL });
 ```
 
 ### Optional peers are lazy
@@ -1507,7 +1544,13 @@ ai.step({
 ## Pattern — RAG tool
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { EmbedderContract, ModelContract, VectorStore } from "@warlock.js/ai";
 import { v } from "@warlock.js/seal";
+
+declare const model: ModelContract;
+declare const embedder: EmbedderContract;
+declare const vectorStore: VectorStore;
 
 const searchKb = ai.tool({
   name: "searchKb",
@@ -1516,7 +1559,7 @@ const searchKb = ai.tool({
   execute: async ({ query, k }) => {
     const { vector } = await embedder.embed(query);
     const hits = await vectorStore.query(vector, { topK: k ?? 5 });
-    return hits.map((h) => ({ text: h.text, score: h.score, source: h.source }));
+    return hits.map((h) => ({ key: h.key, score: h.score, passage: h.value })); // value = what you upserted
   },
 });
 
@@ -1544,7 +1587,7 @@ No built-in vector store. Bring your own (pgvector / Qdrant / Pinecone / Chroma 
 
 ---
 name: escalate-block-to-human
-description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai-guard — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import "@warlock.js/ai-guard"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — the `guard-input-output` topic; PII/moderation detectors — the `detect-and-redact-pii` topic; durable suspend/resume human-step machinery (deferred) — not in this package.'
+description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai guardrails — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import { ai } from "@warlock.js/ai"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — the `guard-input-output` topic; PII/moderation detectors — the `detect-and-redact-pii` topic; durable suspend/resume human-step machinery (deferred) — not in this package.'
 ---
 
 # Escalate a block to a human
@@ -1553,7 +1596,10 @@ A `block` verdict can carry `escalate: true`. When it does, the guard `await`s y
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import "@warlock.js/ai-guard";
+import type { GuardrailBlockEvent, ModelContract } from "@warlock.js/ai";
+
+declare const model: ModelContract; // any provider model
+declare const reviewQueue: { enqueue(item: Pick<GuardrailBlockEvent, "phase" | "reason">): Promise<void> };
 
 const policy = ai.guardrail({
   output: [ai.guardrail.moderation({ blockOn: ["self-harm"] })],
@@ -1592,7 +1638,10 @@ const agent = ai.agent({ model, middleware: [policy] });
 The built-in detectors return ordinary `block` verdicts (no `escalate`). To escalate, author a tiny custom `GuardrailDetector` that sets `escalate: true` on its `block`:
 
 ```ts
-import type { GuardrailDetector } from "@warlock.js/ai-guard";
+import { ai } from "@warlock.js/ai";
+import type { GuardrailBlockEvent, GuardrailDetector } from "@warlock.js/ai";
+
+declare const approvals: { request(event: GuardrailBlockEvent): Promise<void> }; // your review surface
 
 const wirePolicy: GuardrailDetector = {
   name: "wire-transfer",
@@ -1625,7 +1674,7 @@ A `check()` may be sync or async (async = call an external service); the guard a
 
 ## A plain callback by design
 
-`escalation.onBlock` is a **plain callback** — `ai-guard` takes **no** dependency on the deferred durable human-step machinery (suspend/resume). The callback is the decoupling seam: inside it you wire your own review queue, and (where your stack supports it) a `workflow.resume(...)` loop. This package only emits the _signal_; it does not own durable suspension. When the typed human-step handoff ships, `onBlock` upgrades to it without a breaking change here.
+`escalation.onBlock` is a **plain callback** — the guardrail takes **no** dependency on the deferred durable human-step machinery (suspend/resume). The callback is the decoupling seam: inside it you wire your own review queue, and (where your stack supports it) a `workflow.resume(...)` loop. This package only emits the _signal_; it does not own durable suspension. When the typed human-step handoff ships, `onBlock` upgrades to it without a breaking change here.
 
 ## See also
 
@@ -1689,7 +1738,12 @@ The runner reads `.cases` off a dataset. Full `EvalReport`: `{ agentName, total,
 ## Regression gating — `baseline` + `tolerance`
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { AgentContract, DatasetContract } from "@warlock.js/ai";
 import { readFile, writeFile } from "node:fs/promises";
+
+declare const myAgent: AgentContract;
+declare const ds: DatasetContract; // the ai.dataset(...) above
 
 const baseline = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8"));
 
@@ -1846,6 +1900,7 @@ The model id is **not validated locally**. `openai.image({ name })` forwards the
 ## Google — Imagen (per-image) and Gemini (per-token)
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { GoogleSDK } from "@warlock.js/ai-google";
 
 const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
@@ -1907,10 +1962,10 @@ The completed `ImageReport` routes to any registered `Observer` (panoptic, OTel,
 `MockSDK({ imageResponses, imagePricing }).image({ name })` returns a deterministic `MockImageModel` — no HTTP. Script images/usage/errors and inspect `model.calls`.
 
 ```ts
-import { MockSDK } from "@warlock.js/ai";
+import { ai, MockSDK } from "@warlock.js/ai";
 
 const mock = MockSDK({ imageResponses: [{}], imagePricing: { perImage: 0.04 } });
-const { data, usage } = await ai.image({ model: mock.image({ name: "mock-image" }), prompt: "x" });
+const { data, usage } = await ai.image({ model: mock.image!({ name: "mock-image" }), prompt: "x" });
 ```
 
 
@@ -2069,7 +2124,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 
 ---
 name: guard-input-output
-description: 'Build the composed guardrail middleware with @warlock.js/ai-guard and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail`) or `import { guard } from "@warlock.js/ai-guard"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
+description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
 ---
 
 # Guard agent input, output, and tool args
@@ -2078,7 +2133,9 @@ description: 'Build the composed guardrail middleware with @warlock.js/ai-guard 
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import "@warlock.js/ai-guard"; // registers ai.guardrail + ai.guardrail.pii/.topic/.injection/.moderation
+import type { ModelContract } from "@warlock.js/ai";
+
+declare const model: ModelContract; // any provider model
 
 const policy = ai.guardrail({
   name: "compliance",
@@ -2092,7 +2149,7 @@ const agent = ai.agent({ model, middleware: [policy] });
 A named-export form is available for callers who prefer not to rely on the augmented namespace:
 
 ```ts
-import { guard, topic, injection } from "@warlock.js/ai-guard";
+import { guard, topic, injection } from "@warlock.js/ai";
 const policy = guard({ input: [injection({ onMatch: "block" })] });
 ```
 
@@ -2216,28 +2273,36 @@ import {
   WorkflowDriftError,
   // ...
 } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 
-const result = await agent.execute(input);
+declare const agent: AgentContract;
+declare function sleep(ms: number): Promise<void>;
+declare function retry(): Promise<unknown>;
+declare function truncateAndRetry(error: ContextLengthExceededError): Promise<unknown>;
 
-if (!result.error) return result.data;
+async function answer(input: string) {
+  const result = await agent.execute(input);
 
-if (result.error instanceof ProviderRateLimitError) {
-  await sleep(result.error.retryAfter ?? 1000);
-  return retry();
-}
+  if (!result.error) return result.data;
 
-if (result.error instanceof ContextLengthExceededError) {
-  return truncateAndRetry(result.error);
-}
+  if (result.error instanceof ProviderRateLimitError) {
+    await sleep(result.error.retryAfter ?? 1000);
+    return retry();
+  }
 
-// Or branch on stable code string (good for persisted logs / metrics)
-switch (result.error.code) {
-  case "PROVIDER_RATE_LIMIT":
-    /* ... */ break;
-  case "CONTENT_FILTER":
-    /* ... */ break;
-  case "WORKFLOW_DRIFT":
-    /* ... */ break;
+  if (result.error instanceof ContextLengthExceededError) {
+    return truncateAndRetry(result.error);
+  }
+
+  // Or branch on stable code string (good for persisted logs / metrics)
+  switch (result.error.code) {
+    case "PROVIDER_RATE_LIMIT":
+      /* ... */ break;
+    case "CONTENT_FILTER":
+      /* ... */ break;
+    case "WORKFLOW_DRIFT":
+      /* ... */ break;
+  }
 }
 ```
 
@@ -2296,6 +2361,11 @@ When the final model response is cut off by the output token cap (`finishReason:
 
 ```ts
 import { AgentIncompleteError, ai } from "@warlock.js/ai";
+import type { ModelContract, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const writeFile: ToolContract; // a file-writing tool
+declare const task: string;
 
 const worker = ai.agent({ model, tools: [writeFile], continueOnOutputLimit: 2 });
 const result = await worker.execute(task);
@@ -2303,7 +2373,7 @@ const result = await worker.execute(task);
 if (result.error instanceof AgentIncompleteError) {
   // reason: "output_limit" → raise maxTokens / split the task
   // reason: "context_window" → compact or trim the history (never continued)
-  logger.warn("agent answer cut off", {
+  console.warn("agent answer cut off", {
     reason: result.error.reason,
     tripIndex: result.error.tripIndex,
     continuations: result.error.continuations,
@@ -2694,12 +2764,12 @@ beforeAll(() => log.setChannels([]));
 ### Capture all framework log entries in a test
 
 ```ts
-import { log, LogChannel } from "@warlock.js/logger";
+import { log, LogChannel, type LoggingData } from "@warlock.js/logger";
 
 class Capture extends LogChannel {
   public name = "capture";
-  public entries: any[] = [];
-  public log(data) {
+  public entries: LoggingData[] = [];
+  public log(data: LoggingData) {
     this.entries.push(data);
   }
 }
@@ -2742,12 +2812,17 @@ description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() 
 ## Wiring
 
 ```ts
-import { ai } from "@warlock.js/ai";
+import { ai, END } from "@warlock.js/ai";
+import type { AgentContract, PgClientLike } from "@warlock.js/ai";
+
+declare const triage: AgentContract;
+declare const resolver: AgentContract;
+declare const pgPool: PgClientLike; // a live pg.Pool
 
 const orch = ai.orchestrator({
   name: "support",
-  intents,
-  route,
+  intents: { triage, resolver },
+  route: (ctx) => (ctx.iteration === 0 ? "triage" : END),
   iterate: true,
   checkpointStore: ai.checkpoint.pg({ client: pgPool }),
   snapshotStore: ai.snapshot.pg({ client: pgPool }), // a single pg.Pool backs both
@@ -2776,7 +2851,12 @@ Resolution: explicit `checkpointStore` / `snapshotStore` on the config wins, els
 `@warlock.js/ai` takes **NO peer dependency** on `pg` or `redis` — you install the client, build it, and pass it in via `{ client }` (anything matching `PgClientLike` / `RedisClientLike`). The store never opens or closes the connection. A single `pg.Pool` can back the cache, the checkpoint store, and the snapshot store at once.
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { RedisClientLike } from "@warlock.js/ai";
 import { Pool } from "pg";
+
+declare const redisClient: RedisClientLike; // a connected redis client
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 ai.checkpoint.pg({ client: pool, table: "warlock_orchestrator_sessions", ttl: 86_400 });
@@ -3106,21 +3186,16 @@ Resolution (`resolveObservers(observe)`):
 ## The global registry
 
 ```ts
-import {
-  registerObserver,
-  getObservers,
-  setObserveAll,
-  isObserveAll,
-  clearObservers,
-} from "@warlock.js/ai";
+import { registerObserver, getObservers, setObserveAll, isObserveAll } from "@warlock.js/ai";
+import type { Observer } from "@warlock.js/ai";
+
+declare const collector: Observer; // the tool's own collector
 
 registerObserver(collector); // an observability tool registers ONE collector when its config is applied
 getObservers(); // read-only snapshot of the registered observers (do not mutate)
 
 setObserveAll(true); // "observe every flow by default" — flows without their own `observe` get observed
 isObserveAll(); // read the flag (default false — opt-in observability)
-
-clearObservers(); // test-only: reset observers + the observe-all flag for spec isolation
 ```
 
 `observeAll` defaults to `false` (opt-in). A flow that never sets `observe` is observed **only** when observe-all is on; individual flows still opt out with `observe: false`.
@@ -3146,6 +3221,7 @@ An observability tool reacts to its own augmented config slot without core impor
 
 ```ts
 import { onConfigApplied, getAIConfig } from "@warlock.js/ai";
+import { applyPanopticConfig } from "@warlock.js/ai-panoptic"; // also loads the `panoptic` config slot
 
 onConfigApplied((config) => applyPanopticConfig(config.panoptic)); // react on every config merge
 applyPanopticConfig(getAIConfig().panoptic); // catch a pre-set config
@@ -3213,7 +3289,7 @@ import { ai } from "@warlock.js/ai";
 import { cache } from "@warlock.js/cache";
 
 ai.config({
-  defaultStore: cache.driver("redis", { client: redisClient }),
+  defaultStore: await cache.driver("redis"), // the redis driver from config/cache.ts
 });
 ```
 
@@ -3239,12 +3315,20 @@ Brute-force memory drivers carry an `O(N)` similarity scan — fine up to a few 
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract, PgClientLike, RedisClientLike } from "@warlock.js/ai";
+
+declare const client: RedisClientLike; // a connected redis client
+declare const pgPool: PgClientLike; // a live pg.Pool
+declare const routerAgent: AgentContract;
+declare const triage: AgentContract;
+declare const billing: AgentContract;
+declare const resolver: AgentContract;
 
 ai.config({ defaultSnapshotStore: ai.snapshot.redis({ client }) });
 
 const wf = ai.workflow({
   name: "ticket-processor",
-  steps: [...],
+  steps: [ai.step({ name: "triage", agent: triage })],
   // snapshotStore optional — falls back to ai.config({ defaultSnapshotStore })
 });
 
@@ -3453,6 +3537,7 @@ The framework reads `capabilities` to fail loud upfront — e.g. passing `attach
 ## OpenAI adapter — usage
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
 
 // Direct OpenAI
@@ -3704,6 +3789,10 @@ Shared options (`RagLoaderOptions`): `id` (source id — falls back to the URL f
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { Rag } from "@warlock.js/ai";
+
+declare const kb: Rag; // an ai.rag(...) pipeline
+declare const rawHtml: string;
 
 // Bare string, or many records → many distinctly-identified docs:
 await kb.index(
@@ -3739,7 +3828,12 @@ HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text 
 `pdf-parse` is an **optional** peer, dynamic-imported on the FIRST `loadPdf` call — importing `@warlock.js/ai` never forces it. When it is absent, the curated `PDF_PARSE_INSTALL_INSTRUCTIONS` string is thrown as a plain `Error` (a missing infra peer, not a content problem), never a raw module-resolution stack trace.
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { Rag } from "@warlock.js/ai";
 import { readFile } from "node:fs/promises";
+
+declare const kb: Rag; // an ai.rag(...) pipeline
+declare const bytes: Uint8Array; // PDF bytes from an upload or a fetch
 
 // Whole PDF → one doc carrying metadata.pageCount:
 await kb.index(await ai.rag.loadPdf(await readFile("manual.pdf"), { id: "manual" }));
@@ -3757,6 +3851,7 @@ An image-only / scanned page has no text layer and is dropped, so a fully-scanne
 The cache driver **is** the vector store — `upsert → set({ vector, tags })`, `query → similar()`, `removeNamespace → removeNamespace()`. A driver without similarity support throws `CacheUnsupportedError` unchanged (pointing you at the `pg` / `redis` cache drivers).
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { MemoryCacheDriver } from "@warlock.js/cache";
 
 const store = ai.rag.cacheVectorStore(new MemoryCacheDriver()); // dev / tests
@@ -3780,6 +3875,7 @@ type PgVectorStoreOptions = {
 `schema()` (alias `ensureSchema()`) returns the reference migration DDL — `CREATE EXTENSION vector`, the table, a GIN index on `tags`, and the chosen ANN index (`USING hnsw (embedding vector_cosine_ops)`). It **only returns the string**; the framework never auto-migrates — you run it once through your own tool. Index and query MUST use the same embedding model: the `vector(N)` width is fixed at table-creation time from `dimensions`.
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { Pool } from "pg";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -3794,6 +3890,7 @@ await pool.query(store.ensureSchema());
 ## Pattern — a knowledge base from a website, backed by pgvector
 
 ```ts
+import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { ai } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
@@ -3909,6 +4006,10 @@ Recorded chunks reproduce the exact `delta` / `tool-call` / `done` sequence on r
 
 ```ts
 import { VcrCassetteMissError } from "@warlock.js/ai";
+import type { Message, ModelContract } from "@warlock.js/ai";
+
+declare const vcrModel: ModelContract; // a model wrapped by ai.vcr(...)
+declare const messages: Message[];
 
 try {
   await vcrModel.complete(messages);
@@ -3949,6 +4050,12 @@ Humans write prompts as human text; models perform better on structured, model-t
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ModelContract } from "@warlock.js/ai";
+import type { CacheDriver } from "@warlock.js/cache";
+
+declare const model: ModelContract;
+declare const refinerModel: ModelContract; // a strong model that rewrites the template once
+declare const myCacheDriver: CacheDriver<any, any>; // where the refined pin is stored
 
 const support = ai
   .systemPrompt(
@@ -4236,6 +4343,10 @@ const nestedAgents = report.children.filter((c) => c.type === "agent");
 
 ```ts
 import { AgentIncompleteError, ai } from "@warlock.js/ai";
+import type { ModelContract, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const writeFile: ToolContract; // a file-writing tool
 
 const writer = ai.agent({ model, tools: [writeFile], continueOnOutputLimit: 2 });
 const result = await writer.execute("Write src/report.ts");
@@ -4262,7 +4373,11 @@ if (error) {
 ## Pattern — structured output
 
 ```ts
+import type { AgentContract } from "@warlock.js/ai";
 import { v, type Infer } from "@warlock.js/seal";
+
+declare const myAgent: AgentContract;
+declare const input: string;
 
 const summarySchema = v.object({
   summary: v.string(),
@@ -4471,6 +4586,13 @@ Each case runs through `execute(input)`; scorer precedence is per-case `scorers`
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ModelContract, ToolContract } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+declare const model: ModelContract;
+declare const extractEntitiesTool: ToolContract;
+
+const companiesSchema = v.object({ companies: v.array(v.string()) });
 
 const result = await ai.spawnSubAgent({
   name: "extract-entities",
@@ -4801,7 +4923,13 @@ Everything else passes through 1:1 — the sole exception is the report/result `
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 import { v } from "@warlock.js/seal";
+
+declare const techLeadRouter: AgentContract;
+declare const builder: AgentContract;
+declare const reviewer: AgentContract;
+declare const fixer: AgentContract;
 
 const codeTeam = ai.team({
   name: "code-team",
@@ -4911,6 +5039,7 @@ Second rung of the 4-primitive ladder. A named, ordered set of steps with a stab
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 import { MemoryCacheDriver } from "@warlock.js/cache";
 import { v } from "@warlock.js/seal";
 
@@ -4919,6 +5048,9 @@ ai.config({ defaultStore: new MemoryCacheDriver() });
 type CatalogInput = { url: string };
 type CatalogOutput = { id: string };
 type CatalogState = { html?: string; catalogId?: string };
+
+declare const extractorAgent: AgentContract;
+const itemSchema = v.object({ id: v.string(), title: v.string() });
 
 const wf = ai.workflow<CatalogInput, CatalogOutput, CatalogState>({
   name: "catalog-item",
@@ -5191,12 +5323,21 @@ The capstone of the 4-primitive ladder. An orchestrator is a **session-state man
 ```ts
 import { ai } from "@warlock.js/ai";
 import { END } from "@warlock.js/ai";
+import type { AgentContract, Message, PgClientLike } from "@warlock.js/ai";
 
 type SessionState = { category?: string; order?: { id: string }; reply?: string };
 
+declare const classify: AgentContract;
+declare const lookup: AgentContract;
+declare const processRefund: AgentContract;
+declare const compose: AgentContract;
+declare const pg: PgClientLike; // a live pg.Pool
+declare const message: string; // the user's new turn
+declare const history: Message[]; // prior turns, if you keep them yourself
+
 const supportBot = ai.orchestrator<SessionState>({
   name: "refund-support",
-  intents: { classify, lookup, process, compose },
+  intents: { classify, lookup, process: processRefund, compose },
   route: (ctx) => (ctx.iteration === 0 ? "classify" : END),
   iterate: true, // delegate each turn to a real supervisor
   historyWindow: { router: 5, agents: 20 },
@@ -5402,7 +5543,12 @@ A planner turns a free-form **goal** into an ordered **plan** the LLM writes its
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
+
+declare const searchAgent: AgentContract;
+declare const summarizer: AgentContract;
+declare const writerAgent: AgentContract;
 
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -5876,9 +6022,13 @@ Token-level streaming requires the dispatched agents to be streamed (supervisor 
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { SupervisorContract } from "@warlock.js/ai";
 import { cache } from "@warlock.js/cache";
 
-ai.config({ defaultStore: cache.driver("redis", { client }) });
+declare const supportBot: SupervisorContract;
+declare const message: string;
+
+ai.config({ defaultStore: await cache.driver("redis") }); // the redis driver from config/cache.ts
 
 await supportBot.execute(message, { runId: "support-7" }); // fresh
 await supportBot.resume("support-7"); // after crash
@@ -6051,7 +6201,7 @@ const { data, error } = await ai.transcribe({
 });
 
 if (error) console.warn(error.code); // typed AIError
-else console.log(data.text); // the transcript
+else console.log(data?.text); // the transcript
 ```
 
 `TranscriptionModelContract` mirrors `SpeechModelContract` — a peer primitive produced by the adapter's optional `transcribe?()` factory. The model id is **not validated locally** — a non-STT id (`openai.transcribe({ name: "gpt-4o" })`) constructs fine and is forwarded to the provider as given, so it fails as a typed provider error on `result.error`, never as a local throw at construction.
@@ -6376,6 +6526,9 @@ A **skill is text injected into an agent's context — it never runs code.** `ai
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 const agent = ai.agent({
   model: openai.model({ name: "gpt-4o" }),
@@ -6488,6 +6641,11 @@ Three factories — `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()` — 
 
 ```ts
 import { ai } from "@warlock.js/ai";
+
+declare const text: string;
+declare const path: string;
+const block1 = ai.persona("You are a concise assistant.");
+const block2 = ai.instruction("Answer in the user's language.");
 
 ai.systemPrompt(); // empty — chain .persona(), .instruction() onto it
 ai.systemPrompt("literal text"); // one-shot string form

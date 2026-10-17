@@ -13,6 +13,12 @@ Opt-in mid-run crash-resume for the two long-running primitives. Turn it on, giv
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ModelContract, PgClientLike, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const searchTool: ToolContract;
+declare const draftTool: ToolContract;
+declare const pgPool: PgClientLike; // a live pg.Pool
 
 const writer = ai.agent({
   name: "writer",
@@ -92,6 +98,9 @@ Every agent / planner carries a structural `signature` (`agent.signature` — co
 
 ```ts
 import { AgentDriftError } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
+
+declare const writer: AgentContract; // the durable agent above
 
 try {
   await writer.resume("run-42");

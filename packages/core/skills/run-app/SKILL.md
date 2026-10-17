@@ -138,12 +138,12 @@ export default defineConfig({
       include: ["**/*.{ts,tsx}"],
       exclude: ["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"],
     },
-    generateTypings: true,             // background type generation
-    checkForUpdates: true,             // notify on a newer @warlock.js/core at dev start
-    restartOnConfigChange: true,       // restart when warlock.config.ts / .env* changes
-    healthCheckers: [...] /* or false */,
-    transpileCacheDebug: false,        // name cache files <slug>.<hash>.js w/ // @source markers
-    timings: false,                    // print a per-phase reload timing breakdown
+    generateTypings: true, // background type generation
+    checkForUpdates: true, // notify on a newer @warlock.js/core at dev start
+    restartOnConfigChange: true, // restart when warlock.config.ts / .env* changes
+    healthCheckers: { typescript: true }, // built-in switches, custom checkers, or false
+    transpileCacheDebug: false, // name cache files <slug>.<hash>.js w/ // @source markers
+    timings: false, // print a per-phase reload timing breakdown
   },
 });
 ```
@@ -187,6 +187,8 @@ esbuild bundle of the app down to a single JS file in `dist/`. No flags — ever
 ### `build.*` config knobs
 
 ```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
 export default defineConfig({
   build: {
     outdir: "dist", // default — relative or absolute
@@ -547,6 +549,8 @@ npx warlock dev --skip-typings
 Or persist it:
 
 ```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
 export default defineConfig({
   devServer: {
     generateTypings: false,

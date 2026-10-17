@@ -87,6 +87,7 @@ The model id is **not validated locally**. `openai.image({ name })` forwards the
 ## Google — Imagen (per-image) and Gemini (per-token)
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { GoogleSDK } from "@warlock.js/ai-google";
 
 const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
@@ -148,8 +149,8 @@ The completed `ImageReport` routes to any registered `Observer` (panoptic, OTel,
 `MockSDK({ imageResponses, imagePricing }).image({ name })` returns a deterministic `MockImageModel` — no HTTP. Script images/usage/errors and inspect `model.calls`.
 
 ```ts
-import { MockSDK } from "@warlock.js/ai";
+import { ai, MockSDK } from "@warlock.js/ai";
 
 const mock = MockSDK({ imageResponses: [{}], imagePricing: { perImage: 0.04 } });
-const { data, usage } = await ai.image({ model: mock.image({ name: "mock-image" }), prompt: "x" });
+const { data, usage } = await ai.image({ model: mock.image!({ name: "mock-image" }), prompt: "x" });
 ```

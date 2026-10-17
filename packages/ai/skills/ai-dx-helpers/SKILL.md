@@ -94,7 +94,11 @@ The pure verdict functions (`matchConverge`, `matchOutputShape`, `matchPassStep`
 `ai.mockRouter(decisions, options?)` builds a deterministic `route` callback that replays a canned sequence — one decision per supervisor iteration — for testing supervisors without an LLM router:
 
 ```ts
-import { END } from "@warlock.js/ai";
+import { ai, END } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
+
+declare const writer: AgentContract;
+declare const critic: AgentContract;
 
 ai.supervisor({
   name: "draft-then-review",
@@ -117,7 +121,7 @@ A `MockModelResponse` with non-empty `toolCalls` and no `finishReason` finishes 
 ```ts
 import { MockSDK } from "@warlock.js/ai";
 
-const mock = new MockSDK({
+const mock = MockSDK({
   responses: [{ content: "", toolCalls: [{ id: "c1", name: "lookup", input: { sku: "A-1" } }] }],
 });
 const model = mock.model({ name: "mock" });
@@ -171,6 +175,10 @@ Read a recorded fallback signal in an outer middleware's `execute.after`:
 
 ```ts
 import { readBudgetFallbackSignal } from "@warlock.js/ai";
+import type { MiddlewareExecuteContext } from "@warlock.js/ai";
+
+declare const ctx: MiddlewareExecuteContext; // inside a middleware hook or callback
+declare function rerunOnCheaperModel(): Promise<void>;
 
 const signal = readBudgetFallbackSignal(ctx.state); // pass the middleware name as 2nd arg if non-default
 if (signal?.dimension === "cost") await rerunOnCheaperModel();

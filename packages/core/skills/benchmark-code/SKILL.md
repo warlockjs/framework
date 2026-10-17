@@ -12,6 +12,9 @@ description: 'Wrap a function with `measure(name, fn, options?)` to time it and 
 ```ts
 import { measure } from "@warlock.js/core";
 
+declare const db: { users: { findOne(query: { id: number }): Promise<{ id: number } | null> } }; // your data layer
+declare const id: number;
+
 const result = await measure("db.findUser", () => db.users.findOne({ id }));
 
 if (result.success) {
@@ -119,6 +122,8 @@ For high-volume operations where you want p50/p95/p99 rather than per-call hooks
 ```ts
 import { BenchmarkProfiler, ConsoleChannel, measure } from "@warlock.js/core";
 
+declare const db: { users: { findOne(query: { id: number }): Promise<{ id: number } | null> } }; // your data layer
+
 const profiler = new BenchmarkProfiler({
   maxSamples: 1000, // ring buffer per operation name
   channels: [new ConsoleChannel()], // where stats go on flush()
@@ -145,6 +150,8 @@ Wire a profiler globally through `BenchmarkConfigurations.profiler` in `src/conf
 ```ts
 import type { BenchmarkChannel, BenchmarkStats } from "@warlock.js/core";
 
+declare const datadog: { gauge(metric: string, value: number): Promise<void> }; // your metrics client
+
 export class DatadogChannel implements BenchmarkChannel {
   public async onFlush(stats: Record<string, BenchmarkStats>): Promise<void> {
     for (const [name, operationStats] of Object.entries(stats)) {
@@ -162,6 +169,9 @@ When percentiles aren't enough — you need the actual failing inputs/errors for
 
 ```ts
 import { BenchmarkSnapshots, measure } from "@warlock.js/core";
+
+declare const stripe: { charge(payload: { amount: number }): Promise<{ id: string }> }; // your payment client
+declare const payload: { amount: number };
 
 const snapshots = new BenchmarkSnapshots({
   maxSnapshots: 100,
@@ -229,6 +239,9 @@ const result = await measure(
 ```ts
 import { measure } from "@warlock.js/core";
 import { retry } from "@mongez/reinforcements";
+
+declare const bus: { publish(event: unknown): Promise<void> }; // your event bus
+declare const event: { type: string };
 
 await measure("publish-event", () => retry(() => bus.publish(event), { attempts: 4, delay: 200 }));
 ```

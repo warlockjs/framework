@@ -26,28 +26,36 @@ import {
   WorkflowDriftError,
   // ...
 } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 
-const result = await agent.execute(input);
+declare const agent: AgentContract;
+declare function sleep(ms: number): Promise<void>;
+declare function retry(): Promise<unknown>;
+declare function truncateAndRetry(error: ContextLengthExceededError): Promise<unknown>;
 
-if (!result.error) return result.data;
+async function answer(input: string) {
+  const result = await agent.execute(input);
 
-if (result.error instanceof ProviderRateLimitError) {
-  await sleep(result.error.retryAfter ?? 1000);
-  return retry();
-}
+  if (!result.error) return result.data;
 
-if (result.error instanceof ContextLengthExceededError) {
-  return truncateAndRetry(result.error);
-}
+  if (result.error instanceof ProviderRateLimitError) {
+    await sleep(result.error.retryAfter ?? 1000);
+    return retry();
+  }
 
-// Or branch on stable code string (good for persisted logs / metrics)
-switch (result.error.code) {
-  case "PROVIDER_RATE_LIMIT":
-    /* ... */ break;
-  case "CONTENT_FILTER":
-    /* ... */ break;
-  case "WORKFLOW_DRIFT":
-    /* ... */ break;
+  if (result.error instanceof ContextLengthExceededError) {
+    return truncateAndRetry(result.error);
+  }
+
+  // Or branch on stable code string (good for persisted logs / metrics)
+  switch (result.error.code) {
+    case "PROVIDER_RATE_LIMIT":
+      /* ... */ break;
+    case "CONTENT_FILTER":
+      /* ... */ break;
+    case "WORKFLOW_DRIFT":
+      /* ... */ break;
+  }
 }
 ```
 
@@ -106,6 +114,11 @@ When the final model response is cut off by the output token cap (`finishReason:
 
 ```ts
 import { AgentIncompleteError, ai } from "@warlock.js/ai";
+import type { ModelContract, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const writeFile: ToolContract; // a file-writing tool
+declare const task: string;
 
 const worker = ai.agent({ model, tools: [writeFile], continueOnOutputLimit: 2 });
 const result = await worker.execute(task);
@@ -113,7 +126,7 @@ const result = await worker.execute(task);
 if (result.error instanceof AgentIncompleteError) {
   // reason: "output_limit" → raise maxTokens / split the task
   // reason: "context_window" → compact or trim the history (never continued)
-  logger.warn("agent answer cut off", {
+  console.warn("agent answer cut off", {
     reason: result.error.reason,
     tripIndex: result.error.tripIndex,
     continuations: result.error.continuations,

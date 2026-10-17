@@ -238,12 +238,12 @@ describe("Products API", () => {
 
   it("creates a product when authenticated", async () => {
     const user = await User.create({ email: "u@e.com", password: "secret" });
-    const { accessToken } = await authService.generateTokens(user);
+    const { accessToken } = await authService.createTokenPair(user);
 
     const response = await testPost(
       "/products",
       { name: "Pen", price: 5 },
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { headers: { Authorization: `Bearer ${accessToken.token}` } },
     );
 
     const { product } = await expectJson<{

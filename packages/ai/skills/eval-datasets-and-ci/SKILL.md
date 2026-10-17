@@ -52,7 +52,12 @@ The runner reads `.cases` off a dataset. Full `EvalReport`: `{ agentName, total,
 ## Regression gating — `baseline` + `tolerance`
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { AgentContract, DatasetContract } from "@warlock.js/ai";
 import { readFile, writeFile } from "node:fs/promises";
+
+declare const myAgent: AgentContract;
+declare const ds: DatasetContract; // the ai.dataset(...) above
 
 const baseline = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8"));
 

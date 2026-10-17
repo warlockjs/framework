@@ -302,13 +302,16 @@ All accept a relative path (leading `/` optional) and a standard `RequestInit`. 
 ```ts
 import { expectJson, parseJsonResponse } from "@warlock.js/core/tests";
 
+type MyShape = { id: number; name: string };
+declare const response: Response; // from testGet / testPost / fetch
+
 // Parse-only
-const body = await parseJsonResponse<MyShape>(response);
+const parsed = await parseJsonResponse<MyShape>(response);
 
 // Assert status + parse in one call
-const body = await expectJson<MyShape>(response); // expects 200
-const body = await expectJson<MyShape>(response, 201); // expects 201
-const body = await expectJson<MyShape>(response, 404); // expects 404 (testing error paths)
+const ok = await expectJson<MyShape>(response); // expects 200
+const created = await expectJson<MyShape>(response, 201); // expects 201
+const missing = await expectJson<MyShape>(response, 404); // expects 404 (testing error paths)
 ```
 
 `expectJson` throws with the actual status + response body when the assertion fails — no chasing "got 500" messages without context.
@@ -361,10 +364,10 @@ import { User } from "src/app/users/models/user";
 
 it("GET /me returns the current user", async () => {
   const user = await User.create({ email: "auth@e.com", password: "secret" });
-  const { accessToken } = await authService.generateTokens(user);
+  const { accessToken } = await authService.createTokenPair(user);
 
   const response = await testGet("/me", {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${accessToken.token}` },
   });
 
   const { user: me } = await expectJson<{ user: { email: string } }>(response);
@@ -388,8 +391,8 @@ export async function createUserAndToken(overrides: Partial<{ email: string }> =
     password: "test-secret",
   });
 
-  const { accessToken } = await authService.generateTokens(user);
-  return { user, accessToken, authHeader: { Authorization: `Bearer ${accessToken}` } };
+  const { accessToken } = await authService.createTokenPair(user);
+  return { user, accessToken, authHeader: { Authorization: `Bearer ${accessToken.token}` } };
 }
 ```
 

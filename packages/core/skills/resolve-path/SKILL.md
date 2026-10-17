@@ -81,13 +81,17 @@ const httpConfigFile = configPath("http.ts");
 ```ts
 import { uploadsPath } from "@warlock.js/core";
 
+declare const userId: string;
+
 const avatar = uploadsPath(`avatars/${userId}/profile.png`);
 ```
 
 ### Sanitize a user-supplied filename before joining
 
 ```ts
-import { sanitizePath, uploadsPath } from "@warlock.js/core";
+import { sanitizePath, uploadsPath, type Request } from "@warlock.js/core";
+
+declare const req: Request; // the current request
 
 const safe = sanitizePath(req.input("filename"));
 const dest = uploadsPath(`exports/${safe}`);

@@ -181,11 +181,12 @@ own extra guard — the check is already there.
 
 ```ts
 // src/config/http.ts
+import { env, type HttpConfigurations } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
 
 const SLOW_MS = 200;
 
-export default {
+const httpConfig: HttpConfigurations = {
   tracing: {
     enabled: env("TRACING_ENABLED") === "true",
     hooks: [
@@ -206,6 +207,8 @@ export default {
     ],
   },
 };
+
+export default httpConfig;
 ```
 
 ## Gotchas

@@ -153,6 +153,8 @@ import {
   HttpError, // base class — `new HttpError(status, message, payload?)` for arbitrary codes
 } from "@warlock.js/core";
 
+declare const id: string;
+
 throw new ResourceNotFoundError("product.notFound");
 throw new ForbiddenError("permission.denied", { resource: "product", id });
 throw new ConflictError("user.duplicateEmail");
@@ -307,13 +309,19 @@ SSE `event`/`id` fields are already single-lined by `response.sse()`
 ### Localized error
 
 ```ts
-import { t } from "@warlock.js/core";
+import { t, type RequestHandler } from "@warlock.js/core";
 
-if (!result) {
-  return response.unauthorized({ error: t("auth.invalidCredentials") });
-}
+declare function attemptLogin(email: string, password: string): Promise<{ token: string } | null>;
 
-return response.success(result);
+export const loginController: RequestHandler = async ({ request, response }) => {
+  const result = await attemptLogin(request.input("email"), request.input("password"));
+
+  if (!result) {
+    return response.unauthorized({ error: t("auth.invalidCredentials") });
+  }
+
+  return response.success(result);
+};
 ```
 
 ### Created with link header
@@ -329,18 +337,23 @@ return response.successCreate({ product });
 ### Streaming an LLM reply
 
 ```ts
-import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
+import { type RequestHandler } from "@warlock.js/core";
 
-const stream = response.stream("text/event-stream");
-const streamedAgent = await myAgent.stream(request.input("message"));
+declare const myAgent: AgentContract; // an ai.agent(...) instance
 
-for await (const event of streamedAgent.events) {
-  if (event.type === "text-delta") {
-    stream.send(`data: ${JSON.stringify({ delta: event.text })}\n\n`);
+export const chatController: RequestHandler = async ({ request, response }) => {
+  const stream = response.stream("text/event-stream");
+  const run = myAgent.stream(request.input("message"));
+
+  for await (const event of run) {
+    if (event.type === "agent.trip.streaming") {
+      stream.send(`data: ${JSON.stringify({ delta: event.delta })}\n\n`);
+    }
   }
-}
 
-stream.end();
+  stream.end();
+};
 ```
 
 (For the agent surface itself, see `@warlock.js/ai/skills/subskills/agent.md`.)

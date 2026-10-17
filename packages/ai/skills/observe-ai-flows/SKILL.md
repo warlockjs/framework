@@ -44,21 +44,16 @@ Resolution (`resolveObservers(observe)`):
 ## The global registry
 
 ```ts
-import {
-  registerObserver,
-  getObservers,
-  setObserveAll,
-  isObserveAll,
-  clearObservers,
-} from "@warlock.js/ai";
+import { registerObserver, getObservers, setObserveAll, isObserveAll } from "@warlock.js/ai";
+import type { Observer } from "@warlock.js/ai";
+
+declare const collector: Observer; // the tool's own collector
 
 registerObserver(collector); // an observability tool registers ONE collector when its config is applied
 getObservers(); // read-only snapshot of the registered observers (do not mutate)
 
 setObserveAll(true); // "observe every flow by default" — flows without their own `observe` get observed
 isObserveAll(); // read the flag (default false — opt-in observability)
-
-clearObservers(); // test-only: reset observers + the observe-all flag for spec isolation
 ```
 
 `observeAll` defaults to `false` (opt-in). A flow that never sets `observe` is observed **only** when observe-all is on; individual flows still opt out with `observe: false`.
@@ -84,6 +79,7 @@ An observability tool reacts to its own augmented config slot without core impor
 
 ```ts
 import { onConfigApplied, getAIConfig } from "@warlock.js/ai";
+import { applyPanopticConfig } from "@warlock.js/ai-panoptic"; // also loads the `panoptic` config slot
 
 onConfigApplied((config) => applyPanopticConfig(config.panoptic)); // react on every config merge
 applyPanopticConfig(getAIConfig().panoptic); // catch a pre-set config

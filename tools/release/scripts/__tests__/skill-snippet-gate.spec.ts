@@ -512,7 +512,7 @@ describe("ratchet — per-package baseline enforcement", () => {
     // Sanity: the baseline recorded at authoring time.
     assert.equal(
       Object.values(allowances).reduce((sum, n) => sum + n, 0),
-      280,
+      204,
     );
   });
 });

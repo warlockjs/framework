@@ -84,7 +84,7 @@ npx warlock explain                 # every code
 Framework errors carry a stable `code`; read any thrown value with `errorCodeOf()` (it also maps `ECONNREFUSED` → `WL8003`, `EADDRINUSE` / `PortInUseError` → `WL8004`, and follows `cause`):
 
 ```ts
-import { errorCodeOf, explainErrorCode, WarlockError } from "@warlock.js/core";
+import { errorCodeOf, explainErrorCode, router, WarlockError } from "@warlock.js/core";
 
 try {
   router.getRoute("posts.show", {});

@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Skill examples compile against the current API: the guardrail skills import from `@warlock.js/ai` (guardrails ship in core; there is no `@warlock.js/ai-guard` package), `ai.config({ defaultStore })` awaits `cache.driver(...)`, `MockSDK` is called without `new`, the observer skill no longer lists the internal `clearObservers`, the vector-store tool maps `{ key, score, value }` hits, and examples declare the agents, tools and clients they use.
 - `computeCost` bills Anthropic and Bedrock prompt caching correctly. Their `input` excludes cache reads and writes, so cache reads are no longer subtracted from it (which could floor fresh input at 0), and cache writes are now charged: at `ModelPricing.cacheWrite`, with the 1-hour share at `cacheWrite1h`. OpenAI-style usage, where `input` includes cached tokens, is billed as before.
 - Batch, planner and fallback-model usage rollups use the shared `mergeUsage`, so they keep every usage channel and the cache semantics flag.
 - The streaming agent loop reads the finish reason and usage only from the `done` chunk and ignores chunk types it does not know, instead of treating any other chunk as `done`. `fallbackModel().stream()` still falls over after a model emitted only a `usage` chunk.

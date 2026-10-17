@@ -47,7 +47,10 @@ Two forms supported: static string or function. Function form runs after input v
 Input is typed as `StandardSchemaV1<T>`. Recommended: `@warlock.js/seal`. Zod / Valibot / hand-rolled all interop.
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { v } from "@warlock.js/seal";
+
+declare function fetchDocs(query: string, limit: number): Promise<string[]>;
 
 const searchTool = ai.tool({
   name: "search",

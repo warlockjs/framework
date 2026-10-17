@@ -19,7 +19,7 @@
   // package with no recorded allowance fails the gate (an unmeasured allowance is
   // never silently treated as zero).
   "access": 9,
-  "ai": 48,
+  "ai": 4,
   "ai-anthropic": 0,
   "ai-bedrock": 0,
   "ai-cli": 0,
@@ -38,7 +38,7 @@
   "cache": 6,
   "cascade": 17,
   "context": 2,
-  "core": 128,
+  "core": 97,
   "create-warlock": 0,
   "devtools": 0,
   // New in 5.31; its compiled snippets import only framework packages.

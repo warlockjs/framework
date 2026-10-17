@@ -16,7 +16,7 @@ import { cache } from "@warlock.js/cache";
 
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
-ai.config({ defaultStore: cache.driver("redis", { client: redisClient }) });
+ai.config({ defaultStore: await cache.driver("redis") }); // the redis driver from config/cache.ts
 
 const myAgent = ai.agent({
   model: openai.model({ name: "gpt-4o" }),

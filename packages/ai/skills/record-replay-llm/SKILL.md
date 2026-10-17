@@ -65,6 +65,10 @@ Recorded chunks reproduce the exact `delta` / `tool-call` / `done` sequence on r
 
 ```ts
 import { VcrCassetteMissError } from "@warlock.js/ai";
+import type { Message, ModelContract } from "@warlock.js/ai";
+
+declare const vcrModel: ModelContract; // a model wrapped by ai.vcr(...)
+declare const messages: Message[];
 
 try {
   await vcrModel.complete(messages);

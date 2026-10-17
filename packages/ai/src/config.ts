@@ -62,7 +62,7 @@ export interface AIConfig {
    * import { ai } from "@warlock.js/ai";
    *
    * ai.config({
-   *   defaultStore: cache.driver("redis", { client: redisClient }),
+   *   defaultStore: await cache.driver("redis", { client: redisClient }),
    * });
    */
   defaultStore?: CacheDriver<any, any>;
@@ -136,7 +136,7 @@ export function onConfigApplied(listener: ConfigListener): void {
  * import { cache } from "@warlock.js/cache";
  * import { ai } from "@warlock.js/ai";
  *
- * ai.config({ defaultStore: cache.driver("redis", { client }) });
+ * ai.config({ defaultStore: await cache.driver("redis", { client }) });
  */
 export function setAIConfig(partial: Partial<AIConfig>): AIConfig {
   Object.assign(aiConfig, partial);

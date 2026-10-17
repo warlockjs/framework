@@ -12,6 +12,11 @@ Three factories — `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()` — 
 ```ts
 import { ai } from "@warlock.js/ai";
 
+declare const text: string;
+declare const path: string;
+const block1 = ai.persona("You are a concise assistant.");
+const block2 = ai.instruction("Answer in the user's language.");
+
 ai.systemPrompt(); // empty — chain .persona(), .instruction() onto it
 ai.systemPrompt("literal text"); // one-shot string form
 ai.systemPrompt([block1, block2]); // array form — blocks render in declaration order

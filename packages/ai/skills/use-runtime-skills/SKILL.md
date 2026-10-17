@@ -11,6 +11,9 @@ A **skill is text injected into an agent's context — it never runs code.** `ai
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 const agent = ai.agent({
   model: openai.model({ name: "gpt-4o" }),

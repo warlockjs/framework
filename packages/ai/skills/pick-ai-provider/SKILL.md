@@ -62,6 +62,7 @@ The framework reads `capabilities` to fail loud upfront — e.g. passing `attach
 ## OpenAI adapter — usage
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
 
 // Direct OpenAI

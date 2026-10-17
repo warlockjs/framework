@@ -116,12 +116,12 @@ beforeAll(() => log.setChannels([]));
 ### Capture all framework log entries in a test
 
 ```ts
-import { log, LogChannel } from "@warlock.js/logger";
+import { log, LogChannel, type LoggingData } from "@warlock.js/logger";
 
 class Capture extends LogChannel {
   public name = "capture";
-  public entries: any[] = [];
-  public log(data) {
+  public entries: LoggingData[] = [];
+  public log(data: LoggingData) {
     this.entries.push(data);
   }
 }

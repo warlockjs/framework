@@ -47,6 +47,10 @@ Shared options (`RagLoaderOptions`): `id` (source id — falls back to the URL f
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { Rag } from "@warlock.js/ai";
+
+declare const kb: Rag; // an ai.rag(...) pipeline
+declare const rawHtml: string;
 
 // Bare string, or many records → many distinctly-identified docs:
 await kb.index(
@@ -82,7 +86,12 @@ HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text 
 `pdf-parse` is an **optional** peer, dynamic-imported on the FIRST `loadPdf` call — importing `@warlock.js/ai` never forces it. When it is absent, the curated `PDF_PARSE_INSTALL_INSTRUCTIONS` string is thrown as a plain `Error` (a missing infra peer, not a content problem), never a raw module-resolution stack trace.
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { Rag } from "@warlock.js/ai";
 import { readFile } from "node:fs/promises";
+
+declare const kb: Rag; // an ai.rag(...) pipeline
+declare const bytes: Uint8Array; // PDF bytes from an upload or a fetch
 
 // Whole PDF → one doc carrying metadata.pageCount:
 await kb.index(await ai.rag.loadPdf(await readFile("manual.pdf"), { id: "manual" }));
@@ -100,6 +109,7 @@ An image-only / scanned page has no text layer and is dropped, so a fully-scanne
 The cache driver **is** the vector store — `upsert → set({ vector, tags })`, `query → similar()`, `removeNamespace → removeNamespace()`. A driver without similarity support throws `CacheUnsupportedError` unchanged (pointing you at the `pg` / `redis` cache drivers).
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { MemoryCacheDriver } from "@warlock.js/cache";
 
 const store = ai.rag.cacheVectorStore(new MemoryCacheDriver()); // dev / tests
@@ -123,6 +133,7 @@ type PgVectorStoreOptions = {
 `schema()` (alias `ensureSchema()`) returns the reference migration DDL — `CREATE EXTENSION vector`, the table, a GIN index on `tags`, and the chosen ANN index (`USING hnsw (embedding vector_cosine_ops)`). It **only returns the string**; the framework never auto-migrates — you run it once through your own tool. Index and query MUST use the same embedding model: the `vector(N)` width is fixed at table-creation time from `dimensions`.
 
 ```ts
+import { ai } from "@warlock.js/ai";
 import { Pool } from "pg";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -137,6 +148,7 @@ await pool.query(store.ensureSchema());
 ## Pattern — a knowledge base from a website, backed by pgvector
 
 ```ts
+import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { ai } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";

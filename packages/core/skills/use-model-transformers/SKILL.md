@@ -121,14 +121,23 @@ The general-purpose computed-value helper. Use it when the value depends on the 
 
 ```ts
 import { useComputedModel } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
 
-slug: v.computed(useComputedModel((data, model, context) => {
-  // data    — the current schema-level input object
-  // model   — the Model instance being saved
-  // context — Seal's SchemaContext (allValues, rootContext, etc.)
+declare function slugify(text: string): string;
 
-  return `${data.category}-${slugify(data.title)}`;
-})),
+const productSchema = v.object({
+  title: v.string().required(),
+  category: v.string().required(),
+  slug: v.computed(
+    useComputedModel((data, model, context) => {
+      // data    — the current schema-level input object
+      // model   — the Model instance being saved
+      // context — Seal's SchemaContext (allValues, rootContext, etc.)
+
+      return `${data.category}-${slugify(data.title)}`;
+    }),
+  ),
+});
 ```
 
 `useComputedSlug` is implemented on top of `useComputedModel` — they share the same signature. Reach for `useComputedSlug` for the common slug case; reach for `useComputedModel` when you need to combine fields, branch on env, or call out to a service.

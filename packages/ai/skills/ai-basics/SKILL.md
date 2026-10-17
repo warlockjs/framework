@@ -52,8 +52,8 @@ const myAgent = ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) });
 
 const { data, text, report, usage, error } = await myAgent.execute("Hello");
 
-if (error) /* typed AIError */ ;
-console.log(text, usage.total, report.duration);
+if (error) console.error(error.code); // typed AIError
+else console.log(text, usage.total, report.duration);
 ```
 
 ## Pick a skill

@@ -21,7 +21,13 @@ Everything else passes through 1:1 — the sole exception is the report/result `
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 import { v } from "@warlock.js/seal";
+
+declare const techLeadRouter: AgentContract;
+declare const builder: AgentContract;
+declare const reviewer: AgentContract;
+declare const fixer: AgentContract;
 
 const codeTeam = ai.team({
   name: "code-team",

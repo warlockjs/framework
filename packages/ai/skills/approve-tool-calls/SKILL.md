@@ -11,7 +11,12 @@ description: 'Gate an agent''s tool calls behind a human with `ai.human.approval
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { ApprovalDecision, ApprovalRequest, ToolContract } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
+
+declare const refundCustomer: ToolContract;
+declare const lookupOrder: ToolContract;
+declare const ui: { prompt(request: ApprovalRequest): Promise<ApprovalDecision> }; // your operator surface
 
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 

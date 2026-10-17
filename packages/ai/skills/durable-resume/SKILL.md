@@ -13,6 +13,11 @@ Interactive approval `await`s the operator in-process. **Durable** approval is f
 
 ```ts
 import { ai, InterruptSuspendedError } from "@warlock.js/ai";
+import type { ApprovalRequest, ModelContract, ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const deleteAccount: ToolContract;
+declare const slack: { postApproval(request: ApprovalRequest): Promise<void> }; // your notifier
 
 const store = ai.human.interrupt.memory(); // swap for pg / redis in production
 
@@ -46,7 +51,8 @@ const result = await agent.execute("Delete account #88");
 
 // execute() never throws — the suspend rides result.error:
 if (result.error instanceof InterruptSuspendedError) {
-  return { status: "awaiting-approval", interruptId: result.error.interruptId };
+  // answer the caller now; the run continues later through ai.human.resume(...)
+  console.log({ status: "awaiting-approval", interruptId: result.error.interruptId });
 }
 ```
 
@@ -56,6 +62,11 @@ The middleware catches the **sentinel** (`instanceof InterruptSuspendedError`) a
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract, InterruptStore } from "@warlock.js/ai";
+
+declare const interruptId: string; // from the suspended run's error
+declare const store: InterruptStore;
+declare const agent: AgentContract;
 
 // Re-run the turn with the decision pre-seeded:
 const outcome = await ai.human.resume(
@@ -105,21 +116,23 @@ A second resume of an already-resolved (deleted) or never-raised interrupt retur
 | `ai.human.interrupt.redis(options)` | one namespaced JSON value + a self-maintained id index  | lazily imports the optional `redis` peer |
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import { Pool } from "pg";
+
 // Memory — dev / tests / single-process:
-const store = ai.human.interrupt.memory();
+const memoryStore = ai.human.interrupt.memory();
 
 // Postgres — pass a live pool (core never imports pg in that case):
-import { Pool } from "pg";
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const store = ai.human.interrupt.pg({ client: pool });
+const pgStore = ai.human.interrupt.pg({ client: pool });
 // Once, via your migration tool — the framework never auto-migrates:
-// await pool.query(store.schema());
+// await pool.query(pgStore.schema());
 
 // …or let the store build its own pool (lazily import("pg")):
-const store = ai.human.interrupt.pg({ connectionString: process.env.DATABASE_URL });
+const ownPoolStore = ai.human.interrupt.pg({ connectionString: process.env.DATABASE_URL });
 
 // Redis — pass a connected client, or a url:
-const store = ai.human.interrupt.redis({ url: process.env.REDIS_URL });
+const redisStore = ai.human.interrupt.redis({ url: process.env.REDIS_URL });
 ```
 
 ### Optional peers are lazy

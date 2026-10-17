@@ -260,6 +260,9 @@ For background jobs, CLI commands, or anywhere outside the HTTP path, call `vali
 ```ts
 import { v } from "@warlock.js/seal";
 
+const createProductSchema = v.object({ name: v.string().required(), price: v.number().min(0) });
+declare const untrustedInput: unknown; // a queue payload, a webhook body, a CSV row…
+
 const result = await v.validate(createProductSchema, untrustedInput);
 
 if (!result.isValid) {

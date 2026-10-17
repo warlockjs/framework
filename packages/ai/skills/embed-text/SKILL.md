@@ -72,7 +72,13 @@ ai.step({
 ## Pattern — RAG tool
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import type { EmbedderContract, ModelContract, VectorStore } from "@warlock.js/ai";
 import { v } from "@warlock.js/seal";
+
+declare const model: ModelContract;
+declare const embedder: EmbedderContract;
+declare const vectorStore: VectorStore;
 
 const searchKb = ai.tool({
   name: "searchKb",
@@ -81,7 +87,7 @@ const searchKb = ai.tool({
   execute: async ({ query, k }) => {
     const { vector } = await embedder.embed(query);
     const hits = await vectorStore.query(vector, { topK: k ?? 5 });
-    return hits.map((h) => ({ text: h.text, score: h.score, source: h.source }));
+    return hits.map((h) => ({ key: h.key, score: h.score, passage: h.value })); // value = what you upserted
   },
 });
 

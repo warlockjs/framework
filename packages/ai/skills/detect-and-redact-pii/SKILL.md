@@ -1,6 +1,6 @@
 ---
 name: detect-and-redact-pii
-description: 'Detect and redact PII (and run model-graded moderation) with @warlock.js/ai-guard detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail.pii` / `.moderation`) or `import { pii, moderation } from "@warlock.js/ai-guard"`. Skip: composing the guard / wiring it into an agent — the `guard-input-output` topic; routing a block to a human — the `escalate-block-to-human` topic.'
+description: 'Detect and redact PII (and run model-graded moderation) with the @warlock.js/ai guardrail detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail.pii` / `.moderation` ship in core) or `import { pii, moderation } from "@warlock.js/ai"`. Skip: composing the guard / wiring it into an agent — the `guard-input-output` topic; routing a block to a human — the `escalate-block-to-human` topic.'
 ---
 
 # Detect and redact PII (and moderate)
@@ -9,7 +9,6 @@ description: 'Detect and redact PII (and run model-graded moderation) with @warl
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import "@warlock.js/ai-guard";
 
 const policy = ai.guardrail({
   output: [ai.guardrail.pii({ onMatch: "redact", mask: "[REDACTED:{label}]" })],
@@ -77,7 +76,7 @@ const policy = ai.guardrail({
 
 ## Optional moderation peer — `ai.guardrail.moderation`
 
-For model-graded content (violence, self-harm, hate) beyond regex, the optional `moderation` detector calls OpenAI's moderation endpoint. The `openai` SDK is an **optional lazy peer** — importing `@warlock.js/ai-guard` never forces it to resolve; the detector throws a curated install string on first `check()` when the peer is absent (mirrors ai-panoptic's lazy Langfuse exporter).
+For model-graded content (violence, self-harm, hate) beyond regex, the optional `moderation` detector calls OpenAI's moderation endpoint. The `openai` SDK is an **optional lazy peer** — importing `@warlock.js/ai` never forces it to resolve; the detector throws a curated install string on first `check()` when the peer is absent (mirrors ai-panoptic's lazy Langfuse exporter).
 
 ```ts
 const policy = ai.guardrail({

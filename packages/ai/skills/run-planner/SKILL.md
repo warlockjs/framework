@@ -18,7 +18,12 @@ A planner turns a free-form **goal** into an ordered **plan** the LLM writes its
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import type { AgentContract } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
+
+declare const searchAgent: AgentContract;
+declare const summarizer: AgentContract;
+declare const writerAgent: AgentContract;
 
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 

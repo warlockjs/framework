@@ -149,12 +149,12 @@ describe("POST /products", () => {
       email: `creator-${Date.now()}@e.com`,
       password: "secret",
     });
-    const { accessToken } = await authService.generateTokens(user);
+    const { accessToken } = await authService.createTokenPair(user);
 
     const create = await testPost(
       "/products",
       { name: "Test Pen", price: 5 },
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { headers: { Authorization: `Bearer ${accessToken.token}` } },
     );
 
     const { product } = await expectJson<{
@@ -217,12 +217,12 @@ export async function createUserAndToken(overrides: Partial<{ email: string }> =
     password: "test-secret",
   });
 
-  const { accessToken } = await authService.generateTokens(user);
+  const { accessToken } = await authService.createTokenPair(user);
 
   return {
     user,
     accessToken,
-    authHeader: { Authorization: `Bearer ${accessToken}` },
+    authHeader: { Authorization: `Bearer ${accessToken.token}` },
   };
 }
 ```
