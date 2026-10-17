@@ -305,6 +305,14 @@ export const ERROR_CODES = {
     fix: "Check that the http connector booted and that nothing removed the probe routes.",
     skill: "health-checks",
   },
+  WL5004: {
+    code: "WL5004",
+    area: "http",
+    category: "code",
+    title: "Devtools recorded no timeline for the traced request",
+    fix: "Keep http.requestId enabled (its echoed header is how the request is found) and retry; a path under the devtools prefix is never recorded.",
+    skill: "warlock-trace",
+  },
 
   // ── WL6xxx database ──────────────────────────────────────────────────────
   WL6001: {
@@ -344,6 +352,30 @@ export const ERROR_CODES = {
     fix: "Add the named package to the app's dependencies, or import it through @warlock.js/core.",
     skill: "run-app",
     errorNames: ["UndeclaredGeneratedImportError"],
+  },
+  WL7003: {
+    code: "WL7003",
+    area: "cli",
+    category: "code",
+    title: "A command needs an optional package that is not installed",
+    fix: "Install the packages named in the message as dev dependencies (warlock mcp needs @warlock.js/ai-tools and @warlock.js/ai).",
+    skill: "warlock-mcp",
+  },
+  WL7004: {
+    code: "WL7004",
+    area: "cli",
+    category: "code",
+    title: "warlock mcp was asked to listen off loopback without a token",
+    fix: "Pass --token (or set WARLOCK_MCP_TOKEN) when --host is not 127.0.0.1, ::1 or localhost, or keep the default loopback host.",
+    skill: "warlock-mcp",
+  },
+  WL7005: {
+    code: "WL7005",
+    area: "cli",
+    category: "code",
+    title: "An MCP tool that writes files was called on a read-only server",
+    fix: "Restart the server with --allow-writes to let generate tools write; without it they only return the diff.",
+    skill: "warlock-mcp",
   },
   WL7101: {
     code: "WL7101",
@@ -392,6 +424,46 @@ export const ERROR_CODES = {
     title: "A test file failed before its tests ran",
     fix: "Fix the import or setup error named in the message; none of the file's tests ran.",
     skill: "warlock-check",
+  },
+  WL7401: {
+    code: "WL7401",
+    area: "cli",
+    category: "code",
+    title: "The agent board is not initialized",
+    fix: "Run `warlock board init` at the project root first.",
+    skill: "warlock-board",
+  },
+  WL7402: {
+    code: "WL7402",
+    area: "cli",
+    category: "code",
+    title: "A board item does not exist",
+    fix: "Run `warlock board status` to list the item ids.",
+    skill: "warlock-board",
+  },
+  WL7403: {
+    code: "WL7403",
+    area: "cli",
+    category: "code",
+    title: "A board item cannot move to the requested state",
+    fix: "Use one of the next states listed in the message; `warlock board status <id>` shows the item's current state.",
+    skill: "warlock-board",
+  },
+  WL7404: {
+    code: "WL7404",
+    area: "cli",
+    category: "code",
+    title: "No board message arrived before the watch timed out",
+    fix: "Run `warlock board watch` again, or raise --timeout.",
+    skill: "warlock-board",
+  },
+  WL7501: {
+    code: "WL7501",
+    area: "cli",
+    category: "code",
+    title: "AGENTS.md has malformed generated-section markers",
+    fix: "Keep one `<!-- warlock:generated:start -->` line followed by one `<!-- warlock:generated:end -->` line, or remove both.",
+    skill: "warlock-agents-md",
   },
 
   // ── WL8xxx environment ───────────────────────────────────────────────────
@@ -452,6 +524,22 @@ export const ERROR_CODES = {
     title: "A tool crashed, timed out or ran out of memory",
     fix: "Re-run the step; if it repeats, raise the memory limit (NODE_OPTIONS=--max-old-space-size) or use --changed.",
     skill: "warlock-check",
+  },
+  WL8008: {
+    code: "WL8008",
+    area: "environment",
+    category: "environment",
+    title: "The dev server is not running",
+    fix: "Start `warlock dev` in this project, or pass --url with the address of a running dev server.",
+    skill: "warlock-trace",
+  },
+  WL8009: {
+    code: "WL8009",
+    area: "environment",
+    category: "environment",
+    title: "Devtools is not running in the dev server",
+    fix: "Install it with `warlock add devtools` and restart `warlock dev`; devtools answers loopback requests in development only.",
+    skill: "warlock-trace",
   },
 
   // ── WL9xxx conventions and hygiene ───────────────────────────────────────
