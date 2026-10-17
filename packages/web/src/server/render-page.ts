@@ -20,6 +20,7 @@ import {
 import type { SharedContext } from "../index";
 import { LocaleProvider } from "../localization";
 import { withSessionProvider } from "./with-session-provider";
+import { loadStreamingReactDomServer } from "./load-react-dom-server";
 import { buildHydrationPayload } from "./build-hydration-payload";
 import {
   hydrationErrorPageProps,
@@ -708,7 +709,9 @@ async function renderElementToPipeableStream(
   /** Reporting context only (card 1db238ca) — never read for anything else here. */
   request: Request,
 ): Promise<{ pipeableStream: PipeableStream; allReady: Promise<void> }> {
-  const { renderToPipeableStream } = await import("react-dom/server");
+  // Not `import("react-dom/server")`: on Bun and Deno that resolves to a
+  // build without `renderToPipeableStream` (see load-react-dom-server.ts).
+  const { renderToPipeableStream } = await loadStreamingReactDomServer();
 
   let resolveAllReady!: () => void;
   const allReady = new Promise<void>((resolve) => {
