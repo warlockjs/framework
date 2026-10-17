@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Worker } from "node:worker_threads";
-import { fileURLToPath } from "node:url";
+import type { Worker } from "node:worker_threads";
 import ts from "typescript";
+import { createWorker } from "../../../src/dev-server/create-worker";
 import type { FileManager } from "../../../src/dev-server/file-manager";
 import { TypescriptHealthChecker } from "../../../src/dev-server/health-checker/checkers/typescript-health-checker";
 
@@ -78,11 +78,13 @@ async function createFixture(): Promise<{
 }
 
 function createHealthWorker(): Worker {
-  const workerPath = fileURLToPath(
-    new URL("../../../src/dev-server/health-checker/workers/ts-health.worker.ts", import.meta.url),
+  // Exercise the same JavaScript/tsx bootstrap as FilesHealthcareManager.
+  // Node 22.15 cannot start a .ts worker entry through --import tsx/esm alone.
+  return createWorker(
+    "../../../src/dev-server/health-checker/workers/ts-health.worker",
+    import.meta.url,
+    { execArgv: [] },
   );
-
-  return new Worker(workerPath, { execArgv: ["--import", "tsx/esm"] });
 }
 
 function once(worker: Worker): Promise<WorkerResponse> {

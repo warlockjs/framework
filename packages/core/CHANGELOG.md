@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - React module-resolution regressions preserve the ESM package boundary in isolated fixtures and report child-process stderr before checking output, so missing and broken React installations are tested correctly under Node.js 22.15.
+- The TypeScript worker configured-root regression uses the framework's real source-worker bootstrap on Node.js 22.15, retaining its declaration, update and deletion checks instead of starting an unsupported direct `.ts` worker entry.
 
 - Upgrade guidance names `AgentConfig.compaction`, covers sub-agent dispatch and blank/default validation changes, and includes static assets in production rate quotas. In 5.31, `purgeImageVariants()` preserves legacy two-level cache files; retire them manually, correcting the earlier 5.30 cleanup suggestion.
 - Per-file image-cache purges refuse symlinked shard directories for local and object-storage disks. Stale-generation pruning now removes only recognized cache files from older generation-shaped folders, preserving current-generation files, unrelated entries, directories and symlinks.

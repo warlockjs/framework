@@ -54,3 +54,9 @@ Oxlint config failures preserve both warning and error output; structured
 diagnostics keep their specific message. Command failure messages contain a
 bounded status/output summary, without the batch command line. Shutdown gives
 workers up to 500 ms to exit and reap owned CLI children before forcing termination.
+
+Source TypeScript health workers use the framework's JavaScript/tsx bootstrap on
+Node.js 22.15; published JavaScript workers start directly. Framework regression
+tests use the same bootstrap with a clean worker argument list, so declaration
+roots, file updates and deleted declarations are exercised under the supported
+minimum runtime.
