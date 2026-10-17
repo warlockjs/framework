@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Added
+
+- `registeredJobs()` and `queueOf()` are exported, so tools can list the jobs an app defined with `defineJob()` and the queue each runs on; `warlock inspect` reads them for its `jobs` section.
+
 ### Fixed
 
 - Local Redis integration tests skip with a clear service message when Redis is unavailable; CI and explicitly requested integration runs fail instead. Unit cases remain runnable without Redis.
