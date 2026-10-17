@@ -1,0 +1,118 @@
+name: runtimes
+
+# Production runtime support: a Warlock app built with Node must start and
+# serve on Node, Bun and Deno.
+#
+# Each job builds the @warlock.js/* members the fixture app needs (pkgist, the
+# same artifacts a release packs), installs the app from those tarballs in a
+# temp directory, runs `warlock build` on Node, then starts the build on the
+# job's runtime twice — directly (`bun dist/app.js`, `deno run -A dist/app.js`)
+# and through `warlock start` — and smoke-tests the page, API routes, a public
+# file, a client asset, /health, a 404 and the SIGTERM shutdown
+# (packages/core/tests/acceptance/run-runtime-acceptance.mjs).
+#
+# The Bun and Deno versions are pinned: they are the versions the supported
+# runtimes page names. Move them together with
+# docs/src/content/docs/v/latest/core/digging-deeper/supported-runtimes.md.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtimes-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The build runs on the oldest supported Node line (bin/warlock.js requires 22.15+).
+  NODE_VERSION: "22"
+  PNPM_VERSION: "11.24.0"
+  BUN_VERSION: "1.4.3"
+  DENO_VERSION: "2.9.7"
+  CI: "1"
+  NO_COLOR: "1"
+
+jobs:
+  start:
+    name: Start on ${{ matrix.runtime }}
+    # Nightly runs are skipped while the repository is private (free-plan Actions minutes).
+    if: github.event_name != 'schedule' || !github.event.repository.private
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [node, bun, deno]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Set up Bun
+        if: matrix.runtime == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Set up Deno
+        if: matrix.runtime == 'deno'
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Runtime version
+        run: |
+          case "${{ matrix.runtime }}" in
+            node) node --version ;;
+            bun) bun --version ;;
+            deno) deno --version ;;
+          esac
+
+      - name: Install the workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the release runner (pkgist)
+        working-directory: tools/release
+        run: npm ci --no-audit --no-fund
+
+      # Source-level smoke on the real runtime: `warlock dev` is refused, core's
+      # HTTP stack serves, and streaming SSR renders. On the node job both specs
+      # skip their Bun/Deno blocks.
+      - name: Runtime specs (core)
+        working-directory: packages/core
+        run: node node_modules/vitest/vitest.mjs run tests/integration/runtimes/runtimes-smoke.test.ts
+
+      - name: Runtime specs (web)
+        working-directory: packages/web
+        run: node node_modules/vitest/vitest.mjs run __tests__/server/react-dom-server-runtimes.spec.ts
+
+      - name: Build on Node, start on ${{ matrix.runtime }}
+        run: |
+          mkdir -p runtime-logs
+          set -o pipefail
+          node packages/core/tests/acceptance/run-runtime-acceptance.mjs \
+            --runtimes=${{ matrix.runtime }} \
+            --evidence=runtime-logs/${{ matrix.runtime }}.json 2>&1 | tee runtime-logs/${{ matrix.runtime }}.log
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-${{ matrix.runtime }}
+          path: runtime-logs
+          if-no-files-found: ignore
+          retention-days: 14

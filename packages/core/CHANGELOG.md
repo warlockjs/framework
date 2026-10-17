@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Production runtime support for Bun and Deno. An app built on Node with `warlock build` starts and serves on Bun 1.4.3 and Deno 2.9.7, either directly (`bun dist/app.js`, `deno run -A dist/app.js`) or through `warlock start` run with that runtime. A `runtimes` CI workflow builds a fixture app with pages, API routes, file cache, file logging and static files from the packed framework, starts it on Node, Bun and Deno, and checks every route plus a clean `SIGTERM` shutdown. The "Supported runtimes" docs page lists the commands for each runtime.
+
+- `detectJavaScriptRuntime()`, `describeJavaScriptRuntime()`, `nodeOnlyCommandError()`, `assertNodeOnlyCommand()` and `unverifiedBuildRuntimeNotice()` report which runtime is executing (`{ type: "node" | "bun" | "deno", version }`), and let a CLI command refuse to run anywhere but Node.
+
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
 
 - The `upgrade-from-5-29` skill guides application upgrades through logger delivery, tool concurrency, request snapshots, auth counter/lock resets, image cache layouts and viewport metadata. It covers Seal result narrowing and refinement/container/union behavior, AI finish reasons and replay, bounded workspace reads, and production rate-limit migration in 5.31.
@@ -69,6 +73,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The CLI rejects unsupported Node versions with one clear message and a non-zero exit before loading the published entry or registering the source loader.
 
 ### Changed
+
+- `warlock dev` exits with code 1 and a clear error when it is started on Bun or Deno: the development server is Node-only. Before, it started partway and then failed in confusing ways. The error names the runtime and points to the production start commands. `warlock build` on Bun or Deno still runs, but prints a notice that only the Node build is verified.
+- A source checkout of `@warlock.js/core` run by a runtime without `module.registerHooks` now prints what is missing, instead of failing with "registerHooks is not a function".
 
 - Static file serving loads `@fastify/static` on the first file request instead of at boot, including existing public folders and `router.directory` mounts. The directory globber loads at boot only for `wildcard: false`. Concurrent first requests share initialization; upstream headers, ranges, listings, decorators and exact routes for `wildcard: false` are preserved.
 

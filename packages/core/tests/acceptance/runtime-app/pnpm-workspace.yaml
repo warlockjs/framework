@@ -1,0 +1,26 @@
+# Settings pnpm 11 reads from here (it ignores package.json's `pnpm` field).
+#
+# Warlock ships in lockstep and these versions are not on npm until the release
+# publishes, so every @warlock.js/* in the tree is redirected to the tarball the
+# harness packed from this checkout. The harness writes one line per member it
+# packed; the list below is the set the app's dependency closure needs.
+overrides:
+  "@warlock.js/cache": "file:./vendor/cache.tgz"
+  "@warlock.js/cascade": "file:./vendor/cascade.tgz"
+  "@warlock.js/context": "file:./vendor/context.tgz"
+  "@warlock.js/core": "file:./vendor/core.tgz"
+  "@warlock.js/fs": "file:./vendor/fs.tgz"
+  "@warlock.js/logger": "file:./vendor/logger.tgz"
+  "@warlock.js/scheduler": "file:./vendor/scheduler.tgz"
+  "@warlock.js/seal": "file:./vendor/seal.tgz"
+  "@warlock.js/sitemap": "file:./vendor/sitemap.tgz"
+  "@warlock.js/web": "file:./vendor/web.tgz"
+
+# Keep the graph to what the app declares: core's optional peers (sharp,
+# socket.io, the AWS SDKs) stay out.
+autoInstallPeers: false
+strictPeerDependencies: false
+
+# esbuild's install script links its native binary; `warlock build` needs it.
+allowBuilds:
+  esbuild: true

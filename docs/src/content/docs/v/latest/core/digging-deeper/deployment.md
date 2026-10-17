@@ -127,6 +127,8 @@ It is the success marker `warlock start` checks. Copy `outdir` whole when you sh
 node --enable-source-maps dist/app.js
 ```
 
+The child runs on the same runtime as the CLI (`process.execPath`), so running the CLI with Bun or Deno starts the server there — see [Supported runtimes](./supported-runtimes.md) for the exact Bun and Deno commands. `warlock dev` stays Node only.
+
 ### Run only the parts this process serves
 
 One production build can run as an API process, a page-serving web process, a
@@ -391,13 +393,14 @@ Before `warlock start` on a fresh host:
 
 ## Where to host
 
-Warlock produces a standard Node ESM bundle plus your `node_modules` — anywhere that runs Node 22.15 or newer will serve it. Build in CI (or on the box), ship `dist/` + `node_modules` + your `.env`/config, set `NODE_ENV`, and run `warlock start` under whatever process supervisor your platform provides. The framework deliberately doesn't prescribe a container or process-manager setup; the only hard requirements are a Node runtime, the installed dependencies, and the env vars your config files read.
+Warlock produces a standard Node ESM bundle plus your `node_modules` — anywhere that runs Node 22.15 or newer will serve it. Build in CI (or on the box), ship `dist/` + `node_modules` + your `.env`/config, set `NODE_ENV`, and run `warlock start` under whatever process supervisor your platform provides. The framework deliberately doesn't prescribe a container or process-manager setup; the only hard requirements are a Node runtime, the installed dependencies, and the env vars your config files read. The built app also starts on Bun and Deno; [Supported runtimes](./supported-runtimes.md) lists the verified versions and commands.
 
 ## See also
 
 - [Bootstrap and connectors](../architecture-concepts/bootstrap-and-connectors.md) — the boot sequence the production entry reproduces: bootstrap, early phase, app code, late phase.
 - [Connectors](../architecture-concepts/connectors.md) — the catalog of all ten built-ins, their priorities and phases, and the rule that the config file activates each subsystem.
 - [How it works](../architecture-concepts/how-it-works.md) — the production builder and the dev/prod loader split in more depth.
+- [Supported runtimes](./supported-runtimes.md) — which commands run on Node, Bun and Deno.
 - [warlock.config.ts](../architecture-concepts/warlock-config.md) — the project-level config, including the `build` block.
 - [Application](../architecture-concepts/application.md) — the static gateway to `environment`, runtime mode, and the well-known paths.
 - [Configuration](../getting-started/03-configuration.md) — the two config layers and how `.env` values feed `src/config/*`.
