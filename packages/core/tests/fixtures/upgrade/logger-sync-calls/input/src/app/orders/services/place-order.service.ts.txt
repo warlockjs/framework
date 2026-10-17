@@ -1,0 +1,14 @@
+import { log as logger } from "@warlock.js/logger";
+
+export async function placeOrder(id: number) {
+  // keep this comment
+  await logger.info("orders", "place", `Placing ${id}`);
+  const result = await saveOrder(id);
+  await logger.success("orders", "place", "Placed", { id });
+  logger.warn("orders", "slow", "Slow save").then(() => notify(id));
+  await logger.flush();
+  return result;
+}
+
+declare function saveOrder(id: number): Promise<number>;
+declare function notify(id: number): void;

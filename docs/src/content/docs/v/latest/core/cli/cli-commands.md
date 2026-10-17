@@ -499,6 +499,20 @@ Because the whole `@warlock.js/*` family is versioned in lockstep, this keeps ev
 
 Offline runs are honest about it: if none of the registry lookups answer, the command reports that npm was unreachable and changes nothing, rather than claiming everything is up to date. If the install fails after the versions were rewritten, `package.json` keeps them (re-run your package manager to finish) and the command exits non-zero.
 
+### `upgrade`
+
+Apply the code changes a release's breaking changes need, and list what needs a
+decision, with `file:line`. See [`warlock upgrade`](./upgrade.md).
+
+```bash
+warlock upgrade --to 5.31 --dry-run   # diff + review list, nothing written
+warlock upgrade --to 5.31             # apply
+warlock upgrade --to 5.31 --json      # machine-readable result
+```
+
+`update` moves to the latest versions; `upgrade --to` moves to a chosen release
+and edits the code for it.
+
 ---
 
 ## Storage

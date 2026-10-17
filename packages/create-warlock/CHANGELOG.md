@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs.
+- **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs. In an existing app, `warlock upgrade --to 5.31` raises `engines.node`, `.nvmrc` and `.node-version` (codemod `node-22-15`).
 
 ### Added
 

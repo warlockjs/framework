@@ -1,0 +1,7 @@
+import { ai } from "@warlock.js/ai";
+
+declare const model: never;
+declare const summarize: never;
+
+export const support = ai.agent({ name: "support", model, compaction: { afterTokens: 8000 } });
+export const complete = ai.agent({ name: "complete", model, compaction: { afterTokens: 8000, summarize } });

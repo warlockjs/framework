@@ -1,0 +1,13 @@
+import { Head } from "@warlock.js/web";
+
+export default function Root({ children }: { children: unknown }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <Head />
+      </head>
+      <body>{children as never}</body>
+    </html>
+  );
+}

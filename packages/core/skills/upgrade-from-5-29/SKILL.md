@@ -10,6 +10,27 @@ same release. Apply only the changes used by the application, then run its type
 check and targeted tests. These minors can contain breaking changes; do not rely
 on a major version boundary to find them.
 
+## Start with `warlock upgrade`
+
+Run the codemods first; they make the mechanical edits below and list every
+other place to review with `file:line`:
+
+```bash
+warlock upgrade --to 5.31 --dry-run   # diff + review list, nothing written
+warlock upgrade --to 5.31             # apply; then install, type-check, test
+warlock upgrade --to 5.31 --json      # same result as JSON
+```
+
+It removes `await` before log calls, rewrites custom log channels' snapshot
+reads, drops a duplicate default viewport tag, raises `engines.node`/`.nvmrc`
+and moves every `@warlock.js/*` dependency to the target. It lists, without
+editing, `.then()` on log calls, non-snapshot channel reads, `validate()` data
+read without `isValid`, agents with tools and no `toolDispatch`, reserved
+`providerOptions.anthropic.body` keys, `finishReason` switches, a missing
+`http.rateLimit`, `.refine()`, container `.catch()`, `v.union()` and incomplete
+`compaction`. It needs `ts-morph` (it prints the install command when missing).
+Work through the review list with the sections below.
+
 For a target of 5.31, use Node.js 22.15 or newer in development, CI and production.
 The minimum is required before the CLI can load the app. See the `run-app` topic
 for runtime and package-manager troubleshooting.

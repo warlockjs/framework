@@ -1,0 +1,10 @@
+import { Head } from "@warlock.js/web";
+
+export default function AdminRoot() {
+  return (
+    <head>
+      <meta name="viewport" content="width=1024" />
+      <Head />
+    </head>
+  );
+}

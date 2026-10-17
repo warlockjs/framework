@@ -1,0 +1,14 @@
+import { v, validate } from "@warlock.js/seal";
+
+const rowSchema = v.object({ sku: v.string() });
+
+export async function parseRow(row: unknown) {
+  const result = await validate(rowSchema, row);
+  return result.data.sku;
+}
+
+export async function parseChecked(row: unknown) {
+  const checked = await validate(rowSchema, row);
+  if (!checked.isValid) return undefined;
+  return checked.data.sku;
+}

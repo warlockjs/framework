@@ -1,0 +1,11 @@
+export const options = {
+  providerOptions: {
+    anthropic: {
+      body: { model: "other", metadata: { user_id: "1" } },
+    },
+  },
+};
+
+export const fine = {
+  providerOptions: { anthropic: { body: { metadata: { user_id: "1" } } } },
+};

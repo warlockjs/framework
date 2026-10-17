@@ -1,0 +1,9 @@
+import { ai } from "@warlock.js/ai";
+
+declare const model: never;
+declare const tools: never[];
+
+export const writer = ai.agent({ name: "writer", model, tools });
+export const ordered = ai.agent({ name: "ordered", model, tools, toolDispatch: "sequential" });
+export const plain = ai.agent({ name: "plain", model });
+export const child = ai.spawnSubAgent({ name: "child", model, tools, task: "go" });

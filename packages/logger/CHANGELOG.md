@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- **BREAKING (types):** `log.info/warn/error/debug/success/fatal/log/assert` and the function `timer()` returns now return the logger synchronously instead of `Promise<this>`. Remove `await` before log calls (it is harmless but pointless) and any `.then()` chained on one; code that needs the write to finish calls `await log.flush()`.
+- **BREAKING (types):** `log.info/warn/error/debug/success/fatal/log/assert` and the function `timer()` returns now return the logger synchronously instead of `Promise<this>`. Remove `await` before log calls (it is harmless but pointless) and any `.then()` chained on one; code that needs the write to finish calls `await log.flush()`. `warlock upgrade --to 5.31` removes the `await`s and lists chained `.then()` calls (codemod `logger-sync-calls`).
 
 ### Changed
 
