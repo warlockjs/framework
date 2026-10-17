@@ -122,6 +122,47 @@ config.key("http.missingThing"); // → null when the path resolves to nothing a
 
 A key that resolves to nothing returns `null` (not `undefined`) when you don't pass a default — handy to know when you branch on the result. See **[Configuration (deep)](../architecture-concepts/configuration-deep.md)** for the full surface.
 
+### Validate a config file at boot
+
+A config file can export a `configSchema` next to its default export. The value
+is validated before it is registered — when `warlock dev` starts, on every hot
+reload of that file, and when the production build starts — and the app refuses
+to start with one error that lists every problem in every config file:
+
+```ts title="src/config/payments.ts"
+import { defineConfigSchema, env, type ConfigOf } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+export const configSchema = defineConfigSchema(
+  v.object({
+    apiKey: v.string(),
+    webhookSecret: v.string(),
+    currency: v.string().default("usd"),
+  }),
+  { env: { apiKey: "PAYMENTS_API_KEY", webhookSecret: "PAYMENTS_WEBHOOK_SECRET" } },
+);
+
+const paymentsConfig: ConfigOf<typeof configSchema> = {
+  apiKey: env("PAYMENTS_API_KEY"),
+  webhookSecret: env("PAYMENTS_WEBHOOK_SECRET"),
+};
+
+export default paymentsConfig;
+```
+
+```text
+InvalidConfigError: Invalid configuration (2 problems); the app cannot start until it is fixed:
+  - payments.apiKey: The apiKey is required (set PAYMENTS_API_KEY in your environment or .env)
+  - payments.webhookSecret: The webhookSecret is required (set PAYMENTS_WEBHOOK_SECRET in your environment or .env)
+```
+
+The `env` map names the environment variable behind each key path (nested keys
+use dots: `"smtp.password"`), so the error says what to set. Values are never
+printed. An invalid config is not handed to its subsystem (no connection is
+attempted with it); on a hot reload the previous valid value stays in place.
+Files without a `configSchema` load exactly as before. `ConfigOf<typeof
+configSchema>` types the default export from the schema.
+
 ## `.env` — environment values
 
 The bottom layer. Loaded by `@mongez/dotenv` at the very start of bootstrap. Both `warlock.config.ts` and `src/config/*.ts` read from it via `env()`:

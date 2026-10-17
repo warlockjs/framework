@@ -24,8 +24,8 @@ The list lands under the **plural name of the module's resource** — `users`, `
 
 ```typescript
 // ✅ list-users.controller.ts
-export const listUsersController: RequestHandler = async (request, response) => {
-  const { data, pagination } = await listUsersService(request.all());
+export const listUsersController: RequestHandler = async ({ request, response }) => {
+  const { data, pagination } = await listUsersService(request.validated());
 
   return response.success({
     users: data,

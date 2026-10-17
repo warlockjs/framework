@@ -25,6 +25,7 @@ packages:
   - packages/core
   - packages/create-warlock
   - packages/devtools
+  - packages/eslint-plugin
   - packages/fs
   - packages/herald
   - packages/logger

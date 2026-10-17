@@ -1,0 +1,13 @@
+{
+  "name": "shop",
+  "dependencies": {
+    "@warlock.js/core": "^5.31.0",
+    "@warlock.js/web": "5.31.0",
+    "@warlock.js/auth": "~5.31.0",
+    "@warlock.js/seal": "workspace:^",
+    "dayjs": "^1.11.19"
+  },
+  "devDependencies": {
+    "@warlock.js/eslint-plugin": "^5.31.0"
+  }
+}

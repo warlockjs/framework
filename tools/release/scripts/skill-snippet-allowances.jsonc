@@ -41,6 +41,8 @@
   "core": 128,
   "create-warlock": 0,
   "devtools": 0,
+  // New in 5.31; its compiled snippets import only framework packages.
+  "eslint-plugin": 0,
   "fs": 0,
   "herald": 6,
   "logger": 5,

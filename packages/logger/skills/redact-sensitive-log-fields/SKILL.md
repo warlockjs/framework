@@ -164,3 +164,23 @@ Key-based redaction cannot mask a substring inside a message or cache key.
 `maskEmail()` keeps the first code point and domain (`m***@example.com`);
 `maskEmailsInText()` handles text and bounds its scan at 16,384 characters,
 replacing the remaining suffix with a truncation marker.
+
+## Client text inside a message: `escapeLogValue()`
+
+A user agent or search term with a line break forges an extra entry in console
+and file logs; an ANSI sequence rewrites the terminal. Escape it first:
+
+```ts
+import { escapeLogValue, log } from "@warlock.js/logger";
+
+export function logSearch(term: string, userAgent: string) {
+  log.info("search", "query", `"${escapeLogValue(term, { maxLength: 200 })}"`, {
+    agent: escapeLogValue(userAgent),
+  });
+}
+```
+
+CR/LF/tab become `\r`/`\n`/`\t`, other control characters `\uXXXX`, ANSI
+sequences are removed; `maxLength` cuts and marks `…[truncated]`. The
+`@warlock.js/no-sensitive-log` lint rule flags raw emails, credentials and
+request bodies in log calls and accepts these helpers.

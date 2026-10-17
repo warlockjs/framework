@@ -484,18 +484,22 @@ bootstrap();
     // dependency, so a bare import of it resolved by luck under npm/yarn
     // hoisting and died under pnpm's strict layout.
     const imports: string[] = [
-      'import { setConfig, configSpecialHandlers } from "@warlock.js/core";',
+      'import { assertValidConfigModules, configSpecialHandlers, setConfig } from "@warlock.js/core";',
     ];
     const configImports: string[] = [];
     const configSetCalls: string[] = [];
+    const validations: string[] = [];
     const executors: string[] = [];
 
     configNames.forEach(({ path: configPath, key }, index) => {
-      // Index-based identifier: keys like "rate-limit" or "mail/smtp" are not valid names
+      // Index-based identifier: keys like "rate-limit" or "mail/smtp" are not valid names.
+      // A namespace import, so a file's optional `configSchema` export travels with it.
       const varName = `config${index}`;
-      configImports.push(`import ${varName} from "../../src/config/${configPath}";`);
-      configSetCalls.push(`setConfig(${JSON.stringify(key)}, ${varName});`);
-      executors.push(`await configSpecialHandlers.execute(${JSON.stringify(key)}, ${varName});`);
+      const name = JSON.stringify(key);
+      configImports.push(`import * as ${varName} from "../../src/config/${configPath}";`);
+      configSetCalls.push(`setConfig(${name}, ${varName}.default);`);
+      validations.push(`  { name: ${name}, module: ${varName} },`);
+      executors.push(`await configSpecialHandlers.execute(${name}, ${varName}.default);`);
     });
 
     // ESM hoists imports, so prestart must be the first import to run first
@@ -512,6 +516,11 @@ bootstrap();
       "",
       "// Register configs",
       ...configSetCalls,
+      "",
+      "// Refuse to start when a config file's `configSchema` is not satisfied",
+      "await assertValidConfigModules([",
+      ...validations,
+      "]);",
       "",
       "// Special handlers",
       ...executors,

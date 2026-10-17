@@ -31,6 +31,7 @@ import { typecheckCommand } from "./commands/typecheck.command";
 import { testCommand } from "./commands/test.command";
 import { typingsGeneratorCommand } from "./commands/typings-generator.command";
 import { updateCommand } from "./commands/update.command";
+import { upgradeCommand } from "./commands/upgrade.command";
 
 export const frameworkCommands = [
   // development commands
@@ -64,6 +65,7 @@ export const frameworkCommands = [
   // generation/installation commands
   addCommand,
   updateCommand,
+  upgradeCommand,
 
   // scaffolding commands
   generateCommand,

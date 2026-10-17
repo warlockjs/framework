@@ -1,0 +1,5 @@
+const log = { info: async (_message: string) => undefined };
+
+export async function untouched() {
+  await log.info("not the framework logger");
+}

@@ -1,0 +1,6 @@
+{
+  "name": "shop",
+  "engines": {
+    "node": ">=20"
+  }
+}

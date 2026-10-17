@@ -3,7 +3,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { pluralName } from "../utils/name-parser";
-import { crudRepositoryStub, crudSeedStub, repositoryStub, resourceStub } from "./stubs";
+import {
+  crudListControllerStub,
+  crudRepositoryStub,
+  crudRoutesStub,
+  crudSeedStub,
+  repositoryStub,
+  resourceStub,
+} from "./stubs";
 
 /**
  * Every `@warlock.js/core` type a generated file NAMES must also be IMPORTED,
@@ -101,5 +108,20 @@ describe("repositoryStub / resourceStub use real exports", () => {
   it("resourceStub declares a static schema", () => {
     expect(resource).toContain("public static schema");
     expect(resource).not.toMatch(/^\s*public schema/m);
+  });
+});
+
+describe("generated modules follow the lint rules apps run", () => {
+  it("validates the list query instead of forwarding request.all()", () => {
+    const source = crudListControllerStub(pluralName("post"));
+
+    expect(source).not.toContain("request.all()");
+    expect(source).toContain("request.validated()");
+    expect(source).toContain("listPostsController.validation = {");
+    expect(source).toMatch(/limit: v\.numeric\(\)\.min\(1\)\.max\(100\)/);
+  });
+
+  it("registers the CRUD routes inside a guarded group", () => {
+    expect(crudRoutesStub(pluralName("post"))).toMatch(/guarded\(\(\) => \{\n  router\n    \.route/);
   });
 });

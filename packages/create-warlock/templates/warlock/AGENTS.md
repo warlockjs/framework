@@ -97,6 +97,12 @@ suffixes, and JSDoc on the public surface. The bar is senior-level clean code, n
 
 - Respect **module-boundaries** — do not reach across module internals.
 - Never weaken the **security-baseline** — always validate input at boundaries.
+- With the ESLint toolchain, `@warlock.js/eslint-plugin` checks these rules on
+  every `yarn lint`: pass `request.validated()` (never `request.all()`) to
+  queries and services, give every POST/PUT/PATCH/DELETE route auth middleware
+  or an explicit `public: true`, wrap request-supplied redirect targets in
+  `safeRedirect()`, and mask emails/tokens in logs. Each message links to its
+  fix; the `lint-warlock-app` skill lists them all.
 - Follow **git-workflow** for commits and branches; do not commit or push unless
   explicitly asked.
 - When you are unsure how a package or feature works, **stop and read its skill**

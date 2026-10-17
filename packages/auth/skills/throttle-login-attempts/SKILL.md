@@ -23,6 +23,35 @@ That's the whole feature for most apps. Defaults: **5** failed attempts within a
 
 > **Heads-up — account-lockout is a DoS surface.** Because the default tracks per-`email`, an attacker who knows a victim's address can lock them out by spamming failed logins. The per-IP counter mitigates it (the attacker's own IP trips too); for purely anonymous endpoints prefer `by: ["ip"]`, and for high-value accounts consider a CAPTCHA step over a hard lock. See [Gotchas](#gotchas).
 
+## What new apps get by default
+
+The auth package registers no routes, so throttles apply where you attach them.
+A 5.31 `create-warlock` app already attaches `loginThrottleMiddleware()` to
+`/auth/login`, `tokenIssueThrottleMiddleware()` to `/auth/forgot-password`,
+`tokenConsumeThrottleMiddleware()` to `/auth/reset-password` and a 30/minute
+route `rateLimit` to `/auth/refresh-token`, all marked `public: true`. Every
+route also sits under core's global limit (60 requests/minute per IP). Older
+apps add the middleware to their own `src/app/auth/routes.ts`:
+
+```ts
+import { tokenConsumeThrottleMiddleware, tokenIssueThrottleMiddleware } from "@warlock.js/auth";
+import { router, type RequestHandler } from "@warlock.js/core";
+
+const forgotPasswordController: RequestHandler = async ({ response }) =>
+  response.success({ sent: true });
+const resetPasswordController: RequestHandler = async ({ response }) =>
+  response.success({ reset: true });
+
+router.post("/auth/forgot-password", forgotPasswordController, {
+  public: true,
+  middleware: [tokenIssueThrottleMiddleware()],
+});
+router.post("/auth/reset-password", resetPasswordController, {
+  public: true,
+  middleware: [tokenConsumeThrottleMiddleware()],
+});
+```
+
 ## How it behaves
 
 1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`).

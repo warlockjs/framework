@@ -19,10 +19,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs.
+- **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs. In an existing app, `warlock upgrade --to 5.31` raises `engines.node`, `.nvmrc` and `.node-version` (codemod `node-22-15`).
 
 ### Added
 
+- ESLint-mode projects include `@warlock.js/eslint-plugin` with its `recommended` preset in `eslint.config.js`, so `lint` reports unvalidated `request.all()` input, unguarded mutating routes, unsafe redirects, sensitive values in logs, unbounded regexes on input, `await log.*` and `.js` import extensions. `--lint=oxc` projects leave it out (Oxlint's JS plugins are alpha in the pinned 1.88).
+- The scaffold's sign-in and password-recovery routes, contact form and locale switch are marked `public: true`; `/auth/login` uses `loginThrottleMiddleware()`, `/auth/forgot-password` `tokenIssueThrottleMiddleware()`, `/auth/reset-password` `tokenConsumeThrottleMiddleware()`, and `/auth/refresh-token` a 30-per-minute route limit. The user list validates its query (`page`, `limit`, `id`, `name`, `email`) and passes `request.validated()` to the repository.
 - Opt-in `--lint=oxc` / `--lint oxc` flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating `lint:check` and `format:check` scripts. Oxc projects configure and recommend the official VS Code extension for format-on-save and lint fixes; default projects retain their Prettier/ESLint editor settings. Help and headless diagnostics include `--lint`.
 - Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys.
 

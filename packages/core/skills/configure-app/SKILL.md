@@ -178,6 +178,35 @@ The `ConfigRegistry` interface is augmented by generated typings — once you ad
 
 That's the contract. Filename → config key. No registration, no manifest, no side effects.
 
+### Validate a config file at boot: `configSchema`
+
+Export a `configSchema` next to the default export. The value is validated
+before it is registered (dev boot, each hot reload, production start); every
+problem in every config file is reported in one `InvalidConfigError`, naming
+the env variable to set. Values are never printed; an invalid config never
+reaches its special handler; a bad hot reload keeps the previous value.
+
+```ts
+// src/config/payments.ts
+import { defineConfigSchema, env, type ConfigOf } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+export const configSchema = defineConfigSchema(
+  v.object({ apiKey: v.string(), webhookSecret: v.string() }),
+  { env: { apiKey: "PAYMENTS_API_KEY", webhookSecret: "PAYMENTS_WEBHOOK_SECRET" } },
+);
+
+const paymentsConfig: ConfigOf<typeof configSchema> = {
+  apiKey: env("PAYMENTS_API_KEY"),
+  webhookSecret: env("PAYMENTS_WEBHOOK_SECRET"),
+};
+
+export default paymentsConfig;
+```
+
+Nested keys use dotted paths in the `env` map (`"smtp.password"`). Files
+without a `configSchema` load as before.
+
 ## Special handlers
 
 Some subsystems need to do extra work when their config loads (e.g. set the active locale, register a driver). Those have a special handler attached internally — for the most part you don't see them. The takeaway: changing a config file at dev time fires the handler again automatically.

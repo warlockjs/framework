@@ -8,3 +8,4 @@ export * from "./route-name-taken-error";
 export * from "./route-registry";
 export * from "./router";
 export * from "./types";
+export * from "./unguarded-route-diagnostics";

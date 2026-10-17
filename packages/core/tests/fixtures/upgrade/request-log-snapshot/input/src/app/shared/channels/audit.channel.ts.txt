@@ -1,0 +1,15 @@
+import { LogChannel, type LoggingData } from "@warlock.js/logger";
+
+export class AuditChannel extends LogChannel {
+  public name = "audit";
+
+  public log(data: LoggingData) {
+    const url = data.context?.request.baseRequest.url;
+    const route = data.context?.request.route.path;
+    const method = data.context?.request.method;
+    const user = data.context?.request.input("userId");
+    write({ url, route, method, user, headers: data.context?.request.headers });
+  }
+}
+
+declare function write(entry: Record<string, unknown>): void;

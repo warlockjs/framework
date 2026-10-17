@@ -1,0 +1,8 @@
+import { v } from "@warlock.js/seal";
+
+export const userSchema = v.object({
+  name: v.string().refine((value) => value !== "admin"),
+  tags: v.array(v.string()).catch([]),
+  role: v.string().catch("user"),
+  id: v.union([v.string(), v.int()]),
+});

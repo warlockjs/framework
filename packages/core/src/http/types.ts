@@ -246,6 +246,14 @@ export interface HttpConfigurations {
    */
   errorMapper?: HttpErrorMapper;
   /**
+   * In `warlock dev`, warn once per route about POST/PUT/PATCH/DELETE routes
+   * that have no auth middleware and no `public: true`. Development only;
+   * production never checks. Set `false` to silence the warning entirely.
+   *
+   * @default true
+   */
+  warnUnguardedRoutes?: boolean;
+  /**
    * Server port
    */
   port?: number;

@@ -1,0 +1,47 @@
+{
+  "name": "@warlock.js/eslint-plugin",
+  "version": "5.30.0",
+  "type": "module",
+  "description": "ESLint rules for Warlock.js applications: validated request input, guarded mutating routes, safe redirects, redacted logs, bounded regexes and the framework's code conventions",
+  "keywords": [
+    "warlock",
+    "warlockjs",
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "lint",
+    "security"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/eslint-plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/warlockjs/framework/issues"
+  },
+  "homepage": "https://warlock.js.org/v/latest/eslint-plugin/",
+  "engines": {
+    "node": ">=22.15"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "eslint": ">=8.57.0"
+  },
+  "devDependencies": {
+    "@types/estree": "^1.0.9",
+    "@typescript-eslint/parser": "^8.71.2",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.10"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "packageManager": "pnpm@11.24.0"
+}

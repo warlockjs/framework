@@ -153,14 +153,45 @@ guarded(() => {
 
 ```ts
 router.prefix("/auth", () => {
-  router.post("/login", loginController);
-  router.post("/register", registerController);
+  router.post("/login", loginController, { public: true });
+  router.post("/register", registerController, { public: true });
   guarded(() => {
     router.post("/logout", logoutController);
     router.get("/me", meController);
   });
 });
 ```
+
+### Mutating routes: guard them or say `public: true`
+
+Every POST/PUT/PATCH/DELETE route either runs auth middleware (on the route, its
+builder, or an enclosing group such as `guarded()`) or is marked `public: true`.
+`warlock dev` warns once per route about mutating routes with neither; the
+`@warlock.js/require-route-guard` lint rule reports the same at edit time.
+
+```ts
+import { markAuthGuard, router, type Middleware, type RequestHandler } from "@warlock.js/core";
+
+const stripeWebhookController: RequestHandler = async ({ response }) =>
+  response.success({ received: true });
+const importController: RequestHandler = async ({ response }) => response.success({ queued: true });
+
+// Open on purpose: a webhook signed by the provider.
+router.group({ prefix: "/webhooks", public: true }, () => {
+  router.post("/stripe", stripeWebhookController);
+});
+
+// A hand-written guard whose name has no "auth"/"guard" in it.
+const requireApiKey: Middleware = markAuthGuard(async ({ request, response }) => {
+  if (request.headers["x-api-key"] !== process.env.API_KEY) return response.unauthorized();
+});
+
+router.post("/imports", importController, { middleware: [requireApiKey] });
+```
+
+`public` changes nothing at runtime. `authMiddleware()` marks itself (its
+`{ optional: true }` form does not count). Silence the warning app-wide with
+`http.warnUnguardedRoutes: false`; page routes are never reported.
 
 ### Multiple paths on one handler
 

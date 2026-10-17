@@ -400,6 +400,18 @@ export default defineConfig({
             "llms-full.txt",
           ],
         },
+        {
+          /**
+           * ESLint rules and flat-config presets for Warlock apps, new in 5.31.
+           * Installed as a devDependency; `create-warlock` adds it to ESLint-mode
+           * projects. ESLint loads it with a plain `import`, so the built ESM
+           * entry is all it needs.
+           */
+          name: "@warlock.js/eslint-plugin",
+          root: "../../packages/eslint-plugin",
+          entries: ["index.ts"],
+          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "llms.txt", "llms-full.txt"],
+        },
       ],
     },
   ],

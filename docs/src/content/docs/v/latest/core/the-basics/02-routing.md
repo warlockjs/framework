@@ -238,9 +238,9 @@ For auth flows where most routes are public but a couple require a token:
 
 ```ts title="src/app/auth/routes.ts"
 router.prefix("/auth", () => {
-  router.post("/login", loginController);
-  router.post("/register", registerController);
-  router.post("/forgot-password", forgotPasswordController);
+  router.post("/login", loginController, { public: true });
+  router.post("/register", registerController, { public: true });
+  router.post("/forgot-password", forgotPasswordController, { public: true });
 
   guarded(() => {
     router.post("/logout", logoutController);
@@ -251,6 +251,50 @@ router.prefix("/auth", () => {
 ```
 
 `guarded(...)` blocks compose freely inside a `prefix(...)`. Stack as many as the module needs.
+
+## Public mutating routes
+
+A POST, PUT, PATCH or DELETE route must say who may call it: run auth
+middleware (directly, through its route builder, or from an enclosing group
+such as `guarded()`), or pass `public: true` when it is meant to be open — a
+login, a webhook, a contact form. `public` changes nothing at runtime; it
+records the decision.
+
+```ts
+router.post("/auth/login", loginController, { public: true });
+
+// Every route in the group is public; a route can opt back out with `public: false`.
+router.group({ prefix: "/webhooks", public: true }, () => {
+  router.post("/stripe", stripeWebhookController);
+});
+```
+
+`warlock dev` lists, once per route, every mutating route that has neither:
+
+```text
+[router] 1 mutating route has no auth middleware and is not marked public. Anyone
+who can reach the server can call them. Add auth middleware (e.g. register them
+inside a guarded group), or pass { public: true } if they are meant to be open:
+  - POST /api/posts (src/app/posts/routes.ts)
+```
+
+It is a development warning only: production never checks, and the route
+works exactly as before. Page routes are skipped (pages guard themselves with
+`requireUser()`). `authMiddleware()` counts as a guard (its `{ optional: true }`
+form does not); so does any middleware whose function name contains `auth` or
+`guard`. Mark a differently-named guard with `markAuthGuard()`:
+
+```ts
+import { markAuthGuard, type Middleware } from "@warlock.js/core";
+
+export const requireApiKey: Middleware = markAuthGuard(async ({ request, response }) => {
+  if (request.headers["x-api-key"] !== process.env.API_KEY) return response.unauthorized();
+});
+```
+
+Turn the warning off with `http.warnUnguardedRoutes: false`. The same check runs
+at edit time as the [`require-route-guard`](/v/latest/eslint-plugin/rules/require-route-guard/)
+lint rule.
 
 ## API versioning
 

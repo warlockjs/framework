@@ -20,6 +20,12 @@ export default defineConfig({
         __dirname,
         "../core/src/http/context/request-context.ts",
       ),
+      // The auth-guard marker `authMiddleware()` sets, read back by the specs
+      // without loading the core barrel.
+      "@warlock.js/core/src/router/unguarded-route-diagnostics": resolve(
+        __dirname,
+        "../core/src/router/unguarded-route-diagnostics.ts",
+      ),
       "@warlock.js/core": resolve(__dirname, "../core/src/index.ts"),
       "@warlock.js/cascade": resolve(__dirname, "../cascade/src/index.ts"),
       "@warlock.js/logger": resolve(__dirname, "../logger/src/index.ts"),

@@ -69,7 +69,8 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "sharp": "^0.34.5",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "ts-morph": ">=27.0.0"
   },
   "peerDependenciesMeta": {
     "sharp": {
@@ -116,6 +117,9 @@
     },
     "@warlock.js/devtools": {
       "optional": true
+    },
+    "ts-morph": {
+      "optional": true
     }
   },
   "repository": {
@@ -149,6 +153,7 @@
     "@warlock.js/herald": "workspace:^",
     "@warlock.js/notifications": "workspace:^",
     "ajv": "^8.20.0",
+    "ts-morph": "^28.0.0",
     "vitest": "4.1.10"
   },
   "packageManager": "pnpm@11.24.0"

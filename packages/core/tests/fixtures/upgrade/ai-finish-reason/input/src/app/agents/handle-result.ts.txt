@@ -1,0 +1,10 @@
+import type { AgentResult } from "@warlock.js/ai";
+
+export function describe(result: AgentResult) {
+  switch (result.finishReason) {
+    case "stop":
+      return "done";
+    default:
+      return "other";
+  }
+}

@@ -33,6 +33,9 @@ export * from "./request";
 export * from "./request-log-snapshot";
 // response exports
 export * from "./response";
+// output escaping and redirect allowlisting for values built from request input
+export * from "./escape-header-value";
+export * from "./safe-redirect";
 export * from "./xmlable";
 // Stage 1 streaming SSR pipe helper
 export * from "./stream-react-response";

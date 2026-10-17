@@ -39,11 +39,20 @@ function generateApp(): string {
   return appPath;
 }
 
+// The template's flat config imports `@warlock.js/eslint-plugin`, which this
+// workspace links as TypeScript source (the published package is built ESM).
+// `tsx` lets the spawned ESLint load that source.
+const loadTypeScriptSource = ["--import", "tsx"];
+
 function lint(appPath: string) {
-  return spawnSync(process.execPath, [eslintEntry, "--fix", "./src", "--max-warnings=0"], {
-    cwd: appPath,
-    encoding: "utf8",
-  });
+  return spawnSync(
+    process.execPath,
+    [...loadTypeScriptSource, eslintEntry, "--fix", "./src", "--max-warnings=0"],
+    {
+      cwd: appPath,
+      encoding: "utf8",
+    },
+  );
 }
 
 afterEach(() => {

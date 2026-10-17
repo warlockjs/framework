@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `FileLog` `fileName` option: a pattern (`"app-{YYYY}-{MM}-{DD}"`, tokens `{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}` `{name}` in local time) or a `(date) => string` function, evaluated at every write; it replaces the chunk's default name. `rotateFileName` takes the same forms and is rendered at each rotation (a getter passed in the config was read once, at construction, so every archive kept the boot date). Exported `FileNameOption`, `FileLogRetention`, `DAILY_FILE_NAME`, `HOURLY_FILE_NAME` and `ROTATE_FILE_NAME`.
 - `FileLog` `retention: { maxFiles?, maxAgeDays?, match? }`: removes old log files on boot and whenever the channel starts a new file (a size rotation or a dated name rolling over), plus `channel.prune()` on demand. It only considers files in the log directory (each group directory with `groupBy`) whose names match the channel's file name pattern, keeps the file being written, and reports failures to `onChannelError` instead of throwing. A function `fileName` needs `retention.match`. Invalid `maxFiles`/`maxAgeDays` throw a `TypeError` at construction.
 - `LogChannel.reportError(error, entry)` and `setErrorReporter(reporter)` (type `ChannelErrorReporter`): a channel reports failures outside `log()` to the `onChannelError` handler of the logger it was added to (`addChannel`, `setChannels`, `configure({ channels })`), or one stderr line without one.
+- `escapeLogValue(value, { maxLength? })` makes client-controlled text safe inside a log line: CR/LF/tab become visible `\r`/`\n`/`\t`, other control characters (NUL, DEL, C1, U+2028/U+2029) become `\uXXXX`, ANSI escape sequences are removed, and `maxLength` cuts with a `…[truncated]` marker. A user agent or form field can no longer forge entries in console or file logs.
+
 - Skills demonstrate email masking inside text, channel-error observation and bounded asynchronous log drains.
 
 ### Fixed
@@ -27,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- **BREAKING (types):** `log.info/warn/error/debug/success/fatal/log/assert` and the function `timer()` returns now return the logger synchronously instead of `Promise<this>`. Remove `await` before log calls (it is harmless but pointless) and any `.then()` chained on one; code that needs the write to finish calls `await log.flush()`.
+- **BREAKING (types):** `log.info/warn/error/debug/success/fatal/log/assert` and the function `timer()` returns now return the logger synchronously instead of `Promise<this>`. Remove `await` before log calls (it is harmless but pointless) and any `.then()` chained on one; code that needs the write to finish calls `await log.flush()`. `warlock upgrade --to 5.31` removes the `await`s and lists chained `.then()` calls (codemod `logger-sync-calls`).
 
 ### Changed
 
