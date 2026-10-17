@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- **BREAKING:** rate limits now apply to production application routes and web page routes. The default is 60 requests/minute per IP, in one bucket shared across application routes, pages and static assets. Review `http.rateLimit.max`; behind a proxy configure trusted `http.trustProxy` addresses or a suitable `keyGenerator` so clients do not share the proxy's quota. Set `http.rateLimit.global: false` to keep blanket quotas off while retaining explicit per-route limits. Built-in `/health` and `/ready` are exempt unless `http.health.rateLimit: true` opts them back in.
+- **BREAKING:** rate limits now apply to production and development application routes and web page routes. The default is 60 requests/minute per IP, in one bucket shared across application routes, pages and static assets. Review `http.rateLimit.max`; behind a proxy configure trusted `http.trustProxy` addresses or a suitable `keyGenerator` so clients do not share the proxy's quota. Set `http.rateLimit.global: false` to keep blanket quotas off while retaining explicit per-route limits. Built-in `/health` and `/ready` are exempt unless `http.health.rateLimit: true` opts them back in.
 
 - **BREAKING:** upgrade development and production runtimes to Node.js 22.15 or newer before running the CLI.
 
@@ -40,6 +40,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `http.logging.private` applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies check raw, decoded and resolved paths plus the matched route pattern, remove input before snapshots are built and cannot be overridden by per-route logging. Dev-dispatch error URLs use the same policy.
 
 ### Fixed
+
+- Upgrade guidance names `AgentConfig.compaction`, covers sub-agent dispatch and blank/default validation changes, and includes static assets in production rate quotas. In 5.31, `purgeImageVariants()` preserves legacy two-level cache files; retire them manually, correcting the earlier 5.30 cleanup suggestion.
 
 - The validation skill shows the HTTP 422 body as strict JSON that can be copied into a JSON parser.
 - Image-variant purges remove only recognized cache files and retain the cache root, directories, unrelated files and symlinks. Purge and background eviction validate every shard/source/generation path component, so a cache nested inside storage cannot recursively delete uploads. Use a dedicated derivative folder.

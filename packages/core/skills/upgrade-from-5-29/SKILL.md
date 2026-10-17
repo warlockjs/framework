@@ -50,8 +50,20 @@ export function createOrderedAgent(model: ModelContract, tools: ToolContract[]) 
 export function createParallelAgent(model: ModelContract, tools: ToolContract[]) {
   return ai.agent({ name: "parallel", model, tools, maxConcurrentTools: 2 });
 }
+
+export function runOrderedSubAgent(model: ModelContract, tools: ToolContract[], task: string) {
+  return ai.spawnSubAgent({
+    name: "ordered-child",
+    model,
+    tools,
+    task,
+    toolDispatch: "sequential",
+  });
+}
 ```
 
+Sub-agents also default to concurrent tool dispatch; pass
+`spawnSubAgent({ toolDispatch: "sequential", … })` for ordered side effects.
 The cap is per trip, not global. Results still reach the model in request order.
 Audit custom tool middleware for shared mutable state. If storing multi-trip
 conversation history, use captured messages and provider blocks; a final text
@@ -86,6 +98,8 @@ and locks written under 5.29 are forgotten: previously locked accounts/IPs are
 unlocked on upgrade. Changing `auth.accessToken.secret` resets them again because
 it keys the hash. Account for this temporary reset in a security-sensitive rollout;
 let old TTL keys expire and avoid flushing unrelated application data.
+This key change applies to the built-in email/IP identifiers; keys produced by a
+custom `identify` carry over.
 
 Separately, 5.30 adds `http.rateLimit.store: "cache"`. Moving from the memory store
 starts new windows. Servers sharing limits need the same release and Redis/Postgres
@@ -97,6 +111,10 @@ The 5.30 type change makes `validate()` results discriminate on `isValid`: read
 typed `data` after checking success; on failure it is `undefined`. A validator
 typed as bare `BaseValidator` (or bare `ObjectValidator`) retains `data: any`.
 Audit code that used failure data or assigned output to an unrelated type.
+5.30 also validates a present `""` through the members of `v.union()` instead of
+accepting it unchecked. A `null` default no longer satisfies required on a
+non-nullable field, and `v.int().default("")` now fails its type rule. Check forms
+that depended on those defaults or blank values.
 
 ## Image derivatives are re-rendered
 
@@ -108,6 +126,8 @@ folder once the rollout is complete. In 5.31, `purgeImageVariants()` removes onl
 recognized files in the current shard/source/generation layout and retains the
 cache root, unrelated files and symlinks. Purging is an operational action, not a
 prerequisite for successful requests.
+In particular, 5.31 `purgeImageVariants()` does not remove those legacy two-level
+files; the suggestion to use it in the 5.30 changelog does not apply in 5.31.
 
 For 5.31, derivatives also support configured object-storage disks and bounded
 cache age/size. See `store-file` before adapting a private media route.
@@ -147,22 +167,43 @@ Move conversation/model/tool settings to the normal API fields. After a resumed
 `pause_turn`, `result.text` joins the accumulated text. `result.blocks` is only
 provided for single-trip runs; retain captured messages for multi-trip replay.
 
-In 5.31, `autoCompaction` is opt-in. Set an explicit threshold and keep policy
-with a summarization callback, and test tool-result grouping and durable resume
-before enabling it. It preserves the original run input and skips unsafe ranges;
-it does not replace an application's storage or retention policy.
+In 5.31, `AgentConfig.compaction` is opt-in: set required `afterTokens` and a
+`summarize` callback, with optional `keep` and `countTokens`. For example, inject
+the application's summarizer instead of relying on a hidden model call:
+
+```ts
+import { ai, type AgentCompactionConfig, type ModelContract } from "@warlock.js/ai";
+
+export function createCompactingAgent(
+  model: ModelContract,
+  summarize: AgentCompactionConfig["summarize"],
+) {
+  return ai.agent({
+    name: "compact-history",
+    model,
+    compaction: { afterTokens: 16_000, keep: 8, summarize },
+  });
+}
+```
+
+Test tool-result grouping and durable resume before enabling it. Compaction
+preserves the original run input and skips unsafe ranges. When it applies,
+`result.blocks` stays absent; persist `captureMessages` history plus the last
+trip's output/blocks for replay. It does not replace application retention policy.
 
 ## 5.30 to 5.31 production rate limits
 
-5.31 makes global and per-route rate limits apply to production application
-routes, including web page routes. The default global limit is 60 requests per
-minute per IP, shared across routes. Check `max` before deployment; configure
+5.31 makes global and per-route rate limits apply to production and development application
+routes, including web page routes and static assets (`/public`, `/assets`). Each
+page load's asset requests use the same bucket. The default global limit is 60
+requests per minute per IP, shared across routes. Check `max` before deployment; configure
 `trustProxy` or `keyGenerator` behind a proxy so clients do not share the proxy's
 single key. Set `http.rateLimit.global: false` to retain the previous global
 behaviour and enable individual route limits deliberately.
 
-Built-in liveness/readiness routes are exempt by default; see `health-checks`
-for how to opt them into the limiter. Development wildcard dispatch has separate
+Built-in `/health` and `/ready` routes are exempt by default; set
+`http.health.rateLimit: true` to opt them into the limiter (see `health-checks`).
+Development wildcard dispatch has separate
 per-route handling; check route overrides in both environments.
 
 ## Verify the application paths that changed
