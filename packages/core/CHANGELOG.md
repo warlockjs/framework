@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
 
-- The `upgrade-from-5-29` skill guides application upgrades through logger delivery, tool concurrency, request snapshots, rate-limit counters, image cache layouts and viewport metadata, with relevant 5.31 compatibility checks.
+- The `upgrade-from-5-29` skill guides application upgrades through logger delivery, tool concurrency, request snapshots, auth counter/lock resets, image cache layouts and viewport metadata. It covers Seal result narrowing and refinement/container/union behavior, AI finish reasons and replay, bounded workspace reads, and production rate-limit migration in 5.31.
 
 - Skills include complete examples for request cancellation, stream/SSE backpressure and retention, HTTP error mapping, shared rate limits and signed-in test clients.
 

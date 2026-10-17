@@ -1160,7 +1160,20 @@ export default function CancelPage() {
         independent
         query={{ source: "controls" }}
         onSettled={(outcome) => {
-          setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
+          switch (outcome.type) {
+            case "success":
+            case "redirected":
+              setMessage("Completed");
+              break;
+            case "error":
+              setMessage(JSON.stringify(outcome.actionData));
+              break;
+            case "failed":
+              setMessage(outcome.reason);
+              break;
+            case "dropped":
+              break;
+          }
         }}
       >
         <button>Cancel</button>

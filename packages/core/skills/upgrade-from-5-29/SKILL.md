@@ -1,6 +1,6 @@
 ---
 name: upgrade-from-5-29
-description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, fresh rate-limit counters, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -79,14 +79,24 @@ Audit body/query policies on sensitive routes. In 5.31, `http.logging.private`
 can suppress input for URL families even before a route matches; it takes
 precedence over per-route logging settings. See `configure-app`.
 
-## Counters start fresh under the new keys
+## Auth login counters and locks reset
 
-Throttle and rate-limit key hashing changed. Existing counters do not carry into
-new windows after upgrading: account for that temporary reset when rolling out a
-security-sensitive limit. Let old TTL keys expire; avoid flushing unrelated
-application cache data. Servers sharing limits should use the same release and
-Redis/Postgres cache configuration (`http.rateLimit.store: "cache"`). A memory
-driver shares nothing across replicas.
+In 5.30, auth login throttle keys hash account and IP identifiers. Both counters
+and locks written under 5.29 are forgotten: previously locked accounts/IPs are
+unlocked on upgrade. Changing `auth.accessToken.secret` resets them again because
+it keys the hash. Account for this temporary reset in a security-sensitive rollout;
+let old TTL keys expire and avoid flushing unrelated application data.
+
+Separately, 5.30 adds `http.rateLimit.store: "cache"`. Moving from the memory store
+starts new windows. Servers sharing limits need the same release and Redis/Postgres
+cache configuration. A memory driver shares nothing across replicas.
+
+## Seal validation results narrow on success
+
+The 5.30 type change makes `validate()` results discriminate on `isValid`: read
+typed `data` after checking success; on failure it is `undefined`. A validator
+typed as bare `BaseValidator` (or bare `ObjectValidator`) retains `data: any`.
+Audit code that used failure data or assigned output to an unrelated type.
 
 ## Image derivatives are re-rendered
 
@@ -112,17 +122,54 @@ a new scaffold.
 ## Additional 5.31 Seal behavior
 
 Refinements run after successful type/child validation and receive parsed output.
-A container's `catch()` does not replace its own failed rules. Union validation
+They skip absent, null and invalid values; input checks belong in `.addRule()`.
+They also run on successful empty defaults such as `.default("")`, so a rejecting
+refinement now rejects that default. A container's `.catch()` is a no-op,
+including failures in the container's own rules; use child catches or handle a
+failed container result explicitly. Union validation
 returns the matched branch's parsed output, including trimming, Date coercion,
 defaults, stripped keys and explicit `undefined`. Read raw request input before
 validation if the app needs both forms. Audit callbacks that previously assumed
 unparsed input or side effects after validation failure; see Seal's `seal-basics`
 and `compose-schemas` topics for the exact typing and output-transform caveats.
 
+## AI finish reasons, provider bodies and resumed output
+
+5.30 adds `context_exceeded`, `pause_turn` and `refusal` to `FinishReason`; update
+exhaustive switches. The Anthropic adapter maps context-window exhaustion to
+`context_exceeded` instead of `length`, and pause/refusal to their own values
+instead of `error`. Handle each as an explicit application decision.
+
+`providerOptions.anthropic.body` cannot replace `model`, `messages`, `system`,
+`tools`, `mcp_servers` or `stream`; these keys throw `InvalidRequestError`.
+Move conversation/model/tool settings to the normal API fields. After a resumed
+`pause_turn`, `result.text` joins the accumulated text. `result.blocks` is only
+provided for single-trip runs; retain captured messages for multi-trip replay.
+
+In 5.31, `autoCompaction` is opt-in. Set an explicit threshold and keep policy
+with a summarization callback, and test tool-result grouping and durable resume
+before enabling it. It preserves the original run input and skips unsafe ranges;
+it does not replace an application's storage or retention policy.
+
+## 5.30 to 5.31 production rate limits
+
+5.31 makes global and per-route rate limits apply to production application
+routes, including web page routes. The default global limit is 60 requests per
+minute per IP, shared across routes. Check `max` before deployment; configure
+`trustProxy` or `keyGenerator` behind a proxy so clients do not share the proxy's
+single key. Set `http.rateLimit.global: false` to retain the previous global
+behaviour and enable individual route limits deliberately.
+
+Built-in liveness/readiness routes are exempt by default; see `health-checks`
+for how to opt them into the limiter. Development wildcard dispatch has separate
+per-route handling; check route overrides in both environments.
+
 ## Verify the application paths that changed
 
 Run the app's type check, its logger channel tests, any tools with ordered side
 effects, shared-counter tests, one cold derivative request and one mobile page
 render. For workspaces, update custom read results with the new window/byte fields
-and custom shell results with required `cancelled`. An aborted command resolves
+and custom shell results with required `cancelled`. `read.maxBytes` now really
+caps returned content, including line-number prefixes (`bytesCapped: true`);
+a window starting past EOF returns empty content. An aborted command resolves
 with `cancelled: true`; it does not throw solely because it was cancelled.

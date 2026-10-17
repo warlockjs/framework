@@ -282,8 +282,8 @@ export default {
 
 Configure the same Redis or Postgres cache on each server before enabling this;
 a process-local memory driver shares no counters across replicas. Route-specific
-limits get independent counters. After upgrading from 5.29, the new key hashing
-starts fresh windows; old keys can expire naturally.
+limits get independent counters. Moving from the memory store to `store: "cache"`
+starts fresh windows; this store was introduced in 5.30.
 
 ```ts title="src/app/private/routes.ts"
 import { router } from "@warlock.js/core";
