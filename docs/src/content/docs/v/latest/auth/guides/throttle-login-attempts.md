@@ -16,6 +16,50 @@ router.post("/auth/login", loginController, {
 });
 ```
 
+## What is throttled by default
+
+`@warlock.js/auth` does not register routes, so its throttles apply where you
+attach them. What protects an app's auth endpoints out of the box:
+
+| Endpoint                                         | Default protection                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Every route, including auth                      | The global `http.rateLimit` (60 requests per minute per IP since 5.31).                           |
+| `POST /auth/login` in a new `create-warlock` app | `loginThrottleMiddleware()`: 5 failures in 15 minutes lock the account and the IP for 15 minutes. |
+| `POST /auth/forgot-password` in a new app        | `tokenIssueThrottleMiddleware()`: 3 requests per hour per email and per IP.                       |
+| `POST /auth/reset-password` in a new app         | `tokenConsumeThrottleMiddleware()`: 10 failures per 15 minutes per IP.                            |
+| `POST /auth/refresh-token` in a new app          | A route rate limit of 30 requests per minute.                                                     |
+| OTP request/verify                               | `otpRequestThrottleMiddleware()` / `otpVerifyThrottleMiddleware()` when you attach them.          |
+
+An app created before 5.31 keeps its own `routes.ts`; add the same middleware to
+its sign-in and recovery routes:
+
+```ts title="src/app/auth/routes.ts"
+import {
+  loginThrottleMiddleware,
+  tokenConsumeThrottleMiddleware,
+  tokenIssueThrottleMiddleware,
+} from "@warlock.js/auth";
+import { router } from "@warlock.js/core";
+import { forgotPasswordController } from "./controllers/forgot-password.controller";
+import { loginController } from "./controllers/login.controller";
+import { resetPasswordController } from "./controllers/reset-password.controller";
+
+router.prefix("/auth", () => {
+  router.post("/login", loginController, {
+    public: true,
+    middleware: [loginThrottleMiddleware()],
+  });
+  router.post("/forgot-password", forgotPasswordController, {
+    public: true,
+    middleware: [tokenIssueThrottleMiddleware()],
+  });
+  router.post("/reset-password", resetPasswordController, {
+    public: true,
+    middleware: [tokenConsumeThrottleMiddleware()],
+  });
+});
+```
+
 ## Options
 
 | Option            | Default                            | Purpose                                   |

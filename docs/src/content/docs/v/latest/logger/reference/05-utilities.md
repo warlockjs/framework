@@ -76,6 +76,28 @@ import { log, maskEmail } from "@warlock.js/logger";
 log.info("billing", "invoice", `Invoice sent to ${maskEmail(customer.email)}`);
 ```
 
+## `escapeLogValue(value, options?)`
+
+```ts
+function escapeLogValue(value: unknown, options?: { maxLength?: number }): string;
+```
+
+Makes client-controlled text safe inside a log line. CR, LF and tab become the
+visible escapes `\r`, `\n`, `\t`; other control characters (NUL, DEL, C1 controls,
+U+2028/U+2029) become `\uXXXX`; ANSI escape sequences are removed. Non-strings
+are converted with `String()`. With `maxLength`, longer text is cut and ends
+with `…[truncated]`.
+
+Without it, a user agent or form field containing a line break writes a forged
+entry into console and file logs, and an ANSI sequence can rewrite what a
+terminal shows:
+
+```ts
+import { escapeLogValue, log } from "@warlock.js/logger";
+
+log.info("auth", "login", `Login from ${escapeLogValue(userAgent, { maxLength: 256 })}`);
+```
+
 ## See also
 
 - [Redaction](../advanced/01-redaction/) — `applyRedact` / `mergeRedact` in context

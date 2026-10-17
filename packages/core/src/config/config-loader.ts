@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { FileManager } from "../dev-server/file-manager";
 import { importAppModule } from "../loader/app-module-importer";
 import { configKeyFromPath } from "./config-key-from-path";
+import { type ConfigIssue, InvalidConfigError, validateConfigValue } from "./config-schema";
 import { configSpecialHandlers } from "./config-special-handlers";
 
 /**
@@ -22,10 +23,20 @@ export type SpecialConfigHandler = (configValue: any) => unknown | Promise<unkno
  * Supports special handlers for configs that require additional processing
  */
 export class ConfigLoader {
+  /**
+   * Load every config file, then throw one {@link InvalidConfigError} listing
+   * every value that fails its file's `configSchema`. An invalid config is
+   * still registered (later files may read it while loading) but its special
+   * handler does not run, so nothing connects with a broken configuration.
+   */
   public async loadAll(configFiles: FileManager[]): Promise<void> {
+    const issues: ConfigIssue[] = [];
+
     for (const file of configFiles) {
-      await this.loadConfig(file);
+      issues.push(...(await this.loadConfigFile(file, "register-invalid")));
     }
+
+    if (issues.length > 0) throw new InvalidConfigError(issues);
   }
 
   /**
@@ -35,6 +46,20 @@ export class ConfigLoader {
    * cycle gets a fresh module — no manual cache-busting needed here.
    */
   public async loadConfig(file: FileManager): Promise<void> {
+    const issues = await this.loadConfigFile(file, "keep-previous");
+
+    if (issues.length > 0) throw new InvalidConfigError(issues);
+  }
+
+  /**
+   * Import, validate and register one config file. Returns the schema issues.
+   * On a hot reload (`keep-previous`) an invalid value is not registered, so
+   * the running app keeps its last valid configuration.
+   */
+  private async loadConfigFile(
+    file: FileManager,
+    whenInvalid: "register-invalid" | "keep-previous",
+  ): Promise<ConfigIssue[]> {
     const configName = this.getConfigName(file.relativePath);
 
     const fileUrl = pathToFileURL(file.absolutePath).href;
@@ -46,11 +71,20 @@ export class ConfigLoader {
         colors.red(`config error: `),
         `Config file ${colors.yellow(file.relativePath)} does not have a default export`,
       );
-      return;
+      return [];
+    }
+
+    const issues = await validateConfigValue(configName, configValue, configModule.configSchema);
+
+    if (issues.length > 0) {
+      if (whenInvalid === "register-invalid") config.set(configName, configValue);
+      return issues;
     }
 
     config.set(configName, configValue);
     await configSpecialHandlers.execute(configName, configValue);
+
+    return [];
   }
 
   public async reloadConfig(file: FileManager): Promise<void> {

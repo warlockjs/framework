@@ -20,6 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Route option `public?: boolean` (also on `router.group()`, inherited by its routes; a route's own `public: false` opts back out) records that a mutating route is intentionally reachable without signing in. It changes nothing at runtime.
+- `warlock dev` warns once per route about POST/PUT/PATCH/DELETE routes that have no auth middleware and no `public: true`, listing method, path and route file; HMR-added routes are reported when they commit. Page routes are skipped, production never checks, and `http.warnUnguardedRoutes: false` turns it off. Middleware counts as a guard when marked with the new `markAuthGuard(middleware, isGuard?)` (`authMiddleware()` marks itself) or, unmarked, when its function name contains `auth` or `guard`; `isAuthGuardMiddleware()`, `isUnguardedMutatingRoute()` and `reportUnguardedMutatingRoutes()` are exported for tooling.
+- `safeRedirect(target, { allowedOrigins, fallback })` and `isSafeRedirect(target, options?)`: an allowlist for redirect targets taken from request input. Same-origin paths and absolute http(s) URLs on an allowed origin pass; `//host`, `/\host`, other schemes, credentials in the URL and control characters fall back to `"/"` (or `fallback`). `response.redirect()` itself is unchanged.
+- `escapeHeaderValue(value)` makes any value a valid header value: CR/LF/NUL and other control characters (tab kept) are removed, non-Latin-1 characters become `?`, and the result is trimmed, so request input cannot split a header or make Node throw a 500.
+- Typed, validated configuration: a `src/config/<name>.ts` file may export `configSchema = defineConfigSchema(validator, { env })` next to its default export (`ConfigOf<typeof configSchema>` types the value). Dev boot, each config hot reload and the production loader `warlock build` generates validate it before registration and throw one `InvalidConfigError` listing every problem in every config file (key path, rule message, the environment variable to set), never the values. An invalid config never reaches its special handler; an invalid hot reload keeps the previous value. Files without a schema load as before.
+
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
 
 - The `upgrade-from-5-29` skill guides application upgrades through logger delivery, tool concurrency, request snapshots, auth counter/lock resets, image cache layouts and viewport metadata. It covers Seal result narrowing and refinement/container/union behavior, AI finish reasons and replay, bounded workspace reads, and production rate-limit migration in 5.31.
@@ -40,6 +46,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `http.logging.private` applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies check raw, decoded and resolved paths plus the matched route pattern, remove input before snapshots are built and cannot be overridden by per-route logging. Dev-dispatch error URLs use the same policy.
 
 ### Fixed
+
+- `warlock generate.module` list controllers validate their query (`page`, `limit`) with a schema and pass `request.validated()` to the list service instead of `request.all()`; the web starter's contact route is registered with `public: true`.
 
 - React module-resolution regressions preserve the ESM package boundary in isolated fixtures and report child-process stderr before checking output, so missing and broken React installations are tested correctly under Node.js 22.15.
 - The TypeScript worker configured-root regression uses the framework's real source-worker bootstrap on Node.js 22.15, retaining its declaration, update and deletion checks instead of starting an unsupported direct `.ts` worker entry. The same assertions also run against a built `.mjs` worker without loader hooks.

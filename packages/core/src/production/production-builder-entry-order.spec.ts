@@ -96,6 +96,15 @@ describe("ProductionBuilder generated entry order", () => {
     // The config loader starts with the app's prestart, ahead of every config import.
     const configLoader = generated["config-loader.ts"]!;
     expect(firstImport(configLoader)).toBe("import './../../src/app/prestart';");
+
+    // Config files are namespace-imported so their `configSchema` is validated
+    // before any special handler runs.
+    expect(configLoader).toContain('import * as config0 from "../../src/config/app";');
+    expect(configLoader).toContain('setConfig("app", config0.default);');
+    expect(configLoader.indexOf("await assertValidConfigModules([")).toBeLessThan(
+      configLoader.indexOf("await configSpecialHandlers.execute("),
+    );
+    expect(configLoader).toContain('  { name: "app", module: config0 },');
   }, 60_000);
 
   it("embeds locale JSON through the generated locale loader", async () => {

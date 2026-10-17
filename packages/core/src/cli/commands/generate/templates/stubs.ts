@@ -97,19 +97,32 @@ update${moduleName.pascal}Controller.validation = {
  */
 export function crudListControllerStub(moduleName: Name): string {
   const plural = moduleName.plural;
-  return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+  return `import { type Infer, v } from "@warlock.js/seal";
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { list${plural.pascal}Service } from "../services/list-${plural.kebab}.service";
 
-export const list${plural.pascal}Controller: GuardedRequestHandler = async ({
-  request,
-  response,
-}) => {
-  const { data, pagination } = await list${plural.pascal}Service(request.all());
+/**
+ * Query parameters the list accepts. Add each filter you expose; unknown keys
+ * are stripped, so nothing unvalidated reaches the repository.
+ */
+const list${plural.pascal}QuerySchema = v.object({
+  page: v.numeric().min(1).optional(),
+  limit: v.numeric().min(1).max(100).optional(),
+});
+
+export const list${plural.pascal}Controller: GuardedRequestHandler<
+  Infer<typeof list${plural.pascal}QuerySchema>
+> = async ({ request, response }) => {
+  const { data, pagination } = await list${plural.pascal}Service(request.validated());
 
   return response.success({
     data,
     pagination,
   });
+};
+
+list${plural.pascal}Controller.validation = {
+  schema: list${plural.pascal}QuerySchema,
 };
 `;
 }

@@ -230,6 +230,18 @@ export interface RouteOptions {
    * });
    */
   logging?: RequestLoggingOptions;
+  /**
+   * Declare a mutating route (POST/PUT/PATCH/DELETE) intentionally reachable
+   * without signing in — a login, a webhook, a contact form. It changes
+   * nothing at runtime; it records the decision so `warlock dev` (and the
+   * `@warlock.js/require-route-guard` lint rule) stop warning that the route
+   * has no auth middleware. A group's `public: true` applies to every route
+   * registered inside it.
+   *
+   * @example
+   * router.post("/auth/login", loginController, { public: true });
+   */
+  public?: boolean;
 }
 
 export type RequestMethod =
@@ -326,6 +338,12 @@ export type GroupedRoutesOptions = {
    * This will be added to each route as a name prefix
    */
   name?: string;
+  /**
+   * Mark every route in the group as intentionally reachable without
+   * signing in (see `RouteOptions.public`). A route's own `public: false`
+   * opts it back out.
+   */
+  public?: boolean;
 };
 
 /** Route resource */
@@ -385,6 +403,11 @@ export type RouterStacks = {
   prefix: string[];
   name: string[];
   middleware: Middleware[];
+  /**
+   * Open `router.group({ public: true })` scopes; routes registered while any
+   * is open default to `public: true`.
+   */
+  public?: number;
   /**
    * Source file path for routes being added (for HMR route tracking)
    */

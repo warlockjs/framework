@@ -62,6 +62,8 @@ vi.mock("@warlock.js/core", async () => {
     useRequest,
     config: { key: (...args: unknown[]) => configKey(...args) },
     t: (key: string) => key,
+    markAuthGuard: (await import("@warlock.js/core/src/router/unguarded-route-diagnostics"))
+      .markAuthGuard,
   };
 });
 

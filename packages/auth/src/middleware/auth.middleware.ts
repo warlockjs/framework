@@ -1,4 +1,4 @@
-import { config, type HttpContext, t, type Middleware } from "@warlock.js/core";
+import { config, type HttpContext, markAuthGuard, t, type Middleware } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
 import type {
   AuthCredentialDescriptor,
@@ -284,5 +284,8 @@ export function authMiddleware(
   // Non-enumerable so the tag never shows up in logs, spreads or JSON.
   Object.defineProperty(auth, AUTH_MIDDLEWARE_DESCRIPTOR, { value: descriptor, enumerable: false });
 
-  return auth;
+  // Tells `warlock dev` (and the route-guard lint rule's runtime twin) that
+  // routes behind this middleware are authenticated. `{ optional: true }`
+  // lets anonymous requests through, so it does not count as a guard.
+  return markAuthGuard(auth, !optional);
 }

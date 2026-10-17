@@ -146,6 +146,32 @@ return response.permanentRedirect("/new-home"); // 301 shortcut
 
 `response.redirect(url, status?)` sets the `Location` header and the status code. Default is 302 (temporary). Use 301 for permanent moves so search engines update their indexes.
 
+### Redirect targets from the request
+
+A target taken from the request (`?next=`, `returnTo`, the `Referer`) is
+attacker-controlled: following it as-is is an open redirect, and a
+`javascript:` target runs script. Pass it through `safeRedirect()`:
+
+```ts
+import { safeRedirect } from "@warlock.js/core";
+
+return response.redirect(
+  safeRedirect(request.input("next"), {
+    allowedOrigins: ["https://app.example.com"],
+    fallback: "/dashboard",
+  }),
+);
+```
+
+`safeRedirect(target, options?)` returns the target when it is a path on this
+origin (`/posts/1?tab=2`) or an absolute `http:`/`https:` URL whose origin is in
+`allowedOrigins`, and the `fallback` (default `"/"`) otherwise. It refuses
+`//host` and `/\host`, other schemes, paths that do not start with `/`,
+credentials in the URL and any control character. `isSafeRedirect(target,
+options?)` is the boolean form. In pages, use `safeRedirectTarget()` from
+`@warlock.js/web`. The [`safe-redirect`](/v/latest/eslint-plugin/rules/safe-redirect/)
+lint rule flags request input reaching a redirect without one of them.
+
 ## Files
 
 ```ts
@@ -279,7 +305,7 @@ The controller's surface:
 
 Browsers consume SSE via `new EventSource(url)`. The framework already sets `text/event-stream`, `Cache-Control: no-cache`, and disables nginx buffering for you.
 
-The event name and `id` are single-line fields, so line breaks (and NUL) in them are removed before they are written; a value built from user input cannot inject extra fields or events. A multi-line `sse.comment()` is written as one comment line per line. An `onDisconnect` handler that throws is logged and does not stop the handlers registered after it.
+The event name and `id` are single-line fields, so line breaks (and NUL) in them are removed before they are written (`toSingleLineSseField()` is the same function, exported for your own SSE writers); a value built from user input cannot inject extra fields or events. `data` is always written one `data:` line per line, so it needs no escaping. A multi-line `sse.comment()` is written as one comment line per line. An `onDisconnect` handler that throws is logged and does not stop the handlers registered after it.
 
 ### Long-lived and high-volume streams
 
@@ -465,6 +491,18 @@ const all = response.getHeaders();
 ```
 
 `header(name, value)` chains — you can call it multiple times before the terminal helper.
+
+A header value built from request input or stored user data goes through
+`escapeHeaderValue()` first. It removes CR, LF, NUL and other control characters
+(tabs stay), replaces characters outside ISO-8859-1 with `?` and trims, so the
+value can neither split the header nor make Node throw `ERR_INVALID_CHAR` (a
+500):
+
+```ts
+import { escapeHeaderValue } from "@warlock.js/core";
+
+response.header("X-Export-Name", escapeHeaderValue(request.input("name")));
+```
 
 ## Status code (escape hatch)
 

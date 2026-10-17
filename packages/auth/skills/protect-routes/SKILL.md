@@ -149,6 +149,11 @@ Use `optional: true` in the object form when a public route should receive a ver
 middleware: [authMiddleware({ source: "header", optional: true })];
 ```
 
+`authMiddleware()` marks itself as an auth guard for `warlock dev`'s
+unguarded-route warning (`isAuthGuardMiddleware()` from `@warlock.js/core`);
+the optional form does not count, so a mutating route behind only optional
+auth still needs `public: true` to stay quiet.
+
 ## Automatic cookie renewal
 
 Add `refresh: { source: "cookie", key: "refresh_token", overlapMs?: 5000 }`

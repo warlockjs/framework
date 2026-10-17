@@ -7,3 +7,4 @@ export * from "./route-name-method-suffix";
 export * from "./route-registry";
 export * from "./router";
 export * from "./types";
+export * from "./unguarded-route-diagnostics";

@@ -19,6 +19,8 @@ import {
   inspectHandlerSignature,
   reportPositionalHandlerSuspects,
 } from "./positional-handler-diagnostics";
+import { reportUnguardedMutatingRoutes } from "./unguarded-route-diagnostics";
+import { config } from "../config/config-getter";
 import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
 import { buildRouteRateLimit } from "./build-route-rate-limit";
@@ -182,6 +184,12 @@ export class Router {
     removedSourceFiles: Set<string>;
     addedRoutes: Route[];
   };
+
+  /**
+   * Set by the dev server: whether to warn about mutating routes that have no
+   * auth middleware and no `public: true` (`http.warnUnguardedRoutes`).
+   */
+  private warnUnguardedRoutes = false;
 
   /**
    * Router Instance
@@ -372,6 +380,12 @@ export class Router {
       options.middleware = [...(options.middleware || []), ...this.stacks.middleware];
     } else {
       options.middleware = [...this.stacks.middleware, ...(options.middleware || [])];
+    }
+
+    // An enclosing `router.group({ public: true })` makes the route public
+    // unless it says otherwise itself.
+    if (options.public === undefined && (this.stacks.public ?? 0) > 0) {
+      options.public = true;
     }
 
     if (Array.isArray(handler)) {
@@ -647,7 +661,12 @@ export class Router {
       // the name is always defined.
       name = prefix ? trim(prefix.replace(/\//g, "."), ".") : undefined,
       middleware,
+      public: isPublic,
     } = options;
+
+    if (isPublic) {
+      this.stacks.public = (this.stacks.public ?? 0) + 1;
+    }
 
     if (prefix) {
       this.stacks.prefix.push(prefix);
@@ -679,6 +698,9 @@ export class Router {
           this.stacks.middleware.length - middleware.length,
           middleware.length,
         );
+      }
+      if (isPublic) {
+        this.stacks.public = (this.stacks.public ?? 1) - 1;
       }
     }
 
@@ -811,6 +833,12 @@ export class Router {
         if (committedRoutes.has(route)) {
           inspectHandlerSignature(route.handler, route);
         }
+      }
+
+      if (this.warnUnguardedRoutes) {
+        reportUnguardedMutatingRoutes(
+          transaction.addedRoutes.filter((route) => committedRoutes.has(route)),
+        );
       }
 
       this.routesVersion++;
@@ -1000,6 +1028,13 @@ export class Router {
     // are still recorded, but only surface on the next scan or via
     // `warlock doctor`.
     reportPositionalHandlerSuspects();
+
+    // Development only: list mutating routes nobody guarded. Routes added by a
+    // later HMR reload are reported when their replacement commits.
+    this.warnUnguardedRoutes = config.key<boolean>("http.warnUnguardedRoutes", true) !== false;
+    if (this.warnUnguardedRoutes) {
+      reportUnguardedMutatingRoutes(this.routes);
+    }
 
     this.eventListeners.beforeScan?.forEach((callback) => callback(this, server));
 

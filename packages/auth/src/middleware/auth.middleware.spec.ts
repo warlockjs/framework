@@ -68,9 +68,11 @@ function fakeResolveCsrfOriginVerdict(request: {
   return { allowed: false as const, reason: "missing-origin-and-referer" as const };
 }
 
-vi.mock("@warlock.js/core", () => ({
+vi.mock("@warlock.js/core", async () => ({
   config: { key: (...args: unknown[]) => configKey(...args) },
   t: (key: string) => key,
+  markAuthGuard: (await import("@warlock.js/core/src/router/unguarded-route-diagnostics"))
+    .markAuthGuard,
   resolveCsrfOriginVerdict: (request: unknown) =>
     fakeResolveCsrfOriginVerdict(request as Parameters<typeof fakeResolveCsrfOriginVerdict>[0]),
 }));
@@ -106,6 +108,7 @@ vi.mock("../services/auth.service", () => ({
 import { AUTH_MIDDLEWARE_DESCRIPTOR, authMiddleware } from "./auth.middleware";
 import { AuthErrorCodes } from "../utils/auth-error-codes";
 import { makeCtx } from "./test-support/make-ctx";
+import { isAuthGuardMiddleware } from "@warlock.js/core/src/router/unguarded-route-diagnostics";
 
 function buildRequest(authorizationValue?: string) {
   return {
@@ -149,6 +152,12 @@ beforeEach(() => {
 });
 
 describe("authMiddleware", () => {
+  it("marks itself as an auth guard, except in optional mode", () => {
+    expect(isAuthGuardMiddleware(authMiddleware([]))).toBe(true);
+    expect(isAuthGuardMiddleware(authMiddleware("user"))).toBe(true);
+    expect(isAuthGuardMiddleware(authMiddleware([], { optional: true }))).toBe(false);
+  });
+
   it("renews a missing cookie access token before the handler and writes the rotated pair", async () => {
     jwtVerify.mockResolvedValue({ id: 1, userType: "user" });
     accessTokenFindByToken.mockResolvedValue(liveRow({ userType: "user" }));

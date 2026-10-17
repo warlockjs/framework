@@ -69,6 +69,23 @@ return response.redirect("/login"); // 302
 return response.redirect("/new-home", 301); // permanent
 ```
 
+A target from the request (`?next=`, `returnTo`) goes through `safeRedirect()`:
+same-origin paths and allow-listed origins pass, anything else (`//evil.com`,
+`javascript:`) becomes the fallback.
+
+```ts
+import { safeRedirect, type RequestHandler } from "@warlock.js/core";
+
+export const afterLoginController: RequestHandler = async ({ request, response }) => {
+  return response.redirect(
+    safeRedirect(request.input("next"), {
+      allowedOrigins: ["https://app.example.com"],
+      fallback: "/dashboard",
+    }),
+  );
+};
+```
+
 ## Files
 
 ```ts
@@ -245,6 +262,24 @@ is unset — every existing app is unaffected until it opts in.
 A route can still override it — call `response.header("Content-Security-Policy", ...)`
 from a controller or middleware that runs after the funnel, and your value
 wins, same as any other header.
+
+### Header values from user input
+
+`escapeHeaderValue(value)` removes CR/LF and other control characters (tabs
+stay) and replaces non-Latin-1 characters with `?`, so input can neither split
+a header nor make Node throw a 500:
+
+```ts
+import { escapeHeaderValue, type RequestHandler } from "@warlock.js/core";
+
+export const exportController: RequestHandler = async ({ request, response }) => {
+  response.header("X-Export-Name", escapeHeaderValue(request.input("name")));
+  return response.success({ ok: true });
+};
+```
+
+SSE `event`/`id` fields are already single-lined by `response.sse()`
+(`toSingleLineSseField()` is exported for custom writers).
 
 ## Common patterns
 

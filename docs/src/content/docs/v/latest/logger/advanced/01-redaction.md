@@ -155,6 +155,12 @@ If `message` is a plain object, paths under `message.*` work as expected. If `me
 
 Email addresses are the exception worth handling at the call site: they end up inside message strings and cache keys, where no key can reach them. Mask them before logging with `maskEmail` / `maskEmailsInText` (see [Utilities](../reference/05-utilities.md)); Warlock's own mail and cache logs already do.
 
+Free text from the client (a user agent, a search term) can carry line breaks
+that forge a log line in console and file channels. Pass it through
+`escapeLogValue()` before putting it in a message. The
+[`no-sensitive-log`](/v/latest/eslint-plugin/rules/no-sensitive-log/) lint rule
+reports raw emails, credentials and request bodies in log calls.
+
 ## Performance
 
 | Setup                                       | Cost per `log()` call                                                                                                                  |

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `escapeLogValue(value, { maxLength? })` makes client-controlled text safe inside a log line: CR/LF/tab become visible `\r`/`\n`/`\t`, other control characters (NUL, DEL, C1, U+2028/U+2029) become `\uXXXX`, ANSI escape sequences are removed, and `maxLength` cuts with a `…[truncated]` marker. A user agent or form field can no longer forge entries in console or file logs.
+
 - Skills demonstrate email masking inside text, channel-error observation and bounded asynchronous log drains.
 
 ## 5.30.0 - 2026-10-16

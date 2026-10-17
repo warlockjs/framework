@@ -257,6 +257,28 @@ createUser.validation = {
 
 Treat every externally-provided field as hostile until a validator has vouched for it. Constrain enums with `v.string().in([...])` or `v.enum([...])`, cap lengths, and require what you depend on. The full schema surface — database-aware rules like `unique` / `exists`, file rules, the request-type alias, and ad-hoc validation — is on the [Validation](../the-basics/validation.md) page.
 
+## Safe defaults for request-supplied output
+
+Four helpers cover the places where request input most often turns into an
+injection, and the [`@warlock.js/eslint-plugin`](/v/latest/eslint-plugin/)
+rules point at them:
+
+| Where the input ends up     | Helper                                                                    | What it does                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| A redirect `Location`       | `safeRedirect(target, { allowedOrigins, fallback })` (`@warlock.js/core`) | Same-origin paths and allow-listed origins only; everything else becomes the fallback.                  |
+| A response header           | `escapeHeaderValue(value)` (`@warlock.js/core`)                           | Removes CR/LF and control characters, replaces non-Latin-1 with `?`.                                    |
+| An SSE `event:`/`id:` field | `toSingleLineSseField(value)` (`@warlock.js/core`)                        | Removes line breaks and NUL. `response.sse()` already applies it, and writes `data` one line at a time. |
+| A log line                  | `escapeLogValue(value)` (`@warlock.js/logger`)                            | Makes CR/LF/tabs visible as `\n`/`\r`/`\t`, escapes other control characters, strips ANSI sequences.    |
+
+Pair them with the redaction helpers for what must not be logged at all:
+`maskEmail()`, `redact()` and `request.toLogSnapshot()`.
+
+Mutating routes should run auth middleware or say `public: true`; `warlock dev`
+warns about the ones that do neither (see [Routing → Public mutating
+routes](../the-basics/02-routing.md#public-mutating-routes)). Config files can
+declare a `configSchema` so a missing secret stops the boot with a clear error
+instead of failing on first use (see [Configuration](../getting-started/03-configuration.md#validate-a-config-file-at-boot)).
+
 ## Hardening checklist
 
 Concrete, verified-against-the-code steps. Only knobs that actually exist are listed.
@@ -274,6 +296,8 @@ Concrete, verified-against-the-code steps. Only knobs that actually exist are li
 - **Gate admin / webhook routes with `middleware.ipFilter()`** — and only trust `X-Forwarded-For` behind a proxy you control.
 - **Require `middleware.idempotency()` after auth** on non-idempotent writes (`POST` / `PUT` / `PATCH` / `DELETE`) that clients may retry.
 - **Attach a validation schema to every controller that takes input.** Constrain enums, lengths, and required fields. Reject malformed input before the handler runs.
+- **Mark open mutating routes `public: true`** and guard the rest; fix every route `warlock dev` lists as unguarded.
+- **Run `@warlock.js/eslint-plugin`'s `recommended` preset** (new ESLint-mode apps already do) to catch `request.all()` in queries, unsafe redirects, secrets in logs and unbounded regexes on input.
 - **Keep `http.requestId` enabled** so every request is traceable; inherited ids are already validated against log-injection.
 
 ## See also
