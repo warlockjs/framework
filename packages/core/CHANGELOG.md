@@ -83,6 +83,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The cache-backed rate limiter supplies its per-window TTL on every atomic increment, so a key that expires after the create-only seed cannot be recreated without an expiry.
 - The CLI rejects unsupported Node versions with one clear message and a non-zero exit before loading the published entry or registering the source loader.
 
+- Image-variant cache sweeps remove writer temporaries left by a crashed write once they are an hour old, and remove a generation's `source.json` and then its empty directory (after a five-minute grace, never through a symlink) once its derivatives are gone, so object-storage generations no longer pile up when ETags change. Scheduled checks skip the cache walk while the estimate is within budget and nothing has expired; the first check after boot and one per `maxCacheAge` still walk.
+- A cache directory or disk root that cannot be resolved (`ENOTDIR`, `EACCES`, `ELOOP`) now throws `ImageVariantsConfigError`, with the original error as its `cause`, instead of the raw file-system error. The cache-overlap guard remembers its result per cache, disk root and configured local roots instead of resolving every path on each variant request; a newly registered disk is checked again.
+
+- Dev-server Oxlint checks no longer abort a boot scan on one over-long path: it runs in its own batch and, if the OS still refuses it, only that file is reported as unchecked. Batches count each argument's `argv` pointer on POSIX, hold at most 500 files, and a batch whose report overflows the output buffer is split and retried. Shutdown sends SIGKILL 250 ms after SIGTERM to a CLI child that ignores it, and an interrupted check reports a cancellation instead of a 30-second timeout.
+
 ### Changed
 
 - `warlock dev` exits with code 1 and a clear error when it is started on Bun or Deno: the development server is Node-only. Before, it started partway and then failed in confusing ways. The error names the runtime and points to the production start commands. `warlock build` on Bun or Deno still runs, but prints a notice that only the Node build is verified.

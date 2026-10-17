@@ -23,14 +23,23 @@ Releases run in GitHub Actions on this repository
    install/import/scaffold checks share one thirty-minute deadline, with
    exponential backoff from three to sixty seconds. Already-live packages are
    not re-polled; retries start with clean consumer and scaffold directories.
-   On exhaustion, the runner saves its recorded release commit in
-   `$LOGS/release-commit.bundle`, uploaded with `warlock-<version>-logs`.
+   On exhaustion, or when tagging or pushing fails after confirmation, the
+   runner saves its recorded release commit in `$LOGS/release-commit.bundle`,
+   uploaded with `warlock-<version>-logs`.
    Recovery output explains how to download that bundle and the
    `warlock-<version>-artifacts` upload, restore `build-provenance.json`, import
    the commit, check that the origin branch is its ancestor, push the recorded
    commit and tag, and dispatch the registry blog check. When release edits are
    a no-op, the recorded commit is the dispatched commit. Wait for every subject
    to be visible before recovery; do not republish.
+   The same steps are saved as `$LOGS/recover-release-v<version>.sh`: after
+   `gh run download <run_id> -n warlock-<version>-logs -D release-logs`, run
+   `bash release-logs/recover-release-v<version>.sh <run_id>` from the
+   repository root. The script uses `set -euo pipefail` and is safe to rerun
+   after a partial recovery: it skips present downloads, keeps a tag already at
+   the release commit and treats a tag already at origin as pushed. The printed
+   copy is wrapped in `( set -euo pipefail … )`, so pasting it stops at the
+   first failure without closing your shell.
 
 ```bash
 npm ci
@@ -468,7 +477,7 @@ checks and assertions rather than widening types, and lower budgets to measured
 counts after fixes. The release gate verifies the full workspace again.
 
 Release gates always set WARLOCK_REDIS_INTEGRATION=1 for package quality scripts,
-including local runs. The release workflow supplies Redis6390 explicitly.
+including local runs. The release workflow supplies Redis on port 6390 explicitly.
 Skill compilation maps source package subpaths independently of root barrels,
 honours explicit package exports without exposing internal source paths,
 resolves installed dependencies from the skill's owning package, and isolates

@@ -316,7 +316,15 @@ export async function runReleaseFamily(
   // succeeded (see `tagAndPushFamily`) -- a tag or push that exists
   // before the registry confirms is a claim the release has not earned.
   await confirmAtOrigin(handoff, runtime);
-  await tagAndPushFamily(family, handoff, options.version, runtime);
+  try {
+    await tagAndPushFamily(family, handoff, options.version, runtime);
+  } catch (error) {
+    // Every package is already live at origin here, so the release commit must
+    // survive the runner: a failed tag or push (even a partial one, tag pushed
+    // but branch not) is finished by hand from the preserved bundle.
+    await preserveConfirmationRecovery(handoff, runtime);
+    throw error;
+  }
 }
 
 export interface PrepareAndGateOptions {
@@ -2243,32 +2251,83 @@ async function preserveConfirmationRecovery(
       `RELEASE COMMIT RECOVERY FAILED: ${formatError(error)}. Preserve this runner checkout before it is discarded.`,
     );
   }
+  const script = recoveryScriptName(version);
+  const steps = recoveryCommands(handoff, ref);
+  try {
+    await runtime.makeDirectory(logs);
+    await runtime.writeTextFile(
+      path.join(logs, path.basename(script)),
+      renderRecoveryScript(version, steps),
+    );
+    runtime.report(`Saved the recovery commands to ${script} (uploaded with logs).`);
+  } catch (error) {
+    runtime.report(`Could not save ${script}: ${formatError(error)}. Use the block below.`);
+  }
   runtime.report(
     "Manual recovery after all packages become visible (run from repository root; never republish):",
   );
-  runtime.report("Set run_id to the failed GitHub Actions run id.");
-  runtime.report(`gh run download "$run_id" -n warlock-${version}-logs -D release-logs`);
-  runtime.report(`gh run download "$run_id" -n warlock-${version}-artifacts -D tools/release`);
-  runtime.report(`test -f tools/release/release-artifacts/${version}/build-provenance.json`);
   runtime.report(
-    `release_sha=$(node -p "require('./tools/release/release-artifacts/${version}/build-provenance.json').members[0].releaseCommitSha")`,
+    `Either: gh run download "$run_id" -n warlock-${version}-logs -D release-logs && bash ${script} "$run_id"`,
   );
   runtime.report(
-    `release_branch=$(node -p "require('./tools/release/release-artifacts/${version}/build-provenance.json').members[0].checkedOutBranch")`,
+    "Or set run_id to the failed GitHub Actions run id and paste this block; it stops at the first failure without closing your shell:",
   );
-  runtime.report(`git bundle verify release-logs/release-commit.bundle`);
-  runtime.report(`git fetch ./release-logs/release-commit.bundle ${ref}:${ref}`);
-  runtime.report(`test "$(git rev-parse ${ref})" = "$release_sha"`);
-  for (const name of handoff.subjects)
-    runtime.report(`npm view ${name}@${version} version --registry ${NPM_ORIGIN} --prefer-online`);
-  runtime.report('git fetch origin "$release_branch"');
-  runtime.report(
-    'git merge-base --is-ancestor FETCH_HEAD "$release_sha" || { echo "Origin has commits outside this release; stop and investigate."; exit 1; }',
-  );
-  runtime.report(`git tag v${version} "$release_sha"`);
-  runtime.report(`git push origin refs/tags/v${version}`);
-  runtime.report('git push origin "$release_sha:refs/heads/$release_branch"');
-  runtime.report(`gh workflow run blog-check.yml -f version=${version} -f mode=registry`);
+  runtime.report("( set -euo pipefail");
+  runtime.report(': "${run_id:?Set run_id to the failed GitHub Actions run id}"');
+  for (const step of steps) runtime.report(step);
+  runtime.report(")");
+}
+
+/** Where the recovery script is saved, relative to the repository root once the logs artifact is downloaded. */
+function recoveryScriptName(version: string): string {
+  return `release-logs/recover-release-v${version}.sh`;
+}
+
+/**
+ * The manual recovery steps, one shell command per line. Each step is safe to
+ * rerun after a partial recovery: downloads are skipped when their files are
+ * present, an existing tag at the release commit is kept, and a tag already at
+ * origin at the release commit counts as pushed. Failures use
+ * `{ echo ...; false; }`, never `exit`, so a pasted copy cannot close the shell.
+ */
+function recoveryCommands(handoff: ReleaseHandoff, ref: string): string[] {
+  const version = handoff.candidateVersion;
+  const tag = releaseTagName(version);
+  const provenance = `tools/release/release-artifacts/${version}/build-provenance.json`;
+  const stop = (message: string) => `{ echo "${message}"; false; }`;
+  return [
+    `test -f release-logs/release-commit.bundle || gh run download "$run_id" -n warlock-${version}-logs -D release-logs`,
+    `test -f ${provenance} || gh run download "$run_id" -n warlock-${version}-artifacts -D tools/release`,
+    `test -f ${provenance}`,
+    `release_sha=$(node -p "require('./${provenance}').members[0].releaseCommitSha")`,
+    `release_branch=$(node -p "require('./${provenance}').members[0].checkedOutBranch")`,
+    "git bundle verify release-logs/release-commit.bundle",
+    `git fetch ./release-logs/release-commit.bundle ${ref}:${ref}`,
+    `test "$(git rev-parse ${ref})" = "$release_sha"`,
+    ...handoff.subjects.map(
+      (name) => `npm view ${name}@${version} version --registry ${NPM_ORIGIN} --prefer-online`,
+    ),
+    'git fetch origin "$release_branch"',
+    `git merge-base --is-ancestor FETCH_HEAD "$release_sha" || ${stop("Origin has commits outside this release; stop and investigate.")}`,
+    `if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then test "$(git rev-parse "refs/tags/${tag}^{commit}")" = "$release_sha" || ${stop(`Local tag ${tag} is not at $release_sha; stop and investigate.`)}; else git tag ${tag} "$release_sha"; fi`,
+    `origin_tag=$(git ls-remote origin "refs/tags/${tag}" "refs/tags/${tag}^{}" | tail -n 1 | cut -f 1)`,
+    `if [ -z "$origin_tag" ]; then git push origin refs/tags/${tag}; elif [ "$origin_tag" != "$release_sha" ]; then ${stop(`Origin tag ${tag} is at $origin_tag, not $release_sha; stop and investigate.`)}; fi`,
+    'git push origin "$release_sha:refs/heads/$release_branch"',
+    `gh workflow run blog-check.yml -f version=${version} -f mode=registry`,
+  ];
+}
+
+/** The saved recovery script: the same steps, taking the failed run id as its first argument. */
+function renderRecoveryScript(version: string, steps: readonly string[]): string {
+  return [
+    "#!/usr/bin/env bash",
+    `# Manual recovery for release v${version}. Run from the repository root after every`,
+    "# package is visible at origin; never republish. Safe to rerun after a partial run.",
+    "set -euo pipefail",
+    `run_id="\${1:?Usage: bash ${recoveryScriptName(version)} <run_id>}"`,
+    ...steps,
+    "",
+  ].join("\n");
 }
 
 /** `v<version>` -- one tag per release on the monorepo, the format the family has always used (e.g. `v5.6.0`). */

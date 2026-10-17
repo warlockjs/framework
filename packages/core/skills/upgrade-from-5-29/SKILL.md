@@ -125,7 +125,9 @@ initial render load. Reclaim old cache files manually from their dedicated
 folder once the rollout is complete. In 5.31, `purgeImageVariants()` removes only
 recognized files in the current shard/source/generation layout and retains the
 cache root, unrelated files and symlinks. Purging is an operational action, not a
-prerequisite for successful requests.
+prerequisite for successful requests. When `uploads.images.cacheDirectory` is set,
+every local disk shares it, so a path-less `purgeImageVariants()` clears every
+local disk's derivatives, not only the default disk's.
 In particular, 5.31 `purgeImageVariants()` does not remove those legacy two-level
 files; the suggestion to use it in the 5.30 changelog does not apply in 5.31.
 

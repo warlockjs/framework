@@ -1,5 +1,5 @@
 import { parentPort, workerData } from "node:worker_threads";
-import { OxlintRunner, type OxlintFile } from "../oxlint-runner";
+import { OxlintCheckCancelledError, OxlintRunner, type OxlintFile } from "../oxlint-runner";
 
 type WorkerMessage =
   | { type: "init"; config: { cwd: string } }
@@ -31,7 +31,9 @@ parentPort?.on("message", async (message: WorkerMessage) => {
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    console.warn("Oxlint Health Checker:", detail);
+    // A check cut short by shutdown is expected; only real failures are printed.
+    if (!(error instanceof OxlintCheckCancelledError))
+      console.warn("Oxlint Health Checker:", detail);
     parentPort?.postMessage({ type: "error", message: detail });
   }
 });

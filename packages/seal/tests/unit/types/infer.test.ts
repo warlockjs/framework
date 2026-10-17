@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { validate } from "../../../src/factory/validate";
 import { v } from "../../../src/factory/validators";
 import type { Infer } from "../../../src/types/inference-types";
+import type { BaseValidator } from "../../../src/validators/base-validator";
 
 /**
  * Type-level coverage for the `Infer` walker (PACKAGE NOTES calls this out
@@ -91,6 +92,35 @@ describe("Infer (type-level)", () => {
       const schema = v.array(v.object({ id: v.int(), name: v.string() }));
       type T = Infer<typeof schema>;
       expectTypeOf<T>().toEqualTypeOf<Array<{ id: number; name: string }>>();
+    });
+  });
+
+  describe("tuples", () => {
+    it("infers each position instead of widening to an array of the union", async () => {
+      const schema = v.tuple([v.string(), v.int()]);
+      expectTypeOf<Infer.Input<typeof schema>>().toEqualTypeOf<[string, number]>();
+      expectTypeOf<Infer.Output<typeof schema>>().toEqualTypeOf<[string, number]>();
+      expectTypeOf<[number, string]>().not.toExtend<Infer.Output<typeof schema>>();
+
+      const result = await validate(schema, ["a", 1]);
+      expect(result.isValid).toBe(true);
+      if (result.isValid) {
+        expectTypeOf(result.data).toEqualTypeOf<[string, number]>();
+        expect(result.data).toEqual(["a", 1]);
+      }
+    });
+
+    it("keeps output-only guarantees per position", () => {
+      const schema = v.tuple([v.int().optional().default(1), v.string().nullable()]);
+      // A position is never optional, so a standalone validator's own input type applies.
+      expectTypeOf<Infer.Input<typeof schema>>().toEqualTypeOf<[number, string | null]>();
+      expectTypeOf<Infer.Output<typeof schema>>().toEqualTypeOf<[number, string | null]>();
+    });
+
+    it("still accepts a validator array built at runtime", () => {
+      const validators: BaseValidator[] = [v.string(), v.int()];
+      const schema = v.tuple(validators);
+      expectTypeOf<Infer.Output<typeof schema>>().toBeArray();
     });
   });
 

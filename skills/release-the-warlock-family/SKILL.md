@@ -467,7 +467,7 @@ node --import tsx scripts/release-family.ts confirm  --version 5.9.0
   packages are not re-polled, and failed consumer/scaffold checks retry in clean
   directories. Confirmation success tags the recorded commit and pushes its
   tag and branch.
-- **Failed confirmation on a runner:** preserve the uploaded
+- **Failed confirmation, tag or push on a runner:** preserve the uploaded
   `warlock-<version>-logs` and `warlock-<version>-artifacts` artifacts. The logs
   contain `release-commit.bundle`; the artifacts contain
   `release-artifacts/<version>/build-provenance.json`. Follow the printed
@@ -475,7 +475,13 @@ node --import tsx scripts/release-family.ts confirm  --version 5.9.0
   bundle, verify the recorded SHA and origin ancestry, push the recorded tag
   and branch, then run `blog-check.yml` with `mode=registry`. Wait for every
   subject to become visible first. A no-op release uses the dispatched commit
-  recorded in provenance; do not create a replacement release commit.
+  recorded in provenance; do not create a replacement release commit. The
+  logs also hold `recover-release-v<version>.sh` with the same steps: run
+  `bash release-logs/recover-release-v<version>.sh <run_id>` from the
+  repository root. It is safe to rerun after a partial recovery (an existing
+  tag at the release commit is kept, a tag already at origin counts as
+  pushed); the printed copy is wrapped in `( set -euo pipefail … )` so pasting
+  it never closes the shell.
 - **Read the run's own EXIT= line, not the harness exit code** (canon `6c7ca5ab`).
 
 ## Mandatory local-registry pre-gate — before npm origin

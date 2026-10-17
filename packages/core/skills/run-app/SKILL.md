@@ -166,7 +166,7 @@ Install `oxlint` in the app (`npm install --save-dev oxlint`) and add `.oxlintrc
 }
 ```
 
-`warlock dev` then checks changed JavaScript/TypeScript files in an isolated worker and reports rule ids, line/column spans, errors and warnings. It reads saved files from disk, honors the app's Oxlint ignore/config rules, and uses the app-resolved CLI package. A missing package or config skips the checker. Large file lists run in sequential batches within platform command-line limits, using paths relative to the app. Tool/config errors include the CLI output and are reported without stopping the dev server. CLI children are stopped during worker shutdown.
+`warlock dev` then checks changed JavaScript/TypeScript files in an isolated worker and reports rule ids, line/column spans, errors and warnings. It reads saved files from disk, honors the app's Oxlint ignore/config rules, and uses the app-resolved CLI package. A missing package or config skips the checker. Large file lists run in sequential batches of at most 500 files within platform command-line limits, using paths relative to the app; a batch whose report overflows the 8 MiB buffer is split and retried, and a single path the OS refuses as too long is reported as an unchecked warning instead of failing the scan. Tool/config errors include the CLI output and are reported without stopping the dev server. On worker shutdown CLI children get SIGTERM, then SIGKILL after 250 ms; the interrupted check is cancelled quietly ("the development server is shutting down") rather than reported as a timeout.
 
 ```ts
 import { defineConfig } from "@warlock.js/core";

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -2812,9 +2813,13 @@ describe("origin install retries and runner recovery", () => {
     const reported: string[] = [];
     const sleeps: number[] = [];
     const removed: string[] = [];
+    const written = new Map<string, string>();
     let clock = 0;
     const control = fixture({
       report: (line) => reported.push(line),
+      writeTextFile: async (filePath, contents) => {
+        written.set(filePath, contents);
+      },
       now: () => new Date(clock),
       sleep: async (ms) => {
         sleeps.push(ms);
@@ -2854,6 +2859,7 @@ describe("origin install retries and runner recovery", () => {
       reported,
       sleeps,
       removed,
+      written,
       advance: (ms: number) => {
         clock += ms;
       },
@@ -2913,6 +2919,149 @@ describe("origin install retries and runner recovery", () => {
     assert.match(report, /git push origin "\$release_sha:refs\/heads\/\$release_branch"/);
     assert.match(report, /blog-check\.yml.*mode=registry/);
     assert.match(report, /no-op.*dispatched commit/);
+    assertPasteSafeRecovery(control);
+  });
+
+  /** The saved script and the printed block must both be safe to run or paste. */
+  function assertPasteSafeRecovery(control: ReturnType<typeof originFixture>): void {
+    const scripts = [...control.written].filter(([filePath]) =>
+      filePath.endsWith(`recover-release-v${VERSION}.sh`),
+    );
+    assert.equal(scripts.length, 1);
+    const [[scriptPath, script]] = scripts as [[string, string]];
+    assert.equal(path.basename(path.dirname(scriptPath)), "release-logs");
+    const lines = script.split("\n");
+    assert.equal(lines[0], "#!/usr/bin/env bash");
+    assert.ok(lines.includes("set -euo pipefail"));
+    assert.ok(lines.some((line) => line.startsWith('run_id="${1:?')));
+    assert.ok(lines.some((line) => /\bgit tag v5\.3\.0 "\$release_sha"/.test(line)));
+    assert.ok(lines.some((line) => line.includes("git push origin refs/tags/v5.3.0")));
+    assert.ok(lines.includes('git push origin "$release_sha:refs/heads/$release_branch"'));
+    assert.ok(lines.some((line) => /blog-check\.yml.*mode=registry/.test(line)));
+    assert.ok(!/\bexit\b/.test(script));
+
+    const reported = control.reported;
+    assert.ok(
+      reported.some((line) => line.includes(`bash release-logs/recover-release-v${VERSION}.sh`)),
+    );
+    const open = reported.indexOf("( set -euo pipefail");
+    const close = reported.lastIndexOf(")");
+    assert.ok(open >= 0 && close > open);
+    // Every script step is printed inside the subshell, in the same order.
+    const scriptSteps = lines.slice(lines.indexOf("set -euo pipefail") + 2).filter(Boolean);
+    assert.deepEqual(reported.slice(open + 2, close), scriptSteps);
+    for (const line of reported) assert.doesNotMatch(line, /(^|[^(]\s*)\bexit 1\b/);
+    // Both forms parse as bash (skipped where bash is not installed).
+    for (const source of [script, reported.slice(open, close + 1).join("\n")]) {
+      const parsed = spawnSync("bash", ["-n"], { input: source, encoding: "utf8" });
+      if (parsed.error) continue;
+      assert.equal(parsed.status, 0, parsed.stderr);
+    }
+  }
+
+  it("makes the recovery steps idempotent after a partial tag and push", async () => {
+    const control = originFixture();
+    const base = control.dependencies.runCommand!;
+    control.dependencies.runCommand = async (request) => {
+      if (request.args[1] === "install") throw new Error("E404 install still unavailable");
+      return base(request);
+    };
+    await assert.rejects(confirmAtOrigin(control.handoff, control.dependencies), /E404/);
+    const steps = control.reported;
+    // A local tag is reused when it is at the release commit, and an origin tag
+    // already at the release commit counts as pushed.
+    assert.ok(
+      steps.some(
+        (line) =>
+          line.startsWith('if git rev-parse -q --verify "refs/tags/v5.3.0"') &&
+          line.includes('else git tag v5.3.0 "$release_sha"; fi'),
+      ),
+    );
+    assert.ok(
+      steps.some(
+        (line) =>
+          line.startsWith('if [ -z "$origin_tag" ]; then git push origin refs/tags/v5.3.0;') &&
+          line.includes('elif [ "$origin_tag" != "$release_sha" ]'),
+      ),
+    );
+    assert.ok(
+      steps.some((line) => line.startsWith("test -f release-logs/release-commit.bundle ||")),
+    );
+    assertPasteSafeRecovery(control);
+  });
+
+  it("preserves the release commit when tagging or pushing fails after origin confirmed", async () => {
+    const control = originFixture();
+    const handoffPath = path.resolve("confirm-then-push-fails-handoff.json");
+    const sha = "a".repeat(40);
+    control.dependencies.sha256File = async () => HASH;
+    control.dependencies.readTextFile = async (filePath) => {
+      if (filePath === handoffPath) {
+        return JSON.stringify({
+          kind: "warlock-family-publish-handoff",
+          candidateVersion: VERSION,
+          subjects: FAMILY.members.map((member) => member.name),
+          artifacts: FAMILY.members.map((member, index) => ({
+            name: member.name,
+            tarballPath: path.resolve(`confirm-push-artifact-${index}.tgz`),
+            sha256: HASH,
+          })),
+          verifiedAt: "2026-09-02T12:00:00.000Z",
+          matrixScope: "full",
+        });
+      }
+      if (path.basename(filePath) === "build-provenance.json") {
+        return JSON.stringify({
+          schemaVersion: 1,
+          version: VERSION,
+          members: FAMILY.members.map((member) => ({
+            name: member.name,
+            releaseCommitSha: sha,
+            gitHead: "b".repeat(40),
+            checkedOutBranch: "main",
+          })),
+        });
+      }
+      return JSON.stringify({ dependencies: { "@warlock.js/core": VERSION } });
+    };
+    const base = control.dependencies.runCommand!;
+    let branchPushes = 0;
+    control.dependencies.runCommand = async (request) => {
+      if (request.command === "git") {
+        control.commands.push(request);
+        const [verb, first] = request.args;
+        if (verb === "rev-parse" && first === "--abbrev-ref")
+          return { stdout: "main\n", stderr: "" };
+        // No local tag yet, and nothing at origin: the run tags, pushes the tag, then the branch.
+        if (verb === "rev-parse" && first === "--verify") throw new Error("unknown revision");
+        if (verb === "ls-remote") return { stdout: "", stderr: "" };
+        if (verb === "push" && request.args[2]?.includes("refs/heads/")) {
+          branchPushes += 1;
+          throw new Error("remote rejected the branch push");
+        }
+        return { stdout: "", stderr: "" };
+      }
+      return base(request);
+    };
+
+    await assert.rejects(
+      runReleaseFamily({ mode: "confirm", version: VERSION, handoffPath }, control.dependencies),
+      /remote rejected the branch push/,
+    );
+
+    assert.equal(branchPushes, 1);
+    const git = control.commands.filter((request) => request.command === "git");
+    // The tag reached origin before the branch push failed: a partial success.
+    assert.ok(git.some((request) => request.args.join(" ") === "push origin refs/tags/v5.3.0"));
+    const bundle = git.find((request) => request.args[0] === "bundle");
+    assert.equal(bundle?.args[1], "create");
+    assert.match(bundle?.args[2] ?? "", /release-commit\.bundle$/);
+    assert.deepEqual(
+      git.slice(-3).map((request) => request.args[0]),
+      ["update-ref", "bundle", "update-ref"],
+    );
+    assert.ok(control.reported.some((line) => line.includes("Manual recovery")));
+    assertPasteSafeRecovery(control);
   });
 
   it("preserves the bundle when registry views exhaust the window", async () => {
@@ -2931,6 +3080,7 @@ describe("origin install retries and runner recovery", () => {
       control.commands.some((request) => request.command === "git" && request.args[0] === "bundle"),
     );
     assert.ok(control.reported.some((line) => line.includes("Manual recovery")));
+    assertPasteSafeRecovery(control);
   });
 });
 
