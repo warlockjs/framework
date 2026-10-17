@@ -1949,7 +1949,9 @@ class Execution<TOutput> {
       // normalize the real assembled turn array (assistant turns with
       // toolCalls + tool-result turns) onto the report. Off ⇒ field
       // absent, so the report is byte-for-byte as before.
-      ...(this.config.captureMessages ? { messages: this.captureMessages() } : {}),
+      ...((this.options?.captureMessages ?? this.config.captureMessages)
+        ? { messages: this.captureMessages() }
+        : {}),
     };
 
     // Stamp lineage on the assembled tree exactly once per run.
@@ -2121,6 +2123,10 @@ class Execution<TOutput> {
 
       if (message.blocks !== undefined) {
         captured.blocks = message.blocks;
+      }
+
+      if (message.compaction !== undefined) {
+        captured.compaction = message.compaction;
       }
 
       return captured;

@@ -1,6 +1,6 @@
 ---
 name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?, maxOutputTokens?}). System-prompt hoisting, max_tokens required (default: model max output when streaming, 16384 non-streaming; maxOutputTokens for gateway ids), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `maxOutputTokens`, `max_tokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `ai.providerTool`, `web_search_20250305`, `bash_20250124`, `text_editor_20250728`, `streamChunks`, `thinking_delta`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?, maxOutputTokens?}). System-prompt hoisting, max_tokens required (default: model max output when streaming, 16384 non-streaming; maxOutputTokens for gateway ids), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `maxOutputTokens`, `max_tokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `contextManagement`, `serverCompaction`, `clear_tool_uses`, `clear_thinking`, `thinkingBlockBinding`, `block_binding`, `preservedThinking`, `ai.providerTool`, `web_search_20250305`, `bash_20250124`, `text_editor_20250728`, `streamChunks`, `thinking_delta`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -74,6 +74,8 @@ Every `ModelResponse.usage` (and the streaming terminal `done`) is normalized to
 | `usage.cachedTokens`     | `cache_read_input_tokens`     | Subset of input served from the prompt cache. Bills at `cachedInput` (falls back to `input` when unset).                                      |
 | `usage.cacheWriteTokens` | `cache_creation_input_tokens` | Input tokens **written** to the cache on this call (the ~1.25x write surcharge). Bills at `cachedOutput` when set.                            |
 | `usage.reasoningTokens`  | — _(not reported separately)_ | Anthropic bills extended-thinking tokens **inside** `output_tokens`, so this stays unset — populating it would double-count against `output`. |
+
+With server-side compaction (`serverCompaction`), the `compaction` entries of `usage.iterations` are added to `input` / `output` / the cache counts, since the top-level counts leave the compaction step out.
 
 In streaming, `cachedTokens` / `cacheWriteTokens` are seeded from `message_start` and then **overwritten by the cumulative counts on `message_delta`** when those are present and non-zero, so the terminal `done` carries the final tally.
 
@@ -210,28 +212,50 @@ history = [
 ];
 ```
 
+Or let `ai.session({ id, store, agent })` store the turns for you (the `keep-agent-conversations` topic of the `warlock-js-ai` skill).
+
 ## Provider options (`providerOptions.anthropic`)
 
 Anthropic-only request options, per call or in the agent's `modelOptions`. Other adapters ignore the key. Type: `AnthropicCallOptions`.
 
-| Field             | Effect                                                                                                                                                                                                                                                   |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `betas`           | Beta flags. When non-empty the request goes through `client.beta.messages` (needed for beta body fields and beta blocks such as `compaction`).                                                                                                           |
-| `body`            | Extra body fields merged **last** (caller wins): `context_management`, `fallbacks`, `inference_geo`, `tool_choice`, … Not validated, except that `model`, `messages`, `system`, `tools`, `mcp_servers` and `stream` are refused (`InvalidRequestError`). |
-| `thinkingDisplay` | `thinking.display` on adaptive models: `"summarized"`, `"omitted"`, `"updates"` (the last needs its beta).                                                                                                                                               |
+| Field                  | Effect                                                                                                                                                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `betas`                | Beta flags. When non-empty the request goes through `client.beta.messages` (needed for beta body fields and beta blocks such as `compaction`).                                                                                                                                                          |
+| `body`                 | Extra body fields merged **last** (caller wins): `context_management`, `fallbacks`, `inference_geo`, `tool_choice`, … Not validated, except that `model`, `messages`, `system`, `tools`, `mcp_servers` and `stream` are refused (`InvalidRequestError`).                                                |
+| `thinkingDisplay`      | `thinking.display` on adaptive models: `"summarized"`, `"omitted"`, `"updates"` (the last needs its beta).                                                                                                                                                                                              |
+| `contextManagement`    | Typed context editing: `clearToolUses` (`trigger: { inputTokens } \| { toolUses }`, `keep`, `clearAtLeast`, `excludeTools`, `clearToolInputs`) → `clear_tool_uses_20250919`; `clearThinking` (`keep: n \| "all"`) → `clear_thinking_20251015`, listed first. Adds beta `context-management-2025-06-27`. |
+| `serverCompaction`     | `true` or `{ triggerTokens (≥ 50,000; API default 150,000), instructions }` → `compact_20260112`, beta `compact-2026-01-12`. Can't be combined with `body.context_management` (`InvalidRequestError`).                                                                                                  |
+| `thinkingBlockBinding` | `"error"` \| `"drop_block"` → `thinking.block_binding.prefix_mismatch_behavior` + beta `thinking-binding-controls-2026-08-01`; adaptive or budget thinking only (skipped with a debug log on `between_tools`).                                                                                          |
 
 ```ts
 const agent = ai.agent({
   model: anthropic.model({ name: "claude-opus-5-5" }),
+  tools,
   modelOptions: {
     providerOptions: {
       anthropic: {
-        betas: ["compact-2026-01-12"],
-        body: { context_management: { edits: [{ type: "compact_20260112" }] } },
+        contextManagement: { clearToolUses: { trigger: { inputTokens: 100_000 }, keep: 5 } },
+        serverCompaction: { triggerTokens: 200_000 },
       },
     },
   },
 });
+```
+
+The response then starts with a `compaction` block, kept on `blocks` and replayed (the API ignores everything before it). Compaction tokens are billed outside the top-level `input_tokens` / `output_tokens`; the adapter adds the `compaction` entries of `usage.iterations` into `usage`. Leave `pause_after_compaction` off inside an agent: a paused response reads as a final stop.
+
+### Preserved thinking after client-side compaction
+
+Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 accept a replayed thinking block only while everything before it is unchanged. The agent's own compaction marks turns it kept after a summary `compaction: "retained"`; on those models (inferred, or `anthropic.model({ name, preservedThinking: true })`) the adapter replays them **without** `thinking` / `redacted_thinking` blocks. Other models (Opus 5, Sonnet 5, Fable 5, Mythos 5.1, 4.x, budget mode) keep them. Setting `thinkingBlockBinding` disables the stripping and lets the API drop (`"drop_block"`) or reject (`"error"`) instead — also the way to recover a stored conversation someone edited:
+
+```ts
+const recovering = ai.agent({
+  model: anthropic.model({ name: "claude-opus-5-5" }),
+  modelOptions: { providerOptions: { anthropic: { thinkingBlockBinding: "drop_block" } } },
+});
+await recovering.execute(question, { history });
+
+inferPreservedThinking("claude-opus-5-5"); // true (exported helper)
 ```
 
 Cache TTL per call: `options.cacheControl.ttl` (`"5m"` | `"1h"`) overrides the model's `promptCacheTtl` for that call.

@@ -182,7 +182,7 @@ describe("agent automatic compaction", () => {
     expect(summarizeSpy.mock.calls[0]?.[0]).toHaveLength(4);
   });
 
-  it("skips retained opaque blocks/replay metadata without touching their history or signatures", async () => {
+  it("compacts before retained replay data, keeping its blocks/signatures verbatim and marking the turn", async () => {
     for (const replay of [
       {
         blocks: [
@@ -207,17 +207,29 @@ describe("agent automatic compaction", () => {
       const { model, calls } = modelFixture();
       const summarizeSpy = vi.fn(summarize);
       const retained: Message = { role: "assistant", content: "retained", ...replay };
-      const historyWithReplay = [...history, retained];
+      const historyWithReplay: Message[] = [
+        ...history,
+        retained,
+        ...(retained.toolCalls
+          ? [{ role: "tool" as const, toolCallId: "signed", content: "ok" }]
+          : []),
+      ];
       const result = await agent({
         model,
         compaction: policy({ keep: 2, summarize: summarizeSpy }),
       }).execute("go", { history: historyWithReplay });
-      expect(result.report.compactions?.[0]).toMatchObject({
-        type: "skipped",
-        reason: "provider-replay",
+      expect(result.report.compactions?.[0]).toMatchObject({ type: "applied" });
+      expect(summarizeSpy).toHaveBeenCalledOnce();
+      const sent = calls[0]?.messages ?? [];
+      // The summary is user context so the kept assistant turn still leads with its reasoning.
+      expect(sent[0]).toEqual({
+        role: "user",
+        content: "Summary of earlier conversation:\nmemo",
+        compaction: "summary",
       });
-      expect(calls[0]?.messages).toEqual([...historyWithReplay, { role: "user", content: "go" }]);
-      expect(summarizeSpy).not.toHaveBeenCalled();
+      expect(sent[1]).toEqual({ ...retained, compaction: "retained" });
+      expect(sent.at(-1)).toEqual({ role: "user", content: "go" });
+      expect(historyWithReplay[4]).toEqual(retained);
     }
   });
 

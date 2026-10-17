@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `agent.stream()` now emits `agent.trip.reasoning`, `agent.tool.streaming` and `agent.trip.usage` in addition to the existing events, and `MockModel` produces them under `agent.stream()` (one `agent.tool.streaming` per scripted tool call, one `agent.trip.usage` per trip). A test that asserts the exact list of streamed event types should filter for the types it checks, or set `modelOptions: { streamChunks: false }` to keep the previous list. Code that calls `model.stream()` directly sees no change unless it passes `streamChunks`.
 
 - When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.
+- When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay (or use `ai.session()`, which does it). `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature. Keep the `compaction` markers on stored messages.
 
 - Sub-agents also use the concurrent tool default introduced in 5.30. Callers upgrading from 5.29 whose tools need ordered side effects can now set `spawnSubAgent({ toolDispatch: "sequential", ... })`.
 
@@ -47,7 +48,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Skills include complete examples for per-trip tool concurrency and native token preflight with provider-specific request options.
 
-- Agents can opt into automatic history compaction with an explicit token threshold, a summary callback and an optional native/custom counter. System prompts, current input and tool groups are preserved; retained provider replay data is conservatively skipped. Applied/skipped decisions are recorded on reports and durable snapshots.
+- Agents can opt into automatic history compaction with an explicit token threshold, a summary callback and an optional native/custom counter. System prompts, current input and tool groups are preserved. Applied/skipped decisions are recorded on reports and durable snapshots.
+
+- Compaction works on thinking runs. The replaced range always ends before the open tool round, which goes back verbatim with its signed thinking. When kept turns after the range carry signed reasoning, the summary is framed as user context and those turns are marked `compaction: "retained"` (the summary `compaction: "summary"`), so adapters whose providers bind reasoning to the exact prior history can leave it out on replay.
+
+- `ai.compaction.summarize({ model, instructions?, maxTokens?, modelOptions?, onUsage? })` (also `summarizeCompaction`): a ready-made `compaction.summarize` callback. It sends the slice as a tagged transcript with Anthropic's published client-side compaction prompt (`DEFAULT_COMPACTION_INSTRUCTIONS`), reads the `<summary>` tags, and throws on a truncated, refused or empty reply so the agent keeps the conversation. `renderTranscript(messages)` is exported for custom callbacks.
+
+- `ai.session({ id, store, agent, lock? })`: a persisted multi-turn conversation with one agent — `send`, `stream`, `history`, `load`, `fork`, `truncate`, `resume`, `clear`. Each send stores the whole turn (tool rounds, provider blocks, attachment parts), failed runs leave the history unchanged, sends on one session id are serialized, the agent's compaction policy compacts long sessions, and a send interrupted by a crash resumes through a durable agent.
+
+- `ai.snapshot.file({ dir })` and `ai.snapshot.sqlite({ path } | { database })` snapshot stores for local-first apps, usable for durable runs, supervisor snapshots and sessions. The SQLite store uses Node's built-in `node:sqlite` (Node 22.5+; no flag on Node 22.13+), loaded only on first use, or any open `exec` / `prepare` database such as `better-sqlite3`; it creates its table on first use unless `createTable: false`.
+
+- `Message.compaction` / `CapturedMessage.compaction` (`"summary" | "retained"`), and a per-call `captureMessages` option on `agent.execute` / `stream`.
+
+- `ai.snapshot.pg()` and `ai.snapshot.redis()` are generic over the snapshot shape like the other snapshot factories; the default stays `SupervisorSnapshot`.
 
 - `ModelContract.countTokens?()` represents optional native input-token preflight, separate from offline SDK estimates.
 

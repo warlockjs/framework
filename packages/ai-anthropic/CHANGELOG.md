@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Usage includes server-side compaction: the `compaction` entries of `usage.iterations`, which the top-level token counts leave out, are added to `input`, `output` and the cache counts (completions and streams).
+
 - `complete()` always builds a non-streaming request, including when an indexed `stream` option is supplied.
 
 ### Added
@@ -21,6 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `AnthropicModelConfig.maxOutputTokens` overrides the inferred model output limit that sizes the default `max_tokens`.
 - With `streamChunks`, `stream()` yields `reasoning` for `thinking_delta`, `tool-args` for the `input_json_delta` of client `tool_use` blocks, and `usage` after `message_start` and each `message_delta`. `send()` takes the same `streamChunks` transport option.
 - `ai.providerTool({ provider: "anthropic", definition })` entries (`web_search`, `web_fetch`, `code_execution`, `bash`, `text_editor`, `memory`, …) are sent verbatim ahead of the function tools; the prompt-cache breakpoint stays on the last function tool. Other providers' tools are skipped with a warning. The reserved `providerOptions.anthropic.body` keys are unchanged.
+- Typed context management on `providerOptions.anthropic`: `contextManagement.clearToolUses` / `clearThinking` (`clear_tool_uses_20250919` / `clear_thinking_20251015`, beta `context-management-2025-06-27`) and `serverCompaction` (`compact_20260112`, beta `compact-2026-01-12`, trigger of at least 50,000 input tokens). The adapter builds the edits in the order the API requires and adds the beta headers; combining them with `body.context_management` fails with `InvalidRequestError`.
+
+- `thinkingBlockBinding: "error" | "drop_block"` sends `thinking.block_binding.prefix_mismatch_behavior` with the `thinking-binding-controls-2026-08-01` beta.
+
+- Preserved thinking after client-side compaction: on Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 an assistant turn marked `compaction: "retained"` is replayed without its thinking blocks, which were produced against the replaced history. `AnthropicModelConfig.preservedThinking` overrides the inference; `inferPreservedThinking(name)` and `ToAnthropicMessagesOptions` are exported.
 
 - `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
 - Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.

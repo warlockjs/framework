@@ -115,13 +115,15 @@ export async function compactAgentMessages(
     if (inputMessageIndex === undefined) return { record: { ...record, reason: "no-safe-range" } };
     const range = selectRange(messages, config.keep ?? 8, inputMessageIndex);
     if (!range) return { record: { ...record, reason: "no-safe-range" } };
-    if (
-      messages.some(
-        (message, index) => (index < range.start || index >= range.end) && carriesReplay(message),
-      )
-    ) {
-      return { record: { ...record, reason: "provider-replay" } };
-    }
+    // Signed reasoning (Anthropic thinking, Gemini thought signatures) in a
+    // turn kept after the replaced range was produced against the original
+    // history. Turns before the range keep a valid prefix and stay as they
+    // are; turns after it are kept verbatim (the open tool round must go back
+    // with its reasoning intact) and marked so adapters whose providers bind
+    // reasoning to the exact prefix can drop it on replay.
+    const replayAfterRange = messages.some(
+      (message, index) => index >= range.end && carriesReplay(message),
+    );
     const candidate = structuredClone(messages.slice(range.start, range.end));
     const result = await config.summarize(candidate, {
       tripIndex,
@@ -143,10 +145,24 @@ export async function compactAgentMessages(
         "compaction summarize must replace the entire supplied slice with a non-empty assistant text summary.",
       );
     const isFirstTurn = range.start === messages.findIndex((message) => message.role !== "system");
-    const summary: Message = isFirstTurn
-      ? { role: "user", content: `Summary of earlier conversation:\n${result.summary.content}` }
-      : { role: "assistant", content: result.summary.content };
-    const replacement = [...messages.slice(0, range.start), summary, ...messages.slice(range.end)];
+    // With retained reasoning the summary is user context, so a kept
+    // assistant turn still starts with its own thinking instead of being
+    // merged behind summary text (budget-mode thinking requires the last
+    // assistant turn to begin with a thinking block).
+    const summary: Message =
+      isFirstTurn || replayAfterRange
+        ? {
+            role: "user",
+            content: `Summary of earlier conversation:\n${result.summary.content}`,
+            compaction: "summary",
+          }
+        : { role: "assistant", content: result.summary.content, compaction: "summary" };
+    const retained = messages
+      .slice(range.end)
+      .map((message): Message =>
+        carriesReplay(message) ? { ...message, compaction: "retained" } : message,
+      );
+    const replacement = [...messages.slice(0, range.start), summary, ...retained];
     const after = await count(replacement);
     if (options.signal?.aborted) return {};
     if (after >= before) return { record: { ...record, reason: "not-smaller" } };

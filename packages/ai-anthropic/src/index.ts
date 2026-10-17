@@ -1,7 +1,16 @@
 export { AnthropicSDK } from "./sdk";
 export { AnthropicModel } from "./model";
-export type { AnthropicCallOptions, AnthropicSDKConfig, AnthropicModelConfig } from "./config.type";
+export type {
+  AnthropicCallOptions,
+  AnthropicClearThinking,
+  AnthropicClearToolUses,
+  AnthropicContextManagement,
+  AnthropicModelConfig,
+  AnthropicSDKConfig,
+  AnthropicServerCompaction,
+} from "./config.type";
 export type { AnthropicThinkingMode } from "./thinking-mode";
+export { inferPreservedThinking } from "./thinking-mode";
 export type {
   AnthropicRequest,
   AnthropicStreamingRequest,
@@ -11,6 +20,7 @@ export type {
 export {
   toAnthropicMessages,
   type AnthropicMessages,
+  type ToAnthropicMessagesOptions,
   toAnthropicTools,
   fromProviderBlocks,
   toProviderBlocks,

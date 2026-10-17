@@ -226,23 +226,66 @@ history = [
 
 The adapter replays a stored block only when it is a well-formed assistant-turn block from this adapter (its `data.type` matches its `type`); otherwise it rebuilds the turn from `content` and `toolCalls`. Treat a transcript that comes from a client like any other client input.
 
-Beta features go through `providerOptions.anthropic`: `betas` routes the call to the beta endpoint, and `body` adds request fields as-is, after the adapter's own. `body` may not set `model`, `messages`, `system`, `tools`, `mcp_servers` or `stream`, which the adapter builds from the call; the call fails with `InvalidRequestError` if it tries. Server-side compaction:
+Beta features go through `providerOptions.anthropic`: `betas` routes the call to the beta endpoint, and `body` adds request fields as-is, after the adapter's own. `body` may not set `model`, `messages`, `system`, `tools`, `mcp_servers` or `stream`, which the adapter builds from the call; the call fails with `InvalidRequestError` if it tries. The same `body` carries `fallbacks`, `inference_geo` or any other field the Messages API accepts. Other adapters ignore the `anthropic` key, so the options are safe in a fallback chain.
+
+## Context editing and server-side compaction
+
+Two Anthropic betas manage a long conversation on the server, and both have typed options. The adapter adds the `context_management.edits` and the beta headers for you:
 
 ```ts
 const agent = ai.agent({
   model: anthropic.model({ name: "claude-opus-5-5" }),
+  tools,
   modelOptions: {
     providerOptions: {
       anthropic: {
-        betas: ["compact-2026-01-12"],
-        body: { context_management: { edits: [{ type: "compact_20260112" }] } },
+        // Clear old tool results (and optionally old thinking) once the prompt grows.
+        contextManagement: {
+          clearToolUses: { trigger: { inputTokens: 100_000 }, keep: 5, excludeTools: ["memory"] },
+          clearThinking: { keep: 2 },
+        },
+        // Summarize earlier context on the server when the prompt reaches the trigger.
+        serverCompaction: {
+          triggerTokens: 200_000,
+          instructions:
+            "Summarize the transcript inside <summary></summary> tags. Do not call any tools while writing this summary; respond with text only.",
+        },
       },
     },
   },
 });
 ```
 
-The same `body` carries `fallbacks`, `inference_geo` or any other field the Messages API accepts. Other adapters ignore the `anthropic` key, so the options are safe in a fallback chain.
+| Option                            | Wire field (edit)                                                                                       | Beta                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `contextManagement.clearToolUses` | `clear_tool_uses_20250919`: `trigger`, `keep`, `clear_at_least`, `exclude_tools`, `clear_tool_inputs`   | `context-management-2025-06-27` |
+| `contextManagement.clearThinking` | `clear_thinking_20251015`: `keep` (`{ type: "thinking_turns", value }` or `"all"`), always listed first | `context-management-2025-06-27` |
+| `serverCompaction`                | `compact_20260112`: `trigger` (input tokens, at least 50,000; API default 150,000), `instructions`      | `compact-2026-01-12`            |
+
+`true` uses the API defaults (tool-result clearing at 100,000 input tokens keeping 3 tool uses; thinking kept per the model's default). The options fail with `InvalidRequestError` on an invalid count or when `body.context_management` is also set. Field names, defaults and headers follow Anthropic's "Context editing" and "Compaction at a token threshold" pages (read 2026-10-17).
+
+With server compaction, the response starts with a `compaction` block. The adapter keeps it in the turn's `blocks`, the agent replays it, and the API ignores everything before it on the next request, so keep the turn's blocks when you store the conversation (`ai.session()` does). The top-level `input_tokens` / `output_tokens` leave the compaction step out; the adapter adds the `compaction` entries of `usage.iterations` to `usage`, so cost and budgets see what was billed. `pause_after_compaction` is reachable through `body`, but the agent treats a paused response as a final stop, so leave it off inside an agent.
+
+## Preserved thinking and client-side compaction
+
+On Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 a replayed thinking block is valid only while the `system` prompt, the `tools` and every message before it are unchanged ("preserved thinking"). Server-side compaction and context editing don't count as edits. A summary the agent writes on the client does: the turns it keeps after the summary still carry thinking produced against the replaced history.
+
+The agent's [automatic compaction](/v/latest/ai/agents/run-agent/#automatic-compaction-inside-an-agent-run) marks those kept turns `compaction: "retained"`. On the models above the adapter replays them without their `thinking` / `redacted_thinking` blocks (text and tool calls stay), which is the no-beta path Anthropic documents for compaction that keeps recent turns. Other models (Opus 5, Sonnet 5, Fable 5, Mythos 5.1, the 4.x family) don't run the check, so the kept blocks are replayed as they are. Override the inference per model with `preservedThinking`:
+
+```ts
+anthropic.model({ name: "my-gateway/opus", preservedThinking: true });
+```
+
+To let the API decide instead, set `thinkingBlockBinding`. The adapter sends `thinking.block_binding.prefix_mismatch_behavior` with the `thinking-binding-controls-2026-08-01` beta and replays every block; `"drop_block"` drops the invalid ones (listed in the response's `input_transformations`), `"error"` fails with a 400. It is also how you recover a stored conversation that was edited by hand. On a preserved-thinking model that runs adaptive thinking by default, the adapter sends `thinking: { type: "adaptive" }` to carry it; with `between_tools` the option is skipped (debug log), since that shape takes no other field.
+
+```ts
+const recovering = ai.agent({
+  model: anthropic.model({ name: "claude-opus-5-5" }),
+  modelOptions: { providerOptions: { anthropic: { thinkingBlockBinding: "drop_block" } } },
+});
+
+await recovering.execute(question, { history });
+```
 
 ## Finish reasons
 

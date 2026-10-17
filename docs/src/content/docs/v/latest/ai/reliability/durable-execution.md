@@ -30,7 +30,7 @@ const writer = ai.agent({
 
 The `durable` shape is identical on the agent and planner config:
 
-- **`store?`** — a `SnapshotStore`. Falls back to `ai.config({ defaultSnapshotStore })`. When neither resolves, snapshot writes **silently skip** and `resume()` throws.
+- **`store?`** — a `SnapshotStore` (`ai.snapshot.{memory,pg,redis,file,sqlite}()`). Falls back to `ai.config({ defaultSnapshotStore })`. When neither resolves, snapshot writes **silently skip** and `resume()` throws.
 - **`deleteOnComplete?`** — drop the snapshot once the run completes successfully. Default `false`.
 
 Absent `durable`, there is **zero behavior change** — the loop starts at trip 0 / the first node, never writes a snapshot, and runs byte-for-byte as before.

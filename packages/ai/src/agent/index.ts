@@ -11,3 +11,10 @@ export type {
   AgentCompactionContext,
   AgentCompactionRecord,
 } from "./compaction.type";
+export {
+  DEFAULT_COMPACTION_INSTRUCTIONS,
+  renderTranscript,
+  summarizeCompaction,
+  type CompactionSummarizer,
+  type CompactionSummarizerOptions,
+} from "./compaction-summarizer";
