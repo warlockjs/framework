@@ -41,6 +41,42 @@ node --import tsx scripts/release-family.ts gate --version <x.y.z> --matrix none
 The pkgist tool itself is `@mongez/pkgist` on npm, released separately; keep the
 pinned version in `package.json` in step with the @mongez runner.
 
+## Dispatching a release from automation
+
+A person can always dispatch `release.yml` from the Actions tab
+(<https://github.com/warlockjs/framework/actions/workflows/release.yml> → **Run workflow**).
+To let an agent or script dispatch it, it needs a fine-grained personal access token, and the
+`warlockjs` organization's token policy currently rejects such tokens because of their lifetime.
+Only an organization owner can change that:
+
+1. Open the organization's token policy:
+   <https://github.com/organizations/warlockjs/settings/personal-access-tokens>.
+   Under **Fine-grained personal access tokens**, allow access via fine-grained tokens, set the
+   **maximum allowed lifetime** to at least the lifetime you will give the token (or no limit),
+   and choose whether tokens need approval.
+2. Create the token at <https://github.com/settings/personal-access-tokens/new>:
+   - **Resource owner:** `warlockjs`;
+   - **Repository access:** only `warlockjs/framework`;
+   - **Permissions:** `Actions: Read and write` (dispatching and reading runs) and
+     `Metadata: Read` (added automatically). Nothing else is needed.
+   - an expiry within the policy from step 1.
+3. If the policy requires approval, approve the request under the organization's
+   **Personal access tokens → Pending requests**.
+4. Store the token outside the repository with owner-only permissions (`chmod 600`) and dispatch with
+   `gh workflow run release.yml -R warlockjs/framework -f version=<x.y.z> -f publish=<true|false>`
+   using `GH_TOKEN` from that file. Never print it or commit it.
+
+Publishing itself does not use this token: `release.yml` publishes with the `NPM_TOKEN` secret of the
+`release` environment and pushes the tag with the job's own `GITHUB_TOKEN`. A new package added to the
+family must be publishable with that `NPM_TOKEN` (an automation or granular token with write access to
+the whole `@warlock.js` scope, not to a fixed list of packages).
+
+## Repository history
+
+Issue reports used while preparing a release (`findings/`) are removed from the tree once the release
+ships. Earlier reports stay in git history: rewriting the public history would break every clone and
+fork, so it is not done.
+
 ---
 
 The rest of this file is a copy of pkgist's own README, kept here for reference.
