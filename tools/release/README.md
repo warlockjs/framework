@@ -468,7 +468,7 @@ checks and assertions rather than widening types, and lower budgets to measured
 counts after fixes. The release gate verifies the full workspace again.
 
 Release gates always set WARLOCK_REDIS_INTEGRATION=1 for package quality scripts,
-including local runs. The release workflow supplies Redis6390 explicitly.
+including local runs. The release workflow supplies Redis on port 6390 explicitly.
 Skill compilation maps source package subpaths independently of root barrels,
 honours explicit package exports without exposing internal source paths,
 resolves installed dependencies from the skill's owning package, and isolates
