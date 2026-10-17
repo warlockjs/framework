@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -51,6 +52,52 @@ test("treats configured names literally and matches case insensitively", () => {
   const root = fixture();
   writeFileSync(path.join(root, "docs/src/guide.md"), "a+b A+B ab");
   assert.equal(findPublicTextIssues(root, ["a+b"]).length, 2);
+});
+
+function git(root, ...args) {
+  execFileSync("git", args, { cwd: root, stdio: "ignore" });
+}
+
+function gitFixture() {
+  const root = fixture();
+  git(root, "init", "--quiet");
+  return root;
+}
+
+test("scans only tracked files in a git work tree", () => {
+  const root = gitFixture();
+  writeFileSync(path.join(root, "packages/example/README.md"), "clean\n");
+  mkdirSync(path.join(root, "packages/example/esm"), { recursive: true });
+  writeFileSync(path.join(root, "packages/example/esm/index.js"), "// WR-029\n");
+  git(root, "add", "packages/example/README.md");
+  assert.deepEqual(findPublicTextIssues(root, ["another-app"]), []);
+});
+
+test("scans the tracked deployed llms files under docs/public", () => {
+  const root = gitFixture();
+  mkdirSync(path.join(root, "docs/public"), { recursive: true });
+  writeFileSync(path.join(root, "docs/public/llms.txt"), "intro\nsee FW-12\n");
+  git(root, "add", "docs/public/llms.txt");
+  assert.deepEqual(findPublicTextIssues(root, ["another-app"]), [
+    { file: "docs/public/llms.txt", line: 2, match: "FW-12" },
+  ]);
+});
+
+test("scans docs/public in the directory-walk fallback", () => {
+  const root = fixture();
+  mkdirSync(path.join(root, "docs/public"), { recursive: true });
+  writeFileSync(path.join(root, "docs/public/llms-full.txt"), "WR-029\n");
+  assert.equal(findPublicTextIssues(root, ["another-app"]).length, 1);
+});
+
+test("matches internal identifiers case insensitively", () => {
+  const root = gitFixture();
+  writeFileSync(path.join(root, "packages/example/CHANGELOG.md"), "fixes wr-012 and Fw-034\n");
+  git(root, "add", "packages/example/CHANGELOG.md");
+  assert.deepEqual(
+    findPublicTextIssues(root, ["another-app"]).map((issue) => issue.match),
+    ["wr-012", "Fw-034"],
+  );
 });
 
 test("fails when a required scan root is missing", () => {
