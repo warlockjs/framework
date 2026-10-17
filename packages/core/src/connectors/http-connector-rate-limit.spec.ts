@@ -44,61 +44,81 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+const staticUrls = [
+  "/public/asset.txt",
+  "/assets/asset.txt",
+  "/exact/asset.txt",
+  "/file.txt",
+  "/cached-file.txt",
+];
+
+async function bootWithStaticFiles(
+  strategy: "production" | "development",
+  rateLimit: Record<string, unknown> = {},
+) {
+  const root = mkdtempSync(path.join(tmpdir(), "warlock-rate-limit-"));
+  roots.push(root);
+  writeFileSync(path.join(root, "asset.txt"), "asset");
+  process.env.WARLOCK_ROLES = "api";
+  resetRolesCacheForTests();
+  Application.setRuntimeStrategy(strategy);
+  config.set("http", {
+    port: 0,
+    host: "127.0.0.1",
+    rateLimit: { max: 2, timeWindow: 60_000, ...rateLimit },
+  });
+  config.set("app.baseUrl", "http://127.0.0.1");
+  config.set("storage.publicRoot", root);
+  config.set("storage.publicPrefix", "/public/");
+  routerState.routes = [];
+  routerState.staticDirectories = [];
+  router.get("/application", ({ response }) => response.send("application"));
+  router.directory({ root, prefix: "/assets/" });
+  router.directory({ root, prefix: "/exact/", wildcard: false });
+  router.file("/file.txt", path.join(root, "asset.txt"));
+  router.cachedFile("/cached-file.txt", path.join(root, "asset.txt"));
+
+  const connector = new HttpConnector();
+  await connector.boot();
+  await connector.start();
+
+  return { root, baseUrl: boundUrl() };
+}
+
+async function exhaustApplicationQuota(baseUrl: string) {
+  const statuses: number[] = [];
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(baseUrl + "/application");
+    statuses.push(response.status);
+    expect(response.headers.get("x-ratelimit-limit")).toBe("2");
+    await response.text();
+  }
+
+  expect(statuses).toEqual([200, 200, 429]);
+}
+
 describe("HTTP connector global rate limiting", () => {
   it.each(["production", "development"] as const)(
-    "installs the limiter before application and static routes in %s",
+    "exempts static files from the global limiter by default in %s",
     async (strategy) => {
-      const root = mkdtempSync(path.join(tmpdir(), "warlock-rate-limit-"));
-      roots.push(root);
-      writeFileSync(path.join(root, "asset.txt"), "asset");
-      process.env.WARLOCK_ROLES = "api";
-      resetRolesCacheForTests();
-      Application.setRuntimeStrategy(strategy);
-      config.set("http", {
-        port: 0,
-        host: "127.0.0.1",
-        rateLimit: {
-          max: 2,
-          timeWindow: 60_000,
-          // Independent buckets let each route exercise the same global hook.
-          keyGenerator: (request: { ip: string; url: string }) => `${request.ip}:${request.url}`,
-        },
-      });
-      config.set("app.baseUrl", "http://127.0.0.1");
-      config.set("storage.publicRoot", root);
-      config.set("storage.publicPrefix", "/public/");
-      routerState.routes = [];
-      routerState.staticDirectories = [];
-      router.get("/application", ({ response }) => response.send("application"));
-      router.directory({ root, prefix: "/assets/" });
-      router.directory({ root, prefix: "/exact/", wildcard: false });
-
-      const connector = new HttpConnector();
-      await connector.boot();
-      await connector.start();
+      const { baseUrl } = await bootWithStaticFiles(strategy);
       const server = getHttpServer();
-      const address = server.server.address();
-      expect(address).toEqual(expect.objectContaining({ port: expect.any(Number) }));
-      const baseUrl = `http://127.0.0.1:${(address as { port: number }).port}`;
       expect(server.hasReplyDecorator("sendFile")).toBe(true);
       expect(server.hasReplyDecorator("download")).toBe(true);
-      for (const url of [
-        "/application",
-        "/public/asset.txt",
-        "/assets/asset.txt",
-        "/exact/asset.txt",
-      ]) {
-        const statuses: number[] = [];
+
+      await exhaustApplicationQuota(baseUrl);
+
+      for (const url of staticUrls) {
         for (let attempt = 0; attempt < 4; attempt++) {
           const response = await fetch(baseUrl + url);
-          statuses.push(response.status);
-          expect(response.headers.get("x-ratelimit-limit")).toBe("2");
-          expect(response.headers.get("x-ratelimit-remaining")).toBe(attempt === 0 ? "1" : "0");
-          if (attempt >= 2) expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
-          await response.text();
+          expect(response.status, url).toBe(200);
+          expect(response.headers.get("x-ratelimit-limit"), url).toBeNull();
+          expect(response.headers.get("x-ratelimit-remaining"), url).toBeNull();
+          expect(await response.text()).toBe("asset");
         }
-        expect(statuses, url).toEqual([200, 200, 429, 429]);
       }
+
       for (const url of ["/health", "/ready"]) {
         for (let attempt = 0; attempt < 4; attempt++) {
           const response = await fetch(baseUrl + url);
@@ -107,6 +127,78 @@ describe("HTTP connector global rate limiting", () => {
           await response.text();
         }
       }
+
+      // Static traffic left the application's quota exactly where it was.
+      const page = await fetch(baseUrl + "/application");
+      expect(page.status).toBe(429);
+      await page.text();
+    },
+  );
+
+  it.each(["production", "development"] as const)(
+    "counts static files against the shared quota with staticFiles: true in %s",
+    async (strategy) => {
+      const { baseUrl } = await bootWithStaticFiles(strategy, {
+        staticFiles: true,
+        // Independent buckets let each route exercise the same global hook.
+        keyGenerator: (request: { ip: string; url: string }) => `${request.ip}:${request.url}`,
+      });
+
+      for (const url of ["/application", ...staticUrls]) {
+        const statuses: number[] = [];
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const response = await fetch(baseUrl + url);
+          statuses.push(response.status);
+          expect(response.headers.get("x-ratelimit-limit"), url).toBe("2");
+          expect(response.headers.get("x-ratelimit-remaining"), url).toBe(
+            attempt === 0 ? "1" : "0",
+          );
+          if (attempt >= 2) expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+          await response.text();
+        }
+        expect(statuses, url).toEqual([200, 200, 429, 429]);
+      }
+    },
+  );
+
+  it.each(["production", "development"] as const)(
+    "lets one mount opt in while the others stay exempt in %s",
+    async (strategy) => {
+      const root = mkdtempSync(path.join(tmpdir(), "warlock-rate-limit-"));
+      roots.push(root);
+      writeFileSync(path.join(root, "asset.txt"), "asset");
+      const connector = await bootConnector(strategy);
+      router.get("/application", ({ response }) => response.send("application"));
+      router.directory({ root, prefix: "/counted/" }, { rateLimit: true });
+      router.directory({ root, prefix: "/own/" }, { rateLimit: { max: 1, timeWindow: 60_000 } });
+      router.directory({ root, prefix: "/free/" });
+      router.file("/counted-file.txt", path.join(root, "asset.txt"), undefined, {
+        rateLimit: true,
+      });
+      await connector.start();
+      const baseUrl = boundUrl();
+
+      const counted = await fetch(baseUrl + "/counted/asset.txt");
+      expect(counted.headers.get("x-ratelimit-remaining")).toBe("1");
+      await counted.text();
+      const countedFile = await fetch(baseUrl + "/counted-file.txt");
+      expect(countedFile.headers.get("x-ratelimit-remaining")).toBe("0");
+      await countedFile.text();
+      const application = await fetch(baseUrl + "/application");
+      expect(application.status).toBe(429);
+      await application.text();
+
+      for (const status of [200, 429]) {
+        const own = await fetch(baseUrl + "/own/asset.txt");
+        expect(own.status).toBe(status);
+        expect(own.headers.get("x-ratelimit-limit")).toBe("1");
+        await own.text();
+      }
+
+      const free = await fetch(baseUrl + "/free/asset.txt");
+      expect(free.status).toBe(200);
+      expect(free.headers.get("x-ratelimit-limit")).toBeNull();
+      await free.text();
     },
   );
 });
@@ -221,5 +313,40 @@ for (const strategy of ["production", "development"] as const) {
       expect(response.status).toBe(status);
       await response.text();
     }
+  });
+  it(`exempts opted-out routes the same way in ${strategy}`, async () => {
+    const connector = await bootConnector(strategy);
+    router.get("/api", ({ response }) => response.send("api"));
+    router.get("/exempt", ({ response }) => response.send("exempt"), { rateLimit: false });
+    router.get("/passed-through", ({ response }) => response.send("passed"), {
+      serverOptions: { config: { rateLimit: false } },
+    });
+    router.get("/exempt-files/*", ({ response }) => response.send("exempt wildcard"), {
+      rateLimit: false,
+    });
+    router.get("/files/*", ({ response }) => response.send("wildcard"));
+    await connector.start();
+    const baseUrl = boundUrl();
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      for (const url of ["/exempt", "/passed-through", "/exempt-files/a/b.txt", "/missing"]) {
+        const response = await fetch(baseUrl + url);
+        expect(response.status, url).toBe(url === "/missing" ? 404 : 200);
+        expect(response.headers.get("x-ratelimit-limit"), url).toBeNull();
+        await response.text();
+      }
+    }
+
+    // A wildcard route that does not opt out shares the application bucket.
+    const wildcard = await fetch(baseUrl + "/files/a/b.txt");
+    expect(wildcard.status).toBe(200);
+    expect(wildcard.headers.get("x-ratelimit-remaining")).toBe("1");
+    await wildcard.text();
+    const api = await fetch(baseUrl + "/api");
+    expect(api.headers.get("x-ratelimit-remaining")).toBe("0");
+    await api.text();
+    const exhausted = await fetch(baseUrl + "/files/c.txt");
+    expect(exhausted.status).toBe(429);
+    await exhausted.text();
   });
 }

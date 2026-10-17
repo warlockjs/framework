@@ -1,0 +1,8 @@
+Aider v0.86.2
+Main model: claude-sonnet-4-5 with diff edit format, prompt cache, infinite output
+Weak model: claude-haiku-4-5
+Git repo: .git with 4 files
+Repo-map: using 4096 tokens, auto refresh
+
+litellm.AuthenticationError: AnthropicException - {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}
+The API provider is not able to authenticate you. Check your API key.

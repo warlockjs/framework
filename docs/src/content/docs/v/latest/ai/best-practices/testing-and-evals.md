@@ -58,6 +58,31 @@ const supervisor = ai.supervisor({
 ```
 
 > `MockSDK` accepts a `responses` array (consumed in order, last one repeats), and each `MockModelResponse` can carry `toolCalls`, a `usage`, a `delay`, or an `error` to throw — enough to exercise tool loops, latency handling, and provider-error paths without a provider. Reach for raw `MockSDK` when you need that control; reach for `mockAgent` when you just need a scripted agent.
+>
+> A response with non-empty `toolCalls` and no `finishReason` finishes with `"tool_calls"`, so the agent runs the scripted tools — you don't have to repeat the finish reason. Set `finishReason` explicitly to script anything else. The mock model also honours `signal` like a real adapter: an aborted signal rejects the call, aborting during a scripted `delay` rejects at once, and a stream stops between chunks.
+
+```ts
+import { MockSDK, ai } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+const mock = new MockSDK({
+  responses: [
+    // finishReason inferred as "tool_calls" — the agent runs `lookup`
+    { content: "", toolCalls: [{ id: "call-1", name: "lookup", input: { sku: "A-1" } }] },
+    { content: "In stock.", finishReason: "stop" },
+  ],
+});
+
+const lookup = ai.tool({
+  name: "lookup",
+  description: "Look up stock for a SKU.",
+  input: v.object({ sku: v.string() }),
+  execute: async () => ({ inStock: true }),
+});
+
+const agent = ai.agent({ model: mock.model({ name: "mock" }), tools: [lookup] });
+const { text } = await agent.execute("Is A-1 in stock?");
+```
 
 ## Drive routing with `ai.mockRouter`, not a hand-rolled stub
 

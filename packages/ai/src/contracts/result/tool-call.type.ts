@@ -25,6 +25,13 @@ import type { BaseReport } from "./base-report.type";
 export type ToolCall = Omit<BaseReport, "type"> & {
   /** Discriminator overridden to "tool" via `Omit<BaseReport, "type">`. */
   type: "tool";
+  /**
+   * The provider's id for the tool call this dispatch answered
+   * (`ModelToolCallRequest.id`, echoed on the tool-result message). Pairs
+   * a result with its request when one trip calls the same tool more
+   * than once. Set on every call an agent dispatches.
+   */
+  callId?: string;
   /** Which LLM trip triggered this tool call (0-indexed). */
   tripIndex: number;
   /** Input passed to the tool (validated args from the model's request). */

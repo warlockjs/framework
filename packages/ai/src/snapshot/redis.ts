@@ -47,7 +47,9 @@ export type RedisSnapshotStoreOptions = {
  *
  * Front it with the {@link redis} factory — callers never `new` it.
  */
-class RedisSnapshotStore implements SnapshotStore {
+class RedisSnapshotStore<
+  TSnapshot extends { runId: string } = SupervisorSnapshot,
+> implements SnapshotStore<TSnapshot> {
   /** The user-supplied redis client. Only `get`/`set`/`del` are called. */
   private readonly client: RedisClientLike;
 
@@ -83,21 +85,21 @@ class RedisSnapshotStore implements SnapshotStore {
    * missing. Redis returns `null` for an absent key — converted to
    * `undefined` at the boundary.
    */
-  public async load(runId: string): Promise<SupervisorSnapshot | undefined> {
+  public async load(runId: string): Promise<TSnapshot | undefined> {
     const value = await this.client.get(this.key(runId));
 
     if (value === null) {
       return undefined;
     }
 
-    return JSON.parse(value) as SupervisorSnapshot;
+    return JSON.parse(value) as TSnapshot;
   }
 
   /**
    * Persist a snapshot, keyed by its own `runId`. Overwrites any prior
    * snapshot for the same run — a run has exactly one live snapshot.
    */
-  public async save(snapshot: SupervisorSnapshot): Promise<void> {
+  public async save(snapshot: TSnapshot): Promise<void> {
     await this.client.set(this.key(snapshot.runId), JSON.stringify(snapshot));
   }
 
@@ -140,6 +142,8 @@ class RedisSnapshotStore implements SnapshotStore {
  *   snapshotStore: ai.snapshot.redis({ client }),
  * });
  */
-export function redis(options: RedisSnapshotStoreOptions): SnapshotStore {
-  return new RedisSnapshotStore(options);
+export function redis<TSnapshot extends { runId: string } = SupervisorSnapshot>(
+  options: RedisSnapshotStoreOptions,
+): SnapshotStore<TSnapshot> {
+  return new RedisSnapshotStore<TSnapshot>(options);
 }

@@ -12,7 +12,7 @@ The core AI package. Everything hangs off the `ai` facade (`ai.agent`, `ai.tool`
 2. Build an agent (`run-ai-agent.md`); give it typed tools (`define-ai-tool.md`).
 3. Compose when one agent is not enough: `run-ai-workflow.md` (fixed steps), `run-supervisor.md` (routing), `run-ai-team.md`, `run-planner.md`.
 4. Add safety: `guard-input-output.md`, `approve-tool-calls.md`, `secure-outbound-requests.md`, `handle-ai-errors.md`.
-5. Make it durable and observable: `run-orchestrator.md`, `durable-agent-runs.md`, `observe-ai-flows.md`.
+5. Make it durable and observable: `keep-agent-conversations.md` (stored chat), `run-orchestrator.md`, `durable-agent-runs.md`, `observe-ai-flows.md`.
 6. Test it: `record-replay-llm.md`, `eval-datasets-and-ci.md`.
 
 ## Topics by area
@@ -22,7 +22,7 @@ The core AI package. Everything hangs off the `ai` facade (`ai.agent`, `ai.tool`
 - **Composition:** run-ai-workflow, run-supervisor, run-ai-team, run-planner, run-orchestrator
 - **Knowledge and memory:** run-ai-rag, rag-loaders-and-stores, embed-text, use-ai-memory, use-runtime-skills
 - **Safety and human control:** guard-input-output, detect-and-redact-pii, escalate-block-to-human, approve-tool-calls, durable-resume, secure-outbound-requests, handle-ai-errors
-- **Durability and storage:** durable-agent-runs, manage-ai-stores, persist-ai-data
+- **Durability and storage:** keep-agent-conversations, durable-agent-runs, manage-ai-stores, persist-ai-data
 - **Modalities:** generate-images, generate-speech, transcribe-audio
 - **Observability and testing:** observe-ai-flows, log-ai-calls, record-replay-llm, eval-datasets-and-ci
 

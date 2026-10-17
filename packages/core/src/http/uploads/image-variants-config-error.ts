@@ -5,8 +5,11 @@
  * on the first image instead of producing unbounded or surprising derivatives.
  */
 export class ImageVariantsConfigError extends Error {
-  public constructor(message: string) {
-    super(`Invalid uploads.images configuration: ${message}`);
+  /** Stable Warlock error code; `warlock explain WL1005` prints the fix. */
+  public readonly code = "WL1005";
+
+  public constructor(message: string, options?: ErrorOptions) {
+    super(`Invalid uploads.images configuration: ${message}`, options);
 
     this.name = "ImageVariantsConfigError";
   }

@@ -160,7 +160,9 @@ endpoint serves an index. Shards use generation-specific URLs under
 readers, with at least two retained manifests and a one-hour grace period.
 
 Responses stream from storage. ETag and Last-Modified come from the manifest;
-matching conditional requests return 304 without reading artifact contents.
+matching conditional requests return 304 without reading artifact contents
+(`If-None-Match` compares weakly), and an `If-Match` that does not name the exact
+strong tag returns 412.
 The main endpoint defaults to `Cache-Control: public, max-age=300`, configurable
 with `sitemap.cacheControl`. Versioned generation URLs use immutable caching.
 

@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { Readable } from "node:stream";
+import { InvalidRequestError } from "@warlock.js/ai";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BedrockEmbedder } from "./embedder";
 import { BedrockModel } from "./model";
 import { BedrockSDK } from "./sdk";
@@ -123,5 +125,106 @@ describe("BedrockSDK", () => {
     const bare = new BedrockSDK({ region: "us-east-1" });
 
     expect(bare.model({ name: "amazon.nova-pro-v1:0" }).pricing).toBeUndefined();
+  });
+});
+
+/**
+ * A request handler that records the signed request and answers with a
+ * minimal Converse response, so the real client middleware stack (auth
+ * scheme selection, signing) runs without a network call.
+ */
+function recordingHandler() {
+  const requests: Array<{ headers: Record<string, string>; path: string }> = [];
+  const handler = {
+    async handle(request: { headers: Record<string, string>; path: string }) {
+      requests.push({ headers: { ...request.headers }, path: request.path });
+
+      return {
+        response: {
+          statusCode: 200,
+          headers: { "content-type": "application/json" },
+          body: Readable.from([
+            Buffer.from(
+              JSON.stringify({
+                output: { message: { role: "assistant", content: [{ text: "hello" }] } },
+                stopReason: "end_turn",
+                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+              }),
+            ),
+          ]),
+        },
+      };
+    },
+  };
+
+  return { handler, requests };
+}
+
+describe("BedrockSDK apiKey (Amazon Bedrock API keys)", () => {
+  const envKey = "AWS_BEARER_TOKEN_BEDROCK";
+  let savedEnv: string | undefined;
+
+  beforeEach(() => {
+    savedEnv = process.env[envKey];
+    delete process.env[envKey];
+  });
+
+  afterEach(() => {
+    if (savedEnv === undefined) delete process.env[envKey];
+    else process.env[envKey] = savedEnv;
+  });
+
+  it("sends the key as a bearer token instead of a SigV4 signature", async () => {
+    const { handler, requests } = recordingHandler();
+    const sdk = new BedrockSDK({
+      apiKey: "bedrock-api-key-123",
+      region: "us-east-1",
+      requestHandler: handler,
+    });
+
+    const response = await sdk
+      .model({ name: "amazon.nova-pro-v1:0" })
+      .complete([{ role: "user", content: "hi" }]);
+
+    expect(response.content).toBe("hello");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.headers.authorization ?? requests[0]?.headers.Authorization).toBe(
+      "Bearer bedrock-api-key-123",
+    );
+    expect(JSON.stringify(requests[0]?.headers)).not.toContain("AWS4-HMAC-SHA256");
+    expect(requests[0]?.path).toContain("/converse");
+  });
+
+  it("keeps SigV4 signing when credentials are passed instead", async () => {
+    const { handler, requests } = recordingHandler();
+    const sdk = new BedrockSDK({
+      region: "us-east-1",
+      credentials: { accessKeyId: "AKIAEXAMPLE", secretAccessKey: "secret" },
+      requestHandler: handler,
+    });
+
+    await sdk.model({ name: "amazon.nova-pro-v1:0" }).complete([{ role: "user", content: "hi" }]);
+
+    expect(requests[0]?.headers.authorization).toMatch(/^AWS4-HMAC-SHA256 /);
+  });
+
+  it("rejects an empty key", () => {
+    expect(() => new BedrockSDK({ apiKey: "  ", region: "us-east-1" })).toThrow(
+      InvalidRequestError,
+    );
+  });
+
+  it("rejects a key combined with credentials or a token", () => {
+    expect(
+      () =>
+        new BedrockSDK({
+          apiKey: "k",
+          region: "us-east-1",
+          credentials: { accessKeyId: "AKIA", secretAccessKey: "secret" },
+        }),
+    ).toThrow(/either `apiKey` or `credentials`/);
+    expect(
+      () => new BedrockSDK({ apiKey: "k", region: "us-east-1", token: { token: "other" } }),
+    ).toThrow(InvalidRequestError);
   });
 });

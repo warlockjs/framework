@@ -164,6 +164,18 @@ await storage.put(request.file("avatar"), `avatars/${userId}.jpg`);
 
 For uploads, the usual pattern is `UploadedFile.save(directory, options?)` — that lives on the file object itself. See [File uploads](./file-uploads.md) for the full flow.
 
+`putFromUrl` refuses private, loopback, link-local and cloud-metadata hosts before it downloads. The classifier behind that check, `isPrivateOrReservedIp`, is also exported on its own from `@warlock.js/core/net`. That subpath loads only `node:net` and the classifier — never the HTTP server, database, cache or mail modules the root `@warlock.js/core` entry boots — so a worker, CLI or standalone agent process can use the same rules without bundling the framework:
+
+```ts
+import { isPrivateOrReservedIp } from "@warlock.js/core/net";
+
+isPrivateOrReservedIp("10.0.0.1"); // true
+isPrivateOrReservedIp("169.254.169.254"); // true (cloud metadata)
+isPrivateOrReservedIp("93.184.216.34"); // false
+```
+
+It is the same function the root `@warlock.js/core` exports, so both entries apply identical rules.
+
 ### Put options
 
 ```ts
@@ -290,6 +302,26 @@ const tempUrl = await storage.temporaryUrl("private/doc.pdf", 3600);
 
 For private files, prefer `temporaryUrl` over building your own URL — the signing/token machinery is already there.
 
+### Rate limits on served files
+
+Files served straight from disk by the HTTP layer — the public folder
+(`storage.publicRoot`, under `storage.publicPrefix`), `router.directory()` mounts
+and `router.file()` routes — are exempt from the global `http.rateLimit` quota by
+default, so a page's assets do not spend the client's budget. Set
+`http.rateLimit.staticFiles: true` to count them.
+
+A route you register with `uploadedFileController` is an application route: it
+can render image variants on demand, so it stays under the global limiter.
+Exempt it explicitly when that suits your traffic:
+
+```ts title="src/app/uploads/routes.ts"
+import { router, uploadedFileController } from "@warlock.js/core";
+
+router.get("/uploads/*", uploadedFileController, { rateLimit: false });
+```
+
+See [Rate limiting → Static files](../recipes/rate-limiting.md#static-files).
+
 ## Scoped storage — `storage.use(name)`
 
 For a single call against a non-default driver, scope to it:
@@ -323,7 +355,7 @@ await purgeImageVariants(undefined, { disk: "private" }); // a disk's whole cach
 
 A configured `cacheDirectory` is shared by every local disk (derivatives are keyed by the disk's real root, so they never collide), so purging it without a path clears every disk's derivatives.
 
-Use a dedicated derivative-only folder, including when the cache is inside a storage root. Full and per-file purges remove only recognized generated image, source-manifest and temporary files beneath matching shard/source/generation directories. They retain the cache root, directories, unrelated files and symlinks; background eviction validates the same layout. Per-file purges reject symlinked shard and source directories. Stale-generation pruning follows the same recognized-file rules and keeps the current generation, unrelated files, directories and symlinks intact. Reserve generated-looking paths for derivatives. Reclaim files from older cache layouts manually.
+Use a dedicated derivative-only folder, including when the cache is inside a storage root. Full and per-file purges remove only recognized generated image, source-manifest and temporary files beneath matching shard/source/generation directories. They retain the cache root, directories, unrelated files and symlinks. Background eviction validates the same layout; it may also remove empty generated generation directories, while user folders and unrelated entries are never touched. Per-file purges reject symlinked shard and source directories. Stale-generation pruning follows the same recognized-file rules and keeps the current generation, unrelated files, directories and symlinks intact. Reserve generated-looking paths for derivatives. Reclaim files from older cache layouts manually.
 
 :::caution[Keep the cache out of `public/`]
 Because a configured `cacheDirectory` holds every disk's derivatives, a private disk's thumbnails sit next to public ones. Never put it inside `public/` (or `storage.publicRoot`): everything there is served without the checks on the private disk's route. Warlock logs a warning once when it finds the cache there. The default, `<disk root>/.cache/image-variants`, keeps each disk's derivatives under that disk.
@@ -331,7 +363,7 @@ Because a configured `cacheDirectory` holds every disk's derivatives, a private 
 
 ### Bound cache storage and age
 
-`uploads.images.maxCacheBytes` defaults to 512 MiB and `maxCacheAge` defaults to seven days in seconds. Both accept positive integers. A derivative older than the configured age is regenerated even on a cache hit. Derivative writes schedule background cleanup, coalesced and throttled to at most one sweep per minute. Hits check only the requested derivative's age and never walk the cache. The sweep removes expired derivatives and then evicts the oldest until the byte budget fits, retaining the file being returned even when it alone exceeds that budget. A running byte estimate is reconciled with disk during each sweep. The budget can be exceeded until the next sweep; idle caches are cleaned after their next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. The cache directory must not equal or contain any configured local disk root, including disks registered at runtime. Generation and purge share this guard and compare realpaths, so symlinks cannot hide an overlap; an invalid setting throws `ImageVariantsConfigError` before removing cache data. These limits cover derivatives across all disks sharing the configured cache directory. Concurrent readers can observe eviction and should retry resolution if a returned path disappears before it is read (the built-in controller does this).
+`uploads.images.maxCacheBytes` defaults to 512 MiB and `maxCacheAge` defaults to seven days in seconds. Both accept positive integers. A derivative older than the configured age is regenerated even on a cache hit. Derivative writes schedule a coalesced background check, at most once per minute. Hits check only the requested derivative's age and never walk the cache. The check walks the cache only when it may reclaim something: the first time after boot, when the running byte estimate exceeds the budget, when the oldest retained derivative has passed `maxCacheAge`, and at least once per `maxCacheAge`; otherwise it does no directory I/O. The sweep removes expired derivatives and then evicts the oldest until the byte budget fits, retaining the file being returned even when it alone exceeds that budget. A running byte estimate is reconciled with disk during each sweep. The sweep also removes writer temporaries older than one hour, left behind by a crashed write (younger ones may still be renamed into place and are kept). A generation directory left without derivatives loses its `source.json` manifest and then the directory itself, once it is older than five minutes, so a directory a writer has just created survives; the directory is removed only when empty and never through a symlink. Old object-storage generations, left behind when a source's ETag changes, are reclaimed this way through normal age and size eviction. The budget can be exceeded until the next sweep; idle caches are cleaned after their next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. The cache directory must not equal or contain any configured local disk root, including disks registered at runtime. Generation and purge share this guard and compare realpaths, so symlinks cannot hide an overlap; an invalid setting throws `ImageVariantsConfigError` before removing cache data, and so does a cache or disk root that cannot be resolved (for example a cache beneath a regular file, `ENOTDIR`, or `EACCES`; the original error is its `cause`). The guard's result is remembered per cache directory, disk root and set of configured local roots, so repeated requests do not resolve the same paths again; registering another disk changes that set and is checked anew. These limits cover derivatives across all disks sharing the configured cache directory. Concurrent readers can observe eviction and should retry resolution if a returned path disappears before it is read (the built-in controller does this).
 
 ### Variants of other disks
 

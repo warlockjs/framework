@@ -504,8 +504,8 @@ describe("OllamaModel.stream()", () => {
     expect(finishReason).toBe("tool_calls");
   });
 
-  it("aborts the stream when an already-aborted signal is supplied", async () => {
-    const { client, wasAborted } = makeFakeClient({
+  it("rejects without sending a request when the signal is already aborted", async () => {
+    const { client, calls } = makeFakeClient({
       streamChunks: [
         { message: { role: "assistant", content: "x" }, done: true, done_reason: "stop" },
       ],
@@ -514,13 +514,19 @@ describe("OllamaModel.stream()", () => {
     const controller = new AbortController();
     controller.abort();
 
-    for await (const _event of model.stream([{ role: "user", content: "hi" }], {
-      signal: controller.signal,
-    })) {
-      void _event;
-    }
+    const consume = async () => {
+      for await (const _event of model.stream([{ role: "user", content: "hi" }], {
+        signal: controller.signal,
+      })) {
+        void _event;
+      }
+    };
 
-    expect(wasAborted()).toBe(true);
+    await expect(consume()).rejects.toThrow();
+    await expect(
+      model.complete([{ role: "user", content: "hi" }], { signal: controller.signal }),
+    ).rejects.toThrow();
+    expect(calls).toHaveLength(0);
   });
 
   it("rethrows a wrapped typed error when the stream request fails", async () => {

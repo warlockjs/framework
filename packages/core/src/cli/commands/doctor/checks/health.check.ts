@@ -85,6 +85,7 @@ export const healthCheck: DoctorCheck = {
       return {
         name: "health",
         status: "fail",
+        code: "WL5002",
         detail:
           `an app route already claims ${collisions.join(" and ")} — Fastify refuses the ` +
           "duplicate registration and the server will not start. Move the app route, or " +
@@ -106,6 +107,7 @@ export const healthCheck: DoctorCheck = {
       return {
         name: "health",
         status: "warn",
+        code: "WL5003",
         detail:
           "could not read the http server's route table — " +
           `${livenessPath} + ${readinessPath} unverified`,
@@ -118,6 +120,7 @@ export const healthCheck: DoctorCheck = {
       return {
         name: "health",
         status: "fail",
+        code: "WL5003",
         detail: `enabled in config but not registered on the http server: ${missing.join(", ")}`,
       };
     }

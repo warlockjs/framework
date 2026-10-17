@@ -1,0 +1,21 @@
+{
+  "name": "warlock-runtime-acceptance-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Built with Node, started on Node, Bun and Deno by run-runtime-acceptance.mjs. Every @warlock.js/* dependency is a tarball packed from this checkout; see the header of ../run-runtime-acceptance.mjs.",
+  "scripts": {
+    "build": "warlock build",
+    "start": "warlock start"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "5.2.0",
+    "@warlock.js/cache": "file:./vendor/cache.tgz",
+    "@warlock.js/core": "file:./vendor/core.tgz",
+    "@warlock.js/logger": "file:./vendor/logger.tgz",
+    "@warlock.js/web": "file:./vendor/web.tgz",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "vite": "7.3.5"
+  }
+}

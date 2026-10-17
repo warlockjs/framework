@@ -235,6 +235,7 @@ export const localesTsDeprecatedCheck: DoctorCheck = {
     return {
       name: "locales-ts-deprecated",
       status: "warn",
+      code: "WL9101",
       detail:
         `${details.join("; ")}. Auto-loaded locales.ts goes away in v6; ` +
         "run `warlock doctor --fix` to convert auto-convertible files.",

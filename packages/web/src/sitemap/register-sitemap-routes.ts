@@ -94,6 +94,7 @@ async function serveManifestFile(
   cacheControl: string,
 ): Promise<ReturnedResponse> {
   const { request, response } = context;
+  const ifMatch = request.header("if-match");
   const ifNoneMatch = request.header("if-none-match");
   const ifModifiedSince = request.header("if-modified-since");
   const validators = resolveSitemapHttpValidators({
@@ -101,6 +102,7 @@ async function serveManifestFile(
     generatedAt: manifest.generatedAt,
     // Core's Request.header() uses null for an absent header. Validators use
     // undefined to distinguish an absent conditional from a supplied value.
+    ifMatch: typeof ifMatch === "string" ? ifMatch : undefined,
     ifNoneMatch: typeof ifNoneMatch === "string" ? ifNoneMatch : undefined,
     ifModifiedSince: typeof ifModifiedSince === "string" ? ifModifiedSince : undefined,
     method: request.method,
@@ -117,6 +119,10 @@ async function serveManifestFile(
 
   if (validators.notModified) {
     return (await response.setStatusCode(304).send()) as unknown as ReturnedResponse;
+  }
+
+  if (validators.preconditionFailed) {
+    return (await response.setStatusCode(412).send()) as unknown as ReturnedResponse;
   }
 
   if (request.method === "HEAD") {

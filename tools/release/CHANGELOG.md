@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- A tag or push that fails after origin confirmation now preserves the release commit bundle and prints recovery, as a failed confirmation already did. Recovery steps are also saved as `recover-release-v<version>.sh` in the uploaded logs; the script and the printed `( set -euo pipefail … )` block stop at the first failure without closing an interactive shell, and rerunning them after a partial tag or push keeps a tag already at the release commit.
+
+- The public-text check scans git-tracked files, so local build output cannot produce false hits; it now also covers the deployed llms files under `docs/public` and matches internal identifiers case insensitively.
+
+- The documentation tab guard covers every docs version and also fails when an npm, yarn or pnpm tab runs another package manager's command.
+
 - Shared formatter config changes trigger standalone scaffolder checks; temporary coverage scratch output is ignored and its stale tracked snapshot removed.
 
 - Skill compilation respects package export maps, so an existing internal source file cannot make an unpublished import appear valid. Page-test guidance includes both test and spec filenames.

@@ -105,11 +105,11 @@ function writeSpan(
 }
 
 /**
- * Route a line to `error` when the span failed/cancelled, otherwise to
- * `log`. Keeps healthy traces out of the error stream.
+ * Route a line to `error` when the span failed/cancelled/incomplete,
+ * otherwise to `log`. Keeps healthy traces out of the error stream.
  */
 function writeAtSeverity(sink: ConsoleLike, status: TraceSpan["status"], line: string): void {
-  if (status === "failed" || status === "cancelled") {
+  if (status === "failed" || status === "cancelled" || status === "incomplete") {
     sink.error(line);
     return;
   }

@@ -79,6 +79,9 @@ export const DEFAULT_CSP_DIRECTIVES: Readonly<Record<string, readonly string[]>>
  *   unbalanced count means a keyword was truncated or malformed.
  */
 export class InvalidCspDirectiveError extends Error {
+  /** Stable Warlock error code; `warlock explain WL1004` prints the fix. */
+  public readonly code = "WL1004";
+
   public constructor(
     public readonly directive: string,
     public readonly value: string,

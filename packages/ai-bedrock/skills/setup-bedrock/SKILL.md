@@ -1,6 +1,6 @@
 ---
 name: setup-bedrock
-description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain (no apiKey). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint on tools (Claude), system and the last message, 1h TTL via promptCacheTtl, usage inputIncludesCache: false + cachedTokens/cacheWriteTokens/cacheWrite1hTokens, built-in Claude prices for global./us. profiles (BEDROCK_GLOBAL_PRICING, BEDROCK_US_PRICING, bedrockPricingFor), ServiceUnavailableException → ProviderOverloadedError. Triggers: `providerOptions`, `BedrockCallOptions`, `countTokens`, `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
+description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, apiKey?, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain or an Amazon Bedrock API key (bearer). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint on tools (Claude), system and the last message, 1h TTL via promptCacheTtl, usage inputIncludesCache: false + cachedTokens/cacheWriteTokens/cacheWrite1hTokens, built-in Claude prices for global./us. profiles (BEDROCK_GLOBAL_PRICING, BEDROCK_US_PRICING, bedrockPricingFor), ServiceUnavailableException → ProviderOverloadedError. Triggers: `apiKey`, `AWS_BEARER_TOKEN_BEDROCK`, `providerOptions`, `BedrockCallOptions`, `countTokens`, `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `ai.providerTool`, `systemTool`, `nova_grounding`, `server_tool_use`, `streamChunks`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
 ---
 
 # `@warlock.js/ai-bedrock`
@@ -21,9 +21,15 @@ const bedrock2 = new BedrockSDK({
   credentials: { accessKeyId: "AKIA...", secretAccessKey: "..." },
   provider: "bedrock-eu",
 });
+
+// Amazon Bedrock API key (bearer auth, no AWS credentials):
+const bedrock3 = new BedrockSDK({
+  apiKey: process.env.BEDROCK_API_KEY!,
+  region: "us-east-1",
+});
 ```
 
-Bedrock authenticates via the **AWS credential chain, not an API key** — there is no `apiKey`. `region` is required; `credentials` is optional (omit to use the standard provider chain). The whole config object is forwarded to `BedrockRuntimeClient`, so any AWS client option (`endpoint`, `requestHandler`, retry config) is accepted. `provider` defaults to `"bedrock"`.
+Bedrock authenticates via the **AWS credential chain** or an **Amazon Bedrock API key**. `apiKey` sends `Authorization: Bearer <key>` instead of a SigV4 signature (the adapter sets the AWS SDK's `token` + `authSchemePreference: ["httpBearerAuth"]`); combining it with `credentials` or `token`, or passing an empty key, throws `InvalidRequestError`. Without `apiKey`, the AWS SDK still reads a key from `AWS_BEARER_TOKEN_BEDROCK` on its own. `region` is required; `credentials` is optional (omit to use the standard provider chain). The whole config object is forwarded to `BedrockRuntimeClient`, so any AWS client option (`endpoint`, `requestHandler`, retry config) is accepted. `provider` defaults to `"bedrock"`.
 
 ## Producing a model
 
@@ -129,6 +135,17 @@ Object-root `responseSchema` + `structuredOutput`-capable → `outputConfig.text
 - `contentBlockDelta.delta.text` → `{ type: "delta", content }`
 - `toolUse`: `contentBlockStart` opens an accumulator, `contentBlockDelta.delta.toolUse.input` fragments append, `contentBlockStop` emits one consolidated `{ type: "tool-call", ... }`
 - terminal `{ type: "done", finishReason, usage }` — usage from `metadata.usage` (a `TokenUsage`), including `cachedTokens` / `cacheWriteTokens` when reported (see the usage table below)
+- opt-in (`options.streamChunks`, set by `agent.stream()`): `{ type: "reasoning", delta }` per `reasoningContent.text` delta, `{ type: "tool-args", callId, name, delta }` per client `toolUse.input` delta; no `usage` chunk (usage arrives once at the end)
+
+**System tools:** `ai.providerTool({ provider: "bedrock", definition: { systemTool: { name: "nova_grounding" } } })` is appended to `toolConfig.tools` verbatim. `toolUse` blocks with `type: "server_tool_use"` are never dispatched as tool calls.
+
+```ts
+const grounding = ai.providerTool({
+  provider: "bedrock",
+  definition: { systemTool: { name: "nova_grounding" } },
+});
+ai.agent({ model: bedrock.model({ name: "us.amazon.nova-premier-v1:0" }), tools: [grounding] });
+```
 
 ## Finish-reason mapping
 

@@ -25,7 +25,7 @@ export type TraceAggregate = {
   traces: number;
   /** Count of matched traces whose root status was `"completed"`. */
   completed: number;
-  /** Count of matched traces whose root status was `"failed"`. */
+  /** Count of matched traces whose root status was `"failed"` or `"incomplete"`. */
   failed: number;
   /** Count of matched traces whose root status was `"cancelled"`. */
   cancelled: number;

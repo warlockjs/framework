@@ -1,6 +1,6 @@
 ---
 name: upgrade-from-5-29
-description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, cut-off AI agent answers, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -125,7 +125,9 @@ initial render load. Reclaim old cache files manually from their dedicated
 folder once the rollout is complete. In 5.31, `purgeImageVariants()` removes only
 recognized files in the current shard/source/generation layout and retains the
 cache root, unrelated files and symlinks. Purging is an operational action, not a
-prerequisite for successful requests.
+prerequisite for successful requests. When `uploads.images.cacheDirectory` is set,
+every local disk shares it, so a path-less `purgeImageVariants()` clears every
+local disk's derivatives, not only the default disk's.
 In particular, 5.31 `purgeImageVariants()` does not remove those legacy two-level
 files; the suggestion to use it in the 5.30 changelog does not apply in 5.31.
 
@@ -153,6 +155,14 @@ defaults, stripped keys and explicit `undefined`. Read raw request input before
 validation if the app needs both forms. Audit callbacks that previously assumed
 unparsed input or side effects after validation failure; see Seal's `seal-basics`
 and `compose-schemas` topics for the exact typing and output-transform caveats.
+
+`v.union(...)` now tries every member whose type matches, so a union of object
+schemas accepts a value matching a later member. When every member fails, the
+closest member's errors are reported at their own paths (`actor.id`, not `actor`)
+with type `union`; `firstErrorOnly: false` lists each of them instead of one
+`;`-joined message. Update code that maps union errors by path or splits that
+message; a custom `v.union([...], "message")` still reports one error at the
+union's path.
 
 ## AI finish reasons, provider bodies and resumed output
 
@@ -194,17 +204,89 @@ trip's output/blocks for replay. It does not replace application retention polic
 ## 5.30 to 5.31 production rate limits
 
 5.31 makes global and per-route rate limits apply to production and development application
-routes, including web page routes and static assets (`/public`, `/assets`). Each
-page load's asset requests use the same bucket. The default global limit is 60
-requests per minute per IP, shared across routes. Check `max` before deployment; configure
-`trustProxy` or `keyGenerator` behind a proxy so clients do not share the proxy's
-single key. Set `http.rateLimit.global: false` to retain the previous global
-behaviour and enable individual route limits deliberately.
+routes, including web page routes. The default global limit is 60 requests per
+minute per IP, in one bucket shared by pages and API routes. Check `max` before
+deployment; configure `trustProxy` or `keyGenerator` behind a proxy so clients do
+not share the proxy's single key. Set `http.rateLimit.global: false` to retain the
+previous global behaviour and enable individual route limits deliberately.
 
-Built-in `/health` and `/ready` routes are exempt by default; set
+Static files are exempt by default, so a page load's assets do not spend that
+quota: the public folder, `router.directory()` mounts, `router.file()` routes and
+the web build's `/assets/*` and public files. `http.rateLimit.staticFiles: true`
+counts them again; `router.directory(options, { rateLimit: true })` counts one
+mount. Built-in `/health` and `/ready` routes are exempt by default too; set
 `http.health.rateLimit: true` to opt them into the limiter (see `health-checks`).
-Development wildcard dispatch has separate
-per-route handling; check route overrides in both environments.
+
+To exempt one route, pass `rateLimit: false` in its options (or the
+`serverOptions: { config: { rateLimit: false } }` pass-through). Development's
+wildcard dispatcher now honours both, the same as production:
+
+```ts title="src/app/status/routes.ts"
+import { router } from "@warlock.js/core";
+
+router.get("/status", ({ response }) => response.success({ status: "ok" }), {
+  rateLimit: false,
+});
+```
+
+## 5.30 to 5.31 daily log file names
+
+`FileLog` and `JSONFileLog` now name dated files by sortable ISO date: a daily
+chunk writes `2026-10-17.log` instead of `17-10-2026.log`, an hourly chunk
+`2026-10-17-14.log`, and rotated archives use `YYYY-MM-DD` in the middle. Update
+log shippers, cron cleanups or scripts that look for the old names. To keep them:
+
+```ts
+new FileLog({
+  chunk: "daily",
+  fileName: "{DD}-{MM}-{YYYY}", // 17-10-2026.log, as before 5.31
+  rotateFileName: "{DD}-{MM}-{YYYY}",
+});
+```
+
+`rotateFileName` is a `{YYYY}`-style pattern or a function, not a Day.js format.
+To replace a custom pruning job, use `retention: { maxFiles, maxAgeDays }` (see the
+Logger `pick-log-channel` topic); it never removes files with another name pattern,
+such as files written under the old names.
+
+## 5.30 to 5.31 cut-off agent answers
+
+In 5.31 an agent run whose final response hit the output cap (`length`) or the
+context window (`context_exceeded`) no longer succeeds with empty or partial
+text: `result.error` is an `AgentIncompleteError` (`AGENT_INCOMPLETE`,
+`reason: "output_limit" | "context_window"`, `tripIndex`) and
+`report.status` is `"incomplete"`. A tool call cut off mid-input is never run.
+Remove `trips.at(-1).finishReason === "length"` checks that treated it as a
+success, handle the error, or let the agent continue cut-off output:
+
+```ts
+import { ai, AgentIncompleteError, type ModelContract, type ToolContract } from "@warlock.js/ai";
+
+export async function runWorker(model: ModelContract, tools: ToolContract[], task: string) {
+  const worker = ai.agent({ name: "worker", model, tools, continueOnOutputLimit: 2 });
+  const result = await worker.execute(task);
+
+  if (result.error instanceof AgentIncompleteError) {
+    throw new Error(`worker answer cut off (${result.error.reason})`, { cause: result.error });
+  }
+
+  return result.text;
+}
+```
+
+Dashboards that switch on `report.status` need the `incomplete` case. The
+Anthropic adapter's default `max_tokens` rose from 4096 to the model's max
+output when streaming and 16384 otherwise; set `maxTokens` to keep a lower cap.
+`agent.execute/stream(input, { modelOptions })` now applies per-run model options.
+## 5.30 to 5.31 MCP serving
+
+`ai.mcp.serve()` now throws `McpServeError` (`type: "collision"`) when two
+exposed tools share a name; before, both were listed and calls reached only one.
+Rename one tool, or serve `{ groups: { a: toolsA, b: toolsB } }` with
+`prefixToolNames: true`. `{ type: "http" }` now binds a real endpoint
+(`127.0.0.1` by default) and `start()` resolves `{ url, close }`; a
+non-loopback `host` needs `auth`. Code implementing `McpServer` itself must
+return that handle from `start()`.
 
 ## 5.30 to 5.31 AI cost, prices and provider errors
 

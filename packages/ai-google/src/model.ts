@@ -1,6 +1,8 @@
 import {
   attachCost,
   InvalidRequestError,
+  resolveStreamChunks,
+  selectProviderTools,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -32,6 +34,9 @@ import {
 } from "./utils";
 
 const LOG_MODULE = "ai.google";
+
+/** `provider` value of `ai.providerTool()` entries this adapter sends verbatim. */
+const GOOGLE_WIRE_FORMAT = "google";
 
 /**
  * Bucketed `thinkingBudget` (token caps) for the neutral
@@ -210,6 +215,11 @@ export class GoogleModel implements ModelContract {
    * Yields neutral `ModelStreamChunk`s — `delta` for text, `tool-call`
    * per function call (Gemini emits a fully-formed call, not partial
    * JSON), and a terminal `done` with the final finish reason + usage.
+   *
+   * With `options.streamChunks` it also yields `reasoning` for thought
+   * parts (only sent when `thinkingConfig.includeThoughts` is on — set it
+   * through `providerOptions.google.body`) and `usage` whenever a chunk
+   * carries `usageMetadata`. No `tool-args`: calls arrive whole.
    */
   public async *stream(
     messages: Message[],
@@ -239,9 +249,21 @@ export class GoogleModel implements ModelContract {
     let rawFinishReason: string | undefined;
     let sawToolCall = false;
     const usage: Usage = { input: 0, output: 0, total: 0 };
+    const want = resolveStreamChunks(options);
 
     try {
       for await (const chunk of iterable) {
+        // Thought parts (`thought: true`, sent when `thinkingConfig.includeThoughts`
+        // is on) carry the thought summary in `text`; the SDK's `chunk.text`
+        // getter already leaves them out of the answer.
+        if (want.reasoning) {
+          for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+            if (part.thought === true && typeof part.text === "string" && part.text !== "") {
+              yield { type: "reasoning", delta: part.text };
+            }
+          }
+        }
+
         const text = chunk.text;
 
         if (text) {
@@ -274,6 +296,10 @@ export class GoogleModel implements ModelContract {
 
         if (chunk.usageMetadata) {
           applyGoogleUsage(usage, chunk.usageMetadata);
+
+          if (want.usage) {
+            yield { type: "usage", usage: { ...usage } };
+          }
         }
       }
     } catch (thrown) {
@@ -311,7 +337,7 @@ export class GoogleModel implements ModelContract {
         ...(temperature !== undefined ? { temperature } : {}),
         ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
         ...(options?.signal ? { abortSignal: options.signal } : {}),
-        ...this.buildTools(options?.tools),
+        ...this.buildTools(options),
         ...this.buildStructuredOutput(options?.responseSchema),
         ...this.buildThinking(options?.reasoning),
       },
@@ -361,12 +387,22 @@ export class GoogleModel implements ModelContract {
 
   /**
    * Spread-friendly tools fragment. Empty object when no tools were
-   * supplied so the caller can unconditionally spread it.
+   * supplied so the caller can unconditionally spread it. Function tools
+   * come first; `ai.providerTool({ provider: "google" })` definitions
+   * (`{ googleSearch: {} }`, `{ codeExecution: {} }`, `{ urlContext: {} }`,
+   * …) follow verbatim as their own `Tool` entries. Other providers'
+   * definitions are skipped with a warning.
    */
-  private buildTools(tools: ModelCallOptions["tools"]): Pick<GenerateContentConfig, "tools"> {
-    const mapped = toGoogleTools(tools);
+  private buildTools(options: ModelCallOptions | undefined): Pick<GenerateContentConfig, "tools"> {
+    const { tools, definitions } = selectProviderTools(options, {
+      accepts: [GOOGLE_WIRE_FORMAT, this.provider],
+      module: LOG_MODULE,
+      model: this.name,
+      logger: this.logger,
+    });
+    const mapped: Tool[] = [...(toGoogleTools(tools) ?? []), ...(definitions as unknown as Tool[])];
 
-    return mapped ? { tools: mapped } : {};
+    return mapped.length > 0 ? { tools: mapped } : {};
   }
 
   /**

@@ -8,7 +8,9 @@ import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json
  *
  * Tries each validator in order until one passes. If a validator's matchesType()
  * returns false, it's skipped for optimization. First validator that both matches
- * the type and passes validation wins.
+ * the type and passes validation wins; every type-matching validator is tried,
+ * whatever `firstErrorOnly` says. When none passes, the closest one's errors are
+ * reported (fewest mismatched literals, then fewest errors, then deepest path).
  *
  * @example
  * ```ts

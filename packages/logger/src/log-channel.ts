@@ -1,5 +1,12 @@
 import type { BasicLogConfigurations, LogContract, LoggingData, RedactConfig } from "./types";
 
+/**
+ * Receives a failure the channel hits outside a `log()` call (for example
+ * `FileLog` retention). The logger installs one that forwards to its
+ * `onChannelError` handler.
+ */
+export type ChannelErrorReporter = (error: unknown, entry: LoggingData) => void;
+
 export abstract class LogChannel<
   Options extends BasicLogConfigurations = BasicLogConfigurations,
 > implements LogContract {
@@ -34,6 +41,12 @@ export abstract class LogChannel<
   protected isInitialized = false;
 
   /**
+   * Where {@link reportError} sends failures; set by the logger the channel
+   * is added to.
+   */
+  protected errorReporter?: ChannelErrorReporter;
+
+  /**
    * Constructor
    */
   public constructor(configurations?: Options) {
@@ -48,6 +61,33 @@ export abstract class LogChannel<
 
       this.isInitialized = true;
     }, 0);
+  }
+
+  /**
+   * Route this channel's own failures (those outside a `log()` call) to the
+   * given reporter. `Logger` calls this when the channel is added, so the
+   * failures reach `log.onChannelError(...)`.
+   */
+  public setErrorReporter(reporter: ChannelErrorReporter | undefined): void {
+    this.errorReporter = reporter;
+  }
+
+  /**
+   * Report a failure that happened outside a `log()` call. Never throws:
+   * without a reporter it writes one line to stderr.
+   */
+  protected reportError(error: unknown, entry: LoggingData): void {
+    try {
+      if (this.errorReporter) {
+        this.errorReporter(error, entry);
+        return;
+      }
+
+      const reason = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`[@warlock.js/logger] channel "${this.name}" failed: ${reason}\n`);
+    } catch {
+      // Reporting a failure must never become one.
+    }
   }
 
   /**

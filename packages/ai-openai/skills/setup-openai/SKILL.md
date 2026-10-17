@@ -1,6 +1,6 @@
 ---
 name: setup-openai
-description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `cacheWriteTokens`, `inputIncludesCache`, `OPENAI_MODEL_PRICING`, `openAIPricingFor`, `ProviderOverloadedError`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
+description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `cacheWriteTokens`, `inputIncludesCache`, `OPENAI_MODEL_PRICING`, `openAIPricingFor`, `ProviderOverloadedError`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, `ai.providerTool`, hosted `web_search`, `streamChunks`, `reasoning_content`, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
 ---
 
 # `@warlock.js/ai-openai`
@@ -96,6 +96,20 @@ const { data } = await ai.image({ model: gpt, prompt: "a red bicycle", size: "10
 `model.stream()` drains `chat.completions.create({ stream: true })` and yields `{ type: "delta", content }` per token, then — after the stream closes — one consolidated `{ type: "tool-call", id, name, input }` per requested tool, then a terminal `{ type: "done", finishReason, usage }`. `stream_options: { include_usage: true }` is enabled by default.
 
 Tool-call argument fragments arrive split across deltas; the adapter accumulates them per `tool_calls[n].index` and parses the assembled JSON once on completion, so streamed tool calls round-trip identically to non-streaming `complete()`. Accumulators that never received a function name are skipped.
+
+Opt-in chunks (`options.streamChunks`, set by `agent.stream()`): Chat yields `{ type: "tool-args", callId, name, delta }` per argument fragment and `{ type: "reasoning", delta }` for a compatible vendor's `delta.reasoning_content` (DeepSeek) / `delta.reasoning` (Groq); Responses yields `reasoning` for `response.reasoning_summary_text.delta` / `response.reasoning_text.delta` (summaries need `body: { reasoning: { summary: "auto" } }`) and `tool-args` for `response.function_call_arguments.delta`. No `usage` chunk (usage arrives at the end).
+
+## Provider-defined tools
+
+With `api: "responses"`, `ai.providerTool({ provider: "openai", definition })` appends hosted tools verbatim (`{ type: "web_search" }`, `file_search`, `code_interpreter`, `image_generation`, `mcp`). Hosted-call items are not replayed (`store: false`), and a reasoning item that led into one is dropped from the replay. Client-run built-ins (`shell_call`, `apply_patch_call`, `computer_call`, `custom_tool_call`, `local_shell_call`, `mcp_approval_request`) throw `InvalidRequestError`. On Chat Completions a provider tool is sent only when `provider` equals the model's provider label (e.g. Groq `{ type: "browser_search" }` with `provider: "groq"`).
+
+```ts
+const model = openai.model({ name: "gpt-5.6", api: "responses" });
+ai.agent({
+  model,
+  tools: [ai.providerTool({ provider: "openai", definition: { type: "web_search" } }), lookupOrder],
+});
+```
 
 ## Embeddings
 

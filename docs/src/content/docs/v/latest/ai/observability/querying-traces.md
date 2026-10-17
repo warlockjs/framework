@@ -105,7 +105,7 @@ Time bounds compare against each trace's root `startedAt`, **inclusive on both e
 type TraceAggregate = {
   traces: number; // matched count
   completed: number; // root status === "completed"
-  failed: number; // root status === "failed"
+  failed: number; // root status === "failed" or "incomplete"
   cancelled: number; // root status === "cancelled"
   usage: Usage; // summed token usage (input / output / total always present)
   cost?: ModelPricing; // merged per-channel USD, or undefined if no trace was priced

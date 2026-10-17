@@ -24,6 +24,13 @@ export interface ApprovalRequestContext {
   /** Zero-based index of the model round-trip that produced the call. */
   tripIndex: number;
 
+  /**
+   * The provider's tool-call id of the gated call — the `callId` the
+   * agent's `agent.tool.*` events carry. Absent on requests stored before
+   * it was recorded.
+   */
+  callId?: string;
+
   /** Originating session id, when the run is part of an orchestrator session. */
   sessionId?: string;
 
@@ -135,6 +142,9 @@ export interface PolicyContext {
 
   /** Zero-based index of the model round-trip that produced the call. */
   tripIndex: number;
+
+  /** The provider's tool-call id of the call being evaluated. */
+  callId?: string;
 
   /** Originating session id, when part of an orchestrator session. */
   sessionId?: string;

@@ -41,6 +41,19 @@ export type HttpRateLimitConfig = Omit<
    */
   enabled?: boolean;
   /**
+   * Count static files against the global limiter: the public folder, every
+   * `router.directory()` mount, `router.file()` routes and the web package's
+   * built assets.
+   *
+   * Off by default, so one page load's asset requests do not spend the
+   * client's quota; pages and API routes stay limited either way. A mount's
+   * own `rateLimit` option (`router.directory(options, { rateLimit })`) wins
+   * over this setting. Built-in health probes follow `http.health.rateLimit`.
+   *
+   * @default false
+   */
+  staticFiles?: boolean;
+  /**
    * Max requests per time window.
    *
    * @default 60

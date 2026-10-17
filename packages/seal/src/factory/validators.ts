@@ -62,8 +62,14 @@ export const v: ValidatorV = {
     > &
       RecordValidator & { valueValidator: T },
 
-  /** Create a tuple validator - fixed-length array with position-specific types */
-  tuple: <T extends BaseValidator[]>(validators: T, errorMessage?: string) =>
+  /**
+   * Create a tuple validator - fixed-length array with position-specific types.
+   *
+   * The `| []` in the constraint makes TypeScript infer a literal list as a tuple, so
+   * `v.tuple([v.string(), v.int()])` is typed `[string, number]` rather than
+   * `(string | number)[]`; a `BaseValidator[]` variable is still accepted.
+   */
+  tuple: <T extends BaseValidator[] | []>(validators: T, errorMessage?: string) =>
     new TupleValidator(validators, errorMessage) as TupleValidator & {
       validators: T;
     } & StandardSchemaV1<
@@ -240,7 +246,7 @@ export interface ValidatorV {
     errorMessage?: string,
   ) => StandardSchemaV1<Record<string, Infer.Input<T>>, Record<string, Infer.Output<T>>> &
     RecordValidator & { valueValidator: T };
-  tuple: <T extends BaseValidator[]>(
+  tuple: <T extends BaseValidator[] | []>(
     validators: T,
     errorMessage?: string,
   ) => TupleValidator & {

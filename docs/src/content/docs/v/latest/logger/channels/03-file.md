@@ -48,13 +48,13 @@ Error: Card declined
 
 ## File naming and chunking
 
-The `chunk` option controls how entries split across files.
+The `chunk` option controls how entries split across files. Dated names are ISO dates, so the files sort by name in date order.
 
-| Value      | Description                        | Example filename             |
-| ---------- | ---------------------------------- | ---------------------------- |
-| `"single"` | One file for all entries (default) | `app.log`                    |
-| `"daily"`  | One file per calendar day          | `15-03-2024.log`             |
-| `"hourly"` | One file per hour                  | `15-03-2024-10-00-00-am.log` |
+| Value      | Description                        | Example filename    |
+| ---------- | ---------------------------------- | ------------------- |
+| `"single"` | One file for all entries (default) | `app.log`           |
+| `"daily"`  | One file per calendar day          | `2024-03-15.log`    |
+| `"hourly"` | One file per hour                  | `2024-03-15-10.log` |
 
 ```ts
 // One file per day — good balance of granularity and file count
@@ -63,6 +63,38 @@ new FileLog({ storagePath: "./storage/logs", chunk: "daily" });
 // One file per hour — useful for high-volume services
 new FileLog({ storagePath: "./storage/logs", chunk: "hourly" });
 ```
+
+### Custom file names — `fileName`
+
+`fileName` names the file yourself. It is a pattern or a function of the current date, evaluated at every write, so a dated name starts a new file whenever it changes. When set, it replaces the chunk's default name.
+
+| Token    | Value (local time) |
+| -------- | ------------------ |
+| `{YYYY}` | year, `2024`       |
+| `{MM}`   | month, `03`        |
+| `{DD}`   | day of month, `15` |
+| `{HH}`   | hour, `00`–`23`    |
+| `{mm}`   | minute, `00`–`59`  |
+| `{name}` | the `name` option  |
+
+```ts
+// app-2024-03-15.log, app-2024-03-16.log, …
+new FileLog({ storagePath: "./storage/logs", fileName: "app-{YYYY}-{MM}-{DD}" });
+
+// Same, using the `name` option
+new FileLog({ storagePath: "./storage/logs", name: "api", fileName: "{name}-{YYYY}-{MM}-{DD}" });
+
+// A function of the date: one file per quarter, audit-2024-Q1.log
+new FileLog({
+  storagePath: "./storage/logs",
+  fileName: (date) => `audit-${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`,
+});
+
+// The pre-5.31 daily name: 15-03-2024.log
+new FileLog({ storagePath: "./storage/logs", chunk: "daily", fileName: "{DD}-{MM}-{YYYY}" });
+```
+
+Without `fileName`, a `daily` or `hourly` chunk ignores `name`: give two dated channels in one directory distinct `fileName` patterns (or separate `storagePath`s) so they don't share a file.
 
 ## File rotation
 
@@ -74,16 +106,38 @@ storage/logs/
 └── app-15-03-2024-1710494523000.log     ← rotated archive
 ```
 
-The rotated name is `{name}-{rotateFileName}-{Date.now()}.{extension}`. Control the date portion with the `rotateFileName` Day.js format string.
+The rotated name is `<file name>-<rotateFileName>-<epoch ms>.<extension>`, in the rotated file's own directory (a group directory with `groupBy`). `rotateFileName` takes the same forms as `fileName` — a token pattern or a function of the rotation date — and defaults to `{YYYY}-{MM}-{DD}`. Text without tokens is used as is.
 
 ```ts
 new FileLog({
   storagePath: "./storage/logs",
   rotate: true,
   maxFileSize: 10 * 1024 * 1024, // 10 MB
-  rotateFileName: "DD-MM-YYYY",
+  rotateFileName: "{YYYY}{MM}{DD}-{HH}{mm}", // app-20240315-1022-1710494523000.log
 });
 ```
+
+## Retention — pruning old files
+
+`retention` removes old log files so a long-lived host doesn't fill its disk. It runs when the channel boots and whenever it starts a new file (a size rotation, or a dated name rolling over). Call `await channel.prune()` to run it on demand.
+
+```ts
+new FileLog({
+  storagePath: "./storage/logs",
+  chunk: "daily",
+  retention: {
+    maxFiles: 14, // keep the 14 newest files (the one being written counts)
+    maxAgeDays: 30, // and remove any last modified more than 30 days ago
+  },
+});
+```
+
+- **Only this channel's files.** A file is considered only if it sits in the log directory (each group directory with `groupBy`) and its name matches the channel's file name pattern — the `fileName` (or chunk default) plus an optional rotation suffix, with the channel's extension. Other files, directories and differently named logs are never touched.
+- **Newest by modification time.** `maxFiles` keeps the most recently modified files; `maxAgeDays` removes those last modified longer ago. Set either or both. The file being written is never removed.
+- **A function `fileName` needs `retention.match`.** The channel can't derive a pattern from a function, so give the regular expression your names match (tested against the file name with extension): `retention: { maxFiles: 8, match: /^audit-\d{4}-Q[1-4]\.log$/ }`. When set, `match` replaces the derived pattern for any `fileName`.
+- **Never throws into logging.** A file that can't be read or removed is reported to the logger's [`onChannelError`](../reference/01-logger/) handler (entry `module: "logger"`, `action: "retention"`) and pruning continues; a channel not added to a logger writes one stderr line instead.
+
+`maxFiles` must be a positive integer and `maxAgeDays` a positive number; the constructor throws a `TypeError` otherwise.
 
 ## Grouping into sub-directories
 
@@ -134,6 +188,13 @@ new FileLog({
   // How to split entries across files. @default "single"
   chunk: "daily",
 
+  // File name pattern or (date) => string; replaces the chunk's default name.
+  // @default by chunk: name | "{YYYY}-{MM}-{DD}" | "{YYYY}-{MM}-{DD}-{HH}"
+  fileName: "app-{YYYY}-{MM}-{DD}",
+
+  // Remove old files on boot and when a new file starts. @default none
+  retention: { maxFiles: 14, maxAgeDays: 30 },
+
   // Enable rotation when the active file exceeds maxFileSize. @default true
   rotate: true,
 
@@ -141,8 +202,9 @@ new FileLog({
   // @default 10485760 (10 MB)
   maxFileSize: 10 * 1024 * 1024,
 
-  // Day.js format used in the rotated file's name. @default "DD-MM-YYYY"
-  rotateFileName: "DD-MM-YYYY",
+  // Middle part of a rotated file's name; pattern or (date) => string.
+  // @default "{YYYY}-{MM}-{DD}"
+  rotateFileName: "{YYYY}-{MM}-{DD}",
 
   // Messages held in memory before flushing. Also flushed every 5s. @default 100
   maxMessagesToWrite: 100,

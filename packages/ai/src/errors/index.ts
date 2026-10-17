@@ -1,6 +1,11 @@
 export { AgentCancelledError, type AgentCancelledErrorOptions } from "./agent-cancelled-error";
 export { AgentDriftError, type AgentDriftErrorOptions } from "./agent-drift-error";
 export { AgentExecutionError } from "./agent-execution-error";
+export {
+  AgentIncompleteError,
+  type AgentIncompleteErrorOptions,
+  type AgentIncompleteReason,
+} from "./agent-incomplete-error";
 export { AgentMaxTripsError, type AgentMaxTripsErrorOptions } from "./agent-max-trips-error";
 export { AIError, type AIErrorOptions } from "./ai-error";
 export {

@@ -9,6 +9,7 @@ export * from "./memory";
 export * from "./middleware";
 export * from "./model-tool-call-request.type";
 export * from "./model.contract";
+export * from "./provider-tool.type";
 export * from "./orchestrator";
 export * from "./planner";
 export * from "./result";

@@ -14,6 +14,7 @@ describe("resolveSitemapHttpValidators", () => {
       lastModified: "Thu, 24 Sep 2026 10:15:29 GMT",
       cacheControl: DEFAULT_SITEMAP_CACHE_CONTROL,
       notModified: false,
+      preconditionFailed: false,
     });
   });
 
@@ -60,6 +61,29 @@ describe("resolveSitemapHttpValidators", () => {
   it("does not report GET/HEAD 304 semantics for another method", () => {
     expect(
       resolveSitemapHttpValidators({ sha256, generatedAt, ifNoneMatch: "*", method: "POST" })
+        .notModified,
+    ).toBe(false);
+  });
+
+  it("compares If-Match strongly, so a weak validator fails with 412", () => {
+    const strong = `"${sha256}"`;
+
+    expect(
+      resolveSitemapHttpValidators({ sha256, generatedAt, ifMatch: `"other", ${strong}` })
+        .preconditionFailed,
+    ).toBe(false);
+    expect(
+      resolveSitemapHttpValidators({ sha256, generatedAt, ifMatch: `W/${strong}` })
+        .preconditionFailed,
+    ).toBe(true);
+    expect(
+      resolveSitemapHttpValidators({ sha256, generatedAt, ifMatch: "*" }).preconditionFailed,
+    ).toBe(false);
+  });
+
+  it("treats a lowercase w/ prefix as part of the opaque tag", () => {
+    expect(
+      resolveSitemapHttpValidators({ sha256, generatedAt, ifNoneMatch: `w/"${sha256}"` })
         .notModified,
     ).toBe(false);
   });

@@ -53,12 +53,12 @@ function resolveTable(table: string | undefined): string {
  * node-postgres parses `JSONB` into a JS value already, but some pool
  * wrappers hand back the raw string — be defensive across both.
  */
-function parsePayload(payload: unknown): SupervisorSnapshot {
+function parsePayload<TSnapshot>(payload: unknown): TSnapshot {
   if (typeof payload === "string") {
-    return JSON.parse(payload) as SupervisorSnapshot;
+    return JSON.parse(payload) as TSnapshot;
   }
 
-  return payload as SupervisorSnapshot;
+  return payload as TSnapshot;
 }
 
 /**
@@ -77,7 +77,9 @@ function parsePayload(payload: unknown): SupervisorSnapshot {
  *
  * Front it with the {@link pg} factory — callers never `new` it.
  */
-class PgSnapshotStore implements SnapshotStore {
+class PgSnapshotStore<
+  TSnapshot extends { runId: string } = SupervisorSnapshot,
+> implements SnapshotStore<TSnapshot> {
   /** The user-supplied pg client. The store only ever calls `query`. */
   private readonly client: PgClientLike;
 
@@ -99,7 +101,7 @@ class PgSnapshotStore implements SnapshotStore {
    * Load the snapshot for a `runId`, or `undefined` when no in-flight run
    * is recorded.
    */
-  public async load(runId: string): Promise<SupervisorSnapshot | undefined> {
+  public async load(runId: string): Promise<TSnapshot | undefined> {
     const { rows } = await this.client.query(
       `SELECT payload FROM ${this.table} WHERE run_id = $1`,
       [runId],
@@ -109,7 +111,7 @@ class PgSnapshotStore implements SnapshotStore {
       return undefined;
     }
 
-    return parsePayload((rows[0] as { payload: unknown }).payload);
+    return parsePayload<TSnapshot>((rows[0] as { payload: unknown }).payload);
   }
 
   /**
@@ -117,7 +119,7 @@ class PgSnapshotStore implements SnapshotStore {
    * exactly one live snapshot, so a second save for the same `runId`
    * overwrites the payload rather than appending.
    */
-  public async save(snapshot: SupervisorSnapshot): Promise<void> {
+  public async save(snapshot: TSnapshot): Promise<void> {
     await this.client.query(
       `INSERT INTO ${this.table} (run_id, payload, saved_at)
        VALUES ($1, $2::jsonb, now())
@@ -201,6 +203,8 @@ class PgSnapshotStore implements SnapshotStore {
  * // Run once, via your own migration tooling:
  * // await pool.query(orchestrator's store.schema());
  */
-export function pg(options: PgSnapshotStoreOptions): SnapshotStore {
-  return new PgSnapshotStore(options);
+export function pg<TSnapshot extends { runId: string } = SupervisorSnapshot>(
+  options: PgSnapshotStoreOptions,
+): SnapshotStore<TSnapshot> {
+  return new PgSnapshotStore<TSnapshot>(options);
 }

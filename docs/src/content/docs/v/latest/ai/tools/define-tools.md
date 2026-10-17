@@ -197,6 +197,15 @@ const { data, error } = await searchCatalog.invoke({ query: "lamps" }, ctx);
 console.log(data, error, ctx.artifacts.blocks);
 ```
 
+When a server transport runs the tool for a remote client — `ai.mcp.serve` over HTTP from `@warlock.js/ai-tools` — `ctx.request` carries the inbound request's `headers` (lower-cased names) and `remoteAddress`. Read a per-user token or a tenant header there; like `artifacts`, it never reaches the model. In-process dispatch leaves it unset. See [Connect MCP](/v/latest/ai/tools/connect-mcp/).
+
+```ts
+execute: async (input, ctx) => {
+  const tenant = ctx?.request?.headers["x-tenant-id"];
+  return searchItems(input.query, { tenant });
+},
+```
+
 ## Typed artifacts under a supervisor
 
 A supervisor declares `artifactsSchema` and tools registered to it inherit typed `ctx.artifacts.*`:
@@ -261,6 +270,10 @@ const agent = ai.agent({ model, tools: [wrapped] });
 ```
 
 Workflow errors surface as `ToolExecutionError` with `cause` pointing at the original `WorkflowError` subclass.
+
+## Provider-defined tools
+
+A provider's own tools (Anthropic `web_search` / `bash`, OpenAI Responses `web_search`, Gemini `googleSearch`, …) are declared with `ai.providerTool({ provider, definition })` and sit in the same `tools` list. See [Provider-defined tools](/v/latest/ai/tools/provider-tools/).
 
 ## Related
 

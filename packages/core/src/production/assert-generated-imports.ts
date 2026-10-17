@@ -25,6 +25,9 @@ export type GeneratedFile = {
  * problem in one pass instead of one specifier per re-run.
  */
 export class UndeclaredGeneratedImportError extends Error {
+  /** Stable Warlock error code; `warlock explain WL7002` prints the fix. */
+  public readonly code = "WL7002";
+
   public constructor(public readonly violations: UndeclaredImport[]) {
     super(
       [

@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A built-in list price for `gemini-3.5-flash-lite` (`GOOGLE_MODEL_PRICING`, `googlePricingFor`), from the Gemini API pricing page as of 2026-10-17. Models priced by prompt length, by input modality, or with a scheduled price change stay unpriced.
 
 - 503 `UNAVAILABLE` throws `ProviderOverloadedError`. 400 and 500 failures are marked `billed: false`, as Google's billing docs state.
+- An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` on the model and cancels the HTTP request.
+- With `streamChunks`, `stream()` yields `reasoning` for thought parts (sent when `thinkingConfig.includeThoughts` is on) and `usage` for every chunk carrying `usageMetadata`.
+- `ai.providerTool({ provider: "google", definition })` entries (`{ googleSearch: {} }`, `{ codeExecution: {} }`, `{ urlContext: {} }`) are sent verbatim as their own `Tool` after the function declarations; other providers' tools are skipped with a warning.
 
 - `providerOptions.google.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Models expose native `countTokens()` preflight. Vertex counts system instructions and tools; unsupported Developer API system/tool and cached-content counts fail explicitly.

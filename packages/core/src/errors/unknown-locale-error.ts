@@ -13,6 +13,9 @@
  * fail-open rule.
  */
 export class UnknownLocaleError extends Error {
+  /** Stable Warlock error code; `warlock explain WL1008` prints the fix. */
+  public readonly code = "WL1008";
+
   public constructor(locale: string, localeCodes: string[]) {
     super(UnknownLocaleError.buildMessage(locale, localeCodes));
     this.name = "UnknownLocaleError";

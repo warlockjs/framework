@@ -341,13 +341,14 @@ export function dashboardHtml(
 
   var STATUS_FILTERS = ["completed", "failed", "cancelled"];
   var TYPE_FILTERS = ["agent", "tool", "model", "supervisor", "team", "workflow", "orchestrator", "planner", "batch", "callback"];
-  var ERROR_STATUSES = { failed: 1, cancelled: 1 };
+  var ERROR_STATUSES = { failed: 1, cancelled: 1, incomplete: 1 };
   var NO_SESSION_KEY = "(no session)";
   var NO_PROMPT_KEY = "(no prompt)";
   var NO_TYPE_KEY = "(no type)";
 
   var statusClass = function (s) {
     if (s === "completed" || s === "failed" || s === "cancelled") return s;
+    if (s === "incomplete") return "failed";
     return "other";
   };
   var esc = function (v) {

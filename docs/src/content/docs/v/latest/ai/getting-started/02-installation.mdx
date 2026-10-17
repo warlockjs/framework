@@ -21,7 +21,7 @@ Install the core package plus the provider you want to use. Five first-party ada
   <TabItem label="yarn">
 
 ```bash
-pnpm add @warlock.js/ai @warlock.js/ai-openai
+yarn add @warlock.js/ai @warlock.js/ai-openai
 ```
 
   </TabItem>
@@ -47,7 +47,7 @@ If you also need persistence (snapshot resume, semantic cache) or logging, add t
   <TabItem label="yarn">
 
 ```bash
-pnpm add @warlock.js/cache @warlock.js/logger
+yarn add @warlock.js/cache @warlock.js/logger
 ```
 
   </TabItem>
@@ -68,6 +68,10 @@ pnpm add @warlock.js/cache @warlock.js/logger
 </Tabs>
 
 Both are optional. The AI package works without them — you just lose snapshot resume, semantic cache, and structured logging.
+
+**Standalone processes and bundling.** `@warlock.js/ai` depends on `@warlock.js/core` only for its network helpers, and imports them from the side-effect-free `@warlock.js/core/net` subpath. Running `ai.agent` in a process that is not a Warlock app — a queue worker, a CLI, a standalone agent runner — therefore never loads Core's HTTP server, database, cache or mail modules, and a bundler does not need to alias Core away.
+
+`@warlock.js/cache` and `@warlock.js/cascade` are **optional peer dependencies**. Nothing imports them eagerly: the cache- and Cascade-backed scoped budget stores load them with a dynamic `import()` the first time they run (the cache store only when you don't pass your own `cache` driver), and memory, semantic cache and RAG stores take a cache driver you construct yourself. A standalone bundle that does not use those features can mark both as external and leave them uninstalled.
 
 Now write a smoke test to confirm everything resolves:
 
@@ -134,6 +138,7 @@ A few capabilities live in optional satellite packages that **augment the shared
 - `import "@warlock.js/ai-tools"` → `ai.tools.*` (web search, fetch, HTTP, calculator, date-time) and `ai.mcp(...)`.
 - `import "@warlock.js/ai-workspace"` → `ai.workspace(...)` (a policy-jailed filesystem + shell for coding agents).
 - `import "@warlock.js/ai-panoptic"` → the observability wiring read by `ai.config({ panoptic })`.
+- `import "@warlock.js/ai-cli"` → `ai.cli.*` (vendor coding CLIs — Claude Code, Codex, Copilot, Cursor, … — run headless as agents; see [Run coding CLIs as agents](/v/latest/ai/cli-agents/run-cli-agents/)).
 
 The verb stays dark until its package is imported somewhere in your app — a bare `import "@warlock.js/ai-tools"` is enough, and any named import from the package pulls the side effect in too.
 

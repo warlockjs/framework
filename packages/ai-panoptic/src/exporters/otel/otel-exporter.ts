@@ -202,7 +202,9 @@ function applyStatus(otelSpan: OtelSpan, span: TraceSpan): void {
     });
   }
 
-  if (span.status === "failed" || span.status === "cancelled") {
+  // An incomplete run (the model's answer was cut off) has no usable
+  // result, so it is an error like a failed one.
+  if (span.status === "failed" || span.status === "cancelled" || span.status === "incomplete") {
     otelSpan.setStatus({
       code: codes.ERROR,
       message: span.error?.message,

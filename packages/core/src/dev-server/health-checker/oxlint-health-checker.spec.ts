@@ -10,7 +10,14 @@ import { createWorker } from "../create-worker";
 import { OxlintHealthChecker } from "./checkers/oxlint-health-checker";
 import { defaultHealthCheckers } from "./default-health-checkers";
 import { FilesHealthcareManager } from "./files-healthcare.manager";
-import { OxlintRunner, findOxlint, parseOxlintResults, oxlintCommandError } from "./oxlint-runner";
+import {
+  MAX_FILES_PER_BATCH,
+  OxlintRunner,
+  findOxlint,
+  oxlintArgumentSize,
+  oxlintCommandError,
+  parseOxlintResults,
+} from "./oxlint-runner";
 
 const require = createRequire(import.meta.url);
 let cwd: string;
@@ -20,6 +27,10 @@ async function write(name: string, contents: string) {
   const filePath = path.join(cwd, name);
   await fs.writeFile(filePath, contents);
   return { path: filePath, relativePath: name };
+}
+
+function emptyReport() {
+  return { stdout: JSON.stringify({ diagnostics: [] }), stderr: "" };
 }
 
 beforeEach(async () => {
@@ -83,14 +94,12 @@ describe("Oxlint background file checks", () => {
       const argumentsSent = calls.flatMap((args) => args.slice(4));
       expect(argumentsSent).toEqual(files.map((file) => path.relative(cwd, file.path)));
       const limit = platform === "win32" ? 24 * 1024 : 512 * 1024;
+      // Windows: UTF-16 length plus quoting; POSIX: bytes, NUL and the argv pointer.
+      const argumentSize = (arg: string) =>
+        platform === "win32" ? arg.length + 3 : Buffer.byteLength(arg) + 1 + 8;
       for (const args of calls) {
-        expect(
-          args.reduce(
-            (sum, arg) =>
-              sum + (platform === "win32" ? arg.length + 3 : Buffer.byteLength(arg) + 1),
-            0,
-          ),
-        ).toBeLessThan(limit);
+        expect(args.reduce((sum, arg) => sum + argumentSize(arg), 0)).toBeLessThan(limit);
+        expect(args.slice(4).length).toBeLessThanOrEqual(MAX_FILES_PER_BATCH);
         expect(args.slice(4).some((arg) => path.isAbsolute(arg))).toBe(false);
       }
       expect(results).toHaveLength(files.length);
@@ -201,12 +210,175 @@ describe("Oxlint background file checks", () => {
     runner.initialize(fakeCwd);
     const file = await write("changed.ts", "debugger;\n");
     const pending = runner.checkFiles([file]);
-    const rejected = expect(pending).rejects.toThrow("Oxlint could not check changed files");
+    const rejected = expect(pending).rejects.toThrow(
+      "Oxlint check cancelled: the development server is shutting down.",
+    );
     await vi.waitFor(async () => expect(await fs.readFile(pidPath, "utf8")).toMatch(/^\d+$/));
     const pid = Number(await fs.readFile(pidPath, "utf8"));
     runner.shutdown();
     await rejected;
+    await expect(pending).rejects.not.toThrow(/30s/);
     expect(() => process.kill(pid, 0)).toThrow();
+  });
+
+  it("kills a CLI child that ignores SIGTERM shortly after shutdown starts", async () => {
+    const fakeCwd = path.join(cwd, "stubborn");
+    const fake = path.join(fakeCwd, "node_modules", "oxlint");
+    await fs.mkdir(fake, { recursive: true });
+    await fs.writeFile(path.join(fakeCwd, ".oxlintrc.json"), "{}");
+    await fs.writeFile(
+      path.join(fake, "package.json"),
+      JSON.stringify({ name: "oxlint", bin: "cli.cjs" }),
+    );
+    const pidPath = path.join(fakeCwd, "child.pid");
+    await fs.writeFile(
+      path.join(fake, "cli.cjs"),
+      `process.on("SIGTERM", () => {}); require("node:fs").writeFileSync(${JSON.stringify(pidPath)}, String(process.pid)); setInterval(() => {}, 1000);`,
+    );
+    runner.initialize(fakeCwd);
+    const file = await write("changed.ts", "debugger;\n");
+    const pending = runner.checkFiles([file]).catch((error: unknown) => error);
+    await vi.waitFor(async () => expect(await fs.readFile(pidPath, "utf8")).toMatch(/^\d+$/));
+    const pid = Number(await fs.readFile(pidPath, "utf8"));
+    try {
+      const started = Date.now();
+      await runner.shutdown();
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(() => process.kill(pid, 0)).toThrow(expect.objectContaining({ code: "ESRCH" }));
+      expect(String(await pending)).toMatch(/shutting down/);
+    } finally {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {}
+    }
+  });
+
+  it("runs a path over the command-line budget in a batch of its own", async () => {
+    const calls: string[][] = [];
+    const execute = vi.fn(async (_binary: string, args: string[]) => {
+      calls.push(args.slice(4));
+      return emptyReport();
+    });
+    const files = [
+      ...Array.from({ length: 3 }, (_, index) => `src/before-${index}.ts`),
+      `src/${"long-".repeat(6_000)}.ts`,
+      ...Array.from({ length: 3 }, (_, index) => `src/after-${index}.ts`),
+    ].map((relativePath) => ({ path: path.join(cwd, relativePath), relativePath }));
+    const batched = new OxlintRunner({ execute, exists: () => true, platform: "win32" });
+    batched.initialize(cwd);
+    const results = await batched.checkFiles(files);
+    expect(calls.map((args) => args.length)).toEqual([3, 1, 3]);
+    expect(calls[1]?.[0]).toHaveLength(files[3]?.relativePath.length ?? 0);
+    expect(results.map((result) => result.path)).toEqual(files.map((file) => file.path));
+    expect(results.every((result) => result.healthy)).toBe(true);
+  });
+
+  it.each(["E2BIG", "ENAMETOOLONG"])(
+    "reports only the over-long path as unchecked when the OS refuses it: %s",
+    async (code) => {
+      const longPath = `src/${"long-".repeat(6_000)}.ts`;
+      const execute = vi.fn(async (_binary: string, args: string[]) => {
+        if (args.includes(longPath)) throw Object.assign(new Error("spawn failed"), { code });
+        return emptyReport();
+      });
+      const files = ["src/a.ts", longPath, "src/b.ts"].map((relativePath) => ({
+        path: path.join(cwd, relativePath),
+        relativePath,
+      }));
+      const batched = new OxlintRunner({ execute, exists: () => true, platform: "win32" });
+      batched.initialize(cwd);
+      const results = await batched.checkFiles(files);
+      expect(results.map((result) => result.healthy)).toEqual([true, false, true]);
+      expect(results[1]?.warnings).toEqual([
+        expect.objectContaining({ type: "warning", message: expect.stringContaining(code) }),
+      ]);
+    },
+  );
+
+  it("counts the argv pointer of each argument against the POSIX budget", async () => {
+    const calls: { binary: string; args: string[] }[] = [];
+    const execute = vi.fn(async (binary: string, args: string[]) => {
+      calls.push({ binary, args });
+      return emptyReport();
+    });
+    const files = Array.from({ length: 20 }, (_, index) => {
+      const relativePath = `${String.fromCharCode(97 + index)}.ts`;
+      return { path: path.join(cwd, relativePath), relativePath };
+    });
+    const probe = new OxlintRunner({ execute, exists: () => true, platform: "linux" });
+    probe.initialize(cwd);
+    await probe.checkFiles(files.slice(0, 1));
+    const [first] = calls.splice(0);
+    if (!first) throw new Error("expected one probe run");
+    const baseSize = [process.execPath, first.binary, ...first.args.slice(0, 4)].reduce(
+      (sum, arg) => sum + oxlintArgumentSize(arg, "linux"),
+      0,
+    );
+    // Room for ten 4-byte paths with their NUL and pointer (13 each); without
+    // the pointer (5 each) all twenty would fit in one batch.
+    const budgeted = new OxlintRunner({
+      execute,
+      exists: () => true,
+      platform: "linux",
+      commandLineLimit: baseSize + 10 * 13,
+    });
+    budgeted.initialize(cwd);
+    await budgeted.checkFiles(files);
+    expect(calls.map(({ args }) => args.length - 4)).toEqual([10, 10]);
+    expect(oxlintArgumentSize("a.ts", "linux")).toBe(13);
+    expect(oxlintArgumentSize("a.ts", "win32")).toBe(7);
+  });
+
+  it("caps files per batch and splits a batch whose report overflows the buffer", async () => {
+    const sizes: number[] = [];
+    const execute = vi.fn(async (_binary: string, args: string[]) => {
+      const batch = args.slice(4);
+      sizes.push(batch.length);
+      if (batch.length > 100) {
+        throw Object.assign(new Error("stdout maxBuffer length exceeded"), {
+          code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+        });
+      }
+      return {
+        stdout: JSON.stringify({
+          diagnostics: batch.map((filename) => ({
+            filename,
+            severity: "warning",
+            message: "checked",
+          })),
+        }),
+        stderr: "",
+      };
+    });
+    const files = Array.from({ length: 1_200 }, (_, index) => ({
+      path: path.join(cwd, "src", `${index}.ts`),
+      relativePath: `src/${index}.ts`,
+    }));
+    const batched = new OxlintRunner({ execute, exists: () => true, platform: "linux" });
+    batched.initialize(cwd);
+    const results = await batched.checkFiles(files);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(MAX_FILES_PER_BATCH);
+    expect(sizes.slice(0, 1)).toEqual([MAX_FILES_PER_BATCH]);
+    expect(results.map((result) => result.path)).toEqual(files.map((file) => file.path));
+    expect(results.every((result) => result.warnings.length === 1)).toBe(true);
+  });
+
+  it("still fails when a single file's report overflows the buffer", async () => {
+    const execute = vi.fn(async () => {
+      throw Object.assign(new Error("stdout maxBuffer length exceeded"), {
+        code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+      });
+    });
+    const batched = new OxlintRunner({ execute, exists: () => true, platform: "linux" });
+    batched.initialize(cwd);
+    await expect(
+      batched.checkFiles([{ path: path.join(cwd, "a.ts"), relativePath: "a.ts" }]),
+    ).rejects.toThrow("maxBuffer");
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(
+      oxlintCommandError({ code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER", killed: true }, "", "")
+        .message,
+    ).toContain("more than 8 MiB of output");
   });
   it("manager shutdown lets the worker reap its running CLI child", async () => {
     const fake = path.join(cwd, "node_modules", "oxlint");

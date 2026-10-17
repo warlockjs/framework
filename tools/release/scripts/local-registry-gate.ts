@@ -33,6 +33,7 @@ export const WARLOCK_FAMILY_PACKAGE_NAMES = Object.freeze([
   "@warlock.js/ai-xai",
   "@warlock.js/ai-tools",
   "@warlock.js/ai-workspace",
+  "@warlock.js/ai-cli",
   "@warlock.js/auth",
   "@warlock.js/cache",
   "@warlock.js/cascade",

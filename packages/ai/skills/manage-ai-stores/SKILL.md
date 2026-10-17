@@ -1,16 +1,16 @@
 ---
 name: manage-ai-stores
-description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() for cross-turn SESSION STATE and ai.snapshot.{memory,pg,redis}() for in-flight SUPERVISOR/WORKFLOW run state. Two distinct contracts (CheckpointStore vs SnapshotStore), dev-owned pg/redis clients (no peer dep), never-auto-migrated schema(), global defaults via ai.config({defaultCheckpointStore, defaultSnapshotStore}). Triggers: `ai.checkpoint`, `ai.snapshot`, `checkpointStore`, `snapshotStore`, `CheckpointStore`, `SnapshotStore`, `CheckpointRecord`, `checkpoint.pg`, `checkpoint.redis`, `snapshot.pg`, `snapshot.redis`, `store.schema()`, `keepSnapshots`, `defaultCheckpointStore`, `defaultSnapshotStore`, `PgClientLike`, `RedisClientLike`; ''persist orchestrator sessions'', ''wire a pg checkpoint store'', ''run the store DDL'', ''checkpoint vs snapshot''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator lifecycle — the `run-orchestrator` topic; cache-backed snapshot resume / semanticCache store — the `persist-ai-data` topic; competing libs `temporal`, `inngest`.'
+description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() for cross-turn SESSION STATE and ai.snapshot.{memory,pg,redis,file,sqlite}() for in-flight SUPERVISOR/WORKFLOW/agent run state (and ai.session conversations). Two distinct contracts (CheckpointStore vs SnapshotStore), dev-owned pg/redis clients (no peer dep), never-auto-migrated schema(), global defaults via ai.config({defaultCheckpointStore, defaultSnapshotStore}). Triggers: `ai.checkpoint`, `ai.snapshot`, `checkpointStore`, `snapshotStore`, `CheckpointStore`, `SnapshotStore`, `CheckpointRecord`, `checkpoint.pg`, `checkpoint.redis`, `snapshot.pg`, `snapshot.redis`, `snapshot.file`, `snapshot.sqlite`, `node:sqlite`, `better-sqlite3`, `store.schema()`, `keepSnapshots`, `defaultCheckpointStore`, `defaultSnapshotStore`, `PgClientLike`, `RedisClientLike`; ''persist orchestrator sessions'', ''wire a pg checkpoint store'', ''run the store DDL'', ''checkpoint vs snapshot''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator lifecycle — the `run-orchestrator` topic; cache-backed snapshot resume / semanticCache store — the `persist-ai-data` topic; competing libs `temporal`, `inngest`.'
 ---
 
 # Orchestrator stores — checkpoint vs snapshot
 
 `ai.orchestrator()` persists through **two distinct stores** with two distinct contracts. Confusing them is the #1 wiring mistake.
 
-| Store          | Contract          | Persists                                                                      | Keyed by                                      | Factories                           |
-| -------------- | ----------------- | ----------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------- |
-| **checkpoint** | `CheckpointStore` | cross-turn SESSION STATE (one append-only row per settled turn)               | `(orchestrator_name, session_id, turn_index)` | `ai.checkpoint.{memory,pg,redis}()` |
-| **snapshot**   | `SnapshotStore`   | in-flight internal SUPERVISOR run state (for `iterate: true` mid-turn resume) | `runId`                                       | `ai.snapshot.{memory,pg,redis}()`   |
+| Store          | Contract          | Persists                                                                      | Keyed by                                      | Factories                                     |
+| -------------- | ----------------- | ----------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------- |
+| **checkpoint** | `CheckpointStore` | cross-turn SESSION STATE (one append-only row per settled turn)               | `(orchestrator_name, session_id, turn_index)` | `ai.checkpoint.{memory,pg,redis}()`           |
+| **snapshot**   | `SnapshotStore`   | in-flight internal SUPERVISOR run state (for `iterate: true` mid-turn resume) | `runId`                                       | `ai.snapshot.{memory,pg,redis,file,sqlite}()` |
 
 - A **checkpoint** is what lets `execute()` rehydrate a session across calls — state, `turn_index`, drift `signature`, `version`, `last_route`, compaction progress, lock metadata.
 - A **snapshot** is what lets a crashed mid-turn `iterate: true` turn resume — it round-trips the existing `SupervisorSnapshot` envelope (the same shape the supervisor's own `snapshotStore` uses).
@@ -64,6 +64,16 @@ ai.snapshot.pg({ client: pool, table: "warlock_supervisor_snapshots" });
 ai.checkpoint.redis({ client: redisClient, prefix: "warlock:orchestrator", ttl: 86_400 });
 ai.snapshot.redis({ client: redisClient, prefix: "warlock:snapshot" });
 ```
+
+Local-first snapshot stores (no server, single host):
+
+```ts
+ai.snapshot.file({ dir: ".warlock/snapshots" }); // one JSON file per runId, written via temp file + rename
+ai.snapshot.sqlite({ path: "./data/agent.db" }); // node:sqlite; table warlock_snapshots, created on first use
+ai.snapshot.sqlite({ database: betterSqliteDb, table: "runs", createTable: false }); // bring your own exec/prepare database
+```
+
+`ai.snapshot.sqlite` is the one store that creates its own table (an embedded file has no migration step); `createTable: false` turns that off and `schema()` still returns the DDL. Every `ai.snapshot.*` factory is generic over the snapshot shape (`ai.snapshot.file<AgentSnapshot>({ dir })`), so the same factories back `durable` agents and `ai.session()` conversations (the `keep-agent-conversations` topic).
 
 Table / prefix names must be safe SQL identifiers (`[A-Za-z_][A-Za-z0-9_]*`) — interpolated into DDL/DML, so anything outside that subset is rejected. Defaults: pg checkpoint table `warlock_orchestrator_sessions`, pg snapshot table `warlock_supervisor_snapshots`, redis prefix `warlock:orchestrator`.
 

@@ -1,0 +1,223 @@
+---
+title: "Run coding CLIs as agents"
+description: "@warlock.js/ai-cli drives vendor coding CLIs (Claude Code, Codex, Copilot, Cursor, Grok, Kimi, …) headless — one event model, resume, cancellation, usage, MCP, and an ai.agent model adapter."
+sidebar:
+  order: 1
+  label: "Run coding CLIs"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+Many teams run the vendors' own agent CLIs on the subscriptions they already pay for. `@warlock.js/ai-cli` drives those CLIs as first-class agents: it launches one headless session per run, reads the CLI's machine-readable stream, and turns it into **one event model** for every vendor. You get the final text, usage and a session reference to resume, plus cancellation that kills the CLI's whole process tree.
+
+Fourteen vendors ship as built-in adapters — Claude Code, Codex, Antigravity, Qwen Code, Kimi Code, Cursor, Copilot, Grok Build, OpenCode, Amp, Factory Droid, Mistral Vibe, Aider and Reasonix. See [Vendor adapters](../vendors/) for each one's flags, stream format and how it was verified. To support another CLI, [write an adapter](../custom-adapter/).
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+
+```bash
+npm install @warlock.js/ai @warlock.js/ai-cli
+```
+
+  </TabItem>
+  <TabItem label="yarn">
+
+```bash
+yarn add @warlock.js/ai @warlock.js/ai-cli
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```bash
+pnpm add @warlock.js/ai @warlock.js/ai-cli
+```
+
+  </TabItem>
+</Tabs>
+
+The package installs no vendor CLI. Install the ones you use yourself (for example `npm install -g @anthropic-ai/claude-code`), and log in or provide an API key.
+
+## Quick start
+
+```ts
+import "@warlock.js/ai-cli";
+import { ai } from "@warlock.js/ai";
+
+const claude = ai.cli.claudeCode({ model: "sonnet", apiKey: process.env.ANTHROPIC_API_KEY });
+
+const session = await claude.run("Fix the failing test in src/math.spec.ts", {
+  cwd: "/srv/acme-api",
+});
+
+for await (const event of session.events) {
+  if (event.type === "message" && event.delta) process.stdout.write(event.text);
+  if (event.type === "tool.call") console.log("\n→", event.name, event.input);
+}
+
+const result = await session.done();
+
+console.log(result.status, result.text, result.usage, result.sessionRef);
+```
+
+Importing the package registers `ai.cli`. The same namespace is exported directly as `cli` (`import { cli } from "@warlock.js/ai-cli"`). There is one factory per vendor: `cli.claudeCode`, `cli.codex`, `cli.antigravity`, `cli.qwenCode`, `cli.kimi`, `cli.cursor`, `cli.copilot`, `cli.grok`, `cli.opencode`, `cli.amp`, `cli.droid`, `cli.mistralVibe`, `cli.aider` and `cli.reasonix`. `cli.custom(adapter, options)` takes your own adapter.
+
+## Options
+
+A factory takes defaults; `run(prompt, options)` overrides them for one run.
+
+| Option        | Where   | What it does                                                                                                                   |
+| ------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `cwd`         | both    | Working directory of the run (default `process.cwd()`).                                                                        |
+| `model`       | both    | Passed to the CLI's model flag.                                                                                                |
+| `effort`      | both    | Framework effort (`none` … `max`), mapped to the vendor's scale. Refused by CLIs without an effort control.                    |
+| `permission`  | both    | `"standard"` (default) or `"bypass"` — see [Permissions](#permissions).                                                        |
+| `resume`      | both    | A `sessionRef` from an earlier run.                                                                                            |
+| `mcp`         | both    | Per-run MCP servers, written to a 0600 config file — see [MCP servers](#mcp-servers).                                          |
+| `apiKey`      | both    | Exported as the adapter's API-key variable (for example `ANTHROPIC_API_KEY`). Never placed in argv.                            |
+| `env`         | both    | Extra environment for the CLI (wins over inherited variables).                                                                 |
+| `args`        | both    | Extra argv, appended after the adapter's flags. Do not put secrets here.                                                       |
+| `signal`      | both    | Cancels the run and kills the process tree.                                                                                    |
+| `timeoutMs`   | both    | Kills the process tree after this long (status `timeout`).                                                                     |
+| `home`        | factory | `"private"` (default), an absolute path you own, or `"inherit"` — see [Config homes](../security-and-platforms/#config-homes). |
+| `command`     | factory | Executable to run instead of the default (a name on `PATH` or an absolute path).                                               |
+| `inheritEnv`  | factory | `true` (default), `false` (minimal system set only) or a list of names to pass on top of the minimal set.                      |
+| `probe`       | factory | Run the capability probe before the first run (default `true`).                                                                |
+| `killGraceMs` | factory | Grace between SIGTERM and SIGKILL on POSIX (default 2000).                                                                     |
+
+## The event model
+
+`session.events` is an async iterable of `CliEvent`, discriminated on `type`. Every iteration replays from the first event, so several consumers can read it, and it ends after `session.ended`.
+
+| `type`            | Fields                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| `session.started` | `sessionRef?`, `model?`                                                                |
+| `message`         | `text`, `delta` (streamed fragment or complete message), `final?`                      |
+| `tool.call`       | `id`, `name`, `input`                                                                  |
+| `tool.result`     | `id` (pairs with the call), `output`, `isError`                                        |
+| `usage`           | `usage` (`input`, `output`, `total`, cache/reasoning tokens, `costUSD?`), `cumulative` |
+| `error`           | `message`, `fatal?` (a fatal error ends the session `failed`)                          |
+| `session.ended`   | `status`, `exitCode`, `signal`, `sessionRef?`, `durationMs`                            |
+
+Every event except `session.ended` also carries `raw`, the vendor's original record, for debugging.
+
+Not every CLI streams everything: some print whole messages only (no deltas), some report usage only at the end, Kimi and Copilot print no token counts in the stream, and Aider has no machine-readable output at all. The [vendor table](../vendors/) lists what each one provides.
+
+## The result
+
+`session.done()` resolves once the process has exited and the stream is drained. It never rejects; branch on `status`.
+
+```ts
+const result = await session.done();
+
+switch (result.status) {
+  case "completed":
+    console.log(result.text); // the vendor's final record, else the last assistant message
+    break;
+  case "failed":
+  case "timeout":
+    console.error(result.error, result.exitCode, result.stderr);
+    break;
+  case "cancelled":
+    break;
+}
+```
+
+`run()` itself rejects with a `CliError` only for setup problems, before anything starts. `error.type` is one of:
+
+- `not-found` — the executable is not on `PATH`.
+- `capability` — the installed version's `--help` lacks a flag the run needs; see [Capability probe](../security-and-platforms/#capability-probe).
+- `probe-failed` — the CLI's help could not be read.
+- `unsupported-option` — the adapter cannot honour an option.
+- `prompt-transport` — the prompt fits neither argv nor stdin on this platform.
+
+`CliError` extends the framework `ProviderError`.
+
+## Resume, cancel, time out
+
+```ts
+const first = await (await claude.run("Plan the refactor of src/billing")).done();
+
+const second = await claude.run("Now implement step 1", { resume: first.sessionRef });
+
+const controller = new AbortController();
+const third = await claude.run("Run the full test suite", {
+  signal: controller.signal,
+  timeoutMs: 600_000,
+});
+
+setTimeout(() => controller.abort(), 30_000); // or: third.cancel()
+console.log((await third.done()).status); // "cancelled"
+```
+
+Cancellation and timeouts kill the **whole process tree**: the CLI, and every shell, language server and MCP server it started. A run whose signal is already aborted never spawns anything.
+
+## Permissions
+
+`permission` defaults to `"standard"`: the CLI runs with its own non-interactive rules. Most CLIs refuse a tool call that would need a human approval, and none of them hang waiting for one. `"bypass"` switches on the vendor's "approve everything" mode, such as `--dangerously-skip-permissions`, `--dangerously-bypass-approvals-and-sandbox`, `--yolo` or `--always-approve`. Only opt into bypass for a run you would let execute any command.
+
+What `"standard"` allows depends on the vendor:
+
+- **Read-only by default:** Codex (its read-only sandbox) and Droid (read-only autonomy).
+- **Permissive by default:** OpenCode and Amp.
+- **No standard mode:** Kimi Code always approves everything in print mode, so its adapter refuses `"standard"` and requires an explicit `"bypass"`.
+
+The [vendor table](../vendors/) spells out each CLI.
+
+## MCP servers
+
+```ts
+const session = await cli.codex().run("Summarize open issues", {
+  mcp: {
+    tracker: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@acme/tracker-mcp"],
+      env: { TRACKER_TOKEN: process.env.TRACKER_TOKEN ?? "" },
+    },
+    docs: {
+      type: "http",
+      url: "https://mcp.acme.dev/mcp",
+      headers: { Authorization: `Bearer ${process.env.DOCS_TOKEN}` },
+    },
+  },
+});
+```
+
+Servers use one vendor-neutral shape, `{ type: "stdio", command, args, env }` or `{ type: "http" | "sse", url, headers }`, and each adapter renders it into its CLI's own format.
+
+Tokens never reach argv. They are written into a mode-0600 file inside the run's private directory, or inside the private home for CLIs that only read MCP from their home. That file is removed when the run ends. CLIs that read MCP only from their config home (Kimi, Grok, Cursor, Droid, Antigravity, Mistral Vibe, Reasonix) need the default private home for runs with `mcp`. With a shared home they fail closed rather than write tokens into your own config. Aider has no MCP support.
+
+## Use a CLI as an `ai.agent` model
+
+`cli.model(agent, config)`, or the shorthand `agent.model(config)`, wraps a CLI agent in a `ModelContract`. `ai.agent`, and its budget, guardrail, observer and fallback middleware, can then drive a CLI:
+
+```ts
+import { ai, budget } from "@warlock.js/ai";
+import { cli } from "@warlock.js/ai-cli";
+
+const reviewer = ai.agent({
+  model: cli.codex({ cwd: "/srv/acme-api" }).model({ name: "codex-reviewer" }),
+  middleware: [budget({ maxTokens: 200_000 })],
+});
+
+const { text, usage } = await reviewer.execute("Review the last commit for bugs.");
+```
+
+How the model behaves:
+
+- **One fresh session per call.** The conversation is rendered into one prompt: system messages first, then a single user turn as-is or a labelled transcript.
+- **The answer is the session's final text,** and usage maps onto the framework `Usage`.
+- **The CLI runs its own tools.** A call that carries agent `tools` is refused; give the CLI MCP servers instead.
+- **Effort from `reasoning.effort` is forwarded** for adapters with an effort control.
+- **Streaming yields the final answer once the session ends.** For live progress, read `run().events`.
+- **A failed run throws a `CliError` (`type: "run-failed"`)**, so `fallbackModel` can switch to another model.
+- **Pass `pricing`** (per million tokens) to get `Usage.cost` and USD budgets.
+
+## See also
+
+- [Vendor adapters](../vendors/) — flags, stream formats and verification per CLI.
+- [Security and platforms](../security-and-platforms/) — homes, secrets, the probe, Windows rules, cancellation.
+- [Write an adapter](../custom-adapter/) — drive a CLI the package does not ship.

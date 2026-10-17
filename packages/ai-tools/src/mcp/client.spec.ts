@@ -365,6 +365,7 @@ describe("mcp() client — client-level signal", () => {
     const client = mcp(transport, { signal: controller.signal });
 
     const [contract] = await client.tools();
+    if (!contract) throw new Error("expected one adapted tool");
     controller.abort();
     await Promise.resolve();
 
@@ -402,6 +403,7 @@ describe("mcp() client — client-level signal", () => {
     transport.on("tools/call", (request) => textCallResult(request, "ok"));
     const client = mcp(transport, { signal: new AbortController().signal });
     const [contract] = await client.tools();
+    if (!contract) throw new Error("expected one adapted tool");
     const call = new AbortController();
 
     await contract.invoke({ message: "hi" }, { artifacts: {}, signal: call.signal });

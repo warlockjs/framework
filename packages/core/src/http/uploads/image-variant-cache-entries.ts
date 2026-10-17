@@ -8,9 +8,15 @@ const DERIVATIVE = /^[a-f0-9]{64}\.(?:jpg|png|webp|avif)$/;
 const TEMPORARY =
   /^(?:[a-f0-9]{64}\.(?:jpg|png|webp|avif)\.tmp-[a-f0-9]{16}|\.source\.json\.[a-f0-9]{12}\.tmp)$/;
 
-type VariantCacheEntry = {
+export type VariantCacheEntry = {
   target: string;
   type: "derivative" | "manifest" | "temporary";
+};
+
+/** One generation-shaped directory (a real directory, never a symlink) and its recognized files. */
+export type VariantCacheGeneration = {
+  directory: string;
+  entries: VariantCacheEntry[];
 };
 
 async function entries(directory: string) {
@@ -22,11 +28,11 @@ async function entries(directory: string) {
   }
 }
 
-/** Recognize only files emitted by the image writers; never traverse symlinks. */
-export async function* variantSourceCacheEntries(
+/** Recognize only generation directories and files emitted by the image writers; never traverse symlinks. */
+export async function* variantSourceCacheGenerations(
   sourceDirectory: string,
   keepGeneration?: string,
-): AsyncGenerator<VariantCacheEntry> {
+): AsyncGenerator<VariantCacheGeneration> {
   try {
     // Checking the final component alone still follows a symlinked shard.
     for (const directory of [path.dirname(sourceDirectory), sourceDirectory]) {
@@ -44,6 +50,7 @@ export async function* variantSourceCacheEntries(
     )
       continue;
     const directory = path.join(sourceDirectory, generation.name);
+    const found: VariantCacheEntry[] = [];
     for (const file of await entries(directory)) {
       if (!file.isFile()) continue;
       const type = DERIVATIVE.test(file.name)
@@ -53,24 +60,44 @@ export async function* variantSourceCacheEntries(
           : TEMPORARY.test(file.name)
             ? "temporary"
             : undefined;
-      if (type) yield { target: path.join(directory, file.name), type };
+      if (type) found.push({ target: path.join(directory, file.name), type });
     }
+    yield { directory, entries: found };
   }
 }
 
 /** Every directory component must match the generated cache layout. */
-export async function* variantCacheEntries(
+export async function* variantCacheGenerations(
   cacheDirectory: string,
-): AsyncGenerator<VariantCacheEntry> {
+): AsyncGenerator<VariantCacheGeneration> {
   for (const shard of await entries(cacheDirectory)) {
     if (!shard.isDirectory() || !SHARD.test(shard.name)) continue;
     const directory = path.join(cacheDirectory, shard.name);
     for (const source of await entries(directory)) {
       if (!source.isDirectory() || !SOURCE.test(source.name) || !source.name.startsWith(shard.name))
         continue;
-      yield* variantSourceCacheEntries(path.join(directory, source.name));
+      yield* variantSourceCacheGenerations(path.join(directory, source.name));
     }
   }
+}
+
+async function* flatten(
+  generations: AsyncIterable<VariantCacheGeneration>,
+): AsyncGenerator<VariantCacheEntry> {
+  for await (const generation of generations) yield* generation.entries;
+}
+
+/** Recognized files of one source's generations, optionally skipping the `keepGeneration` directory. */
+export function variantSourceCacheEntries(
+  sourceDirectory: string,
+  keepGeneration?: string,
+): AsyncGenerator<VariantCacheEntry> {
+  return flatten(variantSourceCacheGenerations(sourceDirectory, keepGeneration));
+}
+
+/** Recognized files of every source in the cache. */
+export function variantCacheEntries(cacheDirectory: string): AsyncGenerator<VariantCacheEntry> {
+  return flatten(variantCacheGenerations(cacheDirectory));
 }
 
 /** Keep directories in place so removing cache data cannot remove user folders. */

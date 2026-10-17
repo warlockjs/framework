@@ -1,3 +1,5 @@
+import { evaluateConditionalRequest } from "@warlock.js/core";
+
 /**
  * Pure conditional-request metadata for an already generated sitemap file.
  *
@@ -10,6 +12,7 @@ export type SitemapHttpValidatorInput = {
   readonly sha256: string;
   /** Time that those bytes became the current committed generation. */
   readonly generatedAt: Date | number | string;
+  readonly ifMatch?: string;
   readonly ifNoneMatch?: string;
   readonly ifModifiedSince?: string;
   /** Conditional semantics apply to GET and HEAD; defaults to GET. */
@@ -24,6 +27,8 @@ export type SitemapHttpValidators = {
   readonly cacheControl: string;
   /** Whether a GET or HEAD may return 304 with these response headers. */
   readonly notModified: boolean;
+  /** Whether `If-Match` failed (strong comparison), so the answer is 412. */
+  readonly preconditionFailed: boolean;
 };
 
 export const DEFAULT_SITEMAP_CACHE_CONTROL = "public, max-age=300";
@@ -38,48 +43,6 @@ function toSecond(date: Date | number | string): number {
   return Math.floor(milliseconds / 1_000) * 1_000;
 }
 
-/** Split an entity-tag list without treating a comma inside a quoted tag as a separator. */
-function entityTagList(value: string): string[] {
-  const tags: string[] = [];
-  let start = 0;
-  let quoted = false;
-  let escaped = false;
-
-  for (let index = 0; index < value.length; index++) {
-    const character = value[index];
-
-    if (quoted && character === "\\" && !escaped) {
-      escaped = true;
-      continue;
-    }
-
-    if (character === '"' && !escaped) quoted = !quoted;
-    escaped = false;
-
-    if (character === "," && !quoted) {
-      tags.push(value.slice(start, index).trim());
-      start = index + 1;
-    }
-  }
-
-  tags.push(value.slice(start).trim());
-
-  return tags.filter(Boolean);
-}
-
-/** Weak comparison is required by If-None-Match for GET and HEAD. */
-function weaklyMatches(candidate: string, etag: string): boolean {
-  const normalized = candidate.replace(/^W\//i, "").trim();
-
-  return normalized === etag;
-}
-
-function matchesIfNoneMatch(value: string, etag: string): boolean {
-  return entityTagList(value).some(
-    (candidate) => candidate === "*" || weaklyMatches(candidate, etag),
-  );
-}
-
 /**
  * Builds strong validators for generated sitemap bytes and evaluates optional
  * conditional request headers. If-None-Match is deliberately authoritative:
@@ -90,24 +53,22 @@ export function resolveSitemapHttpValidators(
 ): SitemapHttpValidators {
   const generatedAt = toSecond(input.generatedAt);
   const etag = `"${input.sha256}"`;
-  const safeMethod =
-    input.method === undefined || input.method === "GET" || input.method === "HEAD";
-  let notModified = false;
-
-  if (safeMethod && input.ifNoneMatch !== undefined) {
-    notModified = matchesIfNoneMatch(input.ifNoneMatch, etag);
-  } else if (safeMethod && input.ifModifiedSince !== undefined) {
-    const modifiedSince = new Date(input.ifModifiedSince).getTime();
-
-    if (Number.isFinite(modifiedSince)) {
-      notModified = generatedAt <= Math.floor(modifiedSince / 1_000) * 1_000;
-    }
-  }
+  // RFC 9110 §13.2.2 precedence, with weak If-None-Match and strong If-Match
+  // comparison (§13.1); core owns the comparison so every server path agrees.
+  const outcome = evaluateConditionalRequest({
+    method: input.method ?? "GET",
+    etag,
+    lastModified: generatedAt,
+    ifMatch: input.ifMatch,
+    ifNoneMatch: input.ifNoneMatch,
+    ifModifiedSince: input.ifModifiedSince,
+  });
 
   return {
     etag,
     lastModified: new Date(generatedAt).toUTCString(),
     cacheControl: input.cacheControl ?? DEFAULT_SITEMAP_CACHE_CONTROL,
-    notModified,
+    notModified: outcome === "not-modified",
+    preconditionFailed: outcome === "precondition-failed",
   };
 }

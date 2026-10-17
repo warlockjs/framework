@@ -40,7 +40,7 @@ npm install @warlock.js/ai @warlock.js/ai-ollama
   <TabItem label="yarn">
 
 ```bash
-pnpm add @warlock.js/ai @warlock.js/ai-ollama
+yarn add @warlock.js/ai @warlock.js/ai-ollama
 ```
 
   </TabItem>
@@ -139,7 +139,11 @@ ollama.embedder({ name: "nomic-embed-text", dimensions: 512 });
 - **Streaming** — `stream()` yields text `delta`s, a `tool-call` per
   function call (Ollama streams a fully-formed call, not partial JSON),
   and a terminal `done` with the final finish reason and usage.
-  Cancellation via `signal` aborts the underlying stream.
+  Cancellation via `signal` cancels the HTTP request, on `stream()` and
+  `complete()` alike — before the response starts or mid-stream. The
+  `ollama` client takes no per-request signal, so `OllamaSDK` builds its
+  client with a `fetch` wrapper that applies each call's signal (your own
+  `fetch` option is still used underneath).
 - **Structured output** — on by default. A root-object JSON Schema is
   forwarded to Ollama's native `format` field. Otherwise it degrades to
   the agent's soft system-prompt hint plus client-side validation.
@@ -208,3 +212,7 @@ so include any neutral sampling settings you want to retain in that object.
 
 Ollama's chat transport has no native preflight token-count endpoint, so its
 model has no `countTokens` method. `sdk.count(text)` remains an offline estimate.
+
+## Streamed thinking and provider tools
+
+With `streamChunks` (on by default under `agent.stream()`), `stream()` yields `reasoning` for each `message.thinking` piece when `think` is on. Ollama's chat API has no built-in tools: an `ai.providerTool()` naming another provider is left out of the request with a warning. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/) and [Provider-defined tools](/v/latest/ai/tools/provider-tools/).

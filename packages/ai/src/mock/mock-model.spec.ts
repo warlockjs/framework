@@ -311,3 +311,92 @@ describe("MockModel.reset", () => {
     expect(afterReset.content).toBe("first");
   });
 });
+
+describe("MockModel finish reason inference", () => {
+  const toolCalls = [{ id: "call-1", name: "lookup", input: { q: "x" } }];
+
+  it("finishes with 'tool_calls' when scripted tool calls carry no finishReason", async () => {
+    const model = new MockModel("m", [{ content: "", toolCalls }]);
+    const result = await model.complete([{ role: "user", content: "hi" }]);
+
+    expect(result.finishReason).toBe("tool_calls");
+    expect(result.toolCalls).toEqual(toolCalls);
+  });
+
+  it("reports the inferred reason on the stream's done chunk too", async () => {
+    const model = new MockModel("m", [{ content: "", toolCalls }]);
+    const chunks = [];
+
+    for await (const chunk of model.stream([{ role: "user", content: "hi" }])) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.at(-1)).toMatchObject({ type: "done", finishReason: "tool_calls" });
+  });
+
+  it("keeps 'stop' for an empty tool-call list and an explicit finishReason over the inference", async () => {
+    const model = new MockModel("m", [
+      { content: "a", toolCalls: [] },
+      { content: "b", toolCalls, finishReason: "length" },
+    ]);
+
+    expect((await model.complete([{ role: "user", content: "1" }])).finishReason).toBe("stop");
+    expect((await model.complete([{ role: "user", content: "2" }])).finishReason).toBe("length");
+  });
+});
+
+describe("MockModel signal", () => {
+  it("rejects a call whose signal is already aborted", async () => {
+    const model = new MockModel("m", [{ content: "never" }]);
+    const controller = new AbortController();
+
+    controller.abort();
+
+    await expect(
+      model.complete([{ role: "user", content: "hi" }], { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("rejects during a scripted delay as soon as the signal aborts", async () => {
+    const model = new MockModel("m", [{ content: "late", delay: 60_000 }]);
+    const controller = new AbortController();
+    const reason = new Error("caller gave up");
+    const started = Date.now();
+    const call = model.complete([{ role: "user", content: "hi" }], { signal: controller.signal });
+
+    setTimeout(() => controller.abort(reason), 10);
+
+    await expect(call).rejects.toBe(reason);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it("stops a stream between chunks when the signal aborts", async () => {
+    const model = new MockModel("m", [{ content: "", deltas: ["a", "b", "c"] }]);
+    const controller = new AbortController();
+    const seen: string[] = [];
+
+    const consume = async () => {
+      for await (const chunk of model.stream([{ role: "user", content: "hi" }], {
+        signal: controller.signal,
+      })) {
+        if (chunk.type === "delta") {
+          seen.push(chunk.content);
+          controller.abort();
+        }
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({ name: "AbortError" });
+    expect(seen).toEqual(["a"]);
+  });
+
+  it("completes normally when the signal never aborts", async () => {
+    const model = new MockModel("m", [{ content: "ok", delay: 5 }]);
+    const controller = new AbortController();
+    const result = await model.complete([{ role: "user", content: "hi" }], {
+      signal: controller.signal,
+    });
+
+    expect(result.content).toBe("ok");
+  });
+});

@@ -34,6 +34,7 @@ export const configCheck: DoctorCheck = {
       return {
         name: "config",
         status: "fail",
+        code: "WL1001",
         detail: `missing required config section(s): ${missing.join(", ")}`,
       };
     }

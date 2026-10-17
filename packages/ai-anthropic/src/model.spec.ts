@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { totalCost } from "@warlock.js/ai";
+import { totalCost, type Usage } from "@warlock.js/ai";
 import { AnthropicModel } from "./model";
 
 /** The first recorded request; fails the test when none was made. */
@@ -104,7 +104,8 @@ describe("AnthropicModel.complete()", () => {
     ]);
 
     expect(firstCall(calls).params.model).toBe("claude-sonnet-4-6");
-    expect(firstCall(calls).params.max_tokens).toBe(4096);
+    // Non-streaming default: 16384, under the SDK's non-streaming ceiling.
+    expect(firstCall(calls).params.max_tokens).toBe(16384);
     expect(firstCall(calls).params.temperature).toBe(0.4);
     expect(firstCall(calls).params.system).toBe("Be concise.");
     expect(firstCall(calls).params.messages).toEqual([{ role: "user", content: "hi" }]);
@@ -731,7 +732,8 @@ describe("AnthropicModel.complete()", () => {
       type: "enabled",
       budget_tokens: 8000,
     });
-    expect(calls[0]?.params.max_tokens).toBe(12096);
+    // The 16384 default already leaves room above the 8000 budget.
+    expect(calls[0]?.params.max_tokens).toBe(16384);
   });
 
   it("rejects an explicit maxTokens that is not greater than the thinking budget", async () => {
@@ -1319,12 +1321,14 @@ describe("AnthropicModel.stream()", () => {
     const chunks = await collectStream(model.stream([{ role: "user", content: "hi" }]));
     const done = chunks.find((chunk) => chunk.type === "done");
 
-    expect(done?.usage).toMatchObject({
+    const usage = done?.usage as Usage | undefined;
+
+    expect(usage).toMatchObject({
       cacheWriteTokens: 20_000,
       cacheWrite1hTokens: 15_000,
       inputIncludesCache: false,
     });
-    expect(done?.usage.cost?.cacheWrite).toBeCloseTo((5_000 * 3.75 + 15_000 * 6) / 1e6, 10);
+    expect(usage?.cost?.cacheWrite).toBeCloseTo((5_000 * 3.75 + 15_000 * 6) / 1e6, 10);
   });
 
   it("forwards thinking and a cache breakpoint on a streaming request", async () => {
@@ -1582,8 +1586,8 @@ describe("AnthropicModel per-model thinking and temperature rules", () => {
 
     expect(params.thinking).toEqual({ type: "adaptive" });
     expect(params.output_config).toEqual({ effort: "high" });
-    // Same answer headroom as the budget path today: high budget (12000) + 4096.
-    expect(params.max_tokens).toBe(16096);
+    // The 16384 default covers the high budget (12000) plus 4096 answer room.
+    expect(params.max_tokens).toBe(16384);
   });
 
   it.each([
@@ -1612,7 +1616,7 @@ describe("AnthropicModel per-model thinking and temperature rules", () => {
 
     expect(params.thinking).toEqual({ type: "adaptive" });
     expect(params.output_config).toEqual({ effort: "medium" });
-    expect(params.max_tokens).toBe(12096);
+    expect(params.max_tokens).toBe(16384);
   });
 
   it("merges the effort into output_config alongside a structured-output format", async () => {

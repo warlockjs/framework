@@ -18,6 +18,7 @@ function makeContext(sessionId: string, input: unknown): MiddlewareToolContext {
     tripIndex: 0,
     messages: [],
     tool: { name: "refundCustomer", description: "Refund" },
+    callId: "call",
     request: { id: "call", name: "refundCustomer", input },
   };
 }

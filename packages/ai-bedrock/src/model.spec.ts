@@ -2,6 +2,7 @@ import {
   ConverseCommand,
   ConverseStreamCommand,
   type BedrockRuntimeClient,
+  type ConverseCommandInput,
   type ConverseResponse,
   type ConverseStreamOutput,
   type TokenUsage,
@@ -1276,6 +1277,11 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
   });
 });
 
+/** The first recorded Converse request, typed for field access. */
+function sentRequest(calls: ReadonlyArray<Record<string, unknown>>): ConverseCommandInput {
+  return firstCall(calls) as unknown as ConverseCommandInput;
+}
+
 describe("BedrockModel cache points on system and tools", () => {
   const weatherTool = {
     name: "getWeather",
@@ -1303,7 +1309,7 @@ describe("BedrockModel cache points on system and tools", () => {
 
     await model.complete(conversation, { tools: [weatherTool], cacheControl: { breakpoints: 1 } });
 
-    const request = firstCall(calls);
+    const request = sentRequest(calls);
     expect(request.toolConfig?.tools?.at(-1)).toEqual({ cachePoint: { type: "default" } });
     expect(request.system).toEqual([
       { text: "Stable instructions." },
@@ -1318,7 +1324,7 @@ describe("BedrockModel cache points on system and tools", () => {
 
     await model.complete(conversation, { tools: [weatherTool], cacheControl: { breakpoints: 1 } });
 
-    const request = firstCall(calls);
+    const request = sentRequest(calls);
     expect(request.toolConfig?.tools).toHaveLength(1);
     expect(request.system?.at(-1)).toEqual({ cachePoint: { type: "default" } });
   });
@@ -1329,7 +1335,7 @@ describe("BedrockModel cache points on system and tools", () => {
 
     await model.complete(conversation, { tools: [weatherTool] });
 
-    const request = firstCall(calls);
+    const request = sentRequest(calls);
     expect(request.toolConfig?.tools).toHaveLength(1);
     expect(request.system).toEqual([{ text: "Stable instructions." }]);
   });
@@ -1340,7 +1346,7 @@ describe("BedrockModel cache points on system and tools", () => {
       name: "anthropic.claude-haiku-4-5-20251001-v1:0",
       promptCacheTtl: "1h",
     }).complete(conversation, { cacheControl: { breakpoints: 1 } });
-    expect(firstCall(claude.calls).system?.at(-1)).toEqual({
+    expect(sentRequest(claude.calls).system?.at(-1)).toEqual({
       cachePoint: { type: "default", ttl: "1h" },
     });
 
@@ -1348,7 +1354,7 @@ describe("BedrockModel cache points on system and tools", () => {
     await new BedrockModel(legacy.client, {
       name: "anthropic.claude-3-7-sonnet-20250219-v1:0",
     }).complete(conversation, { cacheControl: { breakpoints: 1, ttl: "1h" } });
-    expect(firstCall(legacy.calls).system?.at(-1)).toEqual({ cachePoint: { type: "default" } });
+    expect(sentRequest(legacy.calls).system?.at(-1)).toEqual({ cachePoint: { type: "default" } });
   });
 });
 

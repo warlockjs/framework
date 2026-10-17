@@ -15,6 +15,7 @@ export {
 export {
   attachReasoningReplay,
   pickReplayableReasoning,
+  pickTurnReasoning,
   readReasoningReplay,
   RESPONSES_METADATA_KEY,
   toReplayReasoningItem,

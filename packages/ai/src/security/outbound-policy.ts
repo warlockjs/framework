@@ -1,6 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { isPrivateOrReservedIp } from "@warlock.js/core";
+import { isPrivateOrReservedIp } from "@warlock.js/core/net";
 import { OutboundPolicyError } from "../errors";
 import type { OutboundPolicy, ResolvedOutboundPolicy } from "./outbound-policy.type";
 

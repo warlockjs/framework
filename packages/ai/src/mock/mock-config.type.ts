@@ -43,8 +43,17 @@ export type MockUsage = {
  */
 export type MockModelResponse = {
   content: string;
+  /**
+   * Omitted = `"tool_calls"` when `toolCalls` is non-empty, otherwise
+   * `"stop"`. Set it explicitly to script a different ending (for example
+   * `"length"` with partial tool calls).
+   */
   finishReason?: FinishReason;
   usage?: MockUsage;
+  /**
+   * Tool calls the model "makes". With no `finishReason`, a non-empty list
+   * finishes the response with `"tool_calls"`, so the agent runs them.
+   */
   toolCalls?: ModelToolCallRequest[];
   /** Raw provider blocks to return as `ModelResponse.blocks` (and on the stream's `done` chunk). */
   blocks?: ProviderContentBlock[];
@@ -55,7 +64,16 @@ export type MockModelResponse = {
    * fragments) rather than on the assembled text.
    */
   deltas?: string[];
-  /** Simulate a delay in ms before resolving */
+  /**
+   * Reasoning text `stream()` emits as `reasoning` chunks before the
+   * content, one chunk per entry — only when the call opts in through
+   * `streamChunks` (as a real adapter would). Ignored by `complete()`.
+   */
+  reasoning?: string[];
+  /**
+   * Simulate a delay in ms before resolving. Aborting the call's `signal`
+   * during the delay rejects the call immediately.
+   */
   delay?: number;
   /** Throw this error instead of returning a response */
   error?: Error;

@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`, `detectJavaScriptRuntime`, `assertNodeOnlyCommand`, Bun, Deno, `bun dist/app.js`, `deno run -A`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use", "run on Bun", "run on Deno", "supported runtimes"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -166,7 +166,7 @@ Install `oxlint` in the app (`npm install --save-dev oxlint`) and add `.oxlintrc
 }
 ```
 
-`warlock dev` then checks changed JavaScript/TypeScript files in an isolated worker and reports rule ids, line/column spans, errors and warnings. It reads saved files from disk, honors the app's Oxlint ignore/config rules, and uses the app-resolved CLI package. A missing package or config skips the checker. Large file lists run in sequential batches within platform command-line limits, using paths relative to the app. Tool/config errors include the CLI output and are reported without stopping the dev server. CLI children are stopped during worker shutdown.
+`warlock dev` then checks changed JavaScript/TypeScript files in an isolated worker and reports rule ids, line/column spans, errors and warnings. It reads saved files from disk, honors the app's Oxlint ignore/config rules, and uses the app-resolved CLI package. A missing package or config skips the checker. Large file lists run in sequential batches of at most 500 files within platform command-line limits, using paths relative to the app; a batch whose report overflows the 8 MiB buffer is split and retried, and a single path the OS refuses as too long is reported as an unchecked warning instead of failing the scan. Tool/config errors include the CLI output and are reported without stopping the dev server. On worker shutdown CLI children get SIGTERM, then SIGKILL after 250 ms; the interrupted check is cancelled quietly ("the development server is shutting down") rather than reported as a timeout.
 
 ```ts
 import { defineConfig } from "@warlock.js/core";
@@ -415,6 +415,50 @@ Three consequences worth knowing:
 
 If you need the same fact inside the app, use `Application.onceBooted()` / `Application.whenBooted()` — the signal and your listeners fire from the same latch.
 
+## Runtimes — Node, Bun, Deno
+
+| Command              | Node.js 22.15+     | Bun 1.4.3                     | Deno 2.9.7                    |
+| -------------------- | ------------------ | ----------------------------- | ----------------------------- |
+| `warlock dev`        | supported          | refused (exit 1, clear error) | refused (exit 1, clear error) |
+| `warlock build`      | supported          | runs with a notice — use Node | runs with a notice — use Node |
+| `warlock start`      | supported          | supported                     | supported                     |
+| built entry directly | `node dist/app.js` | `bun dist/app.js`             | `deno run -A dist/app.js`     |
+
+Build on Node, then start the same `dist/` (plus `node_modules` and `.env`) on any of the three:
+
+```bash
+npx warlock build                                                          # Node
+NODE_ENV=production bun dist/app.js                                        # Bun, direct
+NODE_ENV=production bun node_modules/@warlock.js/core/bin/warlock.js start # Bun, via the CLI (--role works)
+NODE_ENV=production deno run -A dist/app.js                                # Deno, direct
+NODE_ENV=production deno run -A node_modules/@warlock.js/core/bin/warlock.js start
+```
+
+- `warlock start` spawns the server with the runtime the CLI runs on (`process.execPath`), so the server runs on Bun/Deno whenever the CLI does. `bun --bun run start` works; plain `bun run start` runs the CLI on Node.
+- Deno needs no npm-compat flag — it reads `node_modules` through the app's `package.json`. `-A` is what CI verifies.
+- Pages render on Bun and Deno: both resolve `react-dom/server` to a build without `renderToPipeableStream`, so `@warlock.js/web` loads `react-dom/server.node` in that case (no change on Node).
+- The versions above are pinned in `.github/workflows/runtimes.yml`; `packages/core/tests/acceptance/run-runtime-acceptance.mjs --runtimes=node,bun,deno` repeats the CI check locally.
+
+A custom Node-only command can reuse the same guard:
+
+```ts title="src/app/tools/commands/profile.command.ts"
+import { assertNodeOnlyCommand, command, detectJavaScriptRuntime } from "@warlock.js/core";
+
+export const profileCommand = command({
+  name: "profile",
+  description: "Capture a CPU profile (uses node:inspector)",
+  preAction: () => {
+    // Prints "warlock profile runs on Node.js only — this process is Bun 1.4.3." and exits 1 on Bun/Deno.
+    assertNodeOnlyCommand("profile");
+  },
+  action: () => {
+    const runtime = detectJavaScriptRuntime(); // { type: "node", version: "22.15.0" }
+
+    console.log(`profiling on ${runtime.type} ${runtime.version}`);
+  },
+});
+```
+
 ## Picking which mode you're in
 
 `Application.environment` and `Application.runtimeStrategy` are separate axes:
@@ -534,6 +578,7 @@ NODE_OPTIONS=--max-old-space-size=4096 npx warlock start
 - **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
 - **`sourcemap: false` cascades to `start`.** Stack traces lose `.ts` precision. Keep sourcemaps on unless artifact size is a hard constraint.
 - **`NODE_ENV` is not set by these commands.** The deployment env (your Dockerfile, CI, hosting provider) sets it. Forget it on a production server and `Application.isProduction` returns `false`, which flips cookie security, CORS, logging — silently. Always set `NODE_ENV=production` in production deployments.
+- **`warlock dev` is Node only.** On Bun or Deno it exits 1 before doing anything; develop on Node and run only the production build on Bun/Deno.
 - **`prestart` runs once on dev boot, not on reload.** If you're seeding test data in `src/app/prestart.ts`, it fires on `warlock dev` startup only. HMR reloads don't re-run it.
 
 ## See also

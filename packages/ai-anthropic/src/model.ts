@@ -1,7 +1,9 @@
 import {
   computeCost,
   InvalidRequestError,
+  resolveStreamChunks,
   safeJsonParse,
+  selectProviderTools,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -15,7 +17,12 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { AnthropicCallOptions, AnthropicModelConfig } from "./config.type";
+import type {
+  AnthropicCallOptions,
+  AnthropicClearThinking,
+  AnthropicClearToolUses,
+  AnthropicModelConfig,
+} from "./config.type";
 import type {
   AnthropicRequest,
   AnthropicRequestOptions,
@@ -23,12 +30,14 @@ import type {
   AnthropicNonStreamingRequest,
 } from "./request.type";
 import { anthropicPricingFor, withAnthropicCacheWriteRates } from "./known-pricing";
+import { inferMaxOutputTokens } from "./known-output-limits";
 import { inferVisionCapability } from "./known-vision-models";
 import {
-  acceptsBetweenTools,
   acceptsTemperature,
+  inferPreservedThinking,
   inferThinkingMode,
   type AnthropicThinkingMode,
+  noReasoningForm,
 } from "./thinking-mode";
 import { applyAnthropicCacheUsage, requestCacheTtl } from "./utils/cache-usage";
 import {
@@ -41,14 +50,32 @@ import {
 
 const LOG_MODULE = "ai.anthropic";
 
+/** `provider` value of `ai.providerTool()` entries this adapter sends verbatim. */
+const ANTHROPIC_WIRE_FORMAT = "anthropic";
+
 /**
  * Anthropic requires `max_tokens` on every request (unlike OpenAI,
- * where it is optional). When neither the per-call option nor the
- * model config supplies one, fall back to a generous default so a
- * caller who never thought about token caps still gets a complete
- * answer instead of a 400.
+ * where it is optional). When neither the per-call option nor the model
+ * config supplies one, the adapter picks a default large enough for agent
+ * work (see `resolveDefaultMaxTokens`):
+ *
+ * - streaming: the model's documented max output (`known-output-limits.ts`,
+ *   or `config.maxOutputTokens`), else this value;
+ * - non-streaming: this value, capped by the model's max output. The
+ *   installed `@anthropic-ai/sdk` (0.129.0, `calculateNonstreamingTimeout`)
+ *   refuses a non-streaming request whose `max_tokens` implies more than
+ *   ten minutes (above ~21,333 tokens) unless the client sets a `timeout`,
+ *   so the non-streaming default stays below that.
  */
-const DEFAULT_MAX_TOKENS = 4096;
+const DEFAULT_MAX_TOKENS = 16_384;
+
+/**
+ * Answer room kept on top of a thinking budget when the default
+ * `max_tokens` is sized: thinking counts toward `max_tokens` (installed
+ * SDK `ThinkingConfigParam` docs, `messages.d.ts:1105`), and in budget
+ * mode `max_tokens` must exceed `budget_tokens`.
+ */
+const MIN_ANSWER_TOKENS = 4096;
 
 /**
  * Anthropic rejects an extended-thinking budget below 1024 tokens, so
@@ -72,11 +99,10 @@ const DEFAULT_THINKING_EFFORT: ThinkingEffort = "medium";
  *
  * - Budget-mode models: sent as `thinking.budget_tokens` when the caller
  *   doesn't pass an explicit `reasoning.maxTokens`.
- * - Both modes: reserved on top of `DEFAULT_MAX_TOKENS` when the caller
- *   sets no `maxTokens`, because thinking counts toward `max_tokens`
- *   (installed SDK `ThinkingConfigParam` docs, `messages.d.ts:1105`).
- *   Adaptive models therefore get the same `max_tokens` the budget path
- *   has always produced.
+ * - Both modes: when the caller sets no `maxTokens`, the default
+ *   `max_tokens` keeps at least this budget plus `MIN_ANSWER_TOKENS`,
+ *   because thinking counts toward `max_tokens` (installed SDK
+ *   `ThinkingConfigParam` docs, `messages.d.ts:1105`).
  */
 const EFFORT_THINKING_BUDGET: Record<ThinkingEffort, number> = {
   // Anthropic's adaptive output config has no `minimal`; keep the minimum
@@ -134,8 +160,9 @@ type StreamedBlock = { block: Record<string, unknown>; json?: string };
  *
  * - `thinking`: the wire `thinking` field (absent = send nothing).
  * - `effort`: `output_config.effort`, set for adaptive-mode models only.
- * - `reservedTokens`: thinking tokens to reserve on top of
- *   `DEFAULT_MAX_TOKENS` when the caller configured no `maxTokens`.
+ * - `reservedTokens`: thinking tokens the default `max_tokens` must leave
+ *   room for (plus `MIN_ANSWER_TOKENS`) when the caller configured no
+ *   `maxTokens`.
  */
 type ThinkingRequest = {
   thinking?: Anthropic.ThinkingConfigParam;
@@ -190,6 +217,9 @@ export class AnthropicModel implements ModelContract {
   private readonly client: Anthropic;
   private readonly config: AnthropicModelConfig;
   private readonly thinkingMode: AnthropicThinkingMode;
+  /** Documented max output tokens of this model, when known. Sizes the default `max_tokens`. */
+  private readonly maxOutputTokens?: number;
+  private readonly preservedThinking: boolean;
   private readonly logger: Logger = log;
 
   public constructor(
@@ -208,6 +238,11 @@ export class AnthropicModel implements ModelContract {
     // Adaptive vs budget thinking — also decides whether `temperature` is
     // accepted. Explicit config wins over name inference, like `vision`.
     this.thinkingMode = config.thinkingMode ?? inferThinkingMode(config.name);
+    this.maxOutputTokens = config.maxOutputTokens ?? inferMaxOutputTokens(config.name);
+    // Budget-mode models predate preserved thinking; explicit config wins.
+    this.preservedThinking =
+      config.preservedThinking ??
+      (this.thinkingMode === "adaptive" && inferPreservedThinking(config.name));
     this.capabilities = {
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
@@ -261,11 +296,9 @@ export class AnthropicModel implements ModelContract {
     messages: Message[],
     options?: ModelCallOptions & { stream?: boolean },
   ): AnthropicRequest {
-    const betas = [...(resolveAnthropicOptions(options).betas ?? [])];
-    const body = structuredClone({
-      ...this.buildBody(messages, options),
-      stream: options?.stream ?? false,
-    });
+    const built = this.buildBody(messages, options);
+    const betas = [...new Set([...(resolveAnthropicOptions(options).betas ?? []), ...built.betas])];
+    const body = structuredClone({ ...built.body, stream: options?.stream ?? false });
 
     return { endpoint: betas.length > 0 ? "beta.messages" : "messages", body, betas };
   }
@@ -373,6 +406,11 @@ export class AnthropicModel implements ModelContract {
    * arguments have fully accumulated, and a terminal `done` carrying the
    * final finish reason + usage totals. Callers consume it with
    * `for await`.
+   *
+   * With `options.streamChunks` it also yields `reasoning` for every
+   * non-empty `thinking_delta`, `tool-args` for every `input_json_delta`
+   * of a client `tool_use` block, and `usage` after `message_start` and
+   * each `message_delta` (whose counts are cumulative).
    */
   public async *stream(
     messages: Message[],
@@ -380,6 +418,7 @@ export class AnthropicModel implements ModelContract {
   ): AsyncIterable<ModelStreamChunk> {
     yield* this.send(this.buildRequest(messages, { ...options, stream: true }), {
       signal: options?.signal,
+      streamChunks: options?.streamChunks,
     });
   }
 
@@ -400,8 +439,10 @@ export class AnthropicModel implements ModelContract {
     }
 
     let rawStopReason: string | null = null;
+    let compaction = compactionIterationUsage(undefined);
     const usage: Usage = { input: 0, output: 0, total: 0, inputIncludesCache: false };
     const cacheTtl = requestCacheTtl(request.body);
+    const want = resolveStreamChunks(options);
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
     const thinkingBlocks = new Map<number, AnthropicThinkingBlock>();
     // Every content block of the turn, by index, so the full ordered turn
@@ -422,6 +463,10 @@ export class AnthropicModel implements ModelContract {
           }
 
           applyAnthropicCacheUsage(usage, event.message.usage, cacheTtl);
+
+          if (want.usage) {
+            yield { type: "usage", usage: { ...usage, total: usage.input + usage.output } };
+          }
 
           continue;
         }
@@ -448,12 +493,28 @@ export class AnthropicModel implements ModelContract {
 
             if (accumulator) {
               accumulator.json += event.delta.partial_json;
+
+              // Only client `tool_use` blocks: a `server_tool_use` input
+              // (e.g. a web search query) never becomes a `tool-call`.
+              if (want.toolArgs && event.delta.partial_json !== "") {
+                yield {
+                  type: "tool-args",
+                  callId: accumulator.id,
+                  name: accumulator.name,
+                  delta: event.delta.partial_json,
+                };
+              }
             }
           } else if (event.delta.type === "thinking_delta") {
             const thinking = thinkingBlocks.get(event.index);
 
             if (thinking?.type === "thinking") {
               thinking.thinking += event.delta.thinking;
+            }
+
+            // `display: "omitted"` streams one empty `thinking_delta`.
+            if (want.reasoning && event.delta.thinking !== "") {
+              yield { type: "reasoning", delta: event.delta.thinking };
             }
           } else if (event.delta.type === "signature_delta") {
             const thinking = thinkingBlocks.get(event.index);
@@ -490,6 +551,10 @@ export class AnthropicModel implements ModelContract {
 
         if (event.type === "message_delta") {
           rawStopReason = event.delta.stop_reason ?? rawStopReason;
+          // The final delta carries every iteration of the request.
+          if (Array.isArray((event.usage as { iterations?: unknown }).iterations)) {
+            compaction = compactionIterationUsage(event.usage);
+          }
           usage.output = event.usage.output_tokens ?? usage.output;
 
           const thinkingTokens = event.usage.output_tokens_details?.thinking_tokens;
@@ -515,12 +580,21 @@ export class AnthropicModel implements ModelContract {
             },
             cacheTtl,
           );
+
+          // `message_delta.usage` counts are cumulative (Anthropic streaming
+          // docs), so this is the running total so far.
+          if (want.usage) {
+            yield { type: "usage", usage: { ...usage, total: usage.input + usage.output } };
+          }
         }
       }
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
 
+    usage.input += compaction.input;
+    usage.output += compaction.output;
+    addCacheCounts(usage, compaction);
     usage.total = usage.input + usage.output;
 
     const cost = computeCost(usage, this.pricing);
@@ -640,19 +714,29 @@ export class AnthropicModel implements ModelContract {
   }
 
   /**
-   * The full request body: the adapter-built params, then
-   * `thinking.display` when thinking is sent on an adaptive model, then
-   * `providerOptions.anthropic.body` merged last (caller fields win). The
-   * body may add fields the adapter does not build (`context_management`,
-   * `fallbacks`, …) but may not replace the conversation or the model —
-   * see {@link RESERVED_BODY_FIELDS}.
+   * The full request body and the beta flags it needs: the adapter-built
+   * params, then `thinking.display` when thinking is sent on an adaptive
+   * model, the typed `thinkingBlockBinding`, `contextManagement` and
+   * `serverCompaction` options, then `providerOptions.anthropic.body`
+   * merged last (caller fields win). The body may add fields the adapter
+   * does not build (`fallbacks`, …) but may not replace the conversation or
+   * the model — see {@link RESERVED_BODY_FIELDS}.
    */
   private buildBody(
     messages: Message[],
-    options: ModelCallOptions | undefined,
-  ): Record<string, unknown> {
+    options: (ModelCallOptions & { stream?: boolean }) | undefined,
+  ): { body: Record<string, unknown>; betas: string[] } {
     const anthropic = resolveAnthropicOptions(options);
-    const body: Record<string, unknown> = { ...this.buildParams(messages, options) };
+    const betas: string[] = [];
+    // Kept turns after a client-written summary carry thinking signed
+    // against the replaced history. Leave it out on models that check the
+    // conversation, unless the caller chose how the API handles it.
+    const body: Record<string, unknown> = {
+      ...this.buildParams(messages, options, {
+        dropRetainedThinking:
+          this.preservedThinking && anthropic.thinkingBlockBinding === undefined,
+      }),
+    };
 
     // `display` belongs to adaptive thinking only; `between_tools` takes
     // no other field and 400s with one.
@@ -665,6 +749,32 @@ export class AnthropicModel implements ModelContract {
         ...(body.thinking as Record<string, unknown>),
         display: anthropic.thinkingDisplay,
       };
+    }
+
+    if (anthropic.thinkingBlockBinding) {
+      this.applyBlockBinding(body, anthropic.thinkingBlockBinding, betas);
+    }
+
+    const edits = buildContextEdits(anthropic);
+
+    if (edits.length > 0) {
+      if (anthropic.body?.context_management !== undefined) {
+        throw new InvalidRequestError(
+          "providerOptions.anthropic.contextManagement / serverCompaction cannot be combined with " +
+            "body.context_management: set the edits in one place.",
+          { context: { fields: ["context_management"] } },
+        );
+      }
+
+      body.context_management = { edits };
+
+      if (edits.some((edit) => edit.type !== "compact_20260112")) {
+        betas.push(CONTEXT_MANAGEMENT_BETA);
+      }
+
+      if (edits.some((edit) => edit.type === "compact_20260112")) {
+        betas.push(COMPACTION_BETA);
+      }
     }
 
     const reserved = Object.keys(anthropic.body ?? {}).filter((key) =>
@@ -680,7 +790,41 @@ export class AnthropicModel implements ModelContract {
       );
     }
 
-    return { ...body, ...anthropic.body };
+    return { body: { ...body, ...anthropic.body }, betas };
+  }
+
+  /**
+   * Set `thinking.block_binding.prefix_mismatch_behavior`. It rides on
+   * adaptive or budget (`enabled`) thinking. A model that runs adaptive
+   * thinking when `thinking` is omitted (every preserved-thinking model) gets
+   * an explicit `{ type: "adaptive" }`, which is the same request. Any other
+   * shape (`between_tools`, `disabled`) takes no extra field, so the option
+   * is skipped with a debug log.
+   */
+  private applyBlockBinding(
+    body: Record<string, unknown>,
+    behavior: "error" | "drop_block",
+    betas: string[],
+  ): void {
+    const thinking = body.thinking as { type?: string } | undefined;
+    const type = thinking?.type ?? (this.preservedThinking ? "adaptive" : undefined);
+
+    if (type !== "adaptive" && type !== "enabled") {
+      this.logger.debug(
+        LOG_MODULE,
+        "thinking-block-binding.ignored",
+        "thinkingBlockBinding needs adaptive or budget thinking on this request; not sent",
+        { model: this.name, thinking: thinking?.type ?? "none" },
+      );
+
+      return;
+    }
+
+    body.thinking = {
+      ...(thinking ?? { type }),
+      block_binding: { prefix_mismatch_behavior: behavior },
+    };
+    betas.push(THINKING_BINDING_BETA);
   }
 
   /**
@@ -697,9 +841,10 @@ export class AnthropicModel implements ModelContract {
    */
   private buildParams(
     messages: Message[],
-    options: ModelCallOptions | undefined,
+    options: (ModelCallOptions & { stream?: boolean }) | undefined,
+    conversion: { dropRetainedThinking: boolean },
   ): Omit<Anthropic.MessageCreateParamsNonStreaming, "stream"> {
-    const { system, messages: anthropicMessages } = toAnthropicMessages(messages);
+    const { system, messages: anthropicMessages } = toAnthropicMessages(messages, conversion);
     const thinking = this.buildThinking(options?.reasoning);
     const temperature = options?.temperature ?? this.config.temperature;
     const configuredMaxTokens = options?.maxTokens ?? this.config.maxTokens;
@@ -707,9 +852,7 @@ export class AnthropicModel implements ModelContract {
       thinking.thinking?.type === "enabled" ? thinking.thinking.budget_tokens : undefined;
     const maxTokens =
       configuredMaxTokens ??
-      (thinking.reservedTokens !== undefined
-        ? thinking.reservedTokens + DEFAULT_MAX_TOKENS
-        : DEFAULT_MAX_TOKENS);
+      this.resolveDefaultMaxTokens(options?.stream === true, thinking.reservedTokens);
     // Extended thinking pins sampling to the default temperature —
     // Anthropic 400s when `thinking` is enabled alongside any explicit
     // `temperature`. Models released after Opus 4.6 (adaptive mode) reject
@@ -736,10 +879,33 @@ export class AnthropicModel implements ModelContract {
       ...this.buildAutomaticCacheControl(options?.cacheControl),
       ...this.buildSystem(system, options?.cacheControl),
       ...(sendTemperature ? { temperature } : {}),
-      ...this.buildTools(options?.tools, options?.cacheControl),
+      ...this.buildTools(options, options?.cacheControl),
       ...this.buildOutputConfig(options?.responseSchema, thinking.effort),
       ...(thinking.thinking ? { thinking: thinking.thinking } : {}),
     };
+  }
+
+  /**
+   * The `max_tokens` sent when neither the call nor the model config sets
+   * `maxTokens`:
+   *
+   * - streaming: the model's documented max output, or
+   *   `DEFAULT_MAX_TOKENS` (16384) for an unknown id;
+   * - non-streaming: `DEFAULT_MAX_TOKENS`, capped by the model's max output
+   *   (the SDK requires streaming for larger non-streaming requests unless
+   *   the client sets a `timeout`; see `DEFAULT_MAX_TOKENS`).
+   *
+   * With thinking on, the value is raised to at least the thinking budget
+   * plus `MIN_ANSWER_TOKENS`, and never exceeds the model's max output.
+   */
+  private resolveDefaultMaxTokens(stream: boolean, reservedTokens: number | undefined): number {
+    const limit = this.maxOutputTokens;
+    const fallback = limit === undefined ? DEFAULT_MAX_TOKENS : Math.min(limit, DEFAULT_MAX_TOKENS);
+    const base = stream ? (limit ?? DEFAULT_MAX_TOKENS) : fallback;
+    const withThinking =
+      reservedTokens === undefined ? base : Math.max(base, reservedTokens + MIN_ANSWER_TOKENS);
+
+    return limit === undefined ? withThinking : Math.min(withThinking, limit);
   }
 
   /**
@@ -824,12 +990,18 @@ export class AnthropicModel implements ModelContract {
    *   `messages.d.ts:1084`), so the budget is floored at that minimum.
    *
    * The neutral `effort: "none"` ("run without reasoning") is mapped per
-   * model:
-   * - Claude Sonnet 5.5 (`acceptsBetweenTools`): `thinking: { type:
-   *   "between_tools" }`, its only thinking-off form. It is sent alone —
-   *   no `output_config.effort` (the model default, `high`, is within the
-   *   `high`-or-below range it requires) and no `display`, both of which
-   *   the API rejects alongside it.
+   * model by `noReasoningForm` (see `thinking-mode.ts` for the sources):
+   * - Claude Sonnet 5.5: `thinking: { type: "between_tools" }`, its only
+   *   thinking-off form. It is sent alone — no `output_config.effort` (the
+   *   model default, `high`, is within the `high`-or-below range it
+   *   requires) and no `display`, both of which the API rejects alongside it.
+   * - Claude Sonnet 5 and Claude Haiku 5.5: `thinking: { type: "disabled" }`
+   *   with no effort and no `display`. Haiku 5.5 accepts `disabled` only at
+   *   effort `high` or below; its default (`medium`) applies.
+   * - Claude Opus 5: adaptive thinking at `output_config.effort: "low"`.
+   *   Opus 5 accepts `disabled`, but with it the model can write a tool call
+   *   as plain text (the call never runs) and leak thinking tags; the lowest
+   *   effort is the documented alternative.
    * - Opus 5.5 and Fable 5/5.1: no `thinking` field. These models have no
    *   thinking-off form (`disabled` and `budget_tokens` are a 400 at every
    *   effort), so thinking still runs at the model's default effort. Pass
@@ -841,12 +1013,11 @@ export class AnthropicModel implements ModelContract {
       return {};
     }
 
-    // `effort: "none"` is an explicit "run without reasoning". Sonnet 5.5
-    // turns thinking off only through `between_tools`; elsewhere we omit
-    // the `thinking` block. (This also short-circuits the
+    // `effort: "none"` is an explicit "run without reasoning", in the form
+    // this model accepts. (This also short-circuits the
     // `EFFORT_THINKING_BUDGET["none"]` → `undefined` → `NaN` budget path.)
     if (reasoning.effort === "none") {
-      return acceptsBetweenTools(this.name) ? { thinking: { type: "between_tools" } } : {};
+      return this.buildNoReasoning();
     }
 
     if (reasoning.maxTokens === undefined && reasoning.effort === undefined) {
@@ -874,6 +1045,27 @@ export class AnthropicModel implements ModelContract {
   }
 
   /**
+   * The thinking settings for `reasoning: { effort: "none" }`, per
+   * `noReasoningForm(this.name)` (documented on `buildThinking`).
+   */
+  private buildNoReasoning(): ThinkingRequest {
+    switch (noReasoningForm(this.name)) {
+      case "between_tools":
+        return { thinking: { type: "between_tools" } };
+      case "disabled":
+        return { thinking: { type: "disabled" } };
+      case "lowest-effort":
+        return {
+          thinking: { type: "adaptive" },
+          effort: EFFORT_TO_OUTPUT_EFFORT.low,
+          reservedTokens: EFFORT_THINKING_BUDGET.low,
+        };
+      case "omit":
+        return {};
+    }
+  }
+
+  /**
    * Spread-friendly tools fragment. Returns an empty object when no
    * tools were supplied so the caller can unconditionally spread it.
    *
@@ -887,13 +1079,24 @@ export class AnthropicModel implements ModelContract {
    * with no reads.
    */
   private buildTools(
-    tools: ModelCallOptions["tools"],
+    options: ModelCallOptions | undefined,
     cacheControl: ModelCallOptions["cacheControl"],
-  ): { tools?: Anthropic.Tool[] } {
+  ): { tools?: Anthropic.ToolUnion[] } {
+    const { tools, definitions } = selectProviderTools(options, {
+      // The wire format, plus the provider label when a gateway sets one.
+      accepts: [ANTHROPIC_WIRE_FORMAT, this.provider],
+      module: LOG_MODULE,
+      model: this.name,
+      logger: this.logger,
+    });
     const mapped = toAnthropicTools(tools);
+    // Provider-defined tools (`web_search_20250305`, `bash_20250124`, …) go
+    // first and verbatim; the cache breakpoint stays on the last function
+    // tool so it still covers every definition before it.
+    const providerDefined = definitions as unknown as Anthropic.ToolUnion[];
 
     if (!mapped) {
-      return {};
+      return providerDefined.length > 0 ? { tools: providerDefined } : {};
     }
 
     if (this.config.promptCaching && mapped.length > 0) {
@@ -905,7 +1108,7 @@ export class AnthropicModel implements ModelContract {
       }
     }
 
-    return { tools: mapped };
+    return { tools: [...providerDefined, ...mapped] };
   }
 
   /**
@@ -1025,12 +1228,14 @@ export class AnthropicModel implements ModelContract {
    * `inputIncludesCache: false`. Anthropic also reports
    * `output_tokens_details.thinking_tokens` as the reasoning subset of
    * its inclusive `output_tokens`; it is surfaced as `reasoningTokens`
-   * when present, without changing the billing total. `cost` is attached
-   * when the model is priced.
+   * when present, without changing the billing total. Server-side
+   * compaction iterations are added in (see {@link compactionIterationUsage}).
+   * `cost` is attached when the model is priced.
    */
   private extractUsage(raw: Anthropic.Usage, cacheTtl: ReturnType<typeof requestCacheTtl>): Usage {
-    const input = raw.input_tokens ?? 0;
-    const output = raw.output_tokens ?? 0;
+    const compaction = compactionIterationUsage(raw);
+    const input = (raw.input_tokens ?? 0) + compaction.input;
+    const output = (raw.output_tokens ?? 0) + compaction.output;
     const thinkingTokens = raw.output_tokens_details?.thinking_tokens;
     const usage: Usage = {
       input,
@@ -1043,6 +1248,7 @@ export class AnthropicModel implements ModelContract {
     };
 
     applyAnthropicCacheUsage(usage, raw, cacheTtl);
+    addCacheCounts(usage, compaction);
 
     const cost = computeCost(usage, this.pricing);
 
@@ -1099,6 +1305,165 @@ const COUNT_TOKENS_FIELDS = [
   "context_management",
   "mcp_servers",
 ] as const;
+
+/** Beta flag for typed context editing (Anthropic docs, "Context editing", read 2026-10-17). */
+const CONTEXT_MANAGEMENT_BETA = "context-management-2025-06-27";
+
+/** Beta flag for threshold compaction (Anthropic docs, "Compaction at a token threshold"). */
+const COMPACTION_BETA = "compact-2026-01-12";
+
+/** Beta flag for `thinking.block_binding` (Anthropic docs, "Preserved thinking"). */
+const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
+
+/** The API rejects a compaction trigger below 50,000 input tokens. */
+const MIN_COMPACTION_TRIGGER = 50_000;
+
+type ContextEdit = { type: string } & Record<string, unknown>;
+
+/**
+ * Translate the typed `contextManagement` / `serverCompaction` options into
+ * `context_management.edits`. `clear_thinking_20251015` must come first
+ * when strategies are combined (Anthropic docs, "Context editing").
+ */
+function buildContextEdits(anthropic: AnthropicCallOptions): ContextEdit[] {
+  const edits: ContextEdit[] = [];
+  const { clearThinking, clearToolUses } = anthropic.contextManagement ?? {};
+
+  if (clearThinking) {
+    edits.push(clearThinkingEdit(clearThinking === true ? {} : clearThinking));
+  }
+
+  if (clearToolUses) {
+    edits.push(clearToolUsesEdit(clearToolUses === true ? {} : clearToolUses));
+  }
+
+  if (anthropic.serverCompaction) {
+    const compaction = anthropic.serverCompaction === true ? {} : anthropic.serverCompaction;
+
+    if (compaction.triggerTokens !== undefined) {
+      assertCount(
+        "serverCompaction.triggerTokens",
+        compaction.triggerTokens,
+        MIN_COMPACTION_TRIGGER,
+      );
+    }
+
+    edits.push({
+      type: "compact_20260112",
+      ...(compaction.triggerTokens !== undefined
+        ? { trigger: { type: "input_tokens", value: compaction.triggerTokens } }
+        : {}),
+      ...(compaction.instructions ? { instructions: compaction.instructions } : {}),
+    });
+  }
+
+  return edits;
+}
+
+function clearThinkingEdit(options: AnthropicClearThinking): ContextEdit {
+  if (options.keep === undefined || options.keep === "all") {
+    return { type: "clear_thinking_20251015", ...(options.keep ? { keep: "all" } : {}) };
+  }
+
+  assertCount("contextManagement.clearThinking.keep", options.keep, 1);
+
+  return {
+    type: "clear_thinking_20251015",
+    keep: { type: "thinking_turns", value: options.keep },
+  };
+}
+
+function clearToolUsesEdit(options: AnthropicClearToolUses): ContextEdit {
+  const edit: ContextEdit = { type: "clear_tool_uses_20250919" };
+
+  if (options.trigger) {
+    const trigger =
+      "inputTokens" in options.trigger
+        ? { type: "input_tokens", value: options.trigger.inputTokens }
+        : { type: "tool_uses", value: options.trigger.toolUses };
+
+    assertCount("contextManagement.clearToolUses.trigger", trigger.value, 1);
+    edit.trigger = trigger;
+  }
+
+  if (options.keep !== undefined) {
+    assertCount("contextManagement.clearToolUses.keep", options.keep, 0);
+    edit.keep = { type: "tool_uses", value: options.keep };
+  }
+
+  if (options.clearAtLeast !== undefined) {
+    assertCount("contextManagement.clearToolUses.clearAtLeast", options.clearAtLeast, 1);
+    edit.clear_at_least = { type: "input_tokens", value: options.clearAtLeast };
+  }
+
+  if (options.excludeTools !== undefined) {
+    edit.exclude_tools = [...options.excludeTools];
+  }
+
+  if (options.clearToolInputs !== undefined) {
+    edit.clear_tool_inputs = Array.isArray(options.clearToolInputs)
+      ? [...options.clearToolInputs]
+      : options.clearToolInputs;
+  }
+
+  return edit;
+}
+
+function assertCount(field: string, value: number, minimum: number): void {
+  if (!Number.isSafeInteger(value) || value < minimum) {
+    throw new InvalidRequestError(
+      `providerOptions.anthropic.${field} must be an integer of at least ${minimum}; got ${value}.`,
+      { context: { field } },
+    );
+  }
+}
+
+type IterationTotals = { input: number; output: number; cacheRead: number; cacheWrite: number };
+
+/**
+ * Tokens of the `compaction` entries in a beta response's `usage.iterations`.
+ * With server-side compaction the top-level `input_tokens` / `output_tokens`
+ * cover only the non-compaction iterations; the billed total is the sum
+ * over every iteration (Anthropic docs, "Compaction at a token threshold" →
+ * "Understanding usage", read 2026-10-17). Zeros when there are none.
+ */
+function compactionIterationUsage(raw: unknown): IterationTotals {
+  const totals: IterationTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const iterations = (raw as { iterations?: unknown } | null | undefined)?.iterations;
+
+  if (!Array.isArray(iterations)) {
+    return totals;
+  }
+
+  for (const entry of iterations as unknown[]) {
+    const iteration = entry as Record<string, unknown> | null;
+
+    if (iteration?.type !== "compaction") {
+      continue;
+    }
+
+    totals.input += numberOrZero(iteration.input_tokens);
+    totals.output += numberOrZero(iteration.output_tokens);
+    totals.cacheRead += numberOrZero(iteration.cache_read_input_tokens);
+    totals.cacheWrite += numberOrZero(iteration.cache_creation_input_tokens);
+  }
+
+  return totals;
+}
+
+function numberOrZero(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function addCacheCounts(usage: Usage, extra: IterationTotals): void {
+  if (extra.cacheRead > 0) {
+    usage.cachedTokens = (usage.cachedTokens ?? 0) + extra.cacheRead;
+  }
+
+  if (extra.cacheWrite > 0) {
+    usage.cacheWriteTokens = (usage.cacheWriteTokens ?? 0) + extra.cacheWrite;
+  }
+}
 
 /** Read `providerOptions.anthropic`, tolerating its absence or a wrong shape. */
 function resolveAnthropicOptions(options: ModelCallOptions | undefined): AnthropicCallOptions {

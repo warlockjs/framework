@@ -1,3 +1,5 @@
+import type { WarlockErrorCode } from "../../../errors/error-codes";
+
 /**
  * @fileoverview Shared types for the `warlock doctor` diagnostics command.
  * @description A doctor check is a self-contained probe of one facet of the
@@ -28,6 +30,18 @@ export type ModuleFailure = {
 };
 
 /**
+ * A model module the boot pass imported, with its exports — what `warlock
+ * inspect` reads the app's model classes from.
+ */
+export type ModelModule = {
+  /** Project-relative path of the model file. */
+  file: string;
+
+  /** The module's exports (a shallow copy of its namespace). */
+  exports: Record<string, unknown>;
+};
+
+/**
  * What the boot pass observed. Handed to every check so no check has to boot
  * anything itself — and so the report cannot contain two checks that booted the
  * app differently and disagreed about it.
@@ -50,6 +64,9 @@ export type DoctorBootContext = {
 
   /** Every app module that failed to import, in load order. */
   moduleFailures: ModuleFailure[];
+
+  /** The model modules that imported, with their exports, in load order. */
+  modelModules: ModelModule[];
 
   /** What happened to the connectors. */
   connectors: {
@@ -105,6 +122,12 @@ export type CheckResult = {
 
   /** One-line, user-facing explanation of the verdict. */
   detail: string;
+
+  /**
+   * Stable Warlock error code of a `warn`/`fail` verdict (`warlock explain
+   * <code>` prints the fix). Absent on `ok`.
+   */
+  code?: WarlockErrorCode;
 };
 
 /**

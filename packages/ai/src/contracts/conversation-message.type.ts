@@ -31,6 +31,9 @@ import type { ProviderContentBlock } from "./provider-content-block.type";
  *   ],
  * };
  */
+/** How client-side compaction touched a message — see {@link Message.compaction}. */
+export type MessageCompactionMarker = "summary" | "retained";
+
 export type Message<User = Record<string, unknown>> = {
   /** Message id */
   id?: string;
@@ -54,6 +57,16 @@ export type Message<User = Record<string, unknown>> = {
    * adapters ignore them. Keep it when you persist a transcript.
    */
   blocks?: ProviderContentBlock[];
+  /**
+   * Set by client-side compaction. `"summary"` marks the message that
+   * replaced earlier turns; `"retained"` marks an assistant turn kept
+   * verbatim after that summary whose signed reasoning (thinking blocks,
+   * thought signatures) was produced against the replaced history. An
+   * adapter whose provider binds reasoning to the exact conversation before
+   * it (Anthropic preserved thinking) leaves that reasoning out on replay;
+   * other adapters ignore the field. Keep it when you persist a transcript.
+   */
+  compaction?: MessageCompactionMarker;
   /** When this message was created */
   timestamp?: Date;
   /** Arbitrary metadata for application-level use */

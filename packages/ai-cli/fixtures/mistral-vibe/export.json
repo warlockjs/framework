@@ -1,0 +1,27 @@
+{
+  "outcome": "finished",
+  "stop_reason": null,
+  "error": null,
+  "session_id": "5f0c2e7a-1b3d-4c8e-9a10-2d4b6f8e0c12",
+  "usage": {
+    "input_tokens": 5321,
+    "output_tokens": 118,
+    "cached_input_tokens": 4096,
+    "total_tokens": 5439
+  },
+  "cost_usd": 0.003355,
+  "steps": 2,
+  "config": {},
+  "schema_version": 1,
+  "vibe_version": "2.26.1",
+  "journal_dir": "session",
+  "started_at": "2026-10-17T19:11:40.000000Z",
+  "ended_at": "2026-10-17T19:11:43.905000Z",
+  "limits": {
+    "max_turns": null,
+    "max_price": null,
+    "max_tokens": null,
+    "time_limit_s": null
+  },
+  "exit_code": 0
+}

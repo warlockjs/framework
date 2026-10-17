@@ -1,4 +1,5 @@
 import type { AgentCompactionRecord } from "../../agent/compaction.type";
+import type { MessageCompactionMarker } from "../conversation-message.type";
 import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { ProviderContentBlock } from "../provider-content-block.type";
 import type { BaseReport, ReportStatus } from "./base-report.type";
@@ -26,6 +27,8 @@ export type CapturedMessage = {
   toolCallId?: string;
   /** Raw provider blocks of an assistant turn — present only when the adapter returned them. */
   blocks?: ProviderContentBlock[];
+  /** Client-side compaction marker — present only on a summary or a turn kept after one. */
+  compaction?: MessageCompactionMarker;
 };
 
 /**

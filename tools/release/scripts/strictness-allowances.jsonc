@@ -21,6 +21,7 @@
   "ai": 453,
   "ai-anthropic": 19,
   "ai-bedrock": 27,
+  "ai-cli": 0,
   "ai-deepseek": 0,
   "ai-google": 38,
   "ai-groq": 0,

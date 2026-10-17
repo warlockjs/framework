@@ -101,6 +101,38 @@ export class DatabaseLog extends LogChannel<BasicLogConfigurations & { connectio
 }
 ```
 
+## Reporting background failures — `reportError()`
+
+A failure inside `log()` reaches `log.onChannelError(...)` on its own. For work outside a `log()` call (a timer, a reconnect, a cleanup in `init()`), call `this.reportError(error, entry)`: the logger the channel was added to forwards it to its handler, and a channel not yet added writes one stderr line. It never throws.
+
+```ts
+export class QueueLog extends LogChannel {
+  public name = "queue";
+
+  protected init() {
+    setInterval(() => {
+      this.drain().catch((error) =>
+        this.reportError(error, {
+          type: "error",
+          module: "logger",
+          action: "drain",
+          message: "Queue drain failed",
+        }),
+      );
+    }, 1_000);
+  }
+
+  public log(data: LoggingData) {
+    if (!this.shouldBeLogged(data)) return;
+    // enqueue data …
+  }
+
+  private async drain() {
+    // send queued entries …
+  }
+}
+```
+
 ## Implementing `flushSync()`
 
 Only if your channel buffers. Signature: `flushSync?(): void`. Synchronous — no `await`, no promises.

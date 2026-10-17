@@ -13,6 +13,7 @@ function makeContext(): DoctorBootContext {
     appRoutes: 0,
     totalRoutes: 0,
     moduleFailures: [],
+    modelModules: [],
     connectors: { registered: [], configured: [], booted: [], skipped: [], failures: [] },
   };
 }

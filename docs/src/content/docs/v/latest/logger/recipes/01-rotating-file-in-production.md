@@ -20,9 +20,10 @@ log.configure({
     ? [
         new FileLog({
           storagePath: process.cwd() + "/storage/logs",
-          chunk: "daily", // one file per calendar day → 15-03-2024.log
+          chunk: "daily", // one file per calendar day → 2024-03-15.log
           rotate: true, // roll the file over once it gets too big
           maxFileSize: 10 * 1024 * 1024, // 10 MB per file before rotation
+          retention: { maxFiles: 30, maxAgeDays: 30 }, // prune old days and archives
         }),
       ]
     : [new ConsoleLog()],
@@ -43,8 +44,9 @@ log.info("app", "boot", "Server listening on :3000");
 
 ## What each piece does
 
-- **`chunk: "daily"`** names the file by date, so you get `15-03-2024.log`, `16-03-2024.log`, … instead of one ever-growing `app.log`. Use `"hourly"` for very high volume, `"single"` (the default) for a single file.
-- **`rotate: true`** (the default) checks the active file's size before each write and, once it passes `maxFileSize`, renames it aside (`app-15-03-2024-1710494523000.log`) and starts a fresh one.
+- **`chunk: "daily"`** names the file by ISO date, so you get `2024-03-15.log`, `2024-03-16.log`, … (sorted by name = sorted by day) instead of one ever-growing `app.log`. Use `"hourly"` for very high volume, `"single"` (the default) for a single file, or `fileName: "app-{YYYY}-{MM}-{DD}"` for your own pattern.
+- **`rotate: true`** (the default) checks the active file's size before each write and, once it passes `maxFileSize`, renames it aside (`2024-03-15-2024-03-15-1710494523000.log`) and starts a fresh one.
+- **`retention`** removes this channel's old files — on boot and whenever a new file starts — keeping the 30 newest and none older than 30 days. Only files matching the channel's name pattern are touched; failures go to `onChannelError`, never to the call site.
 - **`maxFileSize`** is in bytes — `10 * 1024 * 1024` is 10 MB, which is also the default.
 - **`autoFlushOn`** is the important one. `FileLog` buffers entries in memory (it flushes at 100 entries or every 5 seconds), so a process that exits without draining loses whatever is still buffered. Wiring `SIGINT` / `SIGTERM` / `beforeExit` makes the logger flush on `Ctrl+C`, `docker stop`, and natural exit. See [Shutdown & flushing](../advanced/03-shutdown-and-flushing/).
 
@@ -66,11 +68,11 @@ log.setChannels([
 The `levels` whitelist is per channel — the first file still records everything. See [Channels Overview](../channels/01-overview/) for the filtering model.
 
 :::caution[`chunk: "daily"` ignores `name`]
-With `chunk: "daily"` (or `"hourly"`) the file is named by the date, **not** by the `name` option — so two daily channels in the same `storagePath` would write to the _same_ file. Give each channel its own `storagePath` directory (as above) to keep them separate. `name` only takes effect with `chunk: "single"`.
+With `chunk: "daily"` (or `"hourly"`) and no `fileName`, the file is named by the date, **not** by the `name` option — so two daily channels in the same `storagePath` would write to the _same_ file. Give each channel its own `storagePath` directory (as above), or its own pattern such as `fileName: "errors-{YYYY}-{MM}-{DD}"`.
 :::
 
-:::caution[Rotation renames, it doesn't delete]
-`rotate` rolls the current file aside when it exceeds `maxFileSize`, but nothing prunes the rotated archives — on a long-lived host they accumulate. Pair this with an external log-retention tool (logrotate, a cron cleanup, or your platform's log shipper) until built-in retention lands.
+:::caution[Rotation renames, retention deletes]
+`rotate` rolls the current file aside when it exceeds `maxFileSize`; without `retention`, nothing prunes the archives and they accumulate on a long-lived host. Set `retention` (as above) or use an external tool such as logrotate.
 :::
 
 ## See also

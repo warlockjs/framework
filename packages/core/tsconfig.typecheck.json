@@ -49,5 +49,10 @@
     }
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", "tests/acceptance/pnpm-production-app"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests/acceptance/pnpm-production-app",
+    "tests/acceptance/runtime-app"
+  ]
 }

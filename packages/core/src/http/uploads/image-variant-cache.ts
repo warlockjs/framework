@@ -1,7 +1,7 @@
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import fs from "node:fs/promises";
-import { realpathSync } from "node:fs";
+import fsSync from "node:fs";
 import { configuredLocalDiskRoots } from "../../storage/local-disk-roots";
 import type { UploadsImagesConfigurations } from "../uploads-types";
 import { ImageVariantsConfigError } from "./image-variants-config-error";
@@ -34,9 +34,16 @@ async function realpathOrSelf(target: string): Promise<string> {
 function canonicalDirectory(target: string): string {
   const resolved = path.resolve(target);
   try {
-    return realpathSync(resolved);
+    return fsSync.realpathSync(resolved);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") {
+      // ENOTDIR, EACCES, ELOOP, ...: a configuration problem, reported as one.
+      throw new ImageVariantsConfigError(
+        `uploads.images.cacheDirectory (or a local disk root) could not be resolved: ${resolved} (${code ?? "unknown error"})`,
+        { cause: error },
+      );
+    }
     const parent = path.dirname(resolved);
     if (parent === resolved) throw error;
     // Resolve the nearest existing ancestor too, so a symlink followed by a
@@ -45,15 +52,69 @@ function canonicalDirectory(target: string): string {
   }
 }
 
+/** Most distinct cache/disk-root combinations whose overlap check is remembered. */
+const OVERLAP_CHECKS_LIMIT = 64;
+
+/**
+ * Overlap check outcomes, keyed by the cache directory, the disk root and
+ * every configured local root. A disk registered later changes the key, so
+ * it is checked again; the stored error is rethrown for a refused layout.
+ */
+const overlapChecks = new Map<string, ImageVariantsConfigError | undefined>();
+
+function checkCacheOverlap(directory: string, diskRoot: string): void {
+  const roots = [diskRoot, ...configuredLocalDiskRoots()];
+  const key = [directory, ...roots].join("\0");
+  if (overlapChecks.has(key)) {
+    const failure = overlapChecks.get(key);
+    if (failure) throw failure;
+    return;
+  }
+  let failure: ImageVariantsConfigError | undefined;
+  try {
+    const realCache = canonicalDirectory(directory);
+    for (const root of roots) {
+      if (isPathWithin(canonicalDirectory(root), realCache)) {
+        failure = new ImageVariantsConfigError(
+          "uploads.images.cacheDirectory must not equal or contain the storage root of any local disk (including symlinks).",
+        );
+        break;
+      }
+    }
+  } catch (error) {
+    // Only configuration errors are remembered; anything else is retried next time.
+    if (!(error instanceof ImageVariantsConfigError)) throw error;
+    failure = error;
+  }
+  if (overlapChecks.size >= OVERLAP_CHECKS_LIMIT) {
+    const oldest = overlapChecks.keys().next();
+    if (!oldest.done) overlapChecks.delete(oldest.value);
+  }
+  overlapChecks.set(key, failure);
+  if (failure) throw failure;
+}
+
+/**
+ * Forget remembered cache overlap checks, so the next check resolves every
+ * path again (tests). Changes to the configured disks are detected without it;
+ * a directory replaced by a symlink at runtime is not.
+ */
+export function resetVariantCacheOverlapChecks(): void {
+  overlapChecks.clear();
+}
+
 /**
  * The derivative cache directory for a local disk: `uploads.images.cacheDirectory`
  * when the app sets one (shared by every disk; derivatives are keyed by the
  * disk's real root, so they never collide), otherwise
  * `<diskRoot>/.cache/image-variants`. The same rule as
  * `resolveImageVariantsConfig`. Refuses any cache that equals or contains
- * any configured local root, resolving symlinks before comparison.
+ * any configured local root, resolving symlinks before comparison. The
+ * outcome is remembered per cache, disk root and configured local roots, so
+ * repeated requests do not resolve the same paths again.
  *
- * @throws ImageVariantsConfigError when a cache overlaps a local disk root
+ * @throws ImageVariantsConfigError when a cache overlaps a local disk root, or
+ * when the cache or a root cannot be resolved (for example `ENOTDIR`, `EACCES`)
  */
 export function variantCacheDirectoryFor(
   diskRoot: string,
@@ -63,14 +124,7 @@ export function variantCacheDirectoryFor(
   const directory = configured
     ? path.resolve(configured)
     : path.join(path.resolve(diskRoot), ".cache", "image-variants");
-  const realCache = canonicalDirectory(directory);
-  for (const root of [diskRoot, ...configuredLocalDiskRoots()]) {
-    if (isPathWithin(canonicalDirectory(root), realCache)) {
-      throw new ImageVariantsConfigError(
-        "uploads.images.cacheDirectory must not equal or contain the storage root of any local disk (including symlinks).",
-      );
-    }
-  }
+  checkCacheOverlap(directory, diskRoot);
   return directory;
 }
 

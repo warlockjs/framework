@@ -140,20 +140,37 @@ async function fileRoutes(options: FastifyStaticOptions, prefix: string): Promis
  * first file request. Only public Fastify methods are replaced on the facade;
  * the listening application's route/decorator table never changes after ready.
  */
-export function registerLazyStatic(server: FastifyInstance, input: FastifyStaticOptions): void {
+export function registerLazyStatic(
+  server: FastifyInstance,
+  input: FastifyStaticOptions,
+  mount: LazyStaticMount = {},
+): void {
   const options = staticOptions(server, input);
   // Earlier plugins install onRoute hooks (including global rate limiting).
   // Keep the decorators on the calling scope, as @fastify/static does.
   server.register(
-    Object.assign(async (instance: FastifyInstance) => prepareStatic(instance, options), {
+    Object.assign(async (instance: FastifyInstance) => prepareStatic(instance, options, mount), {
       [Symbol.for("skip-override")]: true,
     }),
   );
 }
 
+/**
+ * How the file routes of one static mount meet the rate limiter.
+ */
+export type LazyStaticMount = {
+  /**
+   * The `config.rateLimit` of every file route: `false` exempts the mount
+   * from the global limiter, an object gives it its own limit, and
+   * `undefined` leaves it under the global policy.
+   */
+  rateLimit?: false | Record<string, unknown>;
+};
+
 async function prepareStatic(
   server: FastifyInstance,
   options: FastifyStaticOptions,
+  mount: LazyStaticMount,
 ): Promise<void> {
   const originalPrefix = options.prefix ?? "/";
   const prefix =
@@ -221,7 +238,10 @@ async function prepareStatic(
       constraints: options.constraints,
       schema,
       logLevel: options.logLevel,
-      ...(route.file ? { config: { file: route.file, rootPath: route.rootPath } } : {}),
+      config: {
+        ...(route.file ? { file: route.file, rootPath: route.rootPath } : {}),
+        ...(mount.rateLimit !== undefined ? { rateLimit: mount.rateLimit } : {}),
+      },
       errorHandler(error, request, reply) {
         if (error?.code === "ERR_STREAM_PREMATURE_CLOSE") {
           reply.request.raw.destroy();

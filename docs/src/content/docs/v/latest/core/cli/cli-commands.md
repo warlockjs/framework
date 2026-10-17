@@ -47,6 +47,8 @@ warlock dev --skip-typings           # skip background type generation
 warlock dev --skip-health            # skip health checkers
 ```
 
+`dev` runs on Node.js only. Started on Bun or Deno it exits `1` with an error that names the runtime and points at the production start commands instead — see [Supported runtimes](../digging-deeper/supported-runtimes.md).
+
 | Flag                  | Type    | Description                                                                      |
 | --------------------- | ------- | -------------------------------------------------------------------------------- |
 | `--fresh, -f`         | boolean | Delete `.warlock/manifest.json` before starting (force full re-parse from disk). |
@@ -193,6 +195,8 @@ Bundle the application for production. Reads `warlock.config.ts > build` for esb
 warlock build
 ```
 
+Build on Node.js. On Bun or Deno the command still runs, but prints a notice on stderr that only the Node build is verified.
+
 No flags. Output lands in `dist/` (or wherever `warlock.config.ts > build.outDir` points). See [How it works](../architecture-concepts/how-it-works.md) for the bundler story.
 
 The build is all-or-nothing: it writes into a hidden sibling temp directory and promotes it into `outdir` with a rename only on success. A successful build therefore leaves no stale files from a previous one, and a failed build leaves `outdir` untouched rather than half-written. The promoted directory carries a `.warlock-build.json` success marker that `start` checks. See [Deployment](../digging-deeper/deployment).
@@ -221,7 +225,7 @@ Start the production server from the build output.
 warlock start
 ```
 
-Persistent. Reads `warlock.config.ts` to resolve the entry path and source-map flag, then `spawn`s `node` with the right arguments. Forwards `SIGTERM` / `SIGINT` to the child cleanly — Ctrl+C does what you expect.
+Persistent. Reads `warlock.config.ts` to resolve the entry path and source-map flag, then `spawn`s the runtime the CLI is running on (`process.execPath` — normally `node`) with the right arguments. Run the CLI with Bun (`bun node_modules/@warlock.js/core/bin/warlock.js start`) or Deno (`deno run -A node_modules/@warlock.js/core/bin/warlock.js start`) to serve the build there; see [Supported runtimes](../digging-deeper/supported-runtimes.md). Forwards `SIGTERM` / `SIGINT` to the child cleanly — Ctrl+C does what you expect.
 
 It refuses an output directory that no successful `warlock build` produced — missing, unreadable or non-success `.warlock-build.json` — naming that as the reason and exiting `1` before spawning anything:
 
@@ -538,7 +542,7 @@ Run a set of read-only health checks (routes, config, connectors, optional peers
 warlock doctor
 ```
 
-No flags. Bootstraps app code so routes and connectors are registered for introspection, but starts no connectors — it never opens a database/cache/socket connection. The full check list, statuses, exit-code semantics, and CI usage are in the [`warlock doctor` guide](./doctor.md).
+`--json` prints the report as JSON with a stable [error code](./error-codes.md) on every finding; `--fix` converts legacy `utils/locales.ts` files. Bootstraps app code so routes and connectors are registered for introspection, but starts no connectors — it never opens a database/cache/socket connection. The full check list, statuses, exit-code semantics, and CI usage are in the [`warlock doctor` guide](./doctor.md).
 
 ### `routes`
 
@@ -566,6 +570,51 @@ warlock routes:diff
 ```
 
 Requires a prior `warlock build`. See the [`routes:diff` section](./routes.md#warlock-routesdiff) for the output shape and comparison rules.
+
+### `inspect`
+
+**New in 5.31.** Print the app's facts from its booted registries — routes (middleware, guard, rate limit, logging, request and response JSON Schemas), models, resources, config keys and types, event listeners, pages, queue jobs, scheduled tasks and installed `@warlock.js/*` versions. Boots like `doctor`: no connection, no port.
+
+```bash
+warlock inspect                              # summary
+warlock inspect --json                       # the versioned report (schemaVersion 1)
+warlock inspect --json --section routes,models
+```
+
+The report shape, its JSON Schema and its stability rules are in the [`warlock inspect` guide](./inspect.md).
+
+### `check`
+
+**New in 5.31.** Typecheck, lint, run the affected tests and check conventions in one command; one problem per line (or one JSON object per problem with `--json`), each with a stable error code and a fix hint. Exits `1` for problems in your code and `2` for problems with this machine (missing Redis/database, busy port, Node version, missing tool).
+
+```bash
+warlock check
+warlock check --changed --json
+warlock check --base main --skip tests
+```
+
+See the [`warlock check` guide](./check.md) for the steps, the JSON shape and the exit-code table.
+
+### `typecheck`
+
+**New in 5.31.** Incremental TypeScript check through the compiler API (state in `.warlock/cache/typecheck.tsbuildinfo`); `--changed` limits it to the changed files and the files importing them. Same problem shape and exit codes as `check`.
+
+```bash
+warlock typecheck
+warlock typecheck --changed --json
+```
+
+### `explain`
+
+**New in 5.31.** Print what a stable error code means, what to do, the skill that covers it and its docs link; without a code, list every code.
+
+```bash
+warlock explain WL8004
+warlock explain WL8004 --json
+warlock explain
+```
+
+Every code is on the [Error codes](./error-codes.md) page.
 
 ---
 

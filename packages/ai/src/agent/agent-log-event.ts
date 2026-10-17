@@ -70,7 +70,10 @@ export function logAgentEvent<K extends keyof AgentEventMap>(
       return;
     }
 
-    case "agent.trip.streaming": {
+    case "agent.trip.streaming":
+    case "agent.trip.reasoning":
+    case "agent.trip.usage":
+    case "agent.tool.streaming": {
       // Deltas are too high-volume to log at token granularity.
       // Skipped on purpose; debug level still fires on trip boundaries.
       return;
@@ -88,9 +91,10 @@ export function logAgentEvent<K extends keyof AgentEventMap>(
     }
 
     case "agent.tool.calling": {
-      const { tool, tripIndex } = payload as AgentEventMap["agent.tool.calling"];
+      const { tool, callId, tripIndex } = payload as AgentEventMap["agent.tool.calling"];
       logger.debug(ctx.module, action, `calling tool "${tool.name}"`, {
         tool: tool.name,
+        callId,
         action: tool.action,
         tripIndex,
       });
@@ -101,6 +105,7 @@ export function logAgentEvent<K extends keyof AgentEventMap>(
       const toolCall = payload as AgentEventMap["agent.tool.called"];
       logger.success(ctx.module, action, `tool "${toolCall.name}" finished`, {
         tool: toolCall.name,
+        callId: toolCall.callId,
         duration: toolCall.duration,
         tripIndex: toolCall.tripIndex,
       });
@@ -108,10 +113,11 @@ export function logAgentEvent<K extends keyof AgentEventMap>(
     }
 
     case "agent.tool.failed": {
-      const { tool, error, tripIndex } = payload as AgentEventMap["agent.tool.failed"];
+      const { tool, callId, error, tripIndex } = payload as AgentEventMap["agent.tool.failed"];
 
       logger.warn(ctx.module, action, `tool "${tool.name}" failed`, {
         tool: tool.name,
+        callId,
         tripIndex,
         error: {
           code: error.code,

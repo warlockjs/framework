@@ -6,3 +6,10 @@ export { createToolContext } from "./create-tool-context";
 export type { CreateToolContextOptions } from "./create-tool-context";
 export { compactToolSchemas, measureTools } from "./tool-schemas";
 export type { MeasureToolsOptions, ToolTokenCount, ToolTokenMeasurement } from "./tool-schemas";
+export { isProviderTool, providerTool, selectProviderTools } from "./provider-tool";
+export type {
+  ProviderTool,
+  ProviderToolOptions,
+  ProviderToolTarget,
+  SelectedProviderTools,
+} from "./provider-tool";

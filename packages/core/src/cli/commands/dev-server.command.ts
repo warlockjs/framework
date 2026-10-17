@@ -3,6 +3,7 @@ import { startDevelopmentServer } from "../../dev-server/start-development-serve
 import { isDevWorker, superviseDevServer } from "../../dev-server/supervisor";
 import { assertEsbuildBinaryIsLinked } from "../../production/esbuild-preflight";
 import { command } from "../../commands/cli-command";
+import { assertNodeOnlyCommand } from "../../utils/runtime";
 import { displayStartupBanner } from "../cli-commands.utils";
 
 export const devServerCommand = command({
@@ -27,6 +28,11 @@ export const devServerCommand = command({
     connectors: true,
   },
   preAction: async () => {
+    // Node only. The dev server compiles TypeScript and hot-reloads modules
+    // through Node's module loader hooks; Bun and Deno run the production
+    // build instead. Checked first so neither role starts anything on them.
+    assertNodeOnlyCommand("dev");
+
     // Fail before either role (supervisor or worker) does any other work —
     // a missing/unlinked esbuild binary would otherwise surface much later
     // as an opaque low-level error from deep inside the transpile path.

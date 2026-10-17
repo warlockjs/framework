@@ -11,6 +11,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `ai.mcp(server, { signal })` binds the client to a run: when the signal aborts the client closes its transport, and later handshakes and tool calls fail with an `McpTransportError` of type `"closed"`. Every `tools/call` honors both the client signal and the per-call `ctx.signal`.
 
 - `ai.tools.measure(tools, { model, mode })` — the `measureTools` helper from `@warlock.js/ai` — measures the input tokens a tool list costs per call.
+- `ai.mcp.serve(source, { transport: { type: "http" } })` serves the MCP Streamable HTTP transport on `node:http` (no extra dependency). It binds `127.0.0.1` on a free port at `/mcp` by default (`host`, `port`, `path` override them), and `start()` resolves `{ url, close }`. `close()` stops accepting connections, waits up to `drainTimeoutMs` (default 5 s) for in-flight calls, then aborts their `ctx.signal` and frees the port. The endpoint is stateless: JSON responses, `202` for notifications, `405` for `GET` / `DELETE`, `400` for batches or an unsupported `MCP-Protocol-Version`.
+- HTTP auth: `auth: { bearer }` accepts one token or a rotation list; `auth: { authorize(request) }` runs a custom check; with both set, a request must pass both. Failures get `401` before the body is read.
+- Tools served over HTTP receive the inbound request on `ctx.request` (`headers`, `remoteAddress`), for per-user tokens, tenant headers or trace ids.
+- Grouped sources: `serve({ groups: { name: tools } }, { prefixToolNames: true })` exposes `<group>_<tool>`; a function builds custom names.
+- Optional MCP resources (`resources: [{ uri, name, read }]`) and prompts (`prompts: [{ name, arguments, get }]`), with their capabilities advertised only when configured. The server also answers `ping`.
+- `McpServeError` (`type`: `"collision"`, `"config"`, `"listen"`), `SUPPORTED_PROTOCOL_VERSIONS`, and the `McpHttpServeTransport`, `McpHttpAuth`, `McpHttpRequestInfo`, `McpServeHandle`, `McpHttpServeHandle`, `McpServeResource`, `McpServePrompt`, `McpServeCallContext`, `McpToolSource`, `McpGroupedToolSource` types. `createServeHandler(...).handle(request, context?)` takes an optional call context.
+
+### Changed
+
+- `initialize` negotiates the protocol version: a client's requested version is echoed when supported (`2025-11-25`, `2025-06-18`, `2025-03-26`), otherwise the newest is offered. It previously always answered `2025-06-18`.
+- `McpServer.start()` resolves a handle (`{ url?, close }`) instead of `void`. The http transport's `port` is optional.
+
+### Security
+
+- The HTTP transport binds loopback by default and refuses to start on any non-loopback host without `auth` (`McpServeError`, `type: "config"`).
+- Bearer tokens are compared with `crypto.timingSafeEqual` over SHA-256 digests, so neither content nor length leaks through timing; every configured token is checked. Empty tokens are refused, and an `authorize` hook that throws denies the request.
+- `Origin` is validated on every request, per the MCP transport's DNS-rebinding guidance: loopback origins and `allowedOrigins` pass, others (including `null`) get `403`. While bound to loopback, a `Host` header other than `localhost`, `127.0.0.1`, `[::1]` or `allowedHosts` also gets `403`.
+- Request bodies over `maxBodyBytes` (default 1 MiB) get `413` and the connection is closed.
+
+### Upgrading
+
+- **BREAKING:** `ai.mcp.serve()` throws `McpServeError` (`type: "collision"`) when two exposed tools share a name, and for duplicate resource URIs or prompt names. Previously both tools were listed and every call reached the last one. Rename one tool, or serve a grouped source with `prefixToolNames: true`.
+- `serve(..., { transport: { type: "http" } }).start()` no longer rejects: it binds a real endpoint. Code that implemented `McpServer` itself must return a handle from `start()`.
 
 ## 5.30.0 - 2026-10-16
 

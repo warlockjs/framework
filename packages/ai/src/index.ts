@@ -105,6 +105,7 @@ export * from "./rag";
 export * from "./security";
 export * from "./serve";
 export * from "./skills";
+export * from "./session";
 export * from "./snapshot";
 export * from "./supervisor";
 // Team — sugar over the supervisor (manager + role members + quality gate).
@@ -132,3 +133,12 @@ export {
 export type { MatcherVerdict } from "./testing/matcher-logic";
 export type { AiMatchers } from "./testing/matchers";
 export { registerAiMatchers } from "./testing/register-lazy";
+// Adapter contract check: `ModelCallOptions.signal` must cancel the request.
+// No test-runner import — safe on the root barrel.
+export { verifyModelSignalContract } from "./testing/model-signal-contract";
+export type {
+  ModelSignalContractCheck,
+  ModelSignalContractMethod,
+  ModelSignalContractOptions,
+  ModelSignalContractReport,
+} from "./testing/model-signal-contract";

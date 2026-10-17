@@ -1,7 +1,9 @@
 import {
   InvalidRequestError,
   ProviderError,
+  resolveStreamChunks,
   safeJsonParse,
+  selectProviderTools,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -144,7 +146,7 @@ export class OpenAIModel implements ModelContract {
             messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
             ...this.buildSamplingParams(options),
             ...buildPromptCacheParams(this.provider, this.config),
-            tools: toOpenAITools(options?.tools),
+            ...this.buildTools(options),
             ...this.buildResponseFormat(options?.responseSchema),
             ...this.buildReasoningParams(options?.reasoning, Boolean(options?.tools?.length)),
           },
@@ -200,6 +202,11 @@ export class OpenAIModel implements ModelContract {
    * `delta` for text tokens, `tool-call` when the model requests a tool,
    * and a terminal `done` carrying the final finish reason + usage totals.
    * Callers consume it with `for await`.
+   *
+   * With `options.streamChunks` it also yields `tool-args` for each
+   * `tool_calls[].function.arguments` fragment and `reasoning` for a
+   * vendor's `reasoning_content` / `reasoning` delta field. Usage arrives
+   * only on the final chunk here, so no `usage` chunk is emitted.
    */
   public async *stream(
     messages: Message[],
@@ -222,7 +229,7 @@ export class OpenAIModel implements ModelContract {
             messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
             ...this.buildSamplingParams(options),
             ...buildPromptCacheParams(this.provider, this.config),
-            tools: toOpenAITools(options?.tools),
+            ...this.buildTools(options),
             stream: true,
             stream_options: { include_usage: true },
             ...this.buildResponseFormat(options?.responseSchema),
@@ -245,12 +252,24 @@ export class OpenAIModel implements ModelContract {
 
     let rawFinishReason: string = "stop";
     let usage: Usage = { input: 0, output: 0, total: 0 };
-    const toolCallAccum = new Map<number, { id: string; name: string; arguments: string }>();
+    const want = resolveStreamChunks(options);
+    const toolCallAccum = new Map<
+      number,
+      { id: string; name: string; arguments: string; streamed: number }
+    >();
 
     try {
       for await (const chunk of stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
         const delta = chunk.choices[0]?.delta;
         const finish = chunk.choices[0]?.finish_reason;
+
+        if (want.reasoning && delta) {
+          const reasoning = readReasoningDelta(delta);
+
+          if (reasoning) {
+            yield { type: "reasoning", delta: reasoning };
+          }
+        }
 
         if (delta?.content) {
           yield { type: "delta", content: delta.content };
@@ -260,12 +279,25 @@ export class OpenAIModel implements ModelContract {
           for (const toolCall of delta.tool_calls) {
             const idx = toolCall.index ?? 0;
             if (!toolCallAccum.has(idx)) {
-              toolCallAccum.set(idx, { id: "", name: "", arguments: "" });
+              toolCallAccum.set(idx, { id: "", name: "", arguments: "", streamed: 0 });
             }
             const acc = toolCallAccum.get(idx)!;
             if (toolCall.id) acc.id = toolCall.id;
             if (toolCall.function?.name) acc.name = toolCall.function.name;
             if (toolCall.function?.arguments) acc.arguments += toolCall.function.arguments;
+
+            // The first fragment of a call carries its id and name; later
+            // ones only `index` + argument text. Anything that arrived
+            // before the name is flushed once the call is identified.
+            if (want.toolArgs && acc.name && acc.arguments.length > acc.streamed) {
+              yield {
+                type: "tool-args",
+                callId: acc.id,
+                name: acc.name,
+                delta: acc.arguments.slice(acc.streamed),
+              };
+              acc.streamed = acc.arguments.length;
+            }
           }
         }
 
@@ -312,6 +344,32 @@ export class OpenAIModel implements ModelContract {
     });
 
     yield { type: "done", finishReason, usage };
+  }
+
+  /**
+   * Spread-friendly `tools` fragment: the function tools, then the
+   * provider-defined entries whose `provider` equals this model's
+   * provider label (`"openai"`, or the vendor label an OpenAI-compatible
+   * wrapper sets, e.g. `"groq"`), sent verbatim. Chat Completions only
+   * accepts `function` and `custom` tool types from OpenAI itself; its
+   * hosted tools (`web_search`, `file_search`, …) need `api: "responses"`
+   * and OpenAI rejects them here with a 400.
+   */
+  private buildTools(options: ModelCallOptions | undefined): {
+    tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
+  } {
+    const { tools, definitions } = selectProviderTools(options, {
+      accepts: [this.provider],
+      module: LOG_MODULE,
+      model: this.name,
+      logger: this.logger,
+    });
+    const mapped = [
+      ...(toOpenAITools(tools) ?? []),
+      ...(definitions as unknown as OpenAI.Chat.Completions.ChatCompletionTool[]),
+    ];
+
+    return mapped.length > 0 ? { tools: mapped } : {};
   }
 
   /** Map the neutral cache hint only for the direct OpenAI provider. */
@@ -478,4 +536,25 @@ export class OpenAIModel implements ModelContract {
       input: safeJsonParse<Record<string, unknown>>((toolCall as any).function.arguments, {}),
     }));
   }
+}
+
+/**
+ * Reasoning text an OpenAI-compatible vendor puts on a Chat Completions
+ * stream delta. OpenAI itself streams none on this API. DeepSeek documents
+ * `delta.reasoning_content` (API reference, chat completion chunk); Groq
+ * documents the parsed reasoning under a `reasoning` field. Neither is in
+ * the OpenAI SDK's delta type, so the delta is read as a plain record.
+ */
+function readReasoningDelta(delta: object): string | undefined {
+  const record = delta as Record<string, unknown>;
+
+  for (const key of ["reasoning_content", "reasoning"]) {
+    const value = record[key];
+
+    if (typeof value === "string" && value !== "") {
+      return value;
+    }
+  }
+
+  return undefined;
 }

@@ -1,4 +1,3 @@
-// oxlint-disable no-unused-vars -- Decorated class definitions register models as the tested side effect.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Model } from "../../../src/model/model";
 import {
@@ -63,11 +62,13 @@ describe("Model Registry", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       @RegisterModel({ name: "User" })
+      // oxlint-disable-next-line no-unused-vars -- registered by the decorator as the tested side effect
       class User2 extends Model {
         static table = "users";
       }
 
       @RegisterModel({ name: "User" })
+      // oxlint-disable-next-line no-unused-vars -- registered by the decorator as the tested side effect
       class User extends Model {
         static table = "users";
       }
@@ -79,6 +80,7 @@ describe("Model Registry", () => {
 
     it("should overwrite previous registration on duplicate", () => {
       @RegisterModel({ name: "User" })
+      // oxlint-disable-next-line no-unused-vars -- registered by the decorator as the tested side effect
       class UserV1 extends Model {
         static table = "users_v1";
       }
@@ -147,6 +149,7 @@ describe("Model Registry", () => {
 
     it("should return a copy of the registry (not a reference)", () => {
       @RegisterModel()
+      // oxlint-disable-next-line no-unused-vars -- registered by the decorator as the tested side effect
       class User extends Model {
         static table = "users";
       }
@@ -162,11 +165,13 @@ describe("Model Registry", () => {
   describe("cleanupModelsRegistery()", () => {
     it("should clear all registered models", () => {
       @RegisterModel()
+      // oxlint-disable-next-line no-unused-vars -- registered by the decorator as the tested side effect
       class User extends Model {
         static table = "users";
       }
 
       @RegisterModel()
+      // oxlint-disable-next-line no-unused-vars -- registered by the decorator as the tested side effect
       class Post extends Model {
         static table = "posts";
       }
@@ -182,6 +187,7 @@ describe("Model Registry", () => {
   describe("removeModelFromRegistery()", () => {
     it("should remove specific model from registry", () => {
       @RegisterModel()
+      // oxlint-disable-next-line no-unused-vars -- registered by the decorator as the tested side effect
       class User extends Model {
         static table = "users";
       }

@@ -5,7 +5,7 @@ import type {
   ModelPricing,
   SDKAdapterContract,
 } from "@warlock.js/ai";
-import { approximateTokenCount } from "@warlock.js/ai";
+import { approximateTokenCount, InvalidRequestError } from "@warlock.js/ai";
 import type { BedrockEmbedderConfig, BedrockModelConfig, BedrockSDKConfig } from "./config.type";
 import { BedrockEmbedder } from "./embedder";
 import { BedrockModel } from "./model";
@@ -35,6 +35,10 @@ import { BedrockModel } from "./model";
  * const bedrock = new BedrockSDK({ region: "us-east-1" });
  * const model = bedrock.model({ name: "anthropic.claude-sonnet-4-5-20250929-v1:0" });
  * const embedder = bedrock.embedder({ name: "amazon.titan-embed-text-v2:0" });
+ *
+ * @example
+ * // Amazon Bedrock API key (bearer auth) instead of the AWS credential chain
+ * const bedrock = new BedrockSDK({ apiKey: process.env.BEDROCK_API_KEY!, region: "us-east-1" });
  */
 export class BedrockSDK implements SDKAdapterContract {
   private readonly client: BedrockRuntimeClient;
@@ -42,9 +46,11 @@ export class BedrockSDK implements SDKAdapterContract {
   private readonly pricing?: Record<string, ModelPricing>;
 
   public constructor(config: BedrockSDKConfig) {
-    const { provider, pricing, ...clientConfig } = config;
+    const { provider, pricing, apiKey, ...clientConfig } = config;
 
-    this.client = new BedrockRuntimeClient(clientConfig);
+    this.client = new BedrockRuntimeClient(
+      apiKey === undefined ? clientConfig : withApiKey(clientConfig, apiKey),
+    );
     this.provider = provider ?? "bedrock";
     this.pricing = pricing;
   }
@@ -88,4 +94,47 @@ export class BedrockSDK implements SDKAdapterContract {
   public embedder(config: BedrockEmbedderConfig): EmbedderContract {
     return new BedrockEmbedder(this.client, config, this.provider);
   }
+}
+
+/**
+ * Configure the runtime client for an Amazon Bedrock API key.
+ *
+ * Bedrock API keys are bearer tokens: the request carries
+ * `Authorization: Bearer <key>` instead of a SigV4 signature (AWS docs,
+ * "Use an Amazon Bedrock API key",
+ * https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-use.html,
+ * checked 2026-10-17). The installed `@aws-sdk/client-bedrock-runtime`
+ * supports this natively: its auth scheme provider offers
+ * `smithy.api#httpBearerAuth` beside SigV4, fed by the client's `token`
+ * option, and `authSchemePreference: ["httpBearerAuth"]` selects it ahead
+ * of SigV4, so the AWS credential chain is never consulted.
+ *
+ * Fails closed on an empty key, and on a key combined with `credentials`
+ * or `token` — two credentials for one client leave which one signs the
+ * request ambiguous.
+ */
+function withApiKey(
+  clientConfig: Omit<BedrockSDKConfig, "provider" | "pricing" | "apiKey">,
+  apiKey: string,
+): Omit<BedrockSDKConfig, "provider" | "pricing" | "apiKey"> {
+  if (typeof apiKey !== "string" || apiKey.trim() === "") {
+    throw new InvalidRequestError("BedrockSDK: `apiKey` must be a non-empty string.");
+  }
+
+  const conflicting = (["credentials", "token"] as const).filter(
+    (field) => clientConfig[field] !== undefined,
+  );
+
+  if (conflicting.length > 0) {
+    throw new InvalidRequestError(
+      `BedrockSDK: pass either \`apiKey\` or ${conflicting.map((field) => `\`${field}\``).join(" / ")}, not both.`,
+      { context: { fields: conflicting } },
+    );
+  }
+
+  return {
+    ...clientConfig,
+    token: { token: apiKey },
+    authSchemePreference: ["httpBearerAuth"],
+  };
 }

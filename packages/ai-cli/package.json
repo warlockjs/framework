@@ -1,0 +1,44 @@
+{
+  "name": "@warlock.js/ai-cli",
+  "version": "5.30.0",
+  "type": "module",
+  "description": "Drive vendor coding-agent CLIs (Claude Code, Codex, Copilot, Cursor, …) as first-class @warlock.js/ai agents",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "llms": "node scripts/generate-llms.mjs"
+  },
+  "keywords": [
+    "warlock",
+    "ai",
+    "agent",
+    "cli",
+    "claude-code",
+    "codex",
+    "copilot",
+    "cursor",
+    "coding-agent"
+  ],
+  "author": "Hasan Zohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-cli"
+  },
+  "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
+    "typescript": "^5.0.0",
+    "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@warlock.js/ai": "*"
+  },
+  "packageManager": "pnpm@11.24.0"
+}

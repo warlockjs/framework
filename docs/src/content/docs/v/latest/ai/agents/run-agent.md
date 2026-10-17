@@ -73,12 +73,39 @@ agent.execute(input, {
   repair, // { maxAttempts } — re-ask on validation failure
   signal, // AbortSignal
   sessionId, // stamped onto every report node
+  modelOptions, // model call options for this run, merged over the agent's
+  continueOnOutputLimit, // continue turns allowed after a cut-off response
+  captureMessages, // per-call override of the factory's captureMessages
   streamingToolGuard, // per-call override
   on, // per-call event handlers
 });
 ```
 
 Call-site `output` fully **replaces** the factory's `output` for that run — no merging.
+
+### Per-call model options
+
+`modelOptions` on `execute()` / `stream()` sets the model call options — reasoning effort, `maxTokens`, `temperature`, `cacheControl`, `providerOptions` — for that run only. They are shallow-merged over the agent's `modelOptions`: a key you pass wins, a key you leave out keeps the agent's value. The agent is never changed, so one agent can serve many concurrent runs with different settings.
+
+```ts
+const assistant = ai.agent({
+  model: anthropic.model({ name: "claude-opus-5-5" }),
+  modelOptions: { reasoning: { effort: "medium" } },
+});
+
+// This run thinks harder and keeps its prompt cache for an hour.
+await assistant.execute(question, {
+  modelOptions: {
+    reasoning: { effort: "high" },
+    cacheControl: { breakpoints: 1, ttl: "1h" },
+  },
+});
+
+// The next run is back on the agent's settings.
+await assistant.execute(followUp);
+```
+
+The merge is shallow: a nested object you pass (`reasoning`, `cacheControl`, `providerOptions`) replaces the agent's whole value for that key. Repeat the agent's fields you want to keep, for example `providerOptions: { anthropic: { ...agentBetas, thinkingDisplay: "summarized" } }`. `tools`, `signal` and `responseSchema` belong to the run and are ignored here; use the agent's `tools`, the `signal` option and `output` / `responseSchema` instead.
 
 ## `agent.stream(input, options)`
 
@@ -96,7 +123,7 @@ for await (const event of stream) {
 const result = await stream.result;
 ```
 
-The same lifecycle events fire whether you call `execute` or `stream` — streaming adds per-token deltas on top. The final envelope on `stream.result` is identical to what `execute` would resolve with.
+The same lifecycle events fire whether you call `execute` or `stream` — streaming adds per-token deltas on top, plus reasoning deltas (`agent.trip.reasoning`), tool-argument deltas (`agent.tool.streaming`) and mid-stream usage (`agent.trip.usage`) where the provider streams them — see [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/). The final envelope on `stream.result` is identical to what `execute` would resolve with.
 
 ## The result envelope
 
@@ -112,7 +139,7 @@ type AgentResult<T> = {
 };
 
 type AgentReport = {
-  status: "completed" | "failed" | "cancelled";
+  status: "completed" | "failed" | "cancelled" | "incomplete";
   startedAt: string;
   endedAt: string;
   duration: number;
@@ -187,7 +214,50 @@ Options that only one provider understands go under `providerOptions`, keyed by 
 
 ### Finish reasons and provider blocks
 
-Each trip records why the model stopped: `stop`, `tool_calls`, `length`, `context_exceeded` (the history filled the context window; compact or trim it), `pause_turn`, `refusal` or `error`. The agent resumes a `pause_turn` by itself, within `maxTrips`; the continuation carries only the new content, so `result.text` (and the structured output parsed from it) joins the paused segments with the final one. `refusal` and `context_exceeded` end the run; read `report.trips.at(-1)?.finishReason` to decide whether to retry on another model.
+Each trip records why the model stopped: `stop`, `tool_calls`, `length`, `context_exceeded` (the history filled the context window; compact or trim it), `pause_turn`, `refusal` or `error`. The agent resumes a `pause_turn` by itself, within `maxTrips`; the continuation carries only the new content, so `result.text` (and the structured output parsed from it) joins the paused segments with the final one. `refusal` ends the run; read `report.trips.at(-1)?.finishReason` to decide whether to retry on another model. `length` and `context_exceeded` end it as incomplete, below.
+
+### Cut-off responses — `report.status: "incomplete"`
+
+When the final response is cut off — by the output token cap (`length`) or the context window (`context_exceeded`) — the run has no complete answer. It ends with `report.status: "incomplete"` and `result.error` set to an `AgentIncompleteError`:
+
+| Field           | Value                                                                  |
+| --------------- | ---------------------------------------------------------------------- |
+| `code`          | `"AGENT_INCOMPLETE"` (category `"incomplete"`)                         |
+| `reason`        | `"output_limit"` (`length`) or `"context_window"` (`context_exceeded`) |
+| `tripIndex`     | the trip whose response was cut off                                    |
+| `continuations` | continue turns already sent before giving up                           |
+
+`result.text` keeps the partial text. A tool call the model was still writing when the output ran out may have incomplete input, so it is **never executed**; it is listed on that trip's `truncatedToolCalls`.
+
+```ts
+import { AgentIncompleteError } from "@warlock.js/ai";
+
+const result = await worker.execute(task);
+
+if (result.error instanceof AgentIncompleteError) {
+  if (result.error.reason === "output_limit") {
+    // Raise maxTokens, split the task, or let the agent continue (below).
+  } else {
+    // The context window is full: compact or trim the history.
+  }
+}
+```
+
+**Automatic continuation.** `continueOnOutputLimit: n` (on the agent or per call) lets one run recover from up to `n` output-cap cut-offs. The agent keeps the partial text in the conversation, sends a continue turn, and joins the segments in `result.text` (and the structured output parsed from it). If the cut-off happened inside a tool call, the partial call is dropped and the continue turn tells the model the call did not run, so it issues it again — usually smaller. Each continuation is a normal trip, counted against `maxTrips`. When the continuations or trips run out, the run ends incomplete as above. A full context window is never continued.
+
+```ts
+const writer = ai.agent({
+  model: anthropic.model({ name: "claude-haiku-4-5" }),
+  tools: [writeFile],
+  continueOnOutputLimit: 2,
+});
+
+const result = await writer.execute("Write src/report.ts");
+// A response cut off mid-text continues where it stopped; a cut-off
+// `write_file` call is discarded and re-issued by the model.
+```
+
+Streaming behaves the same: the continuation's deltas follow the partial text on the stream, and `stream.result` carries the joined text or the `AgentIncompleteError`.
 
 Some providers return content the neutral `text` cannot carry, such as Anthropic thinking and compaction blocks. The adapter puts the whole turn on `blocks`, and the agent replays it verbatim inside the run.
 
@@ -315,7 +385,7 @@ if (report.status === "cancelled") {
 }
 ```
 
-Between-trip abort is guaranteed. Mid-trip is best-effort — the provider SDK decides whether the in-flight request can be cut. `report.status === "cancelled"` and `error.category === "cancelled"` are stable signals.
+Between-trip abort is guaranteed, and so is mid-trip abort on every first-party adapter: honouring `signal` is part of the model adapter contract, so aborting rejects the in-flight model call and cancels its HTTP request (the provider stops generating). `report.status === "cancelled"` and `error.category === "cancelled"` are stable signals. A host racing streams against its own abort is no longer needed.
 
 ## Sessions
 
@@ -328,13 +398,14 @@ await myAgent.execute("what's my order?", { sessionId });
 await myAgent.execute("cancel it", { sessionId });
 ```
 
-No implicit persistence. No automatic history. Just a string that rides along.
+No implicit persistence. No automatic history. Just a string that rides along. For a stored conversation, use [`ai.session()`](/v/latest/ai/agents/conversation-sessions/).
 
 ## Events
 
 Names:
 
 - `agent.starting`, `agent.trip.started`, `agent.trip.streaming`, `agent.trip.completed`
+- `agent.trip.reasoning`, `agent.trip.usage`, `agent.tool.streaming` — `agent.stream()` only
 - `agent.tool.calling`, `agent.tool.called`, `agent.tool.failed`
 - `agent.completed`, `agent.error`
 
@@ -352,6 +423,20 @@ await myAgent.execute(input, { on: { "agent.trip.completed": handler } });
 ```
 
 Every payload carries `runId` and `rootRunId` so nested runs (workflow → agent → tool) stitch into one trace.
+
+The three tool events also carry `callId`, the provider's id for the tool call. One trip can call the same tool several times, and those calls run concurrently by default, so pair each result with its call by `callId`, not by tool name. The same id is on the `ToolCall` record (`report.children[].callId`) and on the tool middleware context (`ctx.callId`).
+
+```ts
+const pending = new Map<string, string>();
+
+for await (const event of assistant.stream(question)) {
+  if (event.type === "agent.tool.calling") {
+    pending.set(event.callId, event.tool.action ?? event.tool.name);
+  } else if (event.type === "agent.tool.called" || event.type === "agent.tool.failed") {
+    ui.finishToolChip(event.callId, pending.get(event.callId));
+  }
+}
+```
 
 ## Streaming tool guard
 
@@ -484,6 +569,38 @@ const worker = ai.agent({
 });
 ```
 
+### The built-in summarizer
+
+`ai.compaction.summarize({ model })` builds the callback for you. It renders the
+replaced slice as a tagged transcript (text, tool calls and tool results; signed
+reasoning blocks are opaque and left out), sends it to `model` with Anthropic's
+published client-side compaction prompt, and uses the text inside the reply's
+`<summary></summary>` tags. Use a cheaper model than the agent's:
+
+```ts
+const worker = ai.agent({
+  model,
+  tools,
+  compaction: {
+    afterTokens: 120_000,
+    keep: 2,
+    summarize: ai.compaction.summarize({
+      model: cheapModel,
+      maxTokens: 4_000,
+      // instructions: "…", // replaces the default prompt
+      onUsage: (usage) => ledger.add(usage), // the summary call is not in the agent's usage
+    }),
+  },
+});
+```
+
+A reply that is truncated (`length`), refused or empty throws, so the agent
+records a `callback-error` skip and keeps the conversation as it was.
+`DEFAULT_COMPACTION_INSTRUCTIONS` and `renderTranscript` are exported if you
+write your own callback.
+
+### The callback contract
+
 The `summarize` callback reuses the existing `SummarizeCallback` result shape:
 `CompactionResult`. It receives a detached old slice, and must replace the whole
 slice with a non-empty assistant text summary. Its second argument contains
@@ -501,17 +618,42 @@ when present and when its endpoint can count the entire request.
 Original system messages, the original execution input and the latest user
 message remain intact, including during output repair. `keep` defaults
 to eight recent messages and expands to preserve complete assistant/tool-result
-groups. The agent skips compaction when the retained conversation contains
-provider blocks or tool-call replay metadata, since modifying earlier turns can
-invalidate signed thinking. It also skips unsafe ranges, summaries that do not
+groups. The agent skips unsafe ranges, summaries that do not
 reduce the counted input, and callback/counter failures. Generation continues
 with the original conversation after a skipped decision; cancellation stops the
 run before generation.
 
+### Compaction with thinking
+
+Thinking runs compact too. The range always ends before the open tool round:
+the latest assistant turn and the tool results that answer it go back verbatim,
+signed thinking blocks included, because a provider needs that turn's reasoning
+to finish the round (and budget-mode thinking requires the last assistant turn
+to begin with its thinking block). With `keep: 1` everything before that round
+is summarized; a larger `keep` retains more recent turns verbatim.
+
+When kept turns after the range carry signed reasoning (thinking blocks, thought
+signatures), the summary is framed as user context (`Summary of earlier
+conversation:`) so a kept assistant turn still starts with its own reasoning,
+and each such turn is marked `compaction: "retained"` (the summary is marked
+`compaction: "summary"`). The markers travel with `report.messages`, durable
+snapshots and `ai.session()` history. Turns before the range are untouched: the
+conversation before them did not change.
+
+Whether retained reasoning is still valid is the provider's rule. Models that
+bind thinking to the exact history before it (Anthropic's preserved thinking on
+Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5) can't use reasoning
+produced before a client-written summary; the Anthropic adapter replays those
+turns without their thinking blocks, so the model reasons afresh from the
+summary. Older models accept the kept blocks as they are. See [Anthropic →
+Preserved thinking and client-side compaction](/v/latest/ai/providers/anthropic/#preserved-thinking-and-client-side-compaction);
+on those models, server-side compaction (`serverCompaction`) keeps more of the
+model's own reasoning.
+
 `report.compactions` records threshold-crossing decisions and counter failures as `type: "applied"`
 or `"skipped"`, with the trip index, counting method, input count and either the
 applied `CompactionResult` (indices in the live conversation before replacement)
-or a reason: `no-safe-range`, `provider-replay`, `not-smaller`, `callback-error`.
+or a reason: `no-safe-range`, `not-smaller`, `callback-error`.
 The input count is absent when the counter failed before producing one.
 No field is added when compaction is disabled or the threshold is never reached.
 After an applied compaction, `result.blocks` is absent even for one generation

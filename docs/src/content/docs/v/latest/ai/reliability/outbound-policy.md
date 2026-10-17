@@ -170,6 +170,8 @@ isPrivateOrReservedIp("::1"); // true (IPv6 loopback)
 isPrivateOrReservedIp("93.184.216.34"); // false
 ```
 
+It is Core's classifier, re-exported. `@warlock.js/ai` imports it from the side-effect-free `@warlock.js/core/net` subpath, not the Core root, so loading `@warlock.js/ai` in a standalone process (an agent runner that is not a Warlock app) does not pull in Core's HTTP server, database or cache modules.
+
 ## Errors
 
 Every block, timeout, and overflow throws `OutboundPolicyError` (an `AIError` subclass) with a descriptive message and a structured `context` (the offending URL, host, address, scheme, declared size, or timeout). Catch it where you call the helper directly:

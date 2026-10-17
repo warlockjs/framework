@@ -35,6 +35,7 @@ export const connectorsCheck: DoctorCheck = {
       return {
         name: "connectors",
         status: "fail",
+        code: "WL1009",
         detail: `warlock.config.ts > connectors was refused: ${connectors.registrationError}`,
       };
     }
@@ -43,6 +44,7 @@ export const connectorsCheck: DoctorCheck = {
       return {
         name: "connectors",
         status: "fail",
+        code: "WL2003",
         detail:
           `${connectors.failures.length} connector(s) failed to boot:\n` +
           connectors.failures

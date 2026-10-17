@@ -2,6 +2,7 @@ import type { AIError } from "../../errors/ai-error";
 import type { AgentResult } from "../result/agent-result.type";
 import type { LLMTrip } from "../result/llm-trip.type";
 import type { ToolCall } from "../result/tool-call.type";
+import type { Usage } from "../result/usage.type";
 
 /**
  * Lightweight tool metadata surfaced on tool-lifecycle events. A
@@ -34,19 +35,61 @@ export type AgentTripStartedPayload = { tripIndex: number; input: string };
 /** Token delta received during streaming */
 export type AgentStreamingPayload = { delta: string; tripIndex: number };
 
+/**
+ * Reasoning / thinking text received during streaming (`agent.stream()`
+ * only, and only when the provider streams it — see the
+ * `ModelStreamChunk` `reasoning` variant). Never part of the answer.
+ */
+export type AgentReasoningPayload = { delta: string; tripIndex: number };
+
+/**
+ * A piece of a tool call's argument JSON while the model writes it
+ * (`agent.stream()` only, providers that stream arguments). The parsed
+ * input arrives later on `agent.tool.calling` for the same `callId`.
+ */
+export type AgentToolStreamingPayload = {
+  /** Tool call id; matches `ToolCall` / the later dispatch of this call. */
+  callId: string;
+  /** Tool name the model is calling. */
+  name: string;
+  /** Next piece of the raw argument JSON. */
+  delta: string;
+  tripIndex: number;
+};
+
+/**
+ * Token counts so far for the current trip, reported mid-stream
+ * (`agent.stream()` only, providers that report usage before the end).
+ * A running total for this trip — the final count is on
+ * `agent.trip.completed`.
+ */
+export type AgentTripUsagePayload = { usage: Usage; tripIndex: number };
+
 /** LLM has requested a tool call */
 export type AgentToolCallingPayload = {
   tool: ToolEventMeta;
+  /**
+   * The provider's tool-call id (`ModelToolCallRequest.id`). Matches the
+   * `callId` of the `agent.tool.called` / `agent.tool.failed` event for
+   * the same call, so concurrent calls to one tool stay distinguishable.
+   */
+  callId: string;
   input: unknown;
   tripIndex: number;
 };
 
 /** Tool call completed successfully */
-export type AgentToolCalledPayload = ToolCall & { tool: ToolEventMeta };
+export type AgentToolCalledPayload = ToolCall & {
+  tool: ToolEventMeta;
+  /** The provider's tool-call id — same value as on `agent.tool.calling`. */
+  callId: string;
+};
 
 /** Tool call failed with an error */
 export type AgentToolCallingFailedPayload = {
   tool: ToolEventMeta;
+  /** The provider's tool-call id — same value as on `agent.tool.calling`. */
+  callId: string;
   input: unknown;
   error: AIError;
   tripIndex: number;

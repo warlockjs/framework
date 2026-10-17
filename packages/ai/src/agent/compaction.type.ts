@@ -19,8 +19,11 @@ export type AgentCompactionConfig = {
   /**
    * Receives a detached, safe old slice. Return an assistant text summary replacing
    * the entire slice (indices 0 through history.length - 1). A first-turn summary
-   * is framed as user context before generation. The callback owns its
-   * model calls, billing and usage; no hidden summarizer is invoked by the agent.
+   * is framed as user context before generation, and so is any summary
+   * followed by kept turns that carry signed reasoning (thinking blocks).
+   * The callback owns its model calls, billing and usage; no hidden
+   * summarizer is invoked by the agent. `ai.compaction.summarize({ model })`
+   * builds a ready-made callback.
    */
   summarize: (history: Message[], context: AgentCompactionContext) => ReturnType<SummarizeCallback>;
   /**
@@ -37,6 +40,6 @@ export type AgentCompactionRecord = Omit<AgentCompactionContext, "signal" | "inp
   type: "applied" | "skipped";
   /** Original live-conversation indices of the replaced range. */
   compaction?: CompactionResult;
-  reason?: "no-safe-range" | "provider-replay" | "not-smaller" | "callback-error";
+  reason?: "no-safe-range" | "not-smaller" | "callback-error";
   error?: string;
 };

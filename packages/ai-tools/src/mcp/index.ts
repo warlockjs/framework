@@ -1,6 +1,8 @@
 import type {
   McpClient,
   McpClientOptions,
+  McpHttpServeHandle,
+  McpHttpServeTransport,
   McpServeOptions,
   McpServeSource,
   McpServer,
@@ -10,6 +12,8 @@ import { mcp as mcpClient } from "./client";
 import { serve } from "./serve";
 
 export { serve, createServeHandler } from "./serve";
+export type { McpServeRequestHandler } from "./serve";
+export { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
 export { jsonSchemaToStandard } from "./json-schema-to-standard";
 export { createJsonRpcClient, createTransport } from "./transport";
 export type { JsonRpcClientHandle } from "./transport";
@@ -33,11 +37,16 @@ export interface McpFactory {
   (server: McpTransport, options?: McpClientOptions): McpClient;
   /**
    * Expose a built agent / supervisor / orchestrator (or a literal
-   * `ToolContract[]`) AS an MCP server.
+   * `ToolContract[]`, or named `{ groups }`) AS an MCP server. Over
+   * `{ type: "http" }`, `start()` resolves `{ url, close }`.
    *
    * @param source - The tools to expose.
-   * @param options - Server name, version, transport, and schema dialect.
+   * @param options - Server name, version, transport, schema dialect, resources, prompts.
    */
+  serve(
+    source: McpServeSource,
+    options: McpServeOptions & { transport: McpHttpServeTransport },
+  ): McpServer<McpHttpServeHandle>;
   serve(source: McpServeSource, options: McpServeOptions): McpServer;
 }
 

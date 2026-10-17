@@ -154,6 +154,72 @@ describe("semanticCache — paused turns", () => {
   });
 });
 
+describe("semanticCache — responses cut off by the model's limits", () => {
+  it("stores a continued answer whole and never stores an incomplete one", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "Part one, ", finishReason: "length" },
+        { content: "part two.", finishReason: "stop" },
+        { content: "cut off", finishReason: "length" },
+        { content: "never", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const { driver: store, countEntries } = makeStore();
+
+    const continued = agent({
+      model,
+      continueOnOutputLimit: 1,
+      middleware: [
+        semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.99 }),
+      ],
+    });
+
+    const firstRun = await continued.execute("long question");
+
+    expect(firstRun.text).toBe("Part one, part two.");
+    expect(countEntries()).toBe(1);
+
+    const cached = await continued.execute("long question");
+
+    expect(cached.text).toBe("Part one, part two.");
+
+    const fresh = makeStore();
+    const incomplete = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store: fresh.driver,
+          threshold: 0.99,
+        }),
+      ],
+    });
+
+    const cutOff = await incomplete.execute("long question");
+
+    expect(cutOff.report.status).toBe("incomplete");
+    expect(fresh.countEntries()).toBe(0);
+  });
+
+  it("does not store a response that filled the context window", async () => {
+    const sdk = MockSDK({
+      responses: [{ content: "partial", finishReason: "context_exceeded" }],
+    });
+    const { driver: store, countEntries } = makeStore();
+
+    const result = await agent({
+      model: sdk.model({ name: "gpt-test" }),
+      middleware: [
+        semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.99 }),
+      ],
+    }).execute("huge question");
+
+    expect(result.report.status).toBe("incomplete");
+    expect(countEntries()).toBe(0);
+  });
+});
+
 describe("semanticCache — vector-match path", () => {
   it("serves a cached response for a semantically close prompt", async () => {
     const sdk = MockSDK({

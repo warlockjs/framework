@@ -214,14 +214,14 @@ const { errors, inputKey, inputError, status } = config.get("validation.response
   errors: "errors",
   inputKey: "input",
   inputError: "error",
-  status: 400,
+  status: 422,
 });
 ```
 
 So an out-of-the-box validation failure looks like:
 
 ```json
-// HTTP 400
+// HTTP 422
 {
   "errors": [
     { "input": "email", "error": "Email is required" },
@@ -230,14 +230,15 @@ So an out-of-the-box validation failure looks like:
 }
 ```
 
-| Config field (under `validation.response`) | Default    | Controls                                         |
-| ------------------------------------------ | ---------- | ------------------------------------------------ |
-| `errors`                                   | `"errors"` | The top-level key holding the array of failures. |
-| `inputKey`                                 | `"input"`  | The per-error key naming the failed input.       |
-| `inputError`                               | `"error"`  | The per-error key holding the message.           |
-| `status`                                   | `400`      | The HTTP status for a schema-validation failure. |
+| Config field (under `validation.response`) | Default    | Controls                                                                     |
+| ------------------------------------------ | ---------- | ---------------------------------------------------------------------------- |
+| `errors`                                   | `"errors"` | The top-level key holding the array of failures.                             |
+| `inputKey`                                 | `"input"`  | The per-error key naming the failed input.                                   |
+| `inputError`                               | `"error"`  | The per-error key holding the message.                                       |
+| `status`                                   | `422`      | The HTTP status for a schema-validation failure.                             |
+| `body`                                     | —          | A hook `(result, route) => body` that replaces the envelope for every route. |
 
-Override any of these in your project config to reshape the envelope (for example, to match an existing API contract) without touching framework code.
+Override any of these in your project config to reshape the envelope (for example, to match an existing API contract) without touching framework code. A route that must answer with its own stable error code sets `validation.onFailure`, which wins over `body`; see [Validation → Custom failure responses](../the-basics/validation.md#custom-failure-responses).
 
 ### Use-cases: `BadSchemaUseCaseError`
 

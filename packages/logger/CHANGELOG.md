@@ -6,9 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Upgrading
+
+- **BREAKING:** `FileLog`/`JSONFileLog` dated file names are ISO dates that sort by name: `chunk: "daily"` writes `YYYY-MM-DD.log` (was `DD-MM-YYYY.log`) and `chunk: "hourly"` writes `YYYY-MM-DD-HH.log` (was `DD-MM-YYYY-HH-00-00-am.log`). Size-rotated archives default to `<file name>-YYYY-MM-DD-<epoch ms>`. After upgrading, a running daily channel starts a new file under the new name. To keep the old names, set `fileName: "{DD}-{MM}-{YYYY}"` (daily) and `rotateFileName: "{DD}-{MM}-{YYYY}"`. Tools that find logs by name (shippers, cron cleanups) need the new pattern; `retention` does not remove files with the old names.
+- `rotateFileName` is now a `{YYYY}`/`{MM}`/`{DD}`/`{HH}`/`{mm}`/`{name}` pattern or a function of the rotation date, not a Day.js format. A value without tokens is used as is, as before; a Day.js format such as `"DD-MM-YYYY"` was always written literally and still is — use `"{DD}-{MM}-{YYYY}"`.
+
 ### Added
 
+- `FileLog` `fileName` option: a pattern (`"app-{YYYY}-{MM}-{DD}"`, tokens `{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}` `{name}` in local time) or a `(date) => string` function, evaluated at every write; it replaces the chunk's default name. `rotateFileName` takes the same forms and is rendered at each rotation (a getter passed in the config was read once, at construction, so every archive kept the boot date). Exported `FileNameOption`, `FileLogRetention`, `DAILY_FILE_NAME`, `HOURLY_FILE_NAME` and `ROTATE_FILE_NAME`.
+- `FileLog` `retention: { maxFiles?, maxAgeDays?, match? }`: removes old log files on boot and whenever the channel starts a new file (a size rotation or a dated name rolling over), plus `channel.prune()` on demand. It only considers files in the log directory (each group directory with `groupBy`) whose names match the channel's file name pattern, keeps the file being written, and reports failures to `onChannelError` instead of throwing. A function `fileName` needs `retention.match`. Invalid `maxFiles`/`maxAgeDays` throw a `TypeError` at construction.
+- `LogChannel.reportError(error, entry)` and `setErrorReporter(reporter)` (type `ChannelErrorReporter`): a channel reports failures outside `log()` to the `onChannelError` handler of the logger it was added to (`addChannel`, `setChannels`, `configure({ channels })`), or one stderr line without one.
 - Skills demonstrate email masking inside text, channel-error observation and bounded asynchronous log drains.
+
+### Fixed
+
+- With `groupBy`, size rotation renames the group file that grew too large instead of the ungrouped top-level file.
+- A file name that throws while a buffer is written (a `fileName` function, or an overridden `fileName` getter) is reported as a failed write instead of leaving the channel stuck in its writing state; later writes go through.
 
 ## 5.30.0 - 2026-10-16
 

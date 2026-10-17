@@ -138,8 +138,28 @@ export type AgentConfig<TOutput = unknown> = {
   maxTrips?: number;
   /** Opt-in history compaction before model trips; disabled when omitted. */
   compaction?: AgentCompactionConfig;
-  /** Base model call options merged with per-execute options (execute wins on conflict) */
+  /**
+   * Base model call options sent on every trip of every run. A run's
+   * `AgentExecuteOptions.modelOptions` is shallow-merged over these for
+   * that run only (per-call keys win; nested objects such as
+   * `providerOptions` are replaced, not merged).
+   */
   modelOptions?: ModelCallOptions;
+  /**
+   * How many times one run may recover from a response cut off by the
+   * output token cap (`finishReason: "length"`) by sending a continue
+   * turn. Default `0`: a cut-off final response ends the run with an
+   * `AgentIncompleteError` and `report.status: "incomplete"`.
+   *
+   * Each continuation is a normal trip (counted against `maxTrips`). The
+   * partial text is kept in the conversation and joined with the
+   * continuation's text in `result.text`. A tool call the model was still
+   * writing is discarded, never executed, and the continue turn tells the
+   * model it did not run. A full context window (`"context_exceeded"`) is
+   * never continued. Per-call `AgentExecuteOptions.continueOnOutputLimit`
+   * wins.
+   */
+  continueOnOutputLimit?: number;
   /**
    * Default Standard Schema for structured output. Bakes the output
    * contract into the agent's identity for agents whose shape never

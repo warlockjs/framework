@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `MockModel` infers `finishReason: "tool_calls"` when a scripted response has non-empty `toolCalls` and no `finishReason`, so scripted tool calls run without repeating the finish reason. An explicit `finishReason` still wins.
+- `MockModel` honours `signal`: an already-aborted signal rejects the call, an abort during a scripted `delay` rejects immediately, and `stream()` stops between chunks. The rejection is the signal's `reason` when it is an `Error`, otherwise an `AbortError` `DOMException`.
+- `@warlock.js/ai` imports Core's private-address classifier from the new side-effect-free `@warlock.js/core/net` subpath instead of the Core root, so a standalone process running `ai.agent` no longer loads Core's HTTP server, database, cache and mail modules, and bundlers no longer need to alias Core. An import-graph test fails if anything reachable from the package entry imports the Core root. The installation guide documents `@warlock.js/cache` and `@warlock.js/cascade` as optional, lazily loaded peers for standalone use.
+- **BREAKING** An agent run whose final response was cut off — by the output token cap (`finishReason: "length"`) or the context window (`"context_exceeded"`) — no longer finishes as a success with empty or partial text. It ends with `result.error` an `AgentIncompleteError` (`code: "AGENT_INCOMPLETE"`, category `"incomplete"`, `reason: "output_limit" | "context_window"`, `tripIndex`, `continuations`) and `report.status: "incomplete"`; `result.text` keeps the partial text. A tool call the model was still writing is never executed and is listed on the trip's new `truncatedToolCalls`. Durable snapshots of such a run are stored as `failed`, so `resume()` retries the cut-off trip.
+- The semantic cache never stores a response cut off by the output cap or the context window; a continued answer is stored whole.
+
 - The provider matrix documents inherited `providerOptions.openai.body` on xAI, Groq, DeepSeek and Mistral, and warns against sharing provider-specific fields across incompatible fallback models.
 
 ### Fixed
@@ -15,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `computeCost` bills Anthropic and Bedrock prompt caching correctly. Their `input` excludes cache reads and writes, so cache reads are no longer subtracted from it (which could floor fresh input at 0), and cache writes are now charged: at `ModelPricing.cacheWrite`, with the 1-hour share at `cacheWrite1h`. OpenAI-style usage, where `input` includes cached tokens, is billed as before.
 
 - Batch, planner and fallback-model usage rollups use the shared `mergeUsage`, so they keep every usage channel and the cache semantics flag.
+- The streaming agent loop reads the finish reason and usage only from the `done` chunk and ignores chunk types it does not know, instead of treating any other chunk as `done`. `fallbackModel().stream()` still falls over after a model emitted only a `usage` chunk.
 
 - Automatic compaction preserves the original execution input during output repair and durable resume, records its updated snapshot index, and frames a first-turn summary as user context. Legacy snapshots with missing or ambiguous input skip compaction safely.
 
@@ -23,8 +30,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **BREAKING** `AIErrorCode` gained `PROVIDER_OVERLOADED`, and provider overloads (Anthropic 529, OpenAI and compatible 503, Gemini 503, Bedrock `ServiceUnavailableException`) now throw `ProviderOverloadedError` instead of a plain `ProviderError` with `PROVIDER_ERROR`. It still extends `ProviderError`; code that matches on `PROVIDER_ERROR` for these cases, or switches exhaustively over `AIErrorCode`, needs the new case. Custom `fallbackModel({ retryOn: [...] })` lists should add it.
 
 - Cost totals now include cache writes, in the new `cost.cacheWrite` channel. Replace hand-written sums such as `cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0)` with `totalCost(cost)`. Anthropic and Bedrock runs report higher, correct, costs. Set `cacheWrite` instead of the deprecated `cachedOutput` rate.
+- Tests that script `toolCalls` on a `MockModel` response without a `finishReason` and expect `"stop"` now get `"tool_calls"`; set `finishReason: "stop"` explicitly to keep the old ending. Tests that pass an already-aborted `signal` to a mock model now see the call reject.
+- Hosts that treated an empty or partial `result.text` with no `result.error` as a finished run must handle `AgentIncompleteError` / `report.status === "incomplete"` instead (and can drop their own `trips.at(-1).finishReason === "length"` checks). Exhaustive switches over `ReportStatus` or `ErrorCategory` need the new `"incomplete"` member. To recover automatically from the output cap, set `continueOnOutputLimit`; otherwise raise `maxTokens` or split the task.
+- `agent.stream()` now emits `agent.trip.reasoning`, `agent.tool.streaming` and `agent.trip.usage` in addition to the existing events, and `MockModel` produces them under `agent.stream()` (one `agent.tool.streaming` per scripted tool call, one `agent.trip.usage` per trip). A test that asserts the exact list of streamed event types should filter for the types it checks, or set `modelOptions: { streamChunks: false }` to keep the previous list. Code that calls `model.stream()` directly sees no change unless it passes `streamChunks`.
 
 - When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.
+- When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay (or use `ai.session()`, which does it). `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature. Keep the `compaction` markers on stored messages.
 
 - Sub-agents also use the concurrent tool default introduced in 5.30. Callers upgrading from 5.29 whose tools need ordered side effects can now set `spawnSubAgent({ toolDispatch: "sequential", ... })`.
 
@@ -49,16 +60,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Compact tool schemas: `compactJsonSchema()`, `extractJsonSchema(schema, { compact })`, `withCompactJsonSchema()`, `compactToolSchemas()` and the `toolSchemas: "full" | "compact"` option on `ai.agent()` and `execute()`. Compact schemas drop annotations (descriptions, titles, examples, defaults) and collapse const unions to `enum`; validation is unchanged.
 
 - `createToolContext({ artifacts?, signal? })` builds the `ToolContext` for invoking a tool outside the agent loop.
+- `verifyModelSignalContract({ createModel })` checks that a model adapter honours `ModelCallOptions.signal`: a call with an already-aborted signal rejects, and aborting mid-call rejects promptly and cancels the HTTP request, for `complete()` and `stream()`. It serves an ephemeral local port that never answers (`protocol: "http2"` for HTTP/2 clients), has no test-runner dependency, and throws an `Error` naming the failed check. Honouring `signal` is now part of the documented `ModelContract`, and every first-party adapter runs this check.
+- `continueOnOutputLimit: n` on `AgentConfig` and `AgentExecuteOptions`: up to `n` times per run, a response cut off by the output cap is continued with a continue turn and the segments are joined in `result.text` (and the structured output parsed from it), also on the stream and during repair. A tool call cut off mid-input is dropped and the model is told it did not run. Each continuation is a trip within `maxTrips`; a full context window is never continued.
+- `agent.execute(input, { modelOptions })` and `agent.stream(input, { modelOptions })` set model call options (reasoning effort, `maxTokens`, `cacheControl`, `providerOptions`, …) for that run only, shallow-merged over `AgentConfig.modelOptions`; the agent is not changed. `tools`, `signal` and `responseSchema` in the per-call object are ignored.
+- Tool events carry the provider's tool-call id as `callId`: `agent.tool.calling`, `agent.tool.called` and `agent.tool.failed` (event payloads and stream events), the `ToolCall` record (`report.children[].callId`), the tool middleware context (`ctx.callId`), and the human-approval `PolicyContext` / `ApprovalRequestContext`. Concurrent calls to the same tool in one trip can now be told apart. Tool log lines include it.
+- `AgentIncompleteError`, `AgentIncompleteErrorOptions` and `AgentIncompleteReason` are exported; `AIErrorCode` gains `AGENT_INCOMPLETE`, `ErrorCategory` and `ReportStatus` gain `incomplete`, and `LLMTrip` gains `truncatedToolCalls`.
+- `agent.stream()` emits `agent.trip.reasoning` (reasoning / thinking text), `agent.tool.streaming` (`{ callId, name, delta }` pieces of a tool call's arguments while the model writes them) and `agent.trip.usage` (running token counts for the trip) wherever the provider streams them. `execute()` is unchanged; `modelOptions.streamChunks` turns them down.
+- `ModelStreamChunk` gains `reasoning`, `tool-args` and `usage` chunks. They are opt-in on `model.stream()` through `ModelCallOptions.streamChunks` (`true` or `{ reasoning?, toolArgs?, usage? }`), so existing chunk consumers see exactly the old `delta` / `tool-call` / `done` sequence. `resolveStreamChunks(options)` resolves the option for adapters; `MockModel` emits all three (scripted `reasoning`, the tool input as `tool-args`, a final `usage`) when asked.
+- `ai.providerTool({ provider, definition, execute? })` declares a provider-defined tool (web search, code execution, bash, text editor, search grounding, …). The agent sends it as `ModelCallOptions.providerTools`; only the named provider receives the definition, verbatim, and every other adapter skips it with one `providerTool.skipped` warning. Client-run provider tools dispatch to `execute` by name. Also exported: `isProviderTool`, `selectProviderTools` (adapter helper), `ProviderTool`, `ProviderToolDefinition`.
 
 - Regression fixtures assert required model and identifier segments before reading them under stricter indexed-access checks; the compiler error budget falls by ten.
 
 - Skills include complete examples for per-trip tool concurrency and native token preflight with provider-specific request options.
 
-- Agents can opt into automatic history compaction with an explicit token threshold, a summary callback and an optional native/custom counter. System prompts, current input and tool groups are preserved; retained provider replay data is conservatively skipped. Applied/skipped decisions are recorded on reports and durable snapshots.
+- Agents can opt into automatic history compaction with an explicit token threshold, a summary callback and an optional native/custom counter. System prompts, current input and tool groups are preserved. Applied/skipped decisions are recorded on reports and durable snapshots.
+
+- Compaction works on thinking runs. The replaced range always ends before the open tool round, which goes back verbatim with its signed thinking. When kept turns after the range carry signed reasoning, the summary is framed as user context and those turns are marked `compaction: "retained"` (the summary `compaction: "summary"`), so adapters whose providers bind reasoning to the exact prior history can leave it out on replay.
+
+- `ai.compaction.summarize({ model, instructions?, maxTokens?, modelOptions?, onUsage? })` (also `summarizeCompaction`): a ready-made `compaction.summarize` callback. It sends the slice as a tagged transcript with Anthropic's published client-side compaction prompt (`DEFAULT_COMPACTION_INSTRUCTIONS`), reads the `<summary>` tags, and throws on a truncated, refused or empty reply so the agent keeps the conversation. `renderTranscript(messages)` is exported for custom callbacks.
+
+- `ai.session({ id, store, agent, lock? })`: a persisted multi-turn conversation with one agent — `send`, `stream`, `history`, `load`, `fork`, `truncate`, `resume`, `clear`. Each send stores the whole turn (tool rounds, provider blocks, attachment parts), failed runs leave the history unchanged, sends on one session id are serialized, the agent's compaction policy compacts long sessions, and a send interrupted by a crash resumes through a durable agent.
+
+- `ai.snapshot.file({ dir })` and `ai.snapshot.sqlite({ path } | { database })` snapshot stores for local-first apps, usable for durable runs, supervisor snapshots and sessions. The SQLite store uses Node's built-in `node:sqlite` (Node 22.5+; no flag on Node 22.13+), loaded only on first use, or any open `exec` / `prepare` database such as `better-sqlite3`; it creates its table on first use unless `createTable: false`.
+
+- `Message.compaction` / `CapturedMessage.compaction` (`"summary" | "retained"`), and a per-call `captureMessages` option on `agent.execute` / `stream`.
+
+- `ai.snapshot.pg()` and `ai.snapshot.redis()` are generic over the snapshot shape like the other snapshot factories; the default stays `SupervisorSnapshot`.
 
 - `ModelContract.countTokens?()` represents optional native input-token preflight, separate from offline SDK estimates.
 
 - `SpawnSubAgentSpec` accepts `toolDispatch` and `maxConcurrentTools`, forwarded to the fresh agent. Defaults match `ai.agent()` (concurrent, up to four calls).
+
+- `ToolContext.request` (`ToolRequestContext`: `headers`, `remoteAddress`) carries the inbound request when a server transport runs the tool for a remote client, such as `ai.mcp.serve` over HTTP. It is unset for in-process dispatch and never reaches the model.
 
 ## 5.30.0 - 2026-10-16
 

@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import type { FastifyRequest } from "fastify";
 import { log } from "@warlock.js/logger";
 import { router } from "../router";
+import { resolveStaticRateLimit } from "../router/resolve-route-rate-limit";
 import { rootPath } from "../utils";
 import { buildCorsOptions } from "./build-cors-options";
 import { buildRateLimitOptions } from "./build-rate-limit-options";
@@ -17,7 +18,7 @@ export async function registerHttpPlugins(server: FastifyInstance) {
 
   if (rateLimitOptions) {
     server.register(import("@fastify/rate-limit"), rateLimitOptions);
-  } else if (router.list().some((route) => route.rateLimit)) {
+  } else if (router.list().some((route) => typeof route.rateLimit === "object")) {
     log.warn(
       "http",
       "rateLimit",
@@ -70,10 +71,15 @@ export async function registerHttpPlugins(server: FastifyInstance) {
   const publicRoot = resolvePublicRoot(config.get("storage.publicRoot", rootPath("public")));
 
   if (publicRoot !== undefined) {
-    registerLazyStatic(server, {
-      root: publicRoot,
-      prefix: config.get("storage.publicPrefix", "/public/"),
-    });
+    registerLazyStatic(
+      server,
+      {
+        root: publicRoot,
+        prefix: config.get("storage.publicPrefix", "/public/"),
+      },
+      // Exempt from the global limiter unless `http.rateLimit.staticFiles`.
+      { rateLimit: resolveStaticRateLimit(undefined) },
+    );
   }
 
   // 👇🏻 register cookie plugin

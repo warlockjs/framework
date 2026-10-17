@@ -46,6 +46,24 @@ describe("consoleExporter", () => {
     expect(sink.error.mock.calls[0][0]).toContain("ToolError: boom");
   });
 
+  it("should route incomplete traces to error", async () => {
+    const sink = makeSink();
+    const exporter = consoleExporter({ console: sink });
+
+    await exporter.export(
+      makeTrace(
+        makeSpan({
+          type: "agent",
+          status: "incomplete",
+          error: { type: "AGENT_INCOMPLETE", message: "cut off" },
+        }),
+      ),
+    );
+
+    expect(sink.log).not.toHaveBeenCalled();
+    expect(sink.error.mock.calls[0][0]).toContain("INCOMPLETE");
+  });
+
   it("should print the full indented tree when tree=true", async () => {
     const sink = makeSink();
     const exporter = consoleExporter({ console: sink, tree: true });

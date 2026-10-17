@@ -1,5 +1,6 @@
 import type { AIError } from "../../errors/ai-error";
 import type { FinishReason } from "../finish-reason.type";
+import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { ProviderContentBlock } from "../provider-content-block.type";
 import type { ToolCall } from "./tool-call.type";
 import type { Usage } from "./usage.type";
@@ -44,6 +45,12 @@ export type LLMTrip = {
    * trip's blocks with your transcript to replay the turn verbatim.
    */
   blocks?: ProviderContentBlock[];
+  /**
+   * Tool calls the model was still writing when this trip's output was cut
+   * off (`finishReason: "length"`). Their input may be incomplete, so the
+   * agent never executes them. Absent when nothing was cut off mid-call.
+   */
+  truncatedToolCalls?: ModelToolCallRequest[];
   /** Typed AI error that occurred during this trip, if any */
   error?: AIError;
 };

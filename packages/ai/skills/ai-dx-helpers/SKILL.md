@@ -110,6 +110,44 @@ ai.mockRouter(["research", (ctx) => (ctx.state.summary ? END : "research")], {
 
 A decision is a literal `Next` (intent name / fan-out array / `END`) or a predicate over the live `RouteContext`. On exhaustion: `"end"` (default — terminate), `"throw"` (test failure), `"repeat"` (replay last). For a scripted LLM, use `MockSDK` (script the model output) and `mockAgent({ name, responses })` for fixed-response capabilities.
 
+## Scripted tool calls and cancellation in `MockSDK`
+
+A `MockModelResponse` with non-empty `toolCalls` and no `finishReason` finishes with `"tool_calls"`, so the agent runs the scripted tools; an explicit `finishReason` always wins. The mock honours `signal` like a real adapter — an aborted signal rejects, an abort during `delay` rejects at once, and `stream()` stops between chunks.
+
+```ts
+import { MockSDK } from "@warlock.js/ai";
+
+const mock = new MockSDK({
+  responses: [{ content: "", toolCalls: [{ id: "c1", name: "lookup", input: { sku: "A-1" } }] }],
+});
+const model = mock.model({ name: "mock" });
+
+const first = await model.complete([{ role: "user", content: "stock?" }]);
+// first.finishReason === "tool_calls"
+
+const controller = new AbortController();
+controller.abort();
+await model.complete([{ role: "user", content: "again" }], { signal: controller.signal }).catch(
+  (error: unknown) => error, // DOMException "AbortError"
+);
+```
+
+## Adapter signal contract — `verifyModelSignalContract`
+
+Honouring `ModelCallOptions.signal` is part of the model adapter contract: a pre-aborted call rejects, and aborting mid-call rejects **and** cancels the HTTP request, for `complete()` and `stream()`. Every first-party adapter package runs this helper in `src/signal-contract.spec.ts`; run it for a custom adapter. It serves an ephemeral `127.0.0.1` port that accepts requests and never answers, and throws an `Error` naming the failed check.
+
+```ts
+import { verifyModelSignalContract } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const report = await verifyModelSignalContract({
+  createModel: ({ baseURL }) =>
+    new OpenAISDK({ apiKey: "test", baseURL, maxRetries: 0 }).model({ name: "gpt-4o-mini" }),
+  // protocol: "http2" for HTTP/2 clients (Bedrock), methods: ["complete"] to narrow, timeoutMs: 5000
+});
+// report.checks → [{ method, scenario: "before-call" | "in-flight", requests, error }, …]
+```
+
 ## SLO / cost budget contracts — `ai.middleware.budget({ contract })`
 
 On top of the legacy `maxTokens` / `maxCostUSD` caps, declare a run-level SLO as data, with one global reaction:

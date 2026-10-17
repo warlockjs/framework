@@ -69,6 +69,7 @@ export function makeToolCtx(options: MakeToolCtxOptions = {}): MiddlewareToolCon
     tripIndex: 0,
     messages: [],
     tool: { name: toolName },
+    callId: "call_test",
     request: { id: "call_test", name: toolName, input: options.input },
   } satisfies MiddlewareToolContext;
 }

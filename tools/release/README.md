@@ -23,14 +23,23 @@ Releases run in GitHub Actions on this repository
    install/import/scaffold checks share one thirty-minute deadline, with
    exponential backoff from three to sixty seconds. Already-live packages are
    not re-polled; retries start with clean consumer and scaffold directories.
-   On exhaustion, the runner saves its recorded release commit in
-   `$LOGS/release-commit.bundle`, uploaded with `warlock-<version>-logs`.
+   On exhaustion, or when tagging or pushing fails after confirmation, the
+   runner saves its recorded release commit in `$LOGS/release-commit.bundle`,
+   uploaded with `warlock-<version>-logs`.
    Recovery output explains how to download that bundle and the
    `warlock-<version>-artifacts` upload, restore `build-provenance.json`, import
    the commit, check that the origin branch is its ancestor, push the recorded
    commit and tag, and dispatch the registry blog check. When release edits are
    a no-op, the recorded commit is the dispatched commit. Wait for every subject
    to be visible before recovery; do not republish.
+   The same steps are saved as `$LOGS/recover-release-v<version>.sh`: after
+   `gh run download <run_id> -n warlock-<version>-logs -D release-logs`, run
+   `bash release-logs/recover-release-v<version>.sh <run_id>` from the
+   repository root. The script uses `set -euo pipefail` and is safe to rerun
+   after a partial recovery: it skips present downloads, keeps a tag already at
+   the release commit and treats a tag already at origin as pushed. The printed
+   copy is wrapped in `( set -euo pipefail … )`, so pasting it stops at the
+   first failure without closing your shell.
 
 ```bash
 npm ci
@@ -40,6 +49,42 @@ node --import tsx scripts/release-family.ts gate --version <x.y.z> --matrix none
 
 The pkgist tool itself is `@mongez/pkgist` on npm, released separately; keep the
 pinned version in `package.json` in step with the @mongez runner.
+
+## Dispatching a release from automation
+
+A person can always dispatch `release.yml` from the Actions tab
+(<https://github.com/warlockjs/framework/actions/workflows/release.yml> → **Run workflow**).
+To let an agent or script dispatch it, it needs a fine-grained personal access token, and the
+`warlockjs` organization's token policy currently rejects such tokens because of their lifetime.
+Only an organization owner can change that:
+
+1. Open the organization's token policy:
+   <https://github.com/organizations/warlockjs/settings/personal-access-tokens>.
+   Under **Fine-grained personal access tokens**, allow access via fine-grained tokens, set the
+   **maximum allowed lifetime** to at least the lifetime you will give the token (or no limit),
+   and choose whether tokens need approval.
+2. Create the token at <https://github.com/settings/personal-access-tokens/new>:
+   - **Resource owner:** `warlockjs`;
+   - **Repository access:** only `warlockjs/framework`;
+   - **Permissions:** `Actions: Read and write` (dispatching and reading runs) and
+     `Metadata: Read` (added automatically). Nothing else is needed.
+   - an expiry within the policy from step 1.
+3. If the policy requires approval, approve the request under the organization's
+   **Personal access tokens → Pending requests**.
+4. Store the token outside the repository with owner-only permissions (`chmod 600`) and dispatch with
+   `gh workflow run release.yml -R warlockjs/framework -f version=<x.y.z> -f publish=<true|false>`
+   using `GH_TOKEN` from that file. Never print it or commit it.
+
+Publishing itself does not use this token: `release.yml` publishes with the `NPM_TOKEN` secret of the
+`release` environment and pushes the tag with the job's own `GITHUB_TOKEN`. A new package added to the
+family must be publishable with that `NPM_TOKEN` (an automation or granular token with write access to
+the whole `@warlock.js` scope, not to a fixed list of packages).
+
+## Repository history
+
+Issue reports used while preparing a release (`findings/`) are removed from the tree once the release
+ships. Earlier reports stay in git history: rewriting the public history would break every clone and
+fork, so it is not done.
 
 ---
 
@@ -432,7 +477,7 @@ checks and assertions rather than widening types, and lower budgets to measured
 counts after fixes. The release gate verifies the full workspace again.
 
 Release gates always set WARLOCK_REDIS_INTEGRATION=1 for package quality scripts,
-including local runs. The release workflow supplies Redis6390 explicitly.
+including local runs. The release workflow supplies Redis on port 6390 explicitly.
 Skill compilation maps source package subpaths independently of root barrels,
 honours explicit package exports without exposing internal source paths,
 resolves installed dependencies from the skill's owning package, and isolates

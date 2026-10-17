@@ -28,6 +28,7 @@ type ReportExtensions = {
   turns?: unknown[];
   turnIndex?: number;
   tripIndex?: number;
+  callId?: string;
   recoveredFrom?: string;
 };
 
@@ -188,6 +189,10 @@ function addToolAttributes(
 ): void {
   if (extensions.tripIndex !== undefined) {
     attributes["tool.tripIndex"] = extensions.tripIndex;
+  }
+
+  if (extensions.callId !== undefined) {
+    attributes["tool.callId"] = extensions.callId;
   }
 
   if (extensions.recoveredFrom !== undefined) {

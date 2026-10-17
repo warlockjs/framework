@@ -6,11 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Changed
+
+- `reasoning: { effort: "none" }` now turns thinking off on Claude Sonnet 5 and Claude Haiku 5.5 with `thinking: { type: "disabled" }` (sent alone, so Haiku 5.5 stays at its default effort, inside the range where `disabled` is accepted). Previously no `thinking` field was sent and both models ran adaptive thinking by default.
+- `reasoning: { effort: "none" }` on Claude Opus 5 now sends adaptive thinking at `output_config.effort: "low"` instead of omitting `thinking` (which ran at the default `high`). Opus 5 is deliberately not sent `disabled`: with thinking off it can write a tool call as plain text that never runs, and leak thinking tags. Claude Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 are unchanged.
+
 ### Fixed
 
 - Usage is marked `inputIncludesCache: false` (Anthropic's `input_tokens` excludes cache reads and writes), and 1-hour cache writes are reported in `cacheWrite1hTokens` from `cache_creation.ephemeral_1h_input_tokens` — or, when the breakdown is missing, from a request whose every cache marker asked for `ttl: "1h"`. Cost now bills reads and writes once each, at their own rates.
 
 - Caller pricing that omits cache-write rates gets Anthropic's documented multipliers (5-minute writes 1.25x input, 1-hour writes 2x) instead of billing writes at nothing.
+- Usage includes server-side compaction: the `compaction` entries of `usage.iterations`, which the top-level token counts leave out, are added to `input`, `output` and the cache counts (completions and streams).
 
 - `complete()` always builds a non-streaming request, including when an indexed `stream` option is supplied.
 
@@ -21,6 +27,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `complete()` and the streaming `done` chunk attach `usage.cost` when the model is priced.
 
 - 529 / `overloaded_error` responses and mid-stream overload events throw `ProviderOverloadedError`; every wrapped error carries `status`, `billed` and `retryable`.
+- An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` on the model and cancels the HTTP request.
+- `AnthropicModelConfig.maxOutputTokens` overrides the inferred model output limit that sizes the default `max_tokens`.
+- With `streamChunks`, `stream()` yields `reasoning` for `thinking_delta`, `tool-args` for the `input_json_delta` of client `tool_use` blocks, and `usage` after `message_start` and each `message_delta`. `send()` takes the same `streamChunks` transport option.
+- `ai.providerTool({ provider: "anthropic", definition })` entries (`web_search`, `web_fetch`, `code_execution`, `bash`, `text_editor`, `memory`, …) are sent verbatim ahead of the function tools; the prompt-cache breakpoint stays on the last function tool. Other providers' tools are skipped with a warning. The reserved `providerOptions.anthropic.body` keys are unchanged.
+- Typed context management on `providerOptions.anthropic`: `contextManagement.clearToolUses` / `clearThinking` (`clear_tool_uses_20250919` / `clear_thinking_20251015`, beta `context-management-2025-06-27`) and `serverCompaction` (`compact_20260112`, beta `compact-2026-01-12`, trigger of at least 50,000 input tokens). The adapter builds the edits in the order the API requires and adds the beta headers; combining them with `body.context_management` fails with `InvalidRequestError`.
+
+- `thinkingBlockBinding: "error" | "drop_block"` sends `thinking.block_binding.prefix_mismatch_behavior` with the `thinking-binding-controls-2026-08-01` beta.
+
+- Preserved thinking after client-side compaction: on Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 an assistant turn marked `compaction: "retained"` is replayed without its thinking blocks, which were produced against the replaced history. `AnthropicModelConfig.preservedThinking` overrides the inference; `inferPreservedThinking(name)` and `ToAnthropicMessagesOptions` are exported.
 
 - `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
 - Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.
@@ -28,6 +43,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Upgrading
 
 - Claude models are now priced by default, so `Usage.cost` appears and USD budgets enforce on them without extra configuration. Pass `pricing` to keep contract rates.
+### Changed
+
+- **BREAKING** The default `max_tokens` (when no `maxTokens` is set) rose from 4096. Streaming requests use the model's documented max output — 128K for the Claude 5 family and Opus 4.6–4.8 / Sonnet 4.6, 64K for Opus / Sonnet / Haiku 4.5 — and non-streaming requests use 16384, capped by the model's max output (the Anthropic SDK requires streaming for larger non-streaming requests unless the client sets a `timeout`). Unknown ids default to 16384. With thinking on, the default still keeps room for the thinking budget plus 4096 answer tokens, within the model's limit.
+
+### Upgrading
+
+- Responses can be longer, and cost more, when `maxTokens` was never set. Set `maxTokens` on the model or per call to keep a lower cap. For a gateway or proxy id, set `maxOutputTokens` so streaming uses the real limit.
 
 ## 5.30.0 - 2026-10-16
 

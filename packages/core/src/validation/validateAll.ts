@@ -1,10 +1,11 @@
 import config from "@mongez/config";
 import { merge } from "@mongez/reinforcements";
 import { log } from "@warlock.js/logger";
-import { v, type ObjectValidator } from "@warlock.js/seal";
+import { v, type ObjectValidator, type ValidationResult } from "@warlock.js/seal";
 import type { Request } from "../http";
 import { Response } from "../http/response";
 import type { RequestHandlerValidation, Route } from "../router";
+import { validationFailureStatus } from "./validation-failure-status";
 
 function resolveDataToParse(
   validating: RequestHandlerValidation["validating"],
@@ -96,6 +97,28 @@ function buildCoercingParamsSchema(schema: ObjectValidator): ObjectValidator {
 }
 
 /**
+ * Answer a failed `schema` or `params` validation: the route's own
+ * `onFailure` hook first, then `response.failedSchema(result)`, which applies
+ * the global `validation.response.body` hook or the framework body.
+ */
+async function sendValidationFailure(
+  validation: RequestHandlerValidation,
+  result: ValidationResult,
+  request: Request,
+  response: Response,
+) {
+  if (validation.onFailure) {
+    const custom = await validation.onFailure(result, { request, response, route: request.route });
+
+    if (custom) {
+      return response.send(custom.body, custom.status ?? validationFailureStatus());
+    }
+  }
+
+  return response.failedSchema(result);
+}
+
+/**
  * Validate the request route
  */
 export async function validateAll(
@@ -117,7 +140,7 @@ export async function validateAll(
 
       if (!result.isValid) {
         log.warn("validation", "schema", "Schema Validation failed");
-        return response.failedSchema(result);
+        return sendValidationFailure(validation, result, request, response);
       }
 
       if (result.data) {
@@ -138,7 +161,7 @@ export async function validateAll(
 
       if (!result.isValid) {
         log.warn("validation", "params", "Route params schema validation failed");
-        return response.failedSchema(result);
+        return sendValidationFailure(validation, result, request, response);
       }
 
       if (result.data) {

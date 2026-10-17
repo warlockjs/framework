@@ -53,6 +53,7 @@ export const jwtSecretCheck: DoctorCheck = {
     return {
       name: "jwt-secret",
       status,
+      code: "WL1002",
       detail:
         "auth is configured (auth.userType) but no JWT signing secret is set — " +
         "every login and token operation will fail with a generic 500. " +

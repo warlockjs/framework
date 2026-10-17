@@ -163,6 +163,22 @@ storage.url("uploads/photo.jpg"); // public URL (sync)
 await storage.temporaryUrl("private/doc.pdf", 3600); // signed URL, expires in seconds
 ```
 
+## Private-address check without the framework — `@warlock.js/core/net`
+
+`putFromUrl` refuses private, loopback, link-local and cloud-metadata hosts. Its classifier is also a side-effect-free subpath that loads only `node:net`, so workers, CLIs and standalone agent processes can reuse the rules without booting Core:
+
+```ts
+import { isPrivateOrReservedIp } from "@warlock.js/core/net";
+
+const address = "10.0.0.1";
+
+if (isPrivateOrReservedIp(address)) {
+  throw new Error(`Refusing private address ${address}`);
+}
+```
+
+Same function as the root `@warlock.js/core` export.
+
 ## Switching drivers — `storage.use(name)`
 
 For a single call against a non-default driver, scope it:
@@ -180,13 +196,13 @@ console.log(localFile.url);
 
 ## Cached image variants follow their source
 
-On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears the disk's whole derivative cache. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
+On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears that disk's derivative cache — or, when `uploads.images.cacheDirectory` is set (shared by every local disk), every disk's derivatives. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
 
-Give derivatives a dedicated cache folder, even when it sits beneath a storage root. Full and per-file purges delete recognized image, source-manifest and temporary files in the generated shard/source/generation layout; they retain directories, unrelated files and symlinks. Eviction validates the same directory layout. Per-file purges and stale-generation pruning also reject symlinked shard/source directories. Pruning removes only recognized files from older generation-shaped folders, retaining current-generation files and unrelated entries. Reserve generated-looking paths for derivatives and reclaim files from older cache layouts manually.
+Give derivatives a dedicated cache folder, even when it sits beneath a storage root. Full and per-file purges delete recognized image, source-manifest and temporary files in the generated shard/source/generation layout; they retain directories, unrelated files and symlinks. Eviction validates the same directory layout; it may remove empty generated generation directories, while user folders and unrelated entries are never touched. Per-file purges and stale-generation pruning also reject symlinked shard/source directories. Pruning removes only recognized files from older generation-shaped folders, retaining current-generation files and unrelated entries. Reserve generated-looking paths for derivatives and reclaim files from older cache layouts manually.
 
 ### Bound the cache and render remote disks
 
-Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules background cleanup, coalesced and throttled to at most once per minute; hits never walk the cache. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal.
+Set `uploads.images.maxCacheBytes` (default `512 * 1024 * 1024`) and `maxCacheAge` (seconds, default seven days). Hits older than the age render again. A write schedules a coalesced background check, at most once per minute; hits never walk the cache. The check walks the cache only on the first check after boot, when the byte estimate is over budget, when the oldest retained derivative has expired, or once per `maxCacheAge`. The sweep removes expired derivatives and evicts oldest files to meet the byte budget, retaining the file being returned even when it alone exceeds that budget. It also removes writer temporaries older than an hour (left by a crashed write), and a generation directory left without derivatives loses its `source.json` and then the empty directory once it is older than five minutes, which reclaims old object-storage generations after ETag changes. The byte budget can be exceeded until the next sweep; idle caches are cleaned after the next generated derivative. Use `Number.MAX_SAFE_INTEGER` for a practically unbounded budget. Keep the cache on a local, writable filesystem outside `public/`; it must not equal or contain any configured local storage root, including runtime-registered disks. Generation and purge use the same guard and compare realpaths, including symlinked directories and existing ancestors of paths not yet created. An overlapping setting throws `ImageVariantsConfigError` before cache removal, as does a cache or root that cannot be resolved (`ENOTDIR`, `EACCES`, `ELOOP`; the original error is its `cause`). The guard result is remembered per cache, disk root and configured local roots; a newly registered disk is checked again.
 
 ```ts
 import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";

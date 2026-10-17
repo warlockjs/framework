@@ -78,7 +78,12 @@ const BUDGET_RELEASE_ROOTS = [
  */
 const NEXT_MINOR_VERSION = /^-\d{1,2}(?!\d)/;
 
-function matchesReleaseRoot(name: string, root: string): boolean {
+/**
+ * Whether a lower-cased model id is the release `root` itself, or a dated /
+ * tagged / `@` snapshot of it — but not a later minor version of the same
+ * line (`claude-opus-4` matches `claude-opus-4-20250514`, not `claude-opus-4-7`).
+ */
+export function matchesReleaseRoot(name: string, root: string): boolean {
   if (!name.startsWith(root)) {
     return false;
   }
@@ -160,8 +165,151 @@ const BETWEEN_TOOLS_RELEASE_ROOTS = ["claude-sonnet-5-5"];
  * acceptsBetweenTools("claude-opus-5-5");   // → false
  */
 export function acceptsBetweenTools(modelName: string): boolean {
+  return matchesAnyRelease(modelName, BETWEEN_TOOLS_RELEASE_ROOTS);
+}
+
+/**
+ * Whether the model id — lower-cased, with any platform prefix
+ * (`anthropic.`, `us.anthropic.` on Bedrock) removed — is one of these
+ * releases, dated or tagged, but not a later minor release.
+ */
+function matchesAnyRelease(modelName: string, roots: readonly string[]): boolean {
   const normalized = modelName.toLowerCase();
   const id = normalized.slice(normalized.lastIndexOf(".") + 1);
 
-  return BETWEEN_TOOLS_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root));
+  return roots.some((root) => matchesReleaseRoot(id, root));
+}
+
+/**
+ * How a model is asked to run without reasoning when the caller passes the
+ * neutral `reasoning: { effort: "none" }`.
+ *
+ * - `"between_tools"` — send `thinking: { type: "between_tools" }` alone.
+ * - `"disabled"` — send `thinking: { type: "disabled" }` with no effort.
+ * - `"lowest-effort"` — keep adaptive thinking on and send the lowest
+ *   `output_config.effort` (`"low"`).
+ * - `"omit"` — send no `thinking` field at all.
+ */
+export type AnthropicNoReasoningForm = "between_tools" | "disabled" | "lowest-effort" | "omit";
+
+/**
+ * Releases that accept `thinking: { type: "disabled" }` and run reliably
+ * with it. Source: claude-api ref, "Thinking & Effort" per-model table
+ * (cached 2026-10-06): Claude Sonnet 5 accepts `disabled`; Claude Haiku 5.5
+ * accepts it at effort `low`, `medium` and `high` (a 400 at `xhigh` /
+ * `max`). No effort is sent alongside it, so Haiku 5.5 runs at its default,
+ * `medium`, which is inside the accepted range.
+ */
+const DISABLED_THINKING_RELEASE_ROOTS = ["claude-sonnet-5", "claude-haiku-5-5"];
+
+/**
+ * Releases that accept `disabled` but are kept on adaptive thinking at the
+ * lowest effort instead. Claude Opus 5 accepts `disabled` at effort `high`
+ * or below, but the claude-api ref ("Two failure modes when thinking is
+ * disabled", cached 2026-10-06) documents that with thinking disabled it
+ * occasionally writes a tool call into its visible text instead of a
+ * `tool_use` block — the call never runs and no error is raised — and can
+ * leak `<thinking>` tags into the response. The ref's primary
+ * recommendation is to keep thinking on and lower `effort`, so the adapter
+ * does exactly that.
+ */
+const LOWEST_EFFORT_RELEASE_ROOTS = ["claude-opus-5"];
+
+/**
+ * The wire form for `reasoning: { effort: "none" }` on this model:
+ *
+ * | Model                                  | Form              |
+ * |----------------------------------------|-------------------|
+ * | Claude Sonnet 5.5                      | `between_tools`   |
+ * | Claude Sonnet 5, Claude Haiku 5.5      | `disabled`        |
+ * | Claude Opus 5                          | `lowest-effort`   |
+ * | Opus 5.5, Fable 5/5.1, everything else | `omit`            |
+ *
+ * Opus 5.5 and Fable 5/5.1 have no thinking-off form (`disabled` and
+ * `budget_tokens` are a 400 at every effort), so nothing is sent and the
+ * model runs at its default effort; older models run without thinking when
+ * the field is absent.
+ *
+ * @example
+ * noReasoningForm("claude-sonnet-5");   // → "disabled"
+ * noReasoningForm("claude-opus-5");     // → "lowest-effort"
+ * noReasoningForm("claude-opus-5-5");   // → "omit"
+ */
+export function noReasoningForm(modelName: string): AnthropicNoReasoningForm {
+  if (acceptsBetweenTools(modelName)) {
+    return "between_tools";
+  }
+
+  if (matchesAnyRelease(modelName, DISABLED_THINKING_RELEASE_ROOTS)) {
+    return "disabled";
+  }
+
+  if (matchesAnyRelease(modelName, LOWEST_EFFORT_RELEASE_ROOTS)) {
+    return "lowest-effort";
+  }
+
+  return "omit";
+}
+
+/*
+ * Preserved thinking (Anthropic docs, "Thinking" → "Preserved thinking" and
+ * the "Preserved thinking" page, read 2026-10-17): the API checks that the
+ * `system` prompt, `tools` and every message before a replayed thinking
+ * block are unchanged since the block was produced, on Claude Fable 5.1,
+ * Claude Opus 5.5, Claude Sonnet 5.5 and Claude Haiku 5.5. Claude Mythos 5.1
+ * and every model released before Claude Fable 5.1 don't run that check, so
+ * a thinking block kept after a client-written summary stays valid there.
+ */
+const PREFIX_CHECK_RELEASE_ROOTS = [
+  "claude-fable-5-1",
+  "claude-opus-5-5",
+  "claude-sonnet-5-5",
+  "claude-haiku-5-5",
+];
+
+/** Releases documented not to run the conversation check. */
+const NO_PREFIX_CHECK_RELEASE_ROOTS = [
+  "claude-mythos-5-1",
+  "claude-mythos-5",
+  "claude-mythos-preview",
+  "claude-fable-5",
+  "claude-opus-5",
+  "claude-sonnet-5",
+];
+
+/** Families released before Claude Fable 5.1 in their entirety. */
+const NO_PREFIX_CHECK_FAMILY_PREFIXES = [
+  ...BUDGET_FAMILY_PREFIXES,
+  "claude-opus-4",
+  "claude-sonnet-4",
+];
+
+/**
+ * Whether this model binds a replayed thinking block to the exact
+ * conversation before it (preserved thinking). Unknown and future ids are
+ * assumed to run the check — the safe direction: reasoning a kept turn
+ * can't use is left out instead of risking a 400. Matches the id with or
+ * without a platform prefix and with dated or tagged suffixes.
+ *
+ * @example
+ * inferPreservedThinking("claude-opus-5-5"); // → true
+ * inferPreservedThinking("claude-opus-5");   // → false
+ * inferPreservedThinking("claude-opus-4-8"); // → false
+ */
+export function inferPreservedThinking(modelName: string): boolean {
+  const normalized = modelName.toLowerCase();
+  const id = normalized.slice(normalized.lastIndexOf(".") + 1);
+
+  if (PREFIX_CHECK_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root))) {
+    return true;
+  }
+
+  if (
+    NO_PREFIX_CHECK_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root)) ||
+    NO_PREFIX_CHECK_FAMILY_PREFIXES.some((prefix) => id.startsWith(prefix))
+  ) {
+    return false;
+  }
+
+  return true;
 }

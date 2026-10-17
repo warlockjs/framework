@@ -4,6 +4,7 @@ export * from "./normalize-route-path";
 export * from "./normalize-request-path";
 export * from "./positional-handler-diagnostics";
 export * from "./route-name-method-suffix";
+export * from "./route-name-taken-error";
 export * from "./route-registry";
 export * from "./router";
 export * from "./types";

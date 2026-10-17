@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`.
 - **BREAKING:** `.catch()` is a no-op on container validators, including failures in the container's own rules. Inputs previously accepted by an array/object catch after a length or unknown-key error now fail. Apply catches to child validators or handle a failed container result explicitly.
 - **BREAKING:** `v.union()` now returns its matched branch's validated output. Trimming and date parsing change values; object defaults/computed fields are retained, stripped unknown keys disappear, and an explicit `undefined` output drops the containing object field. Persisted, compared or serialized output can differ. Read and keep the raw input before validation when you need it.
+- **BREAKING:** a failed `v.union(...)` reports the closest member's errors at their own paths (`actor.id` instead of `actor`), still typed `union`; with `firstErrorOnly: false` it reports each of that member's errors separately instead of one `;`-joined message from every member. A custom union message, or a value no member can hold by type, still gives one error at the union's path. Update code that reads union errors by path or splits the joined message.
 - Refinements now also check successful empty defaults such as `.default("")`; callbacks that reject those defaults now reject validation.
 
 ### Changed
@@ -19,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `v.union(...)` tries every member whose type matches before failing, so a union of several object schemas accepts a value that matches a later member; `firstErrorOnly` limits the errors reported, not the members tried. A failing union reports its closest member: fewest mismatched literals, then fewest errors, then the deepest error path, then declaration order.
+- A failing union no longer stores its last member error on the shared rule, so a later validation with no type-matching member reports the default message instead of a stale one.
 - The custom-error locale example is strict JSON, with its filename outside the code fence.
 
 - Standalone string replacement mutators accept an omitted context or options and preserve the stringified input instead of throwing.
@@ -26,9 +29,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Object `.merge()` retains refinements from both schemas, in their original order; cloning, extending and selecting fields preserve the original schema's refinements.
 - Union and record Standard Schema types now distinguish child input from validated output; `Infer.Output` reads the Standard Schema output parameter. Defaults and catches remain guaranteed in output.
 - Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types.
+- `v.tuple([...])` infers one type per position: `v.tuple([v.string(), v.int()])` is typed `[string, number]` for input and output instead of `(string | number)[]`, so a value with swapped positions no longer type-checks. A `BaseValidator[]` variable is still accepted.
 
 ### Added
 
+- A failed rule result may carry `errors: [{ error, path }]` to report several errors, each at its own path, under the rule's type.
 - Successful custom rules may return a `data` property to replace the current validated value, including explicit `undefined`; omitting the property preserves the value.
 
 ## 5.30.0 - 2026-10-16

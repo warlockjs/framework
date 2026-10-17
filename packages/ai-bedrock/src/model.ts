@@ -1,7 +1,9 @@
 import {
   attachCost,
   InvalidRequestError,
+  resolveStreamChunks,
   safeJsonParse,
+  selectProviderTools,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -17,6 +19,7 @@ import {
   CountTokensCommand,
   ConverseCommand,
   ConverseStreamCommand,
+  type Tool,
   type BedrockRuntimeClient,
   type ContentBlock,
   type ConverseRequest,
@@ -40,6 +43,12 @@ import { mapStopReason, toBedrockMessages, toBedrockToolConfig, wrapBedrockError
 type BedrockCachePoint = { type: "default"; ttl?: "1h" };
 
 const LOG_MODULE = "ai.bedrock";
+
+/** `provider` value of `ai.providerTool()` entries this adapter sends verbatim. */
+const BEDROCK_WIRE_FORMAT = "bedrock";
+
+/** Converse `ToolUseBlock.type` of a tool use run by Bedrock itself (SDK `ToolUseType`). */
+const SERVER_TOOL_USE = "server_tool_use";
 
 /** Default output allowance added to a thinking budget when maxTokens is unset. */
 const DEFAULT_MAX_TOKENS = 4096;
@@ -202,6 +211,12 @@ export class BedrockModel implements ModelContract {
    * `ModelStreamChunk`s — `delta` for text, `tool-call` once a
    * `toolUse` block's accumulated input JSON is complete, and a
    * terminal `done` with the final finish reason + usage totals.
+   *
+   * With `options.streamChunks` it also yields `reasoning` for each
+   * `reasoningContent.text` delta and `tool-args` for each client
+   * `toolUse.input` delta. Usage arrives once, in the final `metadata`
+   * event, so no `usage` chunk is emitted. A system tool's
+   * `server_tool_use` block never becomes a `tool-call`.
    */
   public async *stream(
     messages: Message[],
@@ -227,6 +242,7 @@ export class BedrockModel implements ModelContract {
 
     let rawStopReason: string | undefined;
     let usage: Usage = { input: 0, output: 0, total: 0 };
+    const want = resolveStreamChunks(options);
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
     const reasoningBlocks = new Map<
       number,
@@ -238,6 +254,11 @@ export class BedrockModel implements ModelContract {
       for await (const event of response.stream ?? []) {
         if (event.contentBlockStart?.start?.toolUse) {
           const start = event.contentBlockStart.start.toolUse;
+
+          // A system tool's `server_tool_use` runs on Bedrock's side.
+          if (start.type === SERVER_TOOL_USE) {
+            continue;
+          }
 
           toolBlocks.set(event.contentBlockStart.contentBlockIndex ?? 0, {
             id: start.toolUseId ?? "",
@@ -258,6 +279,15 @@ export class BedrockModel implements ModelContract {
 
             if (accumulator) {
               accumulator.json += delta.toolUse.input ?? "";
+
+              if (want.toolArgs && delta.toolUse.input) {
+                yield {
+                  type: "tool-args",
+                  callId: accumulator.id,
+                  name: accumulator.name,
+                  delta: delta.toolUse.input,
+                };
+              }
             }
           } else if (delta.reasoningContent) {
             const index = event.contentBlockDelta.contentBlockIndex ?? 0;
@@ -265,6 +295,10 @@ export class BedrockModel implements ModelContract {
 
             if (delta.reasoningContent.text !== undefined) {
               accumulator.text = (accumulator.text ?? "") + delta.reasoningContent.text;
+
+              if (want.reasoning && delta.reasoningContent.text !== "") {
+                yield { type: "reasoning", delta: delta.reasoningContent.text };
+              }
             }
 
             if (delta.reasoningContent.signature !== undefined) {
@@ -365,7 +399,7 @@ export class BedrockModel implements ModelContract {
           ...(maxTokens !== undefined ? { maxTokens } : {}),
           ...(temperature !== undefined ? { temperature } : {}),
         },
-        ...this.buildToolConfig(options?.tools, cachePoint),
+        ...this.buildToolConfig(options, cachePoint),
         ...this.buildOutputConfig(options?.responseSchema),
         ...this.buildReasoningConfig(thinkingBudget),
       },
@@ -501,20 +535,31 @@ export class BedrockModel implements ModelContract {
    * — Claude only, since Nova accepts no cache point in `tools`.
    */
   private buildToolConfig(
-    tools: ModelCallOptions["tools"],
+    options: ModelCallOptions | undefined,
     cachePoint: BedrockCachePoint | undefined,
   ): Pick<ConverseRequest, "toolConfig"> {
+    const { tools, definitions } = selectProviderTools(options, {
+      accepts: [BEDROCK_WIRE_FORMAT, this.provider],
+      module: LOG_MODULE,
+      model: this.name,
+      logger: this.logger,
+    });
     const toolConfig = toBedrockToolConfig(tools);
+    // Provider-defined entries are whole Converse `Tool` members, e.g.
+    // `{ systemTool: { name: "nova_grounding" } }` (Nova web grounding).
+    const providerDefined = definitions as unknown as Tool[];
 
-    if (!toolConfig) {
-      return {};
+    const allTools = [...(toolConfig?.tools ?? []), ...providerDefined];
+
+    if (allTools.length === 0) {
+      return toolConfig ? { toolConfig } : {};
     }
 
-    if (!cachePoint || !supportsToolCachePoint(this.name) || !toolConfig.tools) {
-      return { toolConfig };
-    }
+    // The cache point goes last, so every tool definition is cached.
+    const withCachePoint =
+      cachePoint && supportsToolCachePoint(this.name) ? [...allTools, { cachePoint }] : allTools;
 
-    return { toolConfig: { ...toolConfig, tools: [...toolConfig.tools, { cachePoint }] } };
+    return { toolConfig: { ...toolConfig, tools: withCachePoint } };
   }
 
   /**
@@ -572,7 +617,9 @@ export class BedrockModel implements ModelContract {
       .filter((block): block is BedrockReasoningBlock => block !== undefined);
 
     for (const block of blocks) {
-      if ("toolUse" in block && block.toolUse) {
+      // `server_tool_use` blocks are run by Bedrock (system tools such as
+      // Nova grounding); only client tool uses are dispatched.
+      if ("toolUse" in block && block.toolUse && block.toolUse.type !== SERVER_TOOL_USE) {
         toolCalls.push({
           id: block.toolUse.toolUseId ?? "",
           name: block.toolUse.name ?? "",

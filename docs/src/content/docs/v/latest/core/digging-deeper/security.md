@@ -129,7 +129,7 @@ The full error-code catalog and how rejections are shaped lives on the [Error ha
 
 ### The global rate limit is separate
 
-`@fastify/rate-limit` is always registered with a global cap read from `http.rateLimit` (`max` default `60`, `duration` default `60_000`ms). That global 429 is distinct from the per-route `middleware.rateLimit()` (`EC102`) — both can run, and either can reject. Use the global as a coarse backstop and the middleware for endpoints that need a tighter cap (login, OTP, password reset, AI completions).
+`@fastify/rate-limit` is always registered with a global cap read from `http.rateLimit` (`max` default `60`, `duration` default `60_000`ms). That global 429 is distinct from the per-route `middleware.rateLimit()` (`EC102`) — both can run, and either can reject. Use the global as a coarse backstop and the middleware for endpoints that need a tighter cap (login, OTP, password reset, AI completions). The global cap counts pages and API routes; static files and the health probes are exempt by default (`http.rateLimit.staticFiles: true` and `http.health.rateLimit: true` count them), see [Rate limiting → Static files](../recipes/rate-limiting.md#static-files).
 
 ## Transport concerns
 

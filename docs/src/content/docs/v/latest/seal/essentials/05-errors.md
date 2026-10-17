@@ -90,7 +90,9 @@ configureSeal({ firstErrorOnly: false });
 const result = await validate(schema, data, { firstErrorOnly: false });
 ```
 
-For HTTP responses where the client shows errors next to each field, `firstErrorOnly: true` (the default) is usually right. For form-validation UI that highlights every problem at once, switch to `false`.
+For HTTP responses where the client shows errors next to each field, `firstErrorOnly: true` (the default) is usually right.
+
+`firstErrorOnly` limits what is reported, never what is checked: `v.union(...)` still tries every branch, then reports the first error of the closest branch (or all of its errors when `false`), typed `union` at each error's own path. For form-validation UI that highlights every problem at once, switch to `false`.
 
 ## Customizing error messages
 

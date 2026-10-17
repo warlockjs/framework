@@ -68,6 +68,7 @@ type ErrorCategory =
   | "tool"
   | "cancelled"
   | "max-trips"
+  | "incomplete"
   | "max-iterations"
   | "max-steps"
   | "schema"
@@ -90,6 +91,8 @@ switch (result.error.category) {
     return policyMessage(); // not retryable
   case "schema":
     return repair(); // use agent `repair`
+  case "incomplete":
+    return retryBigger(); // answer cut off — see AgentIncompleteError below
 }
 
 metrics.increment("ai.error", { category: result.error.category });
@@ -97,13 +100,36 @@ metrics.increment("ai.error", { category: result.error.category });
 
 Each typed subclass declares its `static defaultCategory`. The 4th-arg category override exists only on the base `AIError` for direct `new AIError(...)` usage.
 
+## Cut-off answers — `AgentIncompleteError`
+
+When the final model response is cut off by the output token cap (`finishReason: "length"`) or the context window (`"context_exceeded"`), the run ends with `report.status: "incomplete"` and `result.error` an `AgentIncompleteError` — never a silent success with empty text. A tool call that was cut off mid-input is never executed. Let the agent recover from the output cap with `continueOnOutputLimit`:
+
+```ts
+import { AgentIncompleteError, ai } from "@warlock.js/ai";
+
+const worker = ai.agent({ model, tools: [writeFile], continueOnOutputLimit: 2 });
+const result = await worker.execute(task);
+
+if (result.error instanceof AgentIncompleteError) {
+  // reason: "output_limit" → raise maxTokens / split the task
+  // reason: "context_window" → compact or trim the history (never continued)
+  logger.warn("agent answer cut off", {
+    reason: result.error.reason,
+    tripIndex: result.error.tripIndex,
+    continuations: result.error.continuations,
+    partial: result.text,
+  });
+}
+```
+
 ## Hierarchy
 
 ```
 AIError  (base — code, category, message, cause?, context?)
 ├── AgentExecutionError          AGENT_EXEC_FAILED
 │   ├── AgentCancelledError      AGENT_CANCELLED            { cancelledAt?, reason? } — caller pulled the plug
-│   └── AgentMaxTripsError       AGENT_MAX_TRIPS            { maxTrips } — runaway tool loop hit the cap
+│   ├── AgentMaxTripsError       AGENT_MAX_TRIPS            { maxTrips } — runaway tool loop hit the cap
+│   └── AgentIncompleteError     AGENT_INCOMPLETE           { reason, tripIndex, continuations } — final response cut off
 ├── SchemaValidationError        SCHEMA_VALIDATION_FAILED   { issues? }
 ├── ToolExecutionError           TOOL_EXEC_FAILED           { toolName, tripIndex? }
 ├── WorkflowError                WORKFLOW_ERROR  (base)

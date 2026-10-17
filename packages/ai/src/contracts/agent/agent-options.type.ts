@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { AttachmentPolicy } from "../attachment-policy.type";
 import type { Attachment } from "../attachment.type";
 import type { Message } from "../conversation-message.type";
+import type { ModelCallOptions } from "../model.contract";
 import type { AgentEventMap } from "../events/event-map.type";
 import type { Placeholders } from "../placeholders.type";
 import type { StreamingToolGuardConfig } from "../streaming-tool-guard-config.type";
@@ -129,6 +130,26 @@ export type AgentExecuteOptions<TOutput = unknown> = {
    */
   toolCtx?: ToolContext;
   /**
+   * Model call options for this run only, shallow-merged over the agent's
+   * `AgentConfig.modelOptions` (keys set here win; a nested object such as
+   * `providerOptions` or `reasoning` replaces the agent's whole value). The
+   * agent itself is never changed, so concurrent runs can use different
+   * effort, `maxTokens`, `cacheControl` or `providerOptions`. `tools`,
+   * `signal` and `responseSchema` are owned by the agent run and ignored.
+   *
+   * @example
+   * await agent.execute(input, {
+   *   modelOptions: { reasoning: { effort: "high" }, cacheControl: { ttl: "1h" } },
+   * });
+   */
+  modelOptions?: ModelCallOptions;
+  /**
+   * Per-call override for `AgentConfig.continueOnOutputLimit`: how many
+   * continue turns this run may send after a response is cut off by the
+   * output token cap.
+   */
+  continueOnOutputLimit?: number;
+  /**
    * Per-call override for the stream-time tool-call guard. Wins over
    * `AgentConfig.streamingToolGuard` when set. Pass `undefined` to
    * disable for a single call when the agent-level config has the
@@ -165,6 +186,12 @@ export type AgentExecuteOptions<TOutput = unknown> = {
    * observability identity is shared.
    */
   sessionId?: string;
+  /**
+   * Per-call override of `AgentConfig.captureMessages`: `true` puts the
+   * assembled conversation on `report.messages` for this run only (what
+   * `ai.session()` uses to persist a turn), `false` leaves it off.
+   */
+  captureMessages?: boolean;
 };
 
 /**

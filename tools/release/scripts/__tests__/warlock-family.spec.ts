@@ -16,6 +16,7 @@ const FAMILY_NAMES = [
   "@warlock.js/ai",
   "@warlock.js/ai-anthropic",
   "@warlock.js/ai-bedrock",
+  "@warlock.js/ai-cli",
   "@warlock.js/ai-deepseek",
   "@warlock.js/ai-google",
   "@warlock.js/ai-groq",

@@ -12,16 +12,16 @@ If you've never registered a route before, start with the essentials page. If yo
 
 ## The full method surface
 
-| Category      | Methods                                                                                        |
-| ------------- | ---------------------------------------------------------------------------------------------- |
-| Verb routes   | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `any`                              |
-| Builders      | `route(path)` → `RouteBuilder`, `restfulResource(path, resource)`                              |
-| Grouping      | `group(options, callback)`, `prefix(prefix, callback)`, `version(version, callback)`           |
-| Redirects     | `redirect(from, to, mode?)`                                                                    |
-| Static files  | `directory(options)`, `file(path, location, cacheTime?)`, `cachedFile`, `files`, `cachedFiles` |
-| Proxy         | `proxy(path, baseUrl, options?)`, `proxy(options)`                                             |
-| Scan hooks    | `beforeScanning(callback)`, `afterScanning(callback)`                                          |
-| Introspection | `list()`, `getRoute(name, params?)`                                                            |
+| Category      | Methods                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Verb routes   | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `any`                                                              |
+| Builders      | `route(path)` → `RouteBuilder`, `restfulResource(path, resource)`                                                              |
+| Grouping      | `group(options, callback)`, `prefix(prefix, callback)`, `version(version, callback)`                                           |
+| Redirects     | `redirect(from, to, mode?)`                                                                                                    |
+| Static files  | `directory(options, { rateLimit }?)`, `file(path, location, cacheTime?, { rateLimit }?)`, `cachedFile`, `files`, `cachedFiles` |
+| Proxy         | `proxy(path, baseUrl, options?)`, `proxy(options)`                                                                             |
+| Scan hooks    | `beforeScanning(callback)`, `afterScanning(callback)`                                                                          |
+| Introspection | `list()`, `getRoute(name, params?)`                                                                                            |
 
 Each section below walks the methods in that category.
 
@@ -413,6 +413,27 @@ creates no static routes. The public folder installs lazy `reply.sendFile` and
 so additional mounts do not replace them. The first request that invokes a
 file decorator also initializes the sender. Load failures reach the application's
 normal error handler.
+
+Static files are exempt from the global rate limiter (`http.rateLimit`) by
+default: the public folder, every `directory(...)` mount and the `file` /
+`cachedFile` / `files` / `cachedFiles` routes. One page load fetches many
+assets, and they should not spend the client's quota for pages and API calls.
+Set `http.rateLimit.staticFiles: true` to count them all, or pass a second
+argument to decide for one mount:
+
+```ts
+// Count this mount against the global limiter.
+router.directory({ root: rootPath("storage/exports"), prefix: "/exports/" }, { rateLimit: true });
+
+// Give this mount its own limit and bucket.
+router.directory(
+  { root: rootPath("storage/reports"), prefix: "/reports/" },
+  { rateLimit: { max: 20, timeWindow: 60_000 } },
+);
+```
+
+`rateLimit: false` exempts a mount even when `staticFiles` is `true`. See
+[Rate limiting → Static files](../recipes/rate-limiting.md#static-files).
 
 ### `file(path, location, cacheTime?)` — single file
 

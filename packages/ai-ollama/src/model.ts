@@ -1,5 +1,7 @@
 import {
   attachCost,
+  resolveStreamChunks,
+  selectProviderTools,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -12,14 +14,30 @@ import {
   type Usage,
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
-import type { AbortableAsyncIterator, ChatRequest, ChatResponse, Ollama, Options } from "ollama";
+import type {
+  AbortableAsyncIterator,
+  ChatRequest,
+  ChatResponse,
+  Ollama,
+  Options,
+  Tool,
+} from "ollama";
 import { mergeProviderBody } from "./provider-options";
 import type { OllamaModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
-import { mapDoneReason, toOllamaMessages, toOllamaTools, wrapOllamaError } from "./utils";
+import {
+  mapDoneReason,
+  toOllamaMessages,
+  toOllamaTools,
+  withCallSignal,
+  wrapOllamaError,
+} from "./utils";
 
 const LOG_MODULE = "ai.ollama";
+
+/** `provider` value of `ai.providerTool()` entries this adapter sends verbatim. */
+const OLLAMA_WIRE_FORMAT = "ollama";
 
 /** Ollama supports only low, medium, and high named thinking levels. */
 const EFFORT_TO_THINK_LEVEL: Record<Exclude<ReasoningEffort, "none">, "low" | "medium" | "high"> = {
@@ -104,7 +122,8 @@ export class OllamaModel implements ModelContract {
    * Single-shot completion. Sends the full message list to
    * `client.chat`, waits for the terminal response, and reshapes it
    * into a vendor-neutral `ModelResponse`. Per-call `options` override
-   * the instance defaults for this call only.
+   * the instance defaults for this call only. Aborting `options.signal`
+   * cancels the HTTP request through the SDK client's signal-aware `fetch`.
    */
   public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
     this.logger.debug(LOG_MODULE, "request", "Starting chat call", {
@@ -117,7 +136,10 @@ export class OllamaModel implements ModelContract {
     let response: ChatResponse;
 
     try {
-      response = await this.client.chat({ ...this.buildRequest(messages, options), stream: false });
+      options?.signal?.throwIfAborted();
+      response = await withCallSignal(options?.signal, () =>
+        this.client.chat({ ...this.buildRequest(messages, options), stream: false }),
+      );
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
@@ -141,7 +163,12 @@ export class OllamaModel implements ModelContract {
    * `ModelStreamChunk`s — `delta` for content, `tool-call` per
    * function call (Ollama streams a fully-formed call, not partial
    * JSON), and a terminal `done` with the final finish reason + usage.
-   * Honors `options.signal` by aborting the underlying stream.
+   * Honors `options.signal`: aborting cancels the HTTP request (through
+   * the SDK client's signal-aware `fetch`) and the stream iterator.
+   *
+   * With `options.streamChunks` it also yields `reasoning` for each
+   * `message.thinking` piece. Usage arrives only on the final chunk, so no
+   * `usage` chunk; calls arrive whole, so no `tool-args`.
    */
   public async *stream(
     messages: Message[],
@@ -157,7 +184,10 @@ export class OllamaModel implements ModelContract {
     let stream: AbortableAsyncIterator<ChatResponse>;
 
     try {
-      stream = await this.client.chat({ ...this.buildRequest(messages, options), stream: true });
+      options?.signal?.throwIfAborted();
+      stream = await withCallSignal(options?.signal, () =>
+        this.client.chat({ ...this.buildRequest(messages, options), stream: true }),
+      );
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
@@ -173,9 +203,17 @@ export class OllamaModel implements ModelContract {
     let rawDoneReason: string | undefined;
     let sawToolCall = false;
     const usage: Usage = { input: 0, output: 0, total: 0 };
+    const want = resolveStreamChunks(options);
 
     try {
       for await (const chunk of stream) {
+        // `message.thinking` streams when the request sets `think`.
+        const thinking = chunk.message?.thinking;
+
+        if (want.reasoning && thinking) {
+          yield { type: "reasoning", delta: thinking };
+        }
+
         const content = chunk.message?.content;
 
         if (content) {
@@ -242,7 +280,7 @@ export class OllamaModel implements ModelContract {
         model: this.name,
         messages: toOllamaMessages(messages),
         ...(Object.keys(ollamaOptions).length > 0 ? { options: ollamaOptions } : {}),
-        ...this.buildTools(options?.tools),
+        ...this.buildTools(options),
         ...this.buildFormat(options?.responseSchema),
         ...this.buildThink(options?.reasoning),
       },
@@ -287,10 +325,19 @@ export class OllamaModel implements ModelContract {
    * Spread-friendly tools fragment. Empty object when no tools were
    * supplied so the caller can unconditionally spread it.
    */
-  private buildTools(tools: ModelCallOptions["tools"]): Pick<ChatRequest, "tools"> {
-    const mapped = toOllamaTools(tools);
+  private buildTools(options: ModelCallOptions | undefined): Pick<ChatRequest, "tools"> {
+    // Ollama's chat API has no built-in tools; provider-defined entries
+    // reach it only when they name this adapter, and others are skipped
+    // with a warning.
+    const { tools, definitions } = selectProviderTools(options, {
+      accepts: [OLLAMA_WIRE_FORMAT, this.provider],
+      module: LOG_MODULE,
+      model: this.name,
+      logger: this.logger,
+    });
+    const mapped = [...(toOllamaTools(tools) ?? []), ...(definitions as unknown as Tool[])];
 
-    return mapped ? { tools: mapped } : {};
+    return mapped.length > 0 ? { tools: mapped } : {};
   }
 
   /**
