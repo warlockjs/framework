@@ -16,7 +16,13 @@ import { mergeProviderBody } from "./provider-options";
 import type { OllamaModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
-import { mapDoneReason, toOllamaMessages, toOllamaTools, wrapOllamaError } from "./utils";
+import {
+  mapDoneReason,
+  toOllamaMessages,
+  toOllamaTools,
+  withCallSignal,
+  wrapOllamaError,
+} from "./utils";
 
 const LOG_MODULE = "ai.ollama";
 
@@ -103,7 +109,8 @@ export class OllamaModel implements ModelContract {
    * Single-shot completion. Sends the full message list to
    * `client.chat`, waits for the terminal response, and reshapes it
    * into a vendor-neutral `ModelResponse`. Per-call `options` override
-   * the instance defaults for this call only.
+   * the instance defaults for this call only. Aborting `options.signal`
+   * cancels the HTTP request through the SDK client's signal-aware `fetch`.
    */
   public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
     this.logger.debug(LOG_MODULE, "request", "Starting chat call", {
@@ -116,7 +123,10 @@ export class OllamaModel implements ModelContract {
     let response: ChatResponse;
 
     try {
-      response = await this.client.chat({ ...this.buildRequest(messages, options), stream: false });
+      options?.signal?.throwIfAborted();
+      response = await withCallSignal(options?.signal, () =>
+        this.client.chat({ ...this.buildRequest(messages, options), stream: false }),
+      );
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
@@ -140,7 +150,8 @@ export class OllamaModel implements ModelContract {
    * `ModelStreamChunk`s — `delta` for content, `tool-call` per
    * function call (Ollama streams a fully-formed call, not partial
    * JSON), and a terminal `done` with the final finish reason + usage.
-   * Honors `options.signal` by aborting the underlying stream.
+   * Honors `options.signal`: aborting cancels the HTTP request (through
+   * the SDK client's signal-aware `fetch`) and the stream iterator.
    */
   public async *stream(
     messages: Message[],
@@ -156,7 +167,10 @@ export class OllamaModel implements ModelContract {
     let stream: AbortableAsyncIterator<ChatResponse>;
 
     try {
-      stream = await this.client.chat({ ...this.buildRequest(messages, options), stream: true });
+      options?.signal?.throwIfAborted();
+      stream = await withCallSignal(options?.signal, () =>
+        this.client.chat({ ...this.buildRequest(messages, options), stream: true }),
+      );
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }

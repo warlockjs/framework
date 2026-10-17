@@ -15,3 +15,12 @@ export type { AiMatchers } from "./matchers";
 // `expect` augmentation.
 export { matchConverge, matchOutputShape, matchPassStep, matchRouteTo } from "./matcher-logic";
 export type { MatcherVerdict } from "./matcher-logic";
+
+// Adapter contract check for `ModelCallOptions.signal` (no vitest coupling).
+export { verifyModelSignalContract } from "./model-signal-contract";
+export type {
+  ModelSignalContractCheck,
+  ModelSignalContractMethod,
+  ModelSignalContractOptions,
+  ModelSignalContractReport,
+} from "./model-signal-contract";

@@ -35,10 +35,13 @@ export type ModelCallOptions = {
    */
   responseSchema?: Record<string, unknown>;
   /**
-   * Cancellation handle. Adapters that wire it into their HTTP client
-   * (OpenAI SDK, fetch) will abort the in-flight request when
-   * `signal.aborted` flips. Adapters without support may ignore it;
-   * the agent still honors the signal at trip boundaries regardless.
+   * Cancellation handle — part of the adapter contract. An adapter must
+   * reject a call whose signal is already aborted, and when the signal
+   * aborts mid-call it must reject promptly AND cancel the underlying HTTP
+   * request (so the provider stops generating and billing), for both
+   * `complete()` and `stream()`. Every first-party adapter is checked with
+   * `verifyModelSignalContract()`; run it against a custom adapter too.
+   * The agent additionally honours the signal at trip boundaries.
    */
   signal?: AbortSignal;
   /**

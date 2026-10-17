@@ -139,7 +139,11 @@ ollama.embedder({ name: "nomic-embed-text", dimensions: 512 });
 - **Streaming** — `stream()` yields text `delta`s, a `tool-call` per
   function call (Ollama streams a fully-formed call, not partial JSON),
   and a terminal `done` with the final finish reason and usage.
-  Cancellation via `signal` aborts the underlying stream.
+  Cancellation via `signal` cancels the HTTP request, on `stream()` and
+  `complete()` alike — before the response starts or mid-stream. The
+  `ollama` client takes no per-request signal, so `OllamaSDK` builds its
+  client with a `fetch` wrapper that applies each call's signal (your own
+  `fetch` option is still used underneath).
 - **Structured output** — on by default. A root-object JSON Schema is
   forwarded to Ollama's native `format` field. Otherwise it degrades to
   the agent's soft system-prompt hint plus client-side validation.

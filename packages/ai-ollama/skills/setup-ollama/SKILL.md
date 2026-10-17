@@ -83,7 +83,7 @@ A multipart user message collapses to a single `content` string + an `images` ar
 
 `model.stream()` drains `chat({ stream: true })` (an `AbortableAsyncIterator`). Each chunk's `message.content` → `{ type: "delta" }`; `message.tool_calls` are emitted as `{ type: "tool-call" }` **fully formed**. Terminal `{ type: "done", finishReason, usage }` — usage from the final (`done: true`) chunk's `prompt_eval_count` / `eval_count`.
 
-**`options.signal` is honored** by calling the iterator's `abort()` (stream path; non-stream `complete()` ignores it — the agent still honors the signal at trip boundaries).
+**`options.signal` is honored** on `stream()` and `complete()`: a pre-aborted signal rejects without sending, and aborting mid-call cancels the HTTP request. The `ollama` client has no per-request signal, so `OllamaSDK` wraps its `fetch` (yours, when you pass `fetch`) to apply each call's signal from async context; the stream iterator's `abort()` is called too.
 
 ## Finish-reason mapping
 

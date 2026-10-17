@@ -51,6 +51,22 @@ const myAgent = ai.agent({ model: sdk.model({ name: "some-model" }) });
 
 The agent factory call signature stays identical across adapters. Switching from OpenAI to Anthropic later means changing the SDK constructor and the model name — the rest of your app stays put.
 
+### Cancellation is part of the contract
+
+Every model call takes `signal` in its options, and every adapter must honour it: a call made with an already-aborted signal rejects, and aborting mid-call rejects the call **and** cancels the HTTP request, for `complete()` and `stream()` alike. Each first-party adapter runs `verifyModelSignalContract()` in its test suite; run it against your own adapter as well. It starts a local server that accepts requests and never answers, so you only need to point the model at the `baseURL` it hands you:
+
+```ts
+import { verifyModelSignalContract } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+await verifyModelSignalContract({
+  createModel: ({ baseURL }) =>
+    new OpenAISDK({ apiKey: "test", baseURL, maxRetries: 0 }).model({ name: "gpt-4o-mini" }),
+});
+```
+
+It throws an `Error` naming the failed check (`[before-call]` or `[in-flight]`) and resolves with what each check observed. Pass `protocol: "http2"` for a client whose default transport speaks HTTP/2 (the Bedrock adapter), and `methods: ["complete"]` to check one call only.
+
 ## Capabilities matter
 
 Every `ModelContract` declares what it supports — six optional flags today (absent = treat as `false`):

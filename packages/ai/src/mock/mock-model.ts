@@ -1,4 +1,5 @@
 import type { Message } from "../contracts/conversation-message.type";
+import type { FinishReason } from "../contracts/finish-reason.type";
 import type {
   ModelCallOptions,
   ModelCapabilities,
@@ -28,6 +29,16 @@ type RecordedCall = {
  * - Does NOT own: any real inference, tokenization, or network I/O — when
  *   the queue is exhausted, the final entry is reused so tests never crash
  *   on accidental over-consumption.
+ *
+ * Honours `ModelCallOptions.signal` like a real adapter: an already-aborted
+ * signal rejects the call before anything is returned, an abort during a
+ * scripted `delay` rejects immediately, and a stream stops between chunks.
+ * The rejection is the signal's `reason` when it is an `Error` (an
+ * `AbortError` `DOMException` for a bare `controller.abort()`).
+ *
+ * A scripted entry with non-empty `toolCalls` and no `finishReason`
+ * finishes with `"tool_calls"` (otherwise `"stop"`), so the agent runs the
+ * scripted tools without the script repeating the finish reason.
  *
  * Every AI-related test in this repo uses `MockSDK` / `MockModel` — real
  * provider APIs are never hit from the test suite (see §6 of code-style.md).
@@ -100,7 +111,7 @@ export class MockModel implements ModelContract {
 
     return {
       content: mock.content,
-      finishReason: mock.finishReason ?? "stop",
+      finishReason: mock.finishReason ?? inferFinishReason(mock),
       usage: {
         input: mock.usage?.input ?? estimatedInput,
         output: mock.usage?.output ?? estimatedOutput,
@@ -125,9 +136,7 @@ export class MockModel implements ModelContract {
 
     const mock = this.nextResponse();
 
-    if (mock.delay) {
-      await new Promise((resolve) => setTimeout(resolve, mock.delay));
-    }
+    await waitFor(mock.delay, options?.signal);
 
     if (mock.error) {
       throw mock.error;
@@ -151,10 +160,9 @@ export class MockModel implements ModelContract {
     this.calls.push({ messages, options });
 
     const mock = this.nextResponse();
+    const signal = options?.signal;
 
-    if (mock.delay) {
-      await new Promise((resolve) => setTimeout(resolve, mock.delay));
-    }
+    await waitFor(mock.delay, signal);
 
     if (mock.error) {
       throw mock.error;
@@ -163,11 +171,13 @@ export class MockModel implements ModelContract {
     const chunks = mock.deltas ?? mock.content.split(" ").map((word) => word + " ");
 
     for (const chunk of chunks) {
+      throwIfAborted(signal);
       yield { type: "delta", content: chunk };
     }
 
     if (mock.toolCalls) {
       for (const toolCall of mock.toolCalls) {
+        throwIfAborted(signal);
         yield {
           type: "tool-call",
           id: toolCall.id,
@@ -178,6 +188,8 @@ export class MockModel implements ModelContract {
     }
 
     const response = this.buildResponse(mock);
+
+    throwIfAborted(signal);
 
     yield {
       type: "done",
@@ -196,4 +208,58 @@ export class MockModel implements ModelContract {
     this.calls = [];
     this.responseIndex = 0;
   }
+}
+
+/**
+ * The finish reason a scripted entry implies when it sets none: scripted
+ * tool calls mean the model stopped to call tools.
+ */
+function inferFinishReason(mock: MockModelResponse): FinishReason {
+  return mock.toolCalls !== undefined && mock.toolCalls.length > 0 ? "tool_calls" : "stop";
+}
+
+/** The error an aborted call rejects with — the signal's own reason when it is an `Error`. */
+function abortError(signal: AbortSignal): Error {
+  const reason: unknown = signal.reason;
+
+  return reason instanceof Error
+    ? reason
+    : new DOMException("This operation was aborted", "AbortError");
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw abortError(signal);
+  }
+}
+
+/**
+ * Wait `delay` ms (none when absent), rejecting as soon as `signal` aborts —
+ * including when it was aborted before the call started.
+ */
+async function waitFor(delay: number | undefined, signal: AbortSignal | undefined): Promise<void> {
+  throwIfAborted(signal);
+
+  if (!delay) {
+    return;
+  }
+
+  if (!signal) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay);
+
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }

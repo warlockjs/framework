@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `MockModel` infers `finishReason: "tool_calls"` when a scripted response has non-empty `toolCalls` and no `finishReason`, so scripted tool calls run without repeating the finish reason. An explicit `finishReason` still wins.
+- `MockModel` honours `signal`: an already-aborted signal rejects the call, an abort during a scripted `delay` rejects immediately, and `stream()` stops between chunks. The rejection is the signal's `reason` when it is an `Error`, otherwise an `AbortError` `DOMException`.
 - `@warlock.js/ai` imports Core's private-address classifier from the new side-effect-free `@warlock.js/core/net` subpath instead of the Core root, so a standalone process running `ai.agent` no longer loads Core's HTTP server, database, cache and mail modules, and bundlers no longer need to alias Core. An import-graph test fails if anything reachable from the package entry imports the Core root. The installation guide documents `@warlock.js/cache` and `@warlock.js/cascade` as optional, lazily loaded peers for standalone use.
 - The provider matrix documents inherited `providerOptions.openai.body` on xAI, Groq, DeepSeek and Mistral, and warns against sharing provider-specific fields across incompatible fallback models.
 
@@ -17,12 +19,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
+- Tests that script `toolCalls` on a `MockModel` response without a `finishReason` and expect `"stop"` now get `"tool_calls"`; set `finishReason: "stop"` explicitly to keep the old ending. Tests that pass an already-aborted `signal` to a mock model now see the call reject.
 - When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.
 
 - Sub-agents also use the concurrent tool default introduced in 5.30. Callers upgrading from 5.29 whose tools need ordered side effects can now set `spawnSubAgent({ toolDispatch: "sequential", ... })`.
 
 ### Added
 
+- `verifyModelSignalContract({ createModel })` checks that a model adapter honours `ModelCallOptions.signal`: a call with an already-aborted signal rejects, and aborting mid-call rejects promptly and cancels the HTTP request, for `complete()` and `stream()`. It serves an ephemeral local port that never answers (`protocol: "http2"` for HTTP/2 clients), has no test-runner dependency, and throws an `Error` naming the failed check. Honouring `signal` is now part of the documented `ModelContract`, and every first-party adapter runs this check.
 - Regression fixtures assert required model and identifier segments before reading them under stricter indexed-access checks; the compiler error budget falls by ten.
 
 - Skills include complete examples for per-trip tool concurrency and native token preflight with provider-specific request options.

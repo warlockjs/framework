@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- An adapter contract test verifies that aborting `signal` rejects `complete()` and `stream()` on the Chat Completions and Responses models and cancels the HTTP request.
 - `providerOptions.openai.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.
 - Responses models expose native input-token preflight through `countTokens()`; Chat Completions keeps offline estimates separate.
 
