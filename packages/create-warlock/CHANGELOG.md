@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The starter's `AGENTS.md` ends with a `## This app (generated)` section whose `warlock:generated` markers `warlock dev` (and `warlock agents-md --write`) fills with the app's modules, routes, models, installed skills and verify commands.
 - Opt-in `--lint=oxc` / `--lint oxc` flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating `lint:check` and `format:check` scripts. Oxc projects configure and recommend the official VS Code extension for format-on-save and lint fixes; default projects retain their Prettier/ESLint editor settings. Help and headless diagnostics include `--lint`.
 - Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys.
 

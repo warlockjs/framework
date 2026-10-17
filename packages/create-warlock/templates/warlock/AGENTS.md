@@ -121,3 +121,16 @@ Three things that trip everyone up on a fresh app:
   instance does not expose its columns as direct properties — `post.title` is
   `undefined` at runtime and a type error. Use `post.get("title")`, or
   `post.toJSON()` in a page loader (resources are the serialization gate).
+
+## This app (generated)
+
+`warlock dev` rewrites everything between the two markers below from the
+running app — modules, routes, models, installed skills and the commands to
+verify a change. Edit outside the markers; turn it off with
+`devServer.agentsMd: false` in `warlock.config.ts`.
+
+<!-- warlock:generated:start -->
+
+Run `npx warlock dev` (or `npx warlock agents-md --write`) to fill this section.
+
+<!-- warlock:generated:end -->
