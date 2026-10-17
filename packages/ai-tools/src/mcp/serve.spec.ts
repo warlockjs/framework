@@ -4,7 +4,7 @@ import type { JsonRpcRequest, McpToolCallResult, McpToolDescriptor } from "../co
 import { objectSchema, stringField } from "../schema";
 import { McpServeError } from "../errors";
 import { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
-import { createServeHandler, serve } from "./serve";
+import { answerStdioLine, createServeHandler, serve } from "./serve";
 
 /** A tool that uppercases its `value`. */
 function makeUpperTool(): ToolContract {
@@ -446,5 +446,52 @@ describe("serve() — call context", () => {
 
     expect(seen.tenant).toBe("acme");
     expect(seen.signal).toBe(controller.signal);
+  });
+});
+
+/** A dispatcher that answers every request with an empty result. */
+async function echoDispatch(message: JsonRpcRequest) {
+  return { jsonrpc: "2.0" as const, id: message.id, result: {} };
+}
+
+describe("answerStdioLine() — the stdio transport's line handler", () => {
+  const dispatch = echoDispatch;
+
+  it("answers a JSON value that is not a request object with Invalid Request", async () => {
+    for (const line of ["null", "42", '"text"', "[1,2]", "true"]) {
+      const reply = await answerStdioLine(line, dispatch);
+
+      expect(JSON.parse(reply ?? "")).toEqual({
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32600, message: "Invalid request: not a JSON-RPC object." },
+      });
+    }
+  });
+
+  it("ignores blank lines, non-JSON lines and notifications", async () => {
+    expect(await answerStdioLine("   ", dispatch)).toBeUndefined();
+    expect(await answerStdioLine("{not json", dispatch)).toBeUndefined();
+    expect(
+      await answerStdioLine('{"jsonrpc":"2.0","method":"notifications/initialized"}', dispatch),
+    ).toBeUndefined();
+  });
+
+  it("answers a request on one line", async () => {
+    const reply = await answerStdioLine('{"jsonrpc":"2.0","id":7,"method":"ping"}', dispatch);
+
+    expect(reply).toBe('{"jsonrpc":"2.0","id":7,"result":{}}\n');
+  });
+
+  it("answers an internal error instead of rejecting when dispatch throws", async () => {
+    const reply = await answerStdioLine('{"jsonrpc":"2.0","id":3,"method":"ping"}', async () => {
+      throw new Error("boom");
+    });
+
+    expect(JSON.parse(reply ?? "")).toEqual({
+      jsonrpc: "2.0",
+      id: 3,
+      error: { code: -32603, message: "Internal error." },
+    });
   });
 });

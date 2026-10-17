@@ -137,6 +137,8 @@ await server.start();
 await server.stop();
 ```
 
+Over stdio the server reads one JSON-RPC message per line. Blank and non-JSON lines and notifications get no answer; a JSON value that is not a request object (`null`, a number, an array) gets a JSON-RPC `-32600` "Invalid Request" error with `id: null`. A bad line never stops the server.
+
 ```ts
 // http — a loopback endpoint guarded by a bearer token
 const { url, close } = await ai.mcp

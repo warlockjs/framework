@@ -494,6 +494,70 @@ class McpServeHandler {
   }
 }
 
+/** JSON-RPC "Invalid Request" — the line is JSON but not a request object. */
+const JSON_RPC_INVALID_REQUEST = -32600;
+
+/** JSON-RPC "Internal error" — answering the request failed unexpectedly. */
+const JSON_RPC_INTERNAL_ERROR = -32603;
+
+/**
+ * Turn one stdio line into the line to write back, or `undefined` when
+ * nothing is answered: blank or non-JSON lines and notifications (no `id`).
+ * A JSON value that is not a request object (`null`, a number, an array) is
+ * answered with a JSON-RPC "Invalid Request" error whose `id` is `null`.
+ * Never rejects: a dispatch failure is answered as an internal error.
+ */
+export async function answerStdioLine(
+  line: string,
+  dispatch: (request: JsonRpcRequest) => Promise<JsonRpcResponse>,
+): Promise<string | undefined> {
+  const trimmed = line.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  let message: unknown;
+
+  try {
+    message = JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+
+  if (typeof message !== "object" || message === null || Array.isArray(message)) {
+    const invalid = {
+      jsonrpc: JSONRPC_VERSION,
+      id: null,
+      error: { code: JSON_RPC_INVALID_REQUEST, message: "Invalid request: not a JSON-RPC object." },
+    };
+
+    return `${JSON.stringify(invalid)}\n`;
+  }
+
+  const request = message as JsonRpcRequest;
+  const id: unknown = request.id;
+
+  if (id === undefined || id === null) {
+    // A notification (e.g. notifications/initialized) — nothing to answer.
+    return undefined;
+  }
+
+  try {
+    const response = await dispatch(request);
+
+    return `${JSON.stringify(response)}\n`;
+  } catch {
+    const failed = {
+      jsonrpc: JSONRPC_VERSION,
+      id,
+      error: { code: JSON_RPC_INTERNAL_ERROR, message: "Internal error." },
+    };
+
+    return `${JSON.stringify(failed)}\n`;
+  }
+}
+
 /** Read an unknown value as a plain record (non-objects read as empty). */
 function readRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -649,7 +713,9 @@ class McpServerImpl implements McpServer {
     const reader: Interface = createInterface({ input: process.stdin });
 
     reader.on("line", (line) => {
-      void this.onLine(line);
+      // A failure answering one line must never become an unhandled
+      // rejection: that would take the whole server process down.
+      void this.onLine(line).catch(() => {});
     });
 
     return {
@@ -660,33 +726,13 @@ class McpServerImpl implements McpServer {
     };
   }
 
-  /**
-   * Parse one stdin line as a JSON-RPC request, dispatch it through the
-   * handler, and write the response as a single line to stdout. Non-JSON
-   * lines and notifications (no `id`) are ignored.
-   */
+  /** Answer one stdin line on stdout (see {@link answerStdioLine}). */
   private async onLine(line: string): Promise<void> {
-    const trimmed = line.trim();
+    const reply = await answerStdioLine(line, (request) => this.handler.handle(request));
 
-    if (!trimmed) {
-      return;
+    if (reply !== undefined) {
+      process.stdout.write(reply);
     }
-
-    let request: JsonRpcRequest;
-
-    try {
-      request = JSON.parse(trimmed) as JsonRpcRequest;
-    } catch {
-      return;
-    }
-
-    if (request.id === undefined || request.id === null) {
-      // A notification (e.g. notifications/initialized) — nothing to answer.
-      return;
-    }
-
-    const response = await this.handler.handle(request);
-    process.stdout.write(`${JSON.stringify(response)}\n`);
   }
 
   public async stop(): Promise<void> {

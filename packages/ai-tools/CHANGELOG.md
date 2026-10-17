@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `initialize` negotiates the protocol version: a client's requested version is echoed when supported (`2025-11-25`, `2025-06-18`, `2025-03-26`), otherwise the newest is offered. It previously always answered `2025-06-18`.
 - `McpServer.start()` resolves a handle (`{ url?, close }`) instead of `void`. The http transport's `port` is optional.
 
+### Fixed
+
+- The stdio transport of `ai.mcp.serve()` no longer crashes the process when a line is JSON but not a request object (`null`, a number, an array): it answers a JSON-RPC "Invalid Request" error (`-32600`, `id: null`). A failure while answering a line is answered as an internal error and can no longer become an unhandled rejection.
+
 ### Security
 
 - The HTTP transport binds loopback by default and refuses to start on any non-loopback host without `auth` (`McpServeError`, `type: "config"`).
