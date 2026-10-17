@@ -1101,7 +1101,8 @@ export class Router {
 
     // Development only: list mutating routes nobody guarded. Routes added by a
     // later HMR reload are reported when their replacement commits.
-    this.warnUnguardedRoutes = configAccessor.key<boolean>("http.warnUnguardedRoutes", true) !== false;
+    this.warnUnguardedRoutes =
+      configAccessor.key<boolean>("http.warnUnguardedRoutes", true) !== false;
     if (this.warnUnguardedRoutes) {
       reportUnguardedMutatingRoutes(this.routes);
     }
