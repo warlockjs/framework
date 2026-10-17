@@ -1,6 +1,5 @@
-import type { AIErrorOptions } from "./ai-error";
 import type { ErrorCategory } from "./error-category.type";
-import { ProviderError } from "./provider-error";
+import { ProviderError, type ProviderErrorOptions } from "./provider-error";
 
 /**
  * Provider call timed out — either at the transport layer (socket
@@ -14,8 +13,9 @@ import { ProviderError } from "./provider-error";
  */
 export class ProviderTimeoutError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "timeout";
+  public static readonly defaultRetryable: boolean | undefined = true;
 
-  public constructor(message: string, options?: AIErrorOptions) {
+  public constructor(message: string, options?: ProviderErrorOptions) {
     super(message, options, "PROVIDER_TIMEOUT");
     this.name = "ProviderTimeoutError";
   }

@@ -5,6 +5,7 @@ import {
   InvalidRequestError,
   ProviderAuthError,
   ProviderError,
+  ProviderOverloadedError,
   ProviderRateLimitError,
   ProviderTimeoutError,
   QuotaExceededError,
@@ -93,6 +94,18 @@ export function wrapOpenAIError(thrown: unknown): AIError {
 
   if (typeof shape.status === "number" && shape.status >= 400 && shape.status < 500) {
     return new InvalidRequestError(message, { cause: thrown, context });
+  }
+
+  // OpenAI: 503 `service_unavailable_error` / `server_is_overloaded`
+  // (https://developers.openai.com/api/docs/guides/error-codes). The
+  // OpenAI-compatible wrappers use 503 for the same condition (DeepSeek
+  // documents 503 "Server Overloaded").
+  if (shape.code === "server_is_overloaded" || shape.status === 503) {
+    return new ProviderOverloadedError(message, {
+      cause: thrown,
+      context,
+      retryAfter: parseRetryAfter(shape.headers),
+    });
   }
 
   return new ProviderError(message, { cause: thrown, context });

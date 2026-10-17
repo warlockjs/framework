@@ -24,7 +24,8 @@ export class EmbeddingVectorCountMismatchError extends ProviderError {
   public constructor(options: EmbeddingVectorCountMismatchErrorOptions) {
     super(
       `Embedding provider "${options.provider}" returned ${options.receivedCount} vectors for ${options.expectedCount} records; record "${options.record}" was left without a vector.`,
-      options,
+      // The embedding call itself succeeded, so it was charged.
+      { ...options, billed: true },
       "PROVIDER_EMBEDDING_VECTOR_COUNT_MISMATCH",
     );
     this.name = "EmbeddingVectorCountMismatchError";

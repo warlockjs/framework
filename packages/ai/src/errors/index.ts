@@ -58,7 +58,11 @@ export {
   type PromptRefinementFailureReason,
 } from "./prompt-refinement-error";
 export { ProviderAuthError } from "./provider-auth-error";
-export { ProviderError } from "./provider-error";
+export { ProviderError, type ProviderBilled, type ProviderErrorOptions } from "./provider-error";
+export {
+  ProviderOverloadedError,
+  type ProviderOverloadedErrorOptions,
+} from "./provider-overloaded-error";
 export {
   ProviderRateLimitError,
   type ProviderRateLimitErrorOptions,

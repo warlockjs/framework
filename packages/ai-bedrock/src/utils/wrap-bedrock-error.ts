@@ -4,6 +4,7 @@ import {
   InvalidRequestError,
   ProviderAuthError,
   ProviderError,
+  ProviderOverloadedError,
   ProviderRateLimitError,
   ProviderTimeoutError,
   QuotaExceededError,
@@ -80,6 +81,13 @@ export function wrapBedrockError(thrown: unknown): AIError {
 
   if (shape.name === "ThrottlingException" || shape.httpStatusCode === 429) {
     return new ProviderRateLimitError(message, { cause: thrown, context });
+  }
+
+  // Converse `ServiceUnavailableException` (503): the service is
+  // temporarily unable to serve the request — retry later.
+  // https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html
+  if (shape.name === "ServiceUnavailableException" || shape.httpStatusCode === 503) {
+    return new ProviderOverloadedError(message, { cause: thrown, context });
   }
 
   if (shape.name === "ValidationException") {

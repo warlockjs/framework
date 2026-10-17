@@ -166,7 +166,7 @@ describe("GoogleEmbedder.embedMany()", () => {
   });
 
   it("wraps provider errors from a batch call", async () => {
-    const { ai } = makeFakeAI([], { name: "ApiError", status: 503, message: "down" });
+    const { ai } = makeFakeAI([], { name: "ApiError", status: 502, message: "bad gateway" });
     const embedder = new GoogleEmbedder(ai, { name: "gemini-embedding-001" });
 
     await expect(embedder.embedMany(["a", "b"])).rejects.toMatchObject({

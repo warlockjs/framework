@@ -7,6 +7,7 @@ import {
   ProviderRateLimitError,
   ProviderTimeoutError,
   QuotaExceededError,
+  ProviderOverloadedError,
 } from "@warlock.js/ai";
 import { describe, expect, it } from "vitest";
 import { wrapBedrockError } from "./wrap-bedrock-error";
@@ -257,5 +258,22 @@ describe("wrapBedrockError", () => {
     for (const sample of samples) {
       expect(wrapBedrockError(sample)).toBeInstanceOf(AIError);
     }
+  });
+});
+
+describe("wrapBedrockError — overload and provider facts", () => {
+  it("maps ServiceUnavailableException to a retryable ProviderOverloadedError", () => {
+    const wrapped = wrapBedrockError(
+      awsError({ name: "ServiceUnavailableException", httpStatusCode: 503 }),
+    );
+
+    expect(wrapped).toBeInstanceOf(ProviderOverloadedError);
+    expect(wrapped).toMatchObject({ code: "PROVIDER_OVERLOADED", status: 503, retryable: true });
+  });
+
+  it("marks AccessDenied as not billed", () => {
+    expect(
+      wrapBedrockError(awsError({ name: "AccessDeniedException", httpStatusCode: 403 })),
+    ).toMatchObject({ status: 403, billed: false, retryable: false });
   });
 });

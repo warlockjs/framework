@@ -1,6 +1,5 @@
-import type { AIErrorOptions } from "./ai-error";
 import type { ErrorCategory } from "./error-category.type";
-import { ProviderError } from "./provider-error";
+import { ProviderError, type ProviderErrorOptions } from "./provider-error";
 
 /**
  * Provider rejected the credential — missing / invalid / expired API
@@ -14,8 +13,9 @@ import { ProviderError } from "./provider-error";
  */
 export class ProviderAuthError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "auth";
+  public static readonly defaultRetryable: boolean | undefined = false;
 
-  public constructor(message: string, options?: AIErrorOptions) {
+  public constructor(message: string, options?: ProviderErrorOptions) {
     super(message, options, "PROVIDER_AUTH");
     this.name = "ProviderAuthError";
   }

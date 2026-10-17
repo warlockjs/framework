@@ -6,6 +6,7 @@ import {
   ProviderError,
   ProviderRateLimitError,
   ProviderTimeoutError,
+  ProviderOverloadedError,
 } from "@warlock.js/ai";
 import { ApiError } from "@google/genai";
 import { describe, expect, it } from "vitest";
@@ -176,5 +177,25 @@ describe("wrapGoogleError", () => {
     for (const sample of samples) {
       expect(wrapGoogleError(sample)).toBeInstanceOf(AIError);
     }
+  });
+});
+
+describe("wrapGoogleError — overload and billing facts", () => {
+  it("maps 503 UNAVAILABLE to a retryable ProviderOverloadedError", () => {
+    const wrapped = wrapGoogleError(googleError(503, "UNAVAILABLE: the model is overloaded"));
+
+    expect(wrapped).toBeInstanceOf(ProviderOverloadedError);
+    expect(wrapped).toMatchObject({ code: "PROVIDER_OVERLOADED", status: 503, retryable: true });
+  });
+
+  it("marks 400 and 500 failures as not billed, as Google documents", () => {
+    expect(wrapGoogleError(googleError(400, "bad"))).toMatchObject({ billed: false });
+    expect(wrapGoogleError(googleError(500, "internal"))).toMatchObject({
+      billed: false,
+      retryable: true,
+    });
+    expect(wrapGoogleError(googleError(429, "RESOURCE_EXHAUSTED"))).toMatchObject({
+      billed: "unknown",
+    });
   });
 });

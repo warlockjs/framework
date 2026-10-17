@@ -1,13 +1,12 @@
-import type { AIErrorOptions } from "./ai-error";
 import type { ErrorCategory } from "./error-category.type";
-import { ProviderError } from "./provider-error";
+import { ProviderError, type ProviderErrorOptions } from "./provider-error";
 
 /**
  * Payload for `ContentFilterError`. Both fields optional — providers
  * don't consistently disclose the specific filter reason or
  * categories, especially when the block is pre-generation.
  */
-export type ContentFilterErrorOptions = AIErrorOptions & {
+export type ContentFilterErrorOptions = ProviderErrorOptions & {
   reason?: string;
   categories?: string[];
 };
@@ -24,6 +23,7 @@ export type ContentFilterErrorOptions = AIErrorOptions & {
  */
 export class ContentFilterError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "content-filter";
+  public static readonly defaultRetryable: boolean | undefined = false;
 
   public readonly reason?: string;
   public readonly categories?: string[];
