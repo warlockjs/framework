@@ -552,6 +552,6 @@ workers up to 500 ms to exit and reap owned CLI children before forcing terminat
 
 Source TypeScript health workers use the framework's JavaScript/tsx bootstrap on
 Node.js 22.15; published JavaScript workers start directly. Framework regression
-tests use the same bootstrap with a clean worker argument list, so declaration
-roots, file updates and deleted declarations are exercised under the supported
-minimum runtime.
+tests cover that bootstrap and a built `.mjs` worker with no inherited loader
+hooks. Both paths check configured declaration roots, source updates and deleted
+declarations under the supported minimum runtime.

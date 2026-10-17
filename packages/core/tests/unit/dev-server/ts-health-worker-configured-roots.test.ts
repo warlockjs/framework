@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { build } from "esbuild";
 import path from "node:path";
 import type { Worker } from "node:worker_threads";
 import ts from "typescript";
@@ -77,13 +80,43 @@ async function createFixture(): Promise<{
   return { root, files };
 }
 
-function createHealthWorker(): Worker {
-  // Exercise the same JavaScript/tsx bootstrap as FilesHealthcareManager.
-  // Node 22.15 cannot start a .ts worker entry through --import tsx/esm alone.
-  return createWorker(
-    "../../../src/dev-server/health-checker/workers/ts-health.worker",
+async function createHealthWorker(mode: "source" | "published", root: string): Promise<Worker> {
+  const workerEntry = new URL(
+    "../../../src/dev-server/health-checker/workers/ts-health.worker.ts",
     import.meta.url,
-    { execArgv: [] },
+  );
+  // Start both paths without inherited loaders, including NODE_OPTIONS hooks.
+  const options = { execArgv: [], env: { ...process.env, NODE_OPTIONS: "" } };
+  if (mode === "source") {
+    return createWorker(
+      "../../../src/dev-server/health-checker/workers/ts-health.worker",
+      import.meta.url,
+      options,
+    );
+  }
+
+  // Build the actual published worker entry as ESM, keeping its TypeScript
+  // dependency external just as the package does. The worker starts natively.
+  const builtRoot = path.join(root, "built");
+  await build({
+    entryPoints: [fileURLToPath(workerEntry)],
+    outfile: path.join(builtRoot, "ts-health.worker.mjs"),
+    platform: "node",
+    target: "node22.15",
+    format: "esm",
+    bundle: false,
+  });
+  const require = createRequire(import.meta.url);
+  await mkdir(path.join(root, "node_modules"), { recursive: true });
+  await symlink(
+    path.dirname(require.resolve("typescript/package.json")),
+    path.join(root, "node_modules", "typescript"),
+    "junction",
+  );
+  return createWorker(
+    "./ts-health.worker",
+    pathToFileURL(path.join(builtRoot, "manager.mjs")).href,
+    options,
   );
 }
 
@@ -133,74 +166,78 @@ afterEach(async () => {
 });
 
 describe("TypeScript health worker configured roots", () => {
-  it("keeps declarations included by tsconfig while checking and after unrelated updates", async () => {
-    const { root, files } = await createFixture();
-    const worker = createHealthWorker();
+  it.each(["source", "published"] as const)(
+    "keeps declarations included by tsconfig in the %s worker after updates and deletions",
+    async (mode) => {
+      const { root, files } = await createFixture();
+      const worker = await createHealthWorker(mode, root);
 
-    try {
-      await initialize(worker, root);
+      try {
+        await initialize(worker, root);
 
-      const initial = await check(worker, [
-        files.valid,
-        files.unknown,
-        files.ambient,
-        files.consumer,
-      ]);
-      expect(initial.find((result) => result.relativePath.endsWith("valid.ts"))?.errors).toEqual(
-        [],
-      );
-      expect(
-        initial.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors,
-      ).toHaveLength(1);
-      expect(
-        initial.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors[0]?.message,
-      ).toContain("not assignable");
-      expect(initial.find((result) => result.relativePath.endsWith("consumer.ts"))?.errors).toEqual(
-        [],
-      );
+        const initial = await check(worker, [
+          files.valid,
+          files.unknown,
+          files.ambient,
+          files.consumer,
+        ]);
+        expect(initial.find((result) => result.relativePath.endsWith("valid.ts"))?.errors).toEqual(
+          [],
+        );
+        expect(
+          initial.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors,
+        ).toHaveLength(1);
+        expect(
+          initial.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors[0]?.message,
+        ).toContain("not assignable");
+        expect(
+          initial.find((result) => result.relativePath.endsWith("consumer.ts"))?.errors,
+        ).toEqual([]);
 
-      worker.postMessage({
-        type: "fileChanges",
-        files: [
-          {
-            path: files.unrelated,
-            content: "export const unrelated = false;",
-            relativePath: "src/unrelated.ts",
-          },
-        ],
-      });
+        worker.postMessage({
+          type: "fileChanges",
+          files: [
+            {
+              path: files.unrelated,
+              content: "export const unrelated = false;",
+              relativePath: "src/unrelated.ts",
+            },
+          ],
+        });
 
-      const afterUpdate = await check(worker, [files.valid, files.unknown]);
-      expect(
-        afterUpdate.find((result) => result.relativePath.endsWith("valid.ts"))?.errors,
-      ).toEqual([]);
-      expect(
-        afterUpdate.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors,
-      ).toHaveLength(1);
+        const afterUpdate = await check(worker, [files.valid, files.unknown]);
+        expect(
+          afterUpdate.find((result) => result.relativePath.endsWith("valid.ts"))?.errors,
+        ).toEqual([]);
+        expect(
+          afterUpdate.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors,
+        ).toHaveLength(1);
 
-      await unlink(files.ambient);
-      worker.postMessage({
-        type: "filesDeleted",
-        files: [
-          {
-            path: files.ambient.replace(/\\/g, "/"),
-            relativePath: "src/ambient.ts",
-          },
-        ],
-      });
+        await unlink(files.ambient);
+        worker.postMessage({
+          type: "filesDeleted",
+          files: [
+            {
+              path: files.ambient.replace(/\\/g, "/"),
+              relativePath: "src/ambient.ts",
+            },
+          ],
+        });
 
-      const afterDelete = await check(worker, [files.consumer, files.unknown]);
-      expect(
-        afterDelete.find((result) => result.relativePath.endsWith("consumer.ts"))?.errors[0]
-          ?.message,
-      ).toContain("Cannot find name 'deletedOnly'");
-      expect(
-        afterDelete.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors,
-      ).toHaveLength(1);
-    } finally {
-      await worker.terminate();
-    }
-  }, 30_000);
+        const afterDelete = await check(worker, [files.consumer, files.unknown]);
+        expect(
+          afterDelete.find((result) => result.relativePath.endsWith("consumer.ts"))?.errors[0]
+            ?.message,
+        ).toContain("Cannot find name 'deletedOnly'");
+        expect(
+          afterDelete.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors,
+        ).toHaveLength(1);
+      } finally {
+        await worker.terminate();
+      }
+    },
+    30_000,
+  );
 
   it("keeps tsconfig declarations when the inline fallback rebuilds for a source update", async () => {
     const { files, root } = await createFixture();
