@@ -1,6 +1,6 @@
 ---
 name: pick-ai-provider
-description: 'Choose an AI provider adapter — @warlock.js/ai-openai (shipped, also handles OpenRouter / Azure via baseURL), @warlock.js/ai-anthropic, @warlock.js/ai-bedrock, @warlock.js/ai-google, @warlock.js/ai-ollama — plus cost truth: ModelPricing (per-1M tokens), Usage cost breakdown, the cachedTokens / cacheWriteTokens / reasoningTokens channels, and capability flags. Triggers: `OpenAISDK`, `SDKAdapterContract`, `ModelContract`, `ModelPricing`, `ModelCapabilities`, `sdk.model`, `countTokens`, `providerOptions`, `sdk.embedder`, `capabilities.vision`, `capabilities.structuredOutput`, `capabilities.reasoning`, `capabilities.promptCaching`, `pricing`, `Usage.cost`, `cachedTokens`, `cacheWriteTokens`, `reasoningTokens`, `reasoning.effort`, `cacheControl`, `baseURL`, `provider: "openrouter"`; ''pick a provider'', ''openai vs openrouter'', ''does this model support vision/reasoning'', ''configure pricing'', ''how much did reasoning cost'', ''prompt cache tokens''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent factory — the `run-ai-agent` topic; competing libs raw `openai`, `@anthropic-ai/sdk`, `@aws-sdk/client-bedrock-runtime`.'
+description: 'Choose an AI provider adapter — @warlock.js/ai-openai (shipped, also handles OpenRouter / Azure via baseURL), @warlock.js/ai-anthropic, @warlock.js/ai-bedrock, @warlock.js/ai-google, @warlock.js/ai-ollama — plus cost truth: ModelPricing (per-1M tokens), Usage cost breakdown, the cachedTokens / cacheWriteTokens / reasoningTokens channels, and capability flags. Triggers: `totalCost`, `inputIncludesCache`, `cacheWrite`, `OpenAISDK`, `SDKAdapterContract`, `ModelContract`, `ModelPricing`, `ModelCapabilities`, `sdk.model`, `countTokens`, `providerOptions`, `sdk.embedder`, `capabilities.vision`, `capabilities.structuredOutput`, `capabilities.reasoning`, `capabilities.promptCaching`, `pricing`, `Usage.cost`, `cachedTokens`, `cacheWriteTokens`, `reasoningTokens`, `reasoning.effort`, `cacheControl`, `baseURL`, `provider: "openrouter"`; ''pick a provider'', ''openai vs openrouter'', ''does this model support vision/reasoning'', ''configure pricing'', ''how much did reasoning cost'', ''prompt cache tokens''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent factory — the `run-ai-agent` topic; competing libs raw `openai`, `@anthropic-ai/sdk`, `@aws-sdk/client-bedrock-runtime`.'
 ---
 
 # Pick an AI provider adapter
@@ -106,26 +106,32 @@ const customModel = openai.model({
 
 ## Cost truth — pricing + token channels
 
-`ModelPricing` is **USD per 1,000,000 tokens** (the industry-standard unit), declared at two optional sites — `SDK.pricing` (registry keyed by model name) and `model({ pricing })` (per-model override, wins). Resolution: per-model > SDK registry > undefined (no cost computed).
+`ModelPricing` is **USD per 1,000,000 tokens** (the industry-standard unit), declared at two optional sites — `SDK.pricing` (registry keyed by model name) and `model({ pricing })` (per-model override, wins). Resolution: per-model > SDK registry > the adapter's built-in list prices (verified vendor rates for flat-priced models; see each provider topic) > undefined (no cost computed).
 
 ```ts
 type ModelPricing = {
   input: number; // required — USD / 1M input tokens
   output: number; // required — USD / 1M output tokens
   cachedInput?: number; // prompt-cache READ rate; falls back to `input`
-  cachedOutput?: number; // cache-WRITE rate (Anthropic premium); falls back to `output`
+  cacheWrite?: number; // default-lifetime cache-WRITE rate; falls back to `cachedOutput`, then `input`
+  cacheWrite1h?: number; // 1-hour cache-WRITE rate (Anthropic 2x input); falls back to `cacheWrite`
   reasoning?: number; // reasoning/thinking-token rate; falls back to `output`
+  cachedOutput?: number; // deprecated alias of `cacheWrite`
 };
 ```
+
+`Usage.inputIncludesCache` tells `computeCost` how to read `input`: `true`/absent (OpenAI, Gemini, DeepSeek, xAI, Groq, Mistral) — cache reads are inside `input`; `false` (Anthropic, Bedrock) — `input` is the uncached remainder. Either way each cache token is billed once at its own rate.
 
 Configure it and every report carries `Usage.cost` — a per-channel breakdown captured at emit time as a historical fact (stored reports stay accurate after the upstream table changes):
 
 ```ts
 const { usage } = await ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) }).execute("hi");
 
-usage.cost; // { input, output, cachedInput?, cachedOutput? }  — USD per channel
-// single scalar total: sum the populated fields, treating undefined as 0.
+usage.cost; // { input, output, cachedInput?, cacheWrite?, reasoning? }  — USD per channel
+totalCost(usage.cost); // one USD number, or undefined when unpriced (import from "@warlock.js/ai")
 ```
+
+Adapters also attach `usage.cost` to `model.complete()` / the streaming `done` chunk, so side calls outside an agent are costed too.
 
 `usage.cost` is `undefined` when no pricing is available — honest absence over false zero. Aggregators merge only defined fields, so one unpriced child never erases a priced sibling's cost.
 

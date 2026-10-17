@@ -1,6 +1,6 @@
 ---
 name: define-ai-tool
-description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`, `ai.providerTool`, `ProviderTool`, `providerTools`, `isProviderTool`, `web_search`, `code_execution`, `text_editor`, `googleSearch`, `nova_grounding`; ''define a tool'', ''enable the provider's web search'', ''use Claude's bash / text editor tool'', ''built-in provider tools'',, ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
+description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `createToolContext`, `measureTools`, `ai.tools.measure`, `toolSchemas`, `compactJsonSchema`, `compactToolSchemas`, `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`, `ai.providerTool`, `ProviderTool`, `providerTools`, `isProviderTool`, `web_search`, `code_execution`, `text_editor`, `googleSearch`, `nova_grounding`; ''define a tool'', ''enable the provider's web search'', ''use Claude's bash / text editor tool'', ''built-in provider tools'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
 ---
 
 # `ai.tool()` — typed tool factory
@@ -121,6 +121,27 @@ Under a supervisor: bag starts empty per iteration, accumulates writes from all 
 
 Standalone (no supervisor): framework supplies `{ artifacts: {} }`. Mutations are harmless no-ops.
 
+Invoking a tool yourself (script, test, HTTP handler) with a `signal`, or to read back what it wrote? Use `createToolContext` instead of faking the bag:
+
+```ts
+import { ai, createToolContext } from "@warlock.js/ai";
+
+const pinLocale = ai.tool({
+  name: "pin_locale",
+  description: "Remember the customer's locale",
+  execute: async (_input: unknown, ctx) => {
+    if (ctx) ctx.artifacts.locale = "en-GB";
+    return { ok: true };
+  },
+});
+
+const controller = new AbortController();
+const ctx = createToolContext({ signal: controller.signal }); // { artifacts: {}, signal }
+const { data } = await pinLocale.invoke({}, ctx);
+
+console.log(data, ctx.artifacts.locale); // { ok: true } "en-GB"
+```
+
 ## Type contract for artifacts
 
 The supervisor declares an `artifactsSchema`; tools registered to it inherit typed `ctx.artifacts.*`. Standalone tools fall back to `Record<string, unknown>`.
@@ -209,6 +230,37 @@ const agent = ai.agent({ model, tools: [wrapped] });
 ```
 
 Workflow errors surface as `ToolExecutionError` with `cause` pointing at the original `WorkflowError` subclass.
+
+## Schema token cost — measure, then go compact
+
+Every tool's JSON schema is re-sent on every trip. `measureTools` (also `ai.tools.measure` with `@warlock.js/ai-tools`) reports what the list costs per call: native and exact when the model has `countTokens` (Anthropic, Google, Bedrock, OpenAI Responses — `tools.length + 2` count calls, `perTool` = each tool's marginal cost, `overhead` = the provider's once-per-request tool preamble), estimated from the schema JSON otherwise. `source` says which.
+
+```ts
+import { ai, compactJsonSchema, extractJsonSchema, measureTools } from "@warlock.js/ai";
+import { AnthropicSDK } from "@warlock.js/ai-anthropic";
+
+const model = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" }).model({
+  name: "claude-sonnet-4-6",
+});
+const lookup = ai.tool({
+  name: "lookup_order",
+  description: "Look up an order by id",
+  execute: async () => ({ status: "shipped" }),
+});
+
+const full = await measureTools([lookup], { model });
+const compact = await measureTools([lookup], { model, mode: "compact" });
+console.log(full.source, full.tokens, "→", compact.tokens, full.perTool);
+
+// Send compact schemas on every trip (per call: execute(input, { toolSchemas })).
+const agent = ai.agent({ model, tools: [lookup], toolSchemas: "compact" });
+
+// The same transform, by hand:
+extractJsonSchema(lookup.input, { compact: true });
+compactJsonSchema({ type: "string", description: "Order id", examples: ["A-1"] }); // { type: "string" }
+```
+
+Compact mode drops `description` / `title` / `examples` / `example` / `default` / `$comment` / `deprecated` / `readOnly` / `writeOnly` / `$schema` at every level and collapses `anyOf` / `oneOf` of bare `const` branches into `enum` (`{ keepDescriptions: true }` keeps descriptions). Validation and property names are untouched; the tool's own `description` is always sent. Trade-off: no per-field guidance for the model — name fields clearly and keep must-know rules in the tool `description`. `compactToolSchemas(tools)` returns compact copies for direct `model.complete(messages, { tools })` calls.
 
 ## See also
 

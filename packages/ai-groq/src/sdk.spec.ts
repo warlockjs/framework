@@ -99,10 +99,16 @@ describe("GroqSDK capability inference (Groq model names, not OpenAI's)", () => 
 describe("GroqSDK pricing resolution", () => {
   it("falls back to the adapter's built-in default rate for a known model", () => {
     const sdk = new GroqSDK({ apiKey: "k" });
-    expect(sdk.model({ name: "llama-3.3-70b-versatile" }).pricing).toEqual({
-      input: 0.59,
-      output: 0.79,
+    expect(sdk.model({ name: "openai/gpt-oss-120b" }).pricing).toEqual({
+      input: 0.15,
+      output: 0.6,
+      cachedInput: 0.075,
     });
+  });
+
+  it("leaves models without a published price unpriced", () => {
+    const sdk = new GroqSDK({ apiKey: "k" });
+    expect(sdk.model({ name: "llama-3.3-70b-versatile" }).pricing).toBeUndefined();
   });
 
   it("resolves pricing from the SDK-level registry over the built-in default", () => {

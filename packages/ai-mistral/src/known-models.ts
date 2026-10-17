@@ -107,24 +107,29 @@ export const MISTRAL_MODELS = {
 } as const;
 
 /**
- * Conservative default USD pricing registry (per 1,000,000 tokens),
- * keyed by stable `-latest` alias, surfaced onto every model unless the
- * caller overrides it via SDK-level or per-model `pricing`.
+ * Default USD pricing registry (per 1,000,000 tokens), keyed by API id
+ * and alias, surfaced onto every model unless the caller overrides it via
+ * SDK-level or per-model `pricing`. `cachedInput` is the prompt-cache
+ * rate (10% of input).
  *
- * These are sane published-list approximations for budgeting / cost-truth
- * out of the box — Mistral revises rates and ships new generations, so
- * pass an explicit `pricing` registry to `new MistralSDK({ pricing })`
- * for billing-grade numbers. Resolution at `model()` time always lets a
- * caller-supplied rate win: per-model `pricing` > SDK `pricing` > these
- * defaults > `undefined`.
+ * Source: https://docs.mistral.ai/inference/pricing and the model pages
+ * under https://docs.mistral.ai/models (API ids and aliases), fetched
+ * 2026-10-17. Mistral Large 4 (public preview, sale price) and the
+ * retired Pixtral / Magistral models are not included. Resolution at
+ * `model()` time always lets a caller-supplied rate win: per-model
+ * `pricing` > SDK `pricing` > these defaults > `undefined`.
  */
-export const MISTRAL_DEFAULT_PRICING: Record<string, ModelPricing> = {
-  "mistral-large-latest": { input: 2, output: 6 },
-  "mistral-medium-latest": { input: 0.4, output: 2 },
-  "mistral-small-latest": { input: 0.1, output: 0.3 },
-  "pixtral-large-latest": { input: 2, output: 6 },
-  "pixtral-12b": { input: 0.15, output: 0.15 },
-  "magistral-medium-latest": { input: 2, output: 5 },
-  "magistral-small-latest": { input: 0.5, output: 1.5 },
+export const MISTRAL_DEFAULT_PRICING: Readonly<Record<string, ModelPricing>> = {
+  "mistral-large-latest": { input: 0.5, output: 1.5, cachedInput: 0.05 },
+  "mistral-large-2512": { input: 0.5, output: 1.5, cachedInput: 0.05 },
+  "mistral-medium-latest": { input: 1.5, output: 7.5, cachedInput: 0.15 },
+  "mistral-medium-3-5": { input: 1.5, output: 7.5, cachedInput: 0.15 },
+  "mistral-small-latest": { input: 0.15, output: 0.6, cachedInput: 0.015 },
+  "mistral-small-2603": { input: 0.15, output: 0.6, cachedInput: 0.015 },
+  "ministral-14b-latest": { input: 0.2, output: 0.2, cachedInput: 0.02 },
+  "ministral-14b-2512": { input: 0.2, output: 0.2, cachedInput: 0.02 },
+  "codestral-latest": { input: 0.3, output: 0.9, cachedInput: 0.03 },
+  "codestral-2508": { input: 0.3, output: 0.9, cachedInput: 0.03 },
   "mistral-embed": { input: 0.1, output: 0 },
+  "mistral-embed-2312": { input: 0.1, output: 0 },
 };

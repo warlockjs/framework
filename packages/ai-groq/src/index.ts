@@ -1,4 +1,4 @@
-export { GroqSDK } from "./sdk";
+export { GROQ_DEFAULT_PRICING, GroqSDK } from "./sdk";
 export {
   GROQ_BASE_URL,
   GROQ_PROVIDER,

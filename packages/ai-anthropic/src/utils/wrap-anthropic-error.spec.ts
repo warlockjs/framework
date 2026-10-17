@@ -4,6 +4,7 @@ import {
   InvalidRequestError,
   ProviderAuthError,
   ProviderError,
+  ProviderOverloadedError,
   ProviderRateLimitError,
   ProviderTimeoutError,
   QuotaExceededError,
@@ -146,16 +147,48 @@ describe("wrapAnthropicError", () => {
     );
   });
 
-  it("maps 500 / overloaded to plain ProviderError", () => {
+  it("maps 500 to plain ProviderError, retryable and possibly billed", () => {
     const wrapped = wrapAnthropicError(fakeAnthropicError({ status: 500, message: "server err" }));
 
     expect(wrapped).toBeInstanceOf(ProviderError);
     expect(wrapped).not.toBeInstanceOf(InvalidRequestError);
     expect(wrapped.code).toBe("PROVIDER_ERROR");
+    expect(wrapped).toMatchObject({ status: 500, retryable: true, billed: "unknown" });
+  });
 
+  it("maps 529 / overloaded_error to ProviderOverloadedError", () => {
+    const wrapped = wrapAnthropicError(
+      fakeAnthropicError({
+        status: 529,
+        type: "overloaded_error",
+        headers: { "retry-after": "3" },
+      }),
+    );
+
+    expect(wrapped).toBeInstanceOf(ProviderOverloadedError);
+    expect(wrapped).toMatchObject({
+      code: "PROVIDER_OVERLOADED",
+      status: 529,
+      retryable: true,
+      billed: "unknown",
+      retryAfter: 3_000,
+    });
+
+    // Mid-stream `error` event: the type survives, the status does not.
+    const midStream = wrapAnthropicError(fakeAnthropicError({ type: "overloaded_error" }));
+
+    expect(midStream).toBeInstanceOf(ProviderOverloadedError);
+    expect(midStream).toMatchObject({ billed: "unknown", retryable: true });
+  });
+
+  it("marks auth failures as not billed and leaves rate limits unknown", () => {
+    expect(wrapAnthropicError(fakeAnthropicError({ status: 401 }))).toMatchObject({
+      billed: false,
+      retryable: false,
+    });
     expect(
-      wrapAnthropicError(fakeAnthropicError({ status: 529, type: "overloaded_error" })),
-    ).toBeInstanceOf(ProviderError);
+      wrapAnthropicError(fakeAnthropicError({ status: 429, type: "rate_limit_error" })),
+    ).toMatchObject({ billed: "unknown", retryable: true });
   });
 
   it("maps APIConnectionTimeoutError-by-name to ProviderTimeoutError", () => {

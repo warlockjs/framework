@@ -235,6 +235,18 @@ export type ModelCapabilities = {
 export type ModelResponse = {
   content: string;
   finishReason: FinishReason;
+  /**
+   * Token usage of this call. The first-party adapters also attach
+   * `usage.cost` when the model is priced (per-model `pricing`, the SDK
+   * registry, or the adapter's built-in list prices), so a side call
+   * made outside an agent — a summary, a classifier — is measured and
+   * costed the same way an agent trip is. `usage.inputIncludesCache`
+   * says how to read `input` against the cache counters.
+   *
+   * @example
+   * const { usage } = await model.complete(messages);
+   * console.log(usage.total, totalCost(usage.cost) ?? "unpriced");
+   */
   usage: Usage;
   /** Tool calls requested by the model, present when finishReason is "tool_calls" */
   toolCalls?: ModelToolCallRequest[];

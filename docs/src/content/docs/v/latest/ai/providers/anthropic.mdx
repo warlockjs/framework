@@ -172,10 +172,10 @@ const model = anthropic.model({
 });
 ```
 
-`promptCaching` is **off by default**: a cache _write_ costs ~1.25×, so a breakpoint only pays off when the cached prefix is read at least twice (multi-trip / multi-turn agents). The split is deliberate — tool schemas are static (a per-model decision), while the system prompt often carries per-turn placeholders (a per-call decision). Reads and writes flow back as `Usage.cachedTokens` / `Usage.cacheWriteTokens`.
+`promptCaching` is **off by default**: a cache _write_ costs ~1.25×, so a breakpoint only pays off when the cached prefix is read at least twice (multi-trip / multi-turn agents). The split is deliberate — tool schemas are static (a per-model decision), while the system prompt often carries per-turn placeholders (a per-call decision). Reads and writes flow back as `Usage.cachedTokens` / `Usage.cacheWriteTokens` (1-hour writes also as `Usage.cacheWrite1hTokens`) and are billed at their own rates — see [Pricing and usage](#pricing-and-usage).
 
 :::note[Bedrock differs]
-On the [Bedrock adapter](/v/latest/ai/providers/bedrock/), `promptCaching` is a _capability override_ rather than an opt-in — auto-inferred `true` for Claude 3.5+/3.7/4 and Nova, mapping per-call `cacheControl` breakpoints to Converse `cachePoint` blocks. Set `promptCaching: false` to force it off.
+On the [Bedrock adapter](/v/latest/ai/providers/bedrock/), `promptCaching` is a _capability override_ rather than an opt-in — auto-inferred `true` for Claude 3.5+ / 4 / 5 and Nova. A per-call `cacheControl` breakpoint places Converse `cachePoint` blocks on the tools (Claude only), the system prompt and the last message. Set `promptCaching: false` to force it off.
 :::
 
 Per call, `cacheControl: { ttl: "1h" }` overrides the model's `promptCacheTtl` for the entries that call writes.
@@ -320,25 +320,66 @@ const response = await model.complete([
 
 ## Pricing and usage
 
-Every response reports token `usage` (`input`, `output`, `total`).
-Claude bills input and output separately with no pre-summed total, so
-the adapter computes `total` itself; prompt-cache reads surface as
-`cachedTokens` when present.
+Every response reports token `usage`, on `model.complete()` and the
+streaming `done` chunk as well as on agent reports. Anthropic's
+`input_tokens` is the **uncached remainder only**: cache reads and writes
+are counted on top of it. The adapter therefore marks the usage
+`inputIncludesCache: false`, and cost bills every channel exactly once.
 
-To turn tokens into money, attach a `pricing` registry — keyed by model
-name, in USD per million tokens. It can live on the SDK (one source of
-truth) or per-model (wins when both are set). With pricing set, the
-framework rolls cost up through every node of the `AgentReport`.
+| Field                | Anthropic source                           | Billed at                                  |
+| -------------------- | ------------------------------------------ | ------------------------------------------ |
+| `input`              | `input_tokens`                             | `input`                                    |
+| `cachedTokens`       | `cache_read_input_tokens`                  | `cachedInput`                              |
+| `cacheWriteTokens`   | `cache_creation_input_tokens`              | `cacheWrite` (5-minute write, 1.25× input) |
+| `cacheWrite1hTokens` | `cache_creation.ephemeral_1h_input_tokens` | `cacheWrite1h` (1-hour write, 2× input)    |
+| `reasoningTokens`    | `output_tokens_details.thinking_tokens`    | inside `output`                            |
+| `cost`               | computed when the model is priced          | sum it with `totalCost(usage.cost)`        |
+
+When Anthropic omits the per-lifetime breakdown, all writes count as
+1-hour writes only if every cache marker in the request asked for
+`ttl: "1h"`.
+
+**Built-in list prices.** Every known Claude id is priced out of the box
+from `ANTHROPIC_MODEL_PRICING` — the "Model pricing" table of
+[Anthropic's pricing page](https://platform.claude.com/docs/en/about-claude/pricing),
+fetched 2026-10-17 (standard global routing). Dated snapshot ids such as
+`claude-haiku-4-5-20251001` resolve to their alias. Resolution:
+per-model `pricing` > SDK `pricing` registry > built-in table >
+unpriced (`cost` stays `undefined`).
 
 ```ts
+import { totalCost } from "@warlock.js/ai";
+import { AnthropicSDK, anthropicPricingFor } from "@warlock.js/ai-anthropic";
+
 const anthropic = new AnthropicSDK({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-  pricing: {
-    "claude-haiku-4-5": { input: 1, output: 5, cachedInput: 0.1 },
-    "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3 },
-  },
+  apiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  // Contract rates win over the built-in table.
+  pricing: { "claude-sonnet-4-6": { input: 2.4, output: 12, cachedInput: 0.24 } },
 });
+
+const model = anthropic.model({ name: "claude-sonnet-4-6" });
+const { usage } = await model.complete([{ role: "user", content: "hi" }]);
+
+console.log(totalCost(usage.cost)); // USD for this one call
+console.log(anthropicPricingFor("claude-opus-5-5")); // { input: 4, output: 20, cachedInput: 0.2, cacheWrite: 5, cacheWrite1h: 8 }
 ```
+
+Any entry that leaves out the write rates — your own `{ input, output }`
+included — gets them from Anthropic's multipliers (1.25× input for a
+5-minute write, 2× for a 1-hour write; `withAnthropicCacheWriteRates`).
+The cache-read rate differs per model, so set `cachedInput` yourself or
+reads bill at the full input rate.
+
+Not built in, so pass `pricing` for them: Claude Haiku 5.5 (priced by
+prompt length, with higher rates above 100,000 prompt tokens), US-only
+inference (`inference_geo`), fast mode, the Batch API, and Claude on
+Bedrock or Vertex AI.
+
+An overloaded API (HTTP 529 or a mid-stream `overloaded_error`) surfaces
+as `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`,
+`retryable: true`). Every provider error carries `status`, `retryable`
+and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`: Anthropic
+publishes no rule for failed requests).
 
 Need an offline token estimate before a call? `anthropic.count(text)`
 returns a fast character-heuristic approximation — good for budgeting

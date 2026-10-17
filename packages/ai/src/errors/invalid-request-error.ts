@@ -1,6 +1,5 @@
-import type { AIErrorOptions } from "./ai-error";
 import type { ErrorCategory } from "./error-category.type";
-import { ProviderError } from "./provider-error";
+import { ProviderError, type ProviderErrorOptions } from "./provider-error";
 
 /**
  * Provider rejected the request as malformed — bad model name,
@@ -19,8 +18,9 @@ import { ProviderError } from "./provider-error";
  */
 export class InvalidRequestError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "validation";
+  public static readonly defaultRetryable: boolean | undefined = false;
 
-  public constructor(message: string, options?: AIErrorOptions) {
+  public constructor(message: string, options?: ProviderErrorOptions) {
     super(message, options, "PROVIDER_INVALID_REQUEST");
     this.name = "InvalidRequestError";
   }

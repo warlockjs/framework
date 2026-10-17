@@ -133,7 +133,19 @@ Per-call `Usage` comes from the chat response's `prompt_eval_count` (→ `input`
 
 - `cachedTokens` / `cacheWriteTokens` — **always undefined**. Ollama has no provider prompt cache, so there is no cache-hit or cache-write accounting (honest absence, not a false `0`).
 - `reasoningTokens` — **always undefined**. Reasoning models emit their thinking as the `message.thinking` _string_, but the wire format carries **no separate reasoning-token count** — those tokens are already folded into `eval_count`. The adapter does not estimate a count from the thinking text.
-- `cost` — populated only when a `ModelPricing` is configured (local Ollama is free, so usually undefined).
+- `cost` — attached to each `complete()` / streaming `done` usage only when a `ModelPricing` is configured. The adapter ships no price table (a local model costs nothing per token), so it is usually undefined; set `pricing` for chargeback or a hosted Ollama endpoint.
+- `inputIncludesCache` — left unset: with no cache counters there is nothing to include or exclude.
+
+```ts
+import { totalCost } from "@warlock.js/ai";
+import { OllamaSDK } from "@warlock.js/ai-ollama";
+
+const ollama = new OllamaSDK({ pricing: { "llama3.2": { input: 0.05, output: 0.1 } } }); // internal chargeback rate
+const { usage } = await ollama
+  .model({ name: "llama3.2" })
+  .complete([{ role: "user", content: "hi" }]);
+console.log(totalCost(usage.cost));
+```
 
 ## Provider body options
 

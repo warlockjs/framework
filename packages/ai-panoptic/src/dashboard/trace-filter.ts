@@ -388,6 +388,7 @@ function costSumObj(cost: TraceSpan["usage"]["cost"]): number {
     (cost.input ?? 0) +
     (cost.output ?? 0) +
     (cost.cachedInput ?? 0) +
+    (cost.cacheWrite ?? 0) +
     (cost.cachedOutput ?? 0) +
     (cost.reasoning ?? 0)
   );

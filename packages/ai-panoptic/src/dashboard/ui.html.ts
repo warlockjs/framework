@@ -436,7 +436,7 @@ export function dashboardHtml(
   // Sum every priced lane of a cost object into one USD number.
   function costSumObj(c) {
     if (!c) return 0;
-    return (c.input || 0) + (c.output || 0) + (c.cachedInput || 0) + (c.cachedOutput || 0) + (c.reasoning || 0);
+    return (c.input || 0) + (c.output || 0) + (c.cachedInput || 0) + (c.cacheWrite || 0) + (c.cachedOutput || 0) + (c.reasoning || 0);
   }
   // The cost a single span directly carries (on its rolled-up usage).
   function usageCost(usage) { return usage ? costSumObj(usage.cost) : 0; }
@@ -770,7 +770,7 @@ export function dashboardHtml(
   }
 
   function renderStats(a) {
-    var cost = a.cost ? (((a.cost.input || 0) + (a.cost.output || 0) + (a.cost.cachedInput || 0) + (a.cost.cachedOutput || 0)).toFixed(4)) : "—";
+    var cost = a.cost ? (((a.cost.input || 0) + (a.cost.output || 0) + (a.cost.cachedInput || 0) + (a.cost.cacheWrite || 0) + (a.cost.cachedOutput || 0) + (a.cost.reasoning || 0)).toFixed(4)) : "—";
     var u = a.usage || {};
     var cells = [
       ["traces", num(a.traces), null],

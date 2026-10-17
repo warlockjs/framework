@@ -118,6 +118,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The `upgrade-from-5-29` skill covers the 5.31 AI cost changes: per-provider cache billing, `totalCost`, the new built-in model prices and removed defaults, and `ProviderOverloadedError`.
 - `warlock dev` exits with code 1 and a clear error when it is started on Bun or Deno: the development server is Node-only. Before, it started partway and then failed in confusing ways. The error names the runtime and points to the production start commands. `warlock build` on Bun or Deno still runs, but prints a notice that only the Node build is verified.
 - A source checkout of `@warlock.js/core` run by a runtime without `module.registerHooks` now prints what is missing, instead of failing with "registerHooks is not a function".
 

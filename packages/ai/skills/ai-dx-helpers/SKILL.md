@@ -49,7 +49,7 @@ ai.fallbackModel([primary, backup], { retryOn: ["PROVIDER_RATE_LIMIT", "PROVIDER
 ai.fallbackModel([primary, backup], { retryOn: (error) => error instanceof ProviderError });
 ```
 
-Default retryable codes: `PROVIDER_RATE_LIMIT`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. Inspect `model.lastAttempts` for the failed models of the most recent call.
+Default retryable codes: `PROVIDER_RATE_LIMIT`, `PROVIDER_OVERLOADED`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. Inspect `model.lastAttempts` for the failed models of the most recent call.
 
 **Streaming caveat:** `stream()` can only fail over while no chunk has been emitted yet — once the first `delta` / `tool-call` reaches the consumer, a mid-stream failure propagates instead of restarting. It advances _instantly_ (no backoff) — pair with a backoff middleware if you want delay.
 
@@ -154,7 +154,7 @@ On top of the legacy `maxTokens` / `maxCostUSD` caps, declare a run-level SLO as
 
 ```ts
 const guard = ai.middleware.budget({
-  pricing: { "gpt-4o": { inputPer1K: 0.005, outputPer1K: 0.015 } },
+  pricing: { "gpt-4o": { input: 2.5, output: 10 } }, // ModelPricing, USD / 1M
   contract: {
     maxCostUSD: 0.05,
     maxLatencyMs: 8_000, // wall-clock from first execute.before to each trip.after
@@ -165,7 +165,7 @@ const guard = ai.middleware.budget({
 });
 ```
 
-Every clause is optional (a contract with no caps is inert). `onViolation: "abort"` throws `BudgetExceededError` at the next trip boundary; `"fallback"` does NOT abort — it records a typed `BudgetContractViolation` and fires `fallback`, letting the run continue (the middleware can't itself swap models). A latency breach has no `BudgetUnit` — its numbers surface via the error's `context.dimension`. `maxCostUSD` still needs a `pricing` entry for the running model or it degrades silently.
+Every clause is optional (a contract with no caps is inert). `onViolation: "abort"` throws `BudgetExceededError` at the next trip boundary; `"fallback"` does NOT abort — it records a typed `BudgetContractViolation` and fires `fallback`, letting the run continue (the middleware can't itself swap models). A latency breach has no `BudgetUnit` — its numbers surface via the error's `context.dimension`. `maxCostUSD` needs a price for the running model (budget `pricing` entry, or the model's own `ModelPricing`); an unpriced model fails closed before the first call unless `onUnpriced: "allow"`. Add `reserve: { outputTokens }` to refuse a trip before it is sent when its worst case would cross a cap (see the `attach-ai-middleware` topic).
 
 Read a recorded fallback signal in an outer middleware's `execute.after`:
 

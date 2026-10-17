@@ -15,7 +15,7 @@ import type {
 import type { Usage } from "../contracts/result/usage.type";
 import { AIError } from "../errors/ai-error";
 import type { AIErrorCode } from "../errors/error-code.type";
-import { accumulateCost } from "../utils/compute-cost";
+import { mergeUsage } from "../utils/compute-cost";
 
 /**
  * Error codes treated as transient — and therefore worth falling over
@@ -28,6 +28,7 @@ import { accumulateCost } from "../utils/compute-cost";
  */
 const DEFAULT_RETRYABLE_CODES: readonly AIErrorCode[] = [
   "PROVIDER_RATE_LIMIT",
+  "PROVIDER_OVERLOADED",
   "PROVIDER_TIMEOUT",
   "PROVIDER_ERROR",
 ];
@@ -110,23 +111,7 @@ function resolveShouldRetry(retryOn: FallbackModelOptions["retryOn"]): FallbackR
  * unpriced model never erases a priced sibling's cost.
  */
 function aggregateUsage(total: Usage, next: Usage): void {
-  total.input += next.input;
-  total.output += next.output;
-  total.total += next.total;
-
-  if (next.cachedTokens !== undefined) {
-    total.cachedTokens = (total.cachedTokens ?? 0) + next.cachedTokens;
-  }
-
-  if (next.reasoningTokens !== undefined) {
-    total.reasoningTokens = (total.reasoningTokens ?? 0) + next.reasoningTokens;
-  }
-
-  if (next.cacheWriteTokens !== undefined) {
-    total.cacheWriteTokens = (total.cacheWriteTokens ?? 0) + next.cacheWriteTokens;
-  }
-
-  total.cost = accumulateCost(total.cost, next.cost);
+  mergeUsage(total, next);
 }
 
 /**

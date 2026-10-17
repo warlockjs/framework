@@ -1,6 +1,6 @@
 ---
 name: use-web-and-http-tools
-description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — the `connect-mcp-server` topic; exposing tools AS an MCP server — the `expose-as-mcp-server` topic; filesystem/shell tools — the `use-a-workspace` topic of the `warlock-js-ai-workspace` skill; defining your own custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
+description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.measure`, `measureTools`, `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — the `connect-mcp-server` topic; exposing tools AS an MCP server — the `expose-as-mcp-server` topic; filesystem/shell tools — the `use-a-workspace` topic of the `warlock-js-ai-workspace` skill; defining your own custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
 ---
 
 # Use the web + HTTP tool belt
@@ -118,6 +118,26 @@ await ai.tools
 - For `diff`, pass the start instant as `iso` **or** `from` (an alias models reach for naturally with `from`/`to`); `iso` wins when both are set. The end instant is always `to`.
 - Units are millisecond-based: `milliseconds`, `seconds`, `minutes`, `hours`, `days`, `weeks` (plus singular/short aliases like `day`/`d`). Calendar-relative `month`/`year` are intentionally **unsupported** — they have no fixed length. An unknown unit → `DateTimeError` `"invalid-unit"`; an unknown IANA zone → `"invalid-time-zone"`.
 - For deterministic tests, inject a clock by calling the factory directly: `import { dateTimeTool } from "@warlock.js/ai-tools"; dateTimeTool({}, { clock: () => Date.parse("2026-06-22T00:00:00Z") })`.
+
+## `ai.tools.measure` — what the belt costs per model call
+
+`ai.tools.measure(tools, options?)` is `measureTools` from `@warlock.js/ai`: the input tokens a tool list adds to every call, per tool and in total. Native and exact when the model has `countTokens` (`source: "native"`, `tools.length + 2` count calls, `overhead` = the provider's once-per-request tool preamble); estimated from the schema JSON otherwise (`source: "estimate"`).
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai, type ModelContract } from "@warlock.js/ai";
+
+export async function reportBeltCost(model: ModelContract): Promise<void> {
+  const belt = [ai.tools.calculator(), ai.tools.dateTime()];
+
+  const full = await ai.tools.measure(belt, { model });
+  const compact = await ai.tools.measure(belt, { model, mode: "compact" });
+
+  console.log(full.source, full.tokens, "→", compact.tokens, full.perTool);
+}
+```
+
+If compact saves enough, run the agent with `toolSchemas: "compact"` (the `define-ai-tool` topic of the `warlock-js-ai` skill).
 
 ## Errors flow as data, not throws
 

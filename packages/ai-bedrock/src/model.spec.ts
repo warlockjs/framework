@@ -2,6 +2,7 @@ import {
   ConverseCommand,
   ConverseStreamCommand,
   type BedrockRuntimeClient,
+  type ConverseCommandInput,
   type ConverseResponse,
   type ConverseStreamOutput,
   type TokenUsage,
@@ -136,7 +137,7 @@ describe("BedrockModel.complete()", () => {
     expect(result).toEqual({
       content: "hello",
       finishReason: "stop",
-      usage: { input: 5, output: 3, total: 8 },
+      usage: { inputIncludesCache: false, input: 5, output: 3, total: 8 },
       toolCalls: undefined,
     });
   });
@@ -209,6 +210,7 @@ describe("BedrockModel.complete()", () => {
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
     expect((await model.complete([{ role: "user", content: "hi" }])).usage).toEqual({
+      inputIncludesCache: false,
       input: 10,
       output: 4,
       total: 14,
@@ -315,6 +317,7 @@ describe("BedrockModel.complete()", () => {
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
     expect((await model.complete([{ role: "user", content: "hi" }])).usage).toEqual({
+      inputIncludesCache: false,
       input: 7,
       output: 5,
       total: 12,
@@ -331,6 +334,7 @@ describe("BedrockModel.complete()", () => {
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
     expect((await model.complete([{ role: "user", content: "hi" }])).usage).toEqual({
+      inputIncludesCache: false,
       input: 0,
       output: 4,
       total: 4,
@@ -348,7 +352,7 @@ describe("BedrockModel.complete()", () => {
 
     const usage = (await model.complete([{ role: "user", content: "hi" }])).usage;
 
-    expect(usage).toEqual({ input: 10, output: 4, total: 14 });
+    expect(usage).toEqual({ inputIncludesCache: false, input: 10, output: 4, total: 14 });
     expect(usage).not.toHaveProperty("cachedTokens");
   });
 
@@ -497,7 +501,10 @@ describe("BedrockModel.stream()", () => {
     }
 
     expect(types).toEqual(["delta", "delta", "done"]);
-    expect(done).toEqual({ finishReason: "stop", usage: { input: 9, output: 4, total: 13 } });
+    expect(done).toEqual({
+      finishReason: "stop",
+      usage: { inputIncludesCache: false, input: 9, output: 4, total: 13 },
+    });
   });
 
   it("accumulates toolUse input and emits one tool-call at contentBlockStop", async () => {
@@ -635,7 +642,7 @@ describe("BedrockModel.stream()", () => {
     expect(done).toEqual({
       type: "done",
       finishReason: "stop",
-      usage: { input: 10, output: 4, total: 14, cachedTokens: 6 },
+      usage: { inputIncludesCache: false, input: 10, output: 4, total: 14, cachedTokens: 6 },
     });
   });
 
@@ -657,7 +664,7 @@ describe("BedrockModel.stream()", () => {
     expect(done).toEqual({
       type: "done",
       finishReason: "stop",
-      usage: { input: 1, output: 2, total: 3 },
+      usage: { inputIncludesCache: false, input: 1, output: 2, total: 3 },
     });
   });
 
@@ -672,7 +679,9 @@ describe("BedrockModel.stream()", () => {
 
     const done = (await collect(model.stream([{ role: "user", content: "hi" }]))).at(-1);
 
-    expect(done).toMatchObject({ usage: { input: 8, output: 5, total: 13 } });
+    expect(done).toMatchObject({
+      usage: { inputIncludesCache: false, input: 8, output: 5, total: 13 },
+    });
   });
 
   it("recovers a malformed accumulated tool-input JSON to an empty object", async () => {
@@ -991,6 +1000,7 @@ describe("BedrockModel cost-truth — cacheWriteTokens", () => {
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
     expect((await model.complete([{ role: "user", content: "hi" }])).usage).toEqual({
+      inputIncludesCache: false,
       input: 10,
       output: 4,
       total: 14,
@@ -1010,7 +1020,7 @@ describe("BedrockModel cost-truth — cacheWriteTokens", () => {
 
     const usage = (await model.complete([{ role: "user", content: "hi" }])).usage;
 
-    expect(usage).toEqual({ input: 5, output: 3, total: 8 });
+    expect(usage).toEqual({ inputIncludesCache: false, input: 5, output: 3, total: 8 });
     expect(usage).not.toHaveProperty("cacheWriteTokens");
   });
 
@@ -1039,7 +1049,14 @@ describe("BedrockModel cost-truth — cacheWriteTokens", () => {
     expect(done).toEqual({
       type: "done",
       finishReason: "stop",
-      usage: { input: 10, output: 4, total: 14, cachedTokens: 6, cacheWriteTokens: 32 },
+      usage: {
+        inputIncludesCache: false,
+        input: 10,
+        output: 4,
+        total: 14,
+        cachedTokens: 6,
+        cacheWriteTokens: 32,
+      },
     });
   });
 });
@@ -1257,5 +1274,145 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
     expect(firstCall(calls).additionalModelRequestFields).toEqual({
       thinking: { type: "enabled", budget_tokens: 4096 },
     });
+  });
+});
+
+/** The first recorded Converse request, typed for field access. */
+function sentRequest(calls: ReadonlyArray<Record<string, unknown>>): ConverseCommandInput {
+  return firstCall(calls) as unknown as ConverseCommandInput;
+}
+
+describe("BedrockModel cache points on system and tools", () => {
+  const weatherTool = {
+    name: "getWeather",
+    description: "weather",
+    input: {
+      "~standard": {
+        version: 1,
+        vendor: "test",
+        validate: (value: unknown) => ({ value }),
+        jsonSchema: {
+          input: () => ({ type: "object", properties: { city: { type: "string" } } }),
+        },
+      },
+    } as never,
+    execute: async (value: unknown) => value,
+  };
+  const conversation = [
+    { role: "system" as const, content: "Stable instructions." },
+    { role: "user" as const, content: "hi" },
+  ];
+
+  it("marks tools, system and the last message for Claude, in that prefix order", async () => {
+    const { client, calls } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, { name: "global.anthropic.claude-sonnet-4-6" });
+
+    await model.complete(conversation, { tools: [weatherTool], cacheControl: { breakpoints: 1 } });
+
+    const request = sentRequest(calls);
+    expect(request.toolConfig?.tools?.at(-1)).toEqual({ cachePoint: { type: "default" } });
+    expect(request.system).toEqual([
+      { text: "Stable instructions." },
+      { cachePoint: { type: "default" } },
+    ]);
+    expect(request.messages?.at(-1)?.content?.at(-1)).toEqual({ cachePoint: { type: "default" } });
+  });
+
+  it("never puts a cache point in tools for Nova, which only caches system and messages", async () => {
+    const { client, calls } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
+
+    await model.complete(conversation, { tools: [weatherTool], cacheControl: { breakpoints: 1 } });
+
+    const request = sentRequest(calls);
+    expect(request.toolConfig?.tools).toHaveLength(1);
+    expect(request.system?.at(-1)).toEqual({ cachePoint: { type: "default" } });
+  });
+
+  it("adds no cache point anywhere without a breakpoint", async () => {
+    const { client, calls } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, { name: "global.anthropic.claude-sonnet-4-6" });
+
+    await model.complete(conversation, { tools: [weatherTool] });
+
+    const request = sentRequest(calls);
+    expect(request.toolConfig?.tools).toHaveLength(1);
+    expect(request.system).toEqual([{ text: "Stable instructions." }]);
+  });
+
+  it("sends ttl 1h only to models that accept it", async () => {
+    const claude = makeFakeClient({ converse: baseConverse });
+    await new BedrockModel(claude.client, {
+      name: "anthropic.claude-haiku-4-5-20251001-v1:0",
+      promptCacheTtl: "1h",
+    }).complete(conversation, { cacheControl: { breakpoints: 1 } });
+    expect(sentRequest(claude.calls).system?.at(-1)).toEqual({
+      cachePoint: { type: "default", ttl: "1h" },
+    });
+
+    const legacy = makeFakeClient({ converse: baseConverse });
+    await new BedrockModel(legacy.client, {
+      name: "anthropic.claude-3-7-sonnet-20250219-v1:0",
+    }).complete(conversation, { cacheControl: { breakpoints: 1, ttl: "1h" } });
+    expect(sentRequest(legacy.calls).system?.at(-1)).toEqual({ cachePoint: { type: "default" } });
+  });
+});
+
+describe("BedrockModel usage cost", () => {
+  it("bills uncached input, cache reads and both write lifetimes once each", async () => {
+    const { client } = makeFakeClient({
+      converse: {
+        ...baseConverse,
+        usage: {
+          inputTokens: 100,
+          outputTokens: 500,
+          totalTokens: 600,
+          cacheReadInputTokens: 50_000,
+          cacheWriteInputTokens: 20_000,
+          cacheDetails: [
+            { ttl: "1h", inputTokens: 15_000 },
+            { ttl: "5m", inputTokens: 5_000 },
+          ],
+        },
+      },
+    });
+    const model = new BedrockModel(client, { name: "global.anthropic.claude-sonnet-4-6" });
+
+    const result = await model.complete([{ role: "user", content: "hi" }]);
+
+    expect(model.pricing).toEqual({
+      input: 3,
+      output: 15,
+      cachedInput: 0.3,
+      cacheWrite: 3.75,
+      cacheWrite1h: 6,
+    });
+    expect(result.usage).toMatchObject({
+      inputIncludesCache: false,
+      cachedTokens: 50_000,
+      cacheWriteTokens: 20_000,
+      cacheWrite1hTokens: 15_000,
+    });
+    expect(result.usage.cost?.input).toBeCloseTo((100 * 3) / 1e6, 10);
+    expect(result.usage.cost?.cachedInput).toBeCloseTo((50_000 * 0.3) / 1e6, 10);
+    expect(result.usage.cost?.cacheWrite).toBeCloseTo((5_000 * 3.75 + 15_000 * 6) / 1e6, 10);
+    expect(result.usage.cost?.output).toBeCloseTo((500 * 15) / 1e6, 10);
+  });
+
+  it("prices us. profiles at the geographic rate and leaves in-Region ids unpriced", () => {
+    const { client } = makeFakeClient({ converse: baseConverse });
+
+    expect(
+      new BedrockModel(client, { name: "us.anthropic.claude-sonnet-4-6" }).pricing?.input,
+    ).toBe(3.3);
+    expect(
+      new BedrockModel(client, { name: "anthropic.claude-sonnet-4-6" }).pricing,
+    ).toBeUndefined();
+    expect(
+      new BedrockModel(client, {
+        name: "anthropic.claude-sonnet-4-6",
+        pricing: { input: 3, output: 15 },
+      }).pricing,
+    ).toEqual({ input: 3, output: 15, cacheWrite: 3.75, cacheWrite1h: 6 });
   });
 });

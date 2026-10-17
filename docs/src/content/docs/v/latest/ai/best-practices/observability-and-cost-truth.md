@@ -125,7 +125,7 @@ Cost truth starts at the SDK. With a `ModelPricing` registry configured, the fra
 **Do this — price every model you run, and treat `undefined` as "unknown," not "free."** Pricing per 1M tokens on the SDK; per-model override wins where a tenant has contract pricing.
 
 ```ts
-import type { Usage } from "@warlock.js/ai";
+import { totalCost, type Usage } from "@warlock.js/ai";
 
 const openai = new OpenAISDK({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -135,17 +135,14 @@ const openai = new OpenAISDK({
   },
 });
 
-// Usage.cost has the ModelPricing shape — sum the populated channels for a scalar.
-function runCostUsd(usage: Usage): number {
-  const cost = usage.cost;
-
-  if (!cost) {
-    return 0; // unpriced run — record it as unknown, don't invent a number
-  }
-
-  return cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0);
+// Usage.cost has the ModelPricing shape; totalCost sums every channel
+// (input, output, cache reads, cache writes, reasoning).
+function runCostUsd(usage: Usage): number | undefined {
+  return totalCost(usage.cost); // undefined = unpriced — record it as unknown
 }
 ```
+
+Most adapters also ship **built-in list prices** for the models with one flat published rate, so a common model is priced with no `pricing` at all; your registry and per-model entries still win. Cache semantics are handled per provider — `Usage.inputIncludesCache` tells `computeCost` whether `input` already contains the cache reads and writes (OpenAI-style) or not (Anthropic, Bedrock), so every cache token is billed once at its own rate.
 
 **Avoid this — coercing a missing cost to `0` and summing it into a total.** An unpriced model (a new finetune, a legacy adapter) reporting `usage.cost === undefined` silently becomes free in your dashboard. The result is a cost report that _looks_ complete and _is_ wrong — the worst failure mode, because nobody questions a number.
 
@@ -174,31 +171,20 @@ await tenantLedger.add(tenantId, {
   outputTokens: usage.output,
   cachedTokens: usage.cachedTokens ?? 0, // billed at the cached rate
   reasoningTokens: usage.reasoningTokens ?? 0, // counted within output
-  // Usage.cost has no single scalar — sum the populated channels.
-  costUsd: usage.cost
-    ? usage.cost.input +
-      usage.cost.output +
-      (usage.cost.cachedInput ?? 0) +
-      (usage.cost.cachedOutput ?? 0)
-    : 0,
+  cacheWriteTokens: usage.cacheWriteTokens ?? 0, // billed at the cache-write rate
+  costUsd: totalCost(usage.cost), // undefined when unpriced — store it as unknown
 });
 ```
 
 Or let the in-memory store do the rollup — `aggregate(filter)` sums every matched run's root `usage` (already a tree rollup) and merges the per-channel cost:
 
 ```ts
-import { totalCostUsd } from "@warlock.js/ai-panoptic";
+import { totalCost } from "@warlock.js/ai";
 
 // Every run for one tenant, in one call — Panoptic kept them via the store.
 const stats = store.aggregate({ sessionId: `tenant_${tenantId}:refund-flow` });
 
-const tenantUsd =
-  stats.cost === undefined
-    ? 0
-    : stats.cost.input +
-      stats.cost.output +
-      (stats.cost.cachedInput ?? 0) +
-      (stats.cost.cachedOutput ?? 0);
+const tenantUsd = totalCost(stats.cost) ?? 0;
 
 console.log(
   `${tenantId}: ${stats.traces} runs, ` +

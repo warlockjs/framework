@@ -10,14 +10,14 @@ sidebar:
 >
 > `ai.middleware.budget` enforces exactly that. The classic `maxTokens` / `maxCostUSD` caps abort the run the instant a cap is breached. The declarative `contract` adds a wall-clock latency dimension and one `onViolation` reaction: `"abort"` hard-stops, or `"fallback"` records a typed signal and lets the run continue so an outer layer can degrade to a cheaper model.
 
-## Mind the two pricing shapes
+## Mind the pricing shapes
 
-`budget()` has its **own** pricing table, distinct from the SDK-level `ModelPricing`:
+`budget({ pricing })` takes a table keyed by model name, and each entry is one of two shapes:
 
-- **`ModelPricing`** (on the SDK / `model({ pricing })`) is **USD per 1,000,000 tokens** and drives `Usage.cost` on reports.
-- **`BudgetPricing`** (on `budget({ pricing })`) is **USD per 1,000 tokens**, shape `{ inputPer1K, outputPer1K }`, and is consulted only to enforce the cost cap.
+- **`ModelPricing`** — **USD per 1,000,000 tokens**, the same shape the SDK uses for `Usage.cost`, cache rates included (`cachedInput`, `cacheWrite`, `cacheWrite1h`). Cache reads and writes are billed exactly as on the report.
+- **The legacy `{ inputPer1K, outputPer1K }`** — **USD per 1,000 tokens**, input and output only; cache rates are ignored.
 
-They are separate on purpose — the budget's cost math runs trip-by-trip during the run, before any report is built. A matching `BudgetPricing` entry wins when both are present; otherwise the middleware uses the model's resolved `ModelPricing` (from `model({ pricing })` or SDK-level pricing). Keys in the budget table must match the running model's name exactly.
+A matching budget entry wins; otherwise the middleware uses the model's resolved `ModelPricing` (per-model `pricing`, the SDK registry, or the adapter's built-in list price). Keys in the budget table must match the running model's name exactly. Prefer the `ModelPricing` shape — or no budget table at all — so the cap and the report agree.
 
 For a dollar-capped budget, pricing is fail-closed by default: if neither source resolves a price, `execute()` returns a `BudgetExceededError` before the first model call. Its message names the model and points to `onUnpriced: "allow"`; set that option only when you intentionally want to run without enforceable USD accounting.
 
@@ -39,8 +39,8 @@ const hardCap = ai.middleware.budget({
   maxTokens: 50_000,
   maxCostUSD: 0.5,
   pricing: {
-    // USD per 1K tokens — note the per-1K shape, not per-1M.
-    "gpt-4o": { inputPer1K: 0.0025, outputPer1K: 0.01 },
+    // ModelPricing: USD per 1M tokens, cache-read rate included.
+    "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 },
   },
   onExceeded: "abort", // default; "warn" logs once and lets the run continue
 });
@@ -62,6 +62,60 @@ if (result.error instanceof BudgetExceededError) {
 
 `onExceeded: "warn"` is the rollout-first mode: it logs a single warning the first time a cap is breached and lets the run finish, so you can measure real traffic against a proposed cap before flipping to `"abort"`.
 
+## Reserve before the call — no single trip overruns the cap
+
+The caps above book usage **after** each trip, so the one trip that crosses the line still runs — and a large one can overshoot by a lot. `reserve` switches to reserve-then-commit:
+
+1. **Before** each model call, the middleware reserves the trip's worst case: its input tokens plus `outputTokens`, priced as uncached input. If that would cross `maxTokens`, `maxCostUSD`, an `"abort"` contract cap, or the `scoped` ledger, the call is **never sent** and the run fails with `BudgetExceededError` whose `context.reason` is `"reservation"` (for the `scoped` ledger, a `ScopedBudgetExceededError` carrying the key, window and would-be `used`).
+2. **After** the call, the reservation is replaced by the actual usage.
+3. When the call **fails**, the reservation is released.
+
+```ts
+import { BudgetExceededError, countInputTokens } from "@warlock.js/ai";
+
+const model = openai.model({ name: "gpt-4o", maxTokens: 4_096 });
+
+const guarded = ai.agent({
+  model,
+  middleware: [
+    ai.middleware.budget({
+      maxCostUSD: 0.25,
+      reserve: {
+        outputTokens: 4_096, // the most one trip can generate — match the model's maxTokens
+        // Optional: the default is an offline estimate of the trip's messages.
+        inputTokens: async (ctx) => (await countInputTokens(model, [...ctx.messages])).tokens,
+      },
+    }),
+  ],
+});
+
+const result = await guarded.execute("Summarize the attached filing.");
+
+if (result.error instanceof BudgetExceededError && result.error.context?.reason === "reservation") {
+  // Refused before spending anything: spent + reserved would exceed the cap.
+  console.warn(result.error.context);
+}
+```
+
+Set `outputTokens` to the `maxTokens` the model is called with — that is the true worst case. The default input count is `estimateInputTokens(ctx.messages)`, an offline character-based **estimate** that does not see the tool schemas; pass `inputTokens` for a native count or extra headroom when the cap is tight.
+
+### Counting input tokens
+
+```ts
+import { countInputTokens, estimateInputTokens } from "@warlock.js/ai";
+
+// Offline estimate: ~4 characters per token, plus allowances per message
+// and per attachment. Clearly an estimate — tune charsPerToken down for
+// code / JSON / non-Latin text so it errs high.
+const rough = estimateInputTokens(messages, { tools, charsPerToken: 3 });
+
+// Native count where the model has one (Anthropic, Google, Bedrock, OpenAI
+// Responses), the estimate otherwise — `source` says which.
+const { tokens, source } = await countInputTokens(model, messages, { tools });
+```
+
+`countInputTokens` returns `{ tokens, source: "native" | "estimate" }`, so a cap can treat an estimate more conservatively than a real count.
+
 ## SLO contract — cost, latency, and tokens as one objective
 
 The `contract` clause expresses a full service-level objective and enforces it on top of (and independently of) the legacy caps. Latency is wall-clock milliseconds measured from run start to each trip boundary — the dimension the legacy caps can't express.
@@ -71,10 +125,8 @@ const sloAgent = ai.agent({
   model: openai.model({ name: "gpt-4o" }),
   middleware: [
     ai.middleware.budget({
-      // Cost still needs a pricing entry for the running model.
-      pricing: {
-        "gpt-4o": { inputPer1K: 0.0025, outputPer1K: 0.01 },
-      },
+      // Cost needs a price for the running model — here gpt-4o's built-in
+      // list price applies, so no `pricing` table is needed.
       contract: {
         maxCostUSD: 0.05,
         maxLatencyMs: 8_000,
@@ -113,7 +165,7 @@ const cheap = openai.model({ name: "gpt-4o-mini" });
 const sloGuard = ai.middleware.budget({
   name: "slo",
   pricing: {
-    "gpt-4o": { inputPer1K: 0.0025, outputPer1K: 0.01 },
+    "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 },
   },
   contract: {
     maxCostUSD: 0.05,
@@ -199,7 +251,21 @@ if (result.error instanceof ScopedBudgetExceededError) {
 }
 ```
 
-Since no model exposes a portable pre-flight cost estimate, the middleware reserves each trip's **measured** usage atomically after the response — this keeps the ledger from exceeding its limit, but can't prevent the one trip that caused the rejection from having run.
+Without `reserve`, the middleware books each trip's **measured** usage atomically after the response — this keeps the ledger from exceeding its limit, but can't prevent the one trip that caused the rejection from having run. With `reserve: { outputTokens }`, each trip's worst case is reserved in the ledger atomically **before** the call and settled to the actual usage afterwards (released if the call fails), so concurrent runs sharing a key cannot jointly start more work than the cap allows:
+
+```ts
+const sharedCap = ai.middleware.budget({
+  scoped: {
+    key: "tenant:acme",
+    window: "day",
+    maxTokens: 1_000_000,
+    store: memoryScopedBudgetStore(),
+  },
+  reserve: { outputTokens: 4_096 },
+});
+```
+
+A trip whose actual usage still exceeds its reservation (an estimate that ran low) is booked in full, and the cap is reported as breached after the fact.
 
 ### Stores
 
@@ -216,7 +282,7 @@ const store = await cascadeScopedBudgetStore({ table: "ai_budget_ledgers" });
 
 const monthlyTenantCap = ai.middleware.budget({
   scoped: { key: (ctx) => `tenant:${tenantOf(ctx)}`, window: "month", maxCostUSD: 500, store },
-  pricing: { "gpt-4o": { inputPer1K: 0.0025, outputPer1K: 0.01 } },
+  pricing: { "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 } },
 });
 ```
 

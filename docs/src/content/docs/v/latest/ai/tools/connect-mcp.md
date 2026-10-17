@@ -89,11 +89,26 @@ ai.mcp(server, {
   namePrefix: "github.", // prepended to every remote tool name
   filter: (name) => name.startsWith("issues_"), // only adapt tools whose name passes
   timeoutMs: 30_000, // per tools/call deadline (default 30s)
+  signal: controller.signal, // optional: close the client when this aborts
 });
 ```
 
 - **`namePrefix`** is the collision mitigation — there is **no runtime tool-name collision guard** (the agent resolves a tool by first name match), so the author owns uniqueness. Prefix remote tools to keep them distinct from local ones.
 - **`filter`** receives each tool's _unprefixed_ name; return `false` to drop it.
+- **`signal`** binds the client's lifetime to a run. When it aborts, the client closes its transport (kills the stdio child / ends the HTTP session), in-flight requests reject, and later `tools()` or tool calls fail with `McpTransportError` type `"closed"` without sending anything. Every `tools/call` honors it together with the per-call `ctx.signal` the agent passes — whichever aborts first. `close()` remains available and is idempotent.
+
+```ts
+const controller = new AbortController();
+const github = ai.mcp(
+  { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] },
+  { namePrefix: "github.", signal: controller.signal },
+);
+
+const dev = ai.agent({ model, tools: [...(await github.tools())] });
+const result = await dev.execute("Triage the open issues", { signal: controller.signal });
+
+controller.abort(); // ends the run AND shuts the MCP server down
+```
 
 ### What `tools()` does
 

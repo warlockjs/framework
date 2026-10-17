@@ -27,7 +27,7 @@ import { PlannerFailedError } from "../errors/planner-failed-error";
 import { PlannerPlanInvalidError } from "../errors/planner-plan-invalid-error";
 import { SchemaValidationError } from "../errors/schema-validation-error";
 import { notifyObservers } from "../observe/resolve-observers";
-import { accumulateCost } from "../utils/compute-cost";
+import { mergeUsage } from "../utils/compute-cost";
 import { generateRunId } from "../utils/generate-run-id";
 import { captureChildReport, withoutRunFrame } from "../utils/run-context";
 import { stampReportLineage } from "../utils/stamp-report-lineage";
@@ -1003,27 +1003,7 @@ export class PlannerRun<TOutput> {
    * priced siblings.
    */
   private mergeUsage(target: Usage, child: Usage): void {
-    target.input += child.input;
-    target.output += child.output;
-    target.total += child.total;
-
-    if (child.cachedTokens !== undefined) {
-      target.cachedTokens = (target.cachedTokens ?? 0) + child.cachedTokens;
-    }
-
-    if (child.reasoningTokens !== undefined) {
-      target.reasoningTokens = (target.reasoningTokens ?? 0) + child.reasoningTokens;
-    }
-
-    if (child.cacheWriteTokens !== undefined) {
-      target.cacheWriteTokens = (target.cacheWriteTokens ?? 0) + child.cacheWriteTokens;
-    }
-
-    const mergedCost = accumulateCost(target.cost, child.cost);
-
-    if (mergedCost !== undefined) {
-      target.cost = mergedCost;
-    }
+    mergeUsage(target, child);
   }
 
   /**

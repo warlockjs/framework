@@ -14,6 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Chat calls inherit `providerOptions.openai.body` from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native `countTokens` remains absent; `sdk.count(text)` is an offline estimate.
 
+### Added
+
+- `MistralModelConfig.promptCacheKey` is sent as `prompt_cache_key`.
+
+### Fixed
+
+- `MISTRAL_DEFAULT_PRICING` matches Mistral's current price list (2026-10-17), with cache-read rates and API ids beside the `-latest` aliases. Retired Pixtral and Magistral entries are removed.
+
+### Upgrading
+
+- **BREAKING** `pixtral-*` and `magistral-*` models no longer have built-in prices, so a USD budget on them rejects the run as unpriced. Pass `pricing` for them.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed

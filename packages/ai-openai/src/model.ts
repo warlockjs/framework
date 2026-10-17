@@ -251,7 +251,7 @@ export class OpenAIModel implements ModelContract {
     }
 
     let rawFinishReason: string = "stop";
-    const usage: Usage = { input: 0, output: 0, total: 0 };
+    let usage: Usage = { input: 0, output: 0, total: 0 };
     const want = resolveStreamChunks(options);
     const toolCallAccum = new Map<
       number,
@@ -306,17 +306,7 @@ export class OpenAIModel implements ModelContract {
         }
 
         if (chunk.usage) {
-          usage.input = chunk.usage.prompt_tokens ?? 0;
-          usage.output = chunk.usage.completion_tokens ?? 0;
-          usage.total = chunk.usage.total_tokens ?? 0;
-          const cached = chunk.usage.prompt_tokens_details?.cached_tokens;
-          if (cached !== undefined && cached > 0) {
-            usage.cachedTokens = cached;
-          }
-          const reasoning = chunk.usage.completion_tokens_details?.reasoning_tokens;
-          if (reasoning !== undefined && reasoning > 0) {
-            usage.reasoningTokens = reasoning;
-          }
+          usage = this.extractUsage(chunk.usage);
         }
       }
 
@@ -429,20 +419,26 @@ export class OpenAIModel implements ModelContract {
    * (the hidden reasoning channel on o-series / gpt-5 models, already
    * counted within `output`). Both are emitted only when the provider
    * reports a positive value, so non-reasoning / uncached calls keep the
-   * lean `{ input, output, total }` shape.
+   * lean `{ input, output, total }` shape. `cacheWriteTokens` mirrors
+   * `prompt_tokens_details.cache_write_tokens` (billed writes on the
+   * models that charge for them). `cost` is attached when priced.
    */
   private extractUsage(raw: OpenAI.Completions.CompletionUsage | undefined): Usage {
     if (!raw) {
       return { input: 0, output: 0, total: 0 };
     }
 
-    return buildUsage({
-      input: raw.prompt_tokens,
-      output: raw.completion_tokens,
-      total: raw.total_tokens,
-      cachedTokens: raw.prompt_tokens_details?.cached_tokens,
-      reasoningTokens: raw.completion_tokens_details?.reasoning_tokens,
-    });
+    return buildUsage(
+      {
+        input: raw.prompt_tokens ?? 0,
+        output: raw.completion_tokens ?? 0,
+        total: raw.total_tokens ?? 0,
+        cachedTokens: raw.prompt_tokens_details?.cached_tokens,
+        cacheWriteTokens: raw.prompt_tokens_details?.cache_write_tokens,
+        reasoningTokens: raw.completion_tokens_details?.reasoning_tokens,
+      },
+      this.pricing,
+    );
   }
 
   /**

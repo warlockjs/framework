@@ -1,5 +1,6 @@
 import {
   AIError,
+  computeCost,
   InvalidRequestError,
   resolveStreamChunks,
   safeJsonParse,
@@ -29,6 +30,7 @@ import type {
   AnthropicStreamingRequest,
   AnthropicNonStreamingRequest,
 } from "./request.type";
+import { anthropicPricingFor, withAnthropicCacheWriteRates } from "./known-pricing";
 import { inferMaxOutputTokens } from "./known-output-limits";
 import { inferVisionCapability } from "./known-vision-models";
 import {
@@ -38,6 +40,7 @@ import {
   type AnthropicThinkingMode,
   noReasoningForm,
 } from "./thinking-mode";
+import { applyAnthropicCacheUsage, requestCacheTtl } from "./utils/cache-usage";
 import {
   mapStopReason,
   toAnthropicMessages,
@@ -229,7 +232,10 @@ export class AnthropicModel implements ModelContract {
     this.config = config;
     this.name = config.name;
     this.provider = provider;
-    this.pricing = config.pricing;
+    // Explicit pricing (per-model, or the SDK registry) wins over the
+    // built-in Claude list prices; either way the Anthropic cache-write
+    // multipliers fill any write rate the entry leaves out.
+    this.pricing = withAnthropicCacheWriteRates(config.pricing ?? anthropicPricingFor(config.name));
     // Adaptive vs budget thinking — also decides whether `temperature` is
     // accepted. Explicit config wins over name inference, like `vision`.
     this.thinkingMode = config.thinkingMode ?? inferThinkingMode(config.name);
@@ -381,7 +387,7 @@ export class AnthropicModel implements ModelContract {
     }
 
     const finishReason = mapStopReason(response.stop_reason);
-    const usage = this.extractUsage(response.usage);
+    const usage = this.extractUsage(response.usage, requestCacheTtl(request.body));
     const toolCalls = this.extractToolCalls(response.content);
     const blocks = toProviderBlocks(response.content);
 
@@ -479,7 +485,8 @@ export class AnthropicModel implements ModelContract {
 
     let rawStopReason: string | null = null;
     let compaction = compactionIterationUsage(undefined);
-    const usage: Usage = { input: 0, output: 0, total: 0 };
+    const usage: Usage = { input: 0, output: 0, total: 0, inputIncludesCache: false };
+    const cacheTtl = requestCacheTtl(request.body);
     const want = resolveStreamChunks(options);
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
     const thinkingBlocks = new Map<number, AnthropicThinkingBlock>();
@@ -500,17 +507,7 @@ export class AnthropicModel implements ModelContract {
             usage.reasoningTokens = thinkingTokens;
           }
 
-          const cacheRead = event.message.usage.cache_read_input_tokens;
-
-          if (cacheRead !== null && cacheRead !== undefined && cacheRead > 0) {
-            usage.cachedTokens = cacheRead;
-          }
-
-          const cacheWrite = event.message.usage.cache_creation_input_tokens;
-
-          if (cacheWrite !== null && cacheWrite !== undefined && cacheWrite > 0) {
-            usage.cacheWriteTokens = cacheWrite;
-          }
+          applyAnthropicCacheUsage(usage, event.message.usage, cacheTtl);
 
           if (want.usage) {
             yield { type: "usage", usage: { ...usage, total: usage.input + usage.output } };
@@ -614,17 +611,20 @@ export class AnthropicModel implements ModelContract {
           // `message_delta.usage` carries the cumulative cache counts —
           // prefer them over the `message_start` snapshot when present
           // and non-zero so the terminal `done` reflects the final tally.
-          const cacheRead = event.usage.cache_read_input_tokens;
-
-          if (cacheRead !== null && cacheRead !== undefined && cacheRead > 0) {
-            usage.cachedTokens = cacheRead;
-          }
-
-          const cacheWrite = event.usage.cache_creation_input_tokens;
-
-          if (cacheWrite !== null && cacheWrite !== undefined && cacheWrite > 0) {
-            usage.cacheWriteTokens = cacheWrite;
-          }
+          // It has no per-lifetime breakdown, so a 1-hour share already
+          // read from `message_start` is kept.
+          applyAnthropicCacheUsage(
+            usage,
+            {
+              cache_read_input_tokens: event.usage.cache_read_input_tokens,
+              cache_creation_input_tokens: event.usage.cache_creation_input_tokens,
+              cache_creation:
+                usage.cacheWrite1hTokens !== undefined
+                  ? { ephemeral_1h_input_tokens: usage.cacheWrite1hTokens }
+                  : undefined,
+            },
+            cacheTtl,
+          );
 
           // `message_delta.usage` counts are cumulative (Anthropic streaming
           // docs), so this is the running total so far.
@@ -641,6 +641,12 @@ export class AnthropicModel implements ModelContract {
     usage.output += compaction.output;
     addCacheCounts(usage, compaction);
     usage.total = usage.input + usage.output;
+
+    const cost = computeCost(usage, this.pricing);
+
+    if (cost) {
+      usage.cost = cost;
+    }
 
     const finishReason = mapStopReason(rawStopReason);
     const blocks = toProviderBlocks(this.finishStreamedBlocks(streamedBlocks));
@@ -1260,32 +1266,42 @@ export class AnthropicModel implements ModelContract {
   /**
    * Normalize Anthropic's `usage` block into the neutral `Usage` shape.
    * Anthropic reports `input_tokens` / `output_tokens` separately with
-   * no pre-summed total, so `total` is computed. Cache-read tokens are
-   * surfaced as `cachedTokens` and cache-write tokens as
-   * `cacheWriteTokens`, each only when non-zero. Anthropic also reports
+   * no pre-summed total, so `total` is computed. `input_tokens` is the
+   * uncached remainder only — cache reads (`cachedTokens`) and writes
+   * (`cacheWriteTokens`, with the 1-hour share in `cacheWrite1hTokens`)
+   * come on top of it — so the usage is marked
+   * `inputIncludesCache: false`. Anthropic also reports
    * `output_tokens_details.thinking_tokens` as the reasoning subset of
    * its inclusive `output_tokens`; it is surfaced as `reasoningTokens`
    * when present, without changing the billing total. Server-side
    * compaction iterations are added in (see {@link compactionIterationUsage}).
+   * `cost` is attached when the model is priced.
    */
-  private extractUsage(raw: Anthropic.Usage): Usage {
+  private extractUsage(raw: Anthropic.Usage, cacheTtl: ReturnType<typeof requestCacheTtl>): Usage {
     const compaction = compactionIterationUsage(raw);
     const input = (raw.input_tokens ?? 0) + compaction.input;
     const output = (raw.output_tokens ?? 0) + compaction.output;
-    const cacheRead = (raw.cache_read_input_tokens ?? 0) + compaction.cacheRead;
-    const cacheWrite = (raw.cache_creation_input_tokens ?? 0) + compaction.cacheWrite;
     const thinkingTokens = raw.output_tokens_details?.thinking_tokens;
-
-    return {
+    const usage: Usage = {
       input,
       output,
       total: input + output,
-      ...(cacheRead > 0 ? { cachedTokens: cacheRead } : {}),
-      ...(cacheWrite > 0 ? { cacheWriteTokens: cacheWrite } : {}),
+      inputIncludesCache: false,
       ...(thinkingTokens !== null && thinkingTokens !== undefined
         ? { reasoningTokens: thinkingTokens }
         : {}),
     };
+
+    applyAnthropicCacheUsage(usage, raw, cacheTtl);
+    addCacheCounts(usage, compaction);
+
+    const cost = computeCost(usage, this.pricing);
+
+    if (cost) {
+      usage.cost = cost;
+    }
+
+    return usage;
   }
 
   /**

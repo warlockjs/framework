@@ -81,27 +81,73 @@ strict: true`); pass `responseFormat: "json_object"` or `"text"` on the
 - **Vision** — auto-detected for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`,
   `o1*`, `o3*`, `chatgpt-4o*`. Override with the `vision` flag.
 - **Streaming** — token deltas, tool-call fragments, terminal `done`.
-- **Per-model pricing** — pass a `pricing` map (USD per million tokens)
-  for a cost breakdown in the agent's usage report.
+- **Pricing** — built-in list prices for flat-priced OpenAI models, or a
+  `pricing` map (USD per million tokens) for a cost breakdown on every
+  `usage`.
 
 ## Pricing and usage
 
-Every response reports token `usage` (`input`, `output`, `total`). OpenAI prompt-cache hits surface as `cachedTokens`, and reasoning-model thinking tokens as `reasoningTokens` (counted within `output`) when present.
+Every response reports token `usage` (`input`, `output`, `total`), on
+`model.complete()` and the streaming `done` chunk as well as on agent
+reports. OpenAI's `prompt_tokens` already contains the cached tokens, so
+the usage is marked `inputIncludesCache: true`: prompt-cache hits surface
+as `cachedTokens`, billed cache writes (on the models that charge for
+them) as `cacheWriteTokens`, and both are billed out of `input` exactly
+once. Reasoning-model thinking tokens appear as `reasoningTokens`
+(counted within `output`). When the model is priced, `usage.cost` holds
+the per-channel USD breakdown; sum it with `totalCost(usage.cost)` from
+`@warlock.js/ai`.
 
-Attach a `pricing` registry — keyed by model name, in USD per million tokens — to turn tokens into money. It can live on the SDK (one source of truth) or per-model (wins when both are set); with pricing set, cost rolls up through every node of the `AgentReport`. When neither is set, `Usage.cost` stays `undefined`.
+**Built-in list prices.** With the default `"openai"` provider label,
+flat-priced models are priced out of the box from `OPENAI_MODEL_PRICING`
+— taken from [OpenAI's pricing page](https://developers.openai.com/api/docs/pricing)
+(Standard tier), fetched 2026-10-17: `gpt-5.4-mini`, `gpt-5.4-nano`,
+`gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, the `gpt-4.1`
+family, `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`, `o3-mini` and `o1`. The
+lookup is by exact id (`openAIPricingFor(name)`).
+
+Left unpriced on purpose — pass `pricing` for them: models priced by
+prompt length (a higher rate above 272K input tokens: the gpt-6,
+gpt-5.6, gpt-5.5 and gpt-5.4 families and the `-pro` models), dated
+snapshot ids, promotional / Batch / Flex / Priority pricing, the
+data-residency uplift, and any SDK with a custom `provider` label.
+
+Resolution: per-model `pricing` > SDK `pricing` registry > built-in
+table > unpriced (`Usage.cost` stays `undefined`).
 
 ```ts
+import { totalCost } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
 const openai = new OpenAISDK({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: process.env.OPENAI_API_KEY ?? "",
   pricing: {
-    "gpt-4o-mini": { input: 0.15, output: 0.6, cachedInput: 0.075 },
-    "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 },
+    // Tiered models have no built-in rate; contract rates win over the table.
+    "gpt-5.5": { input: 5, output: 30, cachedInput: 0.5 },
   },
 });
 
-// Or per model, overriding the SDK entry:
+// Or per model, overriding the SDK entry and the built-in table:
 const model = openai.model({ name: "gpt-4o", pricing: { input: 2.5, output: 10 } });
+
+const { usage } = await model.complete([{ role: "user", content: "hi" }]);
+console.log(usage.cachedTokens, totalCost(usage.cost));
 ```
+
+An overloaded API (HTTP 503 / `server_is_overloaded`) surfaces as
+`ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`,
+`retryable: true`). Every provider error carries `status`, `retryable`
+and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`).
+
+### Prompt-cache hints
+
+`openai.model({ name, promptCacheKey, promptCacheRetention })` sends
+`prompt_cache_key` and `prompt_cache_retention`, and
+`cacheControl.breakpoints` adds explicit `prompt_cache_breakpoint`
+markers. Wrapper SDKs reuse this transport: xAI and Mistral receive
+`prompt_cache_key` (both document it), but never the OpenAI-only
+retention or breakpoint fields; Groq and DeepSeek cache automatically
+and receive no hint; a custom `provider` label receives none of them.
 
 Need an offline token estimate before a call? `openai.count(text)` returns a fast character-heuristic approximation — good for budgeting and quota guards, not for billing.
 

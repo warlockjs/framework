@@ -189,25 +189,87 @@ bedrock.embedder({ name: "amazon.titan-embed-text-v2:0", dimensions: 256 });
 > `image/gif`, `image/webp`). Passing a `{ url }` image raises a typed
 > `InvalidRequestError` upfront rather than a downstream Bedrock fault.
 
-## Pricing and usage
+## Prompt caching
 
-Every response reports token `usage` (`input`, `output`, `total`).
-Bedrock supplies a pre-summed `total`; prompt-cache reads surface as
-`cachedTokens` when present.
+For a caching-capable model (Claude 3.5+ / 4 / 5 and the Nova family),
+a per-call `cacheControl: { breakpoints: 1 }` places Converse
+`cachePoint` blocks on each stable part of the prefix, in the order
+Bedrock processes them: after the **tools** (Claude only — Nova accepts
+cache points in `system` and `messages` only), after the **system
+prompt**, and on the **last message**.
 
-Attach a `pricing` registry — keyed by Bedrock model id, in USD per
-million tokens — to turn tokens into money. SDK-level or per-model
-(per-model wins). With pricing set, cost rolls up through every node of
-the `AgentReport`.
+`ttl: "1h"` — from the per-call `cacheControl.ttl` or the model's
+`promptCacheTtl` — is sent only to models that accept it: Claude Haiku
+4.5, Claude Sonnet / Opus 4.5 and later, and every Claude 5 family. Other
+models keep the 5-minute default, since AWS rejects the field there.
+Placement and TTL rules follow
+[Bedrock's prompt-caching guide](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html).
 
 ```ts
+import { BedrockSDK } from "@warlock.js/ai-bedrock";
+
+const bedrock = new BedrockSDK({ region: "us-east-1" });
+const model = bedrock.model({
+  name: "global.anthropic.claude-sonnet-4-6",
+  promptCacheTtl: "1h", // default lifetime for this model's cache points
+});
+
+await model.complete(
+  [
+    { role: "system", content: "Long, stable instructions…" },
+    { role: "user", content: "First question" },
+  ],
+  { cacheControl: { breakpoints: 1 } },
+);
+```
+
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`), on
+`model.complete()` and the streaming `done` chunk as well as on agent
+reports. With caching, Bedrock's `inputTokens` covers only the
+**non-cached** input — cache reads (`cachedTokens`) and writes
+(`cacheWriteTokens`, with the 1-hour share from `cacheDetails` in
+`cacheWrite1hTokens`) come on top of it — so the usage is marked
+`inputIncludesCache: false` and cost bills each channel exactly once.
+
+**Built-in Claude prices.** Claude models invoked through a `global.`
+or `us.` inference profile are priced out of the box from
+`BEDROCK_GLOBAL_PRICING` / `BEDROCK_US_PRICING` (lookup:
+`bedrockPricingFor(id)`), taken from
+[Amazon Bedrock pricing](https://aws.amazon.com/bedrock/pricing/) (US
+East, N. Virginia), fetched 2026-10-17: input, output, cache read,
+5-minute write (1.25× input) and 1-hour write (2× input). In-Region ids
+with no profile prefix, other geographies (`eu.`, `apac.`, …), Claude
+Haiku 5.5 and non-Claude models are not built in — their rates vary by
+Region or were not verified — so pass `pricing` for them. Any Claude
+entry you supply without write rates gets the 1.25× / 2× rates filled in.
+
+Resolution: per-model `pricing` > SDK `pricing` registry (exact id) >
+built-in profile price > unpriced (`Usage.cost` stays `undefined`).
+
+```ts
+import { totalCost } from "@warlock.js/ai";
+import { BedrockSDK } from "@warlock.js/ai-bedrock";
+
 const bedrock = new BedrockSDK({
   region: "us-east-1",
   pricing: {
-    "anthropic.claude-sonnet-4-5-20250929-v1:0": { input: 3, output: 15 },
+    "anthropic.claude-sonnet-4-5-20250929-v1:0": { input: 3, output: 15, cachedInput: 0.3 },
+    "amazon.nova-pro-v1:0": { input: 0.8, output: 3.2 }, // your own rates for unlisted models
   },
 });
+
+const { usage } = await bedrock
+  .model({ name: "global.anthropic.claude-sonnet-4-6" }) // built-in global rate
+  .complete([{ role: "user", content: "hi" }]);
+console.log(usage.inputIncludesCache, totalCost(usage.cost));
 ```
+
+A `ServiceUnavailableException` surfaces as `ProviderOverloadedError`
+(`code: "PROVIDER_OVERLOADED"`, `retryable: true`). Every provider error
+carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403,
+otherwise `"unknown"`).
 
 Need an offline token estimate? `bedrock.count(text)` returns a fast
 character-heuristic approximation — Bedrock has no offline tokenizer and

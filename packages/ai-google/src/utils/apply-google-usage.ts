@@ -19,8 +19,13 @@ export type GoogleUsageMetadata = NonNullable<GenerateContentResponse["usageMeta
  *
  * `total` falls back to `input + output` when Google omits
  * `totalTokenCount`.
+ *
+ * `promptTokenCount` "includes the number of tokens in the cached
+ * content" (https://ai.google.dev/api/generate-content#UsageMetadata), so
+ * the usage is marked `inputIncludesCache: true`.
  */
 export function applyGoogleUsage(usage: Usage, raw: GoogleUsageMetadata): void {
+  usage.inputIncludesCache = true;
   usage.input = raw.promptTokenCount ?? usage.input;
   usage.output = raw.candidatesTokenCount ?? usage.output;
   usage.total = raw.totalTokenCount ?? usage.input + usage.output;

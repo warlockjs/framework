@@ -4,6 +4,7 @@ import {
   InvalidRequestError,
   ProviderAuthError,
   ProviderError,
+  ProviderOverloadedError,
   ProviderRateLimitError,
   ProviderTimeoutError,
   QuotaExceededError,
@@ -80,6 +81,16 @@ export function wrapAnthropicError(thrown: unknown): AIError {
 
   if (shape.type === "rate_limit_error" || shape.status === 429) {
     return new ProviderRateLimitError(message, {
+      cause: thrown,
+      context,
+      retryAfter: parseRetryAfter(shape.headers),
+    });
+  }
+
+  // HTTP 529 / `overloaded_error` — also delivered as a mid-stream SSE
+  // `error` event, where no status exists.
+  if (shape.type === "overloaded_error" || shape.status === 529) {
+    return new ProviderOverloadedError(message, {
       cause: thrown,
       context,
       retryAfter: parseRetryAfter(shape.headers),

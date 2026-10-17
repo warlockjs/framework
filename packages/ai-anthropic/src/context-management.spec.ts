@@ -204,6 +204,8 @@ describe("usage with server-side compaction", () => {
       output: 4_000,
       total: 207_000,
       cachedTokens: 500,
+      inputIncludesCache: false,
+      cost: expect.any(Object),
     });
   });
 
@@ -232,7 +234,13 @@ describe("usage with server-side compaction", () => {
       chunks.push(chunk);
     }
 
-    expect(chunks.at(-1)?.usage).toEqual({ input: 203_000, output: 4_000, total: 207_000 });
+    expect(chunks.at(-1)?.usage).toEqual({
+      input: 203_000,
+      output: 4_000,
+      total: 207_000,
+      inputIncludesCache: false,
+      cost: expect.any(Object),
+    });
   });
 });
 

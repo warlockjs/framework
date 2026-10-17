@@ -1,6 +1,5 @@
-import type { AIErrorOptions } from "./ai-error";
 import type { ErrorCategory } from "./error-category.type";
-import { ProviderError } from "./provider-error";
+import { ProviderError, type ProviderErrorOptions } from "./provider-error";
 
 /**
  * Payload for `ContextLengthExceededError`. All fields are optional —
@@ -8,7 +7,7 @@ import { ProviderError } from "./provider-error";
  * model's limit. When present, they let callers compute a trim
  * target; when absent, the error still categorizes the failure.
  */
-export type ContextLengthExceededErrorOptions = AIErrorOptions & {
+export type ContextLengthExceededErrorOptions = ProviderErrorOptions & {
   limit?: number;
   actual?: number;
   modelName?: string;
@@ -28,6 +27,7 @@ export type ContextLengthExceededErrorOptions = AIErrorOptions & {
  */
 export class ContextLengthExceededError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "context-length";
+  public static readonly defaultRetryable: boolean | undefined = false;
 
   public readonly limit?: number;
   public readonly actual?: number;

@@ -16,6 +16,7 @@ import type {
 import { GoogleEmbedder } from "./embedder";
 import { GeminiImageModel } from "./gemini-image";
 import { GoogleImageModel } from "./image";
+import { googlePricingFor } from "./known-pricing";
 import { GoogleModel } from "./model";
 
 /**
@@ -95,11 +96,13 @@ export class GoogleSDK implements SDKAdapterContract {
    * `GoogleGenAI` client. The SDK's `provider` label is forwarded.
    *
    * Pricing resolution: per-model `config.pricing` wins; otherwise the
-   * SDK-level registry entry keyed by `config.name`; otherwise
-   * `undefined` (no cost computed).
+   * SDK-level registry entry keyed by `config.name`; otherwise the
+   * built-in list price (`GOOGLE_MODEL_PRICING`); otherwise `undefined`
+   * (no cost computed).
    */
   public model(config: GoogleModelConfig): ModelContract {
-    const resolvedPricing = config.pricing ?? this.pricing?.[config.name];
+    const resolvedPricing =
+      config.pricing ?? this.pricing?.[config.name] ?? googlePricingFor(config.name);
     const resolvedConfig: GoogleModelConfig =
       resolvedPricing === config.pricing ? config : { ...config, pricing: resolvedPricing };
 

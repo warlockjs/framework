@@ -1,6 +1,6 @@
 ---
 name: handle-ai-errors
-description: 'Typed AIError hierarchy with stable code strings + coarse category for retry-policy dispatch. execute() never throws — errors surface via result.error (the sole exception: OrchestratorConfigError throws at construction). Triggers: `AIError`, `ProviderRateLimitError`, `ProviderAuthError`, `ContextLengthExceededError`, `ContentFilterError`, `SchemaValidationError`, `ToolExecutionError`, `WorkflowDriftError`, `SupervisorDriftError`, `SupervisorFailedError`, `SupervisorRoutingError`, `OrchestratorFailedError`, `OrchestratorDriftError`, `OrchestratorConfigError`, `OrchestratorCancelledError`, `PlannerFailedError`, `PlannerPlanInvalidError`, `PlannerCancelledError`, `BudgetExceededError`, `GuardrailViolationError`, `error.code`, `error.category`; ''handle ai error'', ''retry on rate limit'', ''branch on error code'', ''ORCHESTRATOR_DRIFT'', ''PLANNER_PLAN_INVALID'', ''build fallback ladder''; typical import `import { AIError } from "@warlock.js/ai"`. Skip: log surfacing — the `log-ai-calls` topic; native `try / catch` on raw `openai`.'
+description: 'Typed AIError hierarchy with stable code strings + coarse category for retry-policy dispatch. execute() never throws — errors surface via result.error (the sole exception: OrchestratorConfigError throws at construction). Triggers: `ProviderOverloadedError`, `PROVIDER_OVERLOADED`, `error.billed`, `error.retryable`, `error.status`, `AIError`, `ProviderRateLimitError`, `ProviderAuthError`, `ContextLengthExceededError`, `ContentFilterError`, `SchemaValidationError`, `ToolExecutionError`, `WorkflowDriftError`, `SupervisorDriftError`, `SupervisorFailedError`, `SupervisorRoutingError`, `OrchestratorFailedError`, `OrchestratorDriftError`, `OrchestratorConfigError`, `OrchestratorCancelledError`, `PlannerFailedError`, `PlannerPlanInvalidError`, `PlannerCancelledError`, `BudgetExceededError`, `GuardrailViolationError`, `error.code`, `error.category`; ''handle ai error'', ''retry on rate limit'', ''branch on error code'', ''ORCHESTRATOR_DRIFT'', ''PLANNER_PLAN_INVALID'', ''build fallback ladder''; typical import `import { AIError } from "@warlock.js/ai"`. Skip: log surfacing — the `log-ai-calls` topic; native `try / catch` on raw `openai`.'
 ---
 
 # Typed errors — `AIError` hierarchy
@@ -152,6 +152,7 @@ AIError  (base — code, category, message, cause?, context?)
 │   └── PlannerCancelledError      PLANNER_CANCELLED       { cancelledAt, reason } (cancelled) — mid-plan abort
 ├── ProviderError                PROVIDER_ERROR  (base + catch-all)
 │   ├── ProviderRateLimitError   PROVIDER_RATE_LIMIT        { retryAfter? } — transient
+│   ├── ProviderOverloadedError  PROVIDER_OVERLOADED        { retryAfter? } — provider busy (529 / 503), retryable
 │   ├── QuotaExceededError       PROVIDER_QUOTA_EXCEEDED    — NOT retryable (billing cap)
 │   ├── ProviderTimeoutError     PROVIDER_TIMEOUT
 │   ├── ContextLengthExceededError CONTEXT_LENGTH_EXCEEDED  { limit?, actual?, modelName? }
@@ -176,13 +177,41 @@ AIError  (base — code, category, message, cause?, context?)
 
 Typed fields (`retryAfter`, `toolName`, `issues`, `stepName`, …) are first-class consumer surface.
 
+Every `ProviderError` (and subclass) also carries:
+
+- `status?: number` — HTTP status of the failed response (`undefined` for transport / mid-stream failures).
+- `billed: true | false | "unknown"` — did the failed call cost money? Fails closed: `false` only for 401 / 402 / 403 and for Gemini 400 / 500 (documented free by Google); everything else is `"unknown"` — treat as possibly billed.
+- `retryable: boolean` — `true` for rate limit / overload / timeout / 5xx / 408 / 409 / 429; `false` for auth / quota / invalid request / context length / content filter.
+
+`ProviderOverloadedError` maps Anthropic 529 `overloaded_error` (also mid-stream), OpenAI 503 `server_is_overloaded` (and the 503 of the OpenAI-compatible wrappers), Gemini 503 `UNAVAILABLE`, and Bedrock `ServiceUnavailableException`. `ai.fallbackModel` fails over on it by default.
+
+```ts
+import { ProviderError, ProviderOverloadedError } from "@warlock.js/ai";
+
+async function settle(error: unknown, retry: () => Promise<void>): Promise<void> {
+  if (!(error instanceof ProviderError)) return;
+
+  if (error.billed !== false) {
+    console.warn(`call may have been billed (status ${error.status ?? "none"})`);
+  }
+
+  if (error instanceof ProviderOverloadedError) {
+    await new Promise((resolve) => setTimeout(resolve, error.retryAfter ?? 2_000));
+    return retry();
+  }
+
+  if (error.retryable) return retry();
+}
+```
+
 ## Retry strategy
 
 | Error family                                                                                                   | Retryable?                                                                              |
 | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | `ProviderRateLimitError`                                                                                       | Yes — back off by `retryAfter` ms                                                       |
+| `ProviderOverloadedError`                                                                                      | Yes — back off (`retryAfter` when sent) or fail over                                    |
 | `ProviderTimeoutError`                                                                                         | Yes — short delay                                                                       |
-| `ProviderError` (generic)                                                                                      | Maybe — depends on cause                                                                |
+| `ProviderError` (generic)                                                                                      | Read `error.retryable` (true for 5xx / 408 / 409)                                       |
 | `QuotaExceededError`                                                                                           | **No** — needs human intervention                                                       |
 | `ProviderAuthError`                                                                                            | **No** — fix config / rotate key                                                        |
 | `ContextLengthExceededError`                                                                                   | Only after truncating input                                                             |

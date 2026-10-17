@@ -1,6 +1,6 @@
 ---
 name: setup-openai
-description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, `ai.providerTool`, hosted `web_search`, `streamChunks`, `reasoning_content`, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
+description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `cacheWriteTokens`, `inputIncludesCache`, `OPENAI_MODEL_PRICING`, `openAIPricingFor`, `ProviderOverloadedError`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, `ai.providerTool`, hosted `web_search`, `streamChunks`, `reasoning_content`, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
 ---
 
 # `@warlock.js/ai-openai`
@@ -40,14 +40,14 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 ## Capabilities — what's auto-set
 
-| Flag               | Default                                                                                                                                                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `structuredOutput` | `true`, unless `responseFormat` is set to `"json_object"` or `"text"` (loose modes) — then `false`.                                                                                         |
-| `vision`           | Inferred from model name. `true` for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`, `o1*`, `o3*`, `chatgpt-4o*`; `false` otherwise.                                                                 |
-| `reasoning`        | Inferred from model name. `true` for the o-series (`o1*`, `o3*`, `o4*`) and the `gpt-5*` family; `false` otherwise. Drives whether `reasoning_effort` is forwarded.                         |
-| `promptCaching`    | `true` for the direct OpenAI provider. It supports automatic cache hits plus explicit content-part write breakpoints; OpenAI-compatible wrapper providers leave the OpenAI-only fields off. |
-| `pdf`              | `false` by default (opt-in `.model({ pdf: true })`). OpenAI accepts PDF `file` parts only on specific models (the `gpt-4o` family) — honest off until you set it.                           |
-| `audio`            | `false` by default (opt-in `.model({ audio: true })`). Only the `gpt-4o-audio-preview` family accepts `input_audio`.                                                                        |
+| Flag               | Default                                                                                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `structuredOutput` | `true`, unless `responseFormat` is set to `"json_object"` or `"text"` (loose modes) — then `false`.                                                                                                                   |
+| `vision`           | Inferred from model name. `true` for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`, `o1*`, `o3*`, `chatgpt-4o*`; `false` otherwise.                                                                                           |
+| `reasoning`        | Inferred from model name. `true` for the o-series (`o1*`, `o3*`, `o4*`) and the `gpt-5*` family; `false` otherwise. Drives whether `reasoning_effort` is forwarded.                                                   |
+| `promptCaching`    | `true` for the direct OpenAI provider. It supports automatic cache hits plus explicit content-part write breakpoints; wrappers send only `prompt_cache_key`, and only where the endpoint documents it (xAI, Mistral). |
+| `pdf`              | `false` by default (opt-in `.model({ pdf: true })`). OpenAI accepts PDF `file` parts only on specific models (the `gpt-4o` family) — honest off until you set it.                                                     |
+| `audio`            | `false` by default (opt-in `.model({ audio: true })`). Only the `gpt-4o-audio-preview` family accepts `input_audio`.                                                                                                  |
 
 **Override `vision`, `structuredOutput`, `reasoning`, `pdf`, or `audio` explicitly** via `.model({ name, vision?, structuredOutput?, reasoning?, pdf?, audio? })` — an explicit value always wins over inference.
 
@@ -197,12 +197,15 @@ await model.complete(messages, { tools, reasoning: { effort: "high" } }); // rea
 | `Usage` field                | OpenAI source                                          | Notes                                                                                                  |
 | ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `input` / `output` / `total` | `prompt_tokens` / `completion_tokens` / `total_tokens` | always present (zeroed if OpenAI omits the block).                                                     |
+| `inputIncludesCache`         | — (always `true`)                                      | `prompt_tokens` already contains the cached and cache-written tokens; cost bills them out of it once.  |
 | `cachedTokens`               | `prompt_tokens_details.cached_tokens`                  | subset of `input` served from OpenAI's automatic prompt cache. Emitted only when > 0.                  |
+| `cacheWriteTokens`           | `prompt_tokens_details.cache_write_tokens`             | subset of `input` written to the cache, on the models that charge for writes. Emitted only when > 0.   |
 | `reasoningTokens`            | `completion_tokens_details.reasoning_tokens`           | hidden reasoning channel on o-series / gpt-5 (already counted within `output`). Emitted only when > 0. |
+| `cost`                       | computed                                               | per-channel USD when the model is priced (see [Pricing](#pricing--built-in-list-prices-and-registry)). |
 
-Both `cachedTokens` and `reasoningTokens` are omitted (not set to `0`) when the provider reports zero, so non-reasoning / uncached calls keep the lean `{ input, output, total }` shape. Reported identically on `complete()` and the streaming `done` event.
+The detail counters are omitted (not set to `0`) when the provider reports zero, so non-reasoning / uncached calls keep the lean `{ input, output, total, inputIncludesCache }` shape. Reported identically on `complete()`, the streaming `done` event and the Responses API (`input_tokens_details.cached_tokens` / `cache_write_tokens`). The OpenAI-compatible wrappers (DeepSeek, xAI, Groq, Mistral) report the same fields and the same inclusive semantics.
 
-### Explicit prompt caching (direct OpenAI only)
+### Explicit prompt caching
 
 Chat Completions exposes OpenAI-specific cache controls on current SDK types. Configure a stable cache bucket and (when needed) its maximum retention policy per model:
 
@@ -216,7 +219,17 @@ const model = openai.model({
 
 `promptCacheKey` improves matching for related requests. `promptCacheRetention` is OpenAI's maximum policy (`"in_memory" | "24h"`). `cacheControl.breakpoints` maps to `prompt_cache_breakpoint: { mode: "explicit" }` on the final user content parts (up to OpenAI's four-request limit); use it when you need to pin a reusable prefix rather than rely only on OpenAI's implicit breakpoint.
 
-These fields are sent only when the SDK provider label is exactly `"openai"`. `DeepSeekSDK`, `GroqSDK`, `XaiSDK`, and `MistralSDK` label their wrapped endpoint differently, so their requests omit every OpenAI-only cache field even though they reuse this transport. Read-side `usage.cachedTokens` accounting remains available whenever the upstream reports it.
+Which fields reach the wire depends on the SDK provider label:
+
+| Provider label         | `prompt_cache_key` | `prompt_cache_retention` / explicit breakpoints | Why                                                                                                                                                                 |
+| ---------------------- | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"openai"`             | sent               | sent                                            | https://developers.openai.com/api/docs/guides/prompt-caching                                                                                                        |
+| `"xai"`                | sent               | —                                               | xAI Chat Completions accepts `prompt_cache_key` (routed as `x-grok-conv-id`) — https://docs.x.ai/developers/advanced-api-usage/prompt-caching/maximizing-cache-hits |
+| `"mistral"`            | sent               | —                                               | https://docs.mistral.ai/studio/conversations/advanced/prompt-caching                                                                                                |
+| `"groq"`, `"deepseek"` | —                  | —                                               | both cache automatically and document no request hint                                                                                                               |
+| any custom label       | —                  | —                                               | an unknown endpoint may reject the fields                                                                                                                           |
+
+(Checked 2026-10-17.) `XaiSDK` and `MistralSDK` keep their default labels unless you pass `provider`, so `xai.model({ name, promptCacheKey })` works out of the box. Read-side `usage.cachedTokens` accounting remains available whenever the upstream reports it.
 
 ## Token counting
 
@@ -226,29 +239,54 @@ await openai.count("some text"); // approximate (heuristic, not tiktoken)
 
 Good enough for budgeting; not for billing.
 
-## Pricing — per-model registry
+## Pricing — built-in list prices and registry
 
-`pricing` is a **registry keyed by model name** — one entry per model, all rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput` / `cachedOutput`).
+All rates are **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput`, `cacheWrite`, `cacheWrite1h`, `reasoning`). Resolution at `model()` time: per-model `pricing` (`openai.model({ name, pricing })`) > SDK `pricing` registry > built-in `OPENAI_MODEL_PRICING` (only when the SDK provider label is `"openai"`, exact model id) > `undefined` (no cost computed).
 
 ```ts
+import { ai, totalCost } from "@warlock.js/ai";
+import { OPENAI_MODEL_PRICING, OpenAISDK, openAIPricingFor } from "@warlock.js/ai-openai";
+
 const openai = new OpenAISDK({
-  apiKey,
+  apiKey: process.env.OPENAI_API_KEY ?? "",
   pricing: {
-    // USD per 1M tokens.
-    "gpt-4o-mini": { input: 0.15, output: 0.6, cachedInput: 0.075 },
-    "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 },
+    // Prompt-length-tiered models have no built-in rate — price them yourself.
+    "gpt-5.5": { input: 5, output: 30, cachedInput: 0.5 },
   },
 });
 
+openai.model({ name: "gpt-4o-mini" }).pricing; // built-in: { input: 0.15, output: 0.6, cachedInput: 0.075 }
+openAIPricingFor("gpt-4o-2024-05-13"); // undefined — dated snapshots can carry other prices
+Object.keys(OPENAI_MODEL_PRICING); // the priced ids
+
 const { usage } = await ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) }).execute("hi");
-usage.cost; // { input, output, cachedInput?, cachedOutput? } — per-channel USD breakdown of THIS run
+console.log(usage.cost, totalCost(usage.cost)); // per-channel USD breakdown of THIS run, and its sum
+
+// A direct call is costed too — no agent needed.
+const side = await openai
+  .model({ name: "gpt-4.1-mini" })
+  .complete([{ role: "user", content: "Classify: …" }]);
+console.log(totalCost(side.usage.cost));
 ```
 
-The registry is per-model; `usage.cost` is the per-channel breakdown the framework computes from `tokens × pricing[model]`. Resolution at `model()` time: per-model `pricing` (`openai.model({ name, pricing })`) > SDK registry > `undefined` (no cost computed). See the `pick-ai-provider` topic of the `warlock-js-ai` skill.
+- **Source.** `OPENAI_MODEL_PRICING` comes from https://developers.openai.com/api/docs/pricing (the target of platform.openai.com/docs/pricing), Standard tier, fetched 2026-10-17. It covers the flat-priced models: `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1` (+ `-mini` / `-nano`), `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`, `o3-mini`, `o1`. None of them charges for cache writes.
+- **Deliberately unpriced:** models priced by prompt length (a higher rate above 272K input tokens — the gpt-6, gpt-5.6, gpt-5.5 and gpt-5.4 families and the `-pro` models), dated snapshot ids, promotional / Batch / Flex / Priority pricing, and the regional data-residency uplift. Wrapper SDKs (`provider` other than `"openai"`) never fall back to this table.
 
 ## Errors
 
-Raw OpenAI SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy via the adapter's error wrapper. Dispatch keys on `APIError.status + code` combined — see the `handle-ai-errors` topic of the `warlock-js-ai` skill.
+Raw OpenAI SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy via the adapter's error wrapper. Dispatch keys on `APIError.status + code` combined — see the `handle-ai-errors` topic of the `warlock-js-ai` skill. HTTP 503 and code `server_is_overloaded` (https://developers.openai.com/api/docs/guides/error-codes) map to `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`, `retryAfter` from `retry-after`); the compatible wrappers use 503 for the same condition (DeepSeek documents it as "Server Overloaded"). Every wrapped error carries `status`, `retryable` and `billed` — `false` for 401 / 402 / 403, otherwise `"unknown"`, because OpenAI publishes no rule for failed requests.
+
+```ts
+import { ai, ProviderOverloadedError } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY ?? "" });
+const result = await ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) }).execute("hi");
+
+if (result.error instanceof ProviderOverloadedError) {
+  console.log(result.error.status, result.error.retryAfter); // back off, or fall back to another model
+}
+```
 
 ## Provider body options and input-token counts
 

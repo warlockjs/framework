@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `computeCost` bills Anthropic and Bedrock prompt caching correctly. Their `input` excludes cache reads and writes, so cache reads are no longer subtracted from it (which could floor fresh input at 0), and cache writes are now charged: at `ModelPricing.cacheWrite`, with the 1-hour share at `cacheWrite1h`. OpenAI-style usage, where `input` includes cached tokens, is billed as before.
+
+- Batch, planner and fallback-model usage rollups use the shared `mergeUsage`, so they keep every usage channel and the cache semantics flag.
 - The streaming agent loop reads the finish reason and usage only from the `done` chunk and ignores chunk types it does not know, instead of treating any other chunk as `done`. `fallbackModel().stream()` still falls over after a model emitted only a `usage` chunk.
 
 - Automatic compaction preserves the original execution input during output repair and durable resume, records its updated snapshot index, and frames a first-turn summary as user context. Legacy snapshots with missing or ambiguous input skip compaction safely.
@@ -25,6 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
+- **BREAKING** `AIErrorCode` gained `PROVIDER_OVERLOADED`, and provider overloads (Anthropic 529, OpenAI and compatible 503, Gemini 503, Bedrock `ServiceUnavailableException`) now throw `ProviderOverloadedError` instead of a plain `ProviderError` with `PROVIDER_ERROR`. It still extends `ProviderError`; code that matches on `PROVIDER_ERROR` for these cases, or switches exhaustively over `AIErrorCode`, needs the new case. Custom `fallbackModel({ retryOn: [...] })` lists should add it.
+
+- Cost totals now include cache writes, in the new `cost.cacheWrite` channel. Replace hand-written sums such as `cost.input + cost.output + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0)` with `totalCost(cost)`. Anthropic and Bedrock runs report higher, correct, costs. Set `cacheWrite` instead of the deprecated `cachedOutput` rate.
 - Tests that script `toolCalls` on a `MockModel` response without a `finishReason` and expect `"stop"` now get `"tool_calls"`; set `finishReason: "stop"` explicitly to keep the old ending. Tests that pass an already-aborted `signal` to a mock model now see the call reject.
 - Hosts that treated an empty or partial `result.text` with no `result.error` as a finished run must handle `AgentIncompleteError` / `report.status === "incomplete"` instead (and can drop their own `trips.at(-1).finishReason === "length"` checks). Exhaustive switches over `ReportStatus` or `ErrorCategory` need the new `"incomplete"` member. To recover automatically from the output cap, set `continueOnOutputLimit`; otherwise raise `maxTokens` or split the task.
 - `agent.stream()` now emits `agent.trip.reasoning`, `agent.tool.streaming` and `agent.trip.usage` in addition to the existing events, and `MockModel` produces them under `agent.stream()` (one `agent.tool.streaming` per scripted tool call, one `agent.trip.usage` per trip). A test that asserts the exact list of streamed event types should filter for the types it checks, or set `modelOptions: { streamChunks: false }` to keep the previous list. Code that calls `model.stream()` directly sees no change unless it passes `streamChunks`.
@@ -36,6 +42,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `Usage.inputIncludesCache` says whether `input` contains the cache counters (set by each first-party adapter; absent reads as `true`), and `Usage.cacheWrite1hTokens` counts 1-hour cache writes. Usage merged across providers with different semantics is normalised to `true`.
+
+- `ModelPricing.cacheWrite` and `cacheWrite1h` (USD per 1M tokens written to the cache, default and 1-hour lifetime). Cost breakdowns carry cache-write spend in `cost.cacheWrite`; `computeCost` also bills `reasoningTokens` at `ModelPricing.reasoning` when that rate is set.
+
+- `totalCost(cost)` sums every channel of a cost breakdown; `attachCost(usage, pricing)` attaches it to a usage. First-party adapters now attach `usage.cost` to `model.complete()` and the streaming `done` chunk when the model is priced, so side calls outside an agent are costed.
+
+- `ProviderError.status` (HTTP status), `.billed` (`true | false | "unknown"`, failing closed to `"unknown"` unless the call never reached a billable account or the provider documents the status as free) and `.retryable`. `ProviderErrorOptions` and `ProviderBilled` are exported.
+
+- `ProviderOverloadedError` with code `PROVIDER_OVERLOADED` (always retryable) for provider overloads; `fallbackModel` fails over on it by default.
+
+- `estimateInputTokens(messages, options)` — an offline estimate of a call's input tokens (text, tool calls, tool schemas, response schema) — and `countInputTokens(model, messages, options)`, which uses the model's native `countTokens` when it has one and reports `source: "native" | "estimate"`.
+
+- `budget({ reserve: { outputTokens, inputTokens? } })`: reserve each trip's worst case before the call, commit the actual usage after it, release the reservation when the call fails. Applies to the run caps and, atomically through the store, to `scoped` ledgers, so concurrent runs cannot jointly overspend. `BudgetPricing` entries may now be a `ModelPricing` (cache rates included) besides `{ inputPer1K, outputPer1K }`.
+
+- `measureTools(tools, { model, mode })` reports the input tokens a tool list adds per call, per tool and in total, counted natively when the model can and estimated otherwise. Registered as `ai.tools.measure` by `@warlock.js/ai-tools`.
+
+- Compact tool schemas: `compactJsonSchema()`, `extractJsonSchema(schema, { compact })`, `withCompactJsonSchema()`, `compactToolSchemas()` and the `toolSchemas: "full" | "compact"` option on `ai.agent()` and `execute()`. Compact schemas drop annotations (descriptions, titles, examples, defaults) and collapse const unions to `enum`; validation is unchanged.
+
+- `createToolContext({ artifacts?, signal? })` builds the `ToolContext` for invoking a tool outside the agent loop.
 - `verifyModelSignalContract({ createModel })` checks that a model adapter honours `ModelCallOptions.signal`: a call with an already-aborted signal rejects, and aborting mid-call rejects promptly and cancels the HTTP request, for `complete()` and `stream()`. It serves an ephemeral local port that never answers (`protocol: "http2"` for HTTP/2 clients), has no test-runner dependency, and throws an `Error` naming the failed check. Honouring `signal` is now part of the documented `ModelContract`, and every first-party adapter runs this check.
 - `continueOnOutputLimit: n` on `AgentConfig` and `AgentExecuteOptions`: up to `n` times per run, a response cut off by the output cap is continued with a continue turn and the segments are joined in `result.text` (and the structured output parsed from it), also on the stream and during repair. A tool call cut off mid-input is dropped and the model is told it did not run. Each continuation is a trip within `maxTrips`; a full context window is never continued.
 - `agent.execute(input, { modelOptions })` and `agent.stream(input, { modelOptions })` set model call options (reasoning effort, `maxTokens`, `cacheControl`, `providerOptions`, …) for that run only, shallow-merged over `AgentConfig.modelOptions`; the agent is not changed. `tools`, `signal` and `responseSchema` in the per-call object are ignored.

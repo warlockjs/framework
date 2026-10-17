@@ -1,4 +1,5 @@
 export { OpenAISDK } from "./sdk";
+export { OPENAI_MODEL_PRICING, openAIPricingFor } from "./known-pricing";
 export { OpenAIEmbedder } from "./embedder";
 export { OpenAIImageModel } from "./image";
 export { OpenAISpeechModel } from "./speech";

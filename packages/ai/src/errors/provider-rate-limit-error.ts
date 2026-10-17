@@ -1,12 +1,11 @@
-import type { AIErrorOptions } from "./ai-error";
 import type { ErrorCategory } from "./error-category.type";
-import { ProviderError } from "./provider-error";
+import { ProviderError, type ProviderErrorOptions } from "./provider-error";
 
 /**
  * Payload for `ProviderRateLimitError`. `retryAfter` is the server's
  * hint (typically parsed from the `Retry-After` header) in milliseconds.
  */
-export type ProviderRateLimitErrorOptions = AIErrorOptions & {
+export type ProviderRateLimitErrorOptions = ProviderErrorOptions & {
   retryAfter?: number;
 };
 
@@ -26,6 +25,7 @@ export type ProviderRateLimitErrorOptions = AIErrorOptions & {
  */
 export class ProviderRateLimitError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "rate-limit";
+  public static readonly defaultRetryable: boolean | undefined = true;
 
   public readonly retryAfter?: number;
 

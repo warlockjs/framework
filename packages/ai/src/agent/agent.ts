@@ -52,6 +52,7 @@ import type { SkillsContract } from "../skills/contracts/skills.contract";
 import { normalizeAgentTools } from "../tool/executable-as-tool";
 import { isProviderTool } from "../tool/provider-tool";
 import type { ToolContract, ToolInvokeResult } from "../tool/tool";
+import { compactToolSchemas } from "../tool/tool-schemas";
 import {
   captureChildReport,
   computeCost,
@@ -607,6 +608,8 @@ class Execution<TOutput> {
    * no skills library is attached this is just `config.tools`.
    */
   private readonly effectiveTools: ToolContract<unknown, unknown>[];
+  /** Lazily built compact-schema copies of `effectiveTools` — see `toolsForModel`. */
+  private compactTools?: ToolContract<unknown, unknown>[];
 
   private error?: AIError;
   /**
@@ -1257,6 +1260,27 @@ class Execution<TOutput> {
   }
 
   /**
+   * The function-tool list as sent to the model (provider tools travel
+   * separately as `providerTools`), with their
+   * schemas compacted when `toolSchemas` (per call, else agent config) is
+   * `"compact"`. Compacted copies are built once and reused; dispatch
+   * and validation always use the originals.
+   */
+  private toolsForModel(
+    functionTools: ToolContract<unknown, unknown>[],
+  ): ToolContract<unknown, unknown>[] {
+    const mode = this.options?.toolSchemas ?? this.config.toolSchemas ?? "full";
+
+    if (mode !== "compact") {
+      return functionTools;
+    }
+
+    this.compactTools ??= compactToolSchemas(functionTools);
+
+    return this.compactTools;
+  }
+
+  /**
    * Exact call options shared by preflight compaction and generation.
    * `ai.providerTool()` entries travel as `providerTools` (sent verbatim
    * by the adapter they name), never as function tools; they stay in
@@ -1270,7 +1294,7 @@ class Execution<TOutput> {
     return {
       ...this.config.modelOptions,
       ...runOptions,
-      tools: functionTools,
+      tools: this.toolsForModel(functionTools),
       ...(providerTools.length > 0
         ? {
             providerTools: [

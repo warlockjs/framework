@@ -104,6 +104,16 @@ export type BedrockModelConfig = ModelConfig & {
    */
   promptCaching?: boolean;
   /**
+   * Default lifetime of the cache points this model writes when a call
+   * asks for `cacheControl` breakpoints. `"1h"` is sent only to models
+   * that accept it (Claude Haiku 4.5, Sonnet / Opus 4.5+, Claude 5);
+   * others keep the 5-minute default. A per-call `cacheControl.ttl` wins.
+   *
+   * @example
+   * bedrock.model({ name: "global.anthropic.claude-sonnet-4-6", promptCacheTtl: "1h" });
+   */
+  promptCacheTtl?: "5m" | "1h";
+  /**
    * Override the auto-inferred PDF / document-input capability. When
    * omitted, the adapter infers `true` for Claude 3+ / Nova families
    * that accept Converse `document` content blocks. When false the

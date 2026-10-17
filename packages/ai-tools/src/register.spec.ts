@@ -1,4 +1,4 @@
-import { ai } from "@warlock.js/ai";
+import { ai, measureTools } from "@warlock.js/ai";
 import { describe, expect, it } from "vitest";
 // Importing the package barrel runs `./register` for its side effect,
 // attaching `ai.tools.*` + `ai.mcp` onto the shared `ai` object.
@@ -18,6 +18,7 @@ describe("register", () => {
     expect(typeof ai.tools.http).toBe("function");
     expect(typeof ai.tools.calculator).toBe("function");
     expect(typeof ai.tools.dateTime).toBe("function");
+    expect(ai.tools.measure).toBe(measureTools);
   });
 
   it("attaches ai.mcp as a callable factory carrying .serve", () => {

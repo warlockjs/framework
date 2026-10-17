@@ -544,14 +544,17 @@ export class OpenAIResponsesModel implements ModelContract {
       return { input: 0, output: 0, total: 0 };
     }
 
-    return buildUsage({
-      input: raw.input_tokens,
-      output: raw.output_tokens,
-      total: raw.total_tokens,
-      cachedTokens: raw.input_tokens_details?.cached_tokens,
-      cacheWriteTokens: raw.input_tokens_details?.cache_write_tokens,
-      reasoningTokens: raw.output_tokens_details?.reasoning_tokens,
-    });
+    return buildUsage(
+      {
+        input: raw.input_tokens,
+        output: raw.output_tokens,
+        total: raw.total_tokens,
+        cachedTokens: raw.input_tokens_details?.cached_tokens,
+        cacheWriteTokens: raw.input_tokens_details?.cache_write_tokens,
+        reasoningTokens: raw.output_tokens_details?.reasoning_tokens,
+      },
+      this.pricing,
+    );
   }
 
   /** Wrap (idempotently), log and return a failure for the caller to throw. */

@@ -1,6 +1,5 @@
-import type { AIErrorOptions } from "./ai-error";
 import type { ErrorCategory } from "./error-category.type";
-import { ProviderError } from "./provider-error";
+import { ProviderError, type ProviderErrorOptions } from "./provider-error";
 
 /**
  * Provider refused the call because the account has exhausted its
@@ -28,8 +27,9 @@ import { ProviderError } from "./provider-error";
  */
 export class QuotaExceededError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "quota";
+  public static readonly defaultRetryable: boolean | undefined = false;
 
-  public constructor(message: string, options?: AIErrorOptions) {
+  public constructor(message: string, options?: ProviderErrorOptions) {
     super(message, options, "PROVIDER_QUOTA_EXCEEDED");
     this.name = "QuotaExceededError";
   }

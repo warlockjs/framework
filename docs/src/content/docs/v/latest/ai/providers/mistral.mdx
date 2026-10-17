@@ -123,36 +123,57 @@ error rather than a runtime failure.
 
 ## Pricing and usage
 
-The adapter ships a conservative default registry
-(`MISTRAL_DEFAULT_PRICING`, USD per 1,000,000 tokens) so cost truth works out
-of the box. Pass your own `pricing` — keyed by model id — to win per model:
+The adapter ships a default registry (`MISTRAL_DEFAULT_PRICING`, USD per
+1,000,000 tokens, with the prompt-cache rate as `cachedInput`) so cost
+truth works out of the box. The rates come from
+[Mistral's pricing](https://docs.mistral.ai/inference/pricing) and the
+model pages (API ids and aliases), fetched 2026-10-17: Large 3, Medium
+3.5, Small 4, Ministral 14B, Codestral and `mistral-embed`, under their
+`-latest` aliases and pinned ids. Mistral Large 4 (preview, temporary
+sale price) and the retired Pixtral / Magistral models are not included.
+Pass your own `pricing` — keyed by model id — to win per model:
 
 ```ts
+import { MistralSDK } from "@warlock.js/ai-mistral";
+
 const mistral = new MistralSDK({
-  apiKey: process.env.MISTRAL_API_KEY!,
+  apiKey: process.env.MISTRAL_API_KEY ?? "",
   pricing: {
-    // USD per 1M tokens — billing-grade overrides.
-    "mistral-large-latest": { input: 2, output: 6 },
-    "magistral-medium-latest": { input: 2, output: 5 },
+    // USD per 1M tokens — contract rates win over the defaults.
+    "mistral-large-latest": { input: 0.45, output: 1.35, cachedInput: 0.045 },
   },
 });
 
 // Or per model, overriding the SDK entry:
 const model = mistral.model({
-  name: "mistral-large-latest",
-  pricing: { input: 2, output: 6 },
+  name: "mistral-small-latest",
+  pricing: { input: 0.15, output: 0.6, cachedInput: 0.015 },
 });
 ```
 
 Resolution at `model()` time: per-model `pricing` > SDK-level `pricing` >
-`MISTRAL_DEFAULT_PRICING` > `undefined`. The defaults are list-price
-approximations — pass explicit rates for billing.
+`MISTRAL_DEFAULT_PRICING` > `undefined`.
 
 Every response reports token `usage` (`input`, `output`, `cachedTokens`,
-`reasoningTokens`), and with pricing set the cost rolls up through every node
-of the `AgentReport`. Need an offline estimate before a call?
-`mistral.count(text)` returns a fast character-heuristic approximation — good
-for budgeting and quota guards, not for billing.
+`reasoningTokens`) — on `model.complete()` and the streaming `done` chunk
+too, with `usage.cost` when priced. `prompt_tokens` contains the cached
+tokens (`inputIncludesCache: true`). Need an offline estimate before a
+call? `mistral.count(text)` returns a fast character-heuristic
+approximation — good for budgeting and quota guards, not for billing.
+
+**Prompt caching.** Mistral documents a `prompt_cache_key` request field
+([prompt caching](https://docs.mistral.ai/studio/conversations/advanced/prompt-caching)).
+Set `promptCacheKey` on the model — sent while the SDK keeps its default
+`"mistral"` provider label — to route related requests to the same cache:
+
+```ts
+const cached = mistral.model({ name: "mistral-large-latest", promptCacheKey: "conversation:42" });
+```
+
+An overloaded endpoint (HTTP 503) surfaces as `ProviderOverloadedError`
+(`code: "PROVIDER_OVERLOADED"`, `retryable: true`); every provider error
+carries `status`, `retryable` and `billed` (`false` for 401 / 402 / 403,
+otherwise `"unknown"`).
 
 ## OpenAI-compatible wire behavior
 

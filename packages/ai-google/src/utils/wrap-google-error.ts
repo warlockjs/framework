@@ -4,6 +4,7 @@ import {
   InvalidRequestError,
   ProviderAuthError,
   ProviderError,
+  ProviderOverloadedError,
   ProviderRateLimitError,
   ProviderTimeoutError,
 } from "@warlock.js/ai";
@@ -51,9 +52,13 @@ export function wrapGoogleError(thrown: unknown): AIError {
   const shape = toShape(thrown);
   const context = buildContext(shape);
   const message = shape.message ?? (thrown instanceof Error ? thrown.message : String(thrown));
+  // "If your request fails with a 400 or 500 error, you won't be charged
+  // for the tokens used." — https://ai.google.dev/gemini-api/docs/billing
+  // (fetched 2026-10-17). Every other failure keeps the default.
+  const billed = shape.status === 400 || shape.status === 500 ? false : undefined;
 
   if (isTimeout(shape)) {
-    return new ProviderTimeoutError(message, { cause: thrown, context });
+    return new ProviderTimeoutError(message, { cause: thrown, context, billed });
   }
 
   if (
@@ -61,26 +66,32 @@ export function wrapGoogleError(thrown: unknown): AIError {
     shape.status === 403 ||
     /permission_denied|api key not valid|unauthenticated/i.test(message)
   ) {
-    return new ProviderAuthError(message, { cause: thrown, context });
+    return new ProviderAuthError(message, { cause: thrown, context, billed });
   }
 
   if (shape.status === 429 || /resource_exhausted|quota/i.test(message)) {
-    return new ProviderRateLimitError(message, { cause: thrown, context });
+    return new ProviderRateLimitError(message, { cause: thrown, context, billed });
   }
 
   if (shape.status === 400) {
     if (/token count|context length|exceeds the maximum|input is too long/i.test(message)) {
-      return new ContextLengthExceededError(message, { cause: thrown, context });
+      return new ContextLengthExceededError(message, { cause: thrown, context, billed });
     }
 
-    return new InvalidRequestError(message, { cause: thrown, context });
+    return new InvalidRequestError(message, { cause: thrown, context, billed });
   }
 
   if (shape.status === 404 || isClientStatus(shape.status)) {
-    return new InvalidRequestError(message, { cause: thrown, context });
+    return new InvalidRequestError(message, { cause: thrown, context, billed });
   }
 
-  return new ProviderError(message, { cause: thrown, context });
+  // 503 UNAVAILABLE — "temporarily overloaded or down"
+  // (https://ai.google.dev/gemini-api/docs/api-errors).
+  if (shape.status === 503 || /\bUNAVAILABLE\b/.test(message) || /overloaded/i.test(message)) {
+    return new ProviderOverloadedError(message, { cause: thrown, context, billed });
+  }
+
+  return new ProviderError(message, { cause: thrown, context, billed });
 }
 
 /**

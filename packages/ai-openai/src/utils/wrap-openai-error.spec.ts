@@ -8,6 +8,7 @@ import {
   ProviderRateLimitError,
   ProviderTimeoutError,
   QuotaExceededError,
+  ProviderOverloadedError,
 } from "@warlock.js/ai";
 import OpenAI from "openai";
 import { describe, expect, it } from "vitest";
@@ -294,5 +295,39 @@ describe("wrapOpenAIError", () => {
     for (const sample of samples) {
       expect(wrapOpenAIError(sample)).toBeInstanceOf(AIError);
     }
+  });
+});
+
+describe("wrapOpenAIError — overload and provider facts", () => {
+  it("maps 503 / server_is_overloaded to a retryable ProviderOverloadedError", () => {
+    const wrapped = wrapOpenAIError(
+      fakeOpenAIError({
+        status: 503,
+        code: "server_is_overloaded",
+        headers: { "retry-after": "2" },
+      }),
+    );
+
+    expect(wrapped).toBeInstanceOf(ProviderOverloadedError);
+    expect(wrapped).toMatchObject({
+      code: "PROVIDER_OVERLOADED",
+      status: 503,
+      retryable: true,
+      billed: "unknown",
+      retryAfter: 2_000,
+    });
+  });
+
+  it("exposes the HTTP status and fails closed on billing", () => {
+    expect(wrapOpenAIError(fakeOpenAIError({ status: 401 }))).toMatchObject({
+      status: 401,
+      billed: false,
+      retryable: false,
+    });
+    expect(wrapOpenAIError(fakeOpenAIError({ status: 500 }))).toMatchObject({
+      status: 500,
+      billed: "unknown",
+      retryable: true,
+    });
   });
 });

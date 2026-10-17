@@ -25,16 +25,40 @@ const DEEPSEEK_PROVIDER = "deepseek";
 
 /**
  * Built-in DeepSeek pricing defaults, in USD per 1,000,000 tokens, keyed
- * by model name. Sourced from DeepSeek's official pricing table
- * (mid-2026); `cachedInput` is the cache-hit input rate. A caller-supplied
- * SDK `pricing` registry, or a per-model `pricing`, overrides any entry
- * here. Update when DeepSeek revises its published rates.
+ * by model name; `cachedInput` is the cache-hit input rate.
+ *
+ * Source: https://api-docs.deepseek.com/quick_start/pricing, fetched
+ * 2026-10-17. DeepSeek bills by time of day: peak hours (01:00–04:00 and
+ * 06:00–10:00 UTC, Monday to Friday) cost twice the off-peak rate. A flat
+ * `ModelPricing` cannot follow the clock, so these are the **peak** rates —
+ * an upper bound that keeps USD budgets safe; off-peak calls really cost
+ * half. Pass {@link DEEPSEEK_OFF_PEAK_PRICING} (or your own) as `pricing`
+ * when you know you run off-peak.
+ *
+ * `deepseek-v4-flash` is the legacy name of `deepseek-flash` and bills at
+ * the same rate. `deepseek-chat` / `deepseek-reasoner` are gone from the
+ * price list (discontinued 2026-07-24) and stay unpriced.
+ *
+ * A caller-supplied SDK `pricing` registry, or a per-model `pricing`,
+ * overrides any entry here.
  */
-const DEEPSEEK_DEFAULT_PRICING: Record<string, ModelPricing> = {
-  "deepseek-chat": { input: 0.14, output: 0.28, cachedInput: 0.0028 },
-  "deepseek-reasoner": { input: 0.14, output: 0.28, cachedInput: 0.0028 },
-  "deepseek-v4-flash": { input: 0.14, output: 0.28, cachedInput: 0.0028 },
-  "deepseek-v4-pro": { input: 0.435, output: 0.87, cachedInput: 0.003625 },
+export const DEEPSEEK_DEFAULT_PRICING: Readonly<Record<string, ModelPricing>> = {
+  "deepseek-flash": { input: 0.3, output: 1.2, cachedInput: 0.006 },
+  "deepseek-v4-flash": { input: 0.3, output: 1.2, cachedInput: 0.006 },
+  "deepseek-v4-pro": { input: 1.32, output: 3.96, cachedInput: 0.044 },
+};
+
+/**
+ * DeepSeek's off-peak rates (half the peak {@link DEEPSEEK_DEFAULT_PRICING}),
+ * same source and date. Opt in per SDK:
+ *
+ * @example
+ * new DeepSeekSDK({ apiKey, pricing: DEEPSEEK_OFF_PEAK_PRICING });
+ */
+export const DEEPSEEK_OFF_PEAK_PRICING: Readonly<Record<string, ModelPricing>> = {
+  "deepseek-flash": { input: 0.15, output: 0.6, cachedInput: 0.003 },
+  "deepseek-v4-flash": { input: 0.15, output: 0.6, cachedInput: 0.003 },
+  "deepseek-v4-pro": { input: 0.66, output: 1.98, cachedInput: 0.022 },
 };
 
 /**

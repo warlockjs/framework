@@ -1,4 +1,5 @@
 import {
+  attachCost,
   InvalidRequestError,
   resolveStreamChunks,
   selectProviderTools,
@@ -156,7 +157,7 @@ export class GoogleModel implements ModelContract {
     const finishReason = toolCalls
       ? "tool_calls"
       : mapFinishReason(response.candidates?.[0]?.finishReason);
-    const usage = this.extractUsage(response);
+    const usage = attachCost(this.extractUsage(response), this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "generateContent call succeeded", {
       finishReason,
@@ -306,6 +307,8 @@ export class GoogleModel implements ModelContract {
     }
 
     const finishReason = sawToolCall ? "tool_calls" : mapFinishReason(rawFinishReason);
+
+    attachCost(usage, this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "generateContentStream call succeeded", {
       finishReason,

@@ -127,7 +127,7 @@ describe("OpenAIModel.complete()", () => {
 
     expect(result.content).toBe("hello");
     expect(result.finishReason).toBe("stop");
-    expect(result.usage).toEqual({ input: 5, output: 3, total: 8 });
+    expect(result.usage).toEqual({ inputIncludesCache: true, input: 5, output: 3, total: 8 });
     expect(result.toolCalls).toBeUndefined();
   });
 
@@ -206,7 +206,13 @@ describe("OpenAIModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 100, output: 20, total: 120, cachedTokens: 40 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: true,
+      input: 100,
+      output: 20,
+      total: 120,
+      cachedTokens: 40,
+    });
   });
 
   it("omits cachedTokens when prompt_tokens_details reports zero cached tokens", async () => {
@@ -226,7 +232,7 @@ describe("OpenAIModel.complete()", () => {
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
     expect(result.usage).not.toHaveProperty("cachedTokens");
-    expect(result.usage).toEqual({ input: 100, output: 20, total: 120 });
+    expect(result.usage).toEqual({ inputIncludesCache: true, input: 100, output: 20, total: 120 });
   });
 
   it("surfaces reasoningTokens from completion_tokens_details when positive", async () => {
@@ -245,7 +251,13 @@ describe("OpenAIModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.usage).toEqual({ input: 50, output: 200, total: 250, reasoningTokens: 180 });
+    expect(result.usage).toEqual({
+      inputIncludesCache: true,
+      input: 50,
+      output: 200,
+      total: 250,
+      reasoningTokens: 180,
+    });
   });
 
   it("omits reasoningTokens when completion_tokens_details reports zero", async () => {
@@ -265,7 +277,7 @@ describe("OpenAIModel.complete()", () => {
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
     expect(result.usage).not.toHaveProperty("reasoningTokens");
-    expect(result.usage).toEqual({ input: 50, output: 200, total: 250 });
+    expect(result.usage).toEqual({ inputIncludesCache: true, input: 50, output: 200, total: 250 });
   });
 
   it("reports cachedTokens and reasoningTokens together when both present", async () => {
@@ -286,6 +298,7 @@ describe("OpenAIModel.complete()", () => {
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
     expect(result.usage).toEqual({
+      inputIncludesCache: true,
       input: 100,
       output: 200,
       total: 300,
@@ -485,8 +498,8 @@ describe("OpenAIModel.complete()", () => {
     ]);
   });
 
-  it.each(["deepseek", "groq", "xai", "mistral"])(
-    "omits OpenAI-only cache fields for the %s wrapper provider",
+  it.each(["deepseek", "groq", "custom-gateway"])(
+    "omits every cache field for the %s provider",
     async (provider) => {
       const { client, calls } = makeFakeClient({ completion: baseCompletion });
       const model = new OpenAIModel(
@@ -498,6 +511,24 @@ describe("OpenAIModel.complete()", () => {
       await model.complete([{ role: "user", content: "hi" }], { cacheControl: { breakpoints: 1 } });
 
       expect(firstParams(calls)).not.toHaveProperty("prompt_cache_key");
+      expect(firstParams(calls)).not.toHaveProperty("prompt_cache_retention");
+      expect(firstParams(calls).messages).toEqual([{ role: "user", content: "hi" }]);
+    },
+  );
+
+  it.each(["xai", "mistral"])(
+    "sends prompt_cache_key, but not the OpenAI-only retention or breakpoints, for %s",
+    async (provider) => {
+      const { client, calls } = makeFakeClient({ completion: baseCompletion });
+      const model = new OpenAIModel(
+        client,
+        { name: "m", promptCacheKey: "tenant:42", promptCacheRetention: "24h" },
+        provider,
+      );
+
+      await model.complete([{ role: "user", content: "hi" }], { cacheControl: { breakpoints: 1 } });
+
+      expect(firstParams(calls).prompt_cache_key).toBe("tenant:42");
       expect(firstParams(calls)).not.toHaveProperty("prompt_cache_retention");
       expect(firstParams(calls).messages).toEqual([{ role: "user", content: "hi" }]);
     },
@@ -1077,7 +1108,7 @@ describe("OpenAIModel.stream()", () => {
       }
     }
 
-    expect(final).toEqual({ input: 9, output: 4, total: 13 });
+    expect(final).toEqual({ inputIncludesCache: true, input: 9, output: 4, total: 13 });
   });
 
   it("zeros usage when no usage chunk arrives", async () => {
@@ -1337,7 +1368,13 @@ describe("OpenAIModel.stream()", () => {
       if (event.type === "done") final = event.usage;
     }
 
-    expect(final).toEqual({ input: 100, output: 20, total: 120, cachedTokens: 60 });
+    expect(final).toEqual({
+      inputIncludesCache: true,
+      input: 100,
+      output: 20,
+      total: 120,
+      cachedTokens: 60,
+    });
   });
 
   it("does not set cachedTokens in the done event when the usage chunk reports zero", async () => {
@@ -1359,7 +1396,7 @@ describe("OpenAIModel.stream()", () => {
     for await (const event of model.stream([{ role: "user", content: "hi" }])) {
       if (event.type === "done") {
         expect(event.usage).not.toHaveProperty("cachedTokens");
-        expect(event.usage).toEqual({ input: 10, output: 2, total: 12 });
+        expect(event.usage).toEqual({ inputIncludesCache: true, input: 10, output: 2, total: 12 });
       }
     }
   });
@@ -1388,7 +1425,13 @@ describe("OpenAIModel.stream()", () => {
       if (event.type === "done") final = event.usage;
     }
 
-    expect(final).toEqual({ input: 50, output: 200, total: 250, reasoningTokens: 180 });
+    expect(final).toEqual({
+      inputIncludesCache: true,
+      input: 50,
+      output: 200,
+      total: 250,
+      reasoningTokens: 180,
+    });
   });
 
   it("does not set reasoningTokens in the done event when the usage chunk reports zero", async () => {
@@ -1410,7 +1453,12 @@ describe("OpenAIModel.stream()", () => {
     for await (const event of model.stream([{ role: "user", content: "hi" }])) {
       if (event.type === "done") {
         expect(event.usage).not.toHaveProperty("reasoningTokens");
-        expect(event.usage).toEqual({ input: 50, output: 200, total: 250 });
+        expect(event.usage).toEqual({
+          inputIncludesCache: true,
+          input: 50,
+          output: 200,
+          total: 250,
+        });
       }
     }
   });
@@ -1578,5 +1626,44 @@ describe("OpenAIModel.stream()", () => {
     }
 
     expect(deltas).toEqual(["real"]);
+  });
+});
+
+describe("OpenAIModel usage cost", () => {
+  it("attaches cost when priced, billing cached input and cache writes inside prompt_tokens once", async () => {
+    const { client } = makeFakeClient({
+      completion: {
+        ...baseCompletion,
+        usage: {
+          prompt_tokens: 1_000_000,
+          completion_tokens: 100_000,
+          total_tokens: 1_100_000,
+          prompt_tokens_details: { cached_tokens: 400_000, cache_write_tokens: 100_000 },
+        },
+      },
+    });
+    const model = new OpenAIModel(client, {
+      name: "gpt-5.6-terra",
+      pricing: { input: 2, output: 12, cachedInput: 0.2, cacheWrite: 2.5 },
+    });
+
+    const result = await model.complete([{ role: "user", content: "hi" }]);
+
+    expect(result.usage).toMatchObject({
+      inputIncludesCache: true,
+      cachedTokens: 400_000,
+      cacheWriteTokens: 100_000,
+    });
+    expect(result.usage.cost?.input).toBeCloseTo((500_000 * 2) / 1e6, 10);
+    expect(result.usage.cost?.cachedInput).toBeCloseTo((400_000 * 0.2) / 1e6, 10);
+    expect(result.usage.cost?.cacheWrite).toBeCloseTo((100_000 * 2.5) / 1e6, 10);
+    expect(result.usage.cost?.output).toBeCloseTo((100_000 * 12) / 1e6, 10);
+  });
+
+  it("leaves cost undefined for an unpriced model", async () => {
+    const { client } = makeFakeClient({ completion: baseCompletion });
+    const model = new OpenAIModel(client, { name: "my-gateway-model" });
+
+    expect((await model.complete([{ role: "user", content: "hi" }])).usage.cost).toBeUndefined();
   });
 });

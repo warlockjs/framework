@@ -745,3 +745,22 @@ describe("OllamaModel.stream()", () => {
     }).rejects.toMatchObject({ code: "PROVIDER_RATE_LIMIT" });
   });
 });
+
+describe("OllamaModel usage cost", () => {
+  it("attaches cost only when the model is priced", async () => {
+    const priced = makeFakeClient({ response: baseResponse });
+    const pricedResult = await new OllamaModel(priced.client, {
+      name: "llama3.2",
+      pricing: { input: 1, output: 2 },
+    }).complete([{ role: "user", content: "hi" }]);
+
+    expect(pricedResult.usage.cost).toBeDefined();
+
+    const free = makeFakeClient({ response: baseResponse });
+    const freeResult = await new OllamaModel(free.client, { name: "llama3.2" }).complete([
+      { role: "user", content: "hi" },
+    ]);
+
+    expect(freeResult.usage.cost).toBeUndefined();
+  });
+});

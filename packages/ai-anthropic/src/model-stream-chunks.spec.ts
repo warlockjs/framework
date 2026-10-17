@@ -175,8 +175,14 @@ describe("AnthropicModel.stream() optional chunks", () => {
       { type: "tool-args", callId: "toolu_01", name: "get_weather", delta: '{"location":' },
       { type: "tool-args", callId: "toolu_01", name: "get_weather", delta: ' "Cairo"}' },
     ]);
-    expect(chunks[0]).toEqual({ type: "usage", usage: { input: 120, output: 0, total: 120 } });
-    expect(chunks[7]).toEqual({ type: "usage", usage: { input: 120, output: 89, total: 209 } });
+    expect(chunks[0]).toEqual({
+      type: "usage",
+      usage: { input: 120, output: 0, total: 120, inputIncludesCache: false },
+    });
+    expect(chunks[7]).toEqual({
+      type: "usage",
+      usage: { input: 120, output: 89, total: 209, inputIncludesCache: false },
+    });
     expect(chunks.at(-1)).toMatchObject({
       type: "done",
       usage: { input: 120, output: 89, total: 209 },

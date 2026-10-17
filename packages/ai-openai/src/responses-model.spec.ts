@@ -583,7 +583,7 @@ describe("OpenAIResponsesModel response mapping", () => {
     expect(result).toEqual({
       content: "hello",
       finishReason: "stop",
-      usage: { input: 10, output: 4, total: 14 },
+      usage: { inputIncludesCache: true, input: 10, output: 4, total: 14 },
     });
     expect(result).not.toHaveProperty("toolCalls");
   });
@@ -730,6 +730,7 @@ describe("OpenAIResponsesModel usage", () => {
     const result = await new OpenAIResponsesModel(client, { name: "gpt-5.6" }).complete(userHi);
 
     expect(result.usage).toEqual({
+      inputIncludesCache: true,
       input: 2000,
       output: 300,
       total: 2300,
@@ -744,7 +745,7 @@ describe("OpenAIResponsesModel usage", () => {
 
     const result = await new OpenAIResponsesModel(client, { name: "gpt-4o-mini" }).complete(userHi);
 
-    expect(result.usage).toEqual({ input: 10, output: 4, total: 14 });
+    expect(result.usage).toEqual({ inputIncludesCache: true, input: 10, output: 4, total: 14 });
   });
 
   it("collapses absent usage to zeros, and tolerates missing detail blocks", async () => {
@@ -760,7 +761,7 @@ describe("OpenAIResponsesModel usage", () => {
     });
     expect(
       (await new OpenAIResponsesModel(partial.client, { name: "m" }).complete(userHi)).usage,
-    ).toEqual({ input: 5, output: 1, total: 6 });
+    ).toEqual({ inputIncludesCache: true, input: 5, output: 1, total: 6 });
   });
 });
 
@@ -1224,7 +1225,11 @@ describe("OpenAIResponsesModel.stream()", () => {
     expect(chunks).toEqual([
       { type: "delta", content: "Hel" },
       { type: "delta", content: "lo" },
-      { type: "done", finishReason: "stop", usage: { input: 10, output: 4, total: 14 } },
+      {
+        type: "done",
+        finishReason: "stop",
+        usage: { inputIncludesCache: true, input: 10, output: 4, total: 14 },
+      },
     ]);
     expect(firstParams(calls)).toEqual({
       model: "gpt-5.6",
@@ -1265,7 +1270,11 @@ describe("OpenAIResponsesModel.stream()", () => {
           openaiResponses: { model: "gpt-5.6", reasoningItems: [reasoningItem()] },
         },
       },
-      { type: "done", finishReason: "tool_calls", usage: { input: 10, output: 4, total: 14 } },
+      {
+        type: "done",
+        finishReason: "tool_calls",
+        usage: { inputIncludesCache: true, input: 10, output: 4, total: 14 },
+      },
     ]);
   });
 
@@ -1307,7 +1316,11 @@ describe("OpenAIResponsesModel.stream()", () => {
     );
 
     expect(chunks).toEqual([
-      { type: "done", finishReason: "length", usage: { input: 10, output: 4, total: 14 } },
+      {
+        type: "done",
+        finishReason: "length",
+        usage: { inputIncludesCache: true, input: 10, output: 4, total: 14 },
+      },
     ]);
   });
 
@@ -1330,7 +1343,11 @@ describe("OpenAIResponsesModel.stream()", () => {
 
     expect(chunks).toEqual([
       { type: "delta", content: "Partial" },
-      { type: "done", finishReason: "length", usage: { input: 10, output: 4, total: 14 } },
+      {
+        type: "done",
+        finishReason: "length",
+        usage: { inputIncludesCache: true, input: 10, output: 4, total: 14 },
+      },
     ]);
   });
 

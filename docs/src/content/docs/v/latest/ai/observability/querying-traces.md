@@ -118,17 +118,13 @@ const stats = store.aggregate({ sessionId: "session-42" });
 
 console.log(`${stats.traces} runs, ${stats.usage.total} tokens, ${stats.failed} failed`);
 
-const totalUsd =
-  (stats.cost?.input ?? 0) +
-  (stats.cost?.output ?? 0) +
-  (stats.cost?.cachedInput ?? 0) +
-  (stats.cost?.cachedOutput ?? 0);
+const totalUsd = totalCost(stats.cost) ?? 0; // `totalCost` from @warlock.js/ai
 ```
 
 Things that matter when you read the numbers:
 
 - **`usage`** sums each trace's _root_ `Usage` (already a rollup of its own cost plus its children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
-- **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number), merged with the framework's own cost-rollup logic, so an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
+- **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number — `cacheWrite` holds cache-write spend), merged with the framework's own cost-rollup logic, so an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
 - **`completed` + `failed` + `cancelled` need not equal `traces`** — non-terminal statuses (`awaiting-input`, `max-iterations`) count toward `traces` but none of the three headline counters.
 - An empty match returns a zeroed aggregate (`usage` all `0`, `cost` `undefined`, `totalDuration` `0`).
 
@@ -137,6 +133,7 @@ Things that matter when you read the numbers:
 Because the store is queryable in-process, a "did this session get expensive?" guard is a few lines — no external dashboard, no extra dependency. Register the store, then read `aggregate` against the session id whenever you want a verdict:
 
 ```ts
+import { totalCost } from "@warlock.js/ai";
 import { panoptic, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
 
 const store = createInMemoryTraceStore();
@@ -144,15 +141,7 @@ const observe = panoptic({ exporters: [store] });
 
 /** USD spent so far on one session, summed across every priced channel. */
 function sessionSpendUsd(sessionId: string): number {
-  const { cost } = store.aggregate({ sessionId });
-
-  if (!cost) {
-    return 0; // nothing priced yet
-  }
-
-  return (
-    (cost.input ?? 0) + (cost.output ?? 0) + (cost.cachedInput ?? 0) + (cost.cachedOutput ?? 0)
-  );
+  return totalCost(store.aggregate({ sessionId }).cost) ?? 0; // 0 = nothing priced yet
 }
 
 /** Throw once a session crosses its budget — call after each turn. */
