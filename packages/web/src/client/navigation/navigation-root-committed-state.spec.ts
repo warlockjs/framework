@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement, startTransition, Suspense, useState } from "react";
+import { act, createElement, startTransition, Suspense, useLayoutEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import type { HydrationDocumentPayloadSource } from "../../hydration-payload";
@@ -117,7 +117,9 @@ it("keeps the boundary fallback until a replacement swap commits after an abando
   let setBlocked!: (blocked: boolean) => void;
   function Harness() {
     const [blocked, updateBlocked] = useState(false);
-    setBlocked = updateBlocked;
+    useLayoutEffect(() => {
+      setBlocked = updateBlocked;
+    }, []);
     if (blocked) {
       attempted();
       throw pending;
