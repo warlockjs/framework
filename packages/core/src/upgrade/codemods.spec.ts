@@ -9,7 +9,6 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { CODEMODS } from "./codemods";
 import { runUpgrade } from "./run-upgrade";
@@ -22,10 +21,7 @@ import { runUpgrade } from "./run-upgrade";
  * - `expected/` — the tree after the codemod (omitted when it edits nothing);
  * - `manual.json` — the `{ file, line }` of every place it lists for review.
  */
-const fixturesRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../tests/fixtures/upgrade",
-);
+const fixturesRoot = path.resolve(__dirname, "../../tests/fixtures/upgrade");
 
 const roots: string[] = [];
 

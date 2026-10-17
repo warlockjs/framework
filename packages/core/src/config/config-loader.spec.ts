@@ -3,6 +3,7 @@ import { v } from "@warlock.js/seal";
 import { pathToFileURL } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileManager } from "../dev-server/file-manager";
+import { ConfigLoader } from "./config-loader";
 import { defineConfigSchema, InvalidConfigError } from "./config-schema";
 
 const modules = new Map<string, { default?: unknown; configSchema?: unknown }>();
@@ -19,8 +20,6 @@ vi.mock("./config-special-handlers", () => ({
     },
   },
 }));
-
-const { ConfigLoader } = await import("./config-loader");
 
 const mailSchema = defineConfigSchema(v.object({ host: v.string() }), {
   env: { host: "MAIL_HOST" },
