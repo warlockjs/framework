@@ -8,9 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Usage includes server-side compaction: the `compaction` entries of `usage.iterations`, which the top-level token counts leave out, are added to `input`, `output` and the cache counts (completions and streams).
+
 - `complete()` always builds a non-streaming request, including when an indexed `stream` option is supplied.
 
 ### Added
+
+- Typed context management on `providerOptions.anthropic`: `contextManagement.clearToolUses` / `clearThinking` (`clear_tool_uses_20250919` / `clear_thinking_20251015`, beta `context-management-2025-06-27`) and `serverCompaction` (`compact_20260112`, beta `compact-2026-01-12`, trigger of at least 50,000 input tokens). The adapter builds the edits in the order the API requires and adds the beta headers; combining them with `body.context_management` fails with `InvalidRequestError`.
+
+- `thinkingBlockBinding: "error" | "drop_block"` sends `thinking.block_binding.prefix_mismatch_behavior` with the `thinking-binding-controls-2026-08-01` beta.
+
+- Preserved thinking after client-side compaction: on Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 an assistant turn marked `compaction: "retained"` is replayed without its thinking blocks, which were produced against the replaced history. `AnthropicModelConfig.preservedThinking` overrides the inference; `inferPreservedThinking(name)` and `ToAnthropicMessagesOptions` are exported.
 
 - `AnthropicModel.buildRequest()` creates a detached request snapshot for preflight auditing; `send(request)` sends that snapshot as a completion or stream without rebuilding its body.
 - Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport.

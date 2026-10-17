@@ -165,3 +165,66 @@ export function acceptsBetweenTools(modelName: string): boolean {
 
   return BETWEEN_TOOLS_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root));
 }
+
+/*
+ * Preserved thinking (Anthropic docs, "Thinking" → "Preserved thinking" and
+ * the "Preserved thinking" page, read 2026-10-17): the API checks that the
+ * `system` prompt, `tools` and every message before a replayed thinking
+ * block are unchanged since the block was produced, on Claude Fable 5.1,
+ * Claude Opus 5.5, Claude Sonnet 5.5 and Claude Haiku 5.5. Claude Mythos 5.1
+ * and every model released before Claude Fable 5.1 don't run that check, so
+ * a thinking block kept after a client-written summary stays valid there.
+ */
+const PREFIX_CHECK_RELEASE_ROOTS = [
+  "claude-fable-5-1",
+  "claude-opus-5-5",
+  "claude-sonnet-5-5",
+  "claude-haiku-5-5",
+];
+
+/** Releases documented not to run the conversation check. */
+const NO_PREFIX_CHECK_RELEASE_ROOTS = [
+  "claude-mythos-5-1",
+  "claude-mythos-5",
+  "claude-mythos-preview",
+  "claude-fable-5",
+  "claude-opus-5",
+  "claude-sonnet-5",
+];
+
+/** Families released before Claude Fable 5.1 in their entirety. */
+const NO_PREFIX_CHECK_FAMILY_PREFIXES = [
+  ...BUDGET_FAMILY_PREFIXES,
+  "claude-opus-4",
+  "claude-sonnet-4",
+];
+
+/**
+ * Whether this model binds a replayed thinking block to the exact
+ * conversation before it (preserved thinking). Unknown and future ids are
+ * assumed to run the check — the safe direction: reasoning a kept turn
+ * can't use is left out instead of risking a 400. Matches the id with or
+ * without a platform prefix and with dated or tagged suffixes.
+ *
+ * @example
+ * inferPreservedThinking("claude-opus-5-5"); // → true
+ * inferPreservedThinking("claude-opus-5");   // → false
+ * inferPreservedThinking("claude-opus-4-8"); // → false
+ */
+export function inferPreservedThinking(modelName: string): boolean {
+  const normalized = modelName.toLowerCase();
+  const id = normalized.slice(normalized.lastIndexOf(".") + 1);
+
+  if (PREFIX_CHECK_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root))) {
+    return true;
+  }
+
+  if (
+    NO_PREFIX_CHECK_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root)) ||
+    NO_PREFIX_CHECK_FAMILY_PREFIXES.some((prefix) => id.startsWith(prefix))
+  ) {
+    return false;
+  }
+
+  return true;
+}

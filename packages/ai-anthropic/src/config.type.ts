@@ -124,6 +124,77 @@ export type AnthropicModelConfig = ModelConfig & {
    * anthropic.model({ name: "my-gateway/haiku", thinkingMode: "budget" });
    */
   thinkingMode?: AnthropicThinkingMode;
+  /**
+   * Override whether the model runs Anthropic's preserved-thinking
+   * conversation check (a replayed thinking block is valid only while
+   * everything before it is unchanged). When omitted it is inferred from the
+   * model name: `true` for Claude Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5
+   * and unknown ids on adaptive thinking; `false` for older models and every
+   * budget-mode model.
+   *
+   * When `true`, assistant turns that client-side compaction kept after its
+   * summary (`Message.compaction === "retained"`) are replayed without their
+   * thinking blocks, which were produced against the replaced history.
+   */
+  preservedThinking?: boolean;
+};
+
+/**
+ * `clear_tool_uses_20250919` context editing: the API replaces the oldest
+ * tool results with a placeholder once the prompt passes `trigger`. Omitted
+ * fields use the API defaults (trigger 100,000 input tokens, keep 3 tool
+ * uses; Anthropic docs, "Context editing", read 2026-10-17).
+ */
+export type AnthropicClearToolUses = {
+  /** When clearing starts: an input-token count or a tool-use count. */
+  trigger?: { inputTokens: number } | { toolUses: number };
+  /** How many of the most recent tool uses keep their results. */
+  keep?: number;
+  /** Apply only when at least this many input tokens can be cleared. */
+  clearAtLeast?: number;
+  /** Tool names whose uses and results are never cleared. */
+  excludeTools?: string[];
+  /** Also clear the tool-use inputs: `true` for every tool, or a list of tool names. */
+  clearToolInputs?: boolean | string[];
+};
+
+/**
+ * `clear_thinking_20251015` context editing: keep thinking blocks for only
+ * the most recent `keep` assistant turns, or `"all"`. Omitted, the
+ * model's default applies (keep all on Opus 4.5+, Sonnet 4.6+, Haiku 5.5 and
+ * the Fable / Mythos models; last turn only on older ones).
+ */
+export type AnthropicClearThinking = { keep?: number | "all" };
+
+/**
+ * Typed Anthropic context editing (beta `context-management-2025-06-27`,
+ * added automatically). Server-side edits don't count as history edits for
+ * preserved thinking: the API checks the conversation as you sent it.
+ */
+export type AnthropicContextManagement = {
+  /** Clear old tool results. `true` uses the API defaults. */
+  clearToolUses?: true | AnthropicClearToolUses;
+  /** Clear thinking blocks from older turns. `true` uses the model default. */
+  clearThinking?: true | AnthropicClearThinking;
+};
+
+/**
+ * Server-side compaction at a token threshold (`compact_20260112`, beta
+ * `compact-2026-01-12`, added automatically). When the prompt reaches
+ * `triggerTokens` the API summarizes earlier context into a `compaction`
+ * block at the start of the response; the agent keeps it on the turn's
+ * `blocks` and the next request sends it back, so the API drops what came
+ * before it. Source: Anthropic docs, "Compaction at a token threshold",
+ * read 2026-10-17.
+ */
+export type AnthropicServerCompaction = {
+  /** Input tokens that trigger compaction. At least 50,000; API default 150,000. */
+  triggerTokens?: number;
+  /**
+   * Replaces the default summarization prompt entirely. When the request has
+   * tools, say "do not call any tools", or the summary step may call one.
+   */
+  instructions?: string;
 };
 
 /**
@@ -133,14 +204,14 @@ export type AnthropicModelConfig = ModelConfig & {
  * fallback chain.
  *
  * @example
- * // Server-side compaction (beta) on a long-running agent.
+ * // Server-side compaction and tool-result clearing (betas added for you).
  * const agent = ai.agent({
  *   model: anthropic.model({ name: "claude-opus-5-5" }),
  *   modelOptions: {
  *     providerOptions: {
  *       anthropic: {
- *         betas: ["compact-2026-01-12"],
- *         body: { context_management: { edits: [{ type: "compact_20260112" }] } },
+ *         serverCompaction: { triggerTokens: 200_000 },
+ *         contextManagement: { clearToolUses: { trigger: { inputTokens: 100_000 }, keep: 5 } },
  *       },
  *     },
  *   },
@@ -188,4 +259,30 @@ export type AnthropicCallOptions = {
    * is enough). Ignored on budget-mode models.
    */
   thinkingDisplay?: "summarized" | "omitted" | "updates";
+  /**
+   * Typed context editing: clear old tool results and/or old thinking
+   * blocks server-side. Adds `context_management.edits` and the
+   * `context-management-2025-06-27` beta. Cannot be combined with a
+   * `context_management` field in `body`.
+   */
+  contextManagement?: AnthropicContextManagement;
+  /**
+   * Server-side compaction at a token threshold: `true` for the API
+   * defaults, or `{ triggerTokens, instructions }`. Adds the
+   * `compact_20260112` edit and the `compact-2026-01-12` beta. Cannot be
+   * combined with a `context_management` field in `body`.
+   */
+  serverCompaction?: boolean | AnthropicServerCompaction;
+  /**
+   * `thinking.block_binding.prefix_mismatch_behavior` (beta
+   * `thinking-binding-controls-2026-08-01`, added automatically): what the
+   * API does with a replayed thinking block whose conversation changed —
+   * `"error"` (a 400) or `"drop_block"` (drop it and every later one,
+   * reported in `input_transformations`). Use `"drop_block"` to recover a
+   * stored conversation that was edited. Applied to adaptive and
+   * budget-mode thinking; ignored, with a debug log, when the request sends
+   * thinking in another shape. While set, retained turns are replayed with
+   * their thinking blocks and the API decides.
+   */
+  thinkingBlockBinding?: "error" | "drop_block";
 };

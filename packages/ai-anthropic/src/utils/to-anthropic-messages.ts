@@ -13,6 +13,20 @@ export type AnthropicMessages = {
   messages: Anthropic.MessageParam[];
 };
 
+/** Options for {@link toAnthropicMessages}. */
+export type ToAnthropicMessagesOptions = {
+  /**
+   * Leave out the `thinking` / `redacted_thinking` blocks of assistant turns
+   * marked `compaction: "retained"` — turns kept verbatim after a
+   * client-written summary. On models that run the preserved-thinking
+   * conversation check those blocks were produced against the replaced
+   * history, so replaying them is a 400 (or a server-side drop). Text and
+   * tool-use blocks stay. Removing them is the no-beta path Anthropic
+   * documents for compaction that keeps recent turns.
+   */
+  dropRetainedThinking?: boolean;
+};
+
 const ANTHROPIC_IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 
 type AnthropicImageMediaType = (typeof ANTHROPIC_IMAGE_MEDIA_TYPES)[number];
@@ -43,6 +57,9 @@ type AnthropicImageMediaType = (typeof ANTHROPIC_IMAGE_MEDIA_TYPES)[number];
  * provider, or blocks whose `tool_use` ids no longer match `toolCalls`,
  * are ignored and the turn is rebuilt from `content` + `toolCalls`.
  *
+ * With `dropRetainedThinking`, a turn marked `compaction: "retained"` is
+ * replayed without its thinking blocks (see {@link ToAnthropicMessagesOptions}).
+ *
  * Other consecutive same-role turns are left as-is — the Messages API
  * merges them server-side.
  *
@@ -54,7 +71,10 @@ type AnthropicImageMediaType = (typeof ANTHROPIC_IMAGE_MEDIA_TYPES)[number];
  * // system === "Be concise."
  * // messages === [{ role: "user", content: "Hi" }]
  */
-export function toAnthropicMessages(messages: Message[]): AnthropicMessages {
+export function toAnthropicMessages(
+  messages: Message[],
+  options: ToAnthropicMessagesOptions = {},
+): AnthropicMessages {
   const systemParts: string[] = [];
   const mapped: Anthropic.MessageParam[] = [];
 
@@ -82,18 +102,25 @@ export function toAnthropicMessages(messages: Message[]): AnthropicMessages {
       continue;
     }
 
+    const dropThinking = options.dropRetainedThinking === true && message.compaction === "retained";
+
     if (message.role === "assistant") {
       const replayed = fromProviderBlocks(message.blocks, message.toolCalls);
+      const content = dropThinking
+        ? replayed?.filter((block) => !isThinkingBlock(block))
+        : replayed;
 
-      if (replayed) {
-        mapped.push({ role: "assistant", content: replayed });
+      if (content && content.length > 0) {
+        mapped.push({ role: "assistant", content });
 
         continue;
       }
     }
 
     if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
-      const blocks: Anthropic.ContentBlockParam[] = extractThinkingBlocks(message.toolCalls);
+      const blocks: Anthropic.ContentBlockParam[] = dropThinking
+        ? []
+        : extractThinkingBlocks(message.toolCalls);
       const text = stringifyContent(message.content);
 
       if (text) {
@@ -133,6 +160,10 @@ export function toAnthropicMessages(messages: Message[]): AnthropicMessages {
     system: systemParts.length > 0 ? systemParts.join("\n\n") : undefined,
     messages: mapped,
   };
+}
+
+function isThinkingBlock(block: Anthropic.ContentBlockParam): boolean {
+  return block.type === "thinking" || block.type === "redacted_thinking";
 }
 
 /**
