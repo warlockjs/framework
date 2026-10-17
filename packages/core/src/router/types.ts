@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import type { ObjectValidator } from "@warlock.js/seal";
+import type { ObjectValidator, ValidationResult } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
 import type { Request, Response, ReturnedResponse } from "../http";
 import type { RequestLoggingOptions } from "../http/request-log-snapshot";
@@ -54,7 +54,64 @@ export type RequestHandlerValidation<TRequest extends Request = Request> = {
    * schema expose their raw string params.
    */
   params?: ObjectValidator;
+  /**
+   * Shape the response when `schema` or `params` fails, instead of the
+   * framework's `{ errors: [...] }` body.
+   *
+   * Return `{ status?, body }`: `body` is sent as the response, with `status`
+   * or else `validation.response.status` (422 by default). Return `undefined`
+   * to fall back to the global `validation.response.body` hook, then the
+   * framework body. Wins over the global hook.
+   *
+   * Declare the body in the handler's `responseSchema` under the same status
+   * so `warlock generate.openapi` documents it.
+   *
+   * @example
+   * createImportController.validation = {
+   *   schema: importSchema,
+   *   onFailure: () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } }),
+   * };
+   */
+  onFailure?: ValidationFailureHandler<TRequest>;
 };
+
+/**
+ * What a validation failure hook answers with.
+ */
+export type ValidationFailureResponse = {
+  /**
+   * Response status. Defaults to `validation.response.status` (422).
+   */
+  status?: number;
+  /**
+   * Response body, sent as JSON.
+   */
+  body: unknown;
+};
+
+/**
+ * The second argument of a route's `validation.onFailure`.
+ */
+export type ValidationFailureContext<TRequest extends Request = Request> = {
+  request: TRequest;
+  response: Response;
+  /**
+   * The route whose validation failed.
+   */
+  route: Route;
+};
+
+/**
+ * A route's `validation.onFailure` hook.
+ */
+export type ValidationFailureHandler<TRequest extends Request = Request> = (
+  result: ValidationResult,
+  context: ValidationFailureContext<TRequest>,
+) =>
+  | ValidationFailureResponse
+  | undefined
+  | void
+  | Promise<ValidationFailureResponse | undefined | void>;
 
 export interface RequestControllerContract {
   /**
@@ -251,6 +308,20 @@ export interface RouteOptions {
    * router.post("/oauth/callback", handler, { csrf: false });
    */
   csrf?: false;
+  /**
+   * Route-level validation, merged over the handler's own `validation`
+   * (keys set here win). Lets one handler serve several routes with different
+   * schemas or failure responses.
+   *
+   * @example
+   * router.post("/workspace-import", importWorkspace, {
+   *   validation: {
+   *     schema: importWorkspaceSchema,
+   *     onFailure: () => ({ status: 400, body: { error: "IMPORT_REQUEST_INVALID" } }),
+   *   },
+   * });
+   */
+  validation?: RequestHandlerValidation;
   /**
    * What this route's request log entries carry of its input, overriding
    * `http.logging`. Applied before any entry is built, so an omitted body or

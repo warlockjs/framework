@@ -8,6 +8,8 @@ import { isIterable, isPlainObject, isScalar } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
 import type { ValidationResult } from "@warlock.js/seal";
+import type { ValidationResponseConfiguration } from "../validation/types";
+import { validationFailureStatus } from "../validation/validation-failure-status";
 import type { FastifyReply } from "fastify";
 import fs from "fs";
 import mime from "mime";
@@ -1846,18 +1848,32 @@ export class Response {
   }
 
   /**
-   * Mark the response as failed
+   * Answer a failed schema validation.
+   *
+   * Uses the global `validation.response.body(result, route)` hook when it is
+   * configured and returns a body; otherwise the framework body,
+   * `{ [errors]: [{ [inputKey], [inputError] }] }`. The status is
+   * `validation.response.status` (422 by default) either way.
    */
-  public failedSchema(result: ValidationResult) {
-    const { errors, inputKey, inputError, status } = {
+  public async failedSchema(result: ValidationResult) {
+    const settings: ValidationResponseConfiguration = config.get("validation.response", {});
+    const { errors, inputKey, inputError } = {
       errors: "errors",
       inputKey: "input",
       inputError: "error",
-      status: 422,
-      ...config.get("validation.response", {}),
+      ...settings,
     };
+    const status = validationFailureStatus();
 
     log.error("request", "validation", `${this.request.id} - Validation failed`);
+
+    if (typeof settings.body === "function") {
+      const body = await settings.body(result, this.request.route);
+
+      if (body !== undefined) {
+        return this.send(body, status);
+      }
+    }
 
     return this.send(
       {

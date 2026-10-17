@@ -1,4 +1,6 @@
+import { resolveRouteValidation } from "../router/resolve-route-validation";
 import {
+  buildCustomValidationFailedResponse,
   buildUnauthorizedResponse,
   buildValidationFailedResponse,
   resolveValidationResponse,
@@ -85,7 +87,7 @@ export function buildOpenApiDocument(
     }
 
     const handler = route.handler as OpenApiRouteInput["handler"] | undefined;
-    const validation = handler?.validation;
+    const validation = resolveRouteValidation(route);
     const auth = readRouteAuth(route.middleware, warn);
     const tag = firstSegmentTag(route.path);
     const pathKey = toOpenApiPath(route.path);
@@ -129,7 +131,7 @@ export function buildOpenApiDocument(
 
       const request = buildRequestParts({ method, path: route.path, validation, warn });
 
-      const responses: Record<string, OpenApiResponse> = route.isPage
+      const declared: Record<string, OpenApiResponse> = route.isPage
         ? {
             "200": {
               description: "HTML page",
@@ -137,15 +139,22 @@ export function buildOpenApiDocument(
             },
           }
         : buildDeclaredResponses(handler?.responseSchema, registry, warn);
+      const responses: Record<string, OpenApiResponse> = { ...declared };
 
       if (!Object.keys(responses).some((status) => status.startsWith("2"))) {
         responses["200"] = { description: "Successful response" };
       }
 
       if (validation?.schema) {
-        const failed = buildValidationFailedResponse(validationShape, registry);
+        const routeHook = typeof validation.onFailure === "function";
+        const failed =
+          routeHook || validationShape.customBody
+            ? buildCustomValidationFailedResponse(validationShape, declared, routeHook, warn)
+            : buildValidationFailedResponse(validationShape, registry);
 
-        responses[failed.status] ??= failed.response;
+        if (failed) {
+          responses[failed.status] ??= failed.response;
+        }
       }
 
       if (auth) {

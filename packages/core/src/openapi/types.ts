@@ -66,6 +66,8 @@ export type OpenApiValidationResponseConfig = {
   inputKey?: string;
   inputError?: string;
   status?: number;
+  /** The global failure-body hook; only whether it is a function is read. */
+  body?: unknown;
 };
 
 /**
@@ -95,7 +97,12 @@ export type OpenApiBuildResult = {
 
 /** The slice of a route the builder reads. A full `Route` satisfies it. */
 export type OpenApiRouteInput = Pick<Route, "method" | "path" | "handler"> &
-  Partial<Pick<Route, "name" | "label" | "description" | "middleware" | "isPage" | "sourceFile">>;
+  Partial<
+    Pick<
+      Route,
+      "name" | "label" | "description" | "middleware" | "isPage" | "sourceFile" | "validation"
+    >
+  >;
 
 /**
  * The descriptor `authMiddleware()` attaches under `Symbol.for("warlock.auth")`.

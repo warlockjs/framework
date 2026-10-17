@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `http.rateLimit.staticFiles` (default `false`) decides whether static files count against the global rate limiter. Each static mount can decide for itself: `router.directory(options, { rateLimit })` and a fourth `{ rateLimit }` argument on `router.file()`, `cachedFile()`, `files()` and `cachedFiles()` take `true` (global limiter), `false` (exempt) or `{ max, timeWindow, errorMessage? }` (own limit and bucket).
+- Route validation can answer with an application's own failure body. `validation.onFailure(result, { request, response, route })` returns `{ status?, body }` for a failed `schema` or `params` (no `status` uses `validation.response.status`, 422 by default); `validation.response.body(result, route)` in the validation config does the same for every route. The route hook wins, either may return `undefined` to fall through, and the framework body is unchanged when neither is set. Routes also accept a `validation` option merged over the handler's own, so one handler can serve several routes with different failure codes. `ValidationConfiguration` now types `response` and `responseStatus`.
+- `warlock generate.openapi` documents a custom validation failure body from the handler's `responseSchema` entry for the failure status instead of the framework's `ValidationFailed` shape; without one, the configured status is documented without a body and a route-level hook produces a warning.
 - A route's `rateLimit` option also accepts `false` to exempt the route from the global limiter, and `true` to keep it under the global policy (the default for application routes).
 
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
@@ -52,6 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Upgrade guidance names `AgentConfig.compaction`, covers sub-agent dispatch and blank/default validation changes, and explains which routes the production rate quotas cover. In 5.31, `purgeImageVariants()` preserves legacy two-level cache files; retire them manually, correcting the earlier 5.30 cleanup suggestion.
 - Per-file image-cache purges refuse symlinked shard directories for local and object-storage disks. Stale-generation pruning now removes only recognized cache files from older generation-shaped folders, preserving current-generation files, unrelated entries, directories and symlinks.
 
+- The error-handling guide gives the schema-validation failure status as 422, matching the framework default, and the validation skill's introduction no longer says 400.
 - The validation skill shows the HTTP 422 body as strict JSON that can be copied into a JSON parser.
 - Image-variant purges remove only recognized cache files and retain the cache root, directories, unrelated files and symlinks. Purge and background eviction validate every shard/source/generation path component, so a cache nested inside storage cannot recursively delete uploads. Use a dedicated derivative folder.
 

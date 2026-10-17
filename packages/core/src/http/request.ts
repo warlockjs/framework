@@ -16,6 +16,7 @@ import {
   resolveLocaleConfiguration,
 } from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
+import { resolveRouteValidation } from "../router/resolve-route-validation";
 import { validateAll } from "../validation/validateAll";
 import { CookieJarUnavailableError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
@@ -985,9 +986,9 @@ export class Request<RequestValidation = any> {
       return this.response.send(middlewareOutput);
     }
 
-    const handler = this.route.handler;
+    const validation = resolveRouteValidation(this.route);
 
-    if (!handler.validation) return;
+    if (!validation) return;
 
     // 👇🏻 check for validation using validateAll helper function — timed as
     // the "validation" tracing phase when tracing is
@@ -995,7 +996,7 @@ export class Request<RequestValidation = any> {
     const tracingEnabled = isTracingEnabled();
     const validationStartedAt = tracingEnabled ? performance.now() : 0;
 
-    const validationOutput = await validateAll(handler.validation, this, this.response);
+    const validationOutput = await validateAll(validation, this, this.response);
 
     if (tracingEnabled) {
       dispatchPhase(buildTracingContext(this), {
