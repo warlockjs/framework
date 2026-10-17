@@ -129,6 +129,13 @@ function seededOps(files: Record<string, string>, opts: { escape?: boolean } = {
     exists: unsupported("exists"),
     mkdir: unsupported("mkdir"),
     remove: unsupported("remove"),
+    multiEdit: unsupported("multiEdit"),
+    startShell: unsupported("startShell"),
+    shellOutput: unsupported("shellOutput"),
+    shellKill: unsupported("shellKill"),
+    listShells: () => [],
+    listDir: unsupported("listDir"),
+    dispose: unsupported("dispose"),
   };
 }
 

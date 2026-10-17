@@ -22,7 +22,7 @@ import {
   reportPositionalHandlerSuspects,
 } from "./positional-handler-diagnostics";
 import { reportUnguardedMutatingRoutes } from "./unguarded-route-diagnostics";
-import { config } from "../config/config-getter";
+import { config as configAccessor } from "../config/config-getter";
 import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
 import { resolveRouteRateLimit, resolveStaticRateLimit } from "./resolve-route-rate-limit";
@@ -1101,7 +1101,7 @@ export class Router {
 
     // Development only: list mutating routes nobody guarded. Routes added by a
     // later HMR reload are reported when their replacement commits.
-    this.warnUnguardedRoutes = config.key<boolean>("http.warnUnguardedRoutes", true) !== false;
+    this.warnUnguardedRoutes = configAccessor.key<boolean>("http.warnUnguardedRoutes", true) !== false;
     if (this.warnUnguardedRoutes) {
       reportUnguardedMutatingRoutes(this.routes);
     }
