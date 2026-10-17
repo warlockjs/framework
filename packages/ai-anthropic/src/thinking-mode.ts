@@ -78,7 +78,12 @@ const BUDGET_RELEASE_ROOTS = [
  */
 const NEXT_MINOR_VERSION = /^-\d{1,2}(?!\d)/;
 
-function matchesReleaseRoot(name: string, root: string): boolean {
+/**
+ * Whether a lower-cased model id is the release `root` itself, or a dated /
+ * tagged / `@` snapshot of it — but not a later minor version of the same
+ * line (`claude-opus-4` matches `claude-opus-4-20250514`, not `claude-opus-4-7`).
+ */
+export function matchesReleaseRoot(name: string, root: string): boolean {
   if (!name.startsWith(root)) {
     return false;
   }

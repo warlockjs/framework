@@ -1,6 +1,6 @@
 ---
 name: upgrade-from-5-29
-description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
+description: "Upgrade a Warlock application from 5.29 to 5.30 or 5.31: synchronous logger calls, concurrent AI tools, request log snapshots, cut-off AI agent answers, auth throttle resets, image derivative caches and the Head viewport. Use for this migration or when diagnosing changed behavior after that upgrade."
 ---
 
 # Upgrade an application from 5.29
@@ -233,6 +233,36 @@ new FileLog({
 To replace a custom pruning job, use `retention: { maxFiles, maxAgeDays }` (see the
 Logger `pick-log-channel` topic); it never removes files with another name pattern,
 such as files written under the old names.
+
+## 5.30 to 5.31 cut-off agent answers
+
+In 5.31 an agent run whose final response hit the output cap (`length`) or the
+context window (`context_exceeded`) no longer succeeds with empty or partial
+text: `result.error` is an `AgentIncompleteError` (`AGENT_INCOMPLETE`,
+`reason: "output_limit" | "context_window"`, `tripIndex`) and
+`report.status` is `"incomplete"`. A tool call cut off mid-input is never run.
+Remove `trips.at(-1).finishReason === "length"` checks that treated it as a
+success, handle the error, or let the agent continue cut-off output:
+
+```ts
+import { ai, AgentIncompleteError, type ModelContract, type ToolContract } from "@warlock.js/ai";
+
+export async function runWorker(model: ModelContract, tools: ToolContract[], task: string) {
+  const worker = ai.agent({ name: "worker", model, tools, continueOnOutputLimit: 2 });
+  const result = await worker.execute(task);
+
+  if (result.error instanceof AgentIncompleteError) {
+    throw new Error(`worker answer cut off (${result.error.reason})`, { cause: result.error });
+  }
+
+  return result.text;
+}
+```
+
+Dashboards that switch on `report.status` need the `incomplete` case. The
+Anthropic adapter's default `max_tokens` rose from 4096 to the model's max
+output when streaming and 16384 otherwise; set `maxTokens` to keep a lower cap.
+`agent.execute/stream(input, { modelOptions })` now applies per-run model options.
 
 ## Verify the application paths that changed
 

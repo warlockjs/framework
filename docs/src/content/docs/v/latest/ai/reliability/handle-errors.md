@@ -68,6 +68,7 @@ type ErrorCategory =
   | "tool"
   | "cancelled"
   | "max-trips"
+  | "incomplete"
   | "max-iterations"
   | "max-steps"
   | "schema"
@@ -102,6 +103,7 @@ Each typed subclass declares a `static defaultCategory`. The 4th-arg override ex
 ```text
 AIError  (base — code, category, message, cause?, context?)
 ├── AgentExecutionError          AGENT_EXEC_FAILED
+│   └── AgentIncompleteError     AGENT_INCOMPLETE           { reason, tripIndex, continuations } — final response cut off
 ├── SchemaValidationError        SCHEMA_VALIDATION_FAILED   { issues? }
 ├── ToolExecutionError           TOOL_EXEC_FAILED           { toolName, tripIndex? }
 ├── WorkflowError (base)
@@ -131,6 +133,10 @@ AIError  (base — code, category, message, cause?, context?)
 ├── BudgetExceededError          BUDGET_EXCEEDED            { limit, actual, unit } — from ai.middleware.budget
 └── GuardrailViolationError      GUARDRAIL_VIOLATION        { phase, reason } — from ai.middleware.guardrail
 ```
+
+## Cut-off answers
+
+An agent whose final response is cut off — by the output token cap or the context window — ends with `report.status: "incomplete"` and an `AgentIncompleteError` (`reason: "output_limit" | "context_window"`, `tripIndex`, `continuations`) instead of a success with empty text. Branch on it to raise `maxTokens`, split the task, or compact the history, or opt into automatic continuation with `continueOnOutputLimit`. See [Cut-off responses](/v/latest/ai/agents/run-agent/#cut-off-responses--reportstatus-incomplete).
 
 ## Error fields
 

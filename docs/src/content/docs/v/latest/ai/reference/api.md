@@ -74,7 +74,7 @@ import { ai /* types, errors */ } from "@warlock.js/ai";
 | `agent.resume(runId, opts?)`                                      | Durable mid-run crash-resume. Re-hydrates completed trips + tool calls + usage from the snapshot and continues from the next trip — never re-issuing a completed trip's model call. Throws `AgentDriftError` on a structural mismatch unless `{ force: true }`.                                                                                                                             |
 | `AgentConfig.durable`                                             | `{ store?: SnapshotStore<AgentSnapshot>; deleteOnComplete? }` — opt-in checkpointing after every settled trip. `store` falls back to `ai.config({ defaultSnapshotStore })`; when neither is set, writes skip and `resume()` throws.                                                                                                                                                         |
 | `AgentSnapshot` / `AgentSnapshotStatus` / `AgentResumeOptions<T>` | The persisted agent state, its status, and `resume()` options (`{ force?, ... }`).                                                                                                                                                                                                                                                                                                          |
-| `AgentExecuteOptions`                                             | Per-call options for `execute` / `stream`.                                                                                                                                                                                                                                                                                                                                                  |
+| `AgentExecuteOptions`                                             | Per-call options for `execute` / `stream`, including `modelOptions` (shallow-merged over the agent's for that run) and `continueOnOutputLimit`.                                                                                                                                                                                                                                             |
 | `AgentResult<T>`                                                  | Result envelope — `{ type, data?, text?, blocks?, report, usage, error? }`. `blocks` are the final trip's raw provider blocks (see `ProviderContentBlock`).                                                                                                                                                                                                                                 |
 | `ToolDispatchMode`                                                | `"concurrent" \| "sequential"` — how the tool calls of one trip run. Concurrent (default) runs them in parallel, at most `maxConcurrentTools` (default `4`) at a time; sequential awaits each call and appends its result before the next starts. Results reach the model in request order either way. Set on `AgentConfig.toolDispatch` or per call on `AgentExecuteOptions.toolDispatch`. |
 | `AgentReport`                                                     | Trace tree — `BaseReport` plus `model`, `trips`, `systemPrompt?` (the resolved `role: "system"` message), and `messages?` (the full `CapturedMessage[]`, present only when `captureMessages` is on). Tool dispatches live under `children` filtered by `type === "tool"`.                                                                                                                   |
@@ -362,12 +362,12 @@ The output/input-modality track — image, speech, and transcription verbs that 
 
 ## Middleware
 
-| Export                     | What it is                                        |
-| -------------------------- | ------------------------------------------------- |
-| `AgentMiddleware`          | Shape — `{ name, execute?, trip?, tool?, log? }`. |
-| `MiddlewareExecuteContext` | `ctx` for `execute` hooks.                        |
-| `MiddlewareTripContext`    | `ctx` for `trip` hooks.                           |
-| `MiddlewareToolContext`    | `ctx` for `tool` hooks.                           |
+| Export                     | What it is                                                       |
+| -------------------------- | ---------------------------------------------------------------- |
+| `AgentMiddleware`          | Shape — `{ name, execute?, trip?, tool?, log? }`.                |
+| `MiddlewareExecuteContext` | `ctx` for `execute` hooks.                                       |
+| `MiddlewareTripContext`    | `ctx` for `trip` hooks.                                          |
+| `MiddlewareToolContext`    | `ctx` for `tool` hooks; `callId` is the provider's tool-call id. |
 
 ## Guardrails
 
@@ -456,6 +456,7 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](/v/latest/
 | `AIError`                    | (base)                      | varies           |
 | `AgentExecutionError`        | `AGENT_EXEC_FAILED`         | varies           |
 | `AgentDriftError`            | `AGENT_DRIFT`               | `drift`          |
+| `AgentIncompleteError`       | `AGENT_INCOMPLETE`          | `incomplete`     |
 | `SchemaValidationError`      | `SCHEMA_VALIDATION_FAILED`  | `schema`         |
 | `ToolExecutionError`         | `TOOL_EXEC_FAILED`          | `tool`           |
 | `WorkflowError`              | (base)                      | varies           |

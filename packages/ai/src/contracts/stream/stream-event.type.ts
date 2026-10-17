@@ -30,13 +30,16 @@ export type StreamEventBody =
   | {
       type: "agent.tool.calling";
       tool: ToolEventMeta;
+      /** The provider's tool-call id; pairs this event with its `called` / `failed` event. */
+      callId: string;
       input: unknown;
       tripIndex: number;
     }
-  | { type: "agent.tool.called"; toolCall: ToolCall; tool: ToolEventMeta }
+  | { type: "agent.tool.called"; toolCall: ToolCall; tool: ToolEventMeta; callId: string }
   | {
       type: "agent.tool.failed";
       tool: ToolEventMeta;
+      callId: string;
       error: AIError;
       tripIndex: number;
     }

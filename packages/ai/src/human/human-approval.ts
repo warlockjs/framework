@@ -46,6 +46,7 @@ function toPolicyContext(ctx: MiddlewareToolContext): PolicyContext {
     args: ctx.request.input,
     agentName: ctx.agent.name,
     tripIndex: ctx.tripIndex,
+    callId: ctx.callId,
     sessionId: ctx.options?.sessionId,
   };
 }
@@ -86,6 +87,7 @@ function buildRequest(
     context: {
       agentName: ctx.agent.name,
       tripIndex: ctx.tripIndex,
+      callId: ctx.callId,
       sessionId: ctx.options?.sessionId,
       originalInput: ctx.input,
       ...(tags ? { tags } : {}),

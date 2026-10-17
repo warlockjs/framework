@@ -39,6 +39,8 @@ function statusMarker(status: TraceSpan["status"]): string {
       return "ERR";
     case "cancelled":
       return "cancel";
+    case "incomplete":
+      return "INCOMPLETE";
     case "max-iterations":
       return "max-iter";
     case "awaiting-input":

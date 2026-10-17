@@ -102,9 +102,10 @@ type PendingWrite = {
   vector: number[];
   scope?: string;
   /**
-   * Text of `pause_turn` segments seen so far. A resumed turn's
-   * continuation carries only its new content, so the stored answer is
-   * these segments followed by the final response's content.
+   * Text of `pause_turn` (and continued `length`) segments seen so far. A
+   * resumed turn's continuation carries only its new content, so the
+   * stored answer is these segments followed by the final response's
+   * content.
    */
   pausedContent?: string;
 };
@@ -381,8 +382,18 @@ export function semanticCache(options: SemanticCacheOptions): AgentMiddleware {
         // prompt key. Deleting here would orphan the pending and the
         // post-tool answer would never make it into the store. A paused
         // turn (`pause_turn`) is mid-turn the same way: the agent resumes it.
-        if (response.finishReason === "pause_turn") {
+        // So is a response cut off by the output cap: the agent either
+        // continues it (`continueOnOutputLimit`) — the stored answer is the
+        // joined text — or ends the run incomplete, and nothing is stored.
+        if (response.finishReason === "pause_turn" || response.finishReason === "length") {
           pending.pausedContent = (pending.pausedContent ?? "") + response.content;
+
+          return;
+        }
+
+        // A full context window has no answer to cache and is never continued.
+        if (response.finishReason === "context_exceeded") {
+          context.state.delete(pendingKey);
 
           return;
         }

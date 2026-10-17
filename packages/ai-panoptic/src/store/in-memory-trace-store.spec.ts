@@ -127,6 +127,16 @@ describe("createInMemoryTraceStore", () => {
     expect(stats.cost?.output).toBeCloseTo(0.036);
   });
 
+  it("counts an incomplete run as failed", () => {
+    const store = createInMemoryTraceStore();
+    store.add(trace({ traceId: "cut", sessionId: "s1", status: "incomplete" }));
+
+    const stats = store.aggregate({ sessionId: "s1" });
+
+    expect(stats.failed).toBe(1);
+    expect(stats.completed).toBe(0);
+  });
+
   it("returns zeroed aggregate with undefined cost when nothing matches", () => {
     const store = createInMemoryTraceStore();
     store.add(trace({ traceId: "a", sessionId: "s1" }));

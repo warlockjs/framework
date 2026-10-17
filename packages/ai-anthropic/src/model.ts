@@ -21,6 +21,7 @@ import type {
   AnthropicStreamingRequest,
   AnthropicNonStreamingRequest,
 } from "./request.type";
+import { inferMaxOutputTokens } from "./known-output-limits";
 import { inferVisionCapability } from "./known-vision-models";
 import {
   acceptsTemperature,
@@ -40,12 +41,27 @@ const LOG_MODULE = "ai.anthropic";
 
 /**
  * Anthropic requires `max_tokens` on every request (unlike OpenAI,
- * where it is optional). When neither the per-call option nor the
- * model config supplies one, fall back to a generous default so a
- * caller who never thought about token caps still gets a complete
- * answer instead of a 400.
+ * where it is optional). When neither the per-call option nor the model
+ * config supplies one, the adapter picks a default large enough for agent
+ * work (see `resolveDefaultMaxTokens`):
+ *
+ * - streaming: the model's documented max output (`known-output-limits.ts`,
+ *   or `config.maxOutputTokens`), else this value;
+ * - non-streaming: this value, capped by the model's max output. The
+ *   installed `@anthropic-ai/sdk` (0.129.0, `calculateNonstreamingTimeout`)
+ *   refuses a non-streaming request whose `max_tokens` implies more than
+ *   ten minutes (above ~21,333 tokens) unless the client sets a `timeout`,
+ *   so the non-streaming default stays below that.
  */
-const DEFAULT_MAX_TOKENS = 4096;
+const DEFAULT_MAX_TOKENS = 16_384;
+
+/**
+ * Answer room kept on top of a thinking budget when the default
+ * `max_tokens` is sized: thinking counts toward `max_tokens` (installed
+ * SDK `ThinkingConfigParam` docs, `messages.d.ts:1105`), and in budget
+ * mode `max_tokens` must exceed `budget_tokens`.
+ */
+const MIN_ANSWER_TOKENS = 4096;
 
 /**
  * Anthropic rejects an extended-thinking budget below 1024 tokens, so
@@ -69,11 +85,10 @@ const DEFAULT_THINKING_EFFORT: ThinkingEffort = "medium";
  *
  * - Budget-mode models: sent as `thinking.budget_tokens` when the caller
  *   doesn't pass an explicit `reasoning.maxTokens`.
- * - Both modes: reserved on top of `DEFAULT_MAX_TOKENS` when the caller
- *   sets no `maxTokens`, because thinking counts toward `max_tokens`
- *   (installed SDK `ThinkingConfigParam` docs, `messages.d.ts:1105`).
- *   Adaptive models therefore get the same `max_tokens` the budget path
- *   has always produced.
+ * - Both modes: when the caller sets no `maxTokens`, the default
+ *   `max_tokens` keeps at least this budget plus `MIN_ANSWER_TOKENS`,
+ *   because thinking counts toward `max_tokens` (installed SDK
+ *   `ThinkingConfigParam` docs, `messages.d.ts:1105`).
  */
 const EFFORT_THINKING_BUDGET: Record<ThinkingEffort, number> = {
   // Anthropic's adaptive output config has no `minimal`; keep the minimum
@@ -131,8 +146,9 @@ type StreamedBlock = { block: Record<string, unknown>; json?: string };
  *
  * - `thinking`: the wire `thinking` field (absent = send nothing).
  * - `effort`: `output_config.effort`, set for adaptive-mode models only.
- * - `reservedTokens`: thinking tokens to reserve on top of
- *   `DEFAULT_MAX_TOKENS` when the caller configured no `maxTokens`.
+ * - `reservedTokens`: thinking tokens the default `max_tokens` must leave
+ *   room for (plus `MIN_ANSWER_TOKENS`) when the caller configured no
+ *   `maxTokens`.
  */
 type ThinkingRequest = {
   thinking?: Anthropic.ThinkingConfigParam;
@@ -187,6 +203,8 @@ export class AnthropicModel implements ModelContract {
   private readonly client: Anthropic;
   private readonly config: AnthropicModelConfig;
   private readonly thinkingMode: AnthropicThinkingMode;
+  /** Documented max output tokens of this model, when known. Sizes the default `max_tokens`. */
+  private readonly maxOutputTokens?: number;
   private readonly logger: Logger = log;
 
   public constructor(
@@ -202,6 +220,7 @@ export class AnthropicModel implements ModelContract {
     // Adaptive vs budget thinking — also decides whether `temperature` is
     // accepted. Explicit config wins over name inference, like `vision`.
     this.thinkingMode = config.thinkingMode ?? inferThinkingMode(config.name);
+    this.maxOutputTokens = config.maxOutputTokens ?? inferMaxOutputTokens(config.name);
     this.capabilities = {
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
@@ -643,7 +662,7 @@ export class AnthropicModel implements ModelContract {
    */
   private buildBody(
     messages: Message[],
-    options: ModelCallOptions | undefined,
+    options: (ModelCallOptions & { stream?: boolean }) | undefined,
   ): Record<string, unknown> {
     const anthropic = resolveAnthropicOptions(options);
     const body: Record<string, unknown> = { ...this.buildParams(messages, options) };
@@ -691,7 +710,7 @@ export class AnthropicModel implements ModelContract {
    */
   private buildParams(
     messages: Message[],
-    options: ModelCallOptions | undefined,
+    options: (ModelCallOptions & { stream?: boolean }) | undefined,
   ): Omit<Anthropic.MessageCreateParamsNonStreaming, "stream"> {
     const { system, messages: anthropicMessages } = toAnthropicMessages(messages);
     const thinking = this.buildThinking(options?.reasoning);
@@ -701,9 +720,7 @@ export class AnthropicModel implements ModelContract {
       thinking.thinking?.type === "enabled" ? thinking.thinking.budget_tokens : undefined;
     const maxTokens =
       configuredMaxTokens ??
-      (thinking.reservedTokens !== undefined
-        ? thinking.reservedTokens + DEFAULT_MAX_TOKENS
-        : DEFAULT_MAX_TOKENS);
+      this.resolveDefaultMaxTokens(options?.stream === true, thinking.reservedTokens);
     // Extended thinking pins sampling to the default temperature —
     // Anthropic 400s when `thinking` is enabled alongside any explicit
     // `temperature`. Models released after Opus 4.6 (adaptive mode) reject
@@ -734,6 +751,29 @@ export class AnthropicModel implements ModelContract {
       ...this.buildOutputConfig(options?.responseSchema, thinking.effort),
       ...(thinking.thinking ? { thinking: thinking.thinking } : {}),
     };
+  }
+
+  /**
+   * The `max_tokens` sent when neither the call nor the model config sets
+   * `maxTokens`:
+   *
+   * - streaming: the model's documented max output, or
+   *   `DEFAULT_MAX_TOKENS` (16384) for an unknown id;
+   * - non-streaming: `DEFAULT_MAX_TOKENS`, capped by the model's max output
+   *   (the SDK requires streaming for larger non-streaming requests unless
+   *   the client sets a `timeout`; see `DEFAULT_MAX_TOKENS`).
+   *
+   * With thinking on, the value is raised to at least the thinking budget
+   * plus `MIN_ANSWER_TOKENS`, and never exceeds the model's max output.
+   */
+  private resolveDefaultMaxTokens(stream: boolean, reservedTokens: number | undefined): number {
+    const limit = this.maxOutputTokens;
+    const fallback = limit === undefined ? DEFAULT_MAX_TOKENS : Math.min(limit, DEFAULT_MAX_TOKENS);
+    const base = stream ? (limit ?? DEFAULT_MAX_TOKENS) : fallback;
+    const withThinking =
+      reservedTokens === undefined ? base : Math.max(base, reservedTokens + MIN_ANSWER_TOKENS);
+
+    return limit === undefined ? withThinking : Math.min(withThinking, limit);
   }
 
   /**

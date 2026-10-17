@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AgentCancelledError,
   AgentExecutionError,
+  AgentIncompleteError,
   AgentMaxTripsError,
   AIError,
   BudgetExceededError,
@@ -170,6 +171,32 @@ describe("AgentMaxTripsError", () => {
     const error = new AgentMaxTripsError("hit cap", { maxTrips: 7 });
 
     expect(error.maxTrips).toBe(7);
+  });
+});
+
+describe("AgentIncompleteError", () => {
+  it("uses code AGENT_INCOMPLETE, category incomplete and its own name", () => {
+    const error = new AgentIncompleteError("cut off", { reason: "output_limit", tripIndex: 2 });
+
+    expect(error.code).toBe("AGENT_INCOMPLETE");
+    expect(error.category).toBe("incomplete");
+    expect(error.name).toBe("AgentIncompleteError");
+    expect(error).toBeInstanceOf(AgentExecutionError);
+  });
+
+  it("exposes reason, tripIndex and continuations", () => {
+    const error = new AgentIncompleteError("cut off", {
+      reason: "context_window",
+      tripIndex: 4,
+      continuations: 1,
+    });
+
+    expect(error.reason).toBe("context_window");
+    expect(error.tripIndex).toBe(4);
+    expect(error.continuations).toBe(1);
+    expect(
+      new AgentIncompleteError("x", { reason: "output_limit", tripIndex: 0 }).continuations,
+    ).toBe(0);
   });
 });
 

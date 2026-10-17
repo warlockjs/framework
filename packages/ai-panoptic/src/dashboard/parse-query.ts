@@ -9,6 +9,7 @@ const KNOWN_STATUSES: readonly ReportStatus[] = [
   "completed",
   "failed",
   "cancelled",
+  "incomplete",
   "max-iterations",
   "awaiting-input",
   "awaiting-approval",

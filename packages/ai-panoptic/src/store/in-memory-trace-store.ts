@@ -128,7 +128,8 @@ class InMemoryTraceStore implements TraceStoreContract, ExporterContract {
    * Non-terminal statuses (`awaiting-input`, `max-iterations`) are
    * counted in `traces` but tracked by none of the three headline
    * counters — intentional, those three answer the common
-   * "succeeded / errored / aborted" question.
+   * "succeeded / errored / aborted" question. An `incomplete` agent run
+   * (its answer was cut off) errored, so it counts as `failed`.
    */
   private countStatus(aggregate: TraceAggregate, trace: Trace): void {
     switch (trace.root.status) {
@@ -137,7 +138,8 @@ class InMemoryTraceStore implements TraceStoreContract, ExporterContract {
         break;
       }
 
-      case "failed": {
+      case "failed":
+      case "incomplete": {
         aggregate.failed += 1;
         break;
       }

@@ -59,6 +59,18 @@ export type AnthropicModelConfig = ModelConfig & {
    */
   vision?: boolean;
   /**
+   * The model's maximum output tokens, used to size the default
+   * `max_tokens` when no `maxTokens` is set. Inferred from known Claude
+   * ids (`known-output-limits.ts`: 128K for the Claude 5 family and
+   * Opus 4.6–4.8 / Sonnet 4.6, 64K for Opus / Sonnet / Haiku 4.5); set it
+   * for gateway or proxy ids the adapter does not recognise. Unknown ids
+   * default to 16384.
+   *
+   * @example
+   * anthropic.model({ name: "my-gateway/opus", maxOutputTokens: 128_000 });
+   */
+  maxOutputTokens?: number;
+  /**
    * Override the inferred `structuredOutput` capability. When omitted,
    * the adapter treats the model as capable and forwards
    * `responseSchema` via Anthropic's native `output_config.format`

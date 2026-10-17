@@ -105,6 +105,18 @@ describe("reportToSpan", () => {
     });
   });
 
+  it("surfaces a tool call's provider call id as an attribute", () => {
+    const report = baseReport({
+      type: "tool",
+      tripIndex: 0,
+      callId: "toolu_01",
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report);
+
+    expect(span.attributes).toEqual({ "tool.tripIndex": 0, "tool.callId": "toolu_01" });
+  });
+
   it("leaves attributes absent for a bare node", () => {
     const span = reportToSpan(baseReport({ trips: undefined } as Partial<BaseReport>));
 

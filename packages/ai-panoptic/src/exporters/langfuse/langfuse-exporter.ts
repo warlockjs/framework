@@ -306,10 +306,10 @@ function langfuseMetadata(span: TraceSpan): Record<string, AttributeValue> {
 
 /**
  * Map the Panoptic span status onto a Langfuse observation level —
- * failed/cancelled spans surface as `ERROR`, everything else `DEFAULT`.
+ * failed/cancelled/incomplete spans surface as `ERROR`, everything else `DEFAULT`.
  */
 function toLevel(span: TraceSpan): LangfuseObservationLevel {
-  if (span.status === "failed" || span.status === "cancelled") {
+  if (span.status === "failed" || span.status === "cancelled" || span.status === "incomplete") {
     return "ERROR";
   }
 

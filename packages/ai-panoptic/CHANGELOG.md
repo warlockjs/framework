@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Added
+
+- Tool spans carry the provider's tool-call id as the `tool.callId` attribute.
+- Agent runs with `status: "incomplete"` (their final answer was cut off) are exported as errors: OTel `ERROR` status, Langfuse level `ERROR`, the console exporter's error stream (marked `INCOMPLETE`), the dashboard's error filter, and the `failed` count of trace-store aggregates. `?status=incomplete` is accepted by the dashboard API.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed
