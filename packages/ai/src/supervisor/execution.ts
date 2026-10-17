@@ -2995,7 +2995,8 @@ export class SupervisorExecution<TOutput> {
 
     const endedAt = new Date();
 
-    // `max-iterations`, the orchestrator-only `awaiting-input`, and the
+    // `max-iterations`, `incomplete` (a cut-off answer, retried on resume),
+    // the orchestrator-only `awaiting-input`, and the
     // planner-only `awaiting-approval` are members of the shared
     // `ReportStatus` union but not of the narrower
     // `SupervisorSnapshotStatus`. A supervisor never reaches
@@ -3004,6 +3005,7 @@ export class SupervisorExecution<TOutput> {
     // representable.
     const finalStatus: SupervisorSnapshotStatus =
       this.status === "max-iterations" ||
+      this.status === "incomplete" ||
       this.status === "awaiting-input" ||
       this.status === "awaiting-approval"
         ? "failed"

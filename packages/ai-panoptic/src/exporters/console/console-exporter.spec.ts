@@ -61,7 +61,7 @@ describe("consoleExporter", () => {
     );
 
     expect(sink.log).not.toHaveBeenCalled();
-    expect(sink.error.mock.calls[0][0]).toContain("INCOMPLETE");
+    expect(sink.error.mock.calls[0]?.[0]).toContain("INCOMPLETE");
   });
 
   it("should print the full indented tree when tree=true", async () => {
@@ -94,7 +94,7 @@ describe("consoleExporter", () => {
     exporter.exportSpan?.(makeSpan({ name: "live", type: "tool" }));
 
     expect(sink.log).toHaveBeenCalledTimes(1);
-    expect(sink.log.mock.calls[0][0]).toContain('tool "live"');
+    expect(sink.log.mock.calls[0]?.[0]).toContain('tool "live"');
   });
 
   it("should print in:/out: lines beneath a span when io=true", async () => {
