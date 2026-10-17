@@ -28,6 +28,9 @@ export type CliOptionSchema = {
  * that gates a destructive action must fail loudly on input it cannot read.
  */
 export class CliOptionValueError extends Error {
+  /** Stable Warlock error code; `warlock explain WL7001` prints the fix. */
+  public readonly code = "WL7001";
+
   public constructor(
     public readonly optionToken: string,
     public readonly value: string,

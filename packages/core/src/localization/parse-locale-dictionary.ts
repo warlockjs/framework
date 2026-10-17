@@ -15,6 +15,9 @@ const FORBIDDEN_SEGMENTS = new Set(["__proto__", "prototype", "constructor"]);
 
 /** A source error that always names both the locale file and the offending JSON key. */
 export class LocaleDictionaryError extends Error {
+  /** Stable Warlock error code; `warlock explain WL1007` prints the fix. */
+  public readonly code = "WL1007";
+
   public constructor(
     public readonly sourceFile: string,
     public readonly key: string,

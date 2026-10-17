@@ -20,6 +20,9 @@ declare global {
  * module surfaces with its origin instead of vanishing into a 404.
  */
 export class ModuleLoadError extends Error {
+  /** Stable Warlock error code; `warlock explain WL2001` prints the fix. */
+  public readonly code = "WL2001";
+
   public constructor(
     public readonly type: string,
     public readonly file: FileManager,

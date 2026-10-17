@@ -90,6 +90,7 @@ export const releaseHygieneCheck: DoctorCheck = {
       return {
         name: "release-hygiene",
         status: "fail",
+        code: "WL9102",
         detail: "package.json is publishable but has no string version field",
       };
     }
@@ -98,6 +99,7 @@ export const releaseHygieneCheck: DoctorCheck = {
       return {
         name: "release-hygiene",
         status: "warn",
+        code: "WL9103",
         detail: `no CHANGELOG.md at project root (package.json is ${pkgVersion})`,
       };
     }
@@ -109,6 +111,7 @@ export const releaseHygieneCheck: DoctorCheck = {
       return {
         name: "release-hygiene",
         status: "warn",
+        code: "WL9103",
         detail: "CHANGELOG.md has no parseable `## x.y.z` heading",
       };
     }
@@ -117,6 +120,7 @@ export const releaseHygieneCheck: DoctorCheck = {
       return {
         name: "release-hygiene",
         status: "fail",
+        code: "WL9102",
         detail: `package.json ${pkgVersion} ≠ top CHANGELOG heading ${heading.version}`,
       };
     }

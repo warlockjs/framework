@@ -52,7 +52,14 @@ describe("@warlock.js/core/errors entry", () => {
     expect(bare).toEqual([]);
     expect(
       [...graph.keys()].map((file) => path.relative(path.resolve(__dirname, ".."), file)).sort(),
-    ).toEqual([path.join("errors", "index.ts"), path.join("http", "errors", "errors.ts")]);
+    ).toEqual(
+      [
+        path.join("errors", "error-codes.ts"),
+        path.join("errors", "index.ts"),
+        path.join("errors", "warlock-error.ts"),
+        path.join("http", "errors", "errors.ts"),
+      ].sort(),
+    );
   });
 
   it("exports the same classes as the root barrel", () => {

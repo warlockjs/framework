@@ -102,6 +102,9 @@ export class NotAllowedError extends HttpError {
  * locale resolution) must not throw on a request that simply has no jar.
  */
 export class CookieJarUnavailableError extends Error {
+  /** Stable Warlock error code; `warlock explain WL5001` prints the fix. */
+  public readonly code = "WL5001";
+
   public constructor(cookieName: string) {
     super(
       `Cannot read cookie "${cookieName}": the cookie jar is unavailable because ` +

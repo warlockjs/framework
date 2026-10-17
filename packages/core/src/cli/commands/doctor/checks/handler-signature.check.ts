@@ -49,6 +49,7 @@ export const handlerSignatureCheck: DoctorCheck = {
     return {
       name: "handler-signature",
       status: "warn",
+      code: "WL3006",
       detail:
         `${headline}:\n` +
         suspects.map((suspect) => `  - ${describePositionalHandlerSuspect(suspect)}`).join("\n"),

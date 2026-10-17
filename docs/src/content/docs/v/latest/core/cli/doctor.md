@@ -10,9 +10,14 @@ sidebar:
 
 ```bash
 warlock doctor
+warlock doctor --json   # machine-readable, each finding with its stable error code
+warlock doctor --fix    # also convert auto-convertible legacy utils/locales.ts files
 ```
 
-No flags, no positional args.
+| Flag         | Type    | Description                                                                        |
+| ------------ | ------- | ---------------------------------------------------------------------------------- |
+| `--json, -j` | boolean | Print the report as JSON (below). stdout carries only the JSON.                    |
+| `--fix`      | boolean | Convert safely auto-convertible legacy `utils/locales.ts` files to `locales.json`. |
 
 ```
 ✓ routes: 42 registered
@@ -51,6 +56,52 @@ The exit code is **`1` if any check fails, otherwise `0`** — warnings alone ke
 ```bash
 warlock doctor || exit 1   # fail the pipeline on any fail-status check
 ```
+
+## Error codes and `--json`
+
+Every `warn` or `fail` finding carries a stable [error code](./error-codes.md), shown after the detail in the plain report (`✗ config: missing required config section(s): http [WL1001]`). `warlock explain WL1001` prints what to do.
+
+`--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields [`warlock check --json`](./check.md#the-json-report) uses, so one consumer reads both:
+
+```json
+{
+  "schemaVersion": 1,
+  "results": [
+    {
+      "name": "routes",
+      "status": "ok",
+      "detail": "42 registered (from 6 route module(s))",
+      "code": null,
+      "hint": null,
+      "skill": null,
+      "docs": null
+    },
+    {
+      "name": "config",
+      "status": "fail",
+      "detail": "missing required config section(s): http",
+      "code": "WL1001",
+      "hint": "Add the missing file under src/config/ (for example src/config/app.ts) exporting the section.",
+      "skill": "configure-app",
+      "docs": "https://warlock.js.org/v/latest/core/cli/error-codes/#wl1001"
+    }
+  ],
+  "summary": { "ok": 1, "warn": 0, "fail": 1 },
+  "exitCode": 1
+}
+```
+
+| Check                   | Codes it reports                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| `routes`                | `WL2001` a module failed to load, `WL2002` discovery failed, `WL3005` no routes registered |
+| `handler-signature`     | `WL3006` a v4 `(request, response)` handler                                                |
+| `config`                | `WL1001` a required section is missing                                                     |
+| `connectors`            | `WL1009` the connectors list was refused, `WL2003` a connector failed to boot              |
+| `optional-peers`        | `WL2007` a configured driver's package is not installed                                    |
+| `jwt-secret`            | `WL1002` no JWT signing secret                                                             |
+| `health`                | `WL5002` a route claims a probe path, `WL5003` probes not registered                       |
+| `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`                                                       |
+| `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable         |
 
 ## What it does NOT do
 

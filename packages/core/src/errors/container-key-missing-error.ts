@@ -19,6 +19,9 @@ const MAX_LISTED_KEYS = 20;
  * there.
  */
 export class ContainerKeyMissingError extends Error {
+  /** Stable Warlock error code; `warlock explain WL2004` prints the fix. */
+  public readonly code = "WL2004";
+
   public constructor(key: string, instanceCount: number, registeredKeys: readonly string[] = []) {
     super(ContainerKeyMissingError.buildMessage(key, instanceCount, registeredKeys));
     this.name = "ContainerKeyMissingError";

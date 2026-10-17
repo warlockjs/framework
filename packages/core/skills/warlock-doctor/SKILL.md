@@ -1,6 +1,6 @@
 ---
 name: warlock-doctor
-description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `warlock doctor --json`, `toDoctorJson`, `WL1001`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`
@@ -21,6 +21,36 @@ npx warlock doctor
 
 Summary: 5 ok, 1 warn, 0 fail
 ```
+
+## Error codes and `--json`
+
+Every `warn`/`fail` finding carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
+
+```bash
+npx warlock doctor --json | jq '.results[] | select(.status != "ok") | "\(.code) \(.detail)"'
+npx warlock explain WL1001
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "results": [
+    {
+      "name": "config",
+      "status": "fail",
+      "detail": "missing required config section(s): http",
+      "code": "WL1001",
+      "hint": "Add the missing file under src/config/ (for example src/config/app.ts) exporting the section.",
+      "skill": "configure-app",
+      "docs": "https://warlock.js.org/v/latest/core/cli/error-codes/#wl1001"
+    }
+  ],
+  "summary": { "ok": 0, "warn": 0, "fail": 1 },
+  "exitCode": 1
+}
+```
+
+A custom check sets `code` on its non-ok results the same way (`{ name, status: "fail", code: "WL2003", detail }`); `ok` results carry none.
 
 ## What it checks
 
@@ -58,6 +88,7 @@ type CheckResult = {
   name: string; // stable check name, e.g. "routes"
   status: CheckStatus;
   detail: string; // one-line, user-facing explanation
+  code?: WarlockErrorCode; // stable code of a warn/fail verdict, e.g. "WL1001"
 };
 
 type DoctorCheck = {
@@ -136,3 +167,5 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 - The `write-cli-command` topic — authoring a command + its `preload` plan, the shape `doctorCommand` is built from.
 - The `add-connector` topic — connector registration, which the `connectors` check enumerates.
 - The `warlock-conventions` topic — project layout the checks assume.
+- The `warlock-check` topic — `warlock check` / `typecheck` / `explain` and the error-code registry the findings use.
+- The `warlock-inspect` topic — `warlock inspect`, the same boot pass printed as a versioned JSON report of the app.

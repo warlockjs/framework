@@ -42,6 +42,7 @@ export const routesCheck: DoctorCheck = {
       return {
         name: "routes",
         status: "fail",
+        code: "WL2001",
         detail:
           `${count} app module(s) failed to load — the routes they declare will 404:\n` +
           describeFailures(context),
@@ -52,6 +53,7 @@ export const routesCheck: DoctorCheck = {
       return {
         name: "routes",
         status: "fail",
+        code: "WL2002",
         detail: "app modules could not be discovered — nothing to report on",
       };
     }
@@ -68,6 +70,7 @@ export const routesCheck: DoctorCheck = {
       return {
         name: "routes",
         status: "fail",
+        code: "WL3005",
         detail:
           `${context.routeModules} route module(s) loaded without error but registered 0 routes — ` +
           "every request will 404",

@@ -1,4 +1,5 @@
 import { colors } from "@mongez/copper";
+import { ERROR_CODES, errorCodeDocsUrl, type WarlockErrorCode } from "../../../errors/error-codes";
 import type { CheckStatus, DoctorReport } from "./check.types";
 
 /**
@@ -37,7 +38,9 @@ function colorizeSymbol(status: CheckStatus): string {
  */
 export function formatReportLines(report: DoctorReport): string[] {
   const lines = report.results.map((result) => {
-    return `${STATUS_SYMBOL[result.status]} ${result.name}: ${result.detail}`;
+    const code = result.code ? ` [${result.code}]` : "";
+
+    return `${STATUS_SYMBOL[result.status]} ${result.name}: ${result.detail}${code}`;
   });
 
   const { ok, warn, fail } = report.summary;
@@ -59,7 +62,9 @@ export function printReport(report: DoctorReport): void {
   for (const result of report.results) {
     const symbol = colorizeSymbol(result.status);
 
-    console.log(`${symbol} ${colors.bold(result.name)}: ${result.detail}`);
+    const code = result.code ? colors.dim(` [${result.code}]`) : "";
+
+    console.log(`${symbol} ${colors.bold(result.name)}: ${result.detail}${code}`);
   }
 
   const { ok, warn, fail } = report.summary;
@@ -67,4 +72,55 @@ export function printReport(report: DoctorReport): void {
 
   console.log("");
   console.log(report.hasFailures ? colors.red(summaryLine) : colors.green(summaryLine));
+}
+
+/** One check in `warlock doctor --json`. Every key is always present. */
+export type DoctorJsonResult = {
+  name: string;
+  status: CheckStatus;
+  detail: string;
+  /** Stable Warlock error code of a `warn`/`fail` verdict, else `null`. */
+  code: WarlockErrorCode | null;
+  /** One line on what to do, from the code registry, else `null`. */
+  hint: string | null;
+  /** Slug of the skill that explains the fix, else `null`. */
+  skill: string | null;
+  /** Docs URL of the code, else `null`. */
+  docs: string | null;
+};
+
+/** What `warlock doctor --json` prints. */
+export type DoctorJsonReport = {
+  schemaVersion: 1;
+  results: DoctorJsonResult[];
+  summary: Record<CheckStatus, number>;
+  exitCode: 0 | 1;
+};
+
+/**
+ * The machine-readable form of a doctor report: each finding with its stable
+ * code and the same `hint` / `skill` / `docs` fields `warlock check --json`
+ * prints, so one consumer reads both.
+ *
+ * @param report The aggregated doctor report.
+ */
+export function toDoctorJson(report: DoctorReport): DoctorJsonReport {
+  return {
+    schemaVersion: 1,
+    results: report.results.map((result) => {
+      const definition = result.code ? ERROR_CODES[result.code] : undefined;
+
+      return {
+        name: result.name,
+        status: result.status,
+        detail: result.detail,
+        code: result.code ?? null,
+        hint: definition?.fix ?? null,
+        skill: definition?.skill ?? null,
+        docs: result.code ? errorCodeDocsUrl(result.code) : null,
+      };
+    }),
+    summary: { ...report.summary },
+    exitCode: report.exitCode,
+  };
 }

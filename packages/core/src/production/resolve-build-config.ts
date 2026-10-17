@@ -53,6 +53,9 @@ const FORBIDDEN_BUILD_OPTIONS = {
  * believing a setting applied when it never did.
  */
 export class ForbiddenBuildOptionError extends Error {
+  /** Stable Warlock error code; `warlock explain WL1006` prints the fix. */
+  public readonly code = "WL1006";
+
   public constructor(public readonly option: keyof typeof FORBIDDEN_BUILD_OPTIONS) {
     super(
       [

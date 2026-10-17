@@ -15,6 +15,9 @@ import { PortInUseError } from "../http/port-preflight";
  * treats as terminal — no restart, no crash-budget spend.
  */
 export class BootPreconditionError extends Error {
+  /** Stable Warlock error code; `warlock explain WL2005` prints the fix. */
+  public readonly code = "WL2005";
+
   public constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
     this.name = "BootPreconditionError";
