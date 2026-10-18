@@ -169,6 +169,8 @@ export interface McpToolDescriptor {
   description?: string;
   /** JSON Schema for the tool's arguments. */
   inputSchema?: Record<string, unknown>;
+  /** JSON Schema for structured results, when declared by the server. */
+  outputSchema?: Record<string, unknown>;
 }
 
 /**
@@ -196,4 +198,8 @@ export interface McpToolCallResult {
   content: McpContentBlock[];
   /** True when the call represents a tool-level error. */
   isError?: boolean;
+  /** Structured tool output (governed by the tool's outputSchema, if present). */
+  structuredContent?: Record<string, unknown>;
+  /** Protocol metadata forwarded without interpretation. */
+  _meta?: Record<string, unknown>;
 }

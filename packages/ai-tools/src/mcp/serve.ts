@@ -21,6 +21,13 @@ import type {
 import { McpServeError, McpTransportError } from "../errors";
 import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
 import { startHttpServer } from "./serve-http";
+import {
+  assertMcpResult,
+  isMcpResult,
+  isRecord,
+  looksLikeMcpResult,
+  unwrapMcpResult,
+} from "./result";
 
 /** JSON-RPC version literal every outbound message carries. */
 const JSONRPC_VERSION = "2.0";
@@ -316,6 +323,9 @@ class McpServeHandler {
         name,
         description: contract.description,
         inputSchema,
+        ...(isRecord(contract.meta?.outputSchema)
+          ? { outputSchema: contract.meta.outputSchema }
+          : {}),
       };
     });
   }
@@ -323,8 +333,9 @@ class McpServeHandler {
   /**
    * Route a `tools/call` to the named contract's `invoke()` and map the
    * never-throwing {@link import("@warlock.js/ai").ToolInvokeResult}: `data`
-   * → a text content block, `error` → an `isError: true` result. An unknown
-   * tool name throws (mapped to a JSON-RPC error by {@link handle}).
+   * → a text content block (or an opted-in native result), `error` → an
+   * `isError: true` result. An unknown tool name throws (mapped to a
+   * JSON-RPC error by {@link handle}).
    *
    * The contract receives a `ToolContext` carrying the abort signal and,
    * over HTTP, the inbound request's headers on `ctx.request`.
@@ -362,6 +373,21 @@ class McpServeHandler {
         content: [{ type: "text", text: result.error.message }],
         isError: true,
       };
+    }
+
+    const mode = contract.meta?.mcpResults ?? this.options.results ?? "text";
+    const branded = isMcpResult(result.data);
+
+    if (branded || (mode === "native" && looksLikeMcpResult(result.data))) {
+      const native = isMcpResult(result.data) ? unwrapMcpResult(result.data) : result.data;
+
+      try {
+        assertMcpResult(native);
+      } catch {
+        throw new RpcFailure(JSON_RPC_INTERNAL_ERROR, "Invalid native MCP CallToolResult.");
+      }
+
+      return native;
     }
 
     return {

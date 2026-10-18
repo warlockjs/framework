@@ -4,6 +4,18 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.1
+
+### Fixed
+
+- Opted-in native MCP tool results preserve content blocks, `isError`, `structuredContent` and `_meta` over stdio and HTTP, including tools with an advertised output schema. Per-request headers and abort signals remain available to tools; default result serialization and thrown-tool error handling are unchanged.
+- Malformed native results produce a JSON-RPC internal error instead of sending invalid MCP payloads.
+
+### Added
+
+- `mcpResult(...)` and its `McpNativeResult` type explicitly mark native tool results. `serve(..., { results: "native" })` enables detection for existing native-returning tools; `meta.mcpResults: "native" | "text"` overrides detection per tool.
+- `meta.outputSchema` advertises structured tool output in `tools/list`; `McpToolCallResult` now includes `structuredContent` and `_meta`.
+
 ## 5.31.0 - 2026-10-18
 
 ### Added

@@ -16,11 +16,16 @@ import "./register";
 // ---------------------------------------------------------------------------
 // MCP — client (`mcp`) + server (`serve`) + the schema/transport seams.
 // ---------------------------------------------------------------------------
-export { mcp, serve, createServeHandler, SUPPORTED_PROTOCOL_VERSIONS } from "./mcp";
+export { mcp, serve, createServeHandler, mcpResult, SUPPORTED_PROTOCOL_VERSIONS } from "./mcp";
 export { jsonSchemaToStandard } from "./mcp/json-schema-to-standard";
 export { createJsonRpcClient, createTransport } from "./mcp/transport";
 export type { JsonRpcClientHandle } from "./mcp/transport";
-export type { McpFactory, McpServeRequestHandler, McpTransportClient } from "./mcp";
+export type {
+  McpFactory,
+  McpNativeResult,
+  McpServeRequestHandler,
+  McpTransportClient,
+} from "./mcp";
 
 // ---------------------------------------------------------------------------
 // The `ai.tools.*` namespace shape (declared once in `./register`).

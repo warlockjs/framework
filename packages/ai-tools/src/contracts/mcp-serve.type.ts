@@ -240,6 +240,15 @@ export interface McpServeOptions {
    */
   schemaTarget?: JsonSchemaTarget;
   /**
+   * Opt in to native MCP result detection for objects containing `content`,
+   * `isError`, `structuredContent` or `_meta`. Other values still become text.
+   * Override per tool with `meta.mcpResults: "native" | "text"`.
+   * Explicit `mcpResult()` values always pass through after validation.
+   *
+   * @default "text"
+   */
+  results?: "text" | "native";
+  /**
    * Prefix each tool of a grouped source (`{ groups: { … } }`) with its
    * group name. `true` exposes `<group>_<tool>`; a function builds the
    * exposed name itself. Only valid with a grouped source.
