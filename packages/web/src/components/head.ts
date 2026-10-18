@@ -49,6 +49,7 @@ function renderDescriptor(descriptor: MetadataDescriptor): ReactElement {
 export function Head(): ReactElement {
   const {
     metadata,
+    fontPreloads,
     stylesheetUrls,
     localeAlternates,
     localeRouting,
@@ -74,6 +75,16 @@ export function Head(): ReactElement {
     // `import` statement. See `DocumentContextValue.hydrationClientModulePreloadUrls`.
     ...(hydrationClientModulePreloadUrls ?? []).map((url) =>
       createElement("link", { key: `modulepreload-${url}`, rel: "modulepreload", href: url }),
+    ),
+    ...[...new Map((fontPreloads ?? []).map((face) => [face.href, face])).values()].map((face) =>
+      createElement("link", {
+        key: `font-${face.href}`,
+        rel: "preload",
+        as: "font",
+        type: face.type,
+        href: face.href,
+        crossOrigin: "anonymous",
+      }),
     ),
     ...resolveMetadataDescriptors(metadata).map(renderDescriptor),
     // Design note §D.2 — framework-owned, not a `MetadataDescriptor`: these

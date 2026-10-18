@@ -11,7 +11,14 @@ export type PageModuleShape = Pick<NormalizedPageModule, "route" | "cache">;
 /** The layout pipeline view after config normalization. */
 export type LayoutModuleShape = Pick<
   NormalizedPageModule,
-  "register" | "prefix" | "default" | "middleware" | "loader" | "metadata" | "ErrorBoundary"
+  | "fontPreload"
+  | "register"
+  | "prefix"
+  | "default"
+  | "middleware"
+  | "loader"
+  | "metadata"
+  | "ErrorBoundary"
 > & {
   /** Ordered outer-to-inner metadata definitions retained by layout composition. */
   layoutMetadata?: readonly (PageMetadata<PipelineLoader> | undefined)[];

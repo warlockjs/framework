@@ -329,6 +329,35 @@ describe("web build contribution — clientOutDir", () => {
   });
 });
 
+describe("web build contribution — fonts", () => {
+  it("carries web config font declarations into the production asset build", async () => {
+    const fonts = [
+      {
+        family: "Display",
+        variable: "--font-display",
+        fallback: "Arial",
+        files: [{ path: "src/fonts/display.woff2", preload: true }],
+      },
+    ];
+    const appRoot = makeTree({
+      "src/web/root.tsx": APP,
+      "src/web/home.page.tsx": PAGE,
+      "src/config/web.ts": `export default { fonts: ${JSON.stringify(fonts)} };`,
+    });
+    const contribution = createWebBuildContribution();
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    buildHydrationClient.mockClear();
+    stubGeneratedPages(1);
+    try {
+      await contribution.generate?.(buildContext(appRoot));
+      await contribution.emit?.(buildContext(appRoot));
+      expect(buildHydrationClient).toHaveBeenCalledWith(expect.objectContaining({ fonts }));
+    } finally {
+      log.mockRestore();
+    }
+  });
+});
+
 describe("web build contribution — connector plugins", () => {
   it("forwards connector plugins to the production hydration build", async () => {
     const appRoot = makeTree({

@@ -12,7 +12,17 @@ export const MODULE_EXPORT_NAMES = [
 ] as const;
 
 export const MODULE_CONFIG_KEYS = {
-  page: ["route", "cache", "middleware", "validation", "metadata", "sitemap", "action", "actions"],
-  layout: ["prefix", "middleware", "metadata", "sitemap"],
-  root: ["middleware", "strictMode", "metadata"],
+  page: [
+    "route",
+    "cache",
+    "middleware",
+    "validation",
+    "metadata",
+    "fontPreload",
+    "sitemap",
+    "action",
+    "actions",
+  ],
+  layout: ["prefix", "middleware", "metadata", "fontPreload", "sitemap"],
+  root: ["middleware", "strictMode", "metadata", "fontPreload"],
 } as const satisfies Record<PageModuleKind, readonly string[]>;

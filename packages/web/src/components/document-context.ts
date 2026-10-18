@@ -249,6 +249,8 @@ export type DocumentContextValue = {
    * resolution.
    */
   stylesheetUrls?: readonly string[];
+  /** Critical declared faces for this rendered document, deduplicated by URL. */
+  fontPreloads?: readonly import("../fonts/types").FontPreload[];
   /**
    * The browser module appended after the server-rendered document, rendered
    * by `<Scripts/>` as a `<script type="module">` carrying the same `nonce`

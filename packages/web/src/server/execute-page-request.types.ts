@@ -70,6 +70,7 @@ export type PageTripleModule = {
   register?: () => unknown;
   /** Root-owned React tree policy, retained by root module normalization. */
   strictMode?: boolean;
+  fontPreload?: boolean;
   route?:
     | string
     | {

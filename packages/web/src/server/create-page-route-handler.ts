@@ -130,6 +130,8 @@ export function defaultApplyBufferedCookie(response: Response, cookie: BufferedC
 export type PageModuleLoader = (moduleId: string) => Promise<unknown>;
 
 export type PageRouteHandlerOptions = {
+  /** App root for declared development font files. */
+  appRoot?: string;
   /** The composed, registered route path — `composeRoutePath`'s output. */
   path: string;
   /** The resolved route name; shared namespace with API routes. */
@@ -374,6 +376,7 @@ async function answerActionOutcome(options: {
  */
 export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRouteHandler {
   const {
+    appRoot,
     path,
     name,
     appFile,
@@ -653,6 +656,7 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
         awaitDeferredForDataRequest: attemptStorageAfterRender
           ? wantsData
           : wantsData && !wantsNdjson,
+        appRoot,
         stylesheetUrls,
         resolveRequestStylesheetUrls,
         hydrationClientModuleUrl,

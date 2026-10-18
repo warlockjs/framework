@@ -1,0 +1,142 @@
+---
+title: Fonts
+slug: v/latest/web/essentials/fonts
+description: Declare self-hosted fonts with early preloads, metric-matched system fallbacks and immutable assets.
+sidebar:
+  order: 17
+---
+
+Declare self-hosted fonts once in `src/config/web.ts`. Warlock generates a
+stylesheet, links it in the document head, preloads critical faces, and emits
+content-hashed assets in production. Apps without `web.fonts` keep their
+existing behavior.
+
+## Stop a hero heading moving when its font arrives
+
+A condensed display font swapping in late reflowed a hero heading onto two
+lines during its fallback paint, then onto one line after the download.
+`font-display: swap` lets the browser paint early, but cannot make a wide
+fallback fit like a condensed font. A CSS-only font declaration also waits
+for stylesheet discovery before the browser knows which file to fetch.
+
+Font preloads start the critical download in the document head. A generated
+local fallback uses `size-adjust`, `ascent-override`, `descent-override` and
+`line-gap-override` to approximate the downloaded face's widths and line box.
+Use the generated variable so the adjusted fallback is in the stack.
+
+```ts title="src/config/web.ts"
+import type { WebConfigurations } from "@warlock.js/web";
+
+export default {
+  fonts: [
+    {
+      family: "Display",
+      variable: "--font-display",
+      fallback: ["Arial", "Helvetica"],
+      files: [
+        {
+          path: "src/fonts/display-regular.woff2",
+          weight: 400,
+          style: "normal",
+          preload: true,
+          aboveFold: true,
+        },
+        { path: "src/fonts/display-bold.woff2", weight: 700 },
+      ],
+    },
+  ],
+} satisfies WebConfigurations;
+```
+
+Place your licensed font files at those paths. Paths are relative to the app
+root, including `src/` or `public/`; URLs and files outside the app are refused.
+Import your ordinary stylesheet from `src/web/root.tsx`:
+
+```css title="src/web/app.css"
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 8vw, 7rem);
+  line-height: 1;
+}
+```
+
+```tsx title="src/web/index.page.tsx"
+export default function HomePage() {
+  return (
+    <section className="hero">
+      <h1>Make room for bold ideas</h1>
+    </section>
+  );
+}
+```
+
+Keep `<Head />` in your custom root's `<head>`. Warlock's default document
+already includes it. Both buffered HTML and the streamed document shell link
+the font stylesheet and preload each critical URL once, with `as="font"`,
+the file's MIME type and `crossorigin="anonymous"`.
+
+## Declaration options
+
+Each family requires `family`, `variable` (a unique CSS custom property
+starting with `--`) and `files`. `display` defaults to `"swap"`; the other
+values are `"auto"`, `"block"`, `"fallback"` and `"optional"`.
+
+Each file declares `path`, optional `weight` (default `400`, or a variable
+range such as `"100 900"`), `style` (`"normal"`, `"italic"` or `"oblique"`),
+`preload`, `aboveFold`, and `unicodeRange` (for example `"U+0000-00FF"`).
+Preload only faces used in the first viewport; an optional bold face further
+down the page usually does not need it. `aboveFold: true` enables development
+warnings for a missing preload or fallback. A preloaded face without a
+fallback also warns. TTF and OTF declarations warn to recommend WOFF2.
+
+`fallback` accepts `"Arial"`, `"Helvetica"`, `"Times New Roman"`,
+`"Segoe UI"`, `"Roboto"`, or an array of these. Each becomes its own local
+fallback face immediately after the real family in the variable's stack.
+Regular, bold, italic and bold italic use recorded face-specific widths and
+local face names. If a visitor lacks a local font, the browser tries the next
+entry. Select fallbacks available on your audience's operating systems.
+
+## Disable preloads for a route
+
+```tsx title="src/web/articles/layout.tsx"
+import type { LayoutConfig } from "@warlock.js/web";
+
+export const config = { fontPreload: false } satisfies LayoutConfig;
+```
+
+`fontPreload: false` on a root, layout or page suppresses all declared font
+preloads for that document. Any ancestor's opt-out wins. Styles remain linked,
+so CSS variables work on that route and after client navigation. Fonts are
+global declarations; only preload policy is route-specific. Redirects and
+data responses do not get font preloads.
+
+## Metrics and caching
+
+Warlock reads sfnt TTF/OTF, WOFF and WOFF2 tables without a font library.
+WOFF2 data is Brotli-decoded with Node's zlib; outlines are never reconstructed.
+The width estimate uses Capsize's weighted Latin character frequencies and
+`hmtx` advances; OS/2 `xAvgCharWidth` is the fallback when those tables are
+absent. Vertical metrics honor OS/2 `USE_TYPO_METRICS`, otherwise hhea.
+Development caches parsing until the configuration or file changes.
+
+If a container cannot be read, provide an equivalent single-face TTF/OTF via
+the file's `metricsPath`. That reference is only read for metrics; the declared
+`path` is still the browser asset. A failed read without a usable reference
+fails with a diagnostic instead of silently inventing adjustments. Font
+collections are unsupported. Variable fonts use their default-instance
+metrics; axis-specific interpolation and non-Latin width sampling are not
+performed. Metric matching is an estimate: particular words, shaping and
+operating-system font versions can still produce a different line break.
+
+System data and adjustment math were verified against
+[Capsize's published metrics and implementation](https://github.com/seek-oss/capsize/tree/1fcf40ae804b918b9b2289cc046f12cedf9f34ae/packages)
+and are recorded with attribution in the package. No font parsing dependency
+is added to the application.
+
+Declared files, including files under `public/`, are emitted as hashed
+`/assets/font-….woff2` URLs. They reuse production's
+`Cache-Control: public, max-age=31536000, immutable` serving. The generated CSS
+is hashed too. An existing unhashed `/fonts/example.ttf` URL keeps the normal
+public-file cache policy; update CSS to use the variable and remove old
+handwritten `@font-face` declarations when migrating. Font files are not
+converted automatically: supply WOFF2 files yourself.

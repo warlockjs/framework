@@ -5,8 +5,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { SitesConfig } from "../sites/site-config.types";
 
-/** The build-safe subset of `web.sites`; runtime callbacks never cross this boundary. */
-export type WebBuildConfig = { sites?: SitesConfig };
+/** The build-safe web configuration: site routing facts and font declarations. */
+export type WebBuildConfig = {
+  sites?: SitesConfig;
+  fonts?: readonly import("../fonts/types").WebFont[];
+};
 
 type Esbuild = typeof import("esbuild");
 
@@ -100,10 +103,10 @@ export async function loadWebBuildConfig(appRoot: string): Promise<WebBuildConfi
 
   try {
     const module = (await import(pathToFileURL(bundleFile).href)) as {
-      default?: { sites?: SitesConfig };
+      default?: WebBuildConfig;
     };
 
-    return { sites: staticSites(module.default?.sites) };
+    return { sites: staticSites(module.default?.sites), fonts: module.default?.fonts };
   } finally {
     await unlink(bundleFile).catch(() => {});
   }

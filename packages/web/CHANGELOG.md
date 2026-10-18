@@ -1,6 +1,13 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to `@warlock.js/web` are documented here.
+
+## 5.32.0
+
+### Added
+
+- Declare self-hosted fonts once with typed `web.fonts`: generated font-face CSS and variables, critical preloads in buffered and streamed heads, page/layout/root preload opt-outs, and metric-matched local fallbacks. Dependency-free sfnt/WOFF/WOFF2 metrics use Capsize's recorded system metrics and weighted Latin advances to reduce layout shifts when a condensed display font swaps into a hero heading.
+- Declared font files and their stylesheet are hashed Vite assets with the existing one-year immutable production cache. Development caches metrics and warns about TTF/OTF files and critical faces missing preload or fallback.
 
 ## 5.31.0 - 2026-10-18
 

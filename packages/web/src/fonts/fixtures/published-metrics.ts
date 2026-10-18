@@ -1,0 +1,43 @@
+// Recorded Capsize metrics; provenance and license in ../CAPSIZE-LICENSE.txt and README.md.
+export default {
+  abel: {
+    familyName: "Abel",
+    fullName: "Abel Regular",
+    postscriptName: "Abel-Regular",
+    ascent: 2006,
+    descent: -604,
+    lineGap: 0,
+    unitsPerEm: 2048,
+    xWidthAvg: 783,
+  },
+  roboto: {
+    familyName: "Roboto",
+    fullName: "Roboto Regular",
+    postscriptName: "Roboto-Regular",
+    ascent: 1900,
+    descent: -500,
+    lineGap: 0,
+    unitsPerEm: 2048,
+    xWidthAvg: 911,
+  },
+  arial: {
+    familyName: "Arial",
+    fullName: "Arial",
+    postscriptName: "ArialMT",
+    ascent: 1854,
+    descent: -434,
+    lineGap: 67,
+    unitsPerEm: 2048,
+    xWidthAvg: 913,
+  },
+  timesNewRoman: {
+    familyName: "Times New Roman",
+    fullName: "Times New Roman",
+    postscriptName: "TimesNewRomanPSMT",
+    ascent: 1825,
+    descent: -443,
+    lineGap: 87,
+    unitsPerEm: 2048,
+    xWidthAvg: 832,
+  },
+};
