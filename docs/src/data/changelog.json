@@ -132,6 +132,806 @@
   ],
   "releases": [
     {
+      "version": "5.32.0",
+      "id": "v5-32-0",
+      "date": "October 18, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>TypeScript 7 across the family, metric-matched web fonts, and fixes from upgrading real apps to 5.31.</strong> Every package, new app and the release tooling move to TypeScript 7.0.2 (the native <code>tsc</code>): the workspace typecheck drops from about 1 min 51 s to 36 s, <code>warlock typecheck</code>/<code>check</code> and the dev-server checker run on the native compiler, and syntax analysis uses oxc-parser. Apps drop <code>baseUrl</code> and <code>moduleResolution: node</code>/<code>node10</code> from their tsconfig. New apps default to Oxlint + Oxfmt; the opt-in ESLint toolchain stays on TypeScript 6.0.3 because typescript-eslint does not support TypeScript 7. Web: declared fonts with preload, metric-matched fallbacks that stop the layout shift when a web font swaps in, and immutable caching. AI: opt-in native MCP results, private permissions for snapshot/session/cassette files, Gemini Developer API token counting with system prompts and tools (with an estimate fallback), hosted-search usage and cost across providers, Qwen search and Kimi search/fetch tools. Security: esbuild 0.28.2 (GHSA-g7r4-m6w7-qqqr). Notifications imports herald as an optional peer instead of bundling a private copy. Agents get <code>report-framework-issue.md</code> and <code>warlock issue</code> to file framework issues with consent. <strong>Breaking:</strong> TypeScript 7 config changes, private AI file modes, herald must be installed for <code>.queue()</code> with the herald backend. Lockstep release across all 32 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.32.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock issue [--type bug|feature] [--title \"...\"] [--json]</code> collects installed environment details and a static config summary without booting the app, then prints a bounded pre-filled framework issue URL; it never submits anything. Add bug/feature issue forms and the <code>report-framework-issue.md</code> agent topic with minimal-repro, privacy, duplicate-search and user-consent guidance."
+            },
+            {
+              "type": "Changed",
+              "html": "Clarify the upgrade skill: new scaffolds default to Oxlint/Oxfmt and TypeScript 7.0.2; explicit ESLint mode stays on TypeScript 6.0.3 to satisfy typescript-eslint, with deprecation planned for 5.33 and removal for 5.34."
+            },
+            {
+              "type": "Changed",
+              "html": "Verify generated web stubs with the scaffold’s TypeScript-independent Prettier import sorter, including an explicit no-plugin negative control and decorator parsing; align the contact controller stub’s inline type-specifier order."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> pin <code>typescript</code> to 7.0.2, whose <code>tsc</code> command uses the native Go compiler. Apps must remove <code>baseUrl</code>, rebase <code>paths</code>, replace <code>moduleResolution: \"node\"</code> / <code>\"node10\"</code>, and declare ambient Node types explicitly."
+            },
+            {
+              "type": "Changed",
+              "html": "Preserve incremental CLI checks and changed-file filtering; reuse a native compiler session for per-file development diagnostics and close it on shutdown."
+            },
+            {
+              "type": "Changed",
+              "html": "Parse imports, configuration, translation keys, model/resource typings, convention checks, page discovery and doctor migrations with OXC instead of the removed JavaScript compiler API."
+            },
+            {
+              "type": "Fixed",
+              "html": "Fix source development workers on Node.js 24 failing to load Node builtins through native dependencies, restoring background TypeScript health checks."
+            },
+            {
+              "type": "Security",
+              "html": "Upgrade esbuild to ^0.28.2, past the Windows development-server advisory <a href=\"https://github.com/advisories/GHSA-g7r4-m6w7-qqqr\">GHSA-g7r4-m6w7-qqqr</a> (patched in 0.28.1)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Declare self-hosted fonts once with typed <code>web.fonts</code>: generated font-face CSS and variables, critical preloads in buffered and streamed heads, page/layout/root preload opt-outs, and metric-matched local fallbacks. Dependency-free sfnt/WOFF/WOFF2 metrics use Capsize's recorded system metrics and weighted Latin advances to reduce layout shifts when a condensed display font swaps into a hero heading."
+            },
+            {
+              "type": "Added",
+              "html": "Declared font files and their stylesheet are hashed Vite assets with the existing one-year immutable production cache. Development caches metrics and warns about TTF/OTF files and critical faces missing preload or fallback."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Security",
+              "html": "Upgrade esbuild to ^0.28.2, past the Windows development-server advisory <a href=\"https://github.com/advisories/GHSA-g7r4-m6w7-qqqr\">GHSA-g7r4-m6w7-qqqr</a> (patched in 0.28.1)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Provider-reported hosted-tool usage counters, per-request <code>ModelPricing.serverTools</code> rates and historical <code>cost.serverTools</code> amounts; <code>mergeUsage</code> and <code>totalCost</code> include them. Budget reserve mode accepts <code>serverToolRequests</code> with fail-closed fee pricing. Responses and streaming terminal chunks retain raw provider metadata; agent trips retain metadata and handle adapter-supplied hosted continuations within <code>maxTrips</code> without function dispatch."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.snapshot.file({ dir, dirMode?, fileMode? })</code> accepts custom permission modes with private defaults, refusing invalid modes and group/other write bits."
+            },
+            {
+              "type": "Changed",
+              "html": "Update provider-tool guidance to use the first-party Kimi search/fetch client tools and their usage accounting, replacing the unreleased builtin path retiring on 20 October 2026."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>countInputTokens</code> falls back to a full-input estimate when native counting explicitly signals <code>InvalidRequestError.reason: \"count-unsupported\"</code>, keeping reserve-mode budget preflight usable with unsupported request shapes while propagating real provider errors."
+            },
+            {
+              "type": "Security",
+              "html": "Local snapshot and VCR cassette stores create directories with <code>0700</code> and JSON files with exactly <code>0600</code>, including temporary files before atomic rename and rewrites of older files. Existing directories are never chmod-ed. SQLite path stores create private parents and set the database and journal/WAL/SHM sidecars to <code>0600</code>; caller-supplied database connections retain caller-managed permissions. POSIX modes are ignored on Windows."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> the default scaffold toolchain is now Oxlint + Oxfmt (<code>--lint=oxc</code>) with TypeScript 7.0.2. Explicit <code>--lint=eslint</code> retains ESLint + Prettier with TypeScript 6.0.3 so npm, pnpm and yarn can satisfy typescript-eslint's peer range. The wizard, help and headless defaults agree."
+            },
+            {
+              "type": "Changed",
+              "html": "ESLint selection prints one compatibility notice explaining the TypeScript 6.0.3 pin and planned deprecation in 5.33 / removal in 5.34. The scaffold gate accepts <code>--lint</code> and <code>--pm</code> to verify both toolchains with npm, pnpm or yarn; CI exercises Oxc by default."
+            },
+            {
+              "type": "Changed",
+              "html": "Replace the Prettier import organizer with <code>@ianvs/prettier-plugin-sort-imports</code> so import sorting works with TypeScript 7. Keep built-ins, packages, internal aliases and relative imports in one block, with separate type imports; align Oxfmt’s internal-alias groups with the same template source. Formatters retain unused imports; ESLint or Oxlint reports them."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> scaffold the default Oxlint/Oxfmt mode with TypeScript 7.0.2 using the native <code>tsc</code> command, supported tsconfig options and explicit Node types. Existing apps must remove <code>baseUrl</code>, rebase <code>paths</code>, and replace classic Node module resolution."
+            },
+            {
+              "type": "Changed",
+              "html": "Document the optional ESLint parser's dependence on the removed JavaScript compiler API; keep its compiler isolated in the monorepo's development tooling so ESLint specs remain executable while the default scaffold uses TS7."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Export <code>kimiSearchTool()</code> (Basic/Pro), <code>kimiFetchTool()</code> and verified <code>KIMI_SERVER_TOOL_PRICING</code>: authenticated, cancellable first-party REST calls with compact results, mapped errors, no automatic retries, and billable response usage/costs aggregated into agent reports."
+            },
+            {
+              "type": "Added",
+              "html": "Retain Responses hosted output/actions/sources and count web-search calls without double-counting stream snapshots. Export opt-in <code>OPENAI_SERVER_TOOL_PRICING</code>. Support typed Qwen/DashScope <code>enableSearch</code> flags."
+            },
+            {
+              "type": "Changed",
+              "html": "Remove the unreleased Kimi/Moonshot <code>$web_search</code> builtin echo path; reject declarations of the builtin retiring on 20 October 2026 and document migration to standalone REST tools."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "Verified that Responses native token counting preserves the shared unsupported-count signal for <code>countInputTokens</code> estimation while authentication errors propagate."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>mcpResult(...)</code> and its <code>McpNativeResult</code> type explicitly mark native tool results. <code>serve(..., { results: \"native\" })</code> enables detection for existing native-returning tools; <code>meta.mcpResults: \"native\" | \"text\"</code> overrides detection per tool."
+            },
+            {
+              "type": "Added",
+              "html": "<code>meta.outputSchema</code> advertises structured tool output in <code>tools/list</code>; <code>McpToolCallResult</code> now includes <code>structuredContent</code> and <code>_meta</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "Opted-in native MCP tool results preserve content blocks, <code>isError</code>, <code>structuredContent</code> and <code>_meta</code> over stdio and HTTP, including tools with an advertised output schema. Per-request headers and abort signals remain available to tools; default result serialization and thrown-tool error handling are unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "Malformed native results produce a JSON-RPC internal error instead of sending invalid MCP payloads."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Map cumulative hosted web-search/fetch usage in completions and streams while preserving server-tool blocks. Export verified request-fee prices as <code>ANTHROPIC_SERVER_TOOL_PRICING</code> for explicit pricing composition."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "Verified that native token counting preserves the shared unsupported-count signal for <code>countInputTokens</code> estimation while authentication errors propagate."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "Verified that native token counting preserves the shared unsupported-count signal for <code>countInputTokens</code> estimation while authentication errors propagate."
+            },
+            {
+              "type": "Fixed",
+              "html": "Clarify that Converse TokenUsage exposes no hosted-search request counter; system-tool blocks cannot establish request fees and no count is fabricated."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Preserve raw candidate grounding metadata and normalize unique nonempty search queries in completions and streams. Export opt-in Gemini 3+ request prices as <code>GOOGLE_SERVER_TOOL_PRICING</code>; document older models’ per-prompt billing."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "Gemini Developer API token counting sends the full <code>generateContentRequest</code>, including system instructions, tools and generation settings, through the existing SDK transport with cancellation and error mapping. Vertex counting is unchanged; unsupported cached-content counts carry the typed signal used by <code>countInputTokens</code> to estimate."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Replace the unused classic TypeScript import-organizer development dependency with <code>@ianvs/prettier-plugin-sort-imports</code>, compatible with TypeScript 7."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Security",
+              "html": "Upgrade esbuild to ^0.28.2, past the Windows development-server advisory <a href=\"https://github.com/advisories/GHSA-g7r4-m6w7-qqqr\">GHSA-g7r4-m6w7-qqqr</a> (patched in 0.28.1)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Replace the unused classic TypeScript import-organizer development dependency with <code>@ianvs/prettier-plugin-sort-imports</code>, compatible with TypeScript 7."
+            },
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Changed",
+              "html": "Rebaseline the type benchmark on TS7 with <code>--checkers 1</code> so type/instantiation counts remain deterministic; resolve the compiler through its exported package manifest."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "Use the canonical usage rollup for trace aggregates, retaining hosted-tool counters and historical request fees alongside cache lifetime and mixed-provider cache semantics."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "Document and test explicit rejection of native <code>web_search</code> / <code>x_search</code> on the current Chat Completions transport, with guidance to use xAI’s Responses API before any request is sent."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            },
+            {
+              "type": "Fixed",
+              "html": "The published package no longer carries a private, bundled copy of <code>@warlock.js/herald</code>'s source. Because herald was declared as an optional dependency, the release build did not treat it as external and inlined it, so an app using both packages could get two separate herald instances. Herald is now an optional peer and is always imported from the app's own installation."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-cli",
+          "slug": "ai-cli",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.31.0",
       "id": "v5-31-0",
       "date": "October 18, 2026",

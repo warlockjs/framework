@@ -1,4 +1,10 @@
 {
+  "5.32.0": {
+    "publishedAt": "2026-10-18T17:12:16.261Z",
+    "matrix": "none",
+    "summary": "**TypeScript 7 across the family, metric-matched web fonts, and fixes from upgrading real apps to 5.31.** Every package, new app and the release tooling move to TypeScript 7.0.2 (the native `tsc`): the workspace typecheck drops from about 1 min 51 s to 36 s, `warlock typecheck`/`check` and the dev-server checker run on the native compiler, and syntax analysis uses oxc-parser. Apps drop `baseUrl` and `moduleResolution: node`/`node10` from their tsconfig. New apps default to Oxlint + Oxfmt; the opt-in ESLint toolchain stays on TypeScript 6.0.3 because typescript-eslint does not support TypeScript 7. Web: declared fonts with preload, metric-matched fallbacks that stop the layout shift when a web font swaps in, and immutable caching. AI: opt-in native MCP results, private permissions for snapshot/session/cassette files, Gemini Developer API token counting with system prompts and tools (with an estimate fallback), hosted-search usage and cost across providers, Qwen search and Kimi search/fetch tools. Security: esbuild 0.28.2 (GHSA-g7r4-m6w7-qqqr). Notifications imports herald as an optional peer instead of bundling a private copy. Agents get `report-framework-issue.md` and `warlock issue` to file framework issues with consent. **Breaking:** TypeScript 7 config changes, private AI file modes, herald must be installed for `.queue()` with the herald backend. Lockstep release across all 32 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.32.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+    "featured": ["@warlock.js/core", "@warlock.js/web", "@warlock.js/ai", "create-warlock"]
+  },
   "5.31.0": {
     "publishedAt": "2026-10-18T06:18:43.973Z",
     "matrix": "none",
