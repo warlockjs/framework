@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Clarify the upgrade skill: new scaffolds default to Oxlint/Oxfmt and TypeScript 7.0.2; explicit ESLint mode stays on TypeScript 6.0.3 to satisfy typescript-eslint, with deprecation planned for 5.33 and removal for 5.34.
+
 - Verify generated web stubs with the scaffold’s TypeScript-independent Prettier import sorter, including an explicit no-plugin negative control and decorator parsing; align the contact controller stub’s inline type-specifier order.
 - **BREAKING:** pin `typescript` to 7.0.2, whose `tsc` command uses the native Go compiler. Apps must remove `baseUrl`, rebase `paths`, replace `moduleResolution: "node"` / `"node10"`, and declare ambient Node types explicitly.
 - Preserve incremental CLI checks and changed-file filtering; reuse a native compiler session for per-file development diagnostics and close it on shutdown.

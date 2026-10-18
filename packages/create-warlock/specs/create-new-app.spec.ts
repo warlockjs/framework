@@ -1123,6 +1123,23 @@ describe("createNewApp — default TTY path", () => {
 });
 
 describe("wizard lint toolchain", () => {
+  it.each([true, false])("defaults to Oxc with yes=%s", async (yes) => {
+    await createNewApp({ name: "default-lint", yes, db: "none", stack: "api" });
+    expect(capturedApp().options.lint).toBe("oxc");
+  });
+
+  it("seeds the wizard with Oxc when --lint is omitted", async () => {
+    primeHappyPath();
+    await createNewApp({ interactive: true });
+    expect(askLintToolchain).toHaveBeenCalledWith("oxc");
+    expect(capturedApp().options.lint).toBe("oxc");
+  });
+
+  it("carries explicit ESLint into headless scaffolding", async () => {
+    await createNewApp({ name: "eslint-app", yes: true, lint: "eslint" });
+    expect(capturedApp().options.lint).toBe("eslint");
+  });
+
   it("preselects --lint and carries the chosen toolchain into scaffolding", async () => {
     primeHappyPath();
     await createNewApp({ interactive: true, lint: "oxc" });

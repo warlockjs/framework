@@ -47,7 +47,7 @@ The first positional argument (or `--name`) is the project name. Value flags acc
 | `--db` / `--no-db`             | yes / no    | `mongodb`                                                           | Database driver — `mongodb`, `postgres`, or `none` (`--no-db` is shorthand for `--db=none`)                                                                                 |
 | `--pm`                         | yes         | inferred (`npm_config_user_agent` or the system)                    | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts                                                            |
 | `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys                                                                                                                                       |
-| `--lint`                       | yes         | `eslint`                                                            | Development toolchain: `oxc` for Oxlint/Oxfmt or `eslint` for ESLint/Prettier; invalid or missing values fail before writes                                                 |
+| `--lint`                       | yes         | `oxc`                                                               | Development toolchain: `oxc` for Oxlint/Oxfmt or `eslint` for ESLint/Prettier; invalid or missing values fail before writes                                                 |
 | `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`)                                                                                                              |
 | `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets to derive docs/skills for — validated against the published target list, cached after the first lookup |
 | `--git` / `--no-git`           | no          | off                                                                 | Force-enable or force-disable git initialization                                                                                                                            |
@@ -106,8 +106,7 @@ after every change.
 ### Prettier import sorting
 
 The ESLint toolchain uses `@ianvs/prettier-plugin-sort-imports` 4.7.1, which parses
-imports with Babel and works independently of the app’s native TypeScript 7
-compiler. The template config keeps built-ins, packages, internal aliases
+imports with Babel and works independently of the app’s TypeScript compiler. The template config keeps built-ins, packages, internal aliases
 (`app/*`, `web/*`, `@shared/*`), then relative imports in one block:
 
 ```json
@@ -127,7 +126,7 @@ Formatting retains unused imports; run `npm run lint:check` to report them or
 
 ### Oxc tooling
 
-`--lint=oxc` installs pinned Oxlint 1.88.0 and Oxfmt 0.73.0, generates
+`--lint=oxc` is the default and installs pinned Oxlint 1.88.0 and Oxfmt 0.73.0, generates
 `.oxlintrc.json` and `.oxfmtrc.json`, and provides `lint`/`format` plus
 non-mutating `lint:check`/`format:check` scripts. It enables the Oxlint dev-server
 checker, disables the ESLint checker and keeps TypeScript checks enabled.
@@ -149,7 +148,7 @@ same under npm, pnpm and yarn without going through `npx`.
 Oxc scaffolds also write VS Code settings that select the official
 [Oxc extension](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode)
 for format-on-save (`editor.defaultFormatter: "oxc.oxc-vscode"`) and lint fixes
-(`source.fixAll.oxc`), and recommend it in `.vscode/extensions.json`. The default
+(`source.fixAll.oxc`), and recommend it in `.vscode/extensions.json`. The opt-in
 ESLint toolchain retains its existing Prettier/ESLint editor settings.
 
 ## Scaffolding without a database
@@ -185,13 +184,16 @@ Inside an existing pnpm workspace the app gets neither: the parent workspace's s
 
 ## TypeScript 7 in 5.32
 
-New projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
+Default Oxlint/Oxfmt projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
 The template uses `module: "ESNext"`, `moduleResolution: "bundler"`, explicit
 Node types, and `paths` relative to its tsconfig, without `baseUrl`.
 Existing apps must remove `baseUrl`, rebase alias targets, and replace
 `moduleResolution: "node"` / `"node10"` before typechecking.
 
-Use the Oxlint/Oxfmt lint mode with TS7. The optional ESLint scaffold is retained,
-but typescript-eslint's parser requires the removed JavaScript compiler API and
-does not support TS7. ESLint mode is scheduled for deprecation in 5.33 and removal
-in 5.34. A parser's bundled older TypeScript is separate from the app's native `tsc`.
+Explicit `--lint=eslint` projects pin `typescript` to **6.0.3**, the newest version
+supported by typescript-eslint. Its parser requires the JavaScript compiler API
+removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
+([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
+Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
+ESLint mode prints a compatibility notice when chosen and is planned for
+deprecation in 5.33 and removal in 5.34. Both modes install with npm, pnpm and yarn.

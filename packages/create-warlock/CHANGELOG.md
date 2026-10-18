@@ -8,9 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **BREAKING:** the default scaffold toolchain is now Oxlint + Oxfmt (`--lint=oxc`) with TypeScript 7.0.2. Explicit `--lint=eslint` retains ESLint + Prettier with TypeScript 6.0.3 so npm, pnpm and yarn can satisfy typescript-eslint's peer range. The wizard, help and headless defaults agree.
+- ESLint selection prints one compatibility notice explaining the TypeScript 6.0.3 pin and planned deprecation in 5.33 / removal in 5.34. The scaffold gate accepts `--lint` and `--pm` to verify both toolchains with npm, pnpm or yarn; CI exercises Oxc by default.
 - Replace the Prettier import organizer with `@ianvs/prettier-plugin-sort-imports` so import sorting works with TypeScript 7. Keep built-ins, packages, internal aliases and relative imports in one block, with separate type imports; align Oxfmt’s internal-alias groups with the same template source. Formatters retain unused imports; ESLint or Oxlint reports them.
-- **BREAKING:** scaffold TypeScript 7.0.2 with the native `tsc` command, supported tsconfig options and explicit Node types. Existing apps must remove `baseUrl`, rebase `paths`, and replace classic Node module resolution.
-- Document the optional ESLint parser's dependence on the removed JavaScript compiler API; keep its compiler isolated in development tooling so scaffold specs remain executable while app typechecks use TS7.
+- **BREAKING:** scaffold the default Oxlint/Oxfmt mode with TypeScript 7.0.2 using the native `tsc` command, supported tsconfig options and explicit Node types. Existing apps must remove `baseUrl`, rebase `paths`, and replace classic Node module resolution.
+- Document the optional ESLint parser's dependence on the removed JavaScript compiler API; keep its compiler isolated in the monorepo's development tooling so ESLint specs remain executable while the default scaffold uses TS7.
+
+### Upgrading
+
+- Omit `--lint` for Oxlint + Oxfmt and TypeScript 7.0.2. Pass `--lint=eslint` explicitly to retain ESLint + Prettier on TypeScript 6.0.3. Existing apps keep their chosen tools; both modes use relative `paths`, no `baseUrl` and bundler module resolution.
 
 ## 5.31.0 - 2026-10-18
 

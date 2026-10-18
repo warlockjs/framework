@@ -19,7 +19,7 @@ export function printDecisionsSummary({ packageManager, options }: Decisions): v
   const headline = [
     `Using ${packageManager}`,
     `database: ${databaseLabel}`,
-    `lint: ${options.lint ?? "eslint"}`,
+    `lint: ${options.lint ?? "oxc"}`,
     `agent-kit targets: ${options.agents.join(", ")}`,
   ].join(" · ");
 

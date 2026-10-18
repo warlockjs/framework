@@ -78,11 +78,14 @@ function assertPass(result: ReturnType<typeof run>) {
 }
 
 describe("lint toolchain flags and prompt", () => {
-  it("parses both flag forms and defaults to eslint", () => {
+  it("parses both flag forms and defaults to oxc", () => {
     expect(parseFlags(["app", "--lint=oxc"]).lint).toBe("oxc");
     expect(parseFlags(["app", "--lint", "eslint"]).lint).toBe("eslint");
-    expect(resolveNonInteractiveOptions({}).lint).toBe("eslint");
+    expect(resolveNonInteractiveOptions({}).lint).toBe("oxc");
     expect(resolveNonInteractiveOptions({ lint: "oxc" }).lint).toBe("oxc");
+    expect(resolveNonInteractiveOptions({ lint: "eslint" }).lint).toBe("eslint");
+    expect(seedFromFlags({}).lint).toBe("oxc");
+    expect(seedFromFlags({ lint: "eslint" }).lint).toBe("eslint");
     expect(seedFromFlags({ lint: "oxc" }).lint).toBe("oxc");
     expect(buildHelpText()).toContain("--lint=<oxc|eslint>");
   });
@@ -97,9 +100,9 @@ describe("lint toolchain flags and prompt", () => {
     );
   });
 
-  it("offers both toolchains and preselects the provided answer", async () => {
+  it("offers both toolchains and preselects Oxc by default", async () => {
     select.mockResolvedValueOnce("oxc");
-    expect(await askLintToolchain("oxc")).toBe("oxc");
+    expect(await askLintToolchain()).toBe("oxc");
     expect(select.mock.calls[0][0]).toMatchObject({
       initialValue: "oxc",
       options: [
@@ -108,12 +111,28 @@ describe("lint toolchain flags and prompt", () => {
       ],
     });
   });
+  it("preselects explicit ESLint in the wizard", async () => {
+    select.mockResolvedValueOnce("eslint");
+    expect(await askLintToolchain("eslint")).toBe("eslint");
+    expect(select.mock.calls[0][0].initialValue).toBe("eslint");
+  });
 });
 
 describe("generated toolchains", () => {
-  it("retains ESLint/Prettier as the default and provides non-mutating scripts", () => {
-    const { appPath } = scaffold();
+  it.each(["oxc", "eslint"] as const)("uses supported tsconfig options for %s", (lint) => {
+    const { appPath } = scaffold(lint);
+    const config = readFileSync(path.join(appPath, "tsconfig.json"), "utf8");
+    expect(config).not.toContain('"baseUrl"');
+    expect(config).toContain('"module": "ESNext"');
+    expect(config).toContain('"moduleResolution": "bundler"');
+    expect(config).toContain('"types": ["node"]');
+    expect(config).toContain('"app/*": ["./src/app/*"]');
+  });
+
+  it("retains explicit ESLint/Prettier on TypeScript 6.0.3 and provides non-mutating scripts", () => {
+    const { appPath } = scaffold("eslint");
     const pkg = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
+    expect(pkg.devDependencies.typescript).toBe("6.0.3");
     expect(pkg.devDependencies.eslint).toBeTruthy();
     expect(pkg.devDependencies.prettier).toBeTruthy();
     expect(pkg.devDependencies["@ianvs/prettier-plugin-sort-imports"]).toBe("^4.7.1");
@@ -133,7 +152,7 @@ describe("generated toolchains", () => {
   });
 
   it.each([false, true])("emits ESLint/Prettier-clean source for web=%s", (web) => {
-    const { appPath } = scaffold(undefined, web);
+    const { appPath } = scaffold("eslint", web);
     assertPass(
       run(path.join(packageRoot, "node_modules/eslint/bin/eslint.js"), appPath, [
         "./src",
@@ -150,65 +169,73 @@ describe("generated toolchains", () => {
     );
   });
 
-  it.each([false, true])("pins Oxc and wires its checker for web=%s", (web) => {
-    const { appPath, app } = scaffold("oxc", web);
-    app.configureLintToolchain();
-    const pkg = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
-    expect(pkg.devDependencies.oxlint).toBe("1.88.0");
-    expect(pkg.devDependencies.oxfmt).toBe("0.73.0");
-    if (web) {
-      expect(pkg.dependencies["@mongez/react-form"]).toBeTruthy();
-      expect(pkg.devDependencies.tailwindcss).toBeTruthy();
-    }
-    expect(Object.keys(pkg.devDependencies).filter((name) => /eslint|prettier/.test(name))).toEqual(
-      [],
-    );
-    for (const name of [".oxlintrc.json", ".oxfmtrc.json"])
-      expect(existsSync(path.join(appPath, name))).toBe(true);
-    const format = JSON.parse(readFileSync(path.join(appPath, ".oxfmtrc.json"), "utf8"));
-    expect(format.sortImports).toEqual({
-      newlinesBetween: false,
-      internalPattern: ["app/", "web/", "@shared/"],
-    });
-    for (const script of ["lint", "lint:check", "format", "format:check"])
-      expect(pkg.scripts[script]).toMatch(/^ox(lint|fmt) /);
-    for (const name of ["eslint.config.js", ".prettierrc.json", ".prettierignore"])
-      expect(existsSync(path.join(appPath, name))).toBe(false);
-    const config = readFileSync(path.join(appPath, "warlock.config.ts"), "utf8");
-    expect(config.match(/healthCheckers:/g)).toHaveLength(1);
-    expect(config).toContain("healthCheckers: { eslint: false, oxlint: true }");
-    const settings = JSON.parse(readFileSync(path.join(appPath, ".vscode/settings.json"), "utf8"));
-    expect(settings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode");
-    expect(settings["editor.formatOnSave"]).toBe(true);
-    expect(settings["editor.codeActionsOnSave"]).toEqual({
-      "source.fixAll.oxc": "explicit",
-      "source.organizeImports": "never",
-    });
-    for (const language of [
-      "typescript",
-      "typescriptreact",
-      "javascript",
-      "javascriptreact",
-      "json",
-      "css",
-    ]) {
-      expect(settings[`[${language}]`]["editor.defaultFormatter"]).toBe("oxc.oxc-vscode");
-    }
-    expect(settings["oxc.enable.oxlint"]).toBe(true);
-    expect(settings["oxc.enable.oxfmt"]).toBe(true);
-    expect(settings["oxc.requireConfig"]).toBe(true);
-    expect(
-      Object.keys(settings).some((key) => key.startsWith("prettier.") || key.startsWith("eslint.")),
-    ).toBe(false);
-    const extensions = JSON.parse(
-      readFileSync(path.join(appPath, ".vscode/extensions.json"), "utf8"),
-    );
-    expect(extensions.recommendations).toContain("oxc.oxc-vscode");
-    expect(Object.keys(pkg.devDependencies)).toEqual(
-      Object.keys(pkg.devDependencies).sort((left, right) => left.localeCompare(right)),
-    );
-    expect(existsSync(path.join(appPath, "src/web"))).toBe(web);
-  });
+  it.each([false, true])(
+    "defaults to pinned Oxc and TypeScript 7 and wires its checker for web=%s",
+    (web) => {
+      const { appPath, app } = scaffold(undefined, web);
+      app.configureLintToolchain();
+      const pkg = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
+      expect(pkg.devDependencies.typescript).toBe("7.0.2");
+      expect(pkg.devDependencies.oxlint).toBe("1.88.0");
+      expect(pkg.devDependencies.oxfmt).toBe("0.73.0");
+      if (web) {
+        expect(pkg.dependencies["@mongez/react-form"]).toBeTruthy();
+        expect(pkg.devDependencies.tailwindcss).toBeTruthy();
+      }
+      expect(
+        Object.keys(pkg.devDependencies).filter((name) => /eslint|prettier/.test(name)),
+      ).toEqual([]);
+      for (const name of [".oxlintrc.json", ".oxfmtrc.json"])
+        expect(existsSync(path.join(appPath, name))).toBe(true);
+      const format = JSON.parse(readFileSync(path.join(appPath, ".oxfmtrc.json"), "utf8"));
+      expect(format.sortImports).toEqual({
+        newlinesBetween: false,
+        internalPattern: ["app/", "web/", "@shared/"],
+      });
+      for (const script of ["lint", "lint:check", "format", "format:check"])
+        expect(pkg.scripts[script]).toMatch(/^ox(lint|fmt) /);
+      for (const name of ["eslint.config.js", ".prettierrc.json", ".prettierignore"])
+        expect(existsSync(path.join(appPath, name))).toBe(false);
+      const config = readFileSync(path.join(appPath, "warlock.config.ts"), "utf8");
+      expect(config.match(/healthCheckers:/g)).toHaveLength(1);
+      expect(config).toContain("healthCheckers: { eslint: false, oxlint: true }");
+      const settings = JSON.parse(
+        readFileSync(path.join(appPath, ".vscode/settings.json"), "utf8"),
+      );
+      expect(settings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode");
+      expect(settings["editor.formatOnSave"]).toBe(true);
+      expect(settings["editor.codeActionsOnSave"]).toEqual({
+        "source.fixAll.oxc": "explicit",
+        "source.organizeImports": "never",
+      });
+      for (const language of [
+        "typescript",
+        "typescriptreact",
+        "javascript",
+        "javascriptreact",
+        "json",
+        "css",
+      ]) {
+        expect(settings[`[${language}]`]["editor.defaultFormatter"]).toBe("oxc.oxc-vscode");
+      }
+      expect(settings["oxc.enable.oxlint"]).toBe(true);
+      expect(settings["oxc.enable.oxfmt"]).toBe(true);
+      expect(settings["oxc.requireConfig"]).toBe(true);
+      expect(
+        Object.keys(settings).some(
+          (key) => key.startsWith("prettier.") || key.startsWith("eslint."),
+        ),
+      ).toBe(false);
+      const extensions = JSON.parse(
+        readFileSync(path.join(appPath, ".vscode/extensions.json"), "utf8"),
+      );
+      expect(extensions.recommendations).toContain("oxc.oxc-vscode");
+      expect(Object.keys(pkg.devDependencies)).toEqual(
+        Object.keys(pkg.devDependencies).sort((left, right) => left.localeCompare(right)),
+      );
+      expect(existsSync(path.join(appPath, "src/web"))).toBe(web);
+    },
+  );
 
   // Standalone scaffolder checkouts do not install the monorepo's root tools.
   it.skipIf(!hasOxc).each([false, true])(

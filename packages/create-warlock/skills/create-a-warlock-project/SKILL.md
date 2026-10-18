@@ -55,7 +55,7 @@ Because almost every choice defaults silently, `create-warlock` prints what it
 decided right after scaffolding, e.g.:
 
 ```
-Using npm · database: none · lint: eslint · agent-kit targets: claude
+Using npm · database: none · lint: oxc · agent-kit targets: claude
 Features: none
   change these — package manager: --pm, database: --db/--no-db, agents: --agents,
   features: --features, ai: --ai, lint: --lint, git: --git/--no-git, jwt: --jwt/--no-jwt — or
@@ -72,7 +72,7 @@ Features: none
 | `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                                     |
 | `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
 | `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default.                |
-| `--lint`                       | yes         | `eslint`                                                            | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier); unknown or missing values fail before writes.                      |
+| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier); unknown or missing values fail before writes.                      |
 | `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                                        |
 | `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                                       |
 | `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                                   |
@@ -201,13 +201,18 @@ a total count; the success screen shows the complete list.
 
 ## Choose the linter and formatter
 
-`--lint=eslint` is the default. `--lint=oxc` (also `--lint oxc`) installs exact
+`--lint=oxc` is the default. It also accepts `--lint oxc` and installs exact
 `oxlint@1.88.0` and `oxfmt@0.73.0` versions, emits `.oxlintrc.json` and
 `.oxfmtrc.json`, and removes the template's ESLint/Prettier configs and dependencies.
-The custom wizard prompts for the same choice; a flag preselects it.
+Pass `--lint=eslint` to opt in to ESLint/Prettier. The custom wizard prompts for
+the same choice; a flag preselects it.
 
 ```bash
-npm create warlock@latest my-app -- --lint=oxc --yes
+# Default: Oxlint + Oxfmt, TypeScript 7.0.2
+npm create warlock@latest my-app -- --yes
+
+# Explicit opt-in: ESLint + Prettier, TypeScript 6.0.3
+npm create warlock@latest my-eslint-app -- --lint=eslint --yes
 ```
 
 Both choices provide `lint`/`format` and non-mutating `lint:check`/`format:check`
@@ -232,18 +237,21 @@ Scripts in both toolchains call local binaries
 
 ## TypeScript 7 in 5.32
 
-New projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
+Default Oxlint/Oxfmt projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
 The template uses `module: "ESNext"`, `moduleResolution: "bundler"`, explicit
 Node types, and `paths` relative to its tsconfig, without `baseUrl`.
 Existing apps must remove `baseUrl`, rebase alias targets, and replace
 `moduleResolution: "node"` / `"node10"` before typechecking.
 
-Use the Oxlint/Oxfmt lint mode with TS7. The optional ESLint scaffold is retained,
-but typescript-eslint's parser requires the removed JavaScript compiler API and
-does not support TS7. ESLint mode is scheduled for deprecation in 5.33 and removal
-in 5.34. A parser's bundled older TypeScript is separate from the app's native `tsc`.
+Explicit `--lint=eslint` projects pin `typescript` to **6.0.3**, the newest version
+supported by typescript-eslint. Its parser requires the JavaScript compiler API
+removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
+([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
+Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
+ESLint mode prints a compatibility notice when chosen and is planned for
+deprecation in 5.33 and removal in 5.34. Both modes install with npm, pnpm and yarn.
 
-### Prettier import order with TypeScript 7
+### Prettier import order in ESLint mode
 
 The ESLint scaffold’s `@ianvs/prettier-plugin-sort-imports` uses Babel instead of
 the compiler API. Keep these options in `.prettierrc.json`:

@@ -3,7 +3,7 @@ title: TypeScript 7
 description: Native compiler requirements and tsconfig migration for Warlock 5.32.
 ---
 
-Warlock 5.32 pins `typescript` to **7.0.2**. The regular `tsc` command now runs
+Warlock 5.32 and create-warlock’s default Oxlint/Oxfmt mode pin `typescript` to **7.0.2**. The regular `tsc` command now runs
 the native Go compiler. Install `typescript@7.0.2` in the app's development
 dependencies; no preview package or alternate command is needed.
 
@@ -53,8 +53,20 @@ JavaScript compiler API. Core isolates its native unstable API in
 `warlock upgrade` continues to use ts-morph's own bundled parser for source
 transformations; it does not use that parser to typecheck apps.
 
-The scaffold's ESLint mode still emits its existing configuration, but
-`@typescript-eslint/parser` does not support TS7's removed JavaScript API.
-Use the Oxlint/Oxfmt mode for TS7 projects. ESLint mode is scheduled for
-deprecation in 5.33 and removal in 5.34; its parser dependency's older compiler
-is a compatibility constraint, not the compiler used by `tsc`.
+New scaffolds default to Oxlint + Oxfmt (`--lint=oxc`). Explicit `--lint=eslint`
+keeps ESLint + Prettier and pins the app's compiler to **TypeScript 6.0.3**,
+the newest version typescript-eslint supports. Its parser needs the JavaScript
+compiler API removed in TS7 and declares a TypeScript peer range of
+`>=4.8.4 <6.1.0`
+([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
+The tsconfig cleanups above also work with TypeScript 6; both modes share them.
+ESLint selection prints a one-line compatibility notice. ESLint mode is planned
+for deprecation in 5.33 and removal in 5.34.
+
+```bash
+# Default: Oxlint + Oxfmt and TypeScript 7.0.2
+npm create warlock@latest my-app -- --yes
+
+# Explicit opt-in: ESLint + Prettier and TypeScript 6.0.3
+npm create warlock@latest my-eslint-app -- --yes --lint=eslint
+```

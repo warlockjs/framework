@@ -92,7 +92,14 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
 
   templateSpinner.stop(spinnerMessages.templateCopied);
 
-  showNotes(notes);
+  showNotes([
+    ...notes,
+    ...(options.lint === "eslint"
+      ? [
+          "ESLint mode uses TypeScript 6.0.3 because typescript-eslint does not support TypeScript 7 yet; ESLint mode is planned for deprecation in 5.33 and removal in 5.34.",
+        ]
+      : []),
+  ]);
 
   // Step 2: Install base dependencies (so the `warlock` binary is available).
   // Nothing downstream works without this, so a failure ends the run — loudly,
