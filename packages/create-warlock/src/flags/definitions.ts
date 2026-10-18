@@ -52,7 +52,8 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
   },
   {
     usage: "--lint=<oxc|eslint>",
-    description: "Linter and formatter: Oxlint/Oxfmt or ESLint/Prettier",
+    description:
+      "Linter and formatter: Oxlint/Oxfmt or ESLint/Prettier (deprecated; removed in 5.34.0)",
     defaultValue: "oxc",
   },
   {

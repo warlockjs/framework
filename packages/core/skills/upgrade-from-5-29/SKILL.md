@@ -450,5 +450,42 @@ npm install --save-dev --save-exact typescript@6.0.3
 npx tsc --noEmit
 ```
 
-The same tsconfig cleanups work with TS6. ESLint mode prints a compatibility
-notice and is planned for deprecation in 5.33 and removal in 5.34.
+The same tsconfig cleanups work with TS6. Starting in 5.33, ESLint mode prints
+a deprecation warning naming removal in 5.34.0 and the Oxc migration command.
+
+## 5.32 to 5.33
+
+**BREAKING:** ESLint background health checking and automatic ESLint selection
+in `warlock check` are disabled by default. Oxlint/Oxfmt replace ESLint/Prettier
+as the default toolchain. Legacy support is deprecated now and removed in
+5.34.0. Temporary opt-ins are `devServer.healthCheckers: { eslint: true }`,
+`warlock check --lint eslint`, and `create-warlock --lint=eslint`; each warns
+about removal and migration. The legacy scaffold stays on TypeScript 6.0.3;
+Oxc apps use TypeScript 7.0.2.
+
+ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
+New apps should use `--lint=oxc`. To migrate an existing app, install the new
+core release and `ts-morph`, then run:
+
+```bash
+npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
+npx warlock upgrade --from 5.32 --to 5.33.0
+npm install
+npm run format
+npm run lint:check
+npx warlock check
+```
+
+Review every reported `file:line`: customized configs are preserved and need
+manual translation before removal. The codemod installs the template's Oxlint
+and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
+scripts, removes legacy dependencies, and deletes only recognized generated
+configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
+configs are preserved. `--dry-run --json` reports the same planned changes
+without writing files.
+
+The `oxc-toolchain` codemod also updates generated VS Code settings and literal
+ESLint/Oxlint health-check switches. Custom editor settings, checker arrays,
+computed options and nonstandard scripts require review. Oxc diagnostics keep
+framework conventions in `warlock check`. Re-run the migration after addressing
+manual findings if needed; an app with only Oxc tooling is a no-op for this codemod.

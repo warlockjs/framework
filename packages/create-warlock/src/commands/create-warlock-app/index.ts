@@ -96,7 +96,7 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
     ...notes,
     ...(options.lint === "eslint"
       ? [
-          "ESLint mode uses TypeScript 6.0.3 because typescript-eslint does not support TypeScript 7 yet; ESLint mode is planned for deprecation in 5.33 and removal in 5.34.",
+          "Deprecated: ESLint + Prettier support will be removed in 5.34.0. Use --lint=oxc for new apps; migrate existing apps with npx warlock upgrade --from 5.32 --to 5.33.0. ESLint mode uses TypeScript 6.0.3 because typescript-eslint does not support TypeScript 7 yet.",
         ]
       : []),
   ]);

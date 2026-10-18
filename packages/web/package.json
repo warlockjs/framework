@@ -61,7 +61,7 @@
   ],
   "scripts": {
     "build": "vite build && node node_modules/typescript/bin/tsc -p tsconfig.json",
-    "format:check": "node ../../node_modules/prettier/bin/prettier.cjs --check src __tests__",
+    "format:check": "node ../../node_modules/oxfmt/bin/oxfmt --config ../../.oxfmtrc.json --disable-nested-config --check ./src ./__tests__",
     "typecheck": "node scripts/typecheck.mjs",
     "test": "vitest run --maxWorkers=1"
   },

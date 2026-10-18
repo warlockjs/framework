@@ -88,6 +88,7 @@ describe("lint toolchain flags and prompt", () => {
     expect(seedFromFlags({ lint: "eslint" }).lint).toBe("eslint");
     expect(seedFromFlags({ lint: "oxc" }).lint).toBe("oxc");
     expect(buildHelpText()).toContain("--lint=<oxc|eslint>");
+    expect(buildHelpText()).toContain("deprecated; removed in 5.34.0");
   });
 
   it.each(["", "other"])("rejects an invalid toolchain %j before writing files", (lint) => {
@@ -106,7 +107,7 @@ describe("lint toolchain flags and prompt", () => {
     expect(select.mock.calls[0][0]).toMatchObject({
       initialValue: "oxc",
       options: [
-        { value: "eslint", label: "ESLint + Prettier" },
+        { value: "eslint", label: "ESLint + Prettier (deprecated)" },
         { value: "oxc", label: "Oxlint + Oxfmt" },
       ],
     });
@@ -144,6 +145,10 @@ describe("generated toolchains", () => {
     expect(pkg.scripts.lint).toBe("eslint --fix ./src --max-warnings=0");
     expect(pkg.scripts["lint:check"]).toContain("eslint ./src");
     expect(pkg.scripts["format:check"]).toContain("prettier --check");
+    expect(pkg.scripts["format:check"]).toContain("removed in 5.34.0");
+    expect(readFileSync(path.join(appPath, "warlock.config.ts"), "utf8")).toContain(
+      "healthCheckers: { eslint: true, oxlint: false }",
+    );
     expect(existsSync(path.join(appPath, "eslint.config.js"))).toBe(true);
     expect(existsSync(path.join(appPath, ".oxlintrc.json"))).toBe(false);
     expect(readFileSync(path.join(appPath, ".vscode/settings.json"), "utf8")).toBe(
@@ -185,6 +190,8 @@ describe("generated toolchains", () => {
       expect(
         Object.keys(pkg.devDependencies).filter((name) => /eslint|prettier/.test(name)),
       ).toEqual([]);
+      expect(pkg.scripts.format).toContain("--ignore-path .oxfmtignore");
+      expect(existsSync(path.join(appPath, ".oxfmtignore"))).toBe(true);
       for (const name of [".oxlintrc.json", ".oxfmtrc.json"])
         expect(existsSync(path.join(appPath, name))).toBe(true);
       const format = JSON.parse(readFileSync(path.join(appPath, ".oxfmtrc.json"), "utf8"));
@@ -248,6 +255,26 @@ describe("generated toolchains", () => {
       );
     },
   );
+
+  it.skipIf(!hasOxc)("honors the emitted Oxfmt ignore file", () => {
+    const { appPath } = scaffold("oxc");
+    writeFileSync(
+      path.join(appPath, "src/ignored.ts"),
+      "export const ignored={value:'unformatted'}\n",
+    );
+    writeFileSync(path.join(appPath, ".oxfmtignore"), "src/ignored.ts\n");
+    const args = [
+      "--ignore-path",
+      ".gitignore",
+      "--ignore-path",
+      ".oxfmtignore",
+      "--check",
+      "./src",
+    ];
+    assertPass(run(oxfmt, appPath, args));
+    writeFileSync(path.join(appPath, ".oxfmtignore"), "");
+    expect(run(oxfmt, appPath, args).status).toBe(1);
+  });
 
   it.skipIf(!hasOxc)("detects lint and format regressions and fixes formatting", () => {
     const { appPath } = scaffold("oxc");

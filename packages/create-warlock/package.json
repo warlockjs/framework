@@ -15,8 +15,8 @@
   },
   "scripts": {
     "start": "node node_modules/tsx/dist/cli.mjs ./index.dev.ts",
-    "lint": "node node_modules/eslint/bin/eslint.js -c ./.eslintrc.json ./src",
-    "fix": "node node_modules/eslint/bin/eslint.js --fix -c ./.eslintrc.json ./src --max-warnings=0",
+    "lint": "node ../../node_modules/oxlint/bin/oxlint --config ../../.oxlintrc.json ./src",
+    "fix": "node ../../node_modules/oxlint/bin/oxlint --config ../../.oxlintrc.json --fix ./src",
     "format": "node node_modules/oxfmt/bin/oxfmt --config ../../.oxfmtrc.json --disable-nested-config --write ./src",
     "format:check": "node node_modules/oxfmt/bin/oxfmt --config ../../.oxfmtrc.json --disable-nested-config --check ./src",
     "test": "node scripts/test.mjs",
@@ -28,8 +28,8 @@
     "llms": "node scripts/generate-llms.mjs",
     "update": "node node_modules/tsx/dist/cli.mjs version-checker.ts",
     "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
-    "format:prettier": "node node_modules/prettier/bin/prettier.cjs --write \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json",
-    "format:prettier:check": "node node_modules/prettier/bin/prettier.cjs --check \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json"
+    "format:prettier": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; use format or format:check (Oxfmt).')\" && node node_modules/prettier/bin/prettier.cjs --write \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json",
+    "format:prettier:check": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; use format or format:check (Oxfmt).')\" && node node_modules/prettier/bin/prettier.cjs --check \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json"
   },
   "dependencies": {
     "@clack/prompts": "^0.8.2",

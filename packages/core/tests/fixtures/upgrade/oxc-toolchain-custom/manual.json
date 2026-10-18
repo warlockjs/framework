@@ -1,0 +1,18 @@
+[
+  {
+    "file": ".eslintrc.json",
+    "line": 1
+  },
+  {
+    "file": ".prettierignore",
+    "line": 1
+  },
+  {
+    "file": ".prettierrc.yaml",
+    "line": 1
+  },
+  {
+    "file": "eslint.config.mjs",
+    "line": 1
+  }
+]

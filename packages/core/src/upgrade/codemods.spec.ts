@@ -62,7 +62,12 @@ describe.each(CODEMODS.map((codemod) => codemod.id))("codemod %s", (id) => {
       listFiles(root).map((file) => [file, readFileSync(path.join(root, file), "utf8")]),
     );
 
-    const result = await runUpgrade({ root, from: "5.29.0", to: "5.31.0", codemods: [codemod] });
+    const result = await runUpgrade({
+      root,
+      from: "5.29.0",
+      to: codemod.version === "target" ? "5.31.0" : codemod.version,
+      codemods: [codemod],
+    });
 
     const expectedDir = path.join(fixtureDir, "expected");
     if (existsSync(expectedDir)) {

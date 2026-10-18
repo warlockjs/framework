@@ -6,7 +6,7 @@ export function askLintToolchain(initialValue: LintToolchain = "oxc") {
   return select<LintToolchain>({
     message: "Choose lint and formatting tools",
     options: [
-      { value: "eslint", label: "ESLint + Prettier" },
+      { value: "eslint", label: "ESLint + Prettier (deprecated)" },
       { value: "oxc", label: "Oxlint + Oxfmt" },
     ],
     initialValue,

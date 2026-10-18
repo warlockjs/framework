@@ -36,6 +36,8 @@ export type TypecheckRunner = (
 export type CheckOptions = {
   /** Project root. Default: `process.cwd()`. */
   cwd?: string;
+  /** Oxlint by default; ESLint is deprecated and requires explicit selection. */
+  lint?: "oxlint" | "eslint";
   /** Limit every step to the files changed against `base` (default HEAD) plus untracked files. */
   changed?: boolean;
   /** Compare with `git merge-base <base> HEAD` instead of HEAD. Implies `changed`. */
@@ -181,10 +183,14 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
       return { status: "skipped", detail: "no files to lint", problems: [] };
     }
 
-    const { linters, problems: found } = await runLint(cwd, lintFiles);
+    const { linters, problems: found } = await runLint(cwd, lintFiles, options.lint);
 
     if (linters.length === 0) {
-      return { status: "skipped", detail: "no ESLint or oxlint config", problems: [] };
+      return {
+        status: "skipped",
+        detail: "no Oxlint config (ESLint requires --lint eslint)",
+        problems: [],
+      };
     }
 
     return { detail: `${linters.join(" + ")} over ${lintFiles.length} file(s)`, problems: found };

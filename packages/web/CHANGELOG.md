@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.33.0
+
+### Changed
+
+- Use root Oxlint/Oxfmt binaries and configuration for package lint/fix and format scripts. Legacy ESLint/Prettier dependencies and configs remain until the 5.34.0 removal.
+
 ## 5.32.0 - 2026-10-18
 
 ### Security

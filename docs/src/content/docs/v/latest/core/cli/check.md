@@ -23,7 +23,7 @@ src/app/posts/services/publish.service.ts:2:24  WL9003  "../../users/models/user
 
 ✓ environment  passed — Node 22.15.0
 ✗ typecheck    failed — 212 file(s) checked in 3120ms
-✓ lint         passed — eslint over 212 file(s)
+✓ lint         passed — oxlint over 212 file(s)
 - tests        skipped — no test files
 ✗ conventions  failed — 212 file(s) checked
 
@@ -37,6 +37,7 @@ src/app/posts/services/publish.service.ts:2:24  WL9003  "../../users/models/user
 | `--changed, -c` | boolean | Limit every step to the files changed against `HEAD` plus untracked files.                 |
 | `--base, -b`    | string  | Compare with `git merge-base <ref> HEAD` instead of `HEAD`. Implies `--changed`.           |
 | `--skip, -s`    | string  | Comma-separated steps to skip: `environment`, `typecheck`, `lint`, `tests`, `conventions`. |
+| `--lint`        | string  | `oxlint` (default) or `eslint` (deprecated; removed in 5.34.0).                            |
 | `--project, -p` | string  | tsconfig path (default `tsconfig.json`).                                                   |
 | `--json, -j`    | boolean | Print the report as JSON. stdout carries only the JSON.                                    |
 
@@ -58,13 +59,13 @@ Any other exit code means the `check` process itself died — treat it like `2`.
 
 All steps run, even after one fails, so one run lists every problem.
 
-| Step          | What it does                                                                                                                                                                                                                                    |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environment` | Checks the running Node.js against core's minimum (22.15) and the app's own `engines.node` when it is a `>=` range. With `--changed`, lists the changed files with git; if git cannot, every later step is `blocked`.                           |
-| `typecheck`   | Runs [`warlock typecheck`](#warlock-typecheck) in a child process, so a heap overflow on a large app is reported as `WL8007` instead of ending `check`.                                                                                         |
-| `lint`        | The linters `warlock dev` runs in the background: ESLint when an `eslint.config.*` exists, oxlint when an oxlint config exists and the app has the `oxlint` package. Lints `src/**` (or the changed files). Skipped when neither is configured. |
-| `tests`       | The app's own vitest (never a global one): `vitest run` for a full check, `vitest related <changed files> --run` with `--changed`, both with `--passWithNoTests` and the JSON reporter. Skipped when there are no test files.                   |
-| `conventions` | Static checks over `src/**` (or the changed files) and `tsconfig.json`, the same whichever linter the app uses — see [Convention checks](#convention-checks).                                                                                   |
+| Step          | What it does                                                                                                                                                                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `environment` | Checks the running Node.js against core's minimum (22.15) and the app's own `engines.node` when it is a `>=` range. With `--changed`, lists the changed files with git; if git cannot, every later step is `blocked`.         |
+| `typecheck`   | Runs [`warlock typecheck`](#warlock-typecheck) in a child process, so a heap overflow on a large app is reported as `WL8007` instead of ending `check`.                                                                       |
+| `lint`        | Oxlint when an app-root Oxlint config exists. Lints `src/**` (or changed files). A missing Oxlint package is `WL8002`. ESLint requires explicit `--lint eslint` and a flat config; its presence alone does not enable it.     |
+| `tests`       | The app's own vitest (never a global one): `vitest run` for a full check, `vitest related <changed files> --run` with `--changed`, both with `--passWithNoTests` and the JSON reporter. Skipped when there are no test files. |
+| `conventions` | Static checks over `src/**` (or the changed files) and `tsconfig.json`, the same whichever linter the app uses — see [Convention checks](#convention-checks).                                                                 |
 
 A step's status is `passed`, `failed`, `skipped` (does not apply, or `--skip`) or `blocked` (this machine kept it from running).
 
@@ -203,3 +204,31 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 ```
 
 `runCheck()` runs the typecheck in-process unless you pass a `typecheck` runner; the CLI passes one that uses a child process.
+
+## Legacy lint selection
+
+`warlock check --lint eslint` keeps ESLint working until 5.34.0 and prints one
+deprecation warning to stderr per process, including with `--json`. `check`
+does not execute `warlock.config.ts`; select the legacy linter explicitly for
+each check invocation. Background dev-server checks use their own config switches.
+
+ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
+New apps should use `--lint=oxc`. To migrate an existing app, install the new
+core release and `ts-morph`, then run:
+
+```bash
+npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
+npx warlock upgrade --from 5.32 --to 5.33.0
+npm install
+npm run format
+npm run lint:check
+npx warlock check
+```
+
+Review every reported `file:line`: customized configs are preserved and need
+manual translation before removal. The codemod installs the template's Oxlint
+and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
+scripts, removes legacy dependencies, and deletes only recognized generated
+configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
+configs are preserved. `--dry-run --json` reports the same planned changes
+without writing files.

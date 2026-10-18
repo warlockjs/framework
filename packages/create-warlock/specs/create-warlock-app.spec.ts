@@ -161,7 +161,7 @@ describe("createWarlockApp — template + base install", () => {
   });
 
   it.each([undefined, "oxc", "eslint"] as const)(
-    "prints the TypeScript compatibility notice only for lint=%s",
+    "prints the deprecation warning only for lint=%s",
     async (lint) => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
       try {
@@ -174,7 +174,9 @@ describe("createWarlockApp — template + base install", () => {
           expect(notices[0]).toContain(
             "6.0.3 because typescript-eslint does not support TypeScript 7 yet",
           );
-          expect(notices[0]).toContain("deprecation in 5.33 and removal in 5.34");
+          expect(notices[0]).toContain("removed in 5.34.0");
+          expect(notices[0]).toContain("--lint=oxc");
+          expect(notices[0]).toContain("npx warlock upgrade --from 5.32 --to 5.33.0");
         }
       } finally {
         logSpy.mockRestore();

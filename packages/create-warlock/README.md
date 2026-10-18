@@ -34,22 +34,22 @@ answered that choice. The stack is the only choice that changes the generated
 app's shape. Everything else below is a flag with a default; a summary of what
 was decided prints after scaffolding, along with how to change each one.
 
-| Flag                           | Description                                                          | Default                                                                  |
-| ------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `--name=<name>`                | Project name (or the first positional arg)                           | required — prompted with a TTY, otherwise fails naming this flag         |
-| `--stack=<api\|web>`           | API-only or full-stack web; the structural choice                    | `api`                                                                    |
-| `--db=<driver>` / `--no-db`    | Database driver (`postgres`, `mongodb`, …), or skip one entirely     | `mongodb`                                                                |
-| `--features=<list>`            | Comma-separated feature keys (e.g. `test,herald`)                    | none (or `["web"]` when `--stack=web` and `--features` is not given)     |
-| `--lint=<oxc\|eslint>`         | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier   | `oxc`                                                                    |
-| `--ai=<list>`                  | Comma-separated AI provider keys (e.g. `openai,anthropic`)           | none                                                                     |
-| `--pm=<manager>`               | Package manager (`npm`, `yarn`, `pnpm`, `bun`)                       | inferred from the invoking agent (`npm_config_user_agent`) or the system |
-| `--agents=<list>`              | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets | `claude`                                                                 |
-| `--git` / `--no-git`           | Force-enable or force-disable git initialization                     | `false`                                                                  |
-| `--jwt` / `--no-jwt`           | Force-enable or force-disable JWT secret generation                  | `false`                                                                  |
-| `-y`, `--yes`                  | Skip every prompt and take defaults for anything unset               | `false`                                                                  |
-| `--interactive`, `--customize` | Restore the full long-form interactive wizard                        | `false`                                                                  |
-| `-h`, `--help`                 | Print usage (every flag + its default) and exit                      | —                                                                        |
-| `-v`, `--version`              | Print the installed version and exit                                 | —                                                                        |
+| Flag                           | Description                                                                     | Default                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `--name=<name>`                | Project name (or the first positional arg)                                      | required — prompted with a TTY, otherwise fails naming this flag         |
+| `--stack=<api\|web>`           | API-only or full-stack web; the structural choice                               | `api`                                                                    |
+| `--db=<driver>` / `--no-db`    | Database driver (`postgres`, `mongodb`, …), or skip one entirely                | `mongodb`                                                                |
+| `--features=<list>`            | Comma-separated feature keys (e.g. `test,herald`)                               | none (or `["web"]` when `--stack=web` and `--features` is not given)     |
+| `--lint=<oxc\|eslint>`         | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier (deprecated) | `oxc`                                                                    |
+| `--ai=<list>`                  | Comma-separated AI provider keys (e.g. `openai,anthropic`)                      | none                                                                     |
+| `--pm=<manager>`               | Package manager (`npm`, `yarn`, `pnpm`, `bun`)                                  | inferred from the invoking agent (`npm_config_user_agent`) or the system |
+| `--agents=<list>`              | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets            | `claude`                                                                 |
+| `--git` / `--no-git`           | Force-enable or force-disable git initialization                                | `false`                                                                  |
+| `--jwt` / `--no-jwt`           | Force-enable or force-disable JWT secret generation                             | `false`                                                                  |
+| `-y`, `--yes`                  | Skip every prompt and take defaults for anything unset                          | `false`                                                                  |
+| `--interactive`, `--customize` | Restore the full long-form interactive wizard                                   | `false`                                                                  |
+| `-h`, `--help`                 | Print usage (every flag + its default) and exit                                 | —                                                                        |
+| `-v`, `--version`              | Print the installed version and exit                                            | —                                                                        |
 
 ```bash
 create-warlock my-app --db=postgres --features=test,herald --yes
@@ -225,5 +225,35 @@ supported by typescript-eslint. Its parser requires the JavaScript compiler API
 removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
 ([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
 Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
-ESLint mode prints a compatibility notice when chosen and is planned for
-deprecation in 5.33 and removal in 5.34. Both modes install with npm, pnpm and yarn.
+ESLint mode prints a deprecation warning naming removal in 5.34.0 and the Oxc migration command. Both modes install with npm, pnpm and yarn.
+
+## Migrate to Oxlint and Oxfmt in 5.33
+
+ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
+New apps should use `--lint=oxc`. To migrate an existing app, install the new
+core release and `ts-morph`, then run:
+
+```bash
+npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
+npx warlock upgrade --from 5.32 --to 5.33.0
+npm install
+npm run format
+npm run lint:check
+npx warlock check
+```
+
+Review every reported `file:line`: customized configs are preserved and need
+manual translation before removal. The codemod installs the template's Oxlint
+and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
+scripts, removes legacy dependencies, and deletes only recognized generated
+configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
+configs are preserved. `--dry-run --json` reports the same planned changes
+without writing files.
+
+Explicit deprecated ESLint scaffolds set `devServer.healthCheckers.eslint: true`;
+existing apps must set this themselves to retain background ESLint checking.
+
+Oxc formatting scripts explicitly read `.gitignore` and `.oxfmtignore`. Oxfmt
+0.73 otherwise defaults to `.prettierignore` (`oxfmt --help`); the explicit
+paths make migrated ignore rules effective. The package template format gate
+also defaults to Oxfmt; `--lint=eslint` is its deprecated compatibility mode.

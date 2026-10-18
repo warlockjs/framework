@@ -1,13 +1,19 @@
 import { colors } from "@mongez/copper";
 import { ESLint } from "eslint";
-import fs from "fs";
-import path from "path";
+import { hasEslint, warnEslintDeprecation } from "../eslint-support";
 import type { FileManager } from "../../file-manager";
 import type { FileHealthCheckerContract } from "../file-health-checker.contract";
 import { FileHealthResult } from "../file-health-result";
 import { BaseHealthChecker } from "./base-health-checker";
 
+/** @deprecated Use OxlintHealthChecker. ESLint support is removed in 5.34.0. */
 export class EslintHealthChecker extends BaseHealthChecker implements FileHealthCheckerContract {
+  public constructor() {
+    super();
+    // Construction happens on the main thread for both inline and worker checking.
+    warnEslintDeprecation();
+  }
+
   /**
    * ESLint instance (using new ESLint v9 API with flat config)
    */
@@ -44,15 +50,7 @@ export class EslintHealthChecker extends BaseHealthChecker implements FileHealth
    */
   public initialize(): EslintHealthChecker {
     try {
-      // Check if eslint.config.js exists (new flat config format)
-      const flatConfigPath = path.join(process.cwd(), "eslint.config.js");
-      const flatConfigMjsPath = path.join(process.cwd(), "eslint.config.mjs");
-      const flatConfigCjsPath = path.join(process.cwd(), "eslint.config.cjs");
-
-      const hasFlatConfig =
-        fs.existsSync(flatConfigPath) ||
-        fs.existsSync(flatConfigMjsPath) ||
-        fs.existsSync(flatConfigCjsPath);
+      const hasFlatConfig = hasEslint(process.cwd());
 
       if (!hasFlatConfig) {
         // No flat config found, skip initialization

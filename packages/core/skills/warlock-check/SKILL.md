@@ -120,7 +120,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 ## Gotchas
 
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
-- Lint runs only the linters the app configures (`eslint.config.*`; an oxlint config + the `oxlint` package). No config → the step is skipped, not failed.
+- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint requires `--lint eslint` (or `runCheck({ lint: "eslint" })`); its flat config alone never enables it. This deprecated selection prints one warning on stderr and is removed in 5.34.0.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
 - The convention checks are the framework's own and run the same with ESLint, Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
@@ -131,3 +131,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 - The `warlock-doctor` topic — boot-time diagnostics; `doctor --json` uses the same codes and fields.
 - The `warlock-inspect` topic — the app's routes, models and config as JSON.
 - The `warlock-conventions` topic — the rules behind `WL9001`–`WL9012`, with the fix for each.
+
+Migrate lint and format tooling with
+`npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run`, then remove `--dry-run`
+and work through the manual-review list. Use `--lint=oxc` for new apps.

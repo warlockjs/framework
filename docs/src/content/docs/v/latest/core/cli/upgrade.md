@@ -90,3 +90,34 @@ warlock upgrade 5.29.0 → 5.31.0 (dry run: nothing written)
 changedFiles, diff, installHint? }`. `applied` and `manual` entries carry
 `codemod`, `file` and `line`; `manual` entries add the `hint` and the `skill`
 to read.
+
+## 5.32 to 5.33: Oxlint and Oxfmt
+
+The `oxc-toolchain` codemod runs when the upgrade crosses 5.33.0:
+
+```bash
+npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run --json
+npx warlock upgrade --from 5.32 --to 5.33.0
+npm install
+npm run format
+npm run lint:check
+npx warlock check
+```
+
+Install the target core release and the optional `ts-morph` development dependency
+before running the command. It writes the create-warlock Oxc configs when absent,
+updates lint/format scripts, replaces ESLint/Prettier development dependencies with
+Oxlint 1.88.0, Oxfmt 0.73.0 and TypeScript 7.0.2, and updates generated editor settings
+and literal background-checker switches. Existing Oxc configs are preserved.
+Recognized generated legacy configs are deleted; a generated `.prettierignore`
+becomes `.oxfmtignore`, which the new formatting scripts explicitly select.
+Customized configs and conflicting ignore files remain with `file:line` guidance.
+Translate those settings and remove the old files after reviewing the report.
+`--dry-run` buffers additions, edits and deletions without writing any files;
+`--json` includes the same changed-file list, diff and manual findings.
+
+ESLint and Prettier support is deprecated in 5.33.0 and removed in **5.34.0**.
+ESLint is off by default even when its config exists. Temporary opt-ins are
+`devServer.healthCheckers: { eslint: true }` and `warlock check --lint eslint`;
+both print a one-time deprecation warning with the migration command. New apps
+should use the default `create-warlock --lint=oxc`.
