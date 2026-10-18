@@ -861,7 +861,7 @@ If two channels share a `name`, only one is reachable this way — the search re
 
 ---
 name: redact-sensitive-log-fields
-description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`, `maskEmail`, `maskEmailsInText`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
+description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`, `maskEmail`, `maskEmailsInText`, `registerLogSecret`, `maskRegisteredLogSecrets`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
 ---
 
 # Redaction — keeping secrets out of logs
@@ -896,7 +896,7 @@ log.configure({
 
 **A channel cannot turn the default set off** (it can only add keys, or turn it back _on_ if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears _your_ paths, not the default denylist.
 
-Not reachable by any layer: secrets interpolated into a `message` string (`` `token=${t}` ``), `Map`/`Set`/`Buffer` contents, and getter-backed or non-enumerable properties.
+Key/path redaction cannot reach secrets interpolated into strings, opaque container contents, or non-enumerable properties. Register known credentials with `registerLogSecret()` (below) for an additional safety floor.
 
 ## Layers 1 & 2 — path globs, opt-in
 
@@ -1045,6 +1045,21 @@ CR/LF/tab become `\r`/`\n`/`\t`, other control characters `\uXXXX`, ANSI
 sequences are removed; `maxLength` cuts and marks `…[truncated]`. `warlock
 check` (from `@warlock.js/core`) reports raw emails, credentials and request
 bodies in log calls as `WL9008` and accepts these helpers.
+
+## Registered credentials (since 5.33)
+
+```ts
+import { registerLogSecret, maskRegisteredLogSecrets, log } from "@warlock.js/logger";
+
+registerLogSecret("provider-credential", ["vendorPrivateRef"]);
+log.info("sample", "request", "using provider-credential", { vendorPrivateRef: "hidden" });
+// "using [REDACTED]", { vendorPrivateRef: "[REDACTED]" }
+const safeText = maskRegisteredLogSecrets("using provider-credential");
+```
+
+Keys are normalized; values are exact literal substrings (punctuation is literal, longer matches win). Empty values are ignored. This adds a final safety floor after censors in every Logger instance: `defaultKeys: false` and permissive censors cannot disable it. Error messages/stacks/causes, property names, Maps/Sets and channel diagnostics are protected. The safety pass clones without invoking getters/serializers; opaque objects (including Buffers) and functions become `[REDACTED]` while any registration is active.
+
+Registration retains keys/values in memory for the process lifetime. Removed/rotated values stay protected. It does not protect prior logs, transformed/encoded credentials, direct console calls, third-party loggers or credentials never registered. Core's `secrets` store registers its encountered keys/values automatically. Keep credentials out of logs even with this protection enabled.
 
 
 ## ship-logs-to-sentry  `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`

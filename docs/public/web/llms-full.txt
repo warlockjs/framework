@@ -1201,6 +1201,66 @@ description: "Load App, Layout, and Page data with named loaders; page validatio
 
 # Warlock — load page data
 
+## Live loader dependencies
+
+Opt a page into automatic loader re-runs using page-owned `config.live`:
+
+```tsx
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  live: { tags: ["products"], pollInterval: 15_000 },
+} satisfies PageConfig;
+```
+
+Pass the app's existing default-namespace Socket.IO client once from a browser
+`register()` hook (guard server registration with `typeof window`):
+
+```ts
+import { configureLivePageData } from "@warlock.js/web";
+import { io } from "socket.io-client";
+
+export function register() {
+  if (typeof window === "undefined") return;
+  configureLivePageData({ socket: io() });
+}
+```
+
+`LivePageOptions` and structural `LivePageSocket` are exported from the web root.
+Reuse an existing socket if the app has one. No client dependency is required for
+polling: `configureLivePageData({})` removes the binding. `pollInterval` defaults
+to 30,000 ms and must be finite, between 1 and 2,147,483,647. Tags must be a
+non-empty string array; they describe dependencies of the whole loader pipeline,
+independent of response-cache policy.
+
+After committing a write, publish server-side:
+
+```ts
+import { invalidatePageCache } from "@warlock.js/web/page-cache";
+
+await invalidatePageCache(["products"]);
+```
+
+This API requires a configured cache driver. It evicts before pushing dependency
+labels to all default-namespace sockets; never put secrets/private identifiers in
+labels. Configure `config.cache.tags` too if caching the response. Live requests
+bypass browser/server page caching (`x-warlock-live: 1`); configure CDN bypass for
+that header. Background refreshes run the normal middleware/session/loader path.
+
+Navigation always wins: notifications wait until idle and recheck the current
+page's tags. Dirty `<Form>` native controls pause pushes and polling; reverting,
+resetting, successful submission, or unmounting clears the pause. Failed submits
+and edits made during a submit stay dirty. An in-flight live result is discarded
+if a form becomes dirty. Custom editors must mirror input into native controls
+and dispatch input/change; plain HTML forms aren't tracked.
+
+Polling runs only without a connected configured socket. Reconnect catches up.
+For multiple app processes, configure a shared cache driver, stable
+`pageCache.namespace`, and the same cross-process `socket.adapter` in every
+process. Cache-only queue workers cannot push: they must boot the socket
+connector with that adapter. Socket.IO polling transport also requires sticky
+sessions. See the live-page-data docs for deployment and best-effort limits.
+
 Loaders run on the server and return serializable data to their own component level.
 Declare the loader so TypeScript infers its return type, then pass `typeof loader`
 to the matching props type (`PageProps<typeof loader>`). Two spellings do that, and

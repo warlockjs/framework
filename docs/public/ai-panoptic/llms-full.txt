@@ -472,6 +472,41 @@ Add exporters after construction with `observe.use(exporter)` (chainable, dedupe
 - The `query-traces` topic — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent and the `BaseReport` shape Panoptic consumes.
 
+## Subscribe across collectors and inspect requests in devtools
+
+`subscribeTraces(listener)` is a process-local adapter hook: it receives every
+finalized trace from built-in collectors (including ones created earlier), in
+the collecting async context, before exporter dispatch. It has no replay and
+adds no retention. It does not enable observation or subscribe to pure
+`toTrace()` calls. Treat incoming traces as read-only. Listener throws/rejections
+are isolated; promises are not awaited.
+
+```ts
+import { subscribeTraces } from "@warlock.js/ai-panoptic";
+import type { TraceListener } from "@warlock.js/ai-panoptic";
+
+const onTrace: TraceListener = (trace) => {
+  console.log(trace.traceId, trace.root.status, trace.usage);
+};
+const unsubscribe = subscribeTraces(onTrace);
+// ...later, on adapter teardown:
+unsubscribe();
+```
+
+With `@warlock.js/devtools` installed, its **AI** tab at `/__warlock` subscribes
+for you. Enable `ai.config({ panoptic: { observeAll: true } })` as above, or use
+an explicit subscriber. No `dashboard: true` is needed. Request-local context
+links runs to their HTTP request when available, independently of `sessionId`.
+The panel never mounts in production.
+
+New diagnostic attributes are `retry.attempts` (timings/outcomes),
+`agent.cacheHits` (trips reporting positive provider cache reads),
+`agent.truncatedTrips`, `agent.providerCompactions` and `agent.compactions`
+(applied/skipped decisions, trip indices, token counts and replaced ranges).
+They exclude compaction summaries and callback error text. Unknown cache hits
+remain absent; do not infer semantic-cache hits from zero tokens. An incomplete
+run is identified by its status or normalized `AGENT_INCOMPLETE` error code.
+
 
 ## query-traces  `@warlock.js/ai-panoptic/query-traces/SKILL.md`
 
@@ -532,6 +567,7 @@ Every field is optional and **ANDed** together — an absent field is "don't car
 ```ts
 type TraceQuery = {
   traceId?: string; // exact one run
+  requestId?: string; // exact HTTP request id, when an integration supplied it
   sessionId?: string; // every run for a session
   status?: ReportStatus | ReportStatus[]; // single status or membership set
   startedAfter?: string | Date; // inclusive lower bound on root startedAt
@@ -690,6 +726,40 @@ console.log(stats.usage.serverToolUse?.webSearchRequests);
 console.log(stats.cost?.serverTools?.webSearch); // historical USD
 console.log(totalCost(stats.cost)); // includes hosted fees
 ```
+
+## Correlate traces with HTTP requests
+
+`Trace.requestId` is an optional integration-supplied identity. It is independent
+of `sessionId`; legacy and background traces omit it. In-memory and cache stores
+use the same exact-match `requestId` filter in `query()` and `aggregate()`, and
+cache hydration preserves it.
+
+```ts
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createInMemoryTraceStore, subscribeTraces } from "@warlock.js/ai-panoptic";
+
+// Your HTTP adapter runs the flow inside this context.
+const httpContext = new AsyncLocalStorage<{ requestId: string }>();
+const requests = createInMemoryTraceStore({ capacity: 200 });
+const unsubscribe = subscribeTraces((trace) => {
+  requests.add({ ...trace, requestId: httpContext.getStore()?.requestId });
+});
+
+const runs = requests.query({ requestId: "request-42" });
+const usage = requests.aggregate({ requestId: "request-42" });
+unsubscribe();
+```
+
+The callback reads request context synchronously, before exporters run. It sees
+future collection from all built-in collectors, with no replay. Treat incoming
+traces as read-only and add an enriched copy. Errors are isolated, async
+callbacks are not awaited, and `toTrace()` does not notify subscribers.
+
+For app development, `@warlock.js/devtools` already does this: open the **AI** tab
+at `/__warlock`, or an HTTP request's **AI runs** section. Its bounded,
+content-free store is separate from your exporter/cache stores. Clearing the
+panel does not clear application trace history. Enable flow observation first;
+installing the viewer alone does not collect runs.
 
 
 ## use-local-dashboard  `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`
@@ -922,3 +992,24 @@ These three findings (link sanitization + the two token-handling items above) ca
 - The `query-traces` topic — the `TraceStoreContract` (`query` / `get` / `aggregate`) the dashboard reads, the `TraceQuery` filter, and capacity eviction.
 - The `export-traces` topic — shipping traces to OTel / Langfuse / a file instead of (or alongside) the local dashboard.
 - The `evaluate-system-prompt` topic — the drawer's "Evaluate system prompt" action, the dashboard's one write route.
+
+## Use the app's devtools AI panel
+
+When developing a Warlock HTTP app with `@warlock.js/devtools` installed, open
+`/__warlock` → **AI** to inspect runs alongside their HTTP requests. This uses
+the existing app server and needs no `dashboard: true`:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic";
+ai.config({ panoptic: { observeAll: true } });
+```
+
+Restart `warlock dev` after installing the optional Panoptic package. Runs
+appear after collection, with model, tokens, historical cost, provider cache
+hits, tool timings, retries, incomplete/truncated status and compaction metadata.
+The panel uses a bounded content-free in-memory view (200 traces by default),
+not the standalone dashboard's persisted cache store. Clear/restart discards
+only that view. HTTP request identity is captured from the collecting async
+context; missing identities remain background runs. Devtools never mounts in
+production and retains its socket-loopback guard.

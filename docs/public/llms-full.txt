@@ -4439,7 +4439,7 @@ const result = await measure("publish-event", () =>
 
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`, `detectJavaScriptRuntime`, `assertNodeOnlyCommand`, Bun, Deno, `bun dist/app.js`, `deno run -A`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use", "run on Bun", "run on Deno", "supported runtimes"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle), `warlock pm2 init` / `reload` (optional deployment tooling). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock pm2`, `ecosystem.config.cjs`, `wait_ready`, `kill_timeout`, `app.shutdownTimeout`, `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`, `detectJavaScriptRuntime`, `assertNodeOnlyCommand`, Bun, Deno, `bun dist/app.js`, `deno run -A`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use", "run on Bun", "run on Deno", "supported runtimes"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -4589,13 +4589,13 @@ export default defineConfig({
 
 - **`watch.include` / `watch.exclude`** — globs piped into the file watcher. Override when you have non-`.ts(x)` files driving reloads (e.g. SQL fixtures), or to exclude a generated folder.
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
-- **`healthCheckers`** — built-in switches (`{ typescript?, eslint?, oxlint? }`), custom file health checker contracts, or `false` to disable. The `--skip-health` flag disables all checkers for that run. TypeScript runs by default. ESLint uses core's dependency and requires only an app-root flat config; Oxlint requires its package installed in the app plus a config. Both run when configured.
+- **`healthCheckers`** — built-in switches (`{ typescript?, eslint?, oxlint? }`), custom file health checker contracts, or `false` to disable. The `--skip-health` flag disables all checkers for that run. TypeScript runs by default. ESLint uses core's dependency and requires only an app-root flat config; Oxlint requires its package installed in the app plus a config. ESLint is disabled by default; explicitly set `eslint: true` to retain it until removal in 5.34.0. Enabling it prints one deprecation warning and the Oxc migration command.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
 - **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See the `update-packages` topic.
 - **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
 - **`timings`** — print a one-line, per-phase breakdown next to the `hmr update` line on every hot reload: `watcher`, `debounce`, `graph`, `reimport`, `connectors`. `watcher` is the raw-fs-notification-to-stabilised-event gap (chokidar's `awaitWriteFinish` window); `debounce` is the handler's own adaptive wait; the rest are self-explanatory. Opt-in, off by default — a disabled flag costs one boolean check per reload, since the watcher-settle bookkeeping only runs when this is on. Use it to see which phase a slow reload is actually spending time in.
 
-### Optional Oxlint file checks
+### Default Oxlint file checks
 
 Install `oxlint` in the app (`npm install --save-dev oxlint`) and add `.oxlintrc.json` at the app root:
 
@@ -4617,7 +4617,7 @@ export default defineConfig({
 });
 ```
 
-Omit the switches to run TypeScript and every installed/configured linter; `true` still requires the linter's config, and Oxlint also requires its app-installed package. Set `oxlint: false` to disable only Oxlint while leaving other defaults intact. A custom checker array replaces the built-in list. Config discovery also accepts `.oxlintrc.jsonc`, `oxlint.config.ts` and `oxlint.config.mts`; use JSON/JSONC on Node 22.15 because current Oxlint TypeScript configs need Node 22.18 or newer.
+Omit the switches to run TypeScript and installed/configured Oxlint; ESLint is off by default and requires `eslint: true`; `true` still requires the linter's config, and Oxlint also requires its app-installed package. Set `oxlint: false` to disable only Oxlint while leaving other defaults intact. A custom checker array replaces the built-in list. Config discovery also accepts `.oxlintrc.jsonc`, `oxlint.config.ts` and `oxlint.config.mts`; use JSON/JSONC on Node 22.15 because current Oxlint TypeScript configs need Node 22.18 or newer.
 
 ## `warlock build` — production bundle
 
@@ -4851,10 +4851,119 @@ Configured http.port "03999" normalised to 3999.
 Three consequences worth knowing:
 
 1. **A queue worker with no http connector still reports.** Readiness hangs on a completed boot, not on a bound port. `port` is simply absent.
-2. **Running the bundle any other way changes nothing.** `node dist/app.js`, a Docker `CMD`, or pm2 — the signal is a strict no-op without both the IPC channel and the handshake flag, so Warlock never writes into a channel that belongs to another supervisor.
+2. **PM2 receives its own readiness message (5.33.0+).** With an IPC channel and PM2's `pm_id` present, core sends `"ready"` after completed boot and leaves the channel open. Plain Node/Docker launches without IPC remain silent. `warlock start` takes priority when its handshake is present.
 3. **A bundle built before 4.11.0 has no signal.** It starts and runs normally, and after ten seconds prints a note on **stderr only** telling you to re-run `warlock build`. An absent signal is never an error, never fails the run, and never kills a slow boot.
 
 If you need the same fact inside the app, use `Application.onceBooted()` / `Application.whenBooted()` — the signal and your listeners fire from the same latch.
+
+## `warlock pm2 init` / `reload` — optional production supervision
+
+PM2 is operator tooling, never a core dependency. Install it separately and
+put `pm2` on `PATH`. Generate from the app root with the target environment:
+
+```bash
+NODE_ENV=production npx warlock build
+NODE_ENV=production npx warlock pm2 init
+# package.json name=store, app.appName=api → store-api-production
+pm2 start ecosystem.config.cjs --only store-api-production
+
+# Deploy a fresh successful build, then reload only this app:
+NODE_ENV=production npx warlock pm2 reload
+NODE_ENV=production npx warlock pm2 reload --id 7
+```
+
+`init` reads app/http/socket config and resolved build paths without starting
+connectors, bootstrap or prestart. It creates `ecosystem.config.cjs` exclusively;
+an existing file is an error. It works without PM2 installed or a prior build.
+The file runs the built entry directly, with an absolute `cwd`, Node interpreter
+and source maps matching `build.sourcemap`.
+
+The identity is `<project>-<app>-<NODE_ENV>`; project defaults to `package.json`
+name (`@team/store` → `team-store`), app to `app.appName` or `app`, environment
+to `NODE_ENV` or `development`. Use `--project store --app api` to override the
+components, and repeat those overrides on reload. Components accept letters,
+digits, `_` and `-`, starting with a letter/digit. Choose a combination unique
+within the daemon; no patterns or broad selectors are supported.
+
+```bash
+NODE_ENV=production npx warlock pm2 init --project store --app api \
+  --cluster --instances 2 --listen-timeout 60000
+NODE_ENV=production npx warlock pm2 reload --project store --app api
+```
+
+Defaults: `exec_mode: "fork"`, `instances: 1`, `wait_ready: true`,
+`listen_timeout: 30000`. `--cluster` opts into two workers by default;
+`--instances` accepts a positive integer or `max`, only with `--cluster`.
+Fork reload falls back to restart and may interrupt traffic. PM2 cluster reload
+can replace workers while others serve, but a boot/readiness timeout can still
+cause downtime. Keep both the PM2 daemon and app on Node 22.15+; cluster uses
+the daemon's runtime.
+
+`kill_timeout` equals the existing overall connector budget,
+`app.shutdownTimeout` (default 10000ms), now typed on `AppConfigurations`:
+
+```ts
+import type { AppConfigurations } from "@warlock.js/core";
+
+export default {
+  appName: "api",
+  shutdownTimeout: 20000,
+} satisfies AppConfigurations;
+```
+
+Keep `http.gracefulShutdown.timeout` lower (e.g. 10000ms), with room for other
+connectors, hooks and log flushes. PM2's kill timer covers the whole exit;
+core's connector timer starts after app hooks and finishes before log flushing.
+The generated comment and CLI output show the configured readiness URL (or an
+unavailable notice for no HTTP, disabled health or ephemeral ports). PM2 itself
+does not poll it. Use an external deployment probe.
+
+Core emits `process.send("ready")` once at completed boot when PM2's `pm_id`
+and IPC are present, after HTTP and the connectors have started. It never
+disconnects PM2's channel. Socket-only apps also await the listener and reject
+bind failures before completing boot. Rebuild with core 5.33+ before using `wait_ready`.
+`listen_timeout` limits waiting for readiness; `kill_timeout` limits shutdown
+before PM2's forced kill. Core handles PM2's default `SIGINT` gracefully.
+
+With sockets enabled, cluster generation/reload refuse a missing
+`socket.adapter` factory and require `socket.options.transports: ["websocket"]`
+with WebSocket-only clients. The adapter handles broadcasts; polling still
+needs sticky routing to each worker, which this generator does not install.
+For polling, use individual fork listeners behind a sticky proxy or a custom
+cluster primary. See the `wire-socket` topic. Avoid duplicating worker jobs
+and in-memory sessions across HTTP workers.
+
+`reload` requires a successful build marker, reads `pm2 jlist`, verifies **all**
+exact-name matches against the app's absolute cwd and entry, then calls
+`pm2 reload <numeric-id>` sequentially. `--id` narrows to one verified worker.
+Foreign cwd/script, invalid selectors, offline cluster workers or cluster
+workers without `wait_ready` are refused before reload. Reload uses settings
+already registered in PM2; regenerate/reapply the ecosystem when they change.
+
+On shared servers, inspect the current PM2 id and path before stopping:
+
+```bash
+pm2 list
+pm2 show 7
+pm2 stop 7
+```
+
+Repeat for each intended worker id. Never stop by pattern or broad name, and
+avoid daemon-wide operations. PM2 ids are not OS PIDs and can change after an
+app is deleted/recreated.
+
+To put logger entries in PM2's captured stdout, configure
+`src/config/log.ts` with `production: { channels: [new ConsoleLog()] }`
+(`ConsoleLog` comes from `@warlock.js/logger`). Keep `time: false` and omit
+`log_date_format` to preserve the logger's timestamp/module/action format.
+Generated `merge_logs: false` keeps worker logs separate. PM2 JSON output wraps
+captured text; it does not recover logger fields. Use `JSONFileLog` with a
+distinct per-worker storage path for structured persistent entries.
+
+Official references: [PM2 readiness/shutdown](https://pm2.keymetrics.io/docs/usage/signals-clean-restart/),
+[cluster reload](https://pm2.keymetrics.io/docs/usage/cluster-mode/),
+[Socket.IO multiple nodes](https://socket.io/docs/v4/using-multiple-nodes/).
+Full docs: `docs/src/content/docs/v/latest/core/cli/pm2.mdx`.
 
 ## Runtimes — Node, Bun, Deno
 
@@ -6387,25 +6496,132 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 - The `send-response` topic — `response.sendFile(absPath)` for serving local files.
 
 
+## store-secrets  `@warlock.js/core/store-secrets/SKILL.md`
+
+---
+name: store-secrets
+description: "Store app credentials with secrets.get/set/remove/has and environmentName; lazy optional OS keychain, read-only scoped environment variables, encrypted file fallback, typed SecretStoreError and memory-backed secretsFake. Use for provider keys and OAuth credentials the app must read back. Skip user passwords (hash-password) and encrypted database columns (encrypt-data)."
+---
+
+# Application secret store
+
+Use core's facade; there is no separate package or preparation step:
+
+```ts
+import { secrets, SecretStoreError } from "@warlock.js/core";
+// The same API is available from "@warlock.js/core/secrets".
+
+await secrets.set("vendor-token", "provider-credential");
+const token = await secrets.get("vendor-token"); // string | undefined
+const exists = await secrets.has("vendor-token"); // boolean; true for ""
+const removed = await secrets.remove("vendor-token"); // boolean
+const variable = secrets.environmentName("vendor-token"); // variable name, not value
+
+try {
+  await secrets.remove("vendor-token");
+} catch (error) {
+  if (error instanceof SecretStoreError && error.code === "READ_ONLY") {
+    // Change the deployment environment instead.
+  } else {
+    throw error;
+  }
+}
+```
+
+Names are case-sensitive, nonempty strings of at most 256 UTF-16 code units. Values are strings, including empty strings. Every operation is async, except `environmentName()`.
+
+## Configuration and backend decisions
+
+- Default namespace: app name plus the SHA-256 hash of the absolute project root. For changing release directories, configure a stable unique namespace including the deployment environment.
+- Reads: OS keychain → exact scoped environment variable → encrypted file.
+- Optional peer: `pnpm add @napi-rs/keyring`. Core lazily uses its 2.1.1 `AsyncEntry` API. Linux requires `secret-service` for persistence; it does not use the memory-only keyutils fallback. Sources: [official README](https://github.com/Brooooooklyn/keyring-node#readme), [published declarations](https://www.npmjs.com/package/@napi-rs/keyring?activeTab=code), verified 2026-10-19.
+- One initial read-only probe selects the keychain for that store lifetime. Missing peer/initially unavailable service falls back automatically. A later keychain failure throws `UNAVAILABLE`; do not silently change backends mid-operation. Keep backend availability consistent between deployments; independent backend writes are not reconciled automatically.
+- Environment names are `WARLOCK_SECRET_<namespace UTF-8 uppercase hex>_<name UTF-8 uppercase hex>`; use `environmentName()` to avoid guessing. No unscoped environment fallback. Both mutation methods throw `READ_ONLY` if that variable is present, including `""` and shadowed environment values.
+- File fallback derives a per-namespace HKDF-SHA256 key from `encryption.key` (64 hex characters, conventionally `APP_ENCRYPTION_KEY`) and uses AES-256-GCM with name/namespace authenticated data. It never stores an unencrypted value/key file. Core's global `encrypt()` helper cannot accept a derived key, so the backend uses Node crypto without changing global config. Consult `encrypt-data` for app key provisioning.
+- Default files: `storage/secrets/<namespace hash>/<name hash>.secret`. Directories `0700`, files `0600`, owner checks, no symlinks/hardlinks, synced temporary writes and rename. Parent directories must be trusted. Same-key concurrent writes use last completed rename.
+- File fallback fails closed on Windows because Node modes cannot enforce owner-only ACLs; use keychain/environment. See [Node file modes](https://nodejs.org/docs/latest-v22.x/api/fs.html#file-modes).
+- Keychain writes clear an old file copy; removal clears both writable layers. Retry errors after fixing the backend; a multi-layer operation may partially complete.
+
+```ts title="src/config/secrets.ts"
+import type { SecretsConfigurations } from "@warlock.js/core";
+
+export default {
+  namespace: "sample-app-production",
+  // directory: "/srv/sample-app/private-secrets",
+} satisfies SecretsConfigurations;
+```
+
+Never change namespace or encryption key without a migration. Keep file storage outside publicly served paths, and secure the app key separately from encrypted backups.
+
+## Isolated tests and explicit stores
+
+`setupTest()` and the HTTP test harness install `secretsFake` by default. `NODE_ENV=test` alone does not install it. Opt out with `tests.fakes: { secrets: false }` only for real-backend tests. Memory is per process; HTTP server and test worker do not share it.
+
+```ts
+import { secrets } from "@warlock.js/core";
+import { secretsFake } from "@warlock.js/core/tests";
+
+secretsFake.install(); // only needed without the standard test harness
+try {
+  secretsFake.clear();
+  await secrets.set("vendor-token", "test-credential");
+  await secretsFake.assertHas("vendor-token");
+  await secretsFake.assertStored("vendor-token", "test-credential");
+  await secrets.remove("vendor-token");
+  await secretsFake.assertMissing("vendor-token");
+  const installed = secretsFake.isInstalled();
+} finally {
+  secretsFake.restore();
+}
+```
+
+For standalone unit tests or distinct app instances:
+
+```ts
+import { MemorySecretBackend, SecretStore } from "@warlock.js/core/secrets";
+import type { SecretBackend, SecretStoreOptions } from "@warlock.js/core/secrets";
+
+const backend: SecretBackend = new MemorySecretBackend();
+const options: SecretStoreOptions = { namespace: "test-app", backend };
+const store = new SecretStore(options);
+await store.set("vendor-token", "test-credential");
+await store.get("vendor-token");
+await store.has("vendor-token");
+await store.remove("vendor-token");
+
+const memory = new MemorySecretBackend();
+memory.clear();
+```
+
+Options also allow a `directory` and `encryptionKey` (string or lazy callback); the default key reads `encryption.key` lazily. A custom `SecretBackend` implements async namespace-aware `get`, `set`, and `remove`. Explicit backends bypass keychain, environment and files; the test fake only swaps the shared facade.
+
+## Error and logging contract
+
+`SecretStoreError.code` is `INVALID_NAME`, `INVALID_VALUE`, `INVALID_NAMESPACE`, `READ_ONLY`, `KEY_REQUIRED`, `UNAVAILABLE`, `UNSAFE_FILE` or `CORRUPT_FILE`. Errors never include names, values, paths or vendor causes. `KEY_REQUIRED` means provision/fix the app encryption key; `CORRUPT_FILE` means wrong key, invalid format or failed authentication. Never replace an unreadable store with an empty one.
+
+The store never logs credentials. It registers encountered names and literal values with `@warlock.js/logger` for process-lifetime masking, including old/removed/failed-write values, interpolated messages, Error text/causes, and channel error reports. Keys and exact values stay protected even with permissive custom censors. Registration retains values in memory. It cannot mask direct console/third-party logging, earlier logs, transformed/encoded values, or credentials never encountered by the store. Keep secrets out of logs even with masking enabled. Fake assertion errors do not print values.
+
+
 ## test-fakes  `@warlock.js/core/test-fakes/SKILL.md`
 
 ---
 name: test-fakes
-description: 'The test fakes Warlock installs by default in the test environment — `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake` — and their assertions (`assertSent`, `assertPushed`, `assertHas`, `assertExists`, `travel`), plus how to opt out (`tests.fakes`, `setupTest({ fakes })`). Triggers: `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake`, `installTestFakes`, `restoreTestFakes`, `tests.fakes`, `FakeAssertionError`, `clock.now`, `ids.uuid`, `setDispatchInterceptor`; "assert an email was sent", "assert a job was dispatched", "freeze time in a test", "deterministic ids", "tests without Redis", "keep the real cache driver in tests". Typical import `import { mailFake, queueFake } from "@warlock.js/core/tests"`. Skip: HTTP request helpers — the `test-http` topic; fixtures — the `model-factories` topic.'
+description: 'The test fakes Warlock installs by default in the test environment — `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake`, `secretsFake` — and their assertions (`assertSent`, `assertPushed`, `assertHas`, `assertExists`, `travel`), plus how to opt out (`tests.fakes`, `setupTest({ fakes })`). Triggers: `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake`, `secretsFake`, `installTestFakes`, `restoreTestFakes`, `tests.fakes`, `FakeAssertionError`, `clock.now`, `ids.uuid`, `setDispatchInterceptor`; "assert an email was sent", "assert a job was dispatched", "freeze time in a test", "deterministic ids", "tests without Redis", "keep the real cache driver in tests". Typical import `import { mailFake, queueFake } from "@warlock.js/core/tests"`. Skip: HTTP request helpers — the `test-http` topic; fixtures — the `model-factories` topic.'
 ---
 
 # Warlock — test fakes
 
-In the test environment six fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
+In the test environment seven fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
 
-| Fake          | Replaces                                                        |
-| ------------- | --------------------------------------------------------------- |
-| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured         |
-| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed     |
-| `cacheFake`   | The cache's current driver: a fresh in-memory driver            |
-| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory  |
-| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z |
-| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens        |
+| Fake          | Replaces                                                              |
+| ------------- | --------------------------------------------------------------------- |
+| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured               |
+| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed           |
+| `cacheFake`   | The cache's current driver: a fresh in-memory driver                  |
+| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory        |
+| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z       |
+| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens              |
+| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files |
 
 ## Assert what your code did
 
@@ -6433,7 +6649,8 @@ it("queues the report, mails the requester and caches the request", async () => 
 - **queue** — `assertPushed(jobOrName, payloadSubset?)`, `assertNotPushed`, `assertPushedCount(n, job?)`, `assertNothingPushed()`, `pushed(job?, matcher?)`. Each record has `id`, `name`, `queue`, `payload`, `options` (`delay`, `priority`, `jobId`) and `pushedAt`. An explicit `jobId` stays idempotent and `job.find(id)` answers from the record. Jobs are not run — call the handler to test it.
 - **cache** — `assertHas(key)`, `assertMissing(key)`, `assertStored(key, value)` (deep equality), `driver()`, `clear()`. TTLs, tags, namespaces and locks are the real memory driver's.
 - **storage** — `assertExists(path, driver?)`, `assertMissing(path, driver?)`, `files(driver?)`, `root()`. Each configured driver name gets a folder under one temp root, shared with the HTTP test server through `WARLOCK_TEST_STORAGE_ROOT`; the process that created it deletes it.
-- A failed assertion throws `FakeAssertionError` listing what was recorded.
+- **secrets** — async `assertHas(name)`, `assertMissing(name)`, `assertStored(name, value)`, plus `clear()` and `isInstalled()`. Assertion errors never reveal values. See `store-secrets` for examples and explicit memory stores.
+- A failed assertion throws `FakeAssertionError`; secret assertions omit values. Other fakes list what was recorded.
 
 ## Time and ids
 
@@ -8030,8 +8247,45 @@ npm install --save-dev --save-exact typescript@6.0.3
 npx tsc --noEmit
 ```
 
-The same tsconfig cleanups work with TS6. ESLint mode prints a compatibility
-notice and is planned for deprecation in 5.33 and removal in 5.34.
+The same tsconfig cleanups work with TS6. Starting in 5.33, ESLint mode prints
+a deprecation warning naming removal in 5.34.0 and the Oxc migration command.
+
+## 5.32 to 5.33
+
+**BREAKING:** ESLint background health checking and automatic ESLint selection
+in `warlock check` are disabled by default. Oxlint/Oxfmt replace ESLint/Prettier
+as the default toolchain. Legacy support is deprecated now and removed in
+5.34.0. Temporary opt-ins are `devServer.healthCheckers: { eslint: true }`,
+`warlock check --lint eslint`, and `create-warlock --lint=eslint`; each warns
+about removal and migration. The legacy scaffold stays on TypeScript 6.0.3;
+Oxc apps use TypeScript 7.0.2.
+
+ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
+New apps should use `--lint=oxc`. To migrate an existing app, install the new
+core release and `ts-morph`, then run:
+
+```bash
+npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
+npx warlock upgrade --from 5.32 --to 5.33.0
+npm install
+npm run format
+npm run lint:check
+npx warlock check
+```
+
+Review every reported `file:line`: customized configs are preserved and need
+manual translation before removal. The codemod installs the template's Oxlint
+and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
+scripts, removes legacy dependencies, and deletes only recognized generated
+configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
+configs are preserved. `--dry-run --json` reports the same planned changes
+without writing files.
+
+The `oxc-toolchain` codemod also updates generated VS Code settings and literal
+ESLint/Oxlint health-check switches. Custom editor settings, checker arrays,
+computed options and nonstandard scripts require review. Oxc diagnostics keep
+framework conventions in `warlock check`. Re-run the migration after addressing
+manual findings if needed; an app with only Oxc tooling is a no-op for this codemod.
 
 
 ## upload-file  `@warlock.js/core/upload-file/SKILL.md`
@@ -10845,7 +11099,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 ## Gotchas
 
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
-- Lint runs only the linters the app configures (`eslint.config.*`; an oxlint config + the `oxlint` package). No config → the step is skipped, not failed.
+- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint requires `--lint eslint` (or `runCheck({ lint: "eslint" })`); its flat config alone never enables it. This deprecated selection prints one warning on stderr and is removed in 5.34.0.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
 - The convention checks are the framework's own and run the same with ESLint, Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
@@ -10856,6 +11110,10 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 - The `warlock-doctor` topic — boot-time diagnostics; `doctor --json` uses the same codes and fields.
 - The `warlock-inspect` topic — the app's routes, models and config as JSON.
 - The `warlock-conventions` topic — the rules behind `WL9001`–`WL9012`, with the fix for each.
+
+Migrate lint and format tooling with
+`npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run`, then remove `--dry-run`
+and work through the manual-review list. Use `--lint=oxc` for new apps.
 
 
 ## warlock-conventions  `@warlock.js/core/warlock-conventions/SKILL.md`
@@ -11287,6 +11545,15 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 - The `warlock-conventions` topic — project layout the checks assume.
 - The `warlock-check` topic — `warlock check` / `typecheck` / `explain` and the error-code registry the findings use.
 - The `warlock-inspect` topic — `warlock inspect`, the same boot pass printed as a versioned JSON report of the app.
+
+## Lint and format checks
+
+`warlock doctor` checks application wiring and HTTP health probes. Use
+`npx warlock check` for source lint diagnostics and `npm run format:check` for
+formatting. In 5.33, Oxlint/Oxfmt are the defaults; ESLint requires
+`warlock check --lint eslint` or `devServer.healthCheckers.eslint: true` for
+background checks. ESLint/Prettier are deprecated and removed in 5.34.0.
+Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`).
 
 
 ## warlock-inspect  `@warlock.js/core/warlock-inspect/SKILL.md`
@@ -11893,6 +12160,25 @@ Reading `app.socket` (or `getSocketServer()`) at the top level of `main.ts` retu
 
 ## Emitting from a controller or service
 
+Use `broadcastSocketEvent` when a framework integration should tolerate an
+absent connector and broadcast through the configured adapter:
+
+```ts
+import { broadcastSocketEvent } from "@warlock.js/core";
+
+const dispatched = broadcastSocketEvent("inventory:changed", { tags: ["products"] });
+// false without a booted socket server; true means dispatched, not delivered.
+```
+
+This broadcasts to all default-namespace clients, so payloads must be public.
+It uses `io.emit` (not `io.local.emit`), allowing `socket.adapter` to forward to
+other app processes. Each publisher, including a queue/CLI process, must boot
+the socket connector with the same adapter. See Socket.IO's official
+[Redis adapter](https://socket.io/docs/v4/redis-adapter/) and
+[multiple-node guidance](https://socket.io/docs/v4/using-multiple-nodes/).
+Web's `invalidatePageCache(tags)` uses this path for opt-in `config.live` pages;
+shared cache storage is also required when evicting across processes.
+
 Once the server is up, anything with access to `app.socket` can emit:
 
 ```ts title="src/app/notifications/services/notify-user.service.ts"
@@ -12293,6 +12579,7 @@ warlock generate                         (alias: g)      — interactive picker
 | `postman`     | `@warlock.js/postman`                                                                                                                                                                  |
 | `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                          |
 | `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                |
+| `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                       |
 | `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                         |
 
 Run `warlock add --list` to see what's currently registered. Pass `--packageManager <yarn\|pnpm\|npm>` to override auto-detection (defaults to whichever lockfile is present).
@@ -12302,6 +12589,10 @@ is loaded automatically by `warlock dev` when installed, and is omitted from a
 production install with dev dependencies excluded.
 
 The Web starter keeps the page's universal non-component setup in `src/web/index.register.ts`, while `src/web/index.page.tsx` re-exports `register`. Warlock still discovers and runs the hook from the page namespace in both SSR and the browser, but editing the page component remains inside React's Fast Refresh boundary. Do not move the `register()` declaration inline beside the component: React Refresh treats that non-component export as incompatible and reloads the page, losing component state.
+
+### AI input measurement
+
+`warlock ai measure --model <id> [--tools <module>] [--system <file>] [--skills <dir>] [--json]` loads `@warlock.js/ai` lazily without app bootstrap. Model IDs default to OpenAI Responses or use `openai:`, `anthropic:`, `google:` prefixes and the corresponding installed adapter/environment API key. `--model-module <module>` accepts `model`, `default`, or `resolveModel(id)` for custom providers/prices. Tools modules export a `tools` or default array; paths resolve from cwd. The report breaks down messages, system, skills catalogue, and tools, labels native counts versus estimates, and includes uncached input USD only when priced. CLI reports include an explicit `.` user probe and do not preload skill bodies or add skill tools. JSON stdout contains one report. No CLI config registration is required.
 
 ### Misc
 
@@ -12386,6 +12677,22 @@ export default command({
 - The `run-app` topic — the operational commands (`dev` / `build` / `start`) with all flags and config knobs.
 - The `configure-app` topic — wiring `defineConfig` and `warlock.config.ts`.
 - The `warlock-conventions` topic — module layout, canonical imports.
+
+## App-owned processes
+
+`npx warlock add process` creates typed `src/config/process.ts` (owner, registry,
+default limits), `src/app/processes/index.ts` (the `processes` supervisor export),
+lifecycle hooks, and a read-only devtools list source. It imports lifecycle from
+`src/app/main.ts`. Startup awaits `recover()` using `Application.onValidateBoot`;
+graceful shutdown awaits `stopAll()` using `Application.onShutdown`. Recovery
+failure aborts boot. Repeated installation preserves existing files.
+
+Set a unique owner and registry per app instance, then import `processes` from
+the generated module and await `processes.spawn({ kind: "worker", command,
+args, labels })`. Consume output and await `handle.exited`. Use handle stops or
+label filters; never stop processes by command or name. `spawnPty()` lazily
+loads separately installed optional peer `node-pty`. The `supervise-processes`
+skill in `@warlock.js/process` contains complete working examples.
 
 
 ## write-middleware  `@warlock.js/core/write-middleware/SKILL.md`
@@ -22686,7 +22993,7 @@ If two channels share a `name`, only one is reachable this way — the search re
 
 ---
 name: redact-sensitive-log-fields
-description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`, `maskEmail`, `maskEmailsInText`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
+description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`, `maskEmail`, `maskEmailsInText`, `registerLogSecret`, `maskRegisteredLogSecrets`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
 ---
 
 # Redaction — keeping secrets out of logs
@@ -22721,7 +23028,7 @@ log.configure({
 
 **A channel cannot turn the default set off** (it can only add keys, or turn it back _on_ if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears _your_ paths, not the default denylist.
 
-Not reachable by any layer: secrets interpolated into a `message` string (`` `token=${t}` ``), `Map`/`Set`/`Buffer` contents, and getter-backed or non-enumerable properties.
+Key/path redaction cannot reach secrets interpolated into strings, opaque container contents, or non-enumerable properties. Register known credentials with `registerLogSecret()` (below) for an additional safety floor.
 
 ## Layers 1 & 2 — path globs, opt-in
 
@@ -22870,6 +23177,21 @@ CR/LF/tab become `\r`/`\n`/`\t`, other control characters `\uXXXX`, ANSI
 sequences are removed; `maxLength` cuts and marks `…[truncated]`. `warlock
 check` (from `@warlock.js/core`) reports raw emails, credentials and request
 bodies in log calls as `WL9008` and accepts these helpers.
+
+## Registered credentials (since 5.33)
+
+```ts
+import { registerLogSecret, maskRegisteredLogSecrets, log } from "@warlock.js/logger";
+
+registerLogSecret("provider-credential", ["vendorPrivateRef"]);
+log.info("sample", "request", "using provider-credential", { vendorPrivateRef: "hidden" });
+// "using [REDACTED]", { vendorPrivateRef: "[REDACTED]" }
+const safeText = maskRegisteredLogSecrets("using provider-credential");
+```
+
+Keys are normalized; values are exact literal substrings (punctuation is literal, longer matches win). Empty values are ignored. This adds a final safety floor after censors in every Logger instance: `defaultKeys: false` and permissive censors cannot disable it. Error messages/stacks/causes, property names, Maps/Sets and channel diagnostics are protected. The safety pass clones without invoking getters/serializers; opaque objects (including Buffers) and functions become `[REDACTED]` while any registration is active.
+
+Registration retains keys/values in memory for the process lifetime. Removed/rotated values stay protected. It does not protect prior logs, transformed/encoded credentials, direct console calls, third-party loggers or credentials never registered. Core's `secrets` store registers its encountered keys/values automatically. Keep credentials out of logs even with this protection enabled.
 
 
 ## ship-logs-to-sentry  `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`
@@ -27791,6 +28113,145 @@ Load when several contexts apply to the same scope (request + database
 
 
 ================================================================================
+# @warlock.js/process
+================================================================================
+
+# Warlock Process — full skills
+
+> Package: `@warlock.js/process`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/process/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## supervise-processes  `@warlock.js/process/supervise-processes/SKILL.md`
+
+---
+name: supervise-processes
+description: Start, limit, list, stop and recover app-owned workers or terminals using @warlock.js/process. Covers supervisor, ProcessNotOwnedError, spawnPty and warlock add process. Use for child process ownership and resource caps.
+---
+
+# Supervise app-owned processes
+
+Use `npx warlock add process` to pin the family package, create
+`src/config/process.ts`, export `processes` from `src/app/processes/index.ts`,
+and wire recovery/shutdown through `src/app/main.ts`. A second run preserves
+existing files. Set a unique owner and registry per app instance.
+
+```ts
+import { supervisor, ProcessNotOwnedError } from "@warlock.js/process";
+
+const processes = supervisor({
+  owner: "example-app",
+  registry: "storage/processes/registry.json",
+  defaults: { timeoutMs: 30_000, memoryBytes: 512 * 1024 * 1024 },
+});
+await processes.recover({ keep: (entry) => entry.labels.persistent === "yes" });
+const worker = await processes.spawn({
+  kind: "worker",
+  command: process.execPath,
+  args: ["-e", 'console.log("ready"); setTimeout(() => {}, 1000)'],
+  cwd: process.cwd(),
+  env: { WORKER_MODE: "once" },
+  labels: { room: "demo", member: "one" },
+  limits: { timeoutMs: 10_000 },
+});
+worker.stdout.pipe(process.stdout);
+worker.stderr.pipe(process.stderr);
+console.log(await processes.list({ labels: { room: "demo" } }));
+await processes.stop({ labels: { room: "demo", member: "one" } });
+await worker.stop(); // idempotent after exit
+console.log(await worker.exited); // reason, code, signal, peakMemoryBytes
+try {
+  await processes.stopPid(worker.pid); // an exited PID is no longer registered
+} catch (error) {
+  if (!(error instanceof ProcessNotOwnedError)) throw error;
+}
+await processes.stop(); // without a filter, stops all verified entries
+await processes.stopAll(); // releases registry, permanently closes supervisor
+```
+
+No name/pattern stops. Labels match every requested key/value. `stop()` selects
+all entries. `stopPid()` verifies ownership or throws `ProcessNotOwnedError`.
+Recovery clears stale identities, adopts those selected by `keep`, and stops
+other verified entries. Default recovery stops verified orphans. Adopted children
+cannot regain stdio or original exit codes. Always recover before spawning.
+
+The input `kind` is the workload category; listing calls it `type`.
+Ownership is random environment token + PID + OS start time, with an isolated
+group on POSIX; commands never prove ownership.
+Do not expose tokens or the private registry. A second live supervisor for the
+same registry fails. Corruption or incomplete leases require inspection.
+
+## Terminals
+
+Install optional peer `node-pty` only for terminals. Import happens lazily.
+
+```ts
+import { supervisor } from "@warlock.js/process";
+
+const terminals = supervisor({ owner: "terminals", registry: "storage/terminals.json" });
+await terminals.recover();
+const terminal = await terminals.spawnPty({
+  kind: "terminal",
+  command: "/bin/sh",
+  args: [],
+  columns: 100,
+  rows: 30,
+  labels: { room: "demo" },
+});
+terminal.stdout.pipe(process.stdout);
+terminal.write("printf 'hello\\n'\n");
+terminal.resize(120, 40);
+await terminal.stop();
+console.log(await terminal.exited);
+await terminals.stopAll();
+```
+
+PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
+
+## Resource and lifecycle decisions
+
+- Linux attempts a per-child cgroup v2 inside an already delegated directory
+  (`cgroupRoot` overrides discovery). It does not request root or change the
+  host's controllers. Denied writes fall back to `rlimit-polling`.
+  For memory enforcement the delegated parent must be empty, with memory
+  enabled; put the app in a separate leaf and use the parent as `cgroupRoot`.
+- Limits: `timeoutMs`, `memoryBytes`, `cpuSeconds`, Linux-only
+  `virtualMemoryBytes`. All are positive safe integers. Linux ignores
+  `RLIMIT_RSS`; fallback RSS accounting covers the leader and can overshoot.
+  V8 reserves large address space; avoid small address-space limits.
+- macOS reads `ps` start times with `LC_ALL=C TZ=UTC`, applies CPU/data rlimits
+  and polls tree RSS. Windows uses PowerShell/CIM creation times, polls tree
+  working sets (`enforcement: "rss-polling"`) and stops verified trees with
+  `taskkill /PID <pid> /T /F`. Memory caps on both are softer than Linux cgroups.
+- Both use a Node guardian as the handle PID. It proves the random token from
+  its own environment through a local socket/named pipe, gates workload launch
+  until registry persistence, and survives supervisor restarts for recovery.
+  Memory includes the guardian and its descendants. No identity-helper setup
+  or custom native compilation is needed.
+- Windows needs PowerShell/CIM. `cpuSeconds` is POSIX-only and
+  `virtualMemoryBytes` Linux-only; unsupported limits fail before launch.
+  Timeouts apply everywhere. Windows always forces the PID tree immediately;
+  Job Objects remain a future hard-containment improvement. `spawnPty` uses
+  optional `node-pty` on Windows/ConPTY too (use `powershell.exe` as the command).
+- Read `enforcement` on listed entries. Kernel cgroup peaks include descendants;
+  sampled peaks can miss short-lived descendants. Reasons are `exit`, `timeout`, `memory-cap`,
+  `stopped`; allocation failures from rlimits may be ordinary exits.
+- Without cgroups, descendants that create a session can escape; a leader that
+  exits cannot be re-verified for escalation. This is not a hostile-code sandbox
+  or an atomic identity-and-signal API. Windows trees also have discovery/PID-reuse
+  races and require a live verified guardian for stopping.
+- The generated `Application.onValidateBoot` awaits recovery and fails boot on
+  error; `Application.onShutdown` awaits cleanup. For manual wiring, use the same
+  hooks. Consume worker output to avoid backpressure.
+  `exited` reports leader exit; await stream `end` events as well when collecting output.
+- With devtools installed, the generated `app/processes/devtools.ts` exports a
+  read-only list source, discovered only in development. No stop endpoint ships.
+
+Platform source references and delegation details:
+https://warlock.js.org/v/latest/process/.
+
+
+================================================================================
 # @warlock.js/herald
 ================================================================================
 
@@ -30646,6 +31107,66 @@ description: "Load App, Layout, and Page data with named loaders; page validatio
 ---
 
 # Warlock — load page data
+
+## Live loader dependencies
+
+Opt a page into automatic loader re-runs using page-owned `config.live`:
+
+```tsx
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  live: { tags: ["products"], pollInterval: 15_000 },
+} satisfies PageConfig;
+```
+
+Pass the app's existing default-namespace Socket.IO client once from a browser
+`register()` hook (guard server registration with `typeof window`):
+
+```ts
+import { configureLivePageData } from "@warlock.js/web";
+import { io } from "socket.io-client";
+
+export function register() {
+  if (typeof window === "undefined") return;
+  configureLivePageData({ socket: io() });
+}
+```
+
+`LivePageOptions` and structural `LivePageSocket` are exported from the web root.
+Reuse an existing socket if the app has one. No client dependency is required for
+polling: `configureLivePageData({})` removes the binding. `pollInterval` defaults
+to 30,000 ms and must be finite, between 1 and 2,147,483,647. Tags must be a
+non-empty string array; they describe dependencies of the whole loader pipeline,
+independent of response-cache policy.
+
+After committing a write, publish server-side:
+
+```ts
+import { invalidatePageCache } from "@warlock.js/web/page-cache";
+
+await invalidatePageCache(["products"]);
+```
+
+This API requires a configured cache driver. It evicts before pushing dependency
+labels to all default-namespace sockets; never put secrets/private identifiers in
+labels. Configure `config.cache.tags` too if caching the response. Live requests
+bypass browser/server page caching (`x-warlock-live: 1`); configure CDN bypass for
+that header. Background refreshes run the normal middleware/session/loader path.
+
+Navigation always wins: notifications wait until idle and recheck the current
+page's tags. Dirty `<Form>` native controls pause pushes and polling; reverting,
+resetting, successful submission, or unmounting clears the pause. Failed submits
+and edits made during a submit stay dirty. An in-flight live result is discarded
+if a form becomes dirty. Custom editors must mirror input into native controls
+and dispatch input/change; plain HTML forms aren't tracked.
+
+Polling runs only without a connected configured socket. Reconnect catches up.
+For multiple app processes, configure a shared cache driver, stable
+`pageCache.namespace`, and the same cross-process `socket.adapter` in every
+process. Cache-only queue workers cannot push: they must boot the socket
+connector with that adapter. Socket.IO polling transport also requires sticky
+sessions. See the live-page-data docs for deployment and best-effort limits.
 
 Loaders run on the server and return serializable data to their own component level.
 Declare the loader so TypeScript infers its return type, then pass `typeof loader`
@@ -35104,12 +35625,58 @@ Runtime deps: `@warlock.js/cache` (persistence), `@warlock.js/logger` (logging),
 
 ---
 name: ai-dx-helpers
-description: "Configure @warlock.js/ai developer-experience helpers for batching, fallback, evaluation, SLOs, and supervisor middleware."
+description: "Configure @warlock.js/ai developer-experience helpers for call token/cost measurement, batching, fallback, evaluation, SLOs, and supervisor middleware."
 ---
 
 # DX helpers — batch, fallback, eval, SLO, supervisor middleware
 
 A grab-bag of additive 4.3.0 helpers. Each is independent — load the section you need.
+
+## `ai.measure(options)` and `ai.measure.diff(before, after)`
+
+Measure the input carried by a call without generating or executing tools. Use the same configured model and representative messages for comparisons:
+
+```ts
+import { ai, type ModelContract, type ToolConfig } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const tools: ToolConfig<unknown, unknown>[];
+
+const messages = [{ role: "user" as const, content: "Find the refund policy" }];
+const skills = ai.skills({
+  name: "support",
+  sources: [{ type: "directory", path: "./agent-skills" }],
+});
+const before = await ai.measure({
+  model,
+  tools,
+  system: "Help customers find documentation.",
+  messages,
+  skills,
+});
+const after = await ai.measure({
+  model,
+  tools,
+  toolSchemas: "compact",
+  system: "Find documentation.",
+  messages,
+  skills,
+});
+console.log(before.parts.tools, before.total);
+console.log(ai.measure.diff(before, after).total); // signed after minus before
+```
+
+The standalone `measure` export has the same `.diff`. Reports expose `parts.messages/system/skills/tools`, `total`, `model`, `provider`, and `probe`. Each part has `tokens`, `source: "native" | "estimate"`, and optional `costUSD`. Attribution adds messages → system → catalogue → tools and parts sum to the total. Native counts may use the network; explicit `count-unsupported` switches the entire report to estimates. Other provider errors propagate. `estimate: { charsPerToken, attachmentTokens, perMessageTokens }` tunes heuristics, not a tokenizer.
+
+`system` is resolved text; `skills` is catalogue text or a library with `catalogPrompt()`. No bodies or library tools are auto-added. Include exposed library tool configs in `tools` and already loaded bodies in the supplied input when those belong to the actual call. Avoid duplicating system/catalogue text in `messages`. Without messages (including `[]`), a `.` user probe supplies counting context and is included in `parts.messages`, with `probe: true`.
+
+USD uses the model's uncached input pricing only; unknown prices stay absent. It excludes output, cache adjustments and hosted-tool fees. A diff omits USD if either side is unpriced and retains both reports so their provenance can be inspected.
+
+```sh
+warlock ai measure --model "$MODEL_ID" --tools ./measure-tools.ts --system ./system.md --skills ./agent-skills --json
+```
+
+The Core command lazily loads AI. Unqualified IDs use OpenAI Responses; `openai:<id>`, `anthropic:<id>`, and `google:<id>` use the respective installed adapters and environment API keys. `--model-module ./models.ts` accepts `model`, `default`, or `resolveModel(id)` for custom providers and configured pricing. Tools modules export `tools` or a default array. CLI measurement always uses the explicit probe, reads catalogue metadata only, and imports module top-level code. JSON owns stdout. Use API messages for actual turn measurements.
 
 ## `ai.batch(executable, items, options?)` — fan-out a dataset
 
@@ -35982,6 +36549,28 @@ const { data } = await pinLocale.invoke({}, ctx);
 
 console.log(data, ctx.artifacts.locale); // { ok: true } "en-GB"
 ```
+
+## MCP request identity
+
+When served by `@warlock.js/ai-tools`, `ToolContext` also carries optional
+`requestId` (the original JSON-RPC string/number id), `principal` (unknown,
+from HTTP `auth.authenticate` or stdio identity options), and `signal` that
+aborts on request cancellation or disconnect/shutdown. Narrow the principal
+before using it; none of this metadata is automatically returned to the model.
+
+```ts
+const identity = ai.tool({
+  name: "identity",
+  description: "Read server-provided identity",
+  execute: async (_input: unknown, ctx) => {
+    ctx?.signal?.throwIfAborted();
+    return { requestId: ctx?.requestId, principal: ctx?.principal };
+  },
+});
+```
+
+See the `expose-as-mcp-server` skill in `@warlock.js/ai-tools` for
+`authenticate`, `beforeCall` and `notifications/cancelled`.
 
 ## Type contract for artifacts
 
@@ -44808,7 +45397,7 @@ The MCP client does not use `@modelcontextprotocol/sdk`: it speaks MCP's JSON-RP
 
 ---
 name: expose-as-mcp-server
-description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Expose tools AS an MCP server (Direction B)
@@ -44872,7 +45461,7 @@ transport: {
 }
 ```
 
-- With `bearer` and `authorize` both set, a request must pass both. A throwing hook denies. Failures → `401`.
+- Checks run in order: `bearer`, `authorize`, `authenticate`; every configured check must pass. A failed check skips later hooks. `authenticate` alone satisfies the non-loopback auth requirement. Host/Origin checks run first. A throwing authentication hook denies. Failures → `401`; bearer or authenticate failures include a Bearer `WWW-Authenticate` challenge.
 - A foreign or `null` `Origin` → `403` (DNS-rebinding guard from the MCP spec). Requests without `Origin` pass.
 - On loopback, a `Host` other than `localhost` / `127.0.0.1` / `[::1]` (or `allowedHosts`) → `403`.
 - Stateless: no session id; `GET` / `DELETE` → `405`; batches → `400`; unsupported `MCP-Protocol-Version` → `400`.
@@ -44898,6 +45487,58 @@ const { url, close } = await ai.mcp
 ```
 
 Header names are lower-cased; every client header is present (including `authorization`). Over stdio `ctx.request` is absent. Nothing on `ctx.request` reaches the model.
+
+## Authenticated context, policy and cancellation
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-tools";
+import type { McpHttpRequestInfo, McpCallRefusal } from "@warlock.js/ai-tools";
+
+declare function findMember(
+  request: McpHttpRequestInfo,
+): Promise<{ id: string; canCall: boolean } | undefined>;
+const denied: McpCallRefusal = {
+  isError: true,
+  content: [{ type: "text", text: "Member cannot call tools" }],
+  _meta: { policy: "membership" },
+};
+const identity = ai.tool({
+  name: "identity",
+  description: "Report the authenticated caller and request id",
+  execute: async (_input: unknown, ctx) => {
+    ctx?.signal?.throwIfAborted();
+    return { requestId: ctx?.requestId, principal: ctx?.principal };
+  },
+});
+
+const server = ai.mcp.serve([identity], {
+  name: "member-tools",
+  transport: { type: "http", auth: { authenticate: findMember } },
+  beforeCall: async (context, tool, input) => {
+    const member = context.principal; // unknown — narrow before use
+    if (
+      typeof member !== "object" ||
+      member === null ||
+      !("canCall" in member) ||
+      member.canCall !== true
+    ) {
+      return denied;
+    }
+    // context.requestId: JSON-RPC id; tool: original ToolContract;
+    // input: validated data, treated as read-only.
+  },
+});
+```
+
+- `authenticate(request)` may be synchronous or async. `undefined` or a thrown error → `401` with `WWW-Authenticate: Bearer realm="mcp"`; every other value becomes `context.principal` and `ctx.principal`. Secrets in thrown auth errors are not exposed.
+- `beforeCall(context, tool, input)` runs after schema validation. Return nothing to allow; return `McpCallRefusal` (`isError: true`) to send native content/metadata unchanged, independent of result mode. Throw → JSON-RPC `-32602`. Invalid refusals → `-32603`. Invalid input skips policy. The boundary validates before policy and `invoke` keeps its own validation, so schemas must be deterministic and policy input read-only.
+- Stdio identity: `transport: { type: "stdio", principal: { id: "local" } }` or `transport: { type: "stdio", principalProvider: async (context) => ({ id: "local", requestId: context.requestId }) }`. The provider runs per request, takes precedence over static principal, and receives the request id and abort signal. A provider throw → JSON-RPC internal error. No HTTP request metadata exists over stdio.
+- Public types: `McpBeforeCall`, `McpCallRefusal`, `McpServeToolContext`, `McpStdioServeTransport`; `ToolContext` in `@warlock.js/ai` adds optional `requestId` and `principal`.
+
+[Cancellation (MCP 2025-11-25)](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation): send `{ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 42, reason: "Caller cancelled" } }`. The matching signal aborts; no JSON-RPC response is sent even if the tool later returns or throws. Unknown/completed/malformed ids are ignored; `initialize` cannot be cancelled. String and numeric ids are distinct; calls sharing an in-flight id still execute, but ambiguous cancellation in one scope is ignored.
+
+HTTP cancellation POSTs must repeat caller credentials and application headers (`Authorization`, `Cookie`, tenant/custom auth headers), from the same remote address. Transport headers such as content length, accept, protocol version and connection may differ. Different credentials can reuse ids safely. Clients sharing credential/application headers must use unique in-flight ids for cancellation to identify a call. Notifications get `202`; a cancelled HTTP call ends with `202`, no JSON-RPC body, when its handler settles. Stdio scopes cancellation to the connection. HTTP disconnect, stdio EOF/close/stop, or HTTP shutdown after the drain timeout also abort tools. Pass `ctx.signal` into cancellable work.
 
 ## Return native MCP results
 
@@ -46459,6 +47100,41 @@ Add exporters after construction with `observe.use(exporter)` (chainable, dedupe
 - The `query-traces` topic — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent and the `BaseReport` shape Panoptic consumes.
 
+## Subscribe across collectors and inspect requests in devtools
+
+`subscribeTraces(listener)` is a process-local adapter hook: it receives every
+finalized trace from built-in collectors (including ones created earlier), in
+the collecting async context, before exporter dispatch. It has no replay and
+adds no retention. It does not enable observation or subscribe to pure
+`toTrace()` calls. Treat incoming traces as read-only. Listener throws/rejections
+are isolated; promises are not awaited.
+
+```ts
+import { subscribeTraces } from "@warlock.js/ai-panoptic";
+import type { TraceListener } from "@warlock.js/ai-panoptic";
+
+const onTrace: TraceListener = (trace) => {
+  console.log(trace.traceId, trace.root.status, trace.usage);
+};
+const unsubscribe = subscribeTraces(onTrace);
+// ...later, on adapter teardown:
+unsubscribe();
+```
+
+With `@warlock.js/devtools` installed, its **AI** tab at `/__warlock` subscribes
+for you. Enable `ai.config({ panoptic: { observeAll: true } })` as above, or use
+an explicit subscriber. No `dashboard: true` is needed. Request-local context
+links runs to their HTTP request when available, independently of `sessionId`.
+The panel never mounts in production.
+
+New diagnostic attributes are `retry.attempts` (timings/outcomes),
+`agent.cacheHits` (trips reporting positive provider cache reads),
+`agent.truncatedTrips`, `agent.providerCompactions` and `agent.compactions`
+(applied/skipped decisions, trip indices, token counts and replaced ranges).
+They exclude compaction summaries and callback error text. Unknown cache hits
+remain absent; do not infer semantic-cache hits from zero tokens. An incomplete
+run is identified by its status or normalized `AGENT_INCOMPLETE` error code.
+
 
 ## query-traces  `@warlock.js/ai-panoptic/query-traces/SKILL.md`
 
@@ -46519,6 +47195,7 @@ Every field is optional and **ANDed** together — an absent field is "don't car
 ```ts
 type TraceQuery = {
   traceId?: string; // exact one run
+  requestId?: string; // exact HTTP request id, when an integration supplied it
   sessionId?: string; // every run for a session
   status?: ReportStatus | ReportStatus[]; // single status or membership set
   startedAfter?: string | Date; // inclusive lower bound on root startedAt
@@ -46677,6 +47354,40 @@ console.log(stats.usage.serverToolUse?.webSearchRequests);
 console.log(stats.cost?.serverTools?.webSearch); // historical USD
 console.log(totalCost(stats.cost)); // includes hosted fees
 ```
+
+## Correlate traces with HTTP requests
+
+`Trace.requestId` is an optional integration-supplied identity. It is independent
+of `sessionId`; legacy and background traces omit it. In-memory and cache stores
+use the same exact-match `requestId` filter in `query()` and `aggregate()`, and
+cache hydration preserves it.
+
+```ts
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createInMemoryTraceStore, subscribeTraces } from "@warlock.js/ai-panoptic";
+
+// Your HTTP adapter runs the flow inside this context.
+const httpContext = new AsyncLocalStorage<{ requestId: string }>();
+const requests = createInMemoryTraceStore({ capacity: 200 });
+const unsubscribe = subscribeTraces((trace) => {
+  requests.add({ ...trace, requestId: httpContext.getStore()?.requestId });
+});
+
+const runs = requests.query({ requestId: "request-42" });
+const usage = requests.aggregate({ requestId: "request-42" });
+unsubscribe();
+```
+
+The callback reads request context synchronously, before exporters run. It sees
+future collection from all built-in collectors, with no replay. Treat incoming
+traces as read-only and add an enriched copy. Errors are isolated, async
+callbacks are not awaited, and `toTrace()` does not notify subscribers.
+
+For app development, `@warlock.js/devtools` already does this: open the **AI** tab
+at `/__warlock`, or an HTTP request's **AI runs** section. Its bounded,
+content-free store is separate from your exporter/cache stores. Clearing the
+panel does not clear application trace history. Enable flow observation first;
+installing the viewer alone does not collect runs.
 
 
 ## use-local-dashboard  `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`
@@ -46910,6 +47621,27 @@ These three findings (link sanitization + the two token-handling items above) ca
 - The `export-traces` topic — shipping traces to OTel / Langfuse / a file instead of (or alongside) the local dashboard.
 - The `evaluate-system-prompt` topic — the drawer's "Evaluate system prompt" action, the dashboard's one write route.
 
+## Use the app's devtools AI panel
+
+When developing a Warlock HTTP app with `@warlock.js/devtools` installed, open
+`/__warlock` → **AI** to inspect runs alongside their HTTP requests. This uses
+the existing app server and needs no `dashboard: true`:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic";
+ai.config({ panoptic: { observeAll: true } });
+```
+
+Restart `warlock dev` after installing the optional Panoptic package. Runs
+appear after collection, with model, tokens, historical cost, provider cache
+hits, tool timings, retries, incomplete/truncated status and compaction metadata.
+The panel uses a bounded content-free in-memory view (200 traces by default),
+not the standalone dashboard's persisted cache store. Clear/restart discards
+only that view. HTTP request identity is captured from the collecting async
+context; missing identities remain background runs. Devtools never mounts in
+production and retains its socket-loopback guard.
+
 
 ================================================================================
 # create-warlock
@@ -46997,7 +47729,7 @@ Features: none
 | `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                                     |
 | `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
 | `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default.                |
-| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier); unknown or missing values fail before writes.                      |
+| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier, deprecated); unknown or missing values fail before writes.          |
 | `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                                        |
 | `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                                       |
 | `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                                   |
@@ -47154,7 +47886,7 @@ double-quote, semicolon and trailing-comma settings. Import sorting is on in
 { "sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] } }
 ```
 
-`format` (`oxfmt --write ./src`) orders built-ins, packages, internal aliases,
+`format` (`npm run format`) orders built-ins, packages, internal aliases,
 then relative imports. Neither formatter deletes unused imports. ESLint reports
 them through `unused-imports/no-unused-imports`; Oxlint uses `no-unused-vars`.
 Scripts in both toolchains call local binaries
@@ -47173,8 +47905,7 @@ supported by typescript-eslint. Its parser requires the JavaScript compiler API
 removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
 ([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
 Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
-ESLint mode prints a compatibility notice when chosen and is planned for
-deprecation in 5.33 and removal in 5.34. Both modes install with every supported package manager.
+ESLint mode prints a deprecation warning naming removal in 5.34.0 and the Oxc migration command. Both modes install with every supported package manager.
 
 ### Prettier import order in ESLint mode
 
@@ -47193,6 +47924,37 @@ Leave `importOrderTypeScriptVersion` at its default to keep type and value impor
 separate. Run `npm run format`, then `npm run lint:check`; formatting preserves
 unused imports, and `npm run lint` can apply ESLint’s unused-import fixes.
 
+## Migrate to Oxlint and Oxfmt in 5.33
+
+ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
+New apps should use `--lint=oxc`. To migrate an existing app, install the new
+core release and `ts-morph`, then run:
+
+```bash
+npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
+npx warlock upgrade --from 5.32 --to 5.33.0
+npm install
+npm run format
+npm run lint:check
+npx warlock check
+```
+
+Review every reported `file:line`: customized configs are preserved and need
+manual translation before removal. The codemod installs the template's Oxlint
+and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
+scripts, removes legacy dependencies, and deletes only recognized generated
+configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
+configs are preserved. `--dry-run --json` reports the same planned changes
+without writing files.
+
+Explicit deprecated ESLint scaffolds set `devServer.healthCheckers.eslint: true`;
+existing apps must set this themselves to retain background ESLint checking.
+
+Oxc formatting scripts explicitly read `.gitignore` and `.oxfmtignore`. Oxfmt
+0.73 otherwise defaults to `.prettierignore` (`oxfmt --help`); the explicit
+paths make migrated ignore rules effective. The package template format gate
+also defaults to Oxfmt; `--lint=eslint` is its deprecated compatibility mode.
+
 
 ================================================================================
 # @warlock.js/devtools
@@ -47208,7 +47970,7 @@ unused imports, and `npm run lint` can apply ESLint’s unused-import fixes.
 
 ---
 name: devtools-overview
-description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations, the route map and an API docs page (`/__warlock/docs`, the OpenAPI 3.1 document of the app rendered with Scalar or Swagger UI at `/__warlock/docs/swagger`, with OpenAPI and Postman downloads). Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard", "browse my API docs in dev", "see the OpenAPI for my routes", "open Swagger UI for my API", "export my routes to Postman". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
+description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations, AI traces per HTTP request (model, tokens, cost, cache hits, tools, retries, truncation, compaction), the route map and an API docs page (`/__warlock/docs`, the OpenAPI 3.1 document of the app rendered with Scalar or Swagger UI at `/__warlock/docs/swagger`, with OpenAPI and Postman downloads). Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard", "browse my API docs in dev", "see the OpenAPI for my routes", "open Swagger UI for my API", "export my routes to Postman". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
 ---
 
 # `@warlock.js/devtools` — overview
@@ -47258,6 +48020,78 @@ of it would fail to resolve there.
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
 
+## AI runs alongside HTTP requests
+
+The **AI** tab and each request's **AI runs** section display completed traces
+from optional `@warlock.js/ai-panoptic`. If it cannot be imported, the tab shows
+install/restart guidance and the other panels keep working.
+
+```bash
+warlock add devtools
+pnpm add @warlock.js/ai @warlock.js/ai-panoptic
+```
+
+At app boot, enable observation, then restart `warlock dev`:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic";
+ai.config({ panoptic: { observeAll: true } });
+```
+
+No `dashboard: true` or extra listener port is needed. Existing `attach`,
+middleware and explicit collection through Panoptic's built-in collector also
+feed the panel. An installed but unobserved flow produces no trace.
+
+- `DevtoolsAiRun` and `DevtoolsAiEvent` are public types from
+  `@warlock.js/devtools`; `DevtoolsStreamEvent` includes the `ai` event.
+- Read all runs with `GET /__warlock/api/ai`, or filter by an exact HTTP id with
+  `GET /__warlock/api/ai?requestId=<encoded-id>`. Responses include `available`,
+  `runs` and a root-usage `aggregate`; unavailable responses contain `message`.
+- Inspect tools/timings, retry attempts and compaction records with
+  `GET /__warlock/api/ai/runs/<encoded-trace-id>` (404 when evicted). The existing
+  stream emits `ai` events with `{ traceId, requestId? }`.
+- Model, input/output/cache-read/cache-write tokens and historical USD cost come
+  from the trace, never a guessed price table. Unknown cost is unpriced. Root
+  usage includes children already; do not sum all spans for a run total.
+- Cache hits count trips reporting positive provider `cachedTokens`.
+  Semantic-cache hits have no explicit report flag and remain unreported; zero
+  tokens alone do not prove a hit. `—` means unreported rather than zero.
+- `incomplete` status or normalized `AGENT_INCOMPLETE` / `AgentIncompleteError`
+  marks truncation. Recovered truncated trips still contribute to their count.
+- Compaction metadata includes applied/skipped agent decisions and provider
+  compaction-block counts; summary content is omitted. Orchestrator result-only
+  compaction cannot be reconstructed from a report-only trace.
+
+A same-origin browser tool can consume the public types directly:
+
+```ts
+import type { DevtoolsAiEvent, DevtoolsAiRun, DevtoolsStreamEvent } from "@warlock.js/devtools";
+
+const response = await fetch("/__warlock/api/ai?requestId=request-42");
+const { runs }: { runs: DevtoolsAiRun[] } = await response.json();
+console.log(runs.map((run) => [run.traceId, run.usage, run.cost]));
+
+function handleStream(event: DevtoolsStreamEvent): void {
+  if (event.type === "ai") {
+    const update: DevtoolsAiEvent = event.data;
+    console.log(update.traceId, update.requestId);
+  }
+}
+handleStream({ type: "ai", data: { traceId: "run-42", requestId: "request-42" } });
+```
+
+Request correlation reads core's current request id at collection time, before
+exporters. Concurrent/late runs can retain their async context. No id means
+background; `sessionId` is never substituted. Replayed reports outside the
+request cannot recover its context automatically.
+
+Devtools retains its own content-free in-memory store, at most `maxRequests`
+traces (200 by default), independently of HTTP request retention. Clear/shutdown
+empties this view, leaving application exporter/cache stores alone. Boot-time
+and persisted traces are not replayed. The source only attaches in development;
+AI routes keep the same socket-loopback guard as every other panel.
+
 ## API docs
 
 `/__warlock/docs` renders the app's OpenAPI 3.1 document with [Scalar](https://github.com/scalar/scalar); the dashboard's **API** tab shows the same page and has a **Scalar | Swagger UI** switch (remembered in the browser). `/__warlock/docs/swagger` renders the same document with [Swagger UI](https://github.com/swagger-api/swagger-ui). The document comes from `GET /__warlock/api/openapi.json`, built in-process by core's `getDevelopmentOpenApiDocument()` from the routes already registered, so it is the same generator as `warlock generate.openapi` and follows your edits with no CLI run. It covers API routes (not pages): paths, parameters, request bodies from Seal validation, responses from each handler's `responseSchema`, `401`/`422` and bearer/cookie security from `authMiddleware()`. See core's `generate-openapi` topic for what is documented and how to declare it.
@@ -47298,6 +48132,18 @@ why the dashboard is development-only and loopback-only.
 - Building your own tooling on the same hooks: core `registerTracingHooks()`,
   cascade `dataSourceRegistry.on("query")`, core `mailEvents.onCaptured()` and
   the cache `invalidated` event are public APIs that also work without devtools.
+
+## Process supervision panel
+
+Run `npx warlock add process` to create an app-owned supervisor and
+`src/app/processes/devtools.ts`, exporting `processPanel = { list: () =>
+processes.list() }`. Devtools discovers this registration only in development.
+The **Processes** tab refreshes `GET /__warlock/api/processes`: PIDs, workload
+categories, labels, display commands, limits, enforcement, and peak memory.
+It excludes ownership tokens. Without registration the list is empty. The
+endpoint retains development/loopback guards and provides no stop action.
+Use the `supervise-processes` skill of `@warlock.js/process` for launch,
+recovery and stop APIs; configure one owner/registry per application instance.
 
 
 ================================================================================

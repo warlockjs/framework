@@ -1,0 +1,9 @@
+# Warlock Process
+
+> Package: `@warlock.js/process`
+
+> App-owned child process supervision with verified identity and resource limits
+
+## Skills
+
+- [supervise-processes](@warlock.js/process/supervise-processes/SKILL.md): Start, limit, list, stop and recover app-owned workers or terminals using @warlock.js/process. Covers supervisor, ProcessNotOwnedError, spawnPty and warlock add process. Use for child process ownership and resource caps.

@@ -46,6 +46,9 @@ combined `llms-full.txt` below is the whole framework and is far larger.
 - [@warlock.js/context](https://warlock.js.org/v/latest/context/): A simple and unified way to share context using AsyncLocalStorage for the Warlock.js framework
   - llms.txt: https://warlock.js.org/context/llms.txt
   - llms-full.txt: https://warlock.js.org/context/llms-full.txt
+- [@warlock.js/process](https://warlock.js.org/v/latest/process/): App-owned child process supervision with verified identity and resource limits
+  - llms.txt: https://warlock.js.org/process/llms.txt
+  - llms-full.txt: https://warlock.js.org/process/llms-full.txt
 - [@warlock.js/herald](https://warlock.js.org/v/latest/herald/): Message bus/brokers for RabbitMQ, Kafka, and more
   - llms.txt: https://warlock.js.org/herald/llms.txt
   - llms-full.txt: https://warlock.js.org/herald/llms-full.txt
