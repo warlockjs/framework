@@ -165,6 +165,13 @@ allowed to create packages in the `@warlock.js` scope.
 
 ### Linux traps already fixed (don't re-learn them)
 
+- After `npm ci` in `tools/release`, its checked native-declaration compatibility
+  patch preserves the tsconfig `rootDir` during emit and output lookup. Keep
+  sibling workspace sources inside that root. Quality scripts and builds now
+  refuse newly untracked files in any member's `src/` and name the responsible
+  command; fix the emitter instead of deleting files or weakening cleanliness.
+- Validate declaration isolation with
+  `cd tools/release && node --import tsx --test scripts/__tests__/native-declaration-root.spec.ts`.
 - Tests that assert Windows paths, Windows file locking, or backslashes must
   be platform-aware.
 - `linkWorkspacePackages` makes `"*"` specs compile sibling **source**. A
