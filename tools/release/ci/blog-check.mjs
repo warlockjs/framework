@@ -41,7 +41,15 @@ const HOST = "127.0.0.1";
 const HTTP_PORT = 2041;
 const BASE_URL = `http://${HOST}:${HTTP_PORT}`;
 
-const FAMILY_SIZE = 31;
+// The family as the release workflow defines it: one member per
+// `root: "../../packages/<name>"` in tools/release/pkgist.config.ts (the same
+// list scripts/release/set-version.mjs reads), so a new package can never leave
+// this count behind.
+const FAMILY_SIZE = new Set(
+  fs
+    .readFileSync(new URL("../pkgist.config.ts", import.meta.url), "utf8")
+    .match(/root: "\.\.\/\.\.\/packages\/[a-z0-9-]+"/g) ?? [],
+).size;
 const DEVTOOLS_PACKAGE = "@warlock.js/devtools";
 const DEVTOOLS_PATH = "/__warlock";
 
