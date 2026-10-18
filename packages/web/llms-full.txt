@@ -1213,16 +1213,15 @@ export const config = {
 } satisfies PageConfig;
 ```
 
-Pass the app's existing default-namespace Socket.IO client once from a browser
-`register()` hook (guard server registration with `typeof window`):
+Bind the app's existing default-namespace Socket.IO client from its browser
+`register()` hook. Keep the binding in a helper that accepts `LivePageSocket`:
 
 ```ts
-import { configureLivePageData } from "@warlock.js/web";
-import { io } from "socket.io-client";
+import { configureLivePageData, type LivePageSocket } from "@warlock.js/web";
 
-export function register() {
+export function bindLivePageData(socket: LivePageSocket) {
   if (typeof window === "undefined") return;
-  configureLivePageData({ socket: io() });
+  configureLivePageData({ socket });
 }
 ```
 
