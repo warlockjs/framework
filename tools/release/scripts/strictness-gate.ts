@@ -12,8 +12,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { readJsonc } from "./read-jsonc";
 import { consumerStrictnessFlags } from "./consumer-strictness-flags";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,16 +23,10 @@ const __dirname = path.dirname(__filename);
 export const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const ALLOWANCES_PATH = path.join(__dirname, "strictness-allowances.jsonc");
 const STRICTNESS_CONTRACT_PATH = path.join(REPO_ROOT, "tsconfig.base.json");
-const TSC_PATH = path.join(
-  REPO_ROOT,
-  "node_modules",
-  ".pnpm",
-  "typescript@5.9.3",
-  "node_modules",
-  "typescript",
-  "bin",
-  "tsc",
-);
+const require = createRequire(import.meta.url);
+const manifestPath = require.resolve("typescript/package.json");
+const manifest: { bin: { tsc: string } } = JSON.parse(readFileSync(manifestPath, "utf8"));
+const TSC_PATH = path.resolve(path.dirname(manifestPath), manifest.bin.tsc);
 const STRICTNESS_OPTIONS = [
   "strict",
   "noUncheckedIndexedAccess",
@@ -71,7 +66,7 @@ export function discoverPackages(repoRoot = REPO_ROOT): WorkspacePackage[] {
 }
 
 export function readAllowances(filePath = ALLOWANCES_PATH): Record<string, number> {
-  const parsed = ts.parseConfigFileTextToJson(filePath, readFileSync(filePath, "utf8"));
+  const parsed = readJsonc(readFileSync(filePath, "utf8"));
   if (parsed.error || !parsed.config || typeof parsed.config !== "object")
     throw new Error(`Cannot read strictness allowances at ${filePath}.`);
   return parsed.config as Record<string, number>;
@@ -79,12 +74,13 @@ export function readAllowances(filePath = ALLOWANCES_PATH): Record<string, numbe
 
 /** The common strictness contract overrides only these options on every package compile. */
 export function sharedStrictnessArgs(filePath = STRICTNESS_CONTRACT_PATH): string[] {
-  const parsed = ts.parseConfigFileTextToJson(filePath, readFileSync(filePath, "utf8"));
+  const parsed = readJsonc(readFileSync(filePath, "utf8"));
   const options = parsed.config?.compilerOptions;
   if (parsed.error || !options || typeof options !== "object")
     throw new Error(`Cannot read strictness contract at ${filePath}.`);
   return STRICTNESS_OPTIONS.flatMap((option) => {
-    if (options[option] !== true) throw new Error(`Strictness contract must enable '${option}'.`);
+    if (Reflect.get(options, option) !== true)
+      throw new Error(`Strictness contract must enable '${option}'.`);
     return [`--${option}`, "true"];
   });
 }

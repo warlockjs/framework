@@ -1,9 +1,9 @@
-import ts from "typescript";
+import * as ast from "../tooling/syntax/ast";
 import { describe, expect, it } from "vitest";
 import { extractTranslationKeys } from "./extract-translation-keys";
 
-function parse(source: string): ts.SourceFile {
-  return ts.createSourceFile("fixture.ts", source, ts.ScriptTarget.Latest, true);
+function parse(source: string): ast.SourceFile {
+  return ast.parseSourceFile("fixture.ts", source);
 }
 
 describe("extractTranslationKeys", () => {

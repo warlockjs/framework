@@ -1,5 +1,5 @@
 import path from "node:path";
-import ts from "typescript";
+import { parentOf } from "../../../src/tooling/syntax/ast";
 import { describe, expect, it } from "vitest";
 import { readConfigAst } from "../../../src/dev-server/read-config-ast";
 
@@ -32,12 +32,12 @@ describe("readConfigAst — correctness", () => {
     const sourceFile = await readConfigAst(fixture);
 
     expect(sourceFile).toBeDefined();
-    expect(sourceFile?.statements.length).toBe(3);
+    expect(sourceFile?.body.length).toBe(3);
   });
 
   it("exposes the import declarations the generator walks", async () => {
     const sourceFile = await readConfigAst(fixture);
-    const imports = sourceFile!.statements.filter(ts.isImportDeclaration);
+    const imports = sourceFile!.body.filter((node) => node.type === "ImportDeclaration");
 
     expect(imports).toHaveLength(2);
   });
@@ -45,7 +45,8 @@ describe("readConfigAst — correctness", () => {
   it("sets parent pointers, which the visitor relies on", async () => {
     const sourceFile = await readConfigAst(fixture);
 
-    expect(sourceFile!.statements[0]?.parent).toBe(sourceFile);
+    const statement = sourceFile?.body[0];
+    expect(statement && parentOf(statement)).toBe(sourceFile);
   });
 
   it("returns undefined for a file that does not exist", async () => {

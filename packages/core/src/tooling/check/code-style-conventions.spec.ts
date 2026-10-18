@@ -1,16 +1,16 @@
-import ts from "typescript";
+import * as ast from "../syntax/ast";
 import { describe, expect, it } from "vitest";
 import { codeStyleFindings } from "./code-style-conventions";
 
 type Found = { code: string; severity: string; text: string; message: string };
 
 function check(source: string): Found[] {
-  const sourceFile = ts.createSourceFile("src/app/a.ts", source, ts.ScriptTarget.Latest, true);
+  const sourceFile = ast.parseSourceFile("src/app/a.ts", source);
 
   return codeStyleFindings(sourceFile).map((finding) => ({
     code: finding.code,
     severity: finding.severity ?? "error",
-    text: finding.node.getText(sourceFile),
+    text: ast.textOf(finding.node),
     message: finding.message,
   }));
 }

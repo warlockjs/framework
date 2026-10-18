@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.32.0
+
+### Changed
+
+- **BREAKING:** pin `typescript` to 7.0.2, whose `tsc` command uses the native Go compiler. Apps must remove `baseUrl`, rebase `paths`, replace `moduleResolution: "node"` / `"node10"`, and declare ambient Node types explicitly.
+- Preserve incremental CLI checks and changed-file filtering; reuse a native compiler session for per-file development diagnostics and close it on shutdown.
+- Parse imports, configuration, translation keys, model/resource typings, convention checks, page discovery and doctor migrations with OXC instead of the removed JavaScript compiler API.
+
 ## 5.31.0 - 2026-10-18
 
 ### Security

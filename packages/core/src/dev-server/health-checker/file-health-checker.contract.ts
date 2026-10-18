@@ -44,6 +44,9 @@ export interface FileHealthCheckerContract {
    */
   initialize(): void;
 
+  /** Release resources owned by an inline checker. */
+  shutdown?(): void | Promise<void>;
+
   /**
    * Detect when files are changed
    */

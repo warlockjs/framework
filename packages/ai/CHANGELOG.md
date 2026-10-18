@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0
 
+### Changed
+
+- Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
+
 ### Security
 
 - Local snapshot and VCR cassette stores create directories with `0700` and JSON files with exactly `0600`, including temporary files before atomic rename and rewrites of older files. Existing directories are never chmod-ed. SQLite path stores create private parents and set the database and journal/WAL/SHM sidecars to `0600`; caller-supplied database connections retain caller-managed permissions. POSIX modes are ignored on Windows.

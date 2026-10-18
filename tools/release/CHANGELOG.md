@@ -1,5 +1,12 @@
 ﻿# Changelog — release tooling
 
+## 5.32.0
+
+### Changed
+
+- Pin the native TypeScript compiler to 7.0.2 and typecheck with supported configuration options.
+- Compile skill snippets with native `tsc`, retain skill-local aliases and dependency scopes, and parse JSONC without the removed compiler API. Resolve the strictness compiler through the package bin manifest.
+
 ## 5.31.0 - 2026-10-18
 
 ### Added

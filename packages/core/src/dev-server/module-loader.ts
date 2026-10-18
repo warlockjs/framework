@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import ts from "typescript";
+import { parseSourceFile } from "../tooling/syntax/ast";
 import { importAppModule } from "../loader/app-module-importer";
 import { registerGroupedTranslationKeys, registerLocaleDictionary } from "../localization";
 import { router } from "../router/router";
@@ -128,9 +128,7 @@ export class ModuleLoader {
     if (type === "locale") {
       registerGroupedTranslationKeys(
         file.relativePath,
-        extractTranslationKeys(
-          ts.createSourceFile(file.relativePath, file.source, ts.ScriptTarget.Latest),
-        ),
+        extractTranslationKeys(parseSourceFile(file.relativePath, file.source)),
       );
     }
 

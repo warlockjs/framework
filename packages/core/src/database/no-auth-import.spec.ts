@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { importSpecifiers } from "../tooling/syntax/imports";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -37,10 +37,11 @@ function listSourceFiles(directory: string): string[] {
 }
 
 function importsForbiddenModule(filePath: string): boolean {
-  const { importedFiles } = ts.preProcessFile(fs.readFileSync(filePath, "utf8"), true, true);
+  const importedFiles = importSpecifiers(filePath, fs.readFileSync(filePath, "utf8"));
 
   return importedFiles.some(
-    ({ fileName }) => fileName === FORBIDDEN_MODULE || fileName.startsWith(`${FORBIDDEN_MODULE}/`),
+    ({ specifier }) =>
+      specifier === FORBIDDEN_MODULE || specifier.startsWith(`${FORBIDDEN_MODULE}/`),
   );
 }
 
@@ -51,9 +52,9 @@ describe("core dependency direction", () => {
 
   it("does not detect module names that only appear inside template literals", () => {
     const stubText = 'export const stub = `import { authMiddleware } from "@warlock.js/auth";`;';
-    const { importedFiles } = ts.preProcessFile(stubText, true, true);
+    const importedFiles = importSpecifiers("stub.ts", stubText);
 
-    expect(importedFiles.map(({ fileName }) => fileName)).not.toContain(FORBIDDEN_MODULE);
+    expect(importedFiles.map(({ specifier }) => specifier)).not.toContain(FORBIDDEN_MODULE);
   });
 
   it("detects static, type-only, dynamic and require imports", () => {
@@ -64,9 +65,9 @@ describe("core dependency direction", () => {
       'const d = require("@warlock.js/auth");',
     ].join("\n");
 
-    const found = ts
-      .preProcessFile(sample, true, true)
-      .importedFiles.filter(({ fileName }) => fileName.startsWith(FORBIDDEN_MODULE));
+    const found = importSpecifiers("sample.ts", sample).filter(({ specifier }) =>
+      specifier.startsWith(FORBIDDEN_MODULE),
+    );
 
     expect(found).toHaveLength(4);
   });

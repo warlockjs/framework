@@ -1,4 +1,4 @@
-import ts from "typescript";
+import * as ast from "../syntax/ast";
 import {
   isMemberAccess,
   isValueReference,
@@ -67,20 +67,20 @@ export const REQUEST_BODY_MEMBERS: ReadonlySet<string> = new Set([
  * When `node` is `<request>.<member>` or `<request>.<member>(…)` (also through
  * `request.query.next`-style chains), the `<member>`.
  */
-export function requestMemberAccess(node: ts.Node): string | undefined {
+export function requestMemberAccess(node: ast.Node): string | undefined {
   let current = unwrap(node);
 
-  if (ts.isCallExpression(current)) current = unwrap(current.expression);
+  if (ast.isCallExpression(current)) current = unwrap(ast.expressionOf(current));
   if (!isMemberAccess(current)) return undefined;
 
   // Walk down to the member read directly off the request: `request.query.next` → `query`.
   let member = current;
 
   for (;;) {
-    const object = unwrap(member.expression);
+    const object = unwrap(ast.expressionOf(member));
 
-    if (ts.isIdentifier(object)) {
-      return REQUEST_NAMES.has(object.text) ? memberName(member) : undefined;
+    if (ast.isIdentifier(object)) {
+      return REQUEST_NAMES.has(ast.valueText(object)) ? memberName(member) : undefined;
     }
 
     if (isMemberAccess(object)) {
@@ -88,8 +88,8 @@ export function requestMemberAccess(node: ts.Node): string | undefined {
       continue;
     }
 
-    if (ts.isCallExpression(object)) {
-      const callee = unwrap(object.expression);
+    if (ast.isCallExpression(object)) {
+      const callee = unwrap(ast.expressionOf(object));
       if (!isMemberAccess(callee)) return undefined;
       member = callee;
       continue;
@@ -100,7 +100,7 @@ export function requestMemberAccess(node: ts.Node): string | undefined {
 }
 
 /** Whether `node` reads client-controlled input from the request. */
-export function isRequestInputExpression(node: ts.Node): boolean {
+export function isRequestInputExpression(node: ast.Node): boolean {
   const member = requestMemberAccess(node);
 
   return member !== undefined && REQUEST_INPUT_MEMBERS.has(member);
@@ -110,13 +110,13 @@ export type TaintOptions = {
   /** Calls whose result is clean, whatever their arguments (matched by name). */
   sanitizers?: ReadonlySet<string>;
   /** Input sources besides the request (client query-string hooks, `location.search`). */
-  isSource?: (node: ts.Node) => boolean;
+  isSource?: (node: ast.Node) => boolean;
 };
 
-function isSanitizerCall(call: ts.CallExpression, sanitizers: ReadonlySet<string>): boolean {
-  const callee = unwrap(call.expression);
+function isSanitizerCall(call: ast.CallExpression, sanitizers: ReadonlySet<string>): boolean {
+  const callee = unwrap(ast.expressionOf(call));
 
-  if (ts.isIdentifier(callee)) return sanitizers.has(callee.text);
+  if (ast.isIdentifier(callee)) return sanitizers.has(ast.valueText(callee));
 
   if (isMemberAccess(callee)) {
     const name = memberName(callee);
@@ -132,9 +132,9 @@ function isSanitizerCall(call: ts.CallExpression, sanitizers: ReadonlySet<string
  * sanitizer launders its arguments.
  */
 export function containsRequestInput(
-  node: ts.Node,
+  node: ast.Node,
   options: TaintOptions = {},
-  seen: Set<ts.Node> = new Set(),
+  seen: Set<ast.Node> = new Set(),
 ): boolean {
   let found = false;
   const sanitizers = options.sanitizers ?? new Set<string>();
@@ -142,16 +142,16 @@ export function containsRequestInput(
   walk(node, (child) => {
     if (found) return false;
 
-    if (ts.isCallExpression(child) && isSanitizerCall(child, sanitizers)) return false;
+    if (ast.isCallExpression(child) && isSanitizerCall(child, sanitizers)) return false;
 
-    if (isMemberAccess(child) || ts.isCallExpression(child)) {
+    if (isMemberAccess(child) || ast.isCallExpression(child)) {
       if (isRequestInputExpression(child) || options.isSource?.(child) === true) {
         found = true;
         return false;
       }
     }
 
-    if (ts.isIdentifier(child) && !seen.has(child)) {
+    if (ast.isIdentifier(child) && !seen.has(child)) {
       seen.add(child);
 
       if (isValueReference(child)) {

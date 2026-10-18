@@ -96,3 +96,29 @@ publicHoistPattern:
 # Resolve @warlock.js/* specs against the packages in this repository, never the
 # registry: a release candidate is unpublished while it is gated.
 linkWorkspacePackages: true
+
+# Compatibility exception: these tools require the classic JS API removed in TS7.
+# Verified by the ESLint scaffold specs (ts-api-utils: TypeFlags.Intrinsic).
+# Give them their own runtime compiler; workspace and app tsc stay on 7.0.2.
+packageExtensions:
+  "@typescript-eslint/parser":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/eslint-plugin":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/type-utils":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/utils":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/typescript-estree":
+    dependencies:
+      typescript: "5.9.3"
+  "ts-api-utils":
+    dependencies:
+      typescript: "5.9.3"
+  "prettier-plugin-organize-imports":
+    dependencies:
+      typescript: "5.9.3"

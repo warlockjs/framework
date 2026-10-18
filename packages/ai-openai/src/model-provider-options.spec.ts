@@ -1,3 +1,4 @@
+import { tool } from "@warlock.js/ai";
 import type OpenAI from "openai";
 import {
   countInputTokens,
@@ -57,7 +58,9 @@ describe("OpenAI provider options and native Responses counts", () => {
     const { client, count } = setup();
     const model = new OpenAIResponsesModel(client, { name: "gpt-5" });
     count.mockRejectedValueOnce(unsupported);
-    const options = { tools: [{ name: "lookup", execute: async () => "ok" }] };
+    const options = {
+      tools: [tool({ name: "lookup", description: "Look up data", execute: async () => "ok" })],
+    };
     expect(await countInputTokens(model, messages, options)).toEqual({
       tokens: estimateInputTokens(messages, options),
       source: "estimate",
@@ -72,7 +75,7 @@ describe("OpenAI provider options and native Responses counts", () => {
     const signal = new AbortController().signal;
     const options = {
       signal,
-      tools: [{ name: "lookup", description: "Look up data", execute: async () => "ok" }],
+      tools: [tool({ name: "lookup", description: "Look up data", execute: async () => "ok" })],
       reasoning: { effort: "high" as const },
       responseSchema: {
         type: "object",
@@ -193,7 +196,7 @@ describe("OpenAI provider options and native Responses counts", () => {
       tools: [{ type: "function", name: "lookup" }],
     };
     const options = {
-      tools: [{ name: "lookup", description: "Look up data", execute: async () => "ok" }],
+      tools: [tool({ name: "lookup", description: "Look up data", execute: async () => "ok" })],
       toolChoice: { type: "function", name: "lookup" },
       providerOptions: { openai: { body: { tool_choice: choice } } },
     };

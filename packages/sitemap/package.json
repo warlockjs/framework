@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "vitest": "4.1.10",
-    "typescript": "^5.9.3"
+    "typescript": "7.0.2"
   },
   "packageManager": "pnpm@11.24.0"
 }

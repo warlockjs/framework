@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import path from "node:path";
 import type { Worker } from "node:worker_threads";
-import ts from "typescript";
+import { FileHealthResult } from "../../../src/dev-server/health-checker/file-health-result";
 import { createWorker } from "../../../src/dev-server/create-worker";
 import type { FileManager } from "../../../src/dev-server/file-manager";
 import { TypescriptHealthChecker } from "../../../src/dev-server/health-checker/checkers/typescript-health-checker";
@@ -104,7 +104,8 @@ async function createHealthWorker(mode: "source" | "published", root: string): P
     platform: "node",
     target: "node22.15",
     format: "esm",
-    bundle: false,
+    bundle: true,
+    external: ["typescript", "typescript/*"],
   });
   const require = createRequire(import.meta.url);
   await mkdir(path.join(root, "node_modules"), { recursive: true });
@@ -233,7 +234,8 @@ describe("TypeScript health worker configured roots", () => {
           afterDelete.find((result) => result.relativePath.endsWith("unknown.ts"))?.errors,
         ).toHaveLength(1);
       } finally {
-        await worker.terminate();
+        worker.postMessage({ type: "shutdown" });
+        await new Promise<void>((resolve) => worker.once("exit", () => resolve()));
       }
     },
     30_000,
@@ -242,22 +244,26 @@ describe("TypeScript health worker configured roots", () => {
   it("keeps tsconfig declarations when the inline fallback rebuilds for a source update", async () => {
     const { files, root } = await createFixture();
     const declarationPath = path.join(root, ".warlock", "typings", "translations.d.ts");
-    const checker = new TypescriptHealthChecker();
-    const parsedConfig = ts.parseJsonConfigFileContent(
-      JSON.parse(await readFile(path.join(root, "tsconfig.json"), "utf-8")),
-      ts.sys,
-      root,
-    );
-
-    (checker as unknown as { parsedConfig: ts.ParsedCommandLine }).parsedConfig = parsedConfig;
-    await checker.onFileChanges([{ absolutePath: files.unrelated } as FileManager]);
-
-    const program = (checker as unknown as { program: ts.Program }).program;
-    const validSource = program.getSourceFile(files.valid);
-    const unknownSource = program.getSourceFile(files.unknown);
-
-    expect(program.getSourceFile(declarationPath)).toBeDefined();
-    expect(validSource && program.getSemanticDiagnostics(validSource)).toEqual([]);
-    expect(unknownSource && program.getSemanticDiagnostics(unknownSource)).toHaveLength(1);
+    const checker = new TypescriptHealthChecker().initialize(root);
+    try {
+      await checker.onFileChanges([
+        { absolutePath: files.unrelated, source: "export const unrelated = false;" } as FileManager,
+      ]);
+      const valid = {
+        absolutePath: files.valid,
+        relativePath: "src/valid.ts",
+        source: await readFile(files.valid, "utf8"),
+      } as FileManager;
+      const unknown = {
+        absolutePath: files.unknown,
+        relativePath: "src/unknown.ts",
+        source: await readFile(files.unknown, "utf8"),
+      } as FileManager;
+      expect((await checker.validate(valid, new FileHealthResult())).getStats().errors).toBe(0);
+      expect((await checker.validate(unknown, new FileHealthResult())).getStats().errors).toBe(1);
+      expect(await readFile(declarationPath, "utf8")).toContain("valid");
+    } finally {
+      checker.shutdown();
+    }
   }, 30_000);
 });

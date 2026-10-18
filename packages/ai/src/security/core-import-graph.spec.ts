@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { parseSync, visitorKeys, type Node } from "oxc-parser";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -25,33 +25,51 @@ type Edge = { from: string; specifier: string; dynamic: boolean };
 
 /** The specifiers a module imports at runtime, after type-only imports are erased. */
 function runtimeSpecifiers(file: string): { specifier: string; dynamic: boolean }[] {
-  const output = ts.transpileModule(readFileSync(file, "utf8"), {
-    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-    fileName: file,
-  }).outputText;
-  const source = ts.createSourceFile(file, output, ts.ScriptTarget.ES2022, true);
+  const source = parseSync(file, readFileSync(file, "utf8")).program;
+  const used = new Set<string>();
   const found: { specifier: string; dynamic: boolean }[] = [];
-
-  const visit = (node: ts.Node): void => {
+  const visit = (node: Node): void => {
+    if (node.type === "ImportDeclaration") return;
+    if (node.type.startsWith("TS")) {
+      if ("expression" in node && node.expression && typeof node.expression === "object")
+        visit(node.expression);
+      return;
+    }
+    if (node.type === "Identifier") used.add(node.name);
     if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
-      found.push({ specifier: node.moduleSpecifier.text, dynamic: false });
-    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-      const [argument] = node.arguments;
-
-      if (argument && ts.isStringLiteral(argument)) {
-        found.push({ specifier: argument.text, dynamic: true });
+      (node.type === "ExportNamedDeclaration" || node.type === "ExportAllDeclaration") &&
+      node.source &&
+      node.exportKind !== "type"
+    )
+      found.push({ specifier: node.source.value, dynamic: false });
+    if (
+      node.type === "ImportExpression" &&
+      node.source.type === "Literal" &&
+      typeof node.source.value === "string"
+    )
+      found.push({ specifier: node.source.value, dynamic: true });
+    const record = node as unknown as Record<string, unknown>;
+    for (const key of visitorKeys[node.type] ?? []) {
+      const value = record[key];
+      for (const child of Array.isArray(value) ? value : [value]) {
+        if (child && typeof child === "object" && "type" in child) visit(child as Node);
       }
     }
-
-    ts.forEachChild(node, visit);
   };
-
   visit(source);
-
+  for (const node of source.body) {
+    if (
+      node.type === "ImportDeclaration" &&
+      node.importKind !== "type" &&
+      (node.specifiers.length === 0 ||
+        node.specifiers.some(
+          (specifier) =>
+            (specifier.type !== "ImportSpecifier" || specifier.importKind !== "type") &&
+            used.has(specifier.local.name),
+        ))
+    )
+      found.push({ specifier: node.source.value, dynamic: false });
+  }
   return found;
 }
 

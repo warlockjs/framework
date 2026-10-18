@@ -14,6 +14,7 @@
   // compile the same source and discovers them.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "types": ["node"],
     "target": "ES2020",
     // Raised from the ES2020 default because the shared source in sibling packages
     // uses ES2022 APIs (Object.hasOwn, String.replaceAll, Array.at), and a consumer
@@ -21,13 +22,13 @@
     // UNSET lib resolves to the .full variant, which bundles DOM - so naming a lib
     // without it would silently drop DOM types this package already relied on.
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "..",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true

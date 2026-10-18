@@ -1,7 +1,8 @@
 import { colors } from "@mongez/copper";
-import ts from "typescript";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { CompilerSession } from "../../../tooling/typescript/compiler";
 import type { FileManager } from "../../file-manager";
-import { tsconfigManager } from "../../tsconfig-manager";
 import type { FileHealthCheckerContract } from "../file-health-checker.contract";
 import { FileHealthResult } from "../file-health-result";
 import { BaseHealthChecker } from "./base-health-checker";
@@ -10,16 +11,7 @@ export class TypescriptHealthChecker
   extends BaseHealthChecker
   implements FileHealthCheckerContract
 {
-  /**
-   * Cached TypeScript program instance
-   */
-  private program: ts.Program | null = null;
-
-  /**
-   * Cached parsed TypeScript configuration
-   */
-  private parsedConfig: ts.ParsedCommandLine | null = null;
-
+  private session: CompilerSession | null = null;
   /**
    * Health checker name
    */
@@ -30,63 +22,6 @@ export class TypescriptHealthChecker
    * Runs in a separate thread to avoid blocking the main dev server
    */
   public workerPath: string = "./workers/ts-health.worker";
-
-  /**
-   * Whether checker is initialized
-   */
-  private initialized: boolean = false;
-
-  /**
-   * Check if file is a TypeScript file
-   */
-  private isTypeScriptFile(filePath: string): boolean {
-    const ext = filePath.toLowerCase();
-    return ext.endsWith(".ts") || ext.endsWith(".tsx");
-  }
-
-  /** Preserve files selected by tsconfig when source updates rebuild the program. */
-  private getProgramRootNames(files: FileManager[]): string[] {
-    return [
-      ...new Set([
-        ...(this.parsedConfig?.fileNames || []),
-        ...files.map((file) => file.absolutePath),
-      ]),
-    ];
-  }
-
-  /**
-   * Extract line and column from diagnostic location
-   */
-  private getDiagnosticLocation(diagnostic: ts.Diagnostic): {
-    lineNumber: number;
-    columnNumber: number;
-  } {
-    if (diagnostic.file && diagnostic.start !== undefined) {
-      const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-      return {
-        lineNumber: line + 1, // TypeScript uses 0-based, we use 1-based
-        columnNumber: character + 1,
-      };
-    }
-    return {
-      lineNumber: 1,
-      columnNumber: 1,
-    };
-  }
-
-  /**
-   * Format diagnostic message
-   */
-  private formatDiagnosticMessage(diagnostic: ts.Diagnostic): string {
-    if (diagnostic.file && diagnostic.start !== undefined) {
-      return ts.formatDiagnostic(diagnostic, {
-        getCurrentDirectory: () => process.cwd(),
-        getCanonicalFileName: (fileName) => fileName,
-        getNewLine: () => "\n",
-      });
-    }
-    return diagnostic.messageText.toString();
-  }
 
   /**
    * Display health check results in a pretty format
@@ -209,165 +144,45 @@ export class TypescriptHealthChecker
     // );
   }
 
-  /**
-   * Detect when files are changed
-   */
   public async onFileChanges(files: FileManager[]): Promise<void> {
-    // recreate an incremental program
-    if (!this.parsedConfig) {
-      return;
-    }
-
-    this.program = ts.createProgram(
-      this.getProgramRootNames(files),
-      {
-        ...this.parsedConfig.options,
-        incremental: true,
-      },
-      undefined,
-      this.program!,
-    );
+    this.session?.update(files.map((file) => ({ path: file.absolutePath, content: file.source })));
   }
 
-  /**
-   * Initialize the health checker
-   */
-  public initialize(): TypescriptHealthChecker {
-    try {
-      // Verify tsconfigManager is initialized and has config
-      if (!tsconfigManager.tsconfig || Object.keys(tsconfigManager.tsconfig).length === 0) {
-        this.initialized = true;
-        return this;
-      }
-
-      // Parse the config using tsconfigManager's cached config
-      this.parsedConfig = ts.parseJsonConfigFileContent(
-        tsconfigManager.tsconfig,
-        ts.sys,
-        process.cwd(),
-      );
-
-      // Check for config errors
-      if (this.parsedConfig.errors.length > 0) {
-        // Log config errors but continue (will skip validation)
-        console.warn(
-          "TypeScript Health Checker: tsconfig.json has errors:",
-          this.parsedConfig.errors.map((e) => ts.formatDiagnostic(e, ts.createCompilerHost({}))),
-        );
-      }
-
-      this.program = ts.createProgram(this.parsedConfig.fileNames, this.parsedConfig.options);
-
-      this.initialized = true;
-    } catch (error) {
-      // Handle any errors during initialization gracefully
-      console.warn("TypeScript Health Checker: Failed to initialize:", error);
-      this.initialized = true; // Mark as initialized to prevent retries
-    }
-
+  public initialize(cwd = process.cwd()): TypescriptHealthChecker {
+    this.shutdown();
+    if (existsSync(path.join(cwd, "tsconfig.json"))) this.session = new CompilerSession(cwd);
     return this;
   }
 
-  /**
-   * Validate the health of the file
-   */
+  public override removeFile(file: FileManager): this {
+    this.session?.update([], [file.absolutePath]);
+    super.removeFile(file);
+    return this;
+  }
+
+  public shutdown(): void {
+    this.session?.close();
+    this.session = null;
+  }
+
   public async validate(file: FileManager, result: FileHealthResult): Promise<FileHealthResult> {
-    // Early exit: skip non-TypeScript files
-    if (!this.isTypeScriptFile(file.absolutePath)) {
+    if (!this.session || !/\.tsx?$/i.test(file.absolutePath)) {
       result.markAsHealthy();
       return result;
     }
-
-    // Early exit: check if parsed config is available
-    if (!this.parsedConfig) {
-      result.markAsHealthy();
-      return result;
-    }
-
-    try {
-      // Lazy-load program on first validation if not already created
-      if (!this.program) {
-        // Create program with all project files from parsed config (for proper type checking)
-        this.program = ts.createProgram(this.parsedConfig.fileNames, this.parsedConfig.options);
-      }
-
-      // Get source file from program
-      const sourceFile = this.program.getSourceFile(file.absolutePath);
-
-      // If file is not in the program, return healthy (might be excluded)
-      if (!sourceFile) {
-        result.markAsHealthy();
-        return result;
-      }
-
-      // Get diagnostics for the specific file only
-      const syntacticDiagnostics = this.program.getSyntacticDiagnostics(sourceFile);
-      const semanticDiagnostics = this.program.getSemanticDiagnostics(sourceFile);
-
-      // Combine all diagnostics
-      const allDiagnostics = [...syntacticDiagnostics, ...semanticDiagnostics];
-
-      // Convert TypeScript diagnostics to FileHealthResult format
-      const errors: Array<{
-        message: string;
-        type: "error";
-        lineNumber: number;
-        columnNumber: number;
-        length: number;
-      }> = [];
-      const warnings: Array<{
-        message: string;
-        type: "warning";
-        lineNumber: number;
-        columnNumber: number;
-        length: number;
-      }> = [];
-
-      for (const diagnostic of allDiagnostics) {
-        const location = this.getDiagnosticLocation(diagnostic);
-        const message = this.formatDiagnosticMessage(diagnostic);
-        const errorLength = diagnostic.length || 1;
-
-        if (diagnostic.category === ts.DiagnosticCategory.Error) {
-          errors.push({
-            message,
-            type: "error",
-            lineNumber: location.lineNumber,
-            columnNumber: location.columnNumber,
-            length: errorLength,
-          });
-        } else if (diagnostic.category === ts.DiagnosticCategory.Warning) {
-          warnings.push({
-            message,
-            type: "warning",
-            lineNumber: location.lineNumber,
-            columnNumber: location.columnNumber,
-            length: errorLength,
-          });
-        }
-      }
-
-      // Add errors and warnings to result
-      if (errors.length > 0) {
-        result.addErrors(errors);
-      }
-      if (warnings.length > 0) {
-        result.addWarnings(warnings);
-      }
-
-      // If no errors or warnings, mark as healthy
-      if (errors.length === 0 && warnings.length === 0) {
-        result.markAsHealthy();
-      } else {
-        // Display results if there are errors or warnings
-        this.displayResults(file, result);
-      }
-    } catch (error) {
-      // Handle any errors during validation gracefully
-      console.warn(`TypeScript Health Checker: Error validating file ${file.relativePath}:`, error);
-      result.markAsHealthy(); // Return healthy on error to avoid blocking
-    }
-
+    this.session.update([{ path: file.absolutePath, content: file.source }]);
+    const diagnostics = this.session.diagnostics(file.absolutePath);
+    const messages = diagnostics.map((diagnostic) => ({
+      type: diagnostic.severity,
+      message: diagnostic.message,
+      lineNumber: diagnostic.line,
+      columnNumber: diagnostic.column,
+      length: diagnostic.length,
+    }));
+    result.addErrors(messages.filter((message) => message.type === "error"));
+    result.addWarnings(messages.filter((message) => message.type === "warning"));
+    if (messages.length === 0) result.markAsHealthy();
+    else this.displayResults(file, result);
     return result;
   }
 }

@@ -1,4 +1,4 @@
-import ts from "typescript";
+import * as ast from "../tooling/syntax/ast";
 
 /**
  * Extract literal lookup keys registered through `groupedTranslations` calls,
@@ -16,95 +16,83 @@ import ts from "typescript";
  * or computed name instead of a literal) cannot be resolved statically and is
  * silently skipped; such keys must be documented by the app author instead.
  */
-export function extractTranslationKeys(sourceFile: ts.SourceFile): string[] {
+export function extractTranslationKeys(sourceFile: ast.SourceFile): string[] {
   const keys = new Set<string>();
 
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ast.Node): void => {
     if (isGroupedTranslationsCall(node)) {
       collectFromCall(node, keys);
     }
 
-    ts.forEachChild(node, visit);
+    ast.forEachChild(node, visit);
   };
 
-  ts.forEachChild(sourceFile, visit);
+  ast.forEachChild(sourceFile, visit);
 
   return Array.from(keys).sort();
 }
 
-function isGroupedTranslationsCall(node: ts.Node): node is ts.CallExpression {
+function isGroupedTranslationsCall(node: ast.Node): node is ast.CallExpression {
   return (
-    ts.isCallExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    node.expression.text === "groupedTranslations"
+    ast.isCallExpression(node) &&
+    ast.isIdentifier(ast.expressionOf(node)) &&
+    ast.valueText(ast.expressionOf(node)) === "groupedTranslations"
   );
 }
 
-function collectFromCall(call: ts.CallExpression, keys: Set<string>): void {
+function collectFromCall(call: ast.CallExpression, keys: Set<string>): void {
   const [first, second] = call.arguments;
 
   if (first === undefined) return;
 
   if (second !== undefined) {
-    if (ts.isStringLiteral(first) && ts.isObjectLiteralExpression(second)) {
-      collectLeaves(second, first.text, keys);
+    if (ast.isStringLiteral(first) && ast.isObjectLiteralExpression(second)) {
+      collectLeaves(second, ast.valueText(first), keys);
     }
     return;
   }
 
-  if (ts.isObjectLiteralExpression(first)) {
+  if (ast.isObjectLiteralExpression(first)) {
     for (const property of first.properties) {
-      if (!ts.isPropertyAssignment(property)) continue;
+      if (!ast.isPropertyAssignment(property)) continue;
 
-      const groupName = getPropertyName(property.name);
+      const groupName = getPropertyName(property.key);
       if (groupName === undefined) continue;
 
-      if (ts.isObjectLiteralExpression(property.initializer)) {
-        collectLeaves(property.initializer, groupName, keys);
+      if (ast.isObjectLiteralExpression(property.value)) {
+        collectLeaves(property.value, groupName, keys);
       }
     }
   }
 }
 
-function collectLeaves(
-  object: ts.ObjectLiteralExpression,
-  prefix: string,
-  keys: Set<string>,
-): void {
+function collectLeaves(object: ast.ObjectExpression, prefix: string, keys: Set<string>): void {
   for (const property of object.properties) {
-    if (!ts.isPropertyAssignment(property)) continue;
+    if (!ast.isPropertyAssignment(property)) continue;
 
-    const key = getPropertyName(property.name);
+    const key = getPropertyName(property.key);
     if (key === undefined) continue;
 
-    if (!ts.isObjectLiteralExpression(property.initializer)) continue;
+    if (!ast.isObjectLiteralExpression(property.value)) continue;
 
     const path = `${prefix}.${key}`;
 
-    if (isLeaf(property.initializer)) {
+    if (isLeaf(property.value)) {
       keys.add(path);
     } else {
-      collectLeaves(property.initializer, path, keys);
+      collectLeaves(property.value, path, keys);
     }
   }
 }
 
 /** A locale map (`{ en: "...", ar: "..." }`) has no object-literal children. */
-function isLeaf(object: ts.ObjectLiteralExpression): boolean {
+function isLeaf(object: ast.ObjectExpression): boolean {
   return !object.properties.some(
     (property) =>
-      ts.isPropertyAssignment(property) && ts.isObjectLiteralExpression(property.initializer),
+      ast.isPropertyAssignment(property) && ast.isObjectLiteralExpression(property.value),
   );
 }
 
-function getPropertyName(name: ts.PropertyName | undefined): string | undefined {
-  if (name === undefined) {
-    return undefined;
-  }
-
-  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
-    return name.text;
-  }
-
-  return undefined;
+function getPropertyName(name: ast.Node | undefined): string | undefined {
+  return ast.keyName(name);
 }

@@ -1,13 +1,14 @@
 {
-  "typescript": "5.9.3",
+  "typescript": "7.0.2",
+  "checkers": 1,
   "node": "v22.15.0",
   "entities": 16,
   "services": 8,
-  "files": 465,
-  "types": 266088,
-  "instantiations": 653057,
-  "memoryKB": 664909,
-  "checkTimeSeconds": 5.95,
-  "totalTimeSeconds": 6.68,
+  "files": 487,
+  "types": 266344,
+  "instantiations": 655949,
+  "memoryKB": 449848,
+  "checkTimeSeconds": 3.171,
+  "totalTimeSeconds": 3.237,
   "errors": 0
 }

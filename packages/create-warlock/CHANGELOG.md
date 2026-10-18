@@ -4,6 +4,13 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.32.0
+
+### Changed
+
+- **BREAKING:** scaffold TypeScript 7.0.2 with the native `tsc` command, supported tsconfig options and explicit Node types. Existing apps must remove `baseUrl`, rebase `paths`, and replace classic Node module resolution.
+- Document the optional ESLint parser's dependence on the removed JavaScript compiler API; keep its compiler isolated in development tooling so scaffold specs remain executable while app typechecks use TS7.
+
 ## 5.31.0 - 2026-10-18
 
 ### Added

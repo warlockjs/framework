@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0
 
+### Changed
+
+- Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
+
 ### Fixed
 
 - Verified that native token counting preserves the shared unsupported-count signal for `countInputTokens` estimation while authentication errors propagate.

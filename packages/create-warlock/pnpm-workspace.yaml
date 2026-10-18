@@ -19,3 +19,29 @@ minimumReleaseAgeExclude:
   # localization, ...). The family bumps it on release day, so it trips the gate
   # exactly like @warlock.js/* did (5.20.0: @mongez/reinforcements@4.0.2).
   - "@mongez/*"
+
+# Compatibility exception: these tools require the classic JS API removed in TS7.
+# Verified by the ESLint scaffold specs (ts-api-utils: TypeFlags.Intrinsic).
+# Give them their own runtime compiler; workspace and app tsc stay on 7.0.2.
+packageExtensions:
+  "@typescript-eslint/parser":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/eslint-plugin":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/type-utils":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/utils":
+    dependencies:
+      typescript: "5.9.3"
+  "@typescript-eslint/typescript-estree":
+    dependencies:
+      typescript: "5.9.3"
+  "ts-api-utils":
+    dependencies:
+      typescript: "5.9.3"
+  "prettier-plugin-organize-imports":
+    dependencies:
+      typescript: "5.9.3"

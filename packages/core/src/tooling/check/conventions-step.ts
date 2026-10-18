@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { parse } from "jsonc-parser";
+import { importSpecifiers } from "../syntax/imports";
+import * as ast from "../syntax/ast";
 import { createProblem, type ToolingProblem } from "../problem";
 import { codeStyleFindings } from "./code-style-conventions";
 import { securityFindings } from "./security-conventions";
@@ -57,31 +59,8 @@ function resolveSpecifier(specifier: string, importer: string, cwd: string): str
 }
 
 /** Every module specifier a source file imports, with its position. */
-function importsOf(sourceFile: ts.SourceFile): { specifier: string; node: ts.Node }[] {
-  const found: { specifier: string; node: ts.Node }[] = [];
-
-  const visit = (node: ts.Node) => {
-    if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
-      found.push({ specifier: node.moduleSpecifier.text, node: node.moduleSpecifier });
-    } else if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments[0] &&
-      ts.isStringLiteral(node.arguments[0])
-    ) {
-      found.push({ specifier: node.arguments[0].text, node: node.arguments[0] });
-    }
-
-    ts.forEachChild(node, visit);
-  };
-
-  visit(sourceFile);
-
-  return found;
+function importsOf(sourceFile: ast.SourceFile): { specifier: string; node: ast.Node }[] {
+  return importSpecifiers(sourceFile.fileName, sourceFile.text);
 }
 
 /** `// warlock-check-ignore [WLxxxx …]` on a problem's line or the line above it. */
@@ -104,7 +83,7 @@ function isIgnored(lines: readonly string[], line: number, code: string): boolea
 
 /** The import conventions (`WL9001`–`WL9003`) of one parsed file. */
 function importProblems(
-  sourceFile: ts.SourceFile,
+  sourceFile: ast.SourceFile,
   relativePath: string,
   cwd: string,
 ): ToolingProblem[] {
@@ -165,7 +144,7 @@ function importProblems(
 }
 
 function findingProblem(
-  sourceFile: ts.SourceFile,
+  sourceFile: ast.SourceFile,
   relativePath: string,
   finding: SourceFinding,
 ): ToolingProblem {
@@ -202,7 +181,7 @@ export function checkFileConventions(
   source: string,
   cwd: string,
 ): ToolingProblem[] {
-  const sourceFile = ts.createSourceFile(relativePath, source, ts.ScriptTarget.Latest, true);
+  const sourceFile = ast.parseSourceFile(relativePath, source);
   const problems = [
     ...importProblems(sourceFile, relativePath, cwd),
     ...[...securityFindings(sourceFile), ...codeStyleFindings(sourceFile)].map((finding) =>
@@ -226,10 +205,10 @@ export function checkTsconfigConventions(cwd: string, project = "tsconfig.json")
   if (!existsSync(file)) return [];
 
   const text = readFileSync(file, "utf8");
-  const read = ts.parseConfigFileTextToJson(file, text);
+  const config: unknown = parse(text);
   const options: unknown =
-    typeof read.config === "object" && read.config !== null
-      ? Reflect.get(read.config, "compilerOptions")
+    typeof config === "object" && config !== null
+      ? Reflect.get(config, "compilerOptions")
       : undefined;
 
   if (

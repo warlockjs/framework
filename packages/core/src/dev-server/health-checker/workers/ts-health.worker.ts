@@ -3,13 +3,14 @@
  *
  * This worker runs in a dedicated thread to perform TypeScript type checking
  * without blocking the main dev server thread. It maintains a persistent
- * ts.Program instance for fast incremental type checking.
+ * native compiler session for fast incremental type checking.
  *
  * Communication:
  * - Receives: { type: 'init' | 'check' | 'fileChanges' | 'shutdown', ... }
  * - Sends: { type: 'results' | 'initialized' | 'error', ... }
  */
-import ts from "typescript";
+import { existsSync } from "node:fs";
+import { CompilerSession } from "../../../tooling/typescript/compiler";
 import path from "node:path";
 import { parentPort, workerData } from "worker_threads";
 
@@ -78,295 +79,52 @@ type WorkerResponse =
   | { type: "results"; results: FileCheckResult[] }
   | { type: "error"; message: string };
 
-/**
- * TypeScript Health Worker class
- * Maintains persistent ts.Program for incremental type checking
- */
+/** The session owns one native compiler child and closes it on shutdown. */
 class TypeScriptHealthWorker {
-  /**
-   * Cached TypeScript program instance
-   */
-  private program: ts.Program | null = null;
-
-  /**
-   * Parsed TypeScript configuration
-   */
-  private parsedConfig: ts.ParsedCommandLine | null = null;
-
-  /**
-   * In-memory file contents cache
-   */
-  private fileContents = new Map<string, string>();
-
-  /** Source paths removed since the tsconfig was parsed. */
-  private deletedRootPaths = new Set<string>();
-
-  /**
-   * Whether the worker is initialized
-   */
-  private initialized = false;
-
-  /**
-   * Current working directory
-   */
-  private cwd: string = process.cwd();
-
-  /**
-   * Initialize the worker with TypeScript configuration
-   */
+  private session: CompilerSession | null = null;
   public initialize(config: { cwd: string; tsconfigPath?: string }): boolean {
-    try {
-      this.cwd = config.cwd || process.cwd();
-
-      // Try to load tsconfig.json
-      const tsconfigPath = config.tsconfigPath || ts.findConfigFile(this.cwd, ts.sys.fileExists);
-
-      if (!tsconfigPath) {
-        this.initialized = true;
-        return true; // No tsconfig, will skip type checking
-      }
-
-      const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
-
-      if (configFile.error) {
-        console.warn("TypeScript Worker: Error reading tsconfig:", configFile.error);
-        this.initialized = true;
-        return true;
-      }
-
-      this.parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, this.cwd);
-
-      if (this.parsedConfig.errors.length > 0) {
-        console.warn("TypeScript Worker: tsconfig has errors:", this.parsedConfig.errors);
-      }
-
-      this.initialized = true;
-      return true;
-    } catch (error) {
-      console.error("TypeScript Worker: Failed to initialize:", error);
-      this.initialized = true;
-      return false;
-    }
+    this.close();
+    const cwd = config.cwd || process.cwd();
+    const configPath = path.resolve(cwd, config.tsconfigPath ?? "tsconfig.json");
+    if (existsSync(configPath)) this.session = new CompilerSession(cwd, configPath);
+    return true;
   }
-
-  /**
-   * Check files for TypeScript errors
-   */
   public checkFiles(files: SerializedFile[]): FileCheckResult[] {
-    if (!this.parsedConfig) {
-      // No config, return all files as healthy
-      return files.map((file) => ({
-        path: file.path,
+    this.session?.update(files);
+    return files.map((file) => {
+      const diagnostics = this.session?.diagnostics(file.path) ?? [];
+      const messages: DiagnosticMessage[] = diagnostics.map((diagnostic) => ({
+        type: diagnostic.severity,
+        message: diagnostic.message,
+        lineNumber: diagnostic.line,
+        columnNumber: diagnostic.column,
+        length: diagnostic.length,
+        filePath: file.path,
         relativePath: file.relativePath,
-        healthy: true,
-        errors: [],
-        warnings: [],
       }));
-    }
-
-    // Update in-memory file cache
-    for (const file of files) {
-      this.fileContents.set(file.path, file.content);
-      this.deletedRootPaths.delete(this.getPathIdentity(file.path));
-    }
-
-    // Create or update the program (incremental)
-    this.program = ts.createProgram(
-      this.getProgramRootNames(),
-      this.parsedConfig.options,
-      this.createCompilerHost(),
-      this.program || undefined, // Pass old program for incremental compilation
-    );
-
-    // Check each file
-    const results: FileCheckResult[] = [];
-
-    for (const file of files) {
-      const result = this.checkSingleFile(file);
-      results.push(result);
-    }
-
-    return results;
+      const errors = messages.filter((message) => message.type === "error");
+      const warnings = messages.filter((message) => message.type === "warning");
+      return {
+        path: file.path,
+        relativePath: file.relativePath,
+        healthy: errors.length === 0 && warnings.length === 0,
+        errors,
+        warnings,
+      };
+    });
   }
-
-  /**
-   * Handle file changes (update program incrementally)
-   */
   public handleFileChanges(files: SerializedFile[]): void {
-    for (const file of files) {
-      this.fileContents.set(file.path, file.content);
-      this.deletedRootPaths.delete(this.getPathIdentity(file.path));
-    }
-
-    // Recreate program with new file contents
-    if (this.parsedConfig && this.program) {
-      this.program = ts.createProgram(
-        this.getProgramRootNames(),
-        this.parsedConfig.options,
-        this.createCompilerHost(),
-        this.program || undefined,
-      );
-    }
+    this.session?.update(files);
   }
-
-  /**
-   * Handle deleted files (remove from cache)
-   */
   public handleFilesDeleted(files: DeletedFile[]): void {
-    let hasChanges = false;
-
-    for (const file of files) {
-      const identity = this.getPathIdentity(file.path);
-      const cachedPath = Array.from(this.fileContents.keys()).find(
-        (candidate) => this.getPathIdentity(candidate) === identity,
-      );
-
-      if (cachedPath) {
-        this.fileContents.delete(cachedPath);
-        hasChanges = true;
-      }
-      if (!this.deletedRootPaths.has(identity)) hasChanges = true;
-      this.deletedRootPaths.add(identity);
-    }
-
-    // Recreate program without deleted files
-    if (hasChanges && this.parsedConfig) {
-      this.program = ts.createProgram(
-        this.getProgramRootNames(),
-        this.parsedConfig.options,
-        this.createCompilerHost(),
-        this.program || undefined,
-      );
-    }
+    this.session?.update(
+      [],
+      files.map((file) => file.path),
+    );
   }
-
-  /**
-   * Check a single file for diagnostics
-   */
-  private checkSingleFile(file: SerializedFile): FileCheckResult {
-    if (!this.program) {
-      return {
-        path: file.path,
-        relativePath: file.relativePath,
-        healthy: true,
-        errors: [],
-        warnings: [],
-      };
-    }
-
-    const sourceFile = this.program.getSourceFile(file.path);
-
-    if (!sourceFile) {
-      return {
-        path: file.path,
-        relativePath: file.relativePath,
-        healthy: true,
-        errors: [],
-        warnings: [],
-      };
-    }
-
-    const syntacticDiagnostics = this.program.getSyntacticDiagnostics(sourceFile);
-    const semanticDiagnostics = this.program.getSemanticDiagnostics(sourceFile);
-    const allDiagnostics = [...syntacticDiagnostics, ...semanticDiagnostics];
-
-    const errors: DiagnosticMessage[] = [];
-    const warnings: DiagnosticMessage[] = [];
-
-    for (const diagnostic of allDiagnostics) {
-      const message = this.formatDiagnostic(diagnostic, file);
-
-      if (diagnostic.category === ts.DiagnosticCategory.Error) {
-        errors.push(message);
-      } else if (diagnostic.category === ts.DiagnosticCategory.Warning) {
-        warnings.push(message);
-      }
-    }
-
-    return {
-      path: file.path,
-      relativePath: file.relativePath,
-      healthy: errors.length === 0 && warnings.length === 0,
-      errors,
-      warnings,
-    };
-  }
-
-  /**
-   * Format a TypeScript diagnostic into our message format
-   */
-  private formatDiagnostic(diagnostic: ts.Diagnostic, file: SerializedFile): DiagnosticMessage {
-    let lineNumber = 1;
-    let columnNumber = 1;
-    let length = 1;
-
-    if (diagnostic.file && diagnostic.start !== undefined) {
-      const pos = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-      lineNumber = pos.line + 1;
-      columnNumber = pos.character + 1;
-      length = diagnostic.length || 1;
-    }
-
-    const messageText =
-      typeof diagnostic.messageText === "string"
-        ? diagnostic.messageText
-        : diagnostic.messageText.messageText;
-
-    return {
-      type: diagnostic.category === ts.DiagnosticCategory.Error ? "error" : "warning",
-      message: messageText,
-      lineNumber,
-      columnNumber,
-      length,
-      filePath: file.path,
-      relativePath: file.relativePath,
-    };
-  }
-
-  /**
-   * Create a custom compiler host that reads from in-memory cache
-   */
-  private createCompilerHost(): ts.CompilerHost {
-    const defaultHost = ts.createCompilerHost(this.parsedConfig?.options || {});
-
-    return {
-      ...defaultHost,
-      readFile: (fileName: string) => {
-        // Check in-memory cache first
-        if (this.fileContents.has(fileName)) {
-          return this.fileContents.get(fileName);
-        }
-        // Fall back to disk
-        return defaultHost.readFile(fileName);
-      },
-      fileExists: (fileName: string) => {
-        if (this.fileContents.has(fileName)) {
-          return true;
-        }
-        return defaultHost.fileExists(fileName);
-      },
-    };
-  }
-
-  /** Keep tsconfig-selected declarations in every incremental program. */
-  private getProgramRootNames(): string[] {
-    const configuredRoots = this.parsedConfig?.fileNames || [];
-
-    const rootsByIdentity = new Map<string, string>();
-
-    for (const filePath of [...configuredRoots, ...this.fileContents.keys()]) {
-      const identity = this.getPathIdentity(filePath);
-      if (!this.deletedRootPaths.has(identity)) rootsByIdentity.set(identity, filePath);
-    }
-
-    return [...rootsByIdentity.values()];
-  }
-
-  /** Compare equivalent Windows path spellings as one TypeScript root. */
-  private getPathIdentity(filePath: string): string {
-    const normalized = path.normalize(path.resolve(filePath));
-
-    return ts.sys.useCaseSensitiveFileNames ? normalized : normalized.toLowerCase();
+  public close(): void {
+    this.session?.close();
+    this.session = null;
   }
 }
 
@@ -402,6 +160,7 @@ parentPort?.on("message", (message: WorkerMessage) => {
       }
 
       case "shutdown": {
+        worker.close();
         process.exit(0);
       }
     }
@@ -418,3 +177,5 @@ parentPort?.on("message", (message: WorkerMessage) => {
 if (workerData?.autoInit) {
   worker.initialize({ cwd: workerData.cwd || process.cwd() });
 }
+
+parentPort?.on("close", () => worker.close());

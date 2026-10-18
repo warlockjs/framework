@@ -1,22 +1,6 @@
 {
-  // Typecheck-only configuration. `tsconfig.json` is left untouched because the
-  // release tooling may consume it; nothing here changes what is built or
-  // published.
-  //
-  // The point of this file is that the headline error count was measuring the
-  // wrong thing. Three settings in the base config made most of it meaningless:
-  //
-  //   1. Sibling `@warlock.js/*` packages resolve through workspace symlinks to
-  //      source folders with no compiled output, so `tsc` reported 87 "cannot
-  //      find module" errors — and every class extending an unresolvable base
-  //      then reported all of its own members missing. The `paths` mapping below
-  //      points them at source instead.
-  //   2. `"module": "CommonJS"` while `package.json` declares `"type": "module"`
-  //      and we ship ESM. That mismatch alone produced every top-level-await
-  //      error. `ESNext` + `Bundler` resolution is what esbuild actually does to
-  //      this code, including extensionless relative imports.
-  //   3. `tsc` follows imports outward, so errors in `../ai/src/...` — a
-  //      different package — were being counted as ours.
+  // Check the shipped ESM source and tests against workspace sources. Bundler
+  // resolution matches esbuild; verbatim imports also catch runtime type imports.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "ESNext",
@@ -35,7 +19,6 @@
     // through `paths` live above this package — so the program root is the
     // workspace folder.
     "rootDir": "..",
-    "baseUrl": ".",
     "paths": {
       "@warlock.js/cascade": ["../cascade/src/index.ts"],
       "@warlock.js/seal": ["../seal/src/index.ts"],

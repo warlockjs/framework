@@ -98,7 +98,7 @@ my-app/
   docs/                   project-local docs scaffold
   eslint.config.js
   package.json
-  tsconfig.json           strict + decorators on + path aliases configured
+  tsconfig.json           strict + standard decorators + path aliases configured
   warlock.config.ts       project-level config (server, build, CLI extensions)
   README.md
 ```
@@ -150,20 +150,24 @@ Your first endpoint is one page away.
 
 ## A note on decorators
 
-Cascade (Warlock's ORM) registers models via `@RegisterModel()` and declares relations via `@BelongsTo` / `@HasMany`. The scaffolded `tsconfig.json` turns decorators on for you:
+Cascade (Warlock's ORM) registers models via `@RegisterModel()` and declares relations via `@BelongsTo` / `@HasMany`. The scaffold uses standard TypeScript decorators:
 
 ```jsonc
 {
   "compilerOptions": {
-    "experimentalDecorators": true,
+    "experimentalDecorators": false,
     "strict": true,
     // …
   },
 }
 ```
 
-If you copy a `tsconfig.json` from elsewhere, **keep `experimentalDecorators: true`**. Without it the model registry stays empty, relations don't hoist, and you'll see confusing runtime errors that look unrelated to TypeScript settings.
+Keep `experimentalDecorators` unset or `false`. Enabling it selects legacy decorators, which is incompatible with Cascade's standard decorator signatures.
 
 ## Next
 
 Continue to [Configuration](./03-configuration.md) to learn what `warlock.config.ts` and `src/config/` actually control, and how `.env` plays in.
+
+## TypeScript 7 compiler
+
+Warlock 5.32 pins the native `typescript@7.0.2` compiler. Follow the [TypeScript 7 guide](./typescript-7.mdx) to remove legacy tsconfig options, rebase aliases, and declare Node types explicitly.

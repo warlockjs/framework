@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.1",
   "private": true,
-  "description": "Warlock.js framework docs site — Starlight + Tailwind, deployed to warlock.js.org.",
+  "description": "Warlock.js framework docs site \u2014 Starlight + Tailwind, deployed to warlock.js.org.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/warlockjs/framework.git",
@@ -23,7 +23,8 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.39.2",
@@ -33,5 +34,8 @@
     "sharp": "^0.34.5",
     "starlight-sidebar-topics": "^0.7.1"
   },
-  "packageManager": "pnpm@11.24.0"
+  "packageManager": "pnpm@11.24.0",
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
 }

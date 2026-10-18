@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { parseSync } from "oxc-parser";
+import * as ast from "../../../../tooling/syntax/ast";
 import { config } from "../../../../config/config-getter";
 import {
   parseLocaleDictionary,
@@ -35,28 +36,20 @@ function localeSources(): LocaleSource[] {
     .filter(({ file }) => existsSync(file));
 }
 
-function propertyName(property: ts.PropertyAssignment): string | undefined {
-  if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
-    return property.name.text;
-  return undefined;
-}
-
-function literalObject(node: ts.Expression): Record<string, unknown> | undefined {
-  if (!ts.isObjectLiteralExpression(node)) return undefined;
+function literalObject(node: ast.Node | undefined): Record<string, unknown> | undefined {
+  if (node?.type !== "ObjectExpression") return undefined;
   const value: Record<string, unknown> = Object.create(null);
   for (const member of node.properties) {
-    if (!ts.isPropertyAssignment(member)) return undefined;
-    const key = propertyName(member);
+    if (!ast.isPropertyAssignment(member)) return undefined;
+    const key = ast.keyName(member.key);
     if (key === undefined) return undefined;
-    if (ts.isStringLiteral(member.initializer) || ts.isNumericLiteral(member.initializer)) {
-      value[key] = ts.isNumericLiteral(member.initializer)
-        ? Number(member.initializer.text)
-        : member.initializer.text;
-      continue;
+    if (ast.isStringLiteral(member.value) || ast.isNumericLiteral(member.value))
+      value[key] = member.value.value;
+    else {
+      const nested = literalObject(member.value);
+      if (nested === undefined) return undefined;
+      value[key] = nested;
     }
-    const nested = literalObject(member.initializer);
-    if (nested === undefined) return undefined;
-    value[key] = nested;
   }
   return value;
 }
@@ -90,27 +83,21 @@ function inspect(source: LocaleSource): LocaleInspection {
     return { ...source, convertible: false, reason: "locales.json already exists" };
 
   const text = readFileSync(source.file, "utf8");
-  const program = ts.createSourceFile(source.file, text, ts.ScriptTarget.Latest, true);
-  const syntaxDiagnostics = ts.transpileModule(text, {
-    fileName: source.file,
-    reportDiagnostics: true,
-  }).diagnostics;
-  if (syntaxDiagnostics !== undefined && syntaxDiagnostics.length > 0)
+  const program = ast.parseSourceFile(source.file, text);
+  if (parseSync(source.file, text).errors.length > 0)
     return { ...source, convertible: false, reason: "TypeScript syntax is invalid" };
-  const [importStatement, callStatement] = program.statements;
+  const [importStatement, callStatement] = program.body;
+  const binding =
+    importStatement?.type === "ImportDeclaration" ? importStatement.specifiers[0] : undefined;
   if (
-    !importStatement ||
-    !ts.isImportDeclaration(importStatement) ||
-    !ts.isStringLiteral(importStatement.moduleSpecifier) ||
-    importStatement.moduleSpecifier.text !== "@warlock.js/core" ||
-    !importStatement.importClause ||
-    importStatement.importClause.isTypeOnly ||
-    importStatement.importClause.name ||
-    !importStatement.importClause.namedBindings ||
-    !ts.isNamedImports(importStatement.importClause.namedBindings) ||
-    importStatement.importClause.namedBindings.elements.length !== 1 ||
-    importStatement.importClause.namedBindings.elements[0]?.name.text !== "groupedTranslations" ||
-    importStatement.importClause.namedBindings.elements[0]?.propertyName
+    importStatement?.type !== "ImportDeclaration" ||
+    importStatement.source.value !== "@warlock.js/core" ||
+    importStatement.importKind === "type" ||
+    importStatement.specifiers.length !== 1 ||
+    binding?.type !== "ImportSpecifier" ||
+    binding.importKind === "type" ||
+    binding.local.name !== "groupedTranslations" ||
+    ast.valueText(binding.imported) !== "groupedTranslations"
   )
     return {
       ...source,
@@ -118,7 +105,7 @@ function inspect(source: LocaleSource): LocaleInspection {
       reason: "must import only groupedTranslations from @warlock.js/core",
     };
 
-  if (program.statements.length !== 2)
+  if (program.body.length !== 2)
     return {
       ...source,
       convertible: false,
@@ -127,8 +114,8 @@ function inspect(source: LocaleSource): LocaleInspection {
 
   if (
     !callStatement ||
-    !ts.isExpressionStatement(callStatement) ||
-    !ts.isCallExpression(callStatement.expression)
+    !ast.isExpressionStatement(callStatement) ||
+    callStatement.expression.type !== "CallExpression"
   )
     return {
       ...source,
@@ -137,24 +124,25 @@ function inspect(source: LocaleSource): LocaleInspection {
     };
   const call = callStatement.expression;
   if (
-    !ts.isIdentifier(call.expression) ||
-    call.expression.text !== "groupedTranslations" ||
+    !ast.isIdentifier(call.callee) ||
+    ast.valueText(call.callee) !== "groupedTranslations" ||
     call.arguments.length !== 2 ||
-    !ts.isStringLiteral(call.arguments[0]!)
+    !call.arguments[0] ||
+    !ast.isStringLiteral(call.arguments[0])
   )
     return {
       ...source,
       convertible: false,
       reason: "must call groupedTranslations with a string group and object",
     };
-  const dictionary = literalObject(call.arguments[1]!);
+  const dictionary = literalObject(call.arguments[1]);
   if (!dictionary)
     return {
       ...source,
       convertible: false,
       reason: "translation object must contain only literal keys, objects, strings, or numbers",
     };
-  const group = call.arguments[0].text;
+  const group = call.arguments[0].value;
   const entries: LocaleDictionaryEntries = Object.create(null);
   if (!flattenLiteral(dictionary, group, entries))
     return {

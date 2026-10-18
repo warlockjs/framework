@@ -1,4 +1,4 @@
-import ts from "typescript";
+import * as ast from "../syntax/ast";
 import { describe, expect, it } from "vitest";
 import { findUnboundedQuantifier, securityFindings } from "./security-conventions";
 
@@ -6,11 +6,11 @@ type Found = { code: string; text: string; message: string };
 
 /** Parse `source` as `fileName` and list what the security checks report. */
 function check(source: string, fileName = "src/app/posts/controllers/a.controller.tsx"): Found[] {
-  const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const sourceFile = ast.parseSourceFile(fileName, source);
 
   return securityFindings(sourceFile).map((finding) => ({
     code: finding.code,
-    text: finding.node.getText(sourceFile),
+    text: ast.textOf(finding.node),
     message: finding.message,
   }));
 }

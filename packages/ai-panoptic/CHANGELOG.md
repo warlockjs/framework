@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0
 
+### Changed
+
+- Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
+
 ### Fixed
 
 - Use the canonical usage rollup for trace aggregates, retaining hosted-tool counters and historical request fees alongside cache lifetime and mixed-provider cache semantics.
