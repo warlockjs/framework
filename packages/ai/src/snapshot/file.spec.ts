@@ -76,7 +76,7 @@ describe("ai.snapshot.file", () => {
         vi.mocked(writeFile).mockImplementationOnce(async (path, data, options) => {
           expect(options).toMatchObject({ mode: 0o600, flag: "wx" });
           await fs.writeFile(path, data, options);
-          expect((await stat(path)).mode & 0o777).toBe(0o600);
+          expect((await stat(String(path))).mode & 0o777).toBe(0o600);
         });
         vi.mocked(rename).mockImplementationOnce(async (source, target) => {
           expect((await stat(source)).mode & 0o777).toBe(0o600);
