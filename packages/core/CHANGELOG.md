@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0
 
+### Security
+
+- Upgrade esbuild to ^0.28.2, past the Windows development-server advisory [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr) (patched in 0.28.1).
+
 ### Changed
 
 - **BREAKING:** pin `typescript` to 7.0.2, whose `tsc` command uses the native Go compiler. Apps must remove `baseUrl`, rebase `paths`, replace `moduleResolution: "node"` / `"node10"`, and declare ambient Node types explicitly.

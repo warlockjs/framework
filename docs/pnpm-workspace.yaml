@@ -7,3 +7,8 @@
 allowBuilds:
   esbuild: true
   sharp: true
+
+# Astro and Vite accept older esbuild releases; require the patched line.
+# https://github.com/advisories/GHSA-g7r4-m6w7-qqqr (fixed in 0.28.1)
+overrides:
+  esbuild: ^0.28.2

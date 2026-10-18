@@ -5,6 +5,9 @@
 ### Fixed
 
 - The release runner forces `tsdown` 0.23.1 under pkgist (npm `overrides`), which brings `rolldown-plugin-dts` 0.28 — the first declaration plugin that supports TypeScript 7. With pkgist's own `tsdown` 0.22 range every member failed to build its `.d.mts` files on TypeScript 7 (`Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')`). Remove the override once pkgist depends on `tsdown` ≥ 0.23.
+### Security
+
+- Refresh the npm lockfile to esbuild 0.28.2, past the Windows development-server advisory [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr) (patched in 0.28.1).
 
 ### Changed
 

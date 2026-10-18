@@ -15,6 +15,11 @@ Five minutes from zero to a Warlock project that boots. Three steps: scaffold, i
 - **Node.js 22.15 or newer**. The CLI checks this before loading the application. Development and builds run on Node; the production build also starts on Bun and Deno — see [Supported runtimes](../digging-deeper/supported-runtimes.md).
 - **A package manager** — npm, yarn, or pnpm. The scaffolder detects what you have installed and lets you pick during setup.
 
+Core 5.32 uses esbuild 0.28.2 or newer in the 0.28 line for development
+transforms and production bundles. This includes the Windows development-server
+fix in [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr),
+patched in 0.28.1. No application configuration changes are required.
+
 ## Step 1 — Scaffold a project
 
 Pick your package manager — the rest of this page assumes the same one end to end.
