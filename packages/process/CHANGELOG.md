@@ -1,6 +1,6 @@
 # Changelog — @warlock.js/process
 
-## 5.33.0
+## 5.33.0 - 2026-10-19
 
 ### Added
 
