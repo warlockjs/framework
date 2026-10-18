@@ -16,7 +16,6 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type OpenAI from "openai";
-import { moonshotSearchCall, moonshotSearchEnabled } from "./utils/moonshot-search";
 import { compatibleSearchParams, mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
@@ -183,18 +182,6 @@ export class OpenAIModel implements ModelContract {
       });
     }
 
-    const hosted = moonshotSearchEnabled(this.provider, options);
-    const serverToolCalls = (choice.message.tool_calls ?? []).flatMap((call) =>
-      hosted &&
-      choice.finish_reason === "tool_calls" &&
-      call.type === "function" &&
-      call.function.name === "$web_search"
-        ? [moonshotSearchCall(call.id, call.function.name, call.function.arguments)]
-        : [],
-    );
-    const clientCalls = choice.message.tool_calls?.filter(
-      (call) => !(hosted && call.type === "function" && call.function.name === "$web_search"),
-    );
     const finishReason = mapFinishReason(choice.finish_reason);
     const usage = this.extractUsage(response.usage);
 
@@ -207,8 +194,7 @@ export class OpenAIModel implements ModelContract {
       content: choice.message.content ?? "",
       finishReason,
       usage,
-      toolCalls: this.extractToolCalls(clientCalls),
-      ...(serverToolCalls.length ? { serverToolCalls } : {}),
+      toolCalls: this.extractToolCalls(choice.message.tool_calls),
     };
   }
 
@@ -269,8 +255,6 @@ export class OpenAIModel implements ModelContract {
     let rawFinishReason: string = "stop";
     let usage: Usage = { input: 0, output: 0, total: 0 };
     const want = resolveStreamChunks(options);
-    const hosted = moonshotSearchEnabled(this.provider, options);
-    const serverToolCalls: NonNullable<ModelResponse["serverToolCalls"]> = [];
     const toolCallAccum = new Map<
       number,
       { id: string; name: string; arguments: string; streamed: number }
@@ -307,12 +291,7 @@ export class OpenAIModel implements ModelContract {
             // The first fragment of a call carries its id and name; later
             // ones only `index` + argument text. Anything that arrived
             // before the name is flushed once the call is identified.
-            if (
-              want.toolArgs &&
-              acc.name &&
-              !(hosted && acc.name === "$web_search") &&
-              acc.arguments.length > acc.streamed
-            ) {
+            if (want.toolArgs && acc.name && acc.arguments.length > acc.streamed) {
               yield {
                 type: "tool-args",
                 callId: acc.id,
@@ -340,11 +319,6 @@ export class OpenAIModel implements ModelContract {
         // Yielding them produces nameless tool-calls the agent runtime
         // can't dispatch and would mis-attribute as a registered tool.
         if (!acc.name) continue;
-        if (hosted && acc.name === "$web_search") {
-          if (rawFinishReason === "tool_calls")
-            serverToolCalls.push(moonshotSearchCall(acc.id, acc.name, acc.arguments));
-          continue;
-        }
 
         yield {
           type: "tool-call",
@@ -375,7 +349,6 @@ export class OpenAIModel implements ModelContract {
       type: "done",
       finishReason,
       usage,
-      ...(serverToolCalls.length ? { serverToolCalls } : {}),
     };
   }
 
@@ -397,6 +370,24 @@ export class OpenAIModel implements ModelContract {
       model: this.name,
       logger: this.logger,
     });
+    // https://platform.kimi.ai/docs/guide/use-web-search — retires 2026-10-20.
+    if (
+      (this.provider === "moonshot" || this.provider === "kimi") &&
+      definitions.some((definition) => {
+        const fn = definition.function;
+        return (
+          definition.type === "builtin_function" &&
+          typeof fn === "object" &&
+          fn !== null &&
+          "name" in fn &&
+          fn.name === "$web_search"
+        );
+      })
+    ) {
+      throw new InvalidRequestError(
+        "Kimi's builtin $web_search retires on 20 October 2026. Use kimiSearchTool() / kimiFetchTool() from @warlock.js/ai-openai.",
+      );
+    }
     // Native search is a Responses-only xAI feature. Fail before transport.
     // https://docs.x.ai/developers/tools/web-search
     if (

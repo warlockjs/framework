@@ -61,6 +61,36 @@ describe("toOpenAIMessages", () => {
     ]);
   });
 
+  it("serializes client tool inputs without treating provider metadata as arguments", () => {
+    const messages: Message[] = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "call",
+            name: "kimi_search",
+            input: { query: "query" },
+            providerMetadata: { diagnostic: "untrusted metadata" },
+          },
+        ],
+      },
+    ];
+    expect(toOpenAIMessages(messages)).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "call",
+            type: "function",
+            function: { name: "kimi_search", arguments: '{"query":"query"}' },
+          },
+        ],
+      },
+    ]);
+  });
+
   it("converts a multipart user message to OpenAI's content-parts shape", () => {
     const messages: Message[] = [
       {

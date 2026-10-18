@@ -288,24 +288,30 @@ await qwenModel.complete(messages, {
 });
 ```
 
-Kimi needs a builtin tool plus an echo continuation. The adapter supplies the
-verbatim result and the agent continues within `maxTrips`:
+Kimi's legacy `$web_search` builtin retires on **20 October 2026** and is
+unsupported. Use first-party REST client tools from `@warlock.js/ai-openai`:
 
 ```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK, kimiSearchTool, kimiFetchTool } from "@warlock.js/ai-openai";
+
+const config = {
+  apiKey: process.env.MOONSHOT_API_KEY ?? "",
+  baseURL: "https://api.moonshot.ai/v1",
+};
+const moonshot = new OpenAISDK({ ...config, provider: "moonshot" });
 const assistant = ai.agent({
-  model: moonshotModel, // OpenAISDK with provider: "moonshot"
+  model: moonshot.model({ name: "kimi-k3" }),
   maxTrips: 4,
-  tools: [
-    ai.providerTool({
-      provider: "moonshot",
-      name: "$web_search",
-      definition: { type: "builtin_function", function: { name: "$web_search" } },
-    }),
-  ],
+  tools: [kimiSearchTool({ ...config, mode: "pro" }), kimiFetchTool(config)],
 });
 ```
 
-No `execute` is needed. Qwen/Kimi request fees are unpriced because no verified
-billing counter is mapped. xAI's hosted search uses Responses and is rejected
-by the current Chat Completions XaiSDK. Full shapes and official sources:
-https://warlock.js.org/v/latest/ai/providers/openai-compatible/
+These ordinary client tools execute `/v1/tools/search`, `search_pro`, and
+`fetch`. They honour cancellation and return compact source results. Their
+`invoke()` envelopes carry billable REST-response counts and request costs;
+agents aggregate them through the existing tool accounting boundary. Basic,
+Pro and Fetch have separate namespaced counters and prices. Qwen's flag still
+has no verified billing counter mapped. xAI's hosted search uses Responses and
+is rejected by the current Chat Completions XaiSDK. Full shapes and official
+sources: https://warlock.js.org/v/latest/ai/providers/openai-compatible/

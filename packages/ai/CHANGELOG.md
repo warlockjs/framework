@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Update provider-tool guidance to use the first-party Kimi search/fetch client tools and their usage accounting, replacing the unreleased builtin path retiring on 20 October 2026.
+
 - Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
 
 ### Security

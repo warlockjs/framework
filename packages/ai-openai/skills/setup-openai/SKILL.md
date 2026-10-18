@@ -1,6 +1,6 @@
 ---
 name: setup-openai
-description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `cacheWriteTokens`, `inputIncludesCache`, `OPENAI_MODEL_PRICING`, `openAIPricingFor`, `ProviderOverloadedError`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, `ai.providerTool`, hosted `web_search`, `streamChunks`, `reasoning_content`, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
+description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `kimiSearchTool`, `kimiFetchTool`, `KIMI_SERVER_TOOL_PRICING`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `cacheWriteTokens`, `inputIncludesCache`, `OPENAI_MODEL_PRICING`, `openAIPricingFor`, `ProviderOverloadedError`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, `ai.providerTool`, hosted `web_search`, `streamChunks`, `reasoning_content`, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
 ---
 
 # `@warlock.js/ai-openai`
@@ -365,8 +365,9 @@ see the [official search output schema](https://developers.openai.com/api/docs/g
 and [cost tracking](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
 Chat Completions does not map hosted-search billing counters.
 
-Qwen's `enableSearch` flag and Kimi's `$web_search` echo continuation have
-separate verified controls; see [OpenAI-compatible native search](https://warlock.js.org/v/latest/ai/providers/openai-compatible/).
+Qwen's `enableSearch` flag and Kimi's standalone `kimiSearchTool()` /
+`kimiFetchTool()` have separate controls; Kimi's legacy builtin retires on
+20 October 2026 and is unsupported; see [OpenAI-compatible native search](https://warlock.js.org/v/latest/ai/providers/openai-compatible/).
 
 ```ts
 import { OPENAI_SERVER_TOOL_PRICING } from "@warlock.js/ai-openai";
@@ -381,3 +382,65 @@ const response = await model.complete(messages, {
 console.log(response.usage.serverToolUse?.webSearchRequests);
 console.log(response.providerMetadata);
 ```
+
+## Kimi first-party search and fetch
+
+Use the same API key/base URL configuration for the model and client tools:
+
+```ts
+import { ai, createToolContext } from "@warlock.js/ai";
+import { OpenAISDK, kimiSearchTool, kimiFetchTool } from "@warlock.js/ai-openai";
+
+const config = {
+  apiKey: process.env.MOONSHOT_API_KEY ?? "",
+  baseURL: "https://api.moonshot.ai/v1",
+};
+const sdk = new OpenAISDK({ ...config, provider: "moonshot" });
+const basic = kimiSearchTool({ ...config, includeContent: false });
+const pro = kimiSearchTool({
+  ...config,
+  mode: "pro",
+  sites: ["moonshot.ai"],
+  timeWindow: { start: "2026-01", end: "2026-10" },
+  limit: 5,
+  timeoutSeconds: 30,
+});
+const fetchPage = kimiFetchTool({ ...config, maxContentChars: 12_000 });
+const assistant = ai.agent({ model: sdk.model({ name: "kimi-k3" }), tools: [pro, fetchPage] });
+const result = await assistant.execute("Research prompt caching");
+console.log(result.usage.serverToolUse, result.usage.cost?.serverTools);
+
+const controller = new AbortController();
+const found = await basic.invoke(
+  { query: "Kimi prompt caching" },
+  createToolContext({ signal: controller.signal }),
+);
+console.log(found.data?.results, found.usage);
+```
+
+Pass these functions directly as ordinary `tools`, without `ai.providerTool`.
+They call `/v1/tools/search`, `/v1/tools/search_pro` or `/v1/tools/fetch` with
+Bearer auth. Search arguments are `{ query }`; fetch arguments are `{ url }`.
+Search results retain sources and optional full text (Basic) or scored chunks
+(Pro); fetch returns Markdown. Text is bounded by `maxContentChars` (12,000 by
+default), with `truncated` reporting trimming. `limit` is 1–20; timeoutSeconds
+is 1–60; Pro accepts up to five sites and date filters. See
+https://platform.kimi.ai/docs/api/tools-search,
+https://platform.kimi.ai/docs/api/tools-search-pro and
+https://platform.kimi.ai/docs/api/tools-fetch.
+
+Use `invoke()` for the usage/report envelope. Per response, billable Basic,
+Pro and Fetch units appear as `kimiSearchRequests`, `kimiSearchProRequests`
+and `kimiFetchRequests`, alongside common search/fetch counters. Agents merge
+these into their totals. `KIMI_SERVER_TOOL_PRICING` supplies the default rates
+in `ModelPricing.serverTools` format; only namespaced keys are priced to avoid
+double charges. Override `pricing` or pass `{}` to leave calls unpriced.
+Official prices verified 2026-10-18: $0.002 / $0.003 / $0.002 respectively,
+excluding taxes, only for HTTP 200 with nonempty search results/nonblank
+Markdown: https://platform.kimi.ai/docs/pricing/websearch.
+
+The legacy `$web_search` builtin retires on 20 October 2026 and is rejected.
+Abort signals cancel transport; retries are disabled. `invoke().error` is a
+`ToolExecutionError` whose `cause` is the mapped provider error (or
+`AgentCancelledError` for caller cancellation). `execute()` returns data only
+and throws mapped errors. Never infer fees from function calls or prose.
