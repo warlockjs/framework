@@ -61,7 +61,8 @@
  * `<packagesRoot>/.skill-snippet-gate-tmp/<package>/<skill-slug>/`, populated with
  * one real file per compiled block at its `title=` path (or a synthetic
  * `__untitled/block-N.ts` for untitled-but-import-bearing blocks). This
- * directory sits inside the monorepo so `@mongez/*` third-party types resolve
+ * directory is removed in `finally` after diagnostics are collected, including
+ * failed runs. It sits inside the monorepo so `@mongez/*` third-party types resolve
  * through the ROOT `node_modules` (pnpm's `publicHoistPattern` hoists
  * `@mongez/*` and `@types/*` there — see `pnpm-workspace.yaml`).
  *
@@ -626,14 +627,17 @@ export function findCrossSkillTypePathConflicts(results: SkillCompileResult[]): 
 export function runSkillSnippetGate(repoRoot: string): GateReport {
   const gateTmpRoot = path.join(repoRoot, GATE_TMP_DIR_NAME);
   rmSync(gateTmpRoot, { recursive: true, force: true });
-  mkdirSync(gateTmpRoot, { recursive: true });
+  try {
+    mkdirSync(gateTmpRoot, { recursive: true });
+    const packages = discoverPackages(repoRoot);
+    const skills = packages.flatMap((pkg) => discoverSkillFiles(pkg));
+    const results = compileManySkills(skills, packages, gateTmpRoot);
+    const typePathConflicts = findCrossSkillTypePathConflicts(results);
 
-  const packages = discoverPackages(repoRoot);
-  const skills = packages.flatMap((pkg) => discoverSkillFiles(pkg));
-  const results = compileManySkills(skills, packages, gateTmpRoot);
-  const typePathConflicts = findCrossSkillTypePathConflicts(results);
-
-  return { packages, skills, results, typePathConflicts };
+    return { packages, skills, results, typePathConflicts };
+  } finally {
+    rmSync(gateTmpRoot, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -744,7 +748,7 @@ function formatReport(report: GateReport): { text: string; failed: boolean } {
       } else {
         totalFailed += 1;
         failures.push(
-          `FAIL ${skillLabel} :: ${file.virtualPath} (written to ${file.absolutePath})`,
+          `FAIL ${skillLabel} :: ${file.virtualPath} (compiled at ${file.absolutePath})`,
         );
         for (const d of file.diagnostics) failures.push(`    ${d}`);
       }

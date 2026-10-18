@@ -37,14 +37,7 @@ function stubFetch(responder: (call: FetchCall) => Response | Promise<Response>)
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-      const headers: Record<string, string> = {};
-      const rawHeaders = init?.headers as Record<string, string> | undefined;
-
-      if (rawHeaders) {
-        for (const key of Object.keys(rawHeaders)) {
-          headers[key] = rawHeaders[key];
-        }
-      }
+      const headers = Object.fromEntries(new Headers(init?.headers));
 
       const call: FetchCall = {
         url: input instanceof URL ? input.toString() : String(input),
@@ -60,6 +53,12 @@ function stubFetch(responder: (call: FetchCall) => Response | Promise<Response>)
   );
 
   return calls;
+}
+
+function firstCall(calls: FetchCall[]): FetchCall {
+  const call = calls[0];
+  if (!call) throw new Error("Expected a recorded fetch call");
+  return call;
 }
 
 /** A JSON `Response` with a sensible default content-type. */
@@ -110,7 +109,7 @@ describe("httpRequestTool", () => {
 
     expect(error).toBeUndefined();
     expect(calls).toHaveLength(1);
-    expect(calls[0].method).toBe("GET");
+    expect(firstCall(calls).method).toBe("GET");
     expect(data?.status).toBe(201);
     expect(data?.headers["content-type"]).toBe("text/plain");
     expect(data?.headers["x-trace"]).toBe("abc");
@@ -143,7 +142,7 @@ describe("httpRequestTool", () => {
     });
 
     expect(error).toBeUndefined();
-    expect(calls[0].method).toBe("POST");
+    expect(firstCall(calls).method).toBe("POST");
     expect(data?.body).toEqual({ id: 1 });
   });
 
@@ -176,7 +175,7 @@ describe("httpRequestTool", () => {
 
     await httpRequestTool({ baseUrl: "https://api.test/v1/" }).invoke({ url: "users/42" });
 
-    expect(calls[0].url).toBe("https://api.test/v1/users/42");
+    expect(firstCall(calls).url).toBe("https://api.test/v1/users/42");
   });
 
   it("rejects an unparseable URL as a typed policy error", async () => {
@@ -207,8 +206,8 @@ describe("httpRequestTool", () => {
       headers: { authorization: "Bearer percall" },
     });
 
-    expect(calls[0].headers.authorization).toBe("Bearer percall");
-    expect(calls[0].headers["x-app"]).toBe("warlock");
+    expect(firstCall(calls).headers.authorization).toBe("Bearer percall");
+    expect(firstCall(calls).headers["x-app"]).toBe("warlock");
   });
 
   it("serializes an object body to JSON and defaults the content-type", async () => {
@@ -220,8 +219,8 @@ describe("httpRequestTool", () => {
       body: { name: "widget", qty: 3 },
     });
 
-    expect(calls[0].body).toBe(JSON.stringify({ name: "widget", qty: 3 }));
-    expect(calls[0].headers["content-type"]).toBe("application/json");
+    expect(firstCall(calls).body).toBe(JSON.stringify({ name: "widget", qty: 3 }));
+    expect(firstCall(calls).headers["content-type"]).toBe("application/json");
   });
 
   it("sends a string body verbatim without overriding content-type", async () => {
@@ -234,8 +233,8 @@ describe("httpRequestTool", () => {
       headers: { "content-type": "application/xml" },
     });
 
-    expect(calls[0].body).toBe("<xml/>");
-    expect(calls[0].headers["content-type"]).toBe("application/xml");
+    expect(firstCall(calls).body).toBe("<xml/>");
+    expect(firstCall(calls).headers["content-type"]).toBe("application/xml");
   });
 
   it("drops the body for a GET request", async () => {
@@ -246,7 +245,7 @@ describe("httpRequestTool", () => {
       body: { ignored: true },
     });
 
-    expect(calls[0].body).toBeUndefined();
+    expect(firstCall(calls).body).toBeUndefined();
   });
 
   it("parses a JSON response body when content-type is JSON", async () => {

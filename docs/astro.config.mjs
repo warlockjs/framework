@@ -249,7 +249,7 @@ const aiRecipesGroup = {
       label: "Cost and Resilience",
       collapsed: true,
       items: [
-        recipe("Measure call tokens and cost", "measure-call"),
+        { ...recipe("Measure call tokens and cost", "measure-call"), latestOnly: true },
         recipe("Cost tracking", "cost-tracking"),
         recipe("Cost per tenant", "cost-aggregate-per-tenant"),
         recipe("Budgets and SLOs", "cost-budgets-and-slo"),

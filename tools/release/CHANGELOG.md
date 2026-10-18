@@ -2,6 +2,10 @@
 
 ## 5.33.0
 
+### Fixed
+
+- Always remove skill-snippet temporary files after collecting diagnostics, including failed runs; workspace toolchain tests ignore scratch directories and files without package manifests.
+
 ### Added
 
 - Register the process supervisor as the 33rd lockstep family member, with local-registry coverage and zero strictness/skill-snippet allowances.

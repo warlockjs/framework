@@ -10,7 +10,8 @@ sidebar:
 Declare a page loader's dependencies in `config.live`. When the server calls
 `invalidatePageCache(tags)`, matching open pages re-run their normal app,
 layout, and page loader pipeline through client navigation. The page URL and
-mounted layout stay in place. No component hook is needed.
+mounted layout stay in place. A navigation can overtake a live request even
+when that request ignores cancellation; the late response is discarded. No component hook is needed.
 
 ```tsx title="src/web/products/index.page.tsx"
 import type { PageConfig, PageProps } from "@warlock.js/web";

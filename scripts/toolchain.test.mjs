@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -7,13 +8,40 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => readFileSync(path.join(root, file), "utf8");
 
+// This workspace declares explicit package paths in pnpm-workspace.yaml.
+function packageManifests(workspaceRoot) {
+  const workspace = readFileSync(path.join(workspaceRoot, "pnpm-workspace.yaml"), "utf8");
+  const packages = [...workspace.matchAll(/^  - (packages\/[a-z0-9-]+)$/gm)];
+  assert.ok(packages.length > 0, "Expected explicit workspace package paths");
+  return packages
+    .map(([, directory]) => path.join(workspaceRoot, directory, "package.json"))
+    .filter((manifest) => existsSync(manifest));
+}
+
+test("package discovery ignores scratch directories and files", (t) => {
+  const workspaceRoot = mkdtempSync(path.join(tmpdir(), "warlock-toolchain-"));
+  t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
+  writeFileSync(
+    path.join(workspaceRoot, "pnpm-workspace.yaml"),
+    ["packages:", "  - packages/widget", "  - packages/missing-manifest", ""].join("\n"),
+  );
+  for (const name of ["widget", ".skill-snippet-gate-tmp", "scratch", "missing-manifest"]) {
+    mkdirSync(path.join(workspaceRoot, "packages", name), { recursive: true });
+  }
+  for (const name of ["widget", ".skill-snippet-gate-tmp", "scratch"]) {
+    writeFileSync(path.join(workspaceRoot, "packages", name, "package.json"), "{}");
+  }
+  writeFileSync(path.join(workspaceRoot, "packages/README.md"), "workspace notes");
+
+  assert.deepEqual(packageManifests(workspaceRoot), [
+    path.join(workspaceRoot, "packages/widget/package.json"),
+  ]);
+});
+
 test("workspace package defaults do not invoke deprecated lint/format tooling", () => {
-  const manifests = [
-    "package.json",
-    ...readdirSync(path.join(root, "packages")).map((name) => `packages/${name}/package.json`),
-  ];
+  const manifests = [path.join(root, "package.json"), ...packageManifests(root)];
   for (const file of manifests) {
-    const { scripts = {} } = JSON.parse(read(file));
+    const { scripts = {} } = JSON.parse(readFileSync(file, "utf8"));
     for (const [name, command] of Object.entries(scripts)) {
       if (!/^(lint|fix|format)(:|$)/.test(name)) continue;
       if (name.startsWith("format:prettier")) {

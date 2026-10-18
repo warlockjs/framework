@@ -87,6 +87,21 @@ For each remote tool:
 2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
 3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
 
+### Selecting one discovered tool
+
+When selecting one discovered tool, guard the array result before invoking it.
+A server may advertise no tools, and `noUncheckedIndexedAccess` reflects that:
+
+```ts
+import type { McpClient } from "@warlock.js/ai-tools";
+
+export async function invokeFirst(client: McpClient, input: unknown) {
+  const [contract] = await client.tools();
+  if (!contract) throw new Error("The MCP server advertised no tools");
+  return contract.invoke(input);
+}
+```
+
 ## `type`, never `kind`
 
 MCP's wire vocabulary uses `kind` in some content/capability descriptors. The client translates any inbound `kind` to `type` when normalizing content blocks, so a value a tool returns never carries MCP's `kind` — every discriminator the agent sees is `type`.

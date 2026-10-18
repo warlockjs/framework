@@ -4,6 +4,10 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ## 5.33.0
 
+### Fixed
+
+- Keep live-refresh cleanup free of control-flow overrides, exercise relative navigation URLs in the live-refresh regression, and demonstrate binding an application-owned socket without an undeclared client import.
+
 ### Changed
 
 - Use root Oxlint/Oxfmt binaries and configuration for package lint/fix and format scripts. Legacy ESLint/Prettier dependencies and configs remain until the 5.34.0 removal.

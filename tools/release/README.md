@@ -505,3 +505,12 @@ application registry augmentations between skills. Missing app support files
 remain compiler errors; examples must include those files or state a complete
 replacement. Existing failure allowances cannot increase; lower them to the
 measured package counts after fixes and the final formatting pass.
+
+### Skill snippet scratch files
+
+`node --import tsx scripts/skill-snippet-gate.ts` compiles each skill in an
+isolated temporary tree under `packages/.skill-snippet-gate-tmp`. The gate
+removes that tree after collecting diagnostics, including failed compilations
+and unexpected errors. Diagnostics retain the virtual file paths and messages;
+re-run the gate to reproduce a failure. Workspace toolchain checks consider
+only package paths declared in `pnpm-workspace.yaml` that contain a `package.json`.

@@ -140,7 +140,7 @@ With the normal sitemap and robots features enabled, `/sitemap.xml` and `/robots
 
 Set `web.tlsAsk` to expose a Caddy on-demand TLS `ask` endpoint. It requires `web.sites`; Warlock allows a domain only when it is a configured fixed host or `resolveHost` claims it.
 
-```caddyfile
+```text title="Caddyfile"
 {
   on_demand_tls {
     ask http://127.0.0.1:<port>/.well-known/warlock/domain

@@ -2,6 +2,10 @@
 
 ## 5.33.0
 
+### Fixed
+
+- Keep the measure-call recipe in the latest sidebar so frozen documentation versions build without a missing page; render Caddy configuration as labeled plain text instead of requesting an unavailable highlighter.
+
 ### Added
 
 - Document process supervision, platform enforcement, safe ownership, terminal support and `warlock add process`; add the package sidebar, catalogue and LLM package order.

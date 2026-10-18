@@ -49,7 +49,7 @@ function response(data: HydrationDocumentPayloadSource, url: string) {
   return {
     ok: true,
     status: 200,
-    url,
+    url: new URL(url, window.location.href).href,
     headers: new Headers({ "content-type": "application/json" }),
     text: async () => stringify(data),
   };
@@ -182,7 +182,7 @@ describe("live page loader refresh", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
-        if (new URL(url).pathname === "/products") {
+        if (new URL(url, window.location.href).pathname === "/products") {
           await gate;
           return response(payload(), url);
         }
@@ -192,8 +192,10 @@ describe("live page loader refresh", () => {
     await mount();
     act(() => invalidate());
     await act(async () => {
-      currentNavigator()?.("/orders");
+      expect(currentNavigator()?.("/orders")).toBe(true);
     });
+    expect(window.location.pathname).toBe("/orders");
+    expect(host.querySelector("p")?.textContent).toBe("orders data");
     await act(async () => release());
     expect(window.location.pathname).toBe("/orders");
     expect(host.querySelector("p")?.textContent).toBe("orders data");

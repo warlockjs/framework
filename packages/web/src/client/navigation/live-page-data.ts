@@ -49,14 +49,15 @@ export function startLivePageData(runtime: {
       // A failed background refresh keeps the current page and retries later.
     } finally {
       running = false;
-      if (disposed) return;
-      if (!applied) {
-        for (const tag of tags) queuedTags.add(tag);
-        pollQueued ||= polled;
+      if (!disposed) {
+        if (!applied) {
+          for (const tag of tags) queuedTags.add(tag);
+          pollQueued ||= polled;
+        }
+        // Events received during the request need another pass, but failures
+        // must wait for a new event, an idle/clean transition, or the next tick.
+        if (applied) void drain();
       }
-      // Events received during the request need another pass, but failures
-      // must wait for a new event, an idle/clean transition, or the next tick.
-      if (applied) void drain();
     }
   };
 
