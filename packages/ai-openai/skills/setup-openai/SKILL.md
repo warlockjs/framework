@@ -337,3 +337,40 @@ if (model.countTokens) {
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `embed-text` topic of the `warlock-js-ai` skill — embedder usage
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
+
+## Hosted-search metering and metadata
+
+On Responses, each structured `web_search_call` output item contributes one
+`usage.serverToolUse.webSearchRequests`. Streaming item events and terminal
+output are reconciled as snapshots, so the same call is counted once.
+`response.providerMetadata.openai.output` (also on streaming `done`) retains
+hosted output items with their action and sources. The adapter automatically
+requests `web_search_call.action.sources` when web-search tools are supplied.
+Agent reports preserve this metadata on each trip; it is not replayed or
+passed to function dispatch.
+
+Explicitly set `pricing.serverTools: OPENAI_SERVER_TOOL_PRICING` (exported by
+this package) for standard `web_search`: $0.01 per tool call, plus search-content
+tokens at model rates. Non-reasoning `web_search_preview` has a different fee
+and needs an explicit override. These prices were verified on 2026-10-18 from
+[OpenAI pricing](https://developers.openai.com/api/docs/pricing#built-in-tools);
+see the [official search output schema](https://developers.openai.com/api/docs/guides/tools-web-search)
+and [cost tracking](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
+Chat Completions does not map hosted-search billing counters.
+
+Qwen's `enableSearch` flag and Kimi's `$web_search` echo continuation have
+separate verified controls; see [OpenAI-compatible native search](https://warlock.js.org/v/latest/ai/providers/openai-compatible/).
+
+```ts
+import { OPENAI_SERVER_TOOL_PRICING } from "@warlock.js/ai-openai";
+const model = openai.model({
+  name: "gpt-4.1",
+  api: "responses",
+  pricing: { ...{ input: 2, output: 8 }, serverTools: OPENAI_SERVER_TOOL_PRICING },
+});
+const response = await model.complete(messages, {
+  providerTools: [{ provider: "openai", definition: { type: "web_search" } }],
+});
+console.log(response.usage.serverToolUse?.webSearchRequests);
+console.log(response.providerMetadata);
+```

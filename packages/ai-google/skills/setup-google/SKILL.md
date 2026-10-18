@@ -312,3 +312,41 @@ if (model.countTokens) {
 - The `run-ai-agent` topic of the `warlock-js-ai` skill
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill
 - The `embed-text` topic of the `warlock-js-ai` skill
+
+## Search grounding metadata and fees
+
+`response.providerMetadata.google.groundingMetadata` retains the raw grounding
+metadata for each indexed candidate: queries, chunks, supports and search entry
+point. Streaming `done` carries the same metadata. Agent reports retain it per
+trip. Hosted search never produces a local function call.
+
+`usage.serverToolUse.webSearchRequests` counts unique nonempty
+`groundingMetadata.webSearchQueries`; `googleWebSearchQueries` records the raw
+array length, including duplicates and empty entries. Stream snapshots replace
+prior metadata per candidate rather than accumulating repeated snapshots.
+The [official schema](https://ai.google.dev/api/generate-content#GroundingMetadata)
+defines the queries array.
+
+[Google's pricing guide](https://ai.google.dev/gemini-api/docs/google-search#pricing)
+(verified 2026-10-18) bills Gemini 3 and newer per unique nonempty query: $14 per
+1,000 queries after the shared monthly free allowance. You can explicitly use
+the exported `GOOGLE_SERVER_TOOL_PRICING` as `pricing.serverTools` for that
+model family. Gemini 2.5 and older bill per grounded prompt; their query count
+is not a billable-prompt count, so leave this fee unpriced or account for it
+outside this per-query table. Free allowances are not subtracted locally.
+No web-fetch/code-execution count is inferred from result parts. See
+[cost tracking](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
+
+```ts
+import { GOOGLE_SERVER_TOOL_PRICING } from "@warlock.js/ai-google";
+const model = google.model({
+  name: "gemini-3.5-flash-lite",
+
+  pricing: { ...{ input: 0.3, output: 2.5 }, serverTools: GOOGLE_SERVER_TOOL_PRICING },
+});
+const response = await model.complete(messages, {
+  providerTools: [{ provider: "google", definition: { googleSearch: {} } }],
+});
+console.log(response.usage.serverToolUse?.webSearchRequests);
+console.log(response.providerMetadata);
+```

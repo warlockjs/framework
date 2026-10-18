@@ -1044,10 +1044,10 @@ class Execution<TOutput> {
         ? response.toolCalls
         : undefined;
 
+    const serverToolCalls = response.serverToolCalls ?? [];
     const isToolCallTrip =
       response.finishReason === "tool_calls" &&
-      response.toolCalls !== undefined &&
-      response.toolCalls.length > 0;
+      (Boolean(response.toolCalls?.length) || serverToolCalls.length > 0);
 
     // A paused turn (Anthropic `pause_turn`, long-running server tools)
     // resumes by sending the assistant turn back unchanged — so it is
@@ -1060,11 +1060,17 @@ class Execution<TOutput> {
       this.messages.push({
         role: "assistant",
         content: response.content,
-        toolCalls: response.toolCalls,
+        toolCalls: [...(response.toolCalls ?? []), ...serverToolCalls],
         ...(response.blocks ? { blocks: response.blocks } : {}),
       });
 
-      tripToolCalls.push(...(await this.dispatchToolCalls(response.toolCalls!, tripIndex)));
+      // Hosted continuations never enter function dispatch or application tool hooks.
+      for (const call of serverToolCalls) {
+        this.messages.push({ role: "tool", toolCallId: call.id, content: call.result });
+      }
+      if (response.toolCalls?.length) {
+        tripToolCalls.push(...(await this.dispatchToolCalls(response.toolCalls, tripIndex)));
+      }
     } else if (isPausedTrip) {
       this.messages.push({
         role: "assistant",
@@ -1082,6 +1088,7 @@ class Execution<TOutput> {
       endedAt: new Date().toISOString(),
       duration: performance.now() - tripStart,
       usage: response.usage,
+      ...(response.providerMetadata ? { providerMetadata: response.providerMetadata } : {}),
       toolCalls: tripToolCalls.length > 0 ? tripToolCalls : undefined,
       ...(truncatedToolCalls ? { truncatedToolCalls } : {}),
       ...(response.blocks ? { blocks: response.blocks } : {}),
@@ -1143,10 +1150,12 @@ class Execution<TOutput> {
     // Composite (`asTool`-wrapped) tools never set `mode: "silent"`
     // in v1 — silent-composite mechanics are deferred per plan
     // 2026-05-07-silent-tools.md (Q4). They behave as feedback.
-    const allSilent = response.toolCalls!.every((request) => {
-      const registered = this.effectiveTools.find((tool) => tool.name === request.name);
-      return registered?.mode === "silent";
-    });
+    const allSilent =
+      serverToolCalls.length === 0 &&
+      (response.toolCalls ?? []).every((request) => {
+        const registered = this.effectiveTools.find((tool) => tool.name === request.name);
+        return registered?.mode === "silent";
+      });
 
     return allSilent ? "stop" : "continue";
   }
@@ -1351,6 +1360,8 @@ class Execution<TOutput> {
     let finishReason: FinishReason = "stop";
     let usage: Usage = { input: 0, output: 0, total: 0 };
     let blocks: ProviderContentBlock[] | undefined;
+    let providerMetadata: ModelResponse["providerMetadata"];
+    let serverToolCalls: ModelResponse["serverToolCalls"];
     const toolCalls: ModelToolCallRequest[] = [];
     const recoveredCalls: ModelToolCallRequest[] = [];
 
@@ -1429,6 +1440,8 @@ class Execution<TOutput> {
         finishReason = chunk.finishReason;
         usage = chunk.usage;
         blocks = chunk.blocks;
+        providerMetadata = chunk.providerMetadata;
+        serverToolCalls = chunk.serverToolCalls;
       }
     }
 
@@ -1458,6 +1471,8 @@ class Execution<TOutput> {
     return {
       content,
       finishReason: resolvedFinishReason,
+      ...(providerMetadata ? { providerMetadata } : {}),
+      ...(serverToolCalls ? { serverToolCalls } : {}),
       usage,
       toolCalls: mergedToolCalls.length > 0 ? mergedToolCalls : undefined,
       // Recovered (guard-synthesized) calls have no provider block, so a

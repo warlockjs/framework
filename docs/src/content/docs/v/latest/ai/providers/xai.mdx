@@ -251,3 +251,15 @@ OpenAI-only bodies across a mixed-provider fallback chain.
 Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
+
+## Native web search requires Responses
+
+[xAI's official web-search guide](https://docs.x.ai/developers/tools/web-search)
+(verified 2026-10-18) sends `{ type: "web_search" }` to `POST /v1/responses`.
+`XaiSDK` currently wraps Chat Completions, so native `web_search` and `x_search`
+provider tools are explicitly unsupported and throw `InvalidRequestError`
+before transport, explaining that the vendor's Responses API is required.
+Use xAI's own Responses SDK for native search. The framework's
+`api: "responses"` adapter remains direct-OpenAI-only; passing a tool definition
+does not change this transport. No xAI hosted-search request count or list fee
+is guessed. See [compatible native search](/v/latest/ai/providers/openai-compatible/#xai).

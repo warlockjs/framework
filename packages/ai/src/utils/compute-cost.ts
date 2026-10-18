@@ -1,4 +1,4 @@
-import type { ModelPricing } from "../contracts/result/model-pricing.type";
+import type { ModelCost, ModelPricing } from "../contracts/result/model-pricing.type";
 import type { Usage } from "../contracts/result/usage.type";
 
 /**
@@ -30,7 +30,8 @@ import type { Usage } from "../contracts/result/usage.type";
  * move out of `output` into a `reasoning` channel at that rate; otherwise
  * they stay in `output` (the common case).
  *
- * Pricing values are USD-per-million-tokens. Each channel divides once at
+ * Token prices are USD-per-million-tokens; serverTools prices are USD per
+ * request, booked as per-tool amounts in cost.serverTools. Each token channel divides once at
  * the end to avoid floating-point accumulation error on per-token math.
  *
  * @example
@@ -50,7 +51,7 @@ import type { Usage } from "../contracts/result/usage.type";
 export function computeCost(
   usage: Usage,
   pricing: ModelPricing | undefined,
-): ModelPricing | undefined {
+): ModelCost | undefined {
   if (!pricing) {
     return undefined;
   }
@@ -69,7 +70,7 @@ export function computeCost(
       ? Math.min(Math.max(0, usage.reasoningTokens ?? 0), Math.max(0, usage.output))
       : 0;
 
-  const cost: ModelPricing = {
+  const cost: ModelCost = {
     input: (freshInput * pricing.input) / 1_000_000,
     output: ((usage.output - reasoningTokens) * pricing.output) / 1_000_000,
   };
@@ -88,6 +89,21 @@ export function computeCost(
 
   if (reasoningTokens > 0 && pricing.reasoning !== undefined) {
     cost.reasoning = (reasoningTokens * pricing.reasoning) / 1_000_000;
+  }
+
+  for (const [counter, count] of Object.entries(usage.serverToolUse ?? {})) {
+    const rateKey =
+      counter === "webSearchRequests"
+        ? "webSearch"
+        : counter === "webFetchRequests"
+          ? "webFetch"
+          : counter === "codeExecutionRequests"
+            ? "codeExecution"
+            : counter;
+    const rate = pricing.serverTools?.[rateKey];
+    if (rate !== undefined && count !== undefined) {
+      cost.serverTools = { ...cost.serverTools, [rateKey]: Math.max(0, count) * rate };
+    }
   }
 
   return cost;
@@ -124,7 +140,7 @@ export function attachCost(usage: Usage, pricing: ModelPricing | undefined): Usa
  * @example
  * totalCost({ input: 0.0003, output: 0.0075, cachedInput: 0.015, cacheWrite: 0.075 }); // 0.0978
  */
-export function totalCost(cost: ModelPricing | undefined): number | undefined {
+export function totalCost(cost: ModelCost | undefined): number | undefined {
   if (!cost) {
     return undefined;
   }
@@ -135,6 +151,7 @@ export function totalCost(cost: ModelPricing | undefined): number | undefined {
     total += cost[channel] ?? 0;
   }
 
+  for (const amount of Object.values(cost.serverTools ?? {})) total += amount ?? 0;
   return total;
 }
 
@@ -149,7 +166,7 @@ const OPTIONAL_COST_CHANNELS = [
   "cacheWrite1h",
   "cachedOutput",
   "reasoning",
-] as const satisfies ReadonlyArray<keyof ModelPricing>;
+] as const satisfies ReadonlyArray<keyof ModelCost>;
 
 /**
  * Merge a child's cost breakdown into a running parent total. Each
@@ -165,18 +182,18 @@ const OPTIONAL_COST_CHANNELS = [
  * pricing" from "genuinely zero").
  */
 export function accumulateCost(
-  parent: ModelPricing | undefined,
-  child: ModelPricing | undefined,
-): ModelPricing | undefined {
+  parent: ModelCost | undefined,
+  child: ModelCost | undefined,
+): ModelCost | undefined {
   if (!child) {
     return parent;
   }
 
   if (!parent) {
-    return { ...child };
+    return { ...child, ...(child.serverTools ? { serverTools: { ...child.serverTools } } : {}) };
   }
 
-  const merged: ModelPricing = {
+  const merged: ModelCost = {
     input: parent.input + child.input,
     output: parent.output + child.output,
   };
@@ -189,6 +206,12 @@ export function accumulateCost(
     }
   }
 
+  if (parent.serverTools || child.serverTools) {
+    merged.serverTools = { ...parent.serverTools };
+    for (const [tool, amount] of Object.entries(child.serverTools ?? {})) {
+      if (amount !== undefined) merged.serverTools[tool] = (merged.serverTools[tool] ?? 0) + amount;
+    }
+  }
   return merged;
 }
 
@@ -255,6 +278,14 @@ export function mergeUsage(target: Usage, child: Usage): void {
     target.inputIncludesCache !== false && child.inputIncludesCache === false
       ? (child.cachedTokens ?? 0) + (child.cacheWriteTokens ?? 0)
       : 0;
+
+  if (child.serverToolUse !== undefined) {
+    const counters = { ...target.serverToolUse };
+    for (const [counter, count] of Object.entries(child.serverToolUse)) {
+      if (count !== undefined) counters[counter] = (counters[counter] ?? 0) + count;
+    }
+    target.serverToolUse = counters;
+  }
 
   target.input += child.input + childFolded;
   target.output += child.output;

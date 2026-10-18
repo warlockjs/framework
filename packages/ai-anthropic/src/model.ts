@@ -40,6 +40,7 @@ import {
   type AnthropicThinkingMode,
   noReasoningForm,
 } from "./thinking-mode";
+import { applyServerToolUsage } from "./utils/server-tool-usage";
 import { applyAnthropicCacheUsage, requestCacheTtl } from "./utils/cache-usage";
 import {
   mapStopReason,
@@ -507,6 +508,7 @@ export class AnthropicModel implements ModelContract {
             usage.reasoningTokens = thinkingTokens;
           }
 
+          applyServerToolUsage(usage, event.message.usage.server_tool_use);
           applyAnthropicCacheUsage(usage, event.message.usage, cacheTtl);
 
           if (want.usage) {
@@ -600,6 +602,7 @@ export class AnthropicModel implements ModelContract {
           if (Array.isArray((event.usage as { iterations?: unknown }).iterations)) {
             compaction = compactionIterationUsage(event.usage);
           }
+          applyServerToolUsage(usage, event.usage.server_tool_use);
           usage.output = event.usage.output_tokens ?? usage.output;
 
           const thinkingTokens = event.usage.output_tokens_details?.thinking_tokens;
@@ -1292,6 +1295,7 @@ export class AnthropicModel implements ModelContract {
         : {}),
     };
 
+    applyServerToolUsage(usage, raw.server_tool_use);
     applyAnthropicCacheUsage(usage, raw, cacheTtl);
     addCacheCounts(usage, compaction);
 

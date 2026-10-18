@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.32.0
+
+### Added
+
+- Map cumulative hosted web-search/fetch usage in completions and streams while preserving server-tool blocks. Export verified request-fee prices as `ANTHROPIC_SERVER_TOOL_PRICING` for explicit pricing composition.
+
 ## 5.31.0 - 2026-10-18
 
 ### Upgrading

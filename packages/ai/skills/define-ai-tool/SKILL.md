@@ -271,3 +271,41 @@ Compact mode drops `description` / `title` / `examples` / `example` / `default` 
 - The `handle-ai-errors` topic — error hierarchy
 - The `run-supervisor` topic — artifacts under a supervisor
 - The `run-ai-workflow` topic — `workflow.asTool()` composition
+
+## Native search: counters and compatible transports
+
+Read `response.usage.serverToolUse` for provider-reported hosted usage and
+`response.providerMetadata` for raw OpenAI hosted output / Google grounding;
+Anthropic hosted blocks remain on `response.blocks`. Never count answer text
+or ordinary function calls as billable hosted usage. Hosted tools bypass
+application handlers.
+
+Qwen/DashScope search is a request flag, not a tool:
+
+```ts
+await qwenModel.complete(messages, {
+  providerOptions: { qwen: { enableSearch: true } }, // model provider must be "qwen"
+});
+```
+
+Kimi needs a builtin tool plus an echo continuation. The adapter supplies the
+verbatim result and the agent continues within `maxTrips`:
+
+```ts
+const assistant = ai.agent({
+  model: moonshotModel, // OpenAISDK with provider: "moonshot"
+  maxTrips: 4,
+  tools: [
+    ai.providerTool({
+      provider: "moonshot",
+      name: "$web_search",
+      definition: { type: "builtin_function", function: { name: "$web_search" } },
+    }),
+  ],
+});
+```
+
+No `execute` is needed. Qwen/Kimi request fees are unpriced because no verified
+billing counter is mapped. xAI's hosted search uses Responses and is rejected
+by the current Chat Completions XaiSDK. Full shapes and official sources:
+https://warlock.js.org/v/latest/ai/providers/openai-compatible/

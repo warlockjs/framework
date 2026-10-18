@@ -1,0 +1,94 @@
+---
+title: OpenAI-compatible native search
+description: Verified Qwen request flags and Kimi hosted-search continuation over Chat Completions.
+---
+
+Use `OpenAISDK` with a vendor base URL and an explicit `provider` label.
+Protocol compatibility does not make native search tools interchangeable.
+These shapes were checked against vendor documentation on **2026-10-18**;
+model, region and account availability still follow the vendor's matrix.
+
+## Qwen / DashScope
+
+[Alibaba's official web-search guide](https://www.alibabacloud.com/help/en/model-studio/web-search)
+shows a top-level `enable_search` request flag on the OpenAI-compatible API.
+Use `provider: "qwen"` and `providerOptions.qwen.enableSearch`, or the equivalent
+`"dashscope"` label and options key. This is a request flag, not a provider tool.
+
+```ts
+import { OpenAISDK, type QwenCallOptions } from "@warlock.js/ai-openai";
+
+const qwen = new OpenAISDK({
+  apiKey: process.env.DASHSCOPE_API_KEY,
+  baseURL: process.env.DASHSCOPE_COMPATIBLE_BASE_URL,
+  provider: "qwen",
+});
+const searchOptions: QwenCallOptions = { enableSearch: true };
+const model = qwen.model({ name: "qwen-plus" });
+await model.complete([{ role: "user", content: "Find recent news" }], {
+  providerOptions: { qwen: searchOptions },
+});
+```
+
+The flag is sent in both completion and streaming requests; `false` is also
+forwarded. Other provider labels ignore these keys. Alibaba documents that
+search-source responses are unavailable over this compatible route, and newer
+multimodal models may require its native multimodal API or Responses API.
+Those routes are unsupported by this adapter. No search request count or fee
+is invented from `enableSearch` or answer text.
+
+## Kimi / Moonshot
+
+[Kimi's official search guide](https://platform.kimi.ai/docs/guide/use-web-search)
+declares `{ type: "builtin_function", function: { name: "$web_search" } }`.
+The model returns arguments that the client must echo in a tool result before
+continuing. The adapter supplies that result; the agent loops automatically.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const moonshot = new OpenAISDK({
+  apiKey: process.env.MOONSHOT_API_KEY,
+  baseURL: "https://api.moonshot.ai/v1",
+  provider: "moonshot",
+});
+const assistant = ai.agent({
+  model: moonshot.model({ name: "kimi-k3" }),
+  maxTrips: 4,
+  tools: [
+    ai.providerTool({
+      provider: "moonshot",
+      name: "$web_search",
+      definition: { type: "builtin_function", function: { name: "$web_search" } },
+    }),
+  ],
+});
+const result = await assistant.execute("Find recent research on prompt caching");
+```
+
+`"kimi"` is also accepted when used consistently for the model and tool label.
+Only this declared builtin receives automatic continuation. The original
+arguments string is preserved in the assistant tool call and echoed verbatim
+as the tool result, including when it streams in fragments. Ordinary function
+tools still dispatch normally, including mixed hosted/function turns. Search
+never invokes an application handler. Every continuation uses one trip, with
+normal cancellation, budgets and `maxTrips`; repeated searches cannot form an
+unbounded adapter loop. Invalid JSON is rejected, and truncated calls are not
+echoed.
+
+Direct model callers receive `response.serverToolCalls` (or streaming `done`)
+with adapter-supplied results and must manage conversation continuation
+explicitly; using an agent handles it automatically. Kimi's search-content
+tokens are included in later prompt usage. We do not derive a billable request
+counter from the echo or from `arguments.usage.total_tokens`, and no request
+list price is supplied.
+
+## xAI
+
+[xAI's documented native search](https://docs.x.ai/developers/tools/web-search)
+uses `POST /v1/responses` with `{ type: "web_search" }`. `XaiSDK` currently
+wraps Chat Completions: native `web_search` / `x_search` definitions throw a
+clear `InvalidRequestError` before transport. Use the vendor's Responses SDK
+for that feature. Setting `api: "responses"` on a compatible `OpenAISDK` is
+also unsupported; the framework's Responses adapter remains direct-OpenAI-only.

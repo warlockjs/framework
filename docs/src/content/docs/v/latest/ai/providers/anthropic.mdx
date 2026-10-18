@@ -445,3 +445,30 @@ const webSearch = ai.providerTool({
 ```
 
 With `streamChunks` (on by default under `agent.stream()`), `stream()` also yields `reasoning` for each `thinking_delta`, `tool-args` for each `input_json_delta` of a client `tool_use` block, and `usage` after `message_start` and every `message_delta`. On Claude 5-family models thinking text streams only with `thinkingDisplay: "summarized"`. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/).
+
+## Hosted-search usage and fees
+
+`complete()` and streaming `done` map the provider's
+`usage.server_tool_use.web_search_requests` / `web_fetch_requests` to
+`usage.serverToolUse.webSearchRequests` / `webFetchRequests`. Streaming
+`message_delta` counts are cumulative snapshots, never added twice. Raw
+`server_tool_use` and search-result blocks remain in `response.blocks` and are
+replayed in history; they never invoke local function handlers.
+
+To add request fees to token costs, explicitly compose the verified
+`ANTHROPIC_SERVER_TOOL_PRICING` export into model `pricing.serverTools`:
+
+```ts
+import { ANTHROPIC_SERVER_TOOL_PRICING } from "@warlock.js/ai-anthropic";
+const model = anthropic.model({
+  name: "claude-sonnet-4-6",
+  pricing: { input: 3, output: 15, serverTools: ANTHROPIC_SERVER_TOOL_PRICING },
+});
+```
+
+The [search fee](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool#usage-and-pricing)
+is $0.01 per search; [fetch](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool#usage-and-pricing)
+has no additional request fee (verified 2026-10-18). Tokens remain additional.
+No code-execution request count is inferred from blocks. See
+[hosted-tool costs](/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees)
+and [fee reservations](/v/latest/ai/recipes/cost-budgets-and-slo/#reserve-hosted-search-fees).

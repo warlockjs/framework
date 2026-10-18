@@ -300,3 +300,13 @@ as user context when it replaces the first non-system turn.
 
 Adjacent-turn normalization preserves empty histories and separate system prompts
 without inserting synthetic conversation turns.
+
+## Hosted-search accounting limit
+
+Bedrock Converse's [TokenUsage schema](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_TokenUsage.html)
+and the installed SDK expose token/cache counts, with no hosted-tool request
+counter (verified 2026-10-18). `usage.serverToolUse` therefore remains absent;
+no count or search fee is inferred from `server_tool_use` system-tool blocks.
+Hosted system tools continue to stay outside function dispatch. Direct
+Anthropic counters are not assumed to exist on Converse. Supply fees only when
+your own verified metering establishes the billing unit.

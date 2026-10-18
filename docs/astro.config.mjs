@@ -479,6 +479,7 @@ const topics = [
         collapsed: true,
         items: [
           { label: "OpenAI", slug: "v/latest/ai/providers/openai" },
+          { label: "OpenAI-compatible search", slug: "v/latest/ai/providers/openai-compatible" },
           { label: "Anthropic", slug: "v/latest/ai/providers/anthropic" },
           { label: "Bedrock", slug: "v/latest/ai/providers/bedrock" },
           { label: "Google", slug: "v/latest/ai/providers/google" },

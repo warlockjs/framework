@@ -1,4 +1,4 @@
-import type { ModelPricing, Usage } from "@warlock.js/ai";
+import type { ModelCost, Usage } from "@warlock.js/ai";
 
 /**
  * Rolled-up usage + cost across a set of stored traces, returned by the
@@ -39,10 +39,10 @@ export type TraceAggregate = {
   /**
    * Merged per-channel USD cost across every matched trace, or
    * `undefined` when no matched trace carried pricing. Same shape as
-   * `ModelPricing` so callers can read the input/output/cache split,
+   * `ModelCost` so callers can read the input/output/cache split,
    * not just one opaque number.
    */
-  cost?: ModelPricing;
+  cost?: ModelCost;
   /** Summed wall-clock duration in milliseconds across matched traces. */
   totalDuration: number;
 };

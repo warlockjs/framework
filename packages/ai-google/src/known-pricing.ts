@@ -32,3 +32,8 @@ export const GOOGLE_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
 export function googlePricingFor(modelName: string): ModelPricing | undefined {
   return GOOGLE_MODEL_PRICING[modelName];
 }
+
+/** USD per nonempty unique query for Gemini 3+, before free monthly allowances.
+ * Gemini 2.5 and older bill per grounded prompt; do not use this rate for them.
+ * https://ai.google.dev/gemini-api/docs/google-search#pricing — verified 2026-10-18. */
+export const GOOGLE_SERVER_TOOL_PRICING = { webSearch: 0.014 };

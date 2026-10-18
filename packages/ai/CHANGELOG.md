@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Provider-reported hosted-tool usage counters, per-request `ModelPricing.serverTools` rates and historical `cost.serverTools` amounts; `mergeUsage` and `totalCost` include them. Budget reserve mode accepts `serverToolRequests` with fail-closed fee pricing. Responses and streaming terminal chunks retain raw provider metadata; agent trips retain metadata and handle adapter-supplied hosted continuations within `maxTrips` without function dispatch.
+
 - `ai.snapshot.file({ dir, dirMode?, fileMode? })` accepts custom permission modes with private defaults, refusing invalid modes and group/other write bits.
 
 ## 5.31.0 - 2026-10-18

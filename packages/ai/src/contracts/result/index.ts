@@ -3,7 +3,7 @@ export type { AttemptEntry } from "./attempt-entry.type";
 export { REPORT_SCHEMA_VERSION } from "./base-report.type";
 export type { BaseReport, ReportStatus, ReportType } from "./base-report.type";
 export type { BaseResult } from "./base-result.type";
-export type { ModelPricing } from "./model-pricing.type";
+export type { ModelCost, ModelPricing, ServerToolPricing } from "./model-pricing.type";
 export type { ExecuteResult } from "./execute-result.type";
 export type {
   AgentReport,
@@ -29,5 +29,5 @@ export type {
   SupervisorTerminatedBy,
 } from "./supervisor-result.type";
 export type { ToolCall } from "./tool-call.type";
-export type { Usage } from "./usage.type";
+export type { ServerToolUse, Usage } from "./usage.type";
 export type { WorkflowReport, WorkflowResult } from "./workflow-result.type";

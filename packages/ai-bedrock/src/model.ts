@@ -664,7 +664,9 @@ export class BedrockModel implements ModelContract {
    * the non-cached input tokens" (AWS prompt-caching guide), so the usage
    * is marked `inputIncludesCache: false`. Bedrock's Converse `TokenUsage`
    * carries no reasoning-token channel, so `Usage.reasoningTokens` is
-   * intentionally left unset here.
+   * intentionally left unset here. The installed SDK 3.1121.0 TokenUsage also
+   * has no hosted-tool request counter; do not infer one from tool blocks.
+   * https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_TokenUsage.html
    */
   private extractUsage(raw: TokenUsage | undefined): Usage {
     if (!raw) {

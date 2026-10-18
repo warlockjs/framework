@@ -49,3 +49,8 @@ export const OPENAI_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
 export function openAIPricingFor(modelName: string): ModelPricing | undefined {
   return OPENAI_MODEL_PRICING[modelName];
 }
+
+/** USD per request for web_search (NOT non-reasoning web_search_preview).
+ * Search content tokens are additional; preview variants can have other rates.
+ * https://developers.openai.com/api/docs/pricing#built-in-tools — verified 2026-10-18. */
+export const OPENAI_SERVER_TOOL_PRICING = { webSearch: 0.01 };

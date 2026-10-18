@@ -1,7 +1,19 @@
+/** USD per hosted-tool request. Omitted rates mean unpriced, never free. */
+export type ServerToolPricing = {
+  webSearch?: number;
+  webFetch?: number;
+  codeExecution?: number;
+  /** Provider-specific counters use the same key as Usage.serverToolUse. */
+  [counter: string]: number | undefined;
+};
+
+/** Historical USD amounts, distinct from token and request pricing rates. */
+export type ModelCost = ModelPricing;
+
 /**
- * Per-million-token USD pricing for a model. All values are in USD per
- * 1,000,000 tokens — the industry-standard unit. Used by the framework
- * to compute `Usage.costUSD` at emit time, so stored reports carry
+ * USD pricing for a model. Token rates are per 1,000,000 tokens;
+ * `serverTools` rates are per request. Used by the framework
+ * to compute `Usage.cost` at emit time, so stored reports carry
  * historical cost (not re-derived against today's pricing).
  *
  * **Optionality.** Every field except `input` / `output` is optional.
@@ -30,6 +42,8 @@
  * };
  */
 export type ModelPricing = {
+  /** USD per request in pricing; historical USD amounts per tool in Usage.cost. */
+  serverTools?: ServerToolPricing;
   /** USD per 1M input tokens. */
   input: number;
   /** USD per 1M output tokens. */

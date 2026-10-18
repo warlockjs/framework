@@ -1,7 +1,16 @@
-import type { ModelPricing } from "./model-pricing.type";
+import type { ModelCost } from "./model-pricing.type";
+
+/** Provider-reported hosted-tool units; never inferred from answer text or function calls. */
+export type ServerToolUse = {
+  webSearchRequests?: number;
+  webFetchRequests?: number;
+  codeExecutionRequests?: number;
+  /** Namespaced provider-specific counters; units must be documented by the adapter. */
+  [counter: string]: number | undefined;
+};
 
 /**
- * Token usage statistics for a single LLM call or aggregated across trips.
+ * Token and hosted-tool usage for a single LLM call or aggregated across trips.
  *
  * `cachedTokens` counts prompt tokens served from the provider's prompt
  * cache (OpenAI's `prompt_tokens_details.cached_tokens`, Anthropic's
@@ -25,6 +34,8 @@ import type { ModelPricing } from "./model-pricing.type";
  * };
  */
 export type Usage = {
+  /** Hosted-tool counts. Absent means unreported, distinct from a reported zero. */
+  serverToolUse?: ServerToolUse;
   /**
    * Number of input/prompt tokens, as the provider reports them. Includes
    * `cachedTokens` / `cacheWriteTokens` unless `inputIncludesCache` is
@@ -103,11 +114,11 @@ export type Usage = {
    */
   cacheWrite1hTokens?: number;
   /**
-   * Cost breakdown in USD, computed at emit time from `tokens × pricing[model]`
+   * Cost breakdown in USD, computed at emit time from token and request usage
    * when the model adapter declared a `ModelPricing`. Same shape as
    * `ModelPricing` (input / output / cachedInput / cacheWrite) so
    * dashboards can tell HOW the total was reached — what share was
-   * input vs output, how much the prompt cache saved — instead of
+   * input vs output, cache savings and hosted request fees — instead of
    * looking at one opaque number.
    *
    * Captured as a historical fact so stored reports remain accurate
@@ -121,5 +132,5 @@ export type Usage = {
    * For a single scalar total use `totalCost(usage.cost)`, which sums
    * every populated channel.
    */
-  cost?: ModelPricing;
+  cost?: ModelCost;
 };
