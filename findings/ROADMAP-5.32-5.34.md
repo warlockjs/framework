@@ -4,6 +4,13 @@ Owner decisions (2026-10-18). Work items for the next three releases; nothing he
 
 ## 5.32.0 — TypeScript 7
 
+Also in 5.32.0 (reports from an app upgrading to 5.31): native MCP CallToolResult passthrough (opt-in);
+private file modes for snapshot/session/cassette files; Gemini Developer API token counting with system prompts
+and tools (+ estimate fallback); native search usage and cost (server-tool counters, raw provider metadata, Qwen
+`enableSearch`, Kimi's new first-party search/fetch tools instead of the `$web_search` builtin retiring on
+2026-10-20, xAI native search rejected with guidance because it needs xAI's Responses API); esbuild raised past
+GHSA-g7r4-m6w7-qqqr; Prettier-mode import sorting moved off a TypeScript-API plugin; fonts in @warlock.js/web.
+
 - Upgrade TypeScript to the latest stable (7.0.2, the native Go compiler) in the monorepo and in the
   create-warlock template: `tsc`/typecheck scripts, the dev-server type checker, `warlock typecheck` /
   `warlock check`, vitest typecheck.
