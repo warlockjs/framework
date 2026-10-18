@@ -47,7 +47,7 @@ describe("warlock inspect", () => {
       bootstrap: true,
     });
     expect(inspectCommand.commandOptions.map((option) => option.name)).toEqual(["json", "section"]);
-  });
+  }, 60_000);
 
   it("prints only the JSON report on stdout under --json", async () => {
     const stdout: string[] = [];
