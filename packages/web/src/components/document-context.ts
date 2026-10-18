@@ -69,6 +69,7 @@ export type SerializedErrorPageProps = {
 };
 
 export type HydrationDocumentPayloadSource = {
+  readonly live?: import("../live-page-data").LivePageOptions;
   readonly appData: unknown;
   readonly layoutData: unknown;
   readonly pageData: unknown;

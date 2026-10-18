@@ -7,6 +7,7 @@ import { queryStringOf } from "../routing/query-string";
 import type { RouteQuery } from "../routing/route-table";
 import { DocumentContext } from "./document-context";
 import { fieldErrorId } from "./field-error";
+import { formInputSnapshot, setFormDirty } from "../client/navigation/dirty-form-store";
 
 export type FormProps = Omit<
   FormHTMLAttributes<HTMLFormElement>,
@@ -116,6 +117,34 @@ export function Form({
   ...rest
 }: FormProps): ReactElement {
   const ref = useRef<HTMLFormElement>(null);
+  const cleanSnapshot = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    const form = ref.current;
+    if (!form) return;
+    cleanSnapshot.current ??= formInputSnapshot(form);
+    let disposed = false;
+    const update = () => setFormDirty(form, formInputSnapshot(form) !== cleanSnapshot.current);
+    const reset = (event: Event) => {
+      // Native reset restores the controls after dispatching the reset event.
+      queueMicrotask(() => {
+        if (disposed || event.defaultPrevented) return;
+        cleanSnapshot.current = formInputSnapshot(form);
+        update();
+      });
+    };
+    form.addEventListener("input", update);
+    form.addEventListener("change", update);
+    form.addEventListener("reset", reset);
+    update();
+    return () => {
+      disposed = true;
+      form.removeEventListener("input", update);
+      form.removeEventListener("change", update);
+      form.removeEventListener("reset", reset);
+      setFormDirty(form, false);
+    };
+  }, []);
   const actionData = useContext(DocumentContext)?.payload.actionData as
     | { errors?: Record<string, string> }
     | undefined;
@@ -195,6 +224,7 @@ export function Form({
       signal = independentController.current.signal;
     }
 
+    const submittedSnapshot = formInputSnapshot(form);
     const outcome = await submitAction(target, new FormData(form, submitter), {
       independent: independentSubmission,
       signal,
@@ -212,6 +242,10 @@ export function Form({
     try {
       if (outcome.type === "success") {
         if (resetOnSuccess) form.reset();
+        cleanSnapshot.current = resetOnSuccess ? formInputSnapshot(form) : submittedSnapshot;
+        if (ref.current === form) {
+          setFormDirty(form, formInputSnapshot(form) !== cleanSnapshot.current);
+        }
         onSuccess?.(outcome);
       } else if (outcome.type === "redirected") {
         onSuccess?.(outcome);

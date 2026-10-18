@@ -145,12 +145,13 @@ const REFRESH_MODE = "replace" as const;
  * were decided by the server's router and merely travelled here. Nothing in
  * this file looks at a path.
  */
-export function createRefresher(runtime: RefreshRuntime): Refresher {
+export function createRefresher(runtime: RefreshRuntime, liveGuard?: () => boolean): Refresher {
   return async () => {
     // Not merely defensive: `refresh()` is importable from a universal module,
     // so a component can call it during the server render. There is no page on
     // screen to refresh there, and no address bar to read one from.
     if (typeof window === "undefined") return false;
+    if (liveGuard && !liveGuard()) return false;
 
     // The address bar IS the current route's URL — the runtime has already put
     // the resolved URL there — so there is no second copy to drift from it.
@@ -161,14 +162,14 @@ export function createRefresher(runtime: RefreshRuntime): Refresher {
     try {
       routerEvents.emitNavigating({ url, mode: REFRESH_MODE });
 
-      const result = await fetchPageData(url, signal);
+      const result = await fetchPageData(url, signal, { live: liveGuard !== undefined });
 
       // Superseded, and silently: this is the answer to a question the user
       // stopped asking. Not an error, and not an event — the operation that
       // overtook this one emits its own outcome. Covers `result.type ===
       // "aborted"` too, which `isCurrent()` catches on its own — the ticket,
       // not the abort, is what actually decided this.
-      if (!isCurrent() || result.type === "aborted") return false;
+      if (!isCurrent() || result.type === "aborted" || (liveGuard && !liveGuard())) return false;
 
       if (result.type === "hard-navigate") {
         /*
@@ -199,7 +200,7 @@ export function createRefresher(runtime: RefreshRuntime): Refresher {
         return false;
       }
 
-      if (!isCurrent()) return false;
+      if (!isCurrent() || (liveGuard && !liveGuard())) return false;
 
       // Shared state BEFORE the render that consumes it, exactly as a navigation
       // does it — a refresh can carry a changed locale or a changed user too.

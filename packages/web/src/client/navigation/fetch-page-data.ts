@@ -21,6 +21,7 @@
  * that changed the payload shape mid-session — into a dead end.
  */
 import { parse } from "devalue";
+import { LIVE_PAGE_REQUEST_HEADER } from "../../live-page-data";
 import {
   DATA_RESPONSE_CONTENT_TYPE,
   WARLOCK_DATA_REQUEST_HEADER,
@@ -332,6 +333,8 @@ async function readNdjsonPageData(response: Response, url: string): Promise<Page
  * ticket exactly as before this parameter existed.
  */
 export type FetchPageDataOptions = {
+  /** Re-run loaders rather than replaying the server/browser page cache. */
+  live?: boolean;
   /** Do not let the server persist its legacy locale cookie for this request. */
   provisionalLocale?: boolean;
   /** The site that booted this client; absent preserves single-site behaviour. */
@@ -349,6 +352,7 @@ export async function fetchPageData(
     response = await fetch(url, {
       headers: {
         [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
+        ...(options.live ? { [LIVE_PAGE_REQUEST_HEADER]: "1" } : {}),
         ...(options.provisionalLocale ? { [PROVISIONAL_LOCALE_REQUEST_HEADER]: "1" } : {}),
         // NDJSON preferred, but a plain-JSON server is honoured just the
         // same — this list is a preference order, not a requirement.
@@ -358,6 +362,7 @@ export async function fetchPageData(
       // a document request would. Without this a client navigation could be
       // logged out while a full load of the same URL is not.
       credentials: "same-origin",
+      ...(options.live ? { cache: "no-store" as const } : {}),
       // Redirects are FOLLOWED, not intercepted: the marker header is re-sent,
       // so the destination answers with a payload too, and `response.url` tells
       // us where we ended up. Handling redirects ourselves would mean

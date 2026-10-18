@@ -21,6 +21,7 @@
  * `type: "page"` routing, HTML error pages, or any other new capability.
  */
 import { stringify } from "devalue";
+import { LIVE_PAGE_REQUEST_HEADER } from "../live-page-data";
 import {
   buildTracingContext,
   container,
@@ -784,6 +785,9 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
       });
 
       if (actionMode) response.header("Cache-Control", ACTION_CACHE_CONTROL);
+      if (request.header(LIVE_PAGE_REQUEST_HEADER, undefined) === "1") {
+        response.header("Cache-Control", "private, no-store");
+      }
 
       // Emitted at the SAME seam as the floor, right after it, so the two
       // headers can never be computed from different auth-state reads.

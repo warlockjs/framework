@@ -2,6 +2,13 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.33.0
+
+### Added
+
+- Page-owned `config.live: { tags, pollInterval }` re-runs matching loader pipelines after `invalidatePageCache` broadcasts through core's Socket.IO adapter. `configureLivePageData({ socket })` reuses an app-owned client and falls back to polling without a connected socket.
+- Live updates wait for navigation and unsent `<Form>` input, discard in-flight responses when editing begins, and bypass page caches. Document shared-cache/socket-adapter requirements for multiple processes and publishing workers.
+
 ## 5.32.0 - 2026-10-18
 
 ### Security

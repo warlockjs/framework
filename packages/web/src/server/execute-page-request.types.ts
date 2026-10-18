@@ -1,4 +1,5 @@
 import type { HttpContext, Request, Response } from "@warlock.js/core";
+import type { LivePageOptions } from "../live-page-data";
 import type { BaseValidator } from "@warlock.js/seal";
 import type { SharedContext } from "../index";
 import type { PageRoute, PageSite } from "../context";
@@ -67,6 +68,7 @@ export type PageActionHandler = (context: any) => unknown;
 export type { PageActionConfig };
 
 export type PageTripleModule = {
+  live?: LivePageOptions;
   register?: () => unknown;
   /** Root-owned React tree policy, retained by root module normalization. */
   strictMode?: boolean;
@@ -200,6 +202,7 @@ export type PageErrorRecord = {
 };
 
 export type PageDataBundle = {
+  live?: LivePageOptions;
   route: {
     name: string;
     path: string;

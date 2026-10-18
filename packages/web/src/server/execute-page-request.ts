@@ -529,6 +529,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
     };
 
     const bundle: Bundle = {
+      ...(triple.page.live === undefined ? {} : { live: triple.page.live }),
       route: {
         name: matched.entry.name,
         path: matched.entry.path,

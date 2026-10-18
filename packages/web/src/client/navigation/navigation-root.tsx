@@ -50,6 +50,8 @@ import { syncDocumentLocale } from "./sync-document-locale";
 import { beginNavigationPending, waitForNavigationIdle } from "./navigation-pending-store";
 import { stashNavigationFailure } from "../navigation-failure-stash";
 import { isSafeRedirectUrl } from "../../routing/safe-redirect-url";
+import { startLivePageData } from "./live-page-data";
+import { hasDirtyForms } from "./dirty-form-store";
 
 /**
  * Carry out a scroll decision (`scroll-restoration.ts`) once the target
@@ -526,6 +528,10 @@ export function NavigationRoot({
     };
 
     const previousRefresher = connectRefresher(createRefresher(runtime));
+    const stopLivePageData = startLivePageData({
+      readOptions: () => currentRef.current.payload.live,
+      refresh: createRefresher(runtime, () => !hasDirtyForms()),
+    });
     const previousLocaleChanger = connectLocaleChanger(createLocaleChanger(runtime));
     const previousActionSubmitter = connectActionSubmitter(
       createActionSubmitter({
@@ -671,6 +677,7 @@ export function NavigationRoot({
 
     return () => {
       disposed = true;
+      stopLivePageData();
       activeController?.abort();
       activePendingCompletion?.();
       pendingCommit.current?.complete();

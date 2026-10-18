@@ -326,3 +326,6 @@ export type {
 // that merely constructs a connector must not. It lives at `@warlock.js/web/connector` — `src/connector/index.ts`.
 
 export type { WebFont, WebFontFace, SystemFont } from "./fonts/types";
+export type { LivePageOptions } from "./live-page-data";
+export { configureLivePageData } from "./client/navigation/live-page-data";
+export type { LivePageSocket } from "./client/navigation/live-page-data";

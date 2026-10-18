@@ -1,4 +1,5 @@
 import { config, type Request, type Response } from "@warlock.js/core";
+import { LIVE_PAGE_REQUEST_HEADER } from "../../live-page-data";
 
 import type { PageCacheOptIn } from "../../routing/route-identity";
 import { computePageCacheKey, type PageCacheVariant } from "../page-cache-key";
@@ -76,6 +77,17 @@ export async function resolvePageCacheHitOrMiss(options: {
   middlewareGate?: () => Promise<"passed" | "sent" | "blocked">;
 }): Promise<PageCacheLookupOutcome> {
   const { request, response, cache, credentialedRequest, pageCacheVariant } = options;
+
+  // Live requests must run loaders even when polling an otherwise cached page.
+  if (request.header(LIVE_PAGE_REQUEST_HEADER, undefined) === "1") {
+    response.header("Cache-Control", "private, no-store");
+    return {
+      served: false,
+      cacheHeaderValue: "bypass",
+      cacheKey: undefined,
+      attemptStorageAfterRender: false,
+    };
+  }
 
   if (request.method !== "GET") {
     // Decision 3 ("GET only"): a non-GET request to a serverCache route is

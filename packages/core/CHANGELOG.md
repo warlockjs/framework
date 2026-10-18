@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.33.0
+
+### Added
+
+- `broadcastSocketEvent(event, ...args)` dispatches through the existing socket connector's adapter and returns `false` when no socket server is available. Web page-cache invalidations use this path to notify clients across processes configured with a shared adapter.
+
 ## 5.32.0 - 2026-10-18
 
 ### Added

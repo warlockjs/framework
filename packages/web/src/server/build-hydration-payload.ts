@@ -123,6 +123,7 @@ export function buildHydrationPayload(
 
   return {
     appData,
+    ...(bundle.live === undefined ? {} : { live: bundle.live }),
     layoutData,
     pageData,
     shared: serializableData(bundle.shared),

@@ -14,6 +14,25 @@ That's the honest scope today. The framework ships only the **server** side. The
 
 ## When you reach for it
 
+For an optional broadcast, `broadcastSocketEvent(event, ...args)` reaches the
+connector at call time and returns `false` when no socket server is available:
+
+```ts
+import { broadcastSocketEvent } from "@warlock.js/core";
+
+broadcastSocketEvent("inventory:changed", { tags: ["products"] });
+```
+
+It dispatches through `io.emit` and the configured `socket.adapter` to all
+default-namespace clients. A `true` result means dispatch, not a delivery
+acknowledgement. Use public payloads. Multiple processes require the same
+cross-process adapter; publishing queue/CLI processes must boot that connector
+too. See the official [Redis adapter](https://socket.io/docs/v4/redis-adapter/)
+and [multiple-node guidance](https://socket.io/docs/v4/using-multiple-nodes/).
+Web uses this broadcast for
+[live page dependencies](/v/latest/web/essentials/live-page-data/), alongside
+shared page-cache storage for cluster-wide eviction.
+
 The HTTP side of Warlock covers request/response. Sockets cover the cases HTTP can't:
 
 - **Push to the client.** Order status changes, new chat messages, agent progress updates.
