@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Replace the unused classic TypeScript import-organizer development dependency with `@ianvs/prettier-plugin-sort-imports`, compatible with TypeScript 7.
 - Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
 - Rebaseline the type benchmark on TS7 with `--checkers 1` so type/instantiation counts remain deterministic; resolve the compiler through its exported package manifest.
 

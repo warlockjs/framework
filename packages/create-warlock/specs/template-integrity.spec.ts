@@ -456,10 +456,13 @@ describe("optional Oxc toolchain templates", () => {
     ]) {
       expect(format[key]).toEqual(prettier[key]);
     }
-    // Prettier sorts imports through prettier-plugin-organize-imports; oxfmt
-    // sorts them itself, kept to one block like organize-imports does.
-    expect(prettier.plugins).toContain("prettier-plugin-organize-imports");
-    expect(format.sortImports).toEqual({ newlinesBetween: false });
+    // Prettier sorts imports through @ianvs/prettier-plugin-sort-imports; oxfmt
+    // sorts them itself, kept to one block like the Prettier toolchain does.
+    expect(prettier.plugins).toContain("@ianvs/prettier-plugin-sort-imports");
+    expect(format.sortImports).toEqual({
+      newlinesBetween: false,
+      internalPattern: ["app/", "web/", "@shared/"],
+    });
   });
 
   it("runs every package script through the local binary, never npx", () => {

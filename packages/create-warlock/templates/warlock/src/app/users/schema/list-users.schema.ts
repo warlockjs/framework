@@ -1,4 +1,4 @@
-import { type Infer, v } from "@warlock.js/seal";
+import { v, type Infer } from "@warlock.js/seal";
 
 /**
  * Query parameters the user list accepts. Unknown keys are stripped, so a

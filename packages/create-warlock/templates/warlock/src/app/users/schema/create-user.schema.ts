@@ -1,4 +1,4 @@
-import { type Infer, v } from "@warlock.js/seal";
+import { v, type Infer } from "@warlock.js/seal";
 import { User } from "../models/user";
 
 export const createUserSchema = v.object({

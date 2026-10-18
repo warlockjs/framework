@@ -1,6 +1,6 @@
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { Post } from "../models/post/post.model";
-import { type UpdatePostSchema, updatePostSchema } from "../schema/update-post.schema";
+import { updatePostSchema, type UpdatePostSchema } from "../schema/update-post.schema";
 
 export const updatePostController: GuardedRequestHandler<UpdatePostSchema> = async ({
   request,

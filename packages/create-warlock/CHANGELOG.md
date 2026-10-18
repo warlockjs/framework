@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Replace the Prettier import organizer with `@ianvs/prettier-plugin-sort-imports` so import sorting works with TypeScript 7. Keep built-ins, packages, internal aliases and relative imports in one block, with separate type imports; align Oxfmt’s internal-alias groups with the same template source. Formatters retain unused imports; ESLint or Oxlint reports them.
 - **BREAKING:** scaffold TypeScript 7.0.2 with the native `tsc` command, supported tsconfig options and explicit Node types. Existing apps must remove `baseUrl`, rebase `paths`, and replace classic Node module resolution.
 - Document the optional ESLint parser's dependence on the removed JavaScript compiler API; keep its compiler isolated in development tooling so scaffold specs remain executable while app typechecks use TS7.
 

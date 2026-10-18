@@ -1,6 +1,6 @@
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { Post } from "../models/post/post.model";
-import { type CreatePostSchema, createPostSchema } from "../schema/create-post.schema";
+import { createPostSchema, type CreatePostSchema } from "../schema/create-post.schema";
 
 export const createNewPostController: GuardedRequestHandler<CreatePostSchema> = async ({
   request,

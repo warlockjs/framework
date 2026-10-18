@@ -1,6 +1,6 @@
 import { Model, RegisterModel } from "@warlock.js/cascade";
 import { useComputedSlug } from "@warlock.js/core";
-import { type Infer, v } from "@warlock.js/seal";
+import { v, type Infer } from "@warlock.js/seal";
 import { PostResource } from "app/posts/resources/post.resource";
 
 export const postSchema = v.object({

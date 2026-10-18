@@ -103,6 +103,28 @@ routes say `public: true` and are throttled, and its user list validates its
 query. The generated `AGENTS.md` tells coding agents to run `npx warlock check`
 after every change.
 
+### Prettier import sorting
+
+The ESLint toolchain uses `@ianvs/prettier-plugin-sort-imports` 4.7.1, which parses
+imports with Babel and works independently of the app’s native TypeScript 7
+compiler. The template config keeps built-ins, packages, internal aliases
+(`app/*`, `web/*`, `@shared/*`), then relative imports in one block:
+
+```json
+{
+  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
+  "importOrder": ["<BUILTIN_MODULES>", "<THIRD_PARTY_MODULES>", "^(app|web|@shared)/", "^[.]"],
+  "importOrderParserPlugins": ["typescript", "jsx", "decorators"]
+}
+```
+
+Keep the default `importOrderTypeScriptVersion` to preserve separate type and
+value imports; inline `type` specifiers remain supported. Side-effect imports
+keep their execution order. See the plugin’s
+[options documentation](https://github.com/IanVS/prettier-plugin-sort-imports#options).
+Formatting retains unused imports; run `npm run lint:check` to report them or
+`npm run lint` to apply ESLint’s unused-import fixes.
+
 ### Oxc tooling
 
 `--lint=oxc` installs pinned Oxlint 1.88.0 and Oxfmt 0.73.0, generates
@@ -112,10 +134,11 @@ checker, disables the ESLint checker and keeps TypeScript checks enabled.
 
 `.oxfmtrc.json` turns on Oxfmt's import sorting with
 `"sortImports": { "newlinesBetween": false }`, the counterpart of the ESLint
-toolchain's `prettier-plugin-organize-imports`: `format` reorders imports by group
-(Node built-ins, packages, then relative paths) and keeps them in one block without
-blank lines between groups. Unlike organize-imports it does not delete unused
-imports; Oxlint's `no-unused-vars` reports them instead. See the
+toolchain's `@ianvs/prettier-plugin-sort-imports`. Its `internalPattern` includes
+`app/`, `web/` and `@shared/`, matching the template aliases. `format` reorders imports by
+group and keeps them in one block without blank lines between groups. Neither
+formatter deletes unused imports; ESLint's `unused-imports/no-unused-imports` or
+Oxlint's `no-unused-vars` reports them instead. See the
 [Oxfmt config reference](https://oxc.rs/docs/guide/usage/formatter/config-file-reference)
 for the `sortImports` options.
 

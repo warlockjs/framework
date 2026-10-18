@@ -116,6 +116,7 @@ describe("generated toolchains", () => {
     const pkg = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
     expect(pkg.devDependencies.eslint).toBeTruthy();
     expect(pkg.devDependencies.prettier).toBeTruthy();
+    expect(pkg.devDependencies["@ianvs/prettier-plugin-sort-imports"]).toBe("^4.7.1");
     // The framework's conventions are checked by `warlock check`, not by a lint plugin.
     expect(
       Object.keys(pkg.devDependencies).filter((name) => name.startsWith("@warlock.js/")),
@@ -165,7 +166,10 @@ describe("generated toolchains", () => {
     for (const name of [".oxlintrc.json", ".oxfmtrc.json"])
       expect(existsSync(path.join(appPath, name))).toBe(true);
     const format = JSON.parse(readFileSync(path.join(appPath, ".oxfmtrc.json"), "utf8"));
-    expect(format.sortImports).toEqual({ newlinesBetween: false });
+    expect(format.sortImports).toEqual({
+      newlinesBetween: false,
+      internalPattern: ["app/", "web/", "@shared/"],
+    });
     for (const script of ["lint", "lint:check", "format", "format:check"])
       expect(pkg.scripts[script]).toMatch(/^ox(lint|fmt) /);
     for (const name of ["eslint.config.js", ".prettierrc.json", ".prettierignore"])
@@ -261,8 +265,8 @@ describe("generated toolchains", () => {
     expect(readFileSync(fixture, "utf8")).toBe(
       [
         'import { readFile } from "node:fs";',
-        'import { config } from "app/config";',
         'import { z } from "zod";',
+        'import { config } from "app/config";',
         'import { local } from "./local";',
         "export const values = [z, local, readFile, config];",
         "",

@@ -1,7 +1,7 @@
 import { Auth } from "@warlock.js/auth";
 import { RegisterModel } from "@warlock.js/cascade";
 import { useHashedPassword } from "@warlock.js/core";
-import { type Infer, v } from "@warlock.js/seal";
+import { v, type Infer } from "@warlock.js/seal";
 import { UserResource } from "app/users/resources/user.resource";
 
 export const userSchema = v.object({

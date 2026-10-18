@@ -1,8 +1,8 @@
 import {
   env,
-  type StorageConfigurations,
   storageConfigurations,
   uploadsPath,
+  type StorageConfigurations,
 } from "@warlock.js/core";
 
 const storageOptions: StorageConfigurations = {

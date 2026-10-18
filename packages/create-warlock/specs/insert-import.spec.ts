@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { insertImportInSortedPosition } from "../src/helpers/insert-import";
 
 /**
- * The scaffolded app formats with `prettier-plugin-organize-imports`, which
+ * The scaffolded app formats with `@ianvs/prettier-plugin-sort-imports`, which
  * orders imports alphabetically by module specifier. Injecting a feature's
  * import at the TOP of a config that already imports `@warlock.js/auth` and
  * `@warlock.js/core` therefore produced a `prettier/prettier` error on the

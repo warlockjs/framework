@@ -2,7 +2,7 @@
  * Splice an `import` statement into a generated source file **in sorted
  * position**, rather than pushing it to the top.
  *
- * The scaffolded app formats with `prettier-plugin-organize-imports`, which
+ * The scaffolded app formats with `@ianvs/prettier-plugin-sort-imports`, which
  * orders imports alphabetically by module specifier. So an import prepended to
  * a file that already has some is, by construction, in the wrong place — and
  * the developer meets it as a `prettier/prettier` error on their very first

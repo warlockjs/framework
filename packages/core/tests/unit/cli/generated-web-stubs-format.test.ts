@@ -37,7 +37,7 @@ const scaffoldPrettierConfig = JSON.parse(readFileSync(TEMPLATE_PRETTIERRC, "utf
 
 /**
  * The scaffold's config names its plugin by bare specifier
- * (`"prettier-plugin-organize-imports"`), which only resolves relative to
+ * (`"@ianvs/prettier-plugin-sort-imports"`), which only resolves relative to
  * `create-warlock`'s own `node_modules` (it is not a dependency of `core`).
  * Resolve it explicitly rather than letting `prettier.format` fail to find
  * it — a plugin that silently fails to load would make this test pass for
@@ -84,35 +84,47 @@ const generatedWebStubs: readonly StubCase[] = [
   },
 ];
 
-describe("prettier-plugin-organize-imports actually loads for this config", () => {
-  it("reorders a deliberately-misordered pair of imports, proving the plugin ran (not merely was listed)", async () => {
-    // `prettier-plugin-organize-imports` also drops unused imports, so both
-    // bindings must actually be referenced or it would strip them instead of
-    // reordering them and the assertion below would prove nothing.
-    const misordered =
-      'import { Head, Scripts } from "@warlock.js/web";\n' +
-      'import type { AppProps } from "@warlock.js/web";\n' +
-      "\n" +
-      "export function App({ children }: AppProps) {\n" +
-      "  return (\n" +
-      "    <>\n" +
-      "      <Head />\n" +
-      "      {children}\n" +
-      "      <Scripts />\n" +
-      "    </>\n" +
-      "  );\n" +
-      "}\n";
+describe("@ianvs/prettier-plugin-sort-imports actually loads for this config", () => {
+  it("reorders imports with the plugin while the no-plugin control preserves the wrong order", async () => {
+    const imports = [
+      'import { local } from "./local";',
+      'import { user } from "app/users";',
+      'import { shared } from "@shared/utils";',
+      'import { page } from "web/page";',
+      'import { Head, Scripts } from "@warlock.js/web";',
+      'import type { AppProps } from "@warlock.js/web";',
+      'import path from "node:path";',
+    ];
+    const misordered = imports.join("\n") + "\n";
+    const options = { ...prettierOptions, filepath: "root.tsx" };
+    const withoutPlugin = await prettier.format(misordered, { ...options, plugins: [] });
+    expect(withoutPlugin).toBe(misordered);
 
-    const formatted = await prettier.format(misordered, {
-      ...prettierOptions,
-      filepath: "root.tsx",
-    });
+    const formatted = await prettier.format(misordered, options);
+    expect(formatted.trim().split("\n")).toEqual([
+      imports[6],
+      imports[4],
+      imports[5],
+      imports[2],
+      imports[1],
+      imports[3],
+      imports[0],
+    ]);
+    // Sorting retains unused bindings and separate type imports. The linter
+    // owns unused-import diagnostics, independently of the formatter.
+    expect(await prettier.format(formatted, options)).toBe(formatted);
+  });
 
-    // The plugin puts the `import type` line before the value import — bare
-    // `prettier.format` with no plugins would leave the input order alone.
-    expect(formatted.indexOf("import type { AppProps }")).toBeLessThan(
-      formatted.indexOf("import { Head, Scripts }"),
+  it("sorts imports in files with stage-3 decorators without silently skipping them", async () => {
+    const source =
+      'import { z } from "z-package";\n' +
+      'import { a } from "a-package";\n' +
+      "\n@a\nexport class Example {\n  value = z;\n}\n";
+    const formatted = await prettier.format(source, { ...prettierOptions, filepath: "model.ts" });
+    expect(formatted.indexOf('from "a-package"')).toBeLessThan(
+      formatted.indexOf('from "z-package"'),
     );
+    expect(formatted).toContain("@a");
   });
 
   it("webRootStub already has its two imports in the plugin's preferred order", () => {
