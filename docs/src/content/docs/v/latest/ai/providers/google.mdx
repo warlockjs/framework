@@ -358,19 +358,30 @@ ignored. `GoogleCallOptions` is exported. `systemInstruction`, `tools`,
 `abortSignal` and `httpOptions` are protected and throw `InvalidRequestError`;
 use neutral messages/tools/signal and SDK transport configuration for them.
 
-`model.countTokens(messages, options?)` calls the native counting endpoint with
-the same converted contents. In Vertex mode it also counts the same system
-instruction and tools as generation and forwards cancellation. In Developer API
-mode, the installed Google SDK cannot count system instructions or tools through
-its typed count endpoint: requests containing them fail explicitly before a
-network call. Cached-content references also fail explicitly, since this SDK
-count endpoint cannot reproduce them. The adapter never silently counts only a
-subset of a prompt. `sdk.count(text)` remains a separate offline estimate.
+`model.countTokens(messages, options?)` counts the converted contents, system
+instructions and tools on both the Gemini Developer API (API key) and Vertex AI.
+Developer API counting sends the full `generateContentRequest`, including tool
+configuration and generation settings, as documented in the
+[Gemini token-counting reference](https://ai.google.dev/api/tokens). It uses the
+existing SDK transport, preserving API-key auth, custom fetch, base URL/proxy
+settings, headers, retries and cancellation. Vertex retains its typed SDK path.
+
+Cached-content references still throw `InvalidRequestError` with
+`reason: "count-unsupported"`. Use `countInputTokens` for budget preflight: it
+returns an estimate for this explicit limitation; authentication, network,
+rate-limit and ordinary validation errors still propagate. `sdk.count(text)`
+remains a separate offline estimate.
 
 ```ts
-if (model.countTokens) {
-  const inputTokens = await model.countTokens(messages, options);
-}
+import { countInputTokens } from "@warlock.js/ai";
+
+const messages = [
+  { role: "system" as const, content: "Be concise." },
+  { role: "user" as const, content: "Hello" },
+];
+const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+const { tokens, source } = await countInputTokens(model, messages, { tools });
+// source is "native" for ordinary Developer API and Vertex requests, including tools.
 ```
 
 ## Built-in tools and streamed thoughts

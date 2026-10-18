@@ -400,6 +400,9 @@ export interface ModelContract {
   /**
    * Native input-token preflight (network call). Absent when this model's
    * transport has no counting endpoint. SDK.count() is a separate offline estimate.
+   * Adapters that cannot count a request shape throw `InvalidRequestError` with
+   * `reason: "count-unsupported"`; `countInputTokens` then estimates instead.
+   * Never use this reason for authentication, transport or other request errors.
    */
   countTokens?(messages: Message[], options?: ModelCallOptions): Promise<number>;
 }

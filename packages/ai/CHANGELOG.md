@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `ai.snapshot.file({ dir, dirMode?, fileMode? })` accepts custom permission modes with private defaults, refusing invalid modes and group/other write bits.
 
+### Fixed
+
+- `countInputTokens` falls back to a full-input estimate when native counting explicitly signals `InvalidRequestError.reason: "count-unsupported"`, keeping reserve-mode budget preflight usable with unsupported request shapes while propagating real provider errors.
+
 ## 5.31.0 - 2026-10-18
 
 ### Changed

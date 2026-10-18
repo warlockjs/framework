@@ -1,6 +1,7 @@
 import type { Message } from "../contracts/conversation-message.type";
 import type { ModelCallOptions, ModelContract } from "../contracts/model.contract";
 import type { ToolConfig } from "../contracts/tool.contract";
+import { InvalidRequestError } from "../errors/invalid-request-error";
 import { extractJsonSchema } from "./json-schema";
 
 /**
@@ -99,7 +100,7 @@ export type InputTokenCount = {
   /**
    * `"native"` — the provider's own count endpoint (`model.countTokens`);
    * `"estimate"` — {@link estimateInputTokens}, because the model has no
-   * count endpoint.
+   * count endpoint or explicitly cannot count this request shape.
    */
   source: "native" | "estimate";
 };
@@ -108,7 +109,10 @@ export type InputTokenCount = {
  * Count the input tokens of a call, natively when the model can
  * (`model.countTokens` — Anthropic, Google, Bedrock and OpenAI Responses
  * models; a network call that generates nothing) and by
- * {@link estimateInputTokens} otherwise. `source` says which.
+ * {@link estimateInputTokens} otherwise. An adapter can explicitly decline a
+ * request shape with `InvalidRequestError` and `reason: "count-unsupported"`.
+ * Only that signal falls back; auth, transport and other errors propagate.
+ * `source` says which.
  *
  * @example
  * const { tokens, source } = await countInputTokens(model, messages, { tools });
@@ -122,7 +126,13 @@ export async function countInputTokens(
   const { estimate, ...callOptions } = options;
 
   if (model.countTokens) {
-    return { tokens: await model.countTokens(messages, callOptions), source: "native" };
+    try {
+      return { tokens: await model.countTokens(messages, callOptions), source: "native" };
+    } catch (error) {
+      if (!(error instanceof InvalidRequestError) || error.reason !== "count-unsupported") {
+        throw error;
+      }
+    }
   }
 
   return {

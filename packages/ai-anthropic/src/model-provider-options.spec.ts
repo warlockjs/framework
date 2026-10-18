@@ -1,5 +1,12 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { InvalidRequestError, type Message, type ReasoningEffort } from "@warlock.js/ai";
+import {
+  countInputTokens,
+  estimateInputTokens,
+  InvalidRequestError,
+  ProviderAuthError,
+  type Message,
+  type ReasoningEffort,
+} from "@warlock.js/ai";
 import { describe, expect, it } from "vitest";
 import { AnthropicModel } from "./model";
 
@@ -13,6 +20,7 @@ function makeClient(options: {
   message?: Partial<Anthropic.Message>;
   streamEvents?: unknown[];
   inputTokens?: number;
+  countError?: Error;
 }) {
   const calls: Recorded[] = [];
 
@@ -33,6 +41,7 @@ function makeClient(options: {
     countTokens: async (body: Record<string, unknown>) => {
       calls.push({ api, method: "countTokens", body });
 
+      if (options.countError) throw options.countError;
       return { input_tokens: options.inputTokens ?? 0 };
     },
   });
@@ -88,6 +97,28 @@ const thinkingBlock = { type: "thinking", thinking: "", signature: "sig_1" };
 const toolUseBlock = { type: "tool_use", id: "tu_1", name: "lookup", input: { q: "x" } };
 
 describe("AnthropicModel provider blocks", () => {
+  it("preserves the unsupported-count signal for estimation, while propagating auth errors", async () => {
+    const messages: Message[] = [
+      { role: "system", content: "rules" },
+      { role: "user", content: "hi" },
+    ];
+    const options = { tools: [{ name: "lookup", execute: async () => "ok" }] };
+    const { client } = makeClient({
+      countError: new InvalidRequestError("cannot count this shape", {
+        reason: "count-unsupported",
+      }),
+    });
+    const model = new AnthropicModel(client, { name: "claude-opus-5-5" });
+    expect(await countInputTokens(model, messages, options)).toEqual({
+      tokens: estimateInputTokens(messages, options),
+      source: "estimate",
+    });
+    const auth = new ProviderAuthError("bad key");
+    const failing = new AnthropicModel(makeClient({ countError: auth }).client, {
+      name: "claude-opus-5-5",
+    });
+    await expect(countInputTokens(failing, messages, options)).rejects.toBe(auth);
+  });
   it("returns the ordered content blocks when the turn has a non-neutral block", async () => {
     const { client } = makeClient({
       message: {

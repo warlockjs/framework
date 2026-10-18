@@ -75,15 +75,26 @@ import { BudgetExceededError, countInputTokens } from "@warlock.js/ai";
 
 const model = openai.model({ name: "gpt-4o", maxTokens: 4_096 });
 
+const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+
 const guarded = ai.agent({
   model,
+  tools,
   middleware: [
     ai.middleware.budget({
       maxCostUSD: 0.25,
       reserve: {
         outputTokens: 4_096, // the most one trip can generate — match the model's maxTokens
         // Optional: the default is an offline estimate of the trip's messages.
-        inputTokens: async (ctx) => (await countInputTokens(model, [...ctx.messages])).tokens,
+        inputTokens: async (ctx) =>
+          (
+            await countInputTokens(model, [...ctx.messages], {
+              tools,
+              signal: ctx.signal,
+              // Pass the same tools and model options used for generation.
+              estimate: { charsPerToken: 3 },
+            })
+          ).tokens,
       },
     }),
   ],
@@ -115,6 +126,26 @@ const { tokens, source } = await countInputTokens(model, messages, { tools });
 ```
 
 `countInputTokens` returns `{ tokens, source: "native" | "estimate" }`, so a cap can treat an estimate more conservatively than a real count.
+
+`countInputTokens` also estimates when native counting throws `InvalidRequestError`
+with `reason: "count-unsupported"`. This typed signal is preserved by Anthropic,
+Google, Bedrock and OpenAI Responses adapters; ordinary validation, authentication,
+network, cancellation and rate-limit errors still propagate. Custom adapters
+should set this reason only when the count endpoint cannot represent the request:
+
+```ts
+import { InvalidRequestError } from "@warlock.js/ai";
+
+throw new InvalidRequestError("This count endpoint cannot count tools.", {
+  reason: "count-unsupported",
+});
+```
+
+Reserve mode can use this fallback for agents with system prompts and tools.
+Include the generation tools/options in the preflight callback; when `source` is
+`"estimate"`, the character heuristic is not an exact tokenizer or a guaranteed
+upper bound. Tune `estimate` for your input and leave headroom. Actual provider
+usage still settles the reservation after each call.
 
 ## SLO contract — cost, latency, and tokens as one objective
 

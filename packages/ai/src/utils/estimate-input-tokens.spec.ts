@@ -2,6 +2,13 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it, vi } from "vitest";
 import type { Message } from "../contracts/conversation-message.type";
 import type { ToolConfig } from "../contracts/tool.contract";
+import {
+  InvalidRequestError,
+  ProviderAuthError,
+  ProviderError,
+  ProviderRateLimitError,
+  ProviderTimeoutError,
+} from "../errors";
 import { countInputTokens, estimateInputTokens, toolSchemaJson } from "./estimate-input-tokens";
 
 function schemaOf(jsonSchema: Record<string, unknown>): StandardSchemaV1<unknown> {
@@ -96,5 +103,46 @@ describe("countInputTokens", () => {
     const result = await countInputTokens({}, messages, { estimate: { perMessageTokens: 0 } });
 
     expect(result).toEqual({ tokens: 3, source: "estimate" });
+  });
+  it("estimates the full input only for the typed unsupported-count signal", async () => {
+    const input: Message[] = [{ role: "system", content: "rules" }, ...messages];
+    const responseSchema = { type: "object", properties: { answer: { type: "string" } } };
+    const signal = new AbortController().signal;
+    const countTokens = vi.fn(async () => {
+      throw new InvalidRequestError("cannot count tools", { reason: "count-unsupported" });
+    });
+    const options = {
+      tools: [searchTool],
+      responseSchema,
+      signal,
+      estimate: { charsPerToken: 1, perMessageTokens: 10 },
+    };
+    expect(await countInputTokens({ countTokens }, input, options)).toEqual({
+      tokens: estimateInputTokens(input, {
+        tools: [searchTool],
+        responseSchema,
+        ...options.estimate,
+      }),
+      source: "estimate",
+    });
+    expect(countTokens).toHaveBeenCalledWith(input, {
+      tools: [searchTool],
+      responseSchema,
+      signal,
+    });
+  });
+
+  it.each([
+    new InvalidRequestError("unsupported tools"),
+    new ProviderAuthError("bad key"),
+    new ProviderError("connection failed"),
+    new ProviderRateLimitError("rate limit"),
+    new ProviderTimeoutError("timeout"),
+    new Error("count-unsupported"),
+  ])("propagates real errors unchanged: $name", async (error) => {
+    const countTokens = async () => {
+      throw error;
+    };
+    await expect(countInputTokens({ countTokens }, messages)).rejects.toBe(error);
   });
 });

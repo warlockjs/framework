@@ -176,38 +176,90 @@ export class GoogleModel implements ModelContract {
   public async countTokens(messages: Message[], options?: ModelCallOptions): Promise<number> {
     const { systemInstruction, contents } = toGoogleContents(messages);
     const config = this.buildConfig(systemInstruction, options);
-    if (
-      !this.ai.vertexai &&
-      (config.systemInstruction !== undefined || config.tools !== undefined)
-    ) {
-      throw new InvalidRequestError(
-        "The Google SDK countTokens endpoint in Developer API mode cannot count system instructions or tools. Use Vertex mode for this preflight, or SDK.count() for an offline estimate.",
-      );
-    }
     if (config.cachedContent !== undefined) {
       throw new InvalidRequestError(
         "The Google SDK countTokens endpoint cannot count a cachedContent reference.",
+        { reason: "count-unsupported" },
       );
     }
     try {
-      const response = await this.ai.models.countTokens({
-        model: this.name,
-        contents,
-        config: {
-          ...(config.systemInstruction !== undefined
-            ? { systemInstruction: config.systemInstruction }
-            : {}),
-          ...(config.tools !== undefined ? { tools: config.tools as Tool[] } : {}),
-          ...(config.abortSignal ? { abortSignal: config.abortSignal } : {}),
-          ...(config.httpOptions ? { httpOptions: config.httpOptions } : {}),
-        },
-      });
+      const response = this.ai.vertexai
+        ? await this.ai.models.countTokens({
+            model: this.name,
+            contents,
+            config: {
+              ...(config.systemInstruction !== undefined
+                ? { systemInstruction: config.systemInstruction }
+                : {}),
+              ...(config.tools !== undefined ? { tools: config.tools as Tool[] } : {}),
+              ...(config.abortSignal ? { abortSignal: config.abortSignal } : {}),
+              ...(config.httpOptions ? { httpOptions: config.httpOptions } : {}),
+            },
+          })
+        : await this.countDeveloperTokens(contents, config);
       if (response.totalTokens === undefined)
         throw new InvalidRequestError("Google countTokens returned no totalTokens.");
       return response.totalTokens;
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
+  }
+
+  /**
+   * REST counts the full generation request, unlike the typed Developer API
+   * converter in @google/genai 2.19.0. See https://ai.google.dev/api/tokens.
+   * extraBody keeps the SDK's auth, fetch, base URL, retries and cancellation.
+   */
+  private countDeveloperTokens(
+    contents: ReturnType<typeof toGoogleContents>["contents"],
+    config: GenerateContentConfig,
+  ) {
+    config.abortSignal?.throwIfAborted();
+
+    const {
+      systemInstruction,
+      serviceTier,
+      tools,
+      toolConfig,
+      safetySettings,
+      cachedContent,
+      abortSignal,
+      httpOptions,
+      ...generationConfig
+    } = config;
+    // Automatic function calling is SDK-only, never a REST generation field.
+    delete generationConfig.automaticFunctionCalling;
+    const model = this.name.startsWith("models/") ? this.name : `models/${this.name}`;
+
+    return this.ai.models.countTokens({
+      model: this.name,
+      contents,
+      config: {
+        abortSignal,
+        httpOptions: {
+          ...httpOptions,
+          extraBody: {
+            ...httpOptions?.extraBody,
+            // The SDK merges extraBody before JSON serialization. undefined
+            // removes its contents field: REST accepts only one input form.
+            contents: undefined,
+            generateContentRequest: {
+              model,
+              contents,
+              ...(serviceTier !== undefined ? { serviceTier } : {}),
+              ...(systemInstruction !== undefined
+                ? { systemInstruction: { parts: [{ text: systemInstruction }] } }
+                : {}),
+              ...(tools !== undefined ? { tools } : {}),
+              ...(toolConfig !== undefined ? { toolConfig } : {}),
+              ...(safetySettings !== undefined ? { safetySettings } : {}),
+              ...(cachedContent !== undefined ? { cachedContent } : {}),
+              ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {}),
+            },
+          },
+        },
+      },
+    });
   }
 
   /**

@@ -65,15 +65,26 @@ import { OpenAISDK } from "@warlock.js/ai-openai";
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY ?? "" });
 const model = openai.model({ name: "gpt-4o", maxTokens: 4_096 });
 
+const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+
 const agent = ai.agent({
   model,
+  tools,
   middleware: [
     ai.middleware.budget({
       maxCostUSD: 0.25,
       reserve: {
         outputTokens: 4_096, // = the model's maxTokens, the most one trip can generate
         // optional — default is estimateInputTokens(ctx.messages), an offline estimate
-        inputTokens: async (ctx) => (await countInputTokens(model, [...ctx.messages])).tokens,
+        inputTokens: async (ctx) =>
+          (
+            await countInputTokens(model, [...ctx.messages], {
+              tools,
+              signal: ctx.signal,
+              // Pass the same tools and model options used for generation.
+              estimate: { charsPerToken: 3 },
+            })
+          ).tokens,
       },
     }),
   ],
@@ -87,6 +98,26 @@ if (result.error instanceof BudgetExceededError && result.error.context?.reason 
 ```
 
 `estimateInputTokens(messages, { tools?, charsPerToken? })` is an offline **estimate**; `countInputTokens(model, messages, options)` uses `model.countTokens` when present and returns `{ tokens, source: "native" | "estimate" }`.
+
+`countInputTokens` also estimates when native counting throws `InvalidRequestError`
+with `reason: "count-unsupported"`. This typed signal is preserved by Anthropic,
+Google, Bedrock and OpenAI Responses adapters; ordinary validation, authentication,
+network, cancellation and rate-limit errors still propagate. Custom adapters
+should set this reason only when the count endpoint cannot represent the request:
+
+```ts
+import { InvalidRequestError } from "@warlock.js/ai";
+
+throw new InvalidRequestError("This count endpoint cannot count tools.", {
+  reason: "count-unsupported",
+});
+```
+
+Reserve mode can use this fallback for agents with system prompts and tools.
+Include the generation tools/options in the preflight callback; when `source` is
+`"estimate"`, the character heuristic is not an exact tokenizer or a guaranteed
+upper bound. Tune `estimate` for your input and leave headroom. Actual provider
+usage still settles the reservation after each call.
 
 ### SLO / cost contract — `budget({ contract })`
 

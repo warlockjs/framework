@@ -449,6 +449,13 @@ const model = anthropic.model({ name: "claude-opus-5-5" }); // an AnthropicModel
 await model.countTokens(messages, { tools }); // exact, via messages.countTokens (network)
 ```
 
+For budget preflight, `countInputTokens(model, messages, { tools })` from
+`@warlock.js/ai` returns `{ tokens, source }`. It estimates only when native
+counting is absent or explicitly throws `InvalidRequestError` with
+`reason: "count-unsupported"`; this adapter preserves that signal. System and
+tools are supported natively. Ordinary validation, auth, network and rate-limit
+errors propagate. See the cost/budget guide for reserve mode.
+
 `countTokens` sends the same system prompt, tools, thinking and `providerOptions.anthropic.betas` a real call would, keeping only the fields the endpoint accepts.
 
 ## No embeddings
