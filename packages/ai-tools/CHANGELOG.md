@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.33.0
 
+### Fixed
+
+- Keep HTTP and MCP fixtures valid under strict indexed access, accept string JSON-RPC request IDs in serving tests, and replace stdin through its descriptor without pretending a stream is a terminal.
+
 ### Added
 
 - MCP serving now exposes per-call `requestId`, authenticated `principal` and cancellation-aware signals over HTTP and stdio. HTTP `auth.authenticate` resolves principals alongside bearer/authorize checks; stdio accepts static or provider principals. `beforeCall` validates policy after input validation and can return a native error refusal or throw a JSON-RPC error. `notifications/cancelled` aborts only the matching caller/request and suppresses its response. New hook/context/refusal and stdio transport types are exported.

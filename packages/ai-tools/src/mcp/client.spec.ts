@@ -145,15 +145,18 @@ describe("mcp() client — handshake + tools/list", () => {
     const tools = await mcp(transport).tools();
 
     expect(tools).toHaveLength(2);
-    expect(tools[0].name).toBe("echo");
-    expect(tools[0].description).toBe("Echo the input back");
-    expect(typeof tools[0].invoke).toBe("function");
+    const [contract] = tools;
+    if (!contract) throw new Error("Expected an adapted echo tool");
+    expect(contract.name).toBe("echo");
+    expect(contract.description).toBe("Echo the input back");
+    expect(typeof contract.invoke).toBe("function");
   });
 
   it("supplies a fallback description when the remote omits one", async () => {
     const transport = scriptedTransport([{ name: "bare" }]);
 
     const [contract] = await mcp(transport).tools();
+    if (!contract) throw new Error("Expected an adapted tool");
 
     expect(contract.description).toContain("bare");
   });

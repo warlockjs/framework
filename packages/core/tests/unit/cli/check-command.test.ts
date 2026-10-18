@@ -69,6 +69,7 @@ describe("warlock check", () => {
     expect(checkCommand.commandPreload).toBeUndefined();
     expect(typecheckCommand.commandPreload).toBeUndefined();
     expect(checkCommand.commandOptions.map((option) => option.name)).toEqual([
+      "lint",
       "changed",
       "base",
       "skip",

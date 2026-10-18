@@ -48,7 +48,7 @@ function makePingTool(): ToolContract {
 }
 
 /** Build a request envelope for a method. */
-function request(id: number, method: string, params?: unknown): JsonRpcRequest {
+function request(id: JsonRpcRequest["id"], method: string, params?: unknown): JsonRpcRequest {
   return { jsonrpc: "2.0", id, method, params };
 }
 
@@ -785,7 +785,9 @@ async function withStdio(
 ): Promise<void> {
   const input = new PassThrough();
   const replies: JsonRpcResponse[] = [];
-  const stdin = vi.spyOn(process, "stdin", "get").mockReturnValue(input as typeof process.stdin);
+  const stdin = Object.getOwnPropertyDescriptor(process, "stdin");
+  if (!stdin) throw new Error("Missing stdin descriptor");
+  Object.defineProperty(process, "stdin", { configurable: true, get: () => input });
   const stdout = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     replies.push(JSON.parse(String(chunk)) as JsonRpcResponse);
     return true;
@@ -809,7 +811,7 @@ async function withStdio(
     });
   } finally {
     await server.stop();
-    stdin.mockRestore();
+    Object.defineProperty(process, "stdin", stdin);
     stdout.mockRestore();
     input.destroy();
   }

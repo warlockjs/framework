@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import {
   REPO_ROOT,
+  GATE_TMP_DIR_NAME,
+  runSkillSnippetGate,
   classifyBlock,
   compileSkill,
   compileManySkills,
@@ -97,6 +100,44 @@ describe("discoverPackages / discoverSkillFiles", () => {
     const skills = discoverSkillFiles(pkg);
     assert.equal(skills.length, 1);
     assert.equal(skills[0].slug, "make-a-widget");
+  });
+});
+
+describe("runSkillSnippetGate — temporary directory cleanup", () => {
+  for (const broken of [false, true]) {
+    it(`cleans temporary files after ${broken ? "failing" : "passing"} compilation`, async () => {
+      const root = await fixtureRoot();
+      const pkg = await writeFixturePackage(
+        root,
+        "widgets",
+        "@fixture/widgets",
+        "export const widget = 1;\n",
+      );
+      await writeFile(
+        path.join(pkg.absPath, "skills", "SKILL.md"),
+        [
+          '```ts title="src/example.ts"',
+          `export const value: string = ${broken ? "42" : '"ok"'};`,
+          "```",
+        ].join("\n"),
+      );
+      const report = runSkillSnippetGate(root);
+      assert.equal(countFailuresByPackage(report)[0].failed, broken ? 1 : 0);
+      assert.equal(existsSync(path.join(root, GATE_TMP_DIR_NAME)), false);
+    });
+  }
+
+  it("cleans temporary files when package discovery throws", async () => {
+    const root = await fixtureRoot();
+    const pkg = await writeFixturePackage(
+      root,
+      "widgets",
+      "@fixture/widgets",
+      "export const widget = 1;\n",
+    );
+    await writeFile(path.join(pkg.absPath, "package.json"), "{invalid json");
+    assert.throws(() => runSkillSnippetGate(root));
+    assert.equal(existsSync(path.join(root, GATE_TMP_DIR_NAME)), false);
   });
 });
 

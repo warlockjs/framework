@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Type the socket connector’s raw HTTP(S) server across asynchronous listener startup; keep native-keyring test doubles declaration-safe and cover the documented `check --lint` option.
 - Socket-only connector boot awaits its listener and rejects bind failures before application readiness can be announced.
 
 ### Upgrading

@@ -12,6 +12,10 @@ That's the honest scope today. The framework ships only the **server** side. The
 
 **`socket.io` is an optional peer.** The framework does not depend on it directly — the connector lazy-imports it on boot. If you add `src/config/socket.ts` without `socket.io` installed, the connector throws on startup with install instructions. Run `warlock add socket` to install the dependency and eject a starter config.
 
+Socket-only startup awaits the raw HTTP(S) listener before reporting readiness.
+When HTTP is configured, the socket connector attaches to its server and leaves
+that server’s shutdown to the HTTP connector.
+
 ## When you reach for it
 
 For an optional broadcast, `broadcastSocketEvent(event, ...args)` reaches the

@@ -1,6 +1,6 @@
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
-import { createServer as createHttpServer } from "http";
+import { createServer as createHttpServer, type Server as HttpServer } from "http";
 import { createServer as createHttpsServer } from "https";
 import type { Server } from "socket.io";
 import { container } from "../container";
@@ -94,7 +94,7 @@ export class SocketConnector extends BaseConnector {
     // now we have two cases
     // 1. http is used, then use it (shared — the HTTP connector owns it)
     // 2. http is not used, then create a new server (we own it)
-    let server;
+    let server: HttpServer;
     const fastify = container.tryGet("http.server");
     if (fastify) {
       server = fastify.server;

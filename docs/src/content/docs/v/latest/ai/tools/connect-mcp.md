@@ -118,6 +118,21 @@ controller.abort(); // ends the run AND shuts the MCP server down
 2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
 3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
 
+### Selecting one discovered tool
+
+When selecting one discovered tool, guard the array result before invoking it.
+A server may advertise no tools, and `noUncheckedIndexedAccess` reflects that:
+
+```ts
+import type { McpClient } from "@warlock.js/ai-tools";
+
+export async function invokeFirst(client: McpClient, input: unknown) {
+  const [contract] = await client.tools();
+  if (!contract) throw new Error("The MCP server advertised no tools");
+  return contract.invoke(input);
+}
+```
+
 ### Errors
 
 Connection / handshake failures surface **at agent-construction time** because the example `await`s `github.tools()` — you see them then, not mid-run. A `tools/call` failure raised mid-run is wrapped by `tool()` and reaches the model as data. Branch on `McpTransportError.type`:

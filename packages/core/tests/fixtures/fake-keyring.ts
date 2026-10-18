@@ -1,8 +1,16 @@
+interface FakeKeyringEntry {
+  getPassword(): Promise<string | null>;
+  setPassword(value: string): Promise<void>;
+  deletePassword(): Promise<boolean>;
+}
+
+type KeyringOptions = { linux: { store: "secret-service" } };
+
 /** Matches @napi-rs/keyring 2.1.1 without loading a native addon or touching the OS. */
 export function fakeKeyring() {
   const state = {
     values: new Map<string, string>(),
-    options: [] as { linux: { store: "secret-service" } }[],
+    options: [] as KeyringOptions[],
     calls: [] as string[],
     unavailable: false,
     writeFailure: false,
@@ -13,7 +21,7 @@ export function fakeKeyring() {
     public constructor(
       private readonly service: string,
       private readonly username: string,
-      options: { linux: { store: "secret-service" } },
+      options: KeyringOptions,
     ) {
       state.options.push(options);
     }
@@ -33,5 +41,12 @@ export function fakeKeyring() {
       return state.values.delete(key(this.service, this.username));
     }
   }
-  return { state, module: { AsyncEntry }, key };
+  const module: {
+    AsyncEntry: new (
+      service: string,
+      username: string,
+      options: KeyringOptions,
+    ) => FakeKeyringEntry;
+  } = { AsyncEntry };
+  return { state, module, key };
 }
