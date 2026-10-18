@@ -36,10 +36,10 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "lint": "eslint ./tests/**/*.{ts,tsx,json,md}",
-    "lint:fix": "eslint ./tests/**/*.{ts,tsx,json,md} --fix",
-    "format": "prettier --write ./tests/**/*.{ts,tsx,json,md}",
-    "format:check": "prettier --check ./tests/**/*.{ts,tsx,json,md}"
+    "lint": "node ../../node_modules/oxlint/bin/oxlint --config ../../.oxlintrc.json ./tests",
+    "lint:fix": "node ../../node_modules/oxlint/bin/oxlint --config ../../.oxlintrc.json --fix ./tests",
+    "format": "node ../../node_modules/oxfmt/bin/oxfmt --config ../../.oxfmtrc.json --disable-nested-config --write ./tests",
+    "format:check": "node ../../node_modules/oxfmt/bin/oxfmt --config ../../.oxfmtrc.json --disable-nested-config --check ./tests"
   },
   "repository": {
     "type": "git",

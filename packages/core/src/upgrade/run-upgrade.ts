@@ -1,5 +1,5 @@
 import glob from "fast-glob";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { detectPackageManager, getInstallCommand } from "../updater/package-manager";
 import { CODEMODS } from "./codemods";
@@ -93,6 +93,11 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<UpgradeRes
 
   const text: TextFiles = {
     read: (file) => textFiles.read(file),
+    list: () => readdirSync(root),
+    remove: (file, change) => {
+      textFiles.remove(file);
+      if (activeCodemod) applied.push({ codemod: activeCodemod.id, file, ...change });
+    },
     write: (file, content, change) => {
       textFiles.write(file, content);
       if (activeCodemod) {
@@ -168,7 +173,7 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<UpgradeRes
   applied.sort(byFileAndLine);
   manual.sort(byFileAndLine);
 
-  const changes: { file: string; before: string; after: string }[] = [];
+  const changes: { file: string; before: string; after: string | undefined }[] = [];
   sourceFiles.forEach((sourceFile, index) => {
     const file = relativePaths[index];
     if (file === undefined) return;
@@ -180,14 +185,17 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<UpgradeRes
   changes.sort((left, right) => left.file.localeCompare(right.file));
 
   if (!options.dryRun) {
-    for (const change of changes) writeFileSync(path.join(root, change.file), change.after);
+    for (const change of changes) {
+      const target = path.join(root, change.file);
+      if (change.after === undefined) rmSync(target, { force: true });
+      else {
+        mkdirSync(path.dirname(target), { recursive: true });
+        writeFileSync(target, change.after);
+      }
+    }
   }
 
-  const packageJsonChanged = changes.some(
-    (change) =>
-      change.file === "package.json" &&
-      applied.some((item) => item.codemod === "warlock-versions" && item.file === "package.json"),
-  );
+  const packageJsonChanged = changes.some((change) => change.file === "package.json");
 
   return {
     from,
@@ -200,7 +208,9 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<UpgradeRes
       (note) => compareVersions(note.version, from) > 0 && compareVersions(note.version, to) <= 0,
     ),
     changedFiles: changes.map((change) => change.file),
-    diff: changes.map((change) => unifiedDiff(change.file, change.before, change.after)).join(""),
+    diff: changes
+      .map((change) => unifiedDiff(change.file, change.before, change.after ?? ""))
+      .join(""),
     ...(packageJsonChanged && {
       installHint: getInstallCommand(await detectPackageManager(root)),
     }),
@@ -299,9 +309,12 @@ function createTextFiles(root: string) {
     write: (file: string, content: string) => {
       entry(file).current = content;
     },
+    remove: (file: string) => {
+      entry(file).current = undefined;
+    },
     changes: () =>
       [...files.entries()]
-        .filter(([, value]) => value.current !== undefined && value.current !== value.before)
-        .map(([file, value]) => ({ file, before: value.before ?? "", after: value.current ?? "" })),
+        .filter(([, value]) => value.current !== value.before)
+        .map(([file, value]) => ({ file, before: value.before ?? "", after: value.current })),
   };
 }

@@ -214,6 +214,18 @@ export class App {
     // Keep npm, pnpm and yarn installs valid without peer-dependency overrides.
     deps.typescript = toolchain === "eslint" ? "6.0.3" : "7.0.2";
     if (toolchain === "eslint") {
+      const config = this.file("warlock.config.ts");
+      if (!config.content.includes("healthCheckers:")) {
+        config
+          .replace(
+            "export default defineConfig({",
+            `export default defineConfig({
+  devServer: {
+    healthCheckers: { eslint: true, oxlint: false },
+  },`,
+          )
+          .save();
+      }
       pkg.save();
       return this;
     }
@@ -237,15 +249,15 @@ export class App {
     Object.assign(content.scripts, {
       lint: "oxlint --fix ./src --max-warnings=0",
       "lint:check": "oxlint ./src --max-warnings=0",
-      format: "oxfmt --write ./src",
-      "format:check": "oxfmt --check ./src",
+      format: "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --write ./src",
+      "format:check": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --check ./src",
     });
     pkg.save();
 
     for (const fileName of ["eslint.config.js", ".prettierrc.json", ".prettierignore"]) {
       rmSync(path.join(this.path, fileName), { force: true });
     }
-    for (const fileName of [".oxlintrc.json", ".oxfmtrc.json"]) {
+    for (const fileName of [".oxlintrc.json", ".oxfmtrc.json", ".oxfmtignore"]) {
       copyFile(
         packageRoot("templates", "toolchains", "oxc", fileName),
         path.join(this.path, fileName),

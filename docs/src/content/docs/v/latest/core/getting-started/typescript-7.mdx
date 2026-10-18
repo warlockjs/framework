@@ -60,8 +60,11 @@ compiler API removed in TS7 and declares a TypeScript peer range of
 `>=4.8.4 <6.1.0`
 ([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
 The tsconfig cleanups above also work with TypeScript 6; both modes share them.
-ESLint selection prints a one-line compatibility notice. ESLint mode is planned
-for deprecation in 5.33 and removal in 5.34.
+ESLint selection prints a deprecation warning. ESLint + Prettier support is
+deprecated in 5.33.0 and removed in **5.34.0**. Migrate with
+`npx warlock upgrade --from 5.32 --to 5.33.0`; the `oxc-toolchain` codemod
+replaces legacy dependencies and pins the app to TypeScript 7.0.2. Preview with
+`--dry-run`, review customized configs, then install and run format/lint/check.
 
 ```bash
 # Default: Oxlint + Oxfmt and TypeScript 7.0.2

@@ -176,7 +176,8 @@ export type WarlockConfig = {
     };
     /**
      * Built-in checker switches, custom checker array, or false to disable.
-     * Installed/configured ESLint and Oxlint both run by default.
+     * TypeScript and installed/configured Oxlint run by default.
+     * ESLint requires `{ eslint: true }` and is deprecated (removed in 5.34.0).
      */
     healthCheckers?: FileHealthCheckerContract[] | BuiltInHealthCheckerOptions | false;
     /**

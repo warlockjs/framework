@@ -179,10 +179,13 @@ describe("Oxlint background file checks", () => {
     );
   });
 
-  it("retains ESLint checks when only its app configuration exists", async () => {
+  it("retains explicitly enabled ESLint checks when its app configuration exists", async () => {
     await write("eslint.config.mjs", "export default [];\n");
     await fs.rm(path.join(cwd, "node_modules", "eslint"));
-    expect(defaultHealthCheckers({}, cwd).map((checker) => checker.name)).toContain("ESLint");
+    expect(defaultHealthCheckers({}, cwd).map((checker) => checker.name)).not.toContain("ESLint");
+    expect(defaultHealthCheckers({ eslint: true }, cwd).map((checker) => checker.name)).toContain(
+      "ESLint",
+    );
   });
 
   it("returns file metadata and diagnostics without echoing serialized source contents", async () => {
@@ -494,11 +497,10 @@ describe("Oxlint background file checks", () => {
     expect(result.getStats()).toEqual({ state: "defective", errors: 1, warnings: 0 });
   });
 
-  it("runs ESLint and Oxlint together and honors individual switches", async () => {
+  it("defaults to Oxlint and runs ESLint only with an explicit opt-in", async () => {
     await write("eslint.config.mjs", "export default [];\n");
     expect(defaultHealthCheckers({}, cwd).map((checker) => checker.name)).toEqual([
       "TypeScript",
-      "ESLint",
       "Oxlint",
     ]);
     expect(
@@ -506,10 +508,9 @@ describe("Oxlint background file checks", () => {
         (checker) => checker.name,
       ),
     ).toEqual(["Oxlint"]);
-    expect(defaultHealthCheckers({ oxlint: false }, cwd).map((checker) => checker.name)).toEqual([
-      "TypeScript",
-      "ESLint",
-    ]);
+    expect(
+      defaultHealthCheckers({ oxlint: false, eslint: true }, cwd).map((checker) => checker.name),
+    ).toEqual(["TypeScript", "ESLint"]);
     await fs.rm(path.join(cwd, "node_modules", "oxlint"));
     expect(defaultHealthCheckers({ typescript: false, eslint: false, oxlint: true }, cwd)).toEqual(
       [],

@@ -12,8 +12,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "format": "node ../../node_modules/prettier/bin/prettier.cjs --write src",
-    "format:check": "node ../../node_modules/prettier/bin/prettier.cjs --check src",
+    "format": "node ../../node_modules/oxfmt/bin/oxfmt --config ../../.oxfmtrc.json --disable-nested-config --write ./src",
+    "format:check": "node ../../node_modules/oxfmt/bin/oxfmt --config ../../.oxfmtrc.json --disable-nested-config --check ./src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

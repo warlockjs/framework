@@ -1,0 +1,3 @@
+export default defineConfig({
+  devServer: { healthCheckers: { eslint: false, oxlint: true } },
+});

@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.33.0
+
+### Added
+
+- `oxc-toolchain`, a 5.33.0 `warlock upgrade` codemod, migrates generated configs, package scripts/dependencies, editor settings and literal dev health switches to Oxlint/Oxfmt. Customized files are retained with file:line review guidance; additions and deletions honor `--dry-run` and `--json`.
+
+### Changed
+
+- **BREAKING** ESLint no longer starts from config detection alone in the dev server or `warlock check`. TypeScript and configured Oxlint remain the default health checkers; `check` defaults to Oxlint.
+
+### Deprecated
+
+- ESLint/Prettier support is removed in 5.34.0. Explicit ESLint opt-ins emit one deprecation warning per process on stderr with migration instructions.
+
+### Upgrading
+
+- Run `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`), install dependencies and review customized configs. To retain legacy lint checks temporarily, set `devServer.healthCheckers.eslint: true` and select `warlock check --lint eslint`. See the upgrade skill's "5.32 to 5.33" section.
+
 ## 5.32.0 - 2026-10-18
 
 ### Added

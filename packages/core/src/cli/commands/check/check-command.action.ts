@@ -43,6 +43,10 @@ export function parseSkippedSteps(value: string | undefined): CheckStepName[] {
  * @param data Parsed CLI args: `changed`, `base`, `skip`, `project`, `json`.
  */
 export async function checkCommandAction({ options }: CommandActionData): Promise<void> {
+  const lint = stringOption(options.lint);
+  if (lint !== undefined && lint !== "oxlint" && lint !== "eslint") {
+    throw new Error("Unknown lint tool. Use --lint oxlint or --lint eslint (deprecated).");
+  }
   const base = stringOption(options.base);
   const changed = options.changed === true || base !== undefined;
   const project = stringOption(options.project);
@@ -51,6 +55,7 @@ export async function checkCommandAction({ options }: CommandActionData): Promis
   const flags = [...(changed ? ["--changed"] : []), ...(base ? ["--base", base] : [])];
 
   const report = await runCheck({
+    lint,
     changed,
     base,
     skip,

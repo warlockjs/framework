@@ -68,9 +68,10 @@ export interface FileHealthCheckerContract {
   stats(): Promise<HealthCheckerFilesStats>;
 }
 
-/** Select built-in background checks; installed/configured linters run by default. */
+/** Select background checks; TypeScript and configured Oxlint run by default. */
 export type BuiltInHealthCheckerOptions = {
   typescript?: boolean;
+  /** @deprecated Removed in 5.34.0. Explicit opt-in only; default false. */
   eslint?: boolean;
   oxlint?: boolean;
 };

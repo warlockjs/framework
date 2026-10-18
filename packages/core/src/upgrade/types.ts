@@ -24,10 +24,14 @@ export type ManualFinding = {
   hint: string;
 };
 
-/** Whole-file edits to non-TypeScript files (package.json, .nvmrc). */
+/** Buffered whole-file additions, replacements and removals, including root config. */
 export type TextFiles = {
   /** File contents, or `undefined` when it does not exist. */
   read(file: string): string | undefined;
+  /** Root filenames available for conservative config discovery. */
+  list(): readonly string[];
+  /** Remove a file and record why; buffered for dry runs. */
+  remove(file: string, change: { line: number; description: string }): void;
   /** Replace a file's contents and record why. */
   write(file: string, content: string, change: { line: number; description: string }): void;
 };
@@ -91,6 +95,6 @@ export type UpgradeResult = {
   changedFiles: string[];
   /** Unified diff of every change (always computed; printed with `--dry-run`). */
   diff: string;
-  /** Command to run after the package.json versions changed, when they did. */
+  /** Install command when package.json changed (including toolchain dependencies). */
   installHint?: string;
 };

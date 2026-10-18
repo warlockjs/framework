@@ -1,6 +1,6 @@
 import { ESLint } from "eslint";
 import path from "node:path";
-import { hasEslint } from "../../dev-server/health-checker/default-health-checkers";
+import { hasEslint, warnEslintDeprecation } from "../../dev-server/health-checker/eslint-support";
 import {
   findOxlint,
   hasOxlintConfig,
@@ -92,14 +92,12 @@ async function runOxlint(cwd: string, files: readonly string[]): Promise<Tooling
   }
 }
 
-/**
- * Lint `files` (project-relative) with the linters the app configures, the
- * same ones `warlock dev` runs in the background: ESLint when an
- * `eslint.config.*` exists, oxlint when an oxlint config exists and the app
- * has the `oxlint` package. A config without its tool is a `WL8002`
- * environment problem.
- */
-export async function runLint(cwd: string, files: readonly string[]): Promise<LintOutcome> {
+/** Oxlint by default. ESLint requires an explicit selection and a flat config. */
+export async function runLint(
+  cwd: string,
+  files: readonly string[],
+  selection: "oxlint" | "eslint" = "oxlint",
+): Promise<LintOutcome> {
   const lintable = files.filter((file) => LINTABLE.test(file));
   const problems: ToolingProblem[] = [];
   const linters: string[] = [];
@@ -108,7 +106,20 @@ export async function runLint(cwd: string, files: readonly string[]): Promise<Li
   // means nothing to run.
   if (lintable.length === 0) return { problems, linters };
 
-  if (hasEslint(cwd)) {
+  if (selection === "eslint") {
+    warnEslintDeprecation();
+    if (!hasEslint(cwd)) {
+      return {
+        linters: ["eslint"],
+        problems: [
+          createProblem({
+            code: "WL8002",
+            source: "environment",
+            message: "Cannot find ESLint flat config in the app.",
+          }),
+        ],
+      };
+    }
     linters.push("eslint");
 
     try {
@@ -118,7 +129,7 @@ export async function runLint(cwd: string, files: readonly string[]): Promise<Li
     }
   }
 
-  if (hasOxlintConfig(cwd)) {
+  if (selection === "oxlint" && hasOxlintConfig(cwd)) {
     linters.push("oxlint");
 
     if (!findOxlint(cwd)) {

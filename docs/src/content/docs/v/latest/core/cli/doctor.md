@@ -136,3 +136,12 @@ The default set, the runner, and the formatter live inside `@warlock.js/core`'s 
 - [CLI commands](./cli-commands.md) — every other built-in `warlock` command.
 - [Health checks](../digging-deeper/health-checks.md) — the `/health` / `/ready` endpoints the `health` check reports on.
 - [Production hardening checklist](../digging-deeper/production-hardening-checklist.md) — where a pre-deploy `warlock doctor` run fits in the release flow.
+
+## Lint and format checks
+
+`warlock doctor` checks application wiring and HTTP health probes. Use
+`npx warlock check` for source lint diagnostics and `npm run format:check` for
+formatting. In 5.33, Oxlint/Oxfmt are the defaults; ESLint requires
+`warlock check --lint eslint` or `devServer.healthCheckers.eslint: true` for
+background checks. ESLint/Prettier are deprecated and removed in 5.34.0.
+Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`).

@@ -1,0 +1,13 @@
+{
+  "name": "custom-app",
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint-plugin-custom": "1.0.0",
+    "@scope/eslint-plugin-extra": "1.0.0",
+    "@prettier/plugin-xml": "1.0.0",
+    "@scope/prettier-plugin-foo": "1.0.0",
+    "typescript": "6.0.3"
+  }
+}

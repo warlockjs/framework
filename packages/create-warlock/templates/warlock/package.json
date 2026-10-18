@@ -20,13 +20,13 @@
     "gen.r": "warlock generate.repository",
     "gen.rs": "warlock generate.resource",
     "lint": "eslint --fix ./src --max-warnings=0",
-    "format": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json",
+    "format": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; migrate with npx warlock upgrade --from 5.32 --to 5.33.0.')\" && prettier --write \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json",
     "tsc": "warlock generate.typings && tsc --noEmit",
     "postinstall": "agent-kit init && agent-kit sync || echo \"warning: AI agent skills were NOT synced, so coding agents will not see the @warlock.js skills. Run the skills:sync script.\"",
     "skills:sync": "agent-kit sync",
     "skills:watch": "agent-kit watch",
     "lint:check": "eslint ./src --max-warnings=0",
-    "format:check": "prettier --check \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json"
+    "format:check": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; migrate with npx warlock upgrade --from 5.32 --to 5.33.0.')\" && prettier --check \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json"
   },
   "dependencies": {
     "@mongez/reinforcements": "^4.0.2",

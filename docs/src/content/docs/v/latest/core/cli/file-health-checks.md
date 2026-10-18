@@ -3,7 +3,7 @@ title: Background file health checks
 description: Configure TypeScript, ESLint and Oxlint checks while developing an app.
 ---
 
-`warlock dev` checks source files in the background after boot and when saved files change. TypeScript runs by default. ESLint and Oxlint are detected independently at startup. ESLint uses core's bundled dependency and needs only an app-root flat configuration; Oxlint needs its app-installed package and an app-root configuration. Both run in dedicated workers when configured. These file checks report development diagnostics; HTTP `/health` and `/ready` probes are configured separately.
+`warlock dev` checks source files in the background after boot and when saved files change. TypeScript and configured Oxlint run by default. ESLint is off by default and requires `devServer.healthCheckers: { eslint: true }`. ESLint uses core's bundled dependency and needs only an app-root flat configuration; Oxlint needs its app-installed package and an app-root configuration. Enabled checkers run in dedicated workers. Enabling ESLint prints a one-time deprecation warning naming removal in 5.34.0 and the migration command. These file checks report development diagnostics; HTTP `/health` and `/ready` probes are configured separately.
 
 ## Enable Oxlint
 
@@ -46,7 +46,7 @@ export default defineConfig({
 });
 ```
 
-Omitted switches keep automatic defaults. Set a switch to `false` to disable only that checker. Setting a linter to `true` still requires its app-root config; Oxlint also needs its package installed in the app. ESLint continues to use core's dependency even when the app does not depend on ESLint directly. Keep both `eslint` and `oxlint` enabled to run both; neither replaces the other's diagnostics. Restart the dev server after adding a new linter or its initial config.
+Omitted switches keep automatic defaults: TypeScript on, ESLint off, and Oxlint on when its app-root config and package exist. Set a switch to `false` to disable only that checker. Setting a linter to `true` still requires its app-root config; Oxlint also needs its package installed in the app. ESLint continues to use core's dependency even when the app does not depend on ESLint directly. Keep both `eslint` and `oxlint` enabled to run both; neither replaces the other's diagnostics. Restart the dev server after adding a new linter or its initial config.
 
 Existing custom checker arrays keep replacing the complete built-in list. `devServer.healthCheckers: false` disables all checks, and `warlock dev --skip-health` overrides any checker configuration for that run. These switches are independent of `devServer.generateTypings`.
 
@@ -64,3 +64,34 @@ resolve from core's installed dependencies; native optional bindings load from
 the parser package's own location. Regression tests cover both paths without
 inherited loader hooks, including configured declaration roots, source updates
 and deleted declarations.
+
+## Deprecated ESLint opt-in
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: { healthCheckers: { eslint: true, oxlint: false } },
+});
+```
+
+ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
+New apps should use `--lint=oxc`. To migrate an existing app, install the new
+core release and `ts-morph`, then run:
+
+```bash
+npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
+npx warlock upgrade --from 5.32 --to 5.33.0
+npm install
+npm run format
+npm run lint:check
+npx warlock check
+```
+
+Review every reported `file:line`: customized configs are preserved and need
+manual translation before removal. The codemod installs the template's Oxlint
+and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
+scripts, removes legacy dependencies, and deletes only recognized generated
+configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
+configs are preserved. `--dry-run --json` reports the same planned changes
+without writing files.

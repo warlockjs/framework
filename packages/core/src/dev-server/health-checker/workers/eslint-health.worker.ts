@@ -10,9 +10,8 @@
  * - Sends: { type: 'results' | 'initialized' | 'error', ... }
  */
 import { ESLint } from "eslint";
-import fs from "fs";
-import path from "path";
 import { parentPort, workerData } from "worker_threads";
+import { hasEslint } from "../eslint-support";
 
 /**
  * Serialized file data received from main thread
@@ -111,13 +110,8 @@ class ESLintHealthWorker {
     try {
       this.cwd = config.cwd || process.cwd();
 
-      // Check if ESLint flat config exists
-      // (.ts/.mts/.cts are supported since ESLint 9.18)
-      const flatConfigExtensions = ["js", "mjs", "cjs", "ts", "mts", "cts"];
-
-      this.hasConfig = flatConfigExtensions.some((extension) =>
-        fs.existsSync(path.join(this.cwd, `eslint.config.${extension}`)),
-      );
+      // The main-thread checker emits the one-time deprecation warning.
+      this.hasConfig = hasEslint(this.cwd);
 
       if (!this.hasConfig) {
         this.initialized = true;
