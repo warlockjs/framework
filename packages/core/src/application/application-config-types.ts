@@ -4,6 +4,14 @@ export type AppConfigurations = {
    */
   appName?: string;
   /**
+   * Overall connector shutdown budget in milliseconds. PM2 config generation
+   * uses the same value for `kill_timeout`. Allow enough time for HTTP draining
+   * and the remaining connectors; tune `http.gracefulShutdown.timeout` below it.
+   *
+   * @default 10000
+   */
+  shutdownTimeout?: number;
+  /**
    * Default locale code
    *
    * @default en

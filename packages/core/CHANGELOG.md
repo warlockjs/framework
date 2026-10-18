@@ -27,6 +27,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Add app-scoped `secrets.get/set/remove/has` and `environmentName`, also exported from `@warlock.js/core/secrets`, with lazy optional OS keychain storage, read-only scoped environment lookup, authenticated encrypted owner-only files, typed errors, logger masking and explicit memory backends.
 - Add `secretsFake` to the default test fakes, with isolated memory storage and assertions that never reveal credentials; opt out with `tests.fakes: { secrets: false }`.
 - `warlock ai measure --model <id> [--tools <module>] [--system <file>] [--skills <dir>] [--json]` lazily loads AI and reports per-part input tokens and priced USD. Supports provider-qualified IDs, configured model modules, and JSON output without app bootstrap.
+- Optional `warlock pm2 init` generates `ecosystem.config.cjs` from app/build config with a `<project>-<app>-<env>` name, readiness URL, `wait_ready`, startup timeout and a kill timeout matched to `app.shutdownTimeout`. PM2 stays outside core's dependencies. Fork mode is the default; cluster mode requires a socket adapter and WebSocket-only transports when sockets are configured.
+- `warlock pm2 reload [--id <pm2-id>]` verifies the exact app name, working directory and bundle path before reloading numeric PM2 ids sequentially. Document rolling reload limits, shared-server stops by PM2 id and logger output formatting.
+
+### Changed
+
+- Completed application boot now sends PM2's `"ready"` IPC message without disconnecting its channel; the existing `warlock start` readiness protocol remains supported. Cluster workers skip the exclusive port preflight so they can share their primary's listener during rolling reloads.
+
+### Fixed
+
+- Socket-only connector boot awaits its listener and rejects bind failures before application readiness can be announced.
+
+### Upgrading
+
+- Rebuild production bundles to include PM2 readiness before using `wait_ready`. Generate with the target `NODE_ENV`, review the ecosystem file, and start the bundle directly under PM2. Cluster sockets require `socket.adapter`, `socket.options.transports: ["websocket"]` and WebSocket-only clients; polling deployments need sticky routing to individual listeners. Fork reloads can interrupt traffic.
 
 ## 5.32.0 - 2026-10-18
 

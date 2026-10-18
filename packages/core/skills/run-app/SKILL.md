@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`, `detectJavaScriptRuntime`, `assertNodeOnlyCommand`, Bun, Deno, `bun dist/app.js`, `deno run -A`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use", "run on Bun", "run on Deno", "supported runtimes"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle), `warlock pm2 init` / `reload` (optional deployment tooling). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock pm2`, `ecosystem.config.cjs`, `wait_ready`, `kill_timeout`, `app.shutdownTimeout`, `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`, `detectJavaScriptRuntime`, `assertNodeOnlyCommand`, Bun, Deno, `bun dist/app.js`, `deno run -A`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use", "run on Bun", "run on Deno", "supported runtimes"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -412,10 +412,119 @@ Configured http.port "03999" normalised to 3999.
 Three consequences worth knowing:
 
 1. **A queue worker with no http connector still reports.** Readiness hangs on a completed boot, not on a bound port. `port` is simply absent.
-2. **Running the bundle any other way changes nothing.** `node dist/app.js`, a Docker `CMD`, or pm2 — the signal is a strict no-op without both the IPC channel and the handshake flag, so Warlock never writes into a channel that belongs to another supervisor.
+2. **PM2 receives its own readiness message (5.33.0+).** With an IPC channel and PM2's `pm_id` present, core sends `"ready"` after completed boot and leaves the channel open. Plain Node/Docker launches without IPC remain silent. `warlock start` takes priority when its handshake is present.
 3. **A bundle built before 4.11.0 has no signal.** It starts and runs normally, and after ten seconds prints a note on **stderr only** telling you to re-run `warlock build`. An absent signal is never an error, never fails the run, and never kills a slow boot.
 
 If you need the same fact inside the app, use `Application.onceBooted()` / `Application.whenBooted()` — the signal and your listeners fire from the same latch.
+
+## `warlock pm2 init` / `reload` — optional production supervision
+
+PM2 is operator tooling, never a core dependency. Install it separately and
+put `pm2` on `PATH`. Generate from the app root with the target environment:
+
+```bash
+NODE_ENV=production npx warlock build
+NODE_ENV=production npx warlock pm2 init
+# package.json name=store, app.appName=api → store-api-production
+pm2 start ecosystem.config.cjs --only store-api-production
+
+# Deploy a fresh successful build, then reload only this app:
+NODE_ENV=production npx warlock pm2 reload
+NODE_ENV=production npx warlock pm2 reload --id 7
+```
+
+`init` reads app/http/socket config and resolved build paths without starting
+connectors, bootstrap or prestart. It creates `ecosystem.config.cjs` exclusively;
+an existing file is an error. It works without PM2 installed or a prior build.
+The file runs the built entry directly, with an absolute `cwd`, Node interpreter
+and source maps matching `build.sourcemap`.
+
+The identity is `<project>-<app>-<NODE_ENV>`; project defaults to `package.json`
+name (`@team/store` → `team-store`), app to `app.appName` or `app`, environment
+to `NODE_ENV` or `development`. Use `--project store --app api` to override the
+components, and repeat those overrides on reload. Components accept letters,
+digits, `_` and `-`, starting with a letter/digit. Choose a combination unique
+within the daemon; no patterns or broad selectors are supported.
+
+```bash
+NODE_ENV=production npx warlock pm2 init --project store --app api \
+  --cluster --instances 2 --listen-timeout 60000
+NODE_ENV=production npx warlock pm2 reload --project store --app api
+```
+
+Defaults: `exec_mode: "fork"`, `instances: 1`, `wait_ready: true`,
+`listen_timeout: 30000`. `--cluster` opts into two workers by default;
+`--instances` accepts a positive integer or `max`, only with `--cluster`.
+Fork reload falls back to restart and may interrupt traffic. PM2 cluster reload
+can replace workers while others serve, but a boot/readiness timeout can still
+cause downtime. Keep both the PM2 daemon and app on Node 22.15+; cluster uses
+the daemon's runtime.
+
+`kill_timeout` equals the existing overall connector budget,
+`app.shutdownTimeout` (default 10000ms), now typed on `AppConfigurations`:
+
+```ts
+import type { AppConfigurations } from "@warlock.js/core";
+
+export default {
+  appName: "api",
+  shutdownTimeout: 20000,
+} satisfies AppConfigurations;
+```
+
+Keep `http.gracefulShutdown.timeout` lower (e.g. 10000ms), with room for other
+connectors, hooks and log flushes. PM2's kill timer covers the whole exit;
+core's connector timer starts after app hooks and finishes before log flushing.
+The generated comment and CLI output show the configured readiness URL (or an
+unavailable notice for no HTTP, disabled health or ephemeral ports). PM2 itself
+does not poll it. Use an external deployment probe.
+
+Core emits `process.send("ready")` once at completed boot when PM2's `pm_id`
+and IPC are present, after HTTP and the connectors have started. It never
+disconnects PM2's channel. Socket-only apps also await the listener and reject
+bind failures before completing boot. Rebuild with core 5.33+ before using `wait_ready`.
+`listen_timeout` limits waiting for readiness; `kill_timeout` limits shutdown
+before PM2's forced kill. Core handles PM2's default `SIGINT` gracefully.
+
+With sockets enabled, cluster generation/reload refuse a missing
+`socket.adapter` factory and require `socket.options.transports: ["websocket"]`
+with WebSocket-only clients. The adapter handles broadcasts; polling still
+needs sticky routing to each worker, which this generator does not install.
+For polling, use individual fork listeners behind a sticky proxy or a custom
+cluster primary. See the `wire-socket` topic. Avoid duplicating worker jobs
+and in-memory sessions across HTTP workers.
+
+`reload` requires a successful build marker, reads `pm2 jlist`, verifies **all**
+exact-name matches against the app's absolute cwd and entry, then calls
+`pm2 reload <numeric-id>` sequentially. `--id` narrows to one verified worker.
+Foreign cwd/script, invalid selectors, offline cluster workers or cluster
+workers without `wait_ready` are refused before reload. Reload uses settings
+already registered in PM2; regenerate/reapply the ecosystem when they change.
+
+On shared servers, inspect the current PM2 id and path before stopping:
+
+```bash
+pm2 list
+pm2 show 7
+pm2 stop 7
+```
+
+Repeat for each intended worker id. Never stop by pattern or broad name, and
+avoid daemon-wide operations. PM2 ids are not OS PIDs and can change after an
+app is deleted/recreated.
+
+To put logger entries in PM2's captured stdout, configure
+`src/config/log.ts` with `production: { channels: [new ConsoleLog()] }`
+(`ConsoleLog` comes from `@warlock.js/logger`). Keep `time: false` and omit
+`log_date_format` to preserve the logger's timestamp/module/action format.
+Generated `merge_logs: false` keeps worker logs separate. PM2 JSON output wraps
+captured text; it does not recover logger fields. Use `JSONFileLog` with a
+distinct per-worker storage path for structured persistent entries.
+
+Official references: [PM2 readiness/shutdown](https://pm2.keymetrics.io/docs/usage/signals-clean-restart/),
+[cluster reload](https://pm2.keymetrics.io/docs/usage/cluster-mode/),
+[Socket.IO multiple nodes](https://socket.io/docs/v4/using-multiple-nodes/).
+Full docs: `docs/src/content/docs/v/latest/core/cli/pm2.mdx`.
 
 ## Runtimes — Node, Bun, Deno
 

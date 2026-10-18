@@ -12,13 +12,9 @@ import { MailerConnector } from "./mail-connector";
 import { NotificationsConnector } from "./notifications-connector";
 import { SocketConnector } from "./socket-connector";
 import { StorageConnector } from "./storage.connector";
+import { DEFAULT_SHUTDOWN_TIMEOUT } from "./shutdown-timeout";
 import { ConnectorLifecyclePhase } from "./types";
 import type { Connector, ConnectorName } from "./types";
-
-/**
- * Overall shutdown budget in ms. Override via `app.shutdownTimeout`.
- */
-const DEFAULT_SHUTDOWN_TIMEOUT = 10_000;
 
 export class ConnectorsManager {
   /**

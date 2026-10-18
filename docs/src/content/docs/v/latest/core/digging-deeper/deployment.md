@@ -264,7 +264,7 @@ A child that dies before reporting readiness is a failed start. The failure is w
 Readiness travels as one versioned IPC message, `{ type: "warlock:ready", version, pid, at, environment, runtimeStrategy, bootDurationMs?, port? }`, sent by `Application.markBooted()` and immediately followed by closing the channel. Three things follow from that:
 
 - **A worker app with no http connector still reports.** Readiness means a completed boot, not a bound port; `port` is simply absent.
-- **Running the bundle any other way is unaffected.** Under `node dist/app.js`, a Docker `CMD`, or pm2, the signal is a no-op — Warlock only writes to a channel opened by `warlock start` itself, so it never interferes with another supervisor's protocol.
+- **PM2 has its own readiness protocol (5.33.0+).** With PM2's `pm_id` and an IPC channel present, core sends `"ready"` after completed boot and keeps the channel open. A plain Node or Docker launch without IPC stays silent. See [PM2 deployment](../cli/pm2.mdx) for ecosystem generation and reloads scoped to this app.
 - **A bundle built before 4.11.0 has no signal.** It runs normally and prints a note on stderr only, asking you to re-run `warlock build`. A missing signal never fails a run and never interrupts a slow boot.
 
 Inside the app, `Application.onceBooted()` and `Application.whenBooted()` fire from the same latch.

@@ -63,9 +63,7 @@ describe("sendBootSignal", () => {
   });
 
   it("stays silent on a channel opened by a supervisor that is not ours", () => {
-    // pm2 and vitest's own worker forks both hand a child an IPC channel for
-    // their own protocol. Writing to one — and then closing it — corrupts that
-    // protocol and can kill the process. Without the handshake flag, nothing.
+    // An unrecognized supervisor keeps ownership of its IPC channel.
     delete process.env[BOOT_SIGNAL_ENV_KEY];
 
     const send = flushingSend();
@@ -225,5 +223,48 @@ describe("Application.markBooted readiness reporting", () => {
     Application.markBooted({ environment: "production", runtimeStrategy: "production" });
 
     expect(order[0]).toBe("signal");
+  });
+
+  it("sends PM2 ready only at completed boot, once, without disconnecting", () => {
+    delete process.env[BOOT_SIGNAL_ENV_KEY];
+    vi.stubEnv("pm_id", "0");
+    try {
+      // HTTP and connectors finish before the entry calls markBooted.
+      expect(send).not.toHaveBeenCalled();
+      Application.markBooted({ environment: "production", runtimeStrategy: "production" });
+      Application.markBooted({ environment: "production", runtimeStrategy: "production" });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0][0]).toBe("ready");
+      expect(process.disconnect).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("prioritizes the warlock start protocol over an inherited PM2 id", () => {
+    vi.stubEnv("pm_id", "0");
+    try {
+      Application.markBooted({ environment: "production", runtimeStrategy: "production" });
+      expect(send.mock.calls[0][0]).toMatchObject({ type: "warlock:ready" });
+      expect(process.disconnect).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("survives a disconnected PM2 channel", () => {
+    delete process.env[BOOT_SIGNAL_ENV_KEY];
+    vi.stubEnv("pm_id", "0");
+    send.mockImplementation(() => {
+      throw new Error("closed IPC");
+    });
+    try {
+      expect(() =>
+        Application.markBooted({ environment: "production", runtimeStrategy: "production" }),
+      ).not.toThrow();
+      expect(Application.isBooted).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

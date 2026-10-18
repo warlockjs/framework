@@ -108,7 +108,17 @@ export class SocketConnector extends BaseConnector {
       server.on("error", (error: Error) => {
         log.error("socket", "connection", error, { port: socketConfig.port });
       });
-      server.listen(socketConfig.port);
+      // Boot must await the socket-only listener too: Application.markBooted
+      // reports readiness to PM2 after the late phase resolves. Logging a bind
+      // error alone would otherwise still let the app announce readiness.
+      await new Promise<void>((resolve, reject) => {
+        const onBindError = (error: Error) => reject(error);
+        server.once("error", onBindError);
+        server.listen(socketConfig.port, () => {
+          server.removeListener("error", onBindError);
+          resolve();
+        });
+      });
       this.ownsRawServer = true;
     }
 
