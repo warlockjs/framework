@@ -188,3 +188,10 @@ await warmupProductCache();
 - The `validate-input` topic — wiring `schema/*.schema.ts` to controllers.
 - The `write-seeder` topic — populating the generated `seeds/` folder.
 - The `use-localization` topic — populating the generated `utils/locales.ts`.
+
+## Verify generated imports
+
+Generated web starter files match the scaffold’s Prettier configuration, using
+`@ianvs/prettier-plugin-sort-imports` with Babel independently of TypeScript 7.
+After editing generated code, run `npm run format` and `npm run lint:check`.
+Formatting retains unused imports; the linter reports them.

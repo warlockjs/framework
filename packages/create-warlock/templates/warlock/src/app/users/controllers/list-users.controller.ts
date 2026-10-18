@@ -1,6 +1,6 @@
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { usersRepository } from "../repositories/users.repository";
-import { type ListUsersSchema, listUsersSchema } from "../schema/list-users.schema";
+import { listUsersSchema, type ListUsersSchema } from "../schema/list-users.schema";
 
 export const listUsersController: GuardedRequestHandler<ListUsersSchema> = async ({
   request,

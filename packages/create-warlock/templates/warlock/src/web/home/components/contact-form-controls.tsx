@@ -1,4 +1,4 @@
-import { type FormControlProps, useFormControl, useSubmitButton } from "@mongez/react-form";
+import { useFormControl, useSubmitButton, type FormControlProps } from "@mongez/react-form";
 import { type ReactNode } from "react";
 
 type ContactFieldProps = FormControlProps & {

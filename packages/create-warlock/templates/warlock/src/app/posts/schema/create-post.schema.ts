@@ -1,4 +1,4 @@
-import { type Infer, v } from "@warlock.js/seal";
+import { v, type Infer } from "@warlock.js/seal";
 
 export const createPostSchema = v.object({
   title: v.string(),

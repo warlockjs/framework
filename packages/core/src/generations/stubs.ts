@@ -928,7 +928,7 @@ export default function App({ children }: AppProps) {
  * dependency: replace the acknowledgement with a mail/job/database action.
  */
 export const webContactControllerStub = `import { type Request, type RequestHandler } from "@warlock.js/core";
-import { type Infer, v } from "@warlock.js/seal";
+import { v, type Infer } from "@warlock.js/seal";
 
 export const contactSchema = v.object({
   name: v.string().min(2),

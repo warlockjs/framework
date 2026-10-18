@@ -116,5 +116,7 @@ mock the availability preflight too; their port numbers never need to be free.
 Use the root Oxfmt configuration for repository source, including scaffolder
 source. `pnpm format:check` is the CI check; `pnpm format` writes it. Preserve
 BOMs and generated-byte oracles. Generated app templates retain their separate
-Prettier/Oxc checks. Import sorting stays disabled: Oxfmt does not replace the
-TypeScript-aware organize-imports plugin's full behavior.
+Prettier/Oxc checks. Repository import sorting stays disabled. The Prettier
+scaffold uses `@ianvs/prettier-plugin-sort-imports` with Babel, without depending
+on the TypeScript compiler API. Both app formatters retain unused imports;
+ESLint or Oxlint reports them.

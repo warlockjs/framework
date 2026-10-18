@@ -1,5 +1,5 @@
 import { type Request, type RequestHandler } from "@warlock.js/core";
-import { type LoginSchema, loginSchema } from "../schema/login.schema";
+import { loginSchema, type LoginSchema } from "../schema/login.schema";
 import { loginService } from "../services/auth.service";
 
 /**

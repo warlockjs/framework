@@ -233,7 +233,8 @@ source uses this root formatter even in its standalone test job. Generated app
 templates retain their own toolchain checks.
 
 `format:prettier` and `format:prettier:check` preserve the previous commands during
-migration. Oxfmt's optional import sorting differs from TypeScript-aware
-`prettier-plugin-organize-imports`: it does not provide the same unused-import
-removal/type-aware organization. Repository sorting is disabled for this pass;
-ESLint and the generated-template Prettier gate remain available.
+migration. Repository import sorting stays disabled. Generated ESLint/Prettier
+apps use `@ianvs/prettier-plugin-sort-imports`, which sorts through Babel without
+depending on the TypeScript compiler API. Neither formatter removes unused
+imports; ESLint or Oxlint reports them. The generated-template Prettier gate
+checks the scaffold's separate configuration.

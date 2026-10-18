@@ -1,5 +1,5 @@
-import { localeSchema, type LocaleSchema } from "@shared/locale.schema";
 import { type Request, type RequestHandler } from "@warlock.js/core";
+import { localeSchema, type LocaleSchema } from "@shared/locale.schema";
 
 /** POST /api/locale — persists the visitor's locale preference in a cookie. */
 export const localeController: RequestHandler<Request<LocaleSchema>> = async ({

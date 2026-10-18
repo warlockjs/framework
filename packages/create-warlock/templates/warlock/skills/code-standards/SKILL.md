@@ -574,7 +574,7 @@ For ESLint, consider enabling these additional rules:
 - `curly` — enforces braces (§ 4.4)
 - `no-console` — enforces § 8
 
-Match the selected formatter config: `.prettierrc.json` or `.oxfmtrc.json`. Both use 100 columns, double quotes, semicolons and trailing commas. Oxfmt does not run `prettier-plugin-organize-imports`; maintain import order and remove unused imports separately, then run the linter.
+Match the selected formatter config: `.prettierrc.json` or `.oxfmtrc.json`. Both use 100 columns, double quotes, semicolons and trailing commas. Prettier uses `@ianvs/prettier-plugin-sort-imports` (Babel, independent of TypeScript); it sorts built-ins, packages, aliases (`app/*`, `web/*`, `@shared/*`) and relatives in one block while preserving separate type imports. Oxfmt sorts imports through its own configuration. Both retain unused imports: ESLint reports them through `unused-imports/no-unused-imports`, and Oxlint through `no-unused-vars`. Run the formatter, then the linter.
 
 ---
 

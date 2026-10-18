@@ -221,7 +221,7 @@ export class App {
       "eslint-plugin-prettier",
       "eslint-plugin-unused-imports",
       "prettier",
-      "prettier-plugin-organize-imports",
+      "@ianvs/prettier-plugin-sort-imports",
     ])
       delete deps[dependency];
     Object.assign(deps, { oxlint: "1.88.0", oxfmt: "0.73.0" });
@@ -463,7 +463,7 @@ export class App {
     const config = getFile(configPath) as string;
     if (!config.includes('"@warlock.js/web/connector"')) {
       // Inserted in sorted position, not prepended. The generated app formats
-      // with `prettier-plugin-organize-imports`, so an import pushed to the top
+      // with `@ianvs/prettier-plugin-sort-imports`, so an import pushed to the top
       // of a file that already imports `@warlock.js/auth` and `@warlock.js/core`
       // is out of order the moment it is written — and the developer meets it as
       // a `prettier/prettier` error on their first `warlock dev`, in a file they

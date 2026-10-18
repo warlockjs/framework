@@ -7,6 +7,9 @@
   "arrowParens": "always",
   "trailingComma": "all",
   "endOfLine": "lf",
-  "sortImports": { "newlinesBetween": false },
+  "sortImports": {
+    "newlinesBetween": false,
+    "internalPattern": ["app/", "web/", "@shared/"]
+  },
   "ignorePatterns": ["node_modules/", "dist/"]
 }

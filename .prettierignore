@@ -10,9 +10,9 @@ package-lock.json
 # Release tooling has its own formatting conventions and generated sources.
 tools/release/
 
-# The scaffold template declares `prettier-plugin-organize-imports`, which is only
-# installed inside a SCAFFOLDED app, never in this monorepo, so including it here
-# aborts the whole run with "Cannot find package". It has its own gate:
+# The scaffold template declares `@ianvs/prettier-plugin-sort-imports`, which is only
+# resolved from create-warlock’s dependencies rather than the root. It has its
+# own formatter gate with the template configuration:
 # packages/create-warlock/scripts/format-check-template.mjs.
 packages/create-warlock/
 

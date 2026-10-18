@@ -119,9 +119,6 @@ packageExtensions:
   "ts-api-utils":
     dependencies:
       typescript: "5.9.3"
-  "prettier-plugin-organize-imports":
-    dependencies:
-      typescript: "5.9.3"
 
 # Vite also accepts 0.27.x; keep every workspace tool on the patched line.
 # https://github.com/advisories/GHSA-g7r4-m6w7-qqqr (fixed in 0.28.1)
