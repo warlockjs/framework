@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `ToolContext` adds optional `requestId` and `principal` fields for server transports, keeping authenticated identity out of tool input and model messages.
+### Added
+
+- `ai.measure({ model, tools?, system?, messages?, skills? })` and standalone `measure` report per-part native input token counts or labelled estimates and uncached input USD when priced. `measure.diff(before, after)` returns signed per-part and total changes with the original reports. Includes compact schemas, catalogue-only measurement, explicit probe metadata, and whole-report fallback for unsupported count shapes.
 
 ## 5.32.0 - 2026-10-18
 

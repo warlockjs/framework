@@ -2,6 +2,7 @@ export * from "./agent";
 export { ai } from "./ai";
 export type { Ai } from "./ai";
 export * from "./batch";
+export * from "./measure";
 export * from "./checkpoint";
 export * from "./config";
 export * from "./contracts";

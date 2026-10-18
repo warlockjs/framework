@@ -1,3 +1,4 @@
+import { aiCommand } from "./commands/ai.command";
 import { addCommand } from "./commands/add.command";
 import { agentsMdCommand } from "./commands/agents-md.command";
 import { boardCommand } from "./commands/board.command";
@@ -49,6 +50,7 @@ export const frameworkCommands = [
   testCommand,
 
   // diagnostics commands
+  aiCommand,
   doctorCommand,
   routesCommand,
   routesDiffCommand,

@@ -1,11 +1,57 @@
 ---
 name: ai-dx-helpers
-description: "Configure @warlock.js/ai developer-experience helpers for batching, fallback, evaluation, SLOs, and supervisor middleware."
+description: "Configure @warlock.js/ai developer-experience helpers for call token/cost measurement, batching, fallback, evaluation, SLOs, and supervisor middleware."
 ---
 
 # DX helpers — batch, fallback, eval, SLO, supervisor middleware
 
 A grab-bag of additive 4.3.0 helpers. Each is independent — load the section you need.
+
+## `ai.measure(options)` and `ai.measure.diff(before, after)`
+
+Measure the input carried by a call without generating or executing tools. Use the same configured model and representative messages for comparisons:
+
+```ts
+import { ai, type ModelContract, type ToolConfig } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const tools: ToolConfig<unknown, unknown>[];
+
+const messages = [{ role: "user" as const, content: "Find the refund policy" }];
+const skills = ai.skills({
+  name: "support",
+  sources: [{ type: "directory", path: "./agent-skills" }],
+});
+const before = await ai.measure({
+  model,
+  tools,
+  system: "Help customers find documentation.",
+  messages,
+  skills,
+});
+const after = await ai.measure({
+  model,
+  tools,
+  toolSchemas: "compact",
+  system: "Find documentation.",
+  messages,
+  skills,
+});
+console.log(before.parts.tools, before.total);
+console.log(ai.measure.diff(before, after).total); // signed after minus before
+```
+
+The standalone `measure` export has the same `.diff`. Reports expose `parts.messages/system/skills/tools`, `total`, `model`, `provider`, and `probe`. Each part has `tokens`, `source: "native" | "estimate"`, and optional `costUSD`. Attribution adds messages → system → catalogue → tools and parts sum to the total. Native counts may use the network; explicit `count-unsupported` switches the entire report to estimates. Other provider errors propagate. `estimate: { charsPerToken, attachmentTokens, perMessageTokens }` tunes heuristics, not a tokenizer.
+
+`system` is resolved text; `skills` is catalogue text or a library with `catalogPrompt()`. No bodies or library tools are auto-added. Include exposed library tool configs in `tools` and already loaded bodies in the supplied input when those belong to the actual call. Avoid duplicating system/catalogue text in `messages`. Without messages (including `[]`), a `.` user probe supplies counting context and is included in `parts.messages`, with `probe: true`.
+
+USD uses the model's uncached input pricing only; unknown prices stay absent. It excludes output, cache adjustments and hosted-tool fees. A diff omits USD if either side is unpriced and retains both reports so their provenance can be inspected.
+
+```sh
+warlock ai measure --model "$MODEL_ID" --tools ./measure-tools.ts --system ./system.md --skills ./agent-skills --json
+```
+
+The Core command lazily loads AI. Unqualified IDs use OpenAI Responses; `openai:<id>`, `anthropic:<id>`, and `google:<id>` use the respective installed adapters and environment API keys. `--model-module ./models.ts` accepts `model`, `default`, or `resolveModel(id)` for custom providers and configured pricing. Tools modules export `tools` or a default array. CLI measurement always uses the explicit probe, reads catalogue metadata only, and imports module top-level code. JSON owns stdout. Use API messages for actual turn measurements.
 
 ## `ai.batch(executable, items, options?)` — fan-out a dataset
 

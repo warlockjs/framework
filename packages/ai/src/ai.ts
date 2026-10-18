@@ -20,6 +20,7 @@ import { interruptMemory, interruptPg, interruptRedis } from "./human/stores";
 import { guardrail as guardrailSuite } from "./guard/guardrail";
 import { budget, readBudgetFallbackSignal } from "./middleware/builtins/budget";
 import { memory } from "./memory";
+import { measure } from "./measure";
 import { guardrail } from "./middleware/builtins/guardrail";
 import { semanticCache } from "./middleware/builtins/semantic-cache";
 import { composeMiddleware, forTool } from "./middleware/helpers";
@@ -90,6 +91,7 @@ export interface Ai {
   team: typeof team;
   orchestrator: typeof orchestrator;
   memory: typeof memory;
+  measure: typeof measure;
   skills: typeof skills;
   planner: typeof planner;
   rag: typeof rag & {
@@ -246,6 +248,7 @@ export interface Ai {
  * });
  */
 export const ai = {
+  measure,
   config: setAIConfig,
   tool,
   providerTool,
