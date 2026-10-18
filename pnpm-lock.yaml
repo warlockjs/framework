@@ -979,6 +979,9 @@ importers:
 
   packages/devtools:
     devDependencies:
+      '@warlock.js/ai-panoptic':
+        specifier: workspace:^
+        version: link:../ai-panoptic
       '@types/node':
         specifier: ^25.6.2
         version: 25.9.5

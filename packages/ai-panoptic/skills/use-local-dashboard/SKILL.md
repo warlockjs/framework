@@ -226,3 +226,24 @@ These three findings (link sanitization + the two token-handling items above) ca
 - The `query-traces` topic — the `TraceStoreContract` (`query` / `get` / `aggregate`) the dashboard reads, the `TraceQuery` filter, and capacity eviction.
 - The `export-traces` topic — shipping traces to OTel / Langfuse / a file instead of (or alongside) the local dashboard.
 - The `evaluate-system-prompt` topic — the drawer's "Evaluate system prompt" action, the dashboard's one write route.
+
+## Use the app's devtools AI panel
+
+When developing a Warlock HTTP app with `@warlock.js/devtools` installed, open
+`/__warlock` → **AI** to inspect runs alongside their HTTP requests. This uses
+the existing app server and needs no `dashboard: true`:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic";
+ai.config({ panoptic: { observeAll: true } });
+```
+
+Restart `warlock dev` after installing the optional Panoptic package. Runs
+appear after collection, with model, tokens, historical cost, provider cache
+hits, tool timings, retries, incomplete/truncated status and compaction metadata.
+The panel uses a bounded content-free in-memory view (200 traces by default),
+not the standalone dashboard's persisted cache store. Clear/restart discards
+only that view. HTTP request identity is captured from the collecting async
+context; missing identities remain background runs. Devtools never mounts in
+production and retains its socket-loopback guard.

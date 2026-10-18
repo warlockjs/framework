@@ -6,6 +6,8 @@ export default defineConfig({
     // Workspace siblings resolve to their sources (core's barrel transitively
     // imports these).
     alias: {
+      "@warlock.js/ai-panoptic": path.resolve(__dirname, "../ai-panoptic/src"),
+      "@warlock.js/ai": path.resolve(__dirname, "../ai/src"),
       "@warlock.js/auth": path.resolve(__dirname, "../auth/src"),
       "@warlock.js/cache": path.resolve(__dirname, "../cache/src"),
       "@warlock.js/cascade": path.resolve(__dirname, "../cascade/src"),

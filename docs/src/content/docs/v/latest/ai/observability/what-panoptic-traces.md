@@ -273,3 +273,48 @@ Other `fullHistory` behaviors worth knowing:
 - [@warlock.js/ai-panoptic](/v/latest/ai/observability/ai-panoptic/) — the package overview, `panoptic()` entry point, and exporters.
 - [Configuring Panoptic](/v/latest/ai/observability/configuring-panoptic/) — wire content capture declaratively via `ai.config({ panoptic })`.
 - [The local dashboard](/v/latest/ai/observability/local-dashboard/) — inspect captured content in a loopback-only UI.
+
+## Development request correlation and diagnostics
+
+With `@warlock.js/devtools` installed, completed traces also appear in the
+[AI panel at `/__warlock`](/v/latest/devtools/ai-panel/). It links runs to the
+current HTTP request when its async context is available and retains a bounded,
+content-free view. No standalone Panoptic dashboard is needed.
+
+`Trace.requestId?: string` is an integration-supplied HTTP identity, separate
+from `sessionId`. Both in-memory and cache stores accept an exact `requestId`
+filter in `query` and `aggregate`; legacy/background traces simply omit it.
+Devtools stamps its own copy, so the application's other exporters are unchanged.
+
+The collector now records `retry.attempts` (index, start/end, duration, status),
+`agent.cacheHits` (trips reporting positive provider cache reads),
+`agent.truncatedTrips` (length/context-limit responses),
+`agent.providerCompactions` (provider compaction-block count), and
+`agent.compactions` (applied/skipped decisions, token counts, trip indices,
+counting method, reason and replaced ranges). Compaction summaries and callback
+error text are excluded from these attributes. These fields do not turn on
+content capture. Unreported cache hits remain absent; zero-token responses do
+not establish semantic-cache hits.
+
+`subscribeTraces(listener)` observes every built-in collector in this process,
+including existing collectors, before exporter dispatch. It runs synchronously
+in the collecting async context, has no replay, and returns an unsubscribe
+function. Treat the trace as read-only; failures are isolated and promises from
+async listeners are not awaited. `toTrace()` alone does not publish or retain
+anything. Observation still needs to be enabled on flows.
+
+```ts
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createInMemoryTraceStore, subscribeTraces } from "@warlock.js/ai-panoptic";
+
+// Populate this context in your HTTP adapter before executing the flow.
+const httpContext = new AsyncLocalStorage<{ requestId: string }>();
+const store = createInMemoryTraceStore({ capacity: 200 });
+const unsubscribe = subscribeTraces((trace) => {
+  store.add({ ...trace, requestId: httpContext.getStore()?.requestId });
+});
+
+store.query({ requestId: "request-42" });
+store.aggregate({ requestId: "request-42" });
+unsubscribe(); // teardown this subscription only
+```

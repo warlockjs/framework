@@ -1,4 +1,4 @@
-import type { BaseReport } from "@warlock.js/ai";
+import type { AgentCompactionRecord, BaseReport, LLMTrip } from "@warlock.js/ai";
 
 /**
  * Per-primitive `BaseReport` extension fields the collector surfaces as
@@ -16,7 +16,8 @@ import type { BaseReport } from "@warlock.js/ai";
  */
 type ReportExtensions = {
   model?: { name?: string; provider?: string };
-  trips?: unknown[];
+  trips?: LLMTrip[];
+  compactions?: AgentCompactionRecord[];
   promptName?: string;
   promptVersion?: string;
   workflowName?: string;
@@ -60,6 +61,13 @@ export function extractSpanAttributes(report: BaseReport): Record<string, unknow
 
   if (report.attempts !== undefined && report.attempts.length > 0) {
     attributes["retries"] = report.attempts.length;
+    attributes["retry.attempts"] = report.attempts.map((attempt) => ({
+      index: attempt.index,
+      startedAt: attempt.startedAt,
+      endedAt: attempt.endedAt,
+      duration: attempt.duration,
+      status: attempt.status,
+    }));
   }
 
   switch (report.type) {
@@ -109,6 +117,40 @@ function addAgentAttributes(
 ): void {
   if (Array.isArray(extensions.trips)) {
     attributes["agent.trips"] = extensions.trips.length;
+    // Reported provider cache reads only. Zero-token synthetic responses do
+    // not identify semantic-cache hits in the core report contract.
+    if (extensions.trips.some((trip) => trip.usage?.cachedTokens !== undefined)) {
+      attributes["agent.cacheHits"] = extensions.trips.filter(
+        (trip) => (trip.usage?.cachedTokens ?? 0) > 0,
+      ).length;
+    }
+    const truncatedTrips = extensions.trips.filter(
+      (trip) => trip.finishReason === "length" || trip.finishReason === "context_exceeded",
+    ).length;
+    if (truncatedTrips > 0) attributes["agent.truncatedTrips"] = truncatedTrips;
+    const providerCompactions = extensions.trips.reduce(
+      (count, trip) =>
+        count + (trip.blocks?.filter((block) => block.type === "compaction").length ?? 0),
+      0,
+    );
+    if (providerCompactions > 0) attributes["agent.providerCompactions"] = providerCompactions;
+  }
+
+  if (extensions.compactions?.length) {
+    // Do not copy summary text, callback errors or raw conversation content.
+    attributes["agent.compactions"] = extensions.compactions.map((record) => ({
+      type: record.type,
+      tripIndex: record.tripIndex,
+      inputTokens: record.inputTokens,
+      counting: record.counting,
+      reason: record.reason,
+      ...(record.compaction
+        ? {
+            replacesFromIndex: record.compaction.replacesFromIndex,
+            replacesToIndex: record.compaction.replacesToIndex,
+          }
+        : {}),
+    }));
   }
 
   if (extensions.model?.name !== undefined) {

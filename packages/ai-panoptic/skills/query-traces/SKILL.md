@@ -55,6 +55,7 @@ Every field is optional and **ANDed** together — an absent field is "don't car
 ```ts
 type TraceQuery = {
   traceId?: string; // exact one run
+  requestId?: string; // exact HTTP request id, when an integration supplied it
   sessionId?: string; // every run for a session
   status?: ReportStatus | ReportStatus[]; // single status or membership set
   startedAfter?: string | Date; // inclusive lower bound on root startedAt
@@ -213,3 +214,37 @@ console.log(stats.usage.serverToolUse?.webSearchRequests);
 console.log(stats.cost?.serverTools?.webSearch); // historical USD
 console.log(totalCost(stats.cost)); // includes hosted fees
 ```
+
+## Correlate traces with HTTP requests
+
+`Trace.requestId` is an optional integration-supplied identity. It is independent
+of `sessionId`; legacy and background traces omit it. In-memory and cache stores
+use the same exact-match `requestId` filter in `query()` and `aggregate()`, and
+cache hydration preserves it.
+
+```ts
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createInMemoryTraceStore, subscribeTraces } from "@warlock.js/ai-panoptic";
+
+// Your HTTP adapter runs the flow inside this context.
+const httpContext = new AsyncLocalStorage<{ requestId: string }>();
+const requests = createInMemoryTraceStore({ capacity: 200 });
+const unsubscribe = subscribeTraces((trace) => {
+  requests.add({ ...trace, requestId: httpContext.getStore()?.requestId });
+});
+
+const runs = requests.query({ requestId: "request-42" });
+const usage = requests.aggregate({ requestId: "request-42" });
+unsubscribe();
+```
+
+The callback reads request context synchronously, before exporters run. It sees
+future collection from all built-in collectors, with no replay. Treat incoming
+traces as read-only and add an enriched copy. Errors are isolated, async
+callbacks are not awaited, and `toTrace()` does not notify subscribers.
+
+For app development, `@warlock.js/devtools` already does this: open the **AI** tab
+at `/__warlock`, or an HTTP request's **AI runs** section. Its bounded,
+content-free store is separate from your exporter/cache stores. Clearing the
+panel does not clear application trace history. Enable flow observation first;
+installing the viewer alone does not collect runs.

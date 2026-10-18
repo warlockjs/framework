@@ -1,3 +1,5 @@
+import type { DevtoolsAiEvent } from "./sources/ai-source";
+
 /**
  * The records the devtools collector keeps and the dashboard API returns.
  *
@@ -187,7 +189,8 @@ export type DevtoolsBackground = {
 export type DevtoolsStreamEvent =
   | { type: "request"; data: DevtoolsRequestSummary }
   | { type: "mail"; data: DevtoolsMailSummary }
-  | { type: "log"; data: DevtoolsLogEntry };
+  | { type: "log"; data: DevtoolsLogEntry }
+  | { type: "ai"; data: DevtoolsAiEvent };
 
 /** Unsubscribes a listener or detaches a source. */
 export type DevtoolsDisposer = () => void;

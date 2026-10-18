@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.33.0
+
+### Added
+
+- `subscribeTraces(listener)` and `TraceListener` for process-local adapters observing finalized traces from every built-in collector before exporter dispatch, with isolated listener failures and independent teardown.
+- Optional `Trace.requestId` and exact `TraceQuery.requestId` filters for both in-memory and cache-backed query/aggregate APIs.
+- Content-free retry-attempt timings, provider cache-hit and truncated-trip counts, agent compaction decisions and provider compaction-block counts on trace attributes, surfaced by the devtools AI panel.
+
 ## 5.32.0 - 2026-10-18
 
 ### Changed

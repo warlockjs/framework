@@ -361,3 +361,16 @@ details summary {
     grid-template-columns: 120px 1fr;
   }
 }
+
+.ai-span {
+  margin: 0.75rem 0 0.75rem 0.75rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid currentColor;
+}
+.ai-span summary {
+  cursor: pointer;
+}
+.toolbar input {
+  flex: 1;
+  min-width: 12rem;
+}

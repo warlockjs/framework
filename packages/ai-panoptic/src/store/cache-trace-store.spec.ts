@@ -268,6 +268,26 @@ describe("createCacheTraceStore", () => {
     expect(fresh!.addedAt).toBeGreaterThan(old!.addedAt);
   });
 
+  it("preserves HTTP request correlation through cache hydration and aggregation", async () => {
+    const driver = mockDriver();
+    const first = createCacheTraceStore(driver as never);
+    first.add({
+      ...trace({ traceId: "linked", sessionId: "conversation" }),
+      requestId: "http-request",
+    });
+    first.add(trace({ traceId: "background" }));
+    await flush();
+    const restored = createCacheTraceStore(driver as never);
+    await restored.ready();
+    expect(restored.query({ requestId: "http-request" }).map((item) => item.traceId)).toEqual([
+      "linked",
+    ]);
+    expect(
+      restored.aggregate({ requestId: "http-request", sessionId: "conversation" }).traces,
+    ).toBe(1);
+    expect(restored.query({ requestId: "conversation" })).toEqual([]);
+  });
+
   it("treats a missing index as an empty store on ready()", async () => {
     const driver = mockDriver();
     const store = createCacheTraceStore(driver as never);

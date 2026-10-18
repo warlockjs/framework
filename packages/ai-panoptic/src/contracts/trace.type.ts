@@ -140,6 +140,8 @@ export type TraceSpanError = {
  * `.execute()` / `.invoke()` call).
  */
 export type Trace = {
+  /** HTTP request correlation supplied by an integration; independent of sessionId. */
+  requestId?: string;
   /** Trace id — equals the root span's `traceId` / `rootRunId`. */
   traceId: string;
   /** Session grouping id, when the originating run carried one. */

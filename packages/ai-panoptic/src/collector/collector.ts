@@ -5,6 +5,7 @@ import type { Trace } from "../contracts/trace.type";
 import { walkSpans } from "../exporters/utils/walk-spans";
 import type { ContentCaptureOptions } from "./content-capture.type";
 import { reportToTrace } from "./report-to-trace";
+import { publishTrace } from "./trace-subscriptions";
 
 /**
  * Notified when a registered exporter throws during `collect` / `flush` /
@@ -80,6 +81,7 @@ class Collector implements CollectorContract {
   public async collect(report: BaseReport, rootError?: unknown): Promise<void> {
     const trace = this.toTrace(report, rootError);
 
+    publishTrace(trace);
     await this.dispatch(trace);
   }
 

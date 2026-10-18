@@ -1,6 +1,6 @@
 ---
 title: Devtools
-description: A loopback-only development dashboard for request timing, database queries, N+1 warnings, mail, logs, cache activity, routes, and API docs.
+description: A loopback-only development dashboard for request timing, database queries, N+1 warnings, mail, logs, cache activity, routes, AI traces, and API docs.
 ---
 
 `@warlock.js/devtools` is an in-app dashboard for understanding what a request
@@ -29,6 +29,7 @@ The default dashboard retains the latest 200 requests at `/__warlock`.
 | Panel    | What it shows                                                                                                                                                                                                                                                             |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Requests | Status, duration, query count, and a waterfall for router and page middleware, loaders, page-cache activity, rendering, and deferred values.                                                                                                                              |
+| AI       | Panoptic runs per HTTP request: model, tokens, cost, provider cache hits, tool timings, retries, truncation and compaction. See [AI panel](/v/latest/devtools/ai-panel/).                                                                                                 |
 | Queries  | SQL with bindings or Mongo commands, duration, rows, and Postgres `SELECT` query plans through **Explain**. Explain uses `EXPLAIN (FORMAT JSON)`, never `ANALYZE`.                                                                                                        |
 | N+1      | Repeated query shapes within one request, including the source file and line. The dashboard marks the request and prints a terminal warning such as `N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`. The fixed threshold is 5. |
 | Mail     | Mail captured by the development mail mode, including headers, sandboxed HTML and text, and attachment names.                                                                                                                                                             |

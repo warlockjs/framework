@@ -21,6 +21,8 @@ import type { ReportStatus } from "@warlock.js/ai";
  * const sessionSpend = store.aggregate({ sessionId: "session-42" });
  */
 export type TraceQuery = {
+  /** Exact HTTP request correlation id; absent on background traces. */
+  requestId?: string;
   /**
    * Match a single trace by its `traceId` (equals the root run's
    * `runId`). The most specific filter — narrows to at most one trace.

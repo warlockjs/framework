@@ -21,6 +21,7 @@ export function registerRequestsRoutes(
 
   server.delete("/api/requests", async (_request, reply) => {
     deps.collector.clear();
+    if (deps.ai?.available) deps.ai.store.clear();
     reply.code(204).send();
   });
 }
