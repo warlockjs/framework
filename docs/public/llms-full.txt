@@ -7984,6 +7984,31 @@ It also writes `.warlock/dev-server.json` (the server's address, for
 `warlock trace` and `warlock mcp`); `.warlock/` is already git-ignored by the
 starter. See the `warlock-agents-md` topic.
 
+## 5.31 to 5.32 TypeScript 7
+
+Pin the app's development dependency to `typescript@7.0.2`. The regular `tsc`
+command is now the native Go compiler; no native-preview package is needed.
+Remove `baseUrl` from every app tsconfig and resolve each `paths` target relative
+to the config. For example, `baseUrl: "src"` with `"app/*": ["app/*"]` becomes
+`"app/*": ["./src/app/*"]`. Replace `moduleResolution: "node"` / `"node10"` with
+`"bundler"` and use `module: "ESNext"` for Warlock's build pipeline. Explicitly
+include Node ambient types with `"types": ["node"]`; set `rootDir` if sources
+sit outside the config folder. Keep strict checking enabled.
+
+```bash
+npm install --save-dev --save-exact typescript@7.0.2
+npx tsc --noEmit
+npx warlock typecheck
+npx warlock typecheck --changed
+```
+
+The CLI preserves incremental state and changed-file filtering. Development
+health checks keep one native compiler session and update its snapshots. Syntax
+analysis uses OXC. `warlock upgrade` still parses/transforms with ts-morph's own
+bundled TypeScript, without using it as the app's compiler. Prefer Oxlint/Oxfmt:
+typescript-eslint still requires the old JavaScript API; ESLint mode is scheduled
+for deprecation in 5.33 and removal in 5.34.
+
 
 ## upload-file  `@warlock.js/core/upload-file/SKILL.md`
 
@@ -34527,6 +34552,132 @@ cache policy, validation, or a sitemap supplier.
 - The `load-page-data` topic: `LayoutLoader`, sequential execution, and `shared`.
 - The `navigate-on-the-client` topic: client swaps and `refresh()`.
 
+## use-web-fonts  `@warlock.js/web/use-web-fonts/SKILL.md`
+
+---
+name: use-web-fonts
+description: "Declare self-hosted fonts in web.fonts with metric-matched fallbacks, critical preloads and hashed immutable assets. Use for hero heading layout shifts, font-display swap, WOFF2, font variables, or fontPreload route policy."
+---
+
+# Use web fonts
+
+Declare fonts in `src/config/web.ts` and use the generated CSS variable.
+Read the existing root and font declarations before editing. Remove equivalent
+handwritten `@font-face` declarations when migrating; keep unrelated CSS.
+
+A condensed display font swapping in late reflowed a hero heading onto two
+lines with the wider fallback. Preloading fetches earlier; a metric-matched
+local fallback approximates both width and line height before the file arrives.
+
+## Complete example
+
+Prerequisite: an app with `webConnector()` installed and a licensed WOFF2
+file at `src/fonts/display-regular.woff2` (font binaries are app assets).
+
+```ts title="src/config/web.ts"
+import type { WebConfigurations } from "@warlock.js/web";
+
+export default {
+  fonts: [
+    {
+      family: "Display",
+      variable: "--font-display",
+      fallback: ["Arial", "Helvetica"],
+      display: "swap",
+      files: [
+        {
+          path: "src/fonts/display-regular.woff2",
+          weight: 400,
+          style: "normal",
+          preload: true,
+          aboveFold: true,
+        },
+      ],
+    },
+  ],
+} satisfies WebConfigurations;
+```
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import "./app.css";
+
+export default function App({ children }: AppProps) {
+  return (
+    <html lang="en">
+      <head>
+        <Head />
+      </head>
+      <body>
+        <div id="vessel">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+```css title="src/web/app.css"
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 8vw, 7rem);
+  line-height: 1;
+}
+```
+
+```tsx title="src/web/index.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/", name: "home" },
+} satisfies PageConfig;
+
+export default function HomePage() {
+  return (
+    <section className="hero">
+      <h1>Make room for bold ideas</h1>
+    </section>
+  );
+}
+```
+
+## Route policy
+
+An optional page/layout/root `config.fontPreload: false` suppresses all font
+preloads for its document; any ancestor's opt-out wins. CSS remains linked for
+client navigation. For example, a route without the hero:
+
+```tsx title="src/web/about.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = { fontPreload: false } satisfies PageConfig;
+
+export default function AboutPage() {
+  return <main>About this site</main>;
+}
+```
+
+## Options and verification
+
+- Paths are relative to the app root (`src/fonts/…` or `public/…`), not URLs.
+- Families require unique `family` and `variable`. Each file supports `weight`
+  (400 by default, or a range such as `"100 900"`), `style`, `unicodeRange`,
+  `preload`, `aboveFold`, and optional equivalent TTF/OTF `metricsPath`.
+- `display` defaults to `swap`. `fallback` accepts Arial, Helvetica, Times New
+  Roman, Segoe UI, Roboto, or an array. Use names from this recorded set.
+- Use the CSS variable; naming only the real family bypasses the adjusted stack.
+- Inspect initial HTML: one cross-origin font preload per critical URL and a
+  stylesheet link appear inside the head in development and production.
+- Inspect a production font response: hashed `/assets/font-…` URL,
+  `Cache-Control: public, max-age=31536000, immutable`. Unhashed public URLs
+  retain their usual policy. No automatic conversion: supply WOFF2 yourself.
+- Dev warnings identify TTF/OTF and critical faces missing preload/fallback.
+- Metrics use Capsize's weighted Latin sample and recorded system-font data
+  (MIT attribution in `src/fonts`). Width matching is approximate; test the
+  actual hero at its breakpoints with an empty browser cache. Variable fonts
+  use default-instance metrics; non-Latin sampling is not implemented.
+
 ## write-the-root  `@warlock.js/web/write-the-root/SKILL.md`
 
 ---
@@ -35375,15 +35526,26 @@ import { OpenAISDK } from "@warlock.js/ai-openai";
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY ?? "" });
 const model = openai.model({ name: "gpt-4o", maxTokens: 4_096 });
 
+const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+
 const agent = ai.agent({
   model,
+  tools,
   middleware: [
     ai.middleware.budget({
       maxCostUSD: 0.25,
       reserve: {
         outputTokens: 4_096, // = the model's maxTokens, the most one trip can generate
         // optional — default is estimateInputTokens(ctx.messages), an offline estimate
-        inputTokens: async (ctx) => (await countInputTokens(model, [...ctx.messages])).tokens,
+        inputTokens: async (ctx) =>
+          (
+            await countInputTokens(model, [...ctx.messages], {
+              tools,
+              signal: ctx.signal,
+              // Pass the same tools and model options used for generation.
+              estimate: { charsPerToken: 3 },
+            })
+          ).tokens,
       },
     }),
   ],
@@ -35397,6 +35559,26 @@ if (result.error instanceof BudgetExceededError && result.error.context?.reason 
 ```
 
 `estimateInputTokens(messages, { tools?, charsPerToken? })` is an offline **estimate**; `countInputTokens(model, messages, options)` uses `model.countTokens` when present and returns `{ tokens, source: "native" | "estimate" }`.
+
+`countInputTokens` also estimates when native counting throws `InvalidRequestError`
+with `reason: "count-unsupported"`. This typed signal is preserved by Anthropic,
+Google, Bedrock and OpenAI Responses adapters; ordinary validation, authentication,
+network, cancellation and rate-limit errors still propagate. Custom adapters
+should set this reason only when the count endpoint cannot represent the request:
+
+```ts
+import { InvalidRequestError } from "@warlock.js/ai";
+
+throw new InvalidRequestError("This count endpoint cannot count tools.", {
+  reason: "count-unsupported",
+});
+```
+
+Reserve mode can use this fallback for agents with system prompts and tools.
+Include the generation tools/options in the preflight callback; when `source` is
+`"estimate"`, the character heuristic is not an exact tokenizer or a guaranteed
+upper bound. Tune `estimate` for your input and leave headroom. Actual provider
+usage still settles the reservation after each call.
 
 ### SLO / cost contract — `budget({ contract })`
 
@@ -35590,6 +35772,41 @@ Same onion semantics: `before` top-down (return a `SupervisorResult` to short-ci
 - The `run-ai-agent` topic — agent lifecycle the middleware wraps
 - The `persist-ai-data` topic — `defaultStore` for semantic cache
 - The `handle-ai-errors` topic — `BudgetExceededError` / `GuardrailViolationError`
+
+## Hosted-search fees and reservation
+
+`ModelPricing.serverTools` uses USD per request; `usage.cost.serverTools` stores
+historical USD by tool, and `totalCost` includes those amounts. Request fees
+are explicit opt-ins alongside token prices. Missing counters/rates stay
+unreported/unpriced. `mergeUsage` sums `serverToolUse` across trips.
+
+```ts
+const guard = ai.middleware.budget({
+  maxCostUSD: 0.25,
+  pricing: {
+    "claude-sonnet-4-6": {
+      input: 3,
+      output: 15,
+      serverTools: { webSearch: 0.01 },
+    },
+  },
+  reserve: { outputTokens: 4096, serverToolRequests: 3 },
+});
+```
+
+`serverToolRequests` is a nonnegative safe integer for web-search requests per
+call, priced with `serverTools.webSearch`. A positive reservation without a
+rate fails closed for USD caps unless `onUnpriced: "allow"`. Use ModelPricing,
+not legacy per-1K prices. Actual reported fees replace the reservation after
+each trip; failed trips release it. Set model pricing too if reports must use
+the same fee table as a budget override.
+
+The allowance reserves money; pair it with provider controls (Anthropic
+`max_uses: 3`) and token headroom for retrieved content. Providers without a
+verified search limit cannot promise that allowance is a hard spending bound.
+Google's exported per-query fee is only for Gemini 3+: older models bill per
+prompt. Official verified rates and sources:
+https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees
 
 
 ## define-ai-tool  `@warlock.js/ai/define-ai-tool/SKILL.md`
@@ -35867,6 +36084,44 @@ Compact mode drops `description` / `title` / `examples` / `example` / `default` 
 - The `handle-ai-errors` topic — error hierarchy
 - The `run-supervisor` topic — artifacts under a supervisor
 - The `run-ai-workflow` topic — `workflow.asTool()` composition
+
+## Native search: counters and compatible transports
+
+Read `response.usage.serverToolUse` for provider-reported hosted usage and
+`response.providerMetadata` for raw OpenAI hosted output / Google grounding;
+Anthropic hosted blocks remain on `response.blocks`. Never count answer text
+or ordinary function calls as billable hosted usage. Hosted tools bypass
+application handlers.
+
+Qwen/DashScope search is a request flag, not a tool:
+
+```ts
+await qwenModel.complete(messages, {
+  providerOptions: { qwen: { enableSearch: true } }, // model provider must be "qwen"
+});
+```
+
+Kimi needs a builtin tool plus an echo continuation. The adapter supplies the
+verbatim result and the agent continues within `maxTrips`:
+
+```ts
+const assistant = ai.agent({
+  model: moonshotModel, // OpenAISDK with provider: "moonshot"
+  maxTrips: 4,
+  tools: [
+    ai.providerTool({
+      provider: "moonshot",
+      name: "$web_search",
+      definition: { type: "builtin_function", function: { name: "$web_search" } },
+    }),
+  ],
+});
+```
+
+No `execute` is needed. Qwen/Kimi request fees are unpriced because no verified
+billing counter is mapped. xAI's hosted search uses Responses and is rejected
+by the current Chat Completions XaiSDK. Full shapes and official sources:
+https://warlock.js.org/v/latest/ai/providers/openai-compatible/
 
 
 ## detect-and-redact-pii  `@warlock.js/ai/detect-and-redact-pii/SKILL.md`
@@ -37428,6 +37683,14 @@ ai.snapshot.sqlite({ path: "./data/chat.db" }); // node:sqlite (Node 22.5+; no f
 ai.snapshot.sqlite({ database: new Database("./data/chat.db") }); // better-sqlite3 (or any exec/prepare database)
 ```
 
+Local snapshot storage is private on POSIX: new directories default to `0700`, and JSON files (including temporary files and rewrites) default to exactly `0600`. Existing directories are never chmod-ed, and directory creation is subject to umask. Untouched older JSON files keep their permissions until rewritten. To allow a trusted group to read:
+
+```ts
+ai.snapshot.file({ dir: "./shared-sessions", dirMode: 0o750, fileMode: 0o640 });
+```
+
+`dirMode` / `fileMode` must be integer permission modes (`0o000`–`0o777`); group/other write bits are refused. `sqlite({ path })` creates parents with `0700`, sets its database to `0600` before opening and protects journal/WAL/SHM sidecars; existing parent directories are unchanged. `":memory:"` creates no files. With `sqlite({ database })`, the caller manages permissions. Windows ignores POSIX modes; configure filesystem ACLs there.
+
 `ai.snapshot.sqlite` creates its table on first use (`createTable: false` to opt out) and never loads `node:sqlite` when you pass `database`. Both stores are single-host. All snapshot factories are generic, so they type themselves as `SnapshotStore<ConversationSessionRecord>` when passed as `store`.
 
 ## Long sessions
@@ -37684,6 +37947,14 @@ ai.snapshot.file({ dir: ".warlock/snapshots" }); // one JSON file per runId, wri
 ai.snapshot.sqlite({ path: "./data/agent.db" }); // node:sqlite; table warlock_snapshots, created on first use
 ai.snapshot.sqlite({ database: betterSqliteDb, table: "runs", createTable: false }); // bring your own exec/prepare database
 ```
+
+Local snapshot storage is private on POSIX: new directories default to `0700`, and JSON files (including temporary files and rewrites) default to exactly `0600`. Existing directories are never chmod-ed, and directory creation is subject to umask. Untouched older JSON files keep their permissions until rewritten. To allow a trusted group to read:
+
+```ts
+ai.snapshot.file({ dir: "./shared-sessions", dirMode: 0o750, fileMode: 0o640 });
+```
+
+`dirMode` / `fileMode` must be integer permission modes (`0o000`–`0o777`); group/other write bits are refused. `sqlite({ path })` creates parents with `0700`, sets its database to `0600` before opening and protects journal/WAL/SHM sidecars; existing parent directories are unchanged. `":memory:"` creates no files. With `sqlite({ database })`, the caller manages permissions. Windows ignores POSIX modes; configure filesystem ACLs there.
 
 `ai.snapshot.sqlite` is the one store that creates its own table (an embedded file has no migration step); `createTable: false` turns that off and `schema()` still returns the DDL. Every `ai.snapshot.*` factory is generic over the snapshot shape (`ai.snapshot.file<AgentSnapshot>({ dir })`), so the same factories back `durable` agents and `ai.session()` conversations (the `keep-agent-conversations` topic).
 
@@ -38831,6 +39102,10 @@ try {
 ```
 
 Thrown only in `replay` mode on a miss (code `"VCR_CASSETTE_MISS"`). It carries the looked-up `requestHash` and the cassette `path` so a failing CI run names exactly which call was not recorded. Extends `AIError` directly (not `ProviderError`) — a miss is a harness/config failure, not a provider failure. **The whole point:** `replay` never falls back to a live call, which would silently re-introduce non-determinism into a test that asked for the opposite. Re-record by running once in `record` / `auto`.
+
+## Disk permissions
+
+On POSIX, cassette saves create missing directories with `0700` (subject to umask) and write JSON through a `0600` temporary file, chmod-ed before atomic rename. Saved files are exactly `0600`, including rewrites of older, more permissive files. Existing directories are never chmod-ed. Windows ignores POSIX modes; use filesystem ACLs there.
 
 ## `save()` — flush new entries
 
@@ -41955,6 +42230,13 @@ used for generation are counted. The endpoint supports only input-shaping fields
 output caps and generation-only options are omitted. The Chat Completions model
 has no `countTokens` method. `sdk.count(text)` remains a separate offline estimate.
 
+For budget preflight, `countInputTokens(model, messages, { tools })` from
+`@warlock.js/ai` returns `{ tokens, source }`. It estimates only when native
+counting is absent or explicitly throws `InvalidRequestError` with
+`reason: "count-unsupported"`; this adapter preserves that signal. System and
+tools are supported natively. Ordinary validation, auth, network and rate-limit
+errors propagate. See the cost/budget guide for reserve mode.
+
 ```ts
 if (model.countTokens) {
   const inputTokens = await model.countTokens(messages, options);
@@ -41971,6 +42253,43 @@ if (model.countTokens) {
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `embed-text` topic of the `warlock-js-ai` skill — embedder usage
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
+
+## Hosted-search metering and metadata
+
+On Responses, each structured `web_search_call` output item contributes one
+`usage.serverToolUse.webSearchRequests`. Streaming item events and terminal
+output are reconciled as snapshots, so the same call is counted once.
+`response.providerMetadata.openai.output` (also on streaming `done`) retains
+hosted output items with their action and sources. The adapter automatically
+requests `web_search_call.action.sources` when web-search tools are supplied.
+Agent reports preserve this metadata on each trip; it is not replayed or
+passed to function dispatch.
+
+Explicitly set `pricing.serverTools: OPENAI_SERVER_TOOL_PRICING` (exported by
+this package) for standard `web_search`: $0.01 per tool call, plus search-content
+tokens at model rates. Non-reasoning `web_search_preview` has a different fee
+and needs an explicit override. These prices were verified on 2026-10-18 from
+[OpenAI pricing](https://developers.openai.com/api/docs/pricing#built-in-tools);
+see the [official search output schema](https://developers.openai.com/api/docs/guides/tools-web-search)
+and [cost tracking](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
+Chat Completions does not map hosted-search billing counters.
+
+Qwen's `enableSearch` flag and Kimi's `$web_search` echo continuation have
+separate verified controls; see [OpenAI-compatible native search](https://warlock.js.org/v/latest/ai/providers/openai-compatible/).
+
+```ts
+import { OPENAI_SERVER_TOOL_PRICING } from "@warlock.js/ai-openai";
+const model = openai.model({
+  name: "gpt-4.1",
+  api: "responses",
+  pricing: { ...{ input: 2, output: 8 }, serverTools: OPENAI_SERVER_TOOL_PRICING },
+});
+const response = await model.complete(messages, {
+  providerTools: [{ provider: "openai", definition: { type: "web_search" } }],
+});
+console.log(response.usage.serverToolUse?.webSearchRequests);
+console.log(response.providerMetadata);
+```
 
 
 ================================================================================
@@ -42436,6 +42755,13 @@ const model = anthropic.model({ name: "claude-opus-5-5" }); // an AnthropicModel
 await model.countTokens(messages, { tools }); // exact, via messages.countTokens (network)
 ```
 
+For budget preflight, `countInputTokens(model, messages, { tools })` from
+`@warlock.js/ai` returns `{ tokens, source }`. It estimates only when native
+counting is absent or explicitly throws `InvalidRequestError` with
+`reason: "count-unsupported"`; this adapter preserves that signal. System and
+tools are supported natively. Ordinary validation, auth, network and rate-limit
+errors propagate. See the cost/budget guide for reserve mode.
+
 `countTokens` sends the same system prompt, tools, thinking and `providerOptions.anthropic.betas` a real call would, keeping only the fields the endpoint accepts.
 
 ## No embeddings
@@ -42452,6 +42778,33 @@ Anthropic ships no first-party embeddings API, so `AnthropicSDK` intentionally d
 - The `run-ai-agent` topic of the `warlock-js-ai` skill
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill
 - The `handle-ai-errors` topic of the `warlock-js-ai` skill
+
+## Hosted-search usage and fees
+
+`complete()` and streaming `done` map the provider's
+`usage.server_tool_use.web_search_requests` / `web_fetch_requests` to
+`usage.serverToolUse.webSearchRequests` / `webFetchRequests`. Streaming
+`message_delta` counts are cumulative snapshots, never added twice. Raw
+`server_tool_use` and search-result blocks remain in `response.blocks` and are
+replayed in history; they never invoke local function handlers.
+
+To add request fees to token costs, explicitly compose the verified
+`ANTHROPIC_SERVER_TOOL_PRICING` export into model `pricing.serverTools`:
+
+```ts
+import { ANTHROPIC_SERVER_TOOL_PRICING } from "@warlock.js/ai-anthropic";
+const model = anthropic.model({
+  name: "claude-sonnet-4-6",
+  pricing: { input: 3, output: 15, serverTools: ANTHROPIC_SERVER_TOOL_PRICING },
+});
+```
+
+The [search fee](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool#usage-and-pricing)
+is $0.01 per search; [fetch](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool#usage-and-pricing)
+has no additional request fee (verified 2026-10-18). Tokens remain additional.
+No code-execution request count is inferred from blocks. See
+[hosted-tool costs](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees)
+and [fee reservations](https://warlock.js.org/v/latest/ai/recipes/cost-budgets-and-slo/#reserve-hosted-search-fees).
 
 
 ================================================================================
@@ -42755,19 +43108,30 @@ ignored. `GoogleCallOptions` is exported. `systemInstruction`, `tools`,
 `abortSignal` and `httpOptions` are protected and throw `InvalidRequestError`;
 use neutral messages/tools/signal and SDK transport configuration for them.
 
-`model.countTokens(messages, options?)` calls the native counting endpoint with
-the same converted contents. In Vertex mode it also counts the same system
-instruction and tools as generation and forwards cancellation. In Developer API
-mode, the installed Google SDK cannot count system instructions or tools through
-its typed count endpoint: requests containing them fail explicitly before a
-network call. Cached-content references also fail explicitly, since this SDK
-count endpoint cannot reproduce them. The adapter never silently counts only a
-subset of a prompt. `sdk.count(text)` remains a separate offline estimate.
+`model.countTokens(messages, options?)` counts the converted contents, system
+instructions and tools on both the Gemini Developer API (API key) and Vertex AI.
+Developer API counting sends the full `generateContentRequest`, including tool
+configuration and generation settings, as documented in the
+[Gemini token-counting reference](https://ai.google.dev/api/tokens). It uses the
+existing SDK transport, preserving API-key auth, custom fetch, base URL/proxy
+settings, headers, retries and cancellation. Vertex retains its typed SDK path.
+
+Cached-content references still throw `InvalidRequestError` with
+`reason: "count-unsupported"`. Use `countInputTokens` for budget preflight: it
+returns an estimate for this explicit limitation; authentication, network,
+rate-limit and ordinary validation errors still propagate. `sdk.count(text)`
+remains a separate offline estimate.
 
 ```ts
-if (model.countTokens) {
-  const inputTokens = await model.countTokens(messages, options);
-}
+import { countInputTokens } from "@warlock.js/ai";
+
+const messages = [
+  { role: "system" as const, content: "Be concise." },
+  { role: "user" as const, content: "Hello" },
+];
+const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+const { tokens, source } = await countInputTokens(model, messages, { tools });
+// source is "native" for ordinary Developer API and Vertex requests, including tools.
 ```
 
 ## When NOT to use this skill
@@ -42780,6 +43144,44 @@ if (model.countTokens) {
 - The `run-ai-agent` topic of the `warlock-js-ai` skill
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill
 - The `embed-text` topic of the `warlock-js-ai` skill
+
+## Search grounding metadata and fees
+
+`response.providerMetadata.google.groundingMetadata` retains the raw grounding
+metadata for each indexed candidate: queries, chunks, supports and search entry
+point. Streaming `done` carries the same metadata. Agent reports retain it per
+trip. Hosted search never produces a local function call.
+
+`usage.serverToolUse.webSearchRequests` counts unique nonempty
+`groundingMetadata.webSearchQueries`; `googleWebSearchQueries` records the raw
+array length, including duplicates and empty entries. Stream snapshots replace
+prior metadata per candidate rather than accumulating repeated snapshots.
+The [official schema](https://ai.google.dev/api/generate-content#GroundingMetadata)
+defines the queries array.
+
+[Google's pricing guide](https://ai.google.dev/gemini-api/docs/google-search#pricing)
+(verified 2026-10-18) bills Gemini 3 and newer per unique nonempty query: $14 per
+1,000 queries after the shared monthly free allowance. You can explicitly use
+the exported `GOOGLE_SERVER_TOOL_PRICING` as `pricing.serverTools` for that
+model family. Gemini 2.5 and older bill per grounded prompt; their query count
+is not a billable-prompt count, so leave this fee unpriced or account for it
+outside this per-query table. Free allowances are not subtracted locally.
+No web-fetch/code-execution count is inferred from result parts. See
+[cost tracking](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
+
+```ts
+import { GOOGLE_SERVER_TOOL_PRICING } from "@warlock.js/ai-google";
+const model = google.model({
+  name: "gemini-3.5-flash-lite",
+
+  pricing: { ...{ input: 0.3, output: 2.5 }, serverTools: GOOGLE_SERVER_TOOL_PRICING },
+});
+const response = await model.complete(messages, {
+  providerTools: [{ provider: "google", definition: { googleSearch: {} } }],
+});
+console.log(response.usage.serverToolUse?.webSearchRequests);
+console.log(response.providerMetadata);
+```
 
 
 ================================================================================
@@ -43068,6 +43470,13 @@ Converse messages, system blocks, tool configuration and
 Availability depends on the model and region; provider failures use the adapter's
 normal typed errors. `sdk.count(text)` remains a separate offline estimate.
 
+For budget preflight, `countInputTokens(model, messages, { tools })` from
+`@warlock.js/ai` returns `{ tokens, source }`. It estimates only when native
+counting is absent or explicitly throws `InvalidRequestError` with
+`reason: "count-unsupported"`; this adapter preserves that signal. System and
+tools are supported natively. Ordinary validation, auth, network and rate-limit
+errors propagate. See the cost/budget guide for reserve mode.
+
 ```ts
 if (model.countTokens) {
   const inputTokens = await model.countTokens(messages, options);
@@ -43096,6 +43505,16 @@ as user context when it replaces the first non-system turn.
 
 Adjacent-turn normalization preserves empty histories and separate system prompts
 without inserting synthetic conversation turns.
+
+## Hosted-search accounting limit
+
+Bedrock Converse's [TokenUsage schema](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_TokenUsage.html)
+and the installed SDK expose token/cache counts, with no hosted-tool request
+counter (verified 2026-10-18). `usage.serverToolUse` therefore remains absent;
+no count or search fee is inferred from `server_tool_use` system-tool blocks.
+Hosted system tools continue to stay outside function dispatch. Direct
+Anthropic counters are not assumed to exist on Converse. Supply fees only when
+your own verified metering establishes the billing unit.
 
 
 ================================================================================
@@ -43711,6 +44130,18 @@ OpenAI-only bodies across a mixed-provider fallback chain.
 Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
+
+## Native web search requires Responses
+
+[xAI's official web-search guide](https://docs.x.ai/developers/tools/web-search)
+(verified 2026-10-18) sends `{ type: "web_search" }` to `POST /v1/responses`.
+`XaiSDK` currently wraps Chat Completions, so native `web_search` and `x_search`
+provider tools are explicitly unsupported and throw `InvalidRequestError`
+before transport, explaining that the vendor's Responses API is required.
+Use xAI's own Responses SDK for native search. The framework's
+`api: "responses"` adapter remains direct-OpenAI-only; passing a tool definition
+does not change this transport. No xAI hosted-search request count or list fee
+is guessed. See [compatible native search](https://warlock.js.org/v/latest/ai/providers/openai-compatible/#xai).
 
 
 ================================================================================
@@ -44374,6 +44805,58 @@ const { url, close } = await ai.mcp
 
 Header names are lower-cased; every client header is present (including `authorization`). Over stdio `ctx.request` is absent. Nothing on `ctx.request` reaches the model.
 
+## Return native MCP results
+
+Default results become one text block, even when an object resembles an MCP result. Return the exported `mcpResult(...)` helper to preserve native content blocks, `isError`, `structuredContent` and `_meta` over stdio or HTTP:
+
+```ts
+import { mcpResult } from "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+
+const count = ai.tool({
+  name: "count",
+  description: "Return a structured count",
+  meta: {
+    outputSchema: {
+      type: "object",
+      properties: { count: { type: "number" } },
+      required: ["count"],
+    },
+  },
+  execute: async (_input: unknown, ctx) =>
+    mcpResult({
+      content: [{ type: "text", text: '{"count":2}' }],
+      structuredContent: { count: 2 },
+      _meta: { tenant: ctx?.request?.headers["x-tenant-id"] ?? "unknown" },
+    }),
+});
+
+ai.mcp.serve([count], { name: "counts" });
+```
+
+The helper returns a branded `McpNativeResult` wrapper. The serving boundary validates and unwraps it without altering its payload. `isError: true` is sent as-is; thrown tool errors retain the existing mapping.
+
+For tools that already return native objects, opt in at the server or tool level:
+
+```ts
+const nativeTool = ai.tool({
+  name: "native-result",
+  description: "Return a native result",
+  meta: { mcpResults: "native" }, // this tool opts in even on a default server
+  execute: async () => ({ content: [{ type: "text", text: "fixture" }], isError: true }),
+});
+
+ai.mcp.serve([nativeTool], { name: "native-tools", results: "native" });
+// On a native-mode server, meta: { mcpResults: "text" } disables detection for a tool.
+// Explicit mcpResult(...) returns always opt in, regardless of the detection setting.
+```
+
+Native mode detects objects containing any of `content`, `isError`, `structuredContent` or `_meta`; other values keep text serialization. `content` must be an array of valid MCP text/image/audio/resource-link/embedded-resource blocks. Optional `isError` must be boolean; `structuredContent` and `_meta` must be JSON objects. Invalid or non-JSON native payloads answer a JSON-RPC internal error (`-32603`), including malformed helper payloads.
+
+`meta.outputSchema` is emitted as `outputSchema` in `tools/list`; `structuredContent` passes through unchanged. Tool authors own schema conformity. Follow the [MCP 2025-11-25 tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#structured-content): also include serialized structured output in a text block for compatibility.
+
+Request identity is unchanged: native tools receive each HTTP call's headers and remote address on `ctx.request`, plus `ctx.signal`. Over stdio, `ctx.request` is absent. Returning a native result does not automatically expose request metadata; the tool controls its response.
+
 ## Sources and tool-name collisions
 
 ```ts
@@ -44419,7 +44902,7 @@ ai.mcp.serve(tools, {
 
 - **`initialize`** → `{ name, version }`, capabilities `tools` (+ `resources` / `prompts` when configured); protocol version negotiated from `SUPPORTED_PROTOCOL_VERSIONS` (`2025-11-25`, `2025-06-18`, `2025-03-26`).
 - **`tools/list`** → `inputSchema` via `extractJsonSchema(contract.input, { target: schemaTarget })` (default `"draft-2020-12"`).
-- **`tools/call`** → `invoke()`; `data` → text block (JSON-stringified unless a string), `error` → `isError: true`. Unknown tool → JSON-RPC error.
+- **`tools/call`** → `invoke()`; default `data` → text block (JSON-stringified unless a string), opted-in native results → validated passthrough, `error` → `isError: true`. Unknown tool → JSON-RPC error.
 - **`ping`** → `{}`.
 
 ## Drive the protocol yourself (tests, custom servers)
@@ -46087,6 +46570,20 @@ for (const trace of store.query({ sessionId })) {
 - The `export-traces` topic — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — the `BaseReport` the collector projects into the `Trace` this store retains.
 
+## Hosted-tool rollups
+
+`sumUsage` uses the framework's all-channel `mergeUsage`, so traces retain
+`usage.serverToolUse` and `usage.cost.serverTools` alongside cache lifetime
+counts and mixed-provider cache semantics. Request counts remain absent when
+unreported; unpriced requests do not erase priced siblings.
+
+```ts
+const stats = store.aggregate({ sessionId });
+console.log(stats.usage.serverToolUse?.webSearchRequests);
+console.log(stats.cost?.serverTools?.webSearch); // historical USD
+console.log(totalCost(stats.cost)); // includes hosted fees
+```
+
 
 ## use-local-dashboard  `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`
 
@@ -46562,6 +47059,19 @@ double-quote, semicolon and trailing-comma settings. Import sorting is on in
 imports. Oxfmt does not delete unused imports, so remove them from Oxlint's
 `no-unused-vars` diagnostics. Scripts in both toolchains call local binaries
 (`eslint --fix ./src --max-warnings=0`, `tsc --noEmit`), never `npx`.
+
+## TypeScript 7 in 5.32
+
+New projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
+The template uses `module: "ESNext"`, `moduleResolution: "bundler"`, explicit
+Node types, and `paths` relative to its tsconfig, without `baseUrl`.
+Existing apps must remove `baseUrl`, rebase alias targets, and replace
+`moduleResolution: "node"` / `"node10"` before typechecking.
+
+Use the Oxlint/Oxfmt lint mode with TS7. The optional ESLint scaffold is retained,
+but typescript-eslint's parser requires the removed JavaScript compiler API and
+does not support TS7. ESLint mode is scheduled for deprecation in 5.33 and removal
+in 5.34. A parser's bundled older TypeScript is separate from the app's native `tsc`.
 
 
 ================================================================================

@@ -295,19 +295,30 @@ ignored. `GoogleCallOptions` is exported. `systemInstruction`, `tools`,
 `abortSignal` and `httpOptions` are protected and throw `InvalidRequestError`;
 use neutral messages/tools/signal and SDK transport configuration for them.
 
-`model.countTokens(messages, options?)` calls the native counting endpoint with
-the same converted contents. In Vertex mode it also counts the same system
-instruction and tools as generation and forwards cancellation. In Developer API
-mode, the installed Google SDK cannot count system instructions or tools through
-its typed count endpoint: requests containing them fail explicitly before a
-network call. Cached-content references also fail explicitly, since this SDK
-count endpoint cannot reproduce them. The adapter never silently counts only a
-subset of a prompt. `sdk.count(text)` remains a separate offline estimate.
+`model.countTokens(messages, options?)` counts the converted contents, system
+instructions and tools on both the Gemini Developer API (API key) and Vertex AI.
+Developer API counting sends the full `generateContentRequest`, including tool
+configuration and generation settings, as documented in the
+[Gemini token-counting reference](https://ai.google.dev/api/tokens). It uses the
+existing SDK transport, preserving API-key auth, custom fetch, base URL/proxy
+settings, headers, retries and cancellation. Vertex retains its typed SDK path.
+
+Cached-content references still throw `InvalidRequestError` with
+`reason: "count-unsupported"`. Use `countInputTokens` for budget preflight: it
+returns an estimate for this explicit limitation; authentication, network,
+rate-limit and ordinary validation errors still propagate. `sdk.count(text)`
+remains a separate offline estimate.
 
 ```ts
-if (model.countTokens) {
-  const inputTokens = await model.countTokens(messages, options);
-}
+import { countInputTokens } from "@warlock.js/ai";
+
+const messages = [
+  { role: "system" as const, content: "Be concise." },
+  { role: "user" as const, content: "Hello" },
+];
+const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+const { tokens, source } = await countInputTokens(model, messages, { tools });
+// source is "native" for ordinary Developer API and Vertex requests, including tools.
 ```
 
 ## When NOT to use this skill
@@ -320,3 +331,41 @@ if (model.countTokens) {
 - The `run-ai-agent` topic of the `warlock-js-ai` skill
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill
 - The `embed-text` topic of the `warlock-js-ai` skill
+
+## Search grounding metadata and fees
+
+`response.providerMetadata.google.groundingMetadata` retains the raw grounding
+metadata for each indexed candidate: queries, chunks, supports and search entry
+point. Streaming `done` carries the same metadata. Agent reports retain it per
+trip. Hosted search never produces a local function call.
+
+`usage.serverToolUse.webSearchRequests` counts unique nonempty
+`groundingMetadata.webSearchQueries`; `googleWebSearchQueries` records the raw
+array length, including duplicates and empty entries. Stream snapshots replace
+prior metadata per candidate rather than accumulating repeated snapshots.
+The [official schema](https://ai.google.dev/api/generate-content#GroundingMetadata)
+defines the queries array.
+
+[Google's pricing guide](https://ai.google.dev/gemini-api/docs/google-search#pricing)
+(verified 2026-10-18) bills Gemini 3 and newer per unique nonempty query: $14 per
+1,000 queries after the shared monthly free allowance. You can explicitly use
+the exported `GOOGLE_SERVER_TOOL_PRICING` as `pricing.serverTools` for that
+model family. Gemini 2.5 and older bill per grounded prompt; their query count
+is not a billable-prompt count, so leave this fee unpriced or account for it
+outside this per-query table. Free allowances are not subtracted locally.
+No web-fetch/code-execution count is inferred from result parts. See
+[cost tracking](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
+
+```ts
+import { GOOGLE_SERVER_TOOL_PRICING } from "@warlock.js/ai-google";
+const model = google.model({
+  name: "gemini-3.5-flash-lite",
+
+  pricing: { ...{ input: 0.3, output: 2.5 }, serverTools: GOOGLE_SERVER_TOOL_PRICING },
+});
+const response = await model.complete(messages, {
+  providerTools: [{ provider: "google", definition: { googleSearch: {} } }],
+});
+console.log(response.usage.serverToolUse?.webSearchRequests);
+console.log(response.providerMetadata);
+```
