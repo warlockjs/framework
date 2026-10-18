@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0 - 2026-10-18
 
+### Upgrading
+
+- **BREAKING (only for `.queue()` with the herald backend):** `@warlock.js/herald` is now an optional peer dependency instead of an optional dependency, so it is no longer installed automatically. If you use `heraldQueue()` / `startNotificationsWorker()`, install it next to the other family packages (`npm install @warlock.js/herald@5.32.0`); without it, `.queue()` with the herald backend rejects with the existing "package not installed" error.
+
+### Fixed
+
+- The published package no longer carries a private, bundled copy of `@warlock.js/herald`'s source. Because herald was declared as an optional dependency, the release build did not treat it as external and inlined it, so an app using both packages could get two separate herald instances. Herald is now an optional peer and is always imported from the app's own installation.
+
 ### Changed
 
 - Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.

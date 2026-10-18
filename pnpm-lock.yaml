@@ -1093,6 +1093,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 4.1.10
         version: 4.1.10(vitest@4.1.10)
+      '@warlock.js/herald':
+        specifier: workspace:^
+        version: link:../herald
       '@warlock.js/queue':
         specifier: workspace:^
         version: link:../queue
@@ -1102,10 +1105,6 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1)(vite@7.3.6(@types/node@22.20.1)(tsx@4.23.13)(yaml@2.9.0))
-    optionalDependencies:
-      '@warlock.js/herald':
-        specifier: 5.32.0
-        version: link:../herald
 
   packages/queue:
     dependencies:

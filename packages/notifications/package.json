@@ -15,13 +15,14 @@
     "@warlock.js/core": "workspace:^",
     "@warlock.js/logger": "workspace:^"
   },
-  "optionalDependencies": {
-    "@warlock.js/herald": "5.32.0"
-  },
   "peerDependencies": {
+    "@warlock.js/herald": "5.32.0",
     "@warlock.js/queue": "5.32.0"
   },
   "peerDependenciesMeta": {
+    "@warlock.js/herald": {
+      "optional": true
+    },
     "@warlock.js/queue": {
       "optional": true
     }
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@vitest/coverage-v8": "4.1.10",
+    "@warlock.js/herald": "workspace:^",
     "@warlock.js/queue": "workspace:^",
     "typescript": "7.0.2",
     "vitest": "4.1.10"

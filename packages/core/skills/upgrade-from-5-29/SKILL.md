@@ -382,6 +382,12 @@ instead of a plain `ProviderError`; update exhaustive `AIErrorCode` switches and
 custom `fallbackModel({ retryOn })` lists. Bedrock calls with a `cacheControl`
 breakpoint now also cache the system prompt and (Claude) tool definitions.
 
+## 5.31 to 5.32 notifications with the herald queue
+
+Apps that call `.queue()` with `heraldQueue()` must now install `@warlock.js/herald` themselves (it became an
+optional peer of `@warlock.js/notifications`; 5.31.0 bundled a private copy of it). Install it at the same version
+as the rest of the family.
+
 ## Verify the application paths that changed
 
 Run the app's type check, its logger channel tests, any tools with ordered side
