@@ -177,7 +177,10 @@ server-only (it reaches `@warlock.js/cache`), and keeping it off the root
 barrel keeps `@warlock.js/cache` out of the client bundle.
 
 Evicts every stored entry under any of the given tags, through
-`@warlock.js/cache`'s tag index.
+`@warlock.js/cache`'s tag index. After eviction it also notifies connected
+[live pages](/v/latest/web/essentials/live-page-data/) through core's socket
+connector. Declare `config.live.tags` to opt an open page into loader re-runs;
+`config.cache.tags` alone only labels its stored response.
 
 ## The `x-warlock-cache` header
 
@@ -208,6 +211,12 @@ Cross-worker reach depends on the configured `@warlock.js/cache` driver:
   worker keeps serving its stale entry until `ttl`/`maxAge` expires. Enabling
   `serverCache` with an in-process driver in a clustered deployment logs a
   one-time startup warning; use a shared driver for cluster-wide invalidation.
+
+Push delivery to clients on every worker additionally requires a shared
+`socket.adapter`. A shared cache alone evicts entries but does not broadcast
+socket events across processes. Queue/CLI publishers must boot the socket
+connector with that adapter too. See
+[live page deployment requirements](/v/latest/web/essentials/live-page-data/#multiple-processes).
 
 ## See also
 

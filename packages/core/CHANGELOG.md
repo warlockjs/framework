@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Upgrading
 
 - Run `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`), install dependencies and review customized configs. To retain legacy lint checks temporarily, set `devServer.healthCheckers.eslint: true` and select `warlock check --lint eslint`. See the upgrade skill's "5.32 to 5.33" section.
+- `broadcastSocketEvent(event, ...args)` dispatches through the existing socket connector's adapter and returns `false` when no socket server is available. Web page-cache invalidations use this path to notify clients across processes configured with a shared adapter.
 
 ## 5.32.0 - 2026-10-18
 

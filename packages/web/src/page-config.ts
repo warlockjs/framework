@@ -1,4 +1,5 @@
 import type { BaseValidator } from "@warlock.js/seal";
+import type { LivePageOptions } from "./live-page-data";
 import type { PageMetadata } from "./metadata";
 import type { LoaderFunction } from "./props";
 import type { RouteDeclaration } from "./route";
@@ -60,6 +61,8 @@ export type PageConfig<TLoader extends LoaderFunction | undefined = undefined> =
   readonly route?: RouteDeclaration;
   /** Response and server-cache policy; independent of URL identity. */
   readonly cache?: PageCacheOptIn;
+  /** Re-run this page's loader pipeline when any dependency tag is invalidated. */
+  readonly live?: LivePageOptions;
   /** Page guards run after ancestor guards. */
   readonly middleware?: readonly PipelineMiddleware[];
   /** Request input validated before the page loader runs. */

@@ -1,4 +1,5 @@
 import { BaseValidator } from "@warlock.js/seal";
+import { isLivePageOptions, type LivePageOptions } from "../live-page-data";
 import {
   MODULE_CONFIG_KEYS,
   MODULE_EXPORT_NAMES,
@@ -40,6 +41,7 @@ export type NormalizedPageModule = {
   register?: () => unknown;
   route?: PageRoute;
   cache?: PageCacheOptIn;
+  live?: LivePageOptions;
   middleware?: readonly PipelineMiddleware[];
   validation?: PageConfigValidation;
   action?: PageActionFunction;
@@ -500,6 +502,14 @@ export function normalizePageModule(
     normalized.middleware = validateMiddleware(configValue.middleware, sourceFile);
 
   if (kind === "page") {
+    if (configValue.live !== undefined) {
+      if (!isLivePageOptions(configValue.live))
+        fail(
+          sourceFile,
+          "config.live requires non-empty tags and a positive polling interval in milliseconds.",
+        );
+      normalized.live = configValue.live;
+    }
     if (configValue.route !== undefined)
       normalized.route = validateRoute(configValue.route, sourceFile);
     if (configValue.cache !== undefined)

@@ -113,6 +113,25 @@ Reading `app.socket` (or `getSocketServer()`) at the top level of `main.ts` retu
 
 ## Emitting from a controller or service
 
+Use `broadcastSocketEvent` when a framework integration should tolerate an
+absent connector and broadcast through the configured adapter:
+
+```ts
+import { broadcastSocketEvent } from "@warlock.js/core";
+
+const dispatched = broadcastSocketEvent("inventory:changed", { tags: ["products"] });
+// false without a booted socket server; true means dispatched, not delivered.
+```
+
+This broadcasts to all default-namespace clients, so payloads must be public.
+It uses `io.emit` (not `io.local.emit`), allowing `socket.adapter` to forward to
+other app processes. Each publisher, including a queue/CLI process, must boot
+the socket connector with the same adapter. See Socket.IO's official
+[Redis adapter](https://socket.io/docs/v4/redis-adapter/) and
+[multiple-node guidance](https://socket.io/docs/v4/using-multiple-nodes/).
+Web's `invalidatePageCache(tags)` uses this path for opt-in `config.live` pages;
+shared cache storage is also required when evicting across processes.
+
 Once the server is up, anything with access to `app.socket` can emit:
 
 ```ts title="src/app/notifications/services/notify-user.service.ts"

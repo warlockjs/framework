@@ -15,6 +15,7 @@ export const MODULE_CONFIG_KEYS = {
   page: [
     "route",
     "cache",
+    "live",
     "middleware",
     "validation",
     "metadata",

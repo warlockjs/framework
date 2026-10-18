@@ -1,0 +1,143 @@
+---
+title: Live page data
+slug: v/latest/web/essentials/live-page-data
+description: Refresh tagged page loaders after server invalidations, with navigation and unsent form guards.
+sidebar:
+  order: 18
+  label: Live page data
+---
+
+Declare a page loader's dependencies in `config.live`. When the server calls
+`invalidatePageCache(tags)`, matching open pages re-run their normal app,
+layout, and page loader pipeline through client navigation. The page URL and
+mounted layout stay in place. No component hook is needed.
+
+```tsx title="src/web/products/index.page.tsx"
+import type { PageConfig, PageProps } from "@warlock.js/web";
+
+export const config = {
+  live: { tags: ["products"], pollInterval: 15_000 },
+} satisfies PageConfig;
+
+export async function loader() {
+  return { updatedAt: new Date() };
+}
+
+export default function Products({ data }: PageProps<typeof loader>) {
+  return <p>Updated: {data.updatedAt.toISOString()}</p>;
+}
+```
+
+`tags` is a non-empty array of non-empty strings. Any overlapping tag triggers
+a refresh. These dependencies are independent of `config.cache`: a private,
+uncached page can be live too. If the page also uses `config.cache.serverCache`,
+include the same dependencies in its cache tags so invalidations evict its
+stored responses as well. `config.live` belongs on a page; it describes the
+dependencies of that page's entire loader pipeline.
+
+`pollInterval` is in milliseconds and defaults to **30,000**. It must be finite
+and between 1 and 2,147,483,647. Polling runs only when the configured socket is
+absent or disconnected. It uses the same navigation and form guards as pushes.
+
+## Connect the existing socket client
+
+Use core's existing socket connector and pass the application's client to
+`configureLivePageData`. The browser package `socket.io-client` is an app-owned
+dependency, installed only when the app wants push delivery. The web package
+does not create another connection or own disconnection/authentication.
+
+```tsx title="src/web/root.tsx — register alongside existing exports"
+import { configureLivePageData } from "@warlock.js/web";
+import { io } from "socket.io-client";
+
+export function register() {
+  if (typeof window === "undefined") return;
+  configureLivePageData({ socket: io() });
+}
+```
+
+Prefer passing the app's existing socket from a shared root `register()` when
+one already exists. Configure once for the browser runtime; calling again
+replaces the listener binding. `configureLivePageData({})` selects polling.
+The passed socket must connect to the default namespace (`/`) served by core's
+socket connector. Its custom `path`, origin, and auth options must match the app.
+The structural `LivePageSocket` type needs only `connected`, `on`, and `off`.
+These APIs and the `connect`/`disconnect` events follow the official
+[Socket.IO client API](https://socket.io/docs/v4/client-api/).
+
+## Publish after a write
+
+```ts
+import { invalidatePageCache } from "@warlock.js/web/page-cache";
+
+export async function publishProductChanges() {
+  // Commit the database write/transaction before invalidating.
+  await invalidatePageCache(["products"]);
+}
+```
+
+This retains the page cache API's requirement for an installed and configured
+`@warlock.js/cache` driver, even when a live page itself does not cache responses.
+The server awaits eviction before emitting `warlock:page-invalidated` with
+`{ tags: string[] }` through core's socket connector. A failed eviction rejects
+without announcing success. With no socket connector, eviction still works;
+clients use polling.
+
+Only tag labels travel over the socket; loaders still run through the ordinary
+HTTP request, middleware, and session checks. Labels are broadcast to **all
+default-namespace clients**, so choose public dependency labels without secrets
+or private identifiers. This is a notification mechanism, not an authorization
+or data transport mechanism.
+
+## Navigation and unsent forms
+
+Notifications coalesce while a router navigation, ordinary action submission, or refresh is
+pending. Once the current navigation commits, the runtime rechecks the tags
+against the page now on screen. An old page's notification cannot take the user
+back to it. A navigation that starts during a live request supersedes that
+request using the router's existing cancellation and ticket mechanism.
+
+Every mounted `<Form>` pauses live refreshes when an input, checkbox, select, or
+textarea differs from its clean values. Reverting edits, resetting the form,
+successfully submitting, or unmounting the form releases its pause. All dirty
+forms must clear before a queued refresh runs. Failed submissions keep their
+drafts; edits made after a submit starts stay dirty after that submit succeeds.
+The existing `resetOnSuccess` option still resets the form when requested.
+
+If the user edits while a live request is in flight, its response is discarded
+and the invalidation waits until the form is clean. Failed background requests
+leave the current page intact; a later notification or fallback polling tick can
+retry. Tracking covers native controls in `<Form>` using their `input`, `change`,
+and `reset` events. Custom editors should synchronize a native form control and
+dispatch its input event; plain HTML forms are outside this tracking.
+
+Live fetches carry `x-warlock-live: 1` and use browser `cache: "no-store"`.
+The server bypasses page-cache lookup/storage and answers `private, no-store`,
+so polling actually re-runs loaders. If a CDN normally serves cached page data,
+configure it to bypass requests with this header and forward it to the origin.
+
+## Multiple processes
+
+Configure **both** a shared page-cache driver (Redis or PostgreSQL, with a stable
+`pageCache.namespace`) and a cross-process `socket.adapter` on every serving
+process. Core's broadcast uses `io.emit`, which reaches the configured adapter;
+it does not use a local-only broadcast. The adapter must share its backend and
+channel configuration across the processes of one deployment. Isolate adapter
+channels between deployments, just as you isolate page-cache namespaces.
+
+For example, use core's [Redis adapter setup](/v/latest/core/digging-deeper/socket/).
+Socket.IO's [Redis adapter documentation](https://socket.io/docs/v4/redis-adapter/)
+describes cross-server fan-out. Its
+[multiple-node guidance](https://socket.io/docs/v4/using-multiple-nodes/)
+requires sticky sessions when using the Socket.IO polling transport.
+
+A queue/CLI process that calls `invalidatePageCache` must also boot the socket
+connector with that same adapter to push to connected clients. A cache-only
+worker evicts the shared cache but cannot send a push. Without a cross-process
+adapter, a socket broadcast reaches only clients on the emitting process; an
+in-process cache likewise cannot evict other processes' stored responses.
+
+Broadcasts are best effort. A `connect` event schedules a guarded catch-up
+refresh to cover missed offline events. Polling covers absent/disconnected
+sockets, rather than compensating for an incorrectly configured cluster whose
+sockets remain connected.

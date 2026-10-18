@@ -1,4 +1,5 @@
 import { parse } from "devalue";
+import { isLivePageOptions } from "./live-page-data";
 import {
   PAYLOAD_SCRIPT_ID,
   type HydrationDocumentPayloadSource,
@@ -176,6 +177,8 @@ function requireValidationIssues(value: unknown): void {
  */
 export function isHydrationPayload(value: unknown): value is HydrationDocumentPayloadSource {
   if (!isPlainObject(value)) return false;
+  const live = (value as Record<string, unknown>).live;
+  if (live !== undefined && !isLivePageOptions(live)) return false;
 
   for (const key of REQUIRED_PAYLOAD_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(value, key)) return false;
