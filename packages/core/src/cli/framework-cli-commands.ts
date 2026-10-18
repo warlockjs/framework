@@ -22,6 +22,7 @@ import {
   makeCommand,
 } from "./commands/generate/generate.command";
 import { inspectCommand } from "./commands/inspect.command";
+import { issueCommand } from "./commands/issue.command";
 import { mcpCommand } from "./commands/mcp.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { openApiGeneratorCommand } from "./commands/openapi-generator.command";
@@ -53,6 +54,7 @@ export const frameworkCommands = [
   routesDiffCommand,
   inspectCommand,
   explainCommand,
+  issueCommand,
   checkCommand,
   typecheckCommand,
 

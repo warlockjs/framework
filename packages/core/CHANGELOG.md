@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0 - 2026-10-18
 
+### Added
+
+- `warlock issue [--type bug|feature] [--title "..."] [--json]` collects installed environment details and a static config summary without booting the app, then prints a bounded pre-filled framework issue URL; it never submits anything. Add bug/feature issue forms and the `report-framework-issue.md` agent topic with minimal-repro, privacy, duplicate-search and user-consent guidance.
+
 ### Security
 
 - Upgrade esbuild to ^0.28.2, past the Windows development-server advisory [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr) (patched in 0.28.1).
