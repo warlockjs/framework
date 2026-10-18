@@ -37,6 +37,7 @@ const FAMILY_NAMES = [
   "@warlock.js/herald",
   "@warlock.js/logger",
   "@warlock.js/notifications",
+  "@warlock.js/process",
   "@warlock.js/queue",
   "@warlock.js/scheduler",
   "@warlock.js/seal",

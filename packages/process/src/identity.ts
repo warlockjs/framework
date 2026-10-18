@@ -1,0 +1,106 @@
+import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { promisify } from "node:util";
+
+const execute = promisify(execFile);
+export const TOKEN_ENV = "WARLOCK_PROCESS_TOKEN";
+export type Identity = { start: string; group: number; state: string; rss: number; token?: string };
+
+function statFields(stat: string): string[] {
+  return stat
+    .slice(stat.lastIndexOf(")") + 2)
+    .trim()
+    .split(/\s+/);
+}
+
+/** /proc fields: https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html */
+export async function identity(pid: number, token = false): Promise<Identity | undefined> {
+  if (!Number.isSafeInteger(pid) || pid <= 1) return undefined;
+  try {
+    if (process.platform === "linux") {
+      const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+      const fields = statFields(stat);
+      const state = fields[0];
+      const start = fields[19];
+      if (!state || !start || state === "Z" || state === "X") return undefined;
+      const boot = (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim();
+      const status = await readFile(`/proc/${pid}/status`, "utf8");
+      const environment = token ? await readFile(`/proc/${pid}/environ`, "utf8") : "";
+      // /proc reads are separate operations. Reject PID reuse or a group change
+      // during observation before combining a token with a start identity.
+      const after = statFields(await readFile(`/proc/${pid}/stat`, "utf8"));
+      if (after[19] !== start || after[2] !== fields[2] || ["Z", "X"].includes(after[0] ?? ""))
+        return undefined;
+      return {
+        start: `${boot}:${start}`,
+        group: Number(fields[2]),
+        state: after[0] ?? state,
+        rss: Number(/^VmRSS:\s+(\d+)/m.exec(status)?.[1] ?? 0) * 1024,
+        token: environment
+          .split("\0")
+          .find((entry) => entry.startsWith(`${TOKEN_ENV}=`))
+          ?.slice(TOKEN_ENV.length + 1),
+      };
+    }
+    if (process.platform === "darwin") {
+      const helper = process.env.WARLOCK_PROCESS_IDENTITY_HELPER;
+      if (!helper)
+        throw new Error(
+          "macOS process supervision requires WARLOCK_PROCESS_IDENTITY_HELPER; compile the shipped native/darwin-identity.c helper first",
+        );
+      const { stdout } = await execute(helper, [String(pid), ...(token ? ["--token"] : [])], {
+        timeout: 5000,
+        maxBuffer: 4096,
+      });
+      const result: unknown = JSON.parse(stdout);
+      if (
+        !result ||
+        typeof result !== "object" ||
+        !("start" in result) ||
+        typeof result.start !== "string" ||
+        !("group" in result) ||
+        typeof result.group !== "number" ||
+        !Number.isSafeInteger(result.group) ||
+        !("rss" in result) ||
+        typeof result.rss !== "number" ||
+        !Number.isFinite(result.rss) ||
+        !("state" in result) ||
+        typeof result.state !== "string" ||
+        !("token" in result) ||
+        typeof result.token !== "string" ||
+        (result.token !== "" && !/^[a-f0-9]{64}$/.test(result.token))
+      )
+        throw new Error("Invalid native process identity response");
+      return {
+        start: result.start,
+        group: result.group,
+        rss: result.rss,
+        state: result.state,
+        token: result.token || undefined,
+      };
+    }
+    return undefined;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (
+      (process.platform === "linux" && ["ENOENT", "ESRCH"].includes(String(code))) ||
+      (process.platform === "darwin" && (error as { code?: unknown }).code === 3)
+    )
+      return undefined;
+    throw error;
+  }
+}
+
+export class ProcessNotOwnedError extends Error {
+  constructor(public readonly pid: number) {
+    super(`Process ${pid} does not have a verified supervisor identity`);
+    this.name = "ProcessNotOwnedError";
+  }
+}
+
+export async function owns(entry: { pid: number; start: string; token: string }): Promise<boolean> {
+  const current = await identity(entry.pid, true);
+  return (
+    current?.start === entry.start && current.token === entry.token && current.group === entry.pid
+  );
+}

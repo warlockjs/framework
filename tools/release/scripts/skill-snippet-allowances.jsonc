@@ -45,6 +45,7 @@
   "herald": 0,
   "logger": 0,
   "notifications": 2,
+  "process": 0,
   "queue": 0,
   "scheduler": 0,
   "seal": 4,

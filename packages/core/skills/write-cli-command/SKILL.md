@@ -221,6 +221,7 @@ warlock generate                         (alias: g)      — interactive picker
 | `postman`     | `@warlock.js/postman`                                                                                                                                                                  |
 | `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                          |
 | `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                |
+| `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                       |
 | `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                         |
 
 Run `warlock add --list` to see what's currently registered. Pass `--packageManager <yarn\|pnpm\|npm>` to override auto-detection (defaults to whichever lockfile is present).
@@ -314,3 +315,19 @@ export default command({
 - The `run-app` topic — the operational commands (`dev` / `build` / `start`) with all flags and config knobs.
 - The `configure-app` topic — wiring `defineConfig` and `warlock.config.ts`.
 - The `warlock-conventions` topic — module layout, canonical imports.
+
+## App-owned processes
+
+`npx warlock add process` creates typed `src/config/process.ts` (owner, registry,
+default limits), `src/app/processes/index.ts` (the `processes` supervisor export),
+lifecycle hooks, and a read-only devtools list source. It imports lifecycle from
+`src/app/main.ts`. Startup awaits `recover()` using `Application.onValidateBoot`;
+graceful shutdown awaits `stopAll()` using `Application.onShutdown`. Recovery
+failure aborts boot. Repeated installation preserves existing files.
+
+Set a unique owner and registry per app instance, then import `processes` from
+the generated module and await `processes.spawn({ kind: "worker", command,
+args, labels })`. Consume output and await `handle.exited`. Use handle stops or
+label filters; never stop processes by command or name. `spawnPty()` lazily
+loads separately installed optional peer `node-pty`. The `supervise-processes`
+skill in `@warlock.js/process` contains complete working examples.

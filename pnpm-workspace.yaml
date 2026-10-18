@@ -29,6 +29,7 @@ packages:
   - packages/herald
   - packages/logger
   - packages/notifications
+  - packages/process
   - packages/queue
   - packages/scheduler
   - packages/seal
@@ -55,8 +56,10 @@ allowBuilds:
   ssh2: false
   # transitive via bullmq (optional native msgpack speed-up; msgpackr falls back to pure JS)
   msgpackr-extract: false
+  # optional process terminal peer; native PTY coverage needs an explicitly prepared binary
+  node-pty: false
 
-# The family publishes all 28 packages at one version, so EVERY release is
+# The family publishes all 33 packages at one version, so EVERY release is
 # younger than pnpm's default release-age gate. Excluding by version pins a line
 # per package per release and goes stale the moment we publish again; the scope
 # pattern never needs editing. Matches create-warlock's workspace file.
