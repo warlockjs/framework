@@ -154,10 +154,33 @@ describe("createWarlockApp — template + base install", () => {
 
     const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
     expect(printed).toContain("Using yarn");
+    expect(printed).toContain("lint: oxc");
     expect(printed).toContain("agent-kit targets: claude");
 
     logSpy.mockRestore();
   });
+
+  it.each([undefined, "oxc", "eslint"] as const)(
+    "prints the TypeScript compatibility notice only for lint=%s",
+    async (lint) => {
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      try {
+        await run(makeFakeApp({ lint }));
+        const notices = logSpy.mock.calls
+          .map((call) => String(call[0]))
+          .filter((line) => line.includes("ESLint mode uses TypeScript"));
+        expect(notices).toHaveLength(lint === "eslint" ? 1 : 0);
+        if (lint === "eslint") {
+          expect(notices[0]).toContain(
+            "6.0.3 because typescript-eslint does not support TypeScript 7 yet",
+          );
+          expect(notices[0]).toContain("deprecation in 5.33 and removal in 5.34");
+        }
+      } finally {
+        logSpy.mockRestore();
+      }
+    },
+  );
 
   it("invokes the base install at least once (so the warlock binary exists)", async () => {
     const fake = makeFakeApp();

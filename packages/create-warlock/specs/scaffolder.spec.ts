@@ -533,15 +533,18 @@ describe("App template emission", () => {
     expect(packageJson.name).toBe("@acme-store");
   });
 
-  it("copies the full module tree across users, posts, auth, uploads and config", () => {
+  it("copies the full module tree and applies the default Oxc toolchain", () => {
     const app = new App(makeApplication(appPath));
 
     app.use("warlock");
 
+    app.configureLintToolchain();
+
     const expectedFiles = [
       "warlock.config.ts",
       "tsconfig.json",
-      "eslint.config.js",
+      ".oxlintrc.json",
+      ".oxfmtrc.json",
       "src/app/users/models/user/user.model.ts",
       "src/app/users/controllers/create-new-user.controller.ts",
       "src/app/users/resources/user.resource.ts",

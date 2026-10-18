@@ -30,10 +30,11 @@ function generateApp(): string {
       aiProviders: [],
       useGit: false,
       useJWT: false,
+      lint: "eslint",
     },
   };
 
-  new App(application).use("warlock").configureWebStarter(false);
+  new App(application).use("warlock").configureWebStarter(false).configureLintToolchain();
   generatedRoots.push(root);
 
   return appPath;
@@ -55,6 +56,8 @@ afterEach(() => {
 describe("the ESLint config emitted by a real no-web scaffold", () => {
   it("keeps the innocent no-CSS scaffold linting exactly as before", () => {
     const appPath = generateApp();
+    const pkg = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
+    expect(pkg.devDependencies.typescript).toBe("6.0.3");
     const sourceFiles = readdirSync(path.join(appPath, "src"), {
       recursive: true,
       withFileTypes: true,

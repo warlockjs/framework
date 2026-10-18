@@ -40,7 +40,7 @@ was decided prints after scaffolding, along with how to change each one.
 | `--stack=<api\|web>`           | API-only or full-stack web; the structural choice                    | `api`                                                                    |
 | `--db=<driver>` / `--no-db`    | Database driver (`postgres`, `mongodb`, …), or skip one entirely     | `mongodb`                                                                |
 | `--features=<list>`            | Comma-separated feature keys (e.g. `test,herald`)                    | none (or `["web"]` when `--stack=web` and `--features` is not given)     |
-| `--lint=<oxc\|eslint>`         | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier   | `eslint`                                                                 |
+| `--lint=<oxc\|eslint>`         | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier   | `oxc`                                                                    |
 | `--ai=<list>`                  | Comma-separated AI provider keys (e.g. `openai,anthropic`)           | none                                                                     |
 | `--pm=<manager>`               | Package manager (`npm`, `yarn`, `pnpm`, `bun`)                       | inferred from the invoking agent (`npm_config_user_agent`) or the system |
 | `--agents=<list>`              | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets | `claude`                                                                 |
@@ -174,15 +174,19 @@ The decisions overview shows the total selected feature/AI count and up to six
 keys, followed by `+N more` for longer selections. The final success screen lists
 all selected feature keys.
 
-### Optional Oxc tooling
+### Default Oxc tooling
 
-Pass `--lint=oxc` (or `--lint oxc`) to scaffold with Oxlint **1.88.0** and Oxfmt
-**0.73.0**. The full `--customize` wizard offers the same choice and preselects
-any supplied flag. The default is `--lint=eslint`, which keeps ESLint/Prettier.
+New projects default to `--lint=oxc` (also `--lint oxc`), with Oxlint **1.88.0**
+and Oxfmt **0.73.0**. The full `--customize` wizard offers the same choice and
+preselects any supplied flag. Pass `--lint=eslint` to opt in to ESLint/Prettier.
 Unknown or missing `--lint` values fail before copying the project.
 
 ```bash
-npm create warlock@latest my-app -- --lint=oxc --yes
+# Default: Oxlint + Oxfmt, TypeScript 7.0.2
+npm create warlock@latest my-app -- --yes
+
+# Explicit opt-in: ESLint + Prettier, TypeScript 6.0.3
+npm create warlock@latest my-eslint-app -- --lint=eslint --yes
 ```
 
 Oxc projects receive `.oxlintrc.json` and `.oxfmtrc.json`, replace the template's
@@ -192,7 +196,7 @@ checker while retaining TypeScript checks. Both choices provide `lint`, `format`
 Oxc projects also receive VS Code format-on-save settings and an extension
 recommendation for [Oxc](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode).
 Its formatter is `oxc.oxc-vscode` and lint fixes use `source.fixAll.oxc`;
-ESLint/Prettier editor settings remain the default for the ESLint toolchain.
+ESLint projects retain their Prettier/ESLint editor settings.
 
 The Oxlint config preserves the template's unused-variable/import checks,
 explicit class accessibility and type-import style. Oxfmt uses the same 100-column,
@@ -210,13 +214,16 @@ when adding project rules.
 
 ## TypeScript 7 in 5.32
 
-New projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
+Default Oxlint/Oxfmt projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
 The template uses `module: "ESNext"`, `moduleResolution: "bundler"`, explicit
 Node types, and `paths` relative to its tsconfig, without `baseUrl`.
 Existing apps must remove `baseUrl`, rebase alias targets, and replace
 `moduleResolution: "node"` / `"node10"` before typechecking.
 
-Use the Oxlint/Oxfmt lint mode with TS7. The optional ESLint scaffold is retained,
-but typescript-eslint's parser requires the removed JavaScript compiler API and
-does not support TS7. ESLint mode is scheduled for deprecation in 5.33 and removal
-in 5.34. A parser's bundled older TypeScript is separate from the app's native `tsc`.
+Explicit `--lint=eslint` projects pin `typescript` to **6.0.3**, the newest version
+supported by typescript-eslint. Its parser requires the JavaScript compiler API
+removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
+([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
+Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
+ESLint mode prints a compatibility notice when chosen and is planned for
+deprecation in 5.33 and removal in 5.34. Both modes install with npm, pnpm and yarn.

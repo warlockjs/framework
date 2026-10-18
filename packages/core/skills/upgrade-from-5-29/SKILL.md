@@ -414,7 +414,8 @@ starter. See the `warlock-agents-md` topic.
 
 ## 5.31 to 5.32 TypeScript 7
 
-Pin the app's development dependency to `typescript@7.0.2`. The regular `tsc`
+With the default Oxlint/Oxfmt toolchain, pin the app's development dependency to
+`typescript@7.0.2`. The regular `tsc`
 command is now the native Go compiler; no native-preview package is needed.
 Remove `baseUrl` from every app tsconfig and resolve each `paths` target relative
 to the config. For example, `baseUrl: "src"` with `"app/*": ["app/*"]` becomes
@@ -433,6 +434,15 @@ npx warlock typecheck --changed
 The CLI preserves incremental state and changed-file filtering. Development
 health checks keep one native compiler session and update its snapshots. Syntax
 analysis uses OXC. `warlock upgrade` still parses/transforms with ts-morph's own
-bundled TypeScript, without using it as the app's compiler. Prefer Oxlint/Oxfmt:
-typescript-eslint still requires the old JavaScript API; ESLint mode is scheduled
-for deprecation in 5.33 and removal in 5.34.
+bundled TypeScript, without using it as the app's compiler. New scaffolds default
+to Oxlint/Oxfmt (`--lint=oxc`). Explicit `--lint=eslint` pins the app's compiler to
+TypeScript **6.0.3** because typescript-eslint requires the old JavaScript API
+and supports `>=4.8.4 <6.1.0`. Keep ESLint apps on 6.0.3 until switching tools:
+
+```bash
+npm install --save-dev --save-exact typescript@6.0.3
+npx tsc --noEmit
+```
+
+The same tsconfig cleanups work with TS6. ESLint mode prints a compatibility
+notice and is planned for deprecation in 5.33 and removal in 5.34.

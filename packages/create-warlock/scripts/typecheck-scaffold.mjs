@@ -36,16 +36,33 @@
  * Usage:
  *   node scripts/typecheck-scaffold.mjs            # scaffold, check, clean up
  *   node scripts/typecheck-scaffold.mjs --keep     # leave the project in place
+ *   node scripts/typecheck-scaffold.mjs --lint=eslint # opt-in TS6 toolchain
+ *   node scripts/typecheck-scaffold.mjs --pm=pnpm  # also accepts yarn
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const keepArtifacts = process.argv.includes("--keep");
+const { values } = parseArgs({
+  options: {
+    keep: { type: "boolean", default: false },
+    lint: { type: "string" },
+    pm: { type: "string", default: "npm" },
+  },
+});
+const keepArtifacts = values.keep;
+const lint = values.lint ?? "oxc";
+const packageManager = values.pm;
+if (!["oxc", "eslint"].includes(lint) || !["npm", "pnpm", "yarn"].includes(packageManager)) {
+  throw new Error(
+    "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc|eslint] [--pm=npm|pnpm|yarn] [--keep]",
+  );
+}
 
 const APP_NAME = "scaffold-typecheck-app";
 
@@ -67,6 +84,7 @@ function run(command, args, cwd) {
       env: { ...process.env, NODE_ENV: "development", CI: "1" },
     });
 
+    console.log(`Started ${command} (PID ${child.pid})`);
     let output = "";
 
     const capture = (chunk) => {
@@ -107,7 +125,9 @@ async function main() {
         path.join(packageRoot, "index.dev.ts"),
         APP_NAME,
         "--db=mongodb",
-        "--pm=npm",
+        `--pm=${packageManager}`,
+        // Omit --lint by default so CI exercises the actual scaffolder default.
+        ...(values.lint ? [`--lint=${lint}`] : []),
         "--yes",
         "--no-git",
       ],
@@ -126,7 +146,18 @@ async function main() {
       return;
     }
 
-    heading(`Typechecking (tsc --noEmit) in ${appPath}`);
+    const expectedTypeScript = lint === "eslint" ? "6.0.3" : "7.0.2";
+    const installedTypeScript = JSON.parse(
+      readFileSync(path.join(appPath, "node_modules", "typescript", "package.json"), "utf8"),
+    ).version;
+    if (installedTypeScript !== expectedTypeScript) {
+      failure = `expected TypeScript ${expectedTypeScript} for ${lint}, got ${installedTypeScript}`;
+      return;
+    }
+
+    heading(
+      `Typechecking ${lint} / ${packageManager} (TypeScript ${installedTypeScript}) in ${appPath}`,
+    );
 
     const tsc = await run(path.join(appPath, "node_modules", ".bin", "tsc"), ["--noEmit"], appPath);
 

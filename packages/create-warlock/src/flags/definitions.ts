@@ -53,7 +53,7 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
   {
     usage: "--lint=<oxc|eslint>",
     description: "Linter and formatter: Oxlint/Oxfmt or ESLint/Prettier",
-    defaultValue: "eslint",
+    defaultValue: "oxc",
   },
   {
     usage: "--agents=<list>",

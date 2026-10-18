@@ -201,9 +201,7 @@ export class App {
   }
 
   /** Apply the selected development tools before dependency installation. */
-  public configureLintToolchain(toolchain: LintToolchain = this.options.lint ?? "eslint") {
-    if (toolchain === "eslint") return this;
-
+  public configureLintToolchain(toolchain: LintToolchain = this.options.lint ?? "oxc") {
     // Database and web setup may have edited package.json after it was cached.
     delete this.jsonFiles[path.resolve(this.path, "package.json")];
     const pkg = this.package;
@@ -212,6 +210,14 @@ export class App {
       scripts: Record<string, string>;
     };
     const deps = content.devDependencies;
+    // Registry peer range: @typescript-eslint/parser@8.71.2 supports >=4.8.4 <6.1.0.
+    // Keep npm, pnpm and yarn installs valid without peer-dependency overrides.
+    deps.typescript = toolchain === "eslint" ? "6.0.3" : "7.0.2";
+    if (toolchain === "eslint") {
+      pkg.save();
+      return this;
+    }
+
     for (const dependency of [
       "@types/prettier",
       "@typescript-eslint/eslint-plugin",

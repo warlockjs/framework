@@ -335,7 +335,7 @@ export type SyncAppOptions = Omit<AppOptions, "agents">;
  * before any file is written.
  */
 export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
-  const lint = cli.lint ?? "eslint";
+  const lint = cli.lint ?? "oxc";
   if (lint !== "eslint" && lint !== "oxc") {
     throw new Error(`Unknown lint toolchain "${lint}". Use --lint=eslint or --lint=oxc.`);
   }

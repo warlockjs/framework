@@ -435,9 +435,11 @@ describe("the scaffolded root is mobile-ready", () => {
   });
 });
 
-describe("optional Oxc toolchain templates", () => {
-  it("keeps the default template on ESLint and supplies matching Oxc style", () => {
+describe("lint toolchain source templates", () => {
+  it("retains the ESLint base template and supplies matching default Oxc style", () => {
     const pkg = JSON.parse(read("package.json"));
+    // The selected toolchain sets the final compiler version before install.
+    expect(pkg.devDependencies.typescript).toBe("7.0.2");
     expect(pkg.devDependencies.eslint).toBeTruthy();
     expect(pkg.devDependencies.oxlint).toBeUndefined();
     const lint = JSON.parse(read("../toolchains/oxc/.oxlintrc.json"));
