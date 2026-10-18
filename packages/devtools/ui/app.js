@@ -712,6 +712,19 @@ function apiView() {
 }
 
 let renderVersion = 0;
+
+async function processesView() {
+  const rows = await api("api/processes");
+  const section = el("section", { class: "card detail" }, [el("h2", { text: "Processes" })]);
+  section.append(el("button", { text: "Refresh", onclick: () => render() }));
+  if (!rows.length)
+    section.append(empty("No supervised processes. Configure with warlock add process."));
+  for (const row of rows) {
+    section.append(el("pre", { text: JSON.stringify(row, null, 2) }));
+  }
+  return section;
+}
+
 async function render() {
   const version = ++renderVersion;
   try {
@@ -728,7 +741,9 @@ async function render() {
                 ? await logsView()
                 : state.tab === "routes"
                   ? await routesView()
-                  : apiView();
+                  : state.tab === "processes"
+                    ? await processesView()
+                    : apiView();
     if (version === renderVersion) app.replaceChildren(view);
   } catch (error) {
     if (version === renderVersion) app.replaceChildren(errorView(error));

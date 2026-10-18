@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Upgrading
 
 - Rebuild production bundles to include PM2 readiness before using `wait_ready`. Generate with the target `NODE_ENV`, review the ecosystem file, and start the bundle directly under PM2. Cluster sockets require `socket.adapter`, `socket.options.transports: ["websocket"]` and WebSocket-only clients; polling deployments need sticky routing to individual listeners. Fork reloads can interrupt traffic.
+- Add `warlock add process` with exact family dependency, typed supervisor config, application recovery/shutdown hooks, optional devtools registration, next steps and idempotent file generation.
 
 ## 5.32.0 - 2026-10-18
 

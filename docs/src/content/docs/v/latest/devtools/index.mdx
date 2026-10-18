@@ -41,6 +41,17 @@ The default dashboard retains the latest 200 requests at `/__warlock`.
 Work that is not part of a request, such as boot work or a scheduler tick,
 appears separately so it does not distort a request timeline.
 
+## Processes
+
+`npx warlock add process` registers a read-only **Processes** panel through
+`src/app/processes/devtools.ts`. With `@warlock.js/process` configured, refresh
+the panel to see its current PIDs, workload types, labels, command display,
+limits, enforcement mode and peak memory. Environment tokens are not listed.
+The endpoint is `GET /__warlock/api/processes` and uses the same development
+and loopback guards. Without registration it returns an empty list. Process
+stops remain application APIs; this panel has no stop endpoint. See
+[process supervision](/v/latest/process/) for ownership and platform limits.
+
 ## API docs
 
 The dashboard has an **API** tab, and the same page is served on its own at `/__warlock/docs`. It renders the app's OpenAPI 3.1 document with [Scalar](https://github.com/scalar/scalar): every API route with its parameters, request body, responses and security.

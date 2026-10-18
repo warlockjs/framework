@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.33.0
+
+### Added
+
+- Document process supervision, platform enforcement, safe ownership, terminal support and `warlock add process`; add the package sidebar, catalogue and LLM package order.
+
 ## 5.32.0
 
 ### Security

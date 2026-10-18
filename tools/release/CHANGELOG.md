@@ -1,5 +1,11 @@
 ﻿# Changelog — release tooling
 
+## 5.33.0
+
+### Added
+
+- Register the process supervisor as the 33rd lockstep family member, with local-registry coverage and zero strictness/skill-snippet allowances.
+
 ## 5.32.0 - 2026-10-18
 
 ### Fixed

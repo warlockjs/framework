@@ -162,3 +162,15 @@ why the dashboard is development-only and loopback-only.
 - Building your own tooling on the same hooks: core `registerTracingHooks()`,
   cascade `dataSourceRegistry.on("query")`, core `mailEvents.onCaptured()` and
   the cache `invalidated` event are public APIs that also work without devtools.
+
+## Process supervision panel
+
+Run `npx warlock add process` to create an app-owned supervisor and
+`src/app/processes/devtools.ts`, exporting `processPanel = { list: () =>
+processes.list() }`. Devtools discovers this registration only in development.
+The **Processes** tab refreshes `GET /__warlock/api/processes`: PIDs, workload
+categories, labels, display commands, limits, enforcement, and peak memory.
+It excludes ownership tokens. Without registration the list is empty. The
+endpoint retains development/loopback guards and provides no stop action.
+Use the `supervise-processes` skill of `@warlock.js/process` for launch,
+recovery and stop APIs; configure one owner/registry per application instance.

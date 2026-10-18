@@ -1,0 +1,246 @@
+---
+title: Process supervision
+description: Start, limit, recover and stop only the processes owned by your application.
+---
+
+`@warlock.js/process` supervises application-owned CLI workers and terminals.
+Each launch gets a random environment token and a registry entry containing its
+PID and OS start time, with an isolated process group on POSIX. Command text is for
+display; it never selects a process to stop.
+
+## Install and application lifecycle
+
+```sh
+npx warlock add process
+```
+
+The command pins the package to the installed Core version, creates
+`src/config/process.ts` and `src/app/processes/{index,lifecycle,devtools}.ts`,
+and imports the lifecycle module from `src/app/main.ts`. Repeating the command
+preserves existing files and adds no duplicate import. `--no-install` and
+`--dry-run --json` work through the usual generator interface.
+
+The generated config satisfies `SupervisorOptions`: `owner`, `registry`, and
+`defaults` (a five-minute timeout and 512 MiB memory cap). Change these for your
+workload. Use a unique owner and registry per application instance; workers
+must not share a registry. The generated startup validator awaits `recover()`
+before serving requests and aborts boot on failure. The shutdown hook awaits
+`stopAll()` before connectors close. If you start children during startup,
+await recovery first.
+
+When devtools is installed, its **Processes** tab discovers the generated
+`devtools.ts` registration in development. It calls `list()` and exposes no
+stop endpoint. Production does not import devtools. Custom supervisor setups
+can export `processPanel = { list: () => processes.list() }` from that file.
+
+## Launch a worker
+
+```ts
+import { supervisor } from "@warlock.js/process";
+
+const processes = supervisor({
+  owner: "example-app",
+  registry: "storage/processes/registry.json",
+  defaults: { timeoutMs: 30_000, memoryBytes: 512 * 1024 * 1024 },
+});
+await processes.recover();
+const worker = await processes.spawn({
+  kind: "worker",
+  command: process.execPath,
+  args: ["-e", 'console.log("ready")'],
+  env: { WORKER_MODE: "once" },
+  labels: { room: "demo", member: "one" },
+});
+worker.stdout.pipe(process.stdout);
+worker.stderr.pipe(process.stderr);
+const result = await worker.exited;
+console.log(result.reason, result.code, result.peakMemoryBytes);
+await processes.stopAll();
+```
+
+`spawn()` is asynchronous. On Linux a shell applies inherited resource limits
+and stops itself; the supervisor verifies its token, PID, start time and group,
+attempts cgroup attachment, and persists the registry before resuming user code.
+On macOS and Windows a small Node guardian gates launch until persistence and
+stays alive for the workload. Its PID is the handle/registry PID. macOS applies
+inherited shell rlimits before starting the guardian. The command and arguments are passed as an argument array, without interpolation.
+`cwd` and `env` are optional; environment entries override the parent except
+for the ownership token. Consume stdout/stderr to avoid pipe backpressure.
+`exited` reports leader exit; pipe streams can finish later, so await their
+`end` events too when collecting complete output.
+
+The launch input uses `kind` as a workload category; `list()` exposes
+it as `type`. It has no role in ownership or process selection.
+
+## API
+
+| API                                                                                      | Behavior                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supervisor({ owner, registry, defaults?, pollIntervalMs?, stopGraceMs?, cgroupRoot? })` | Creates a lazy supervisor; first operation opens the registry. Default poll interval is 100 ms; stop grace is 1000 ms.                                                                                                              |
+| `await spawn({ kind, command, args?, cwd?, env?, labels?, limits? })`                    | Returns `{ pid, stdin, stdout, stderr, exited, stop() }`. Per-launch limits override defaults.                                                                                                                                      |
+| `await handle.exited`                                                                    | Resolves to `{ reason, code, signal, peakMemoryBytes }`. Reasons: `exit`, `timeout`, `memory-cap`, `stopped`. Registry persistence or supervision observation errors reject it; a rejected promise does not prove the child exited. |
+| `await handle.stop()`                                                                    | Stops its verified POSIX group or Windows PID tree; repeated calls after exit are harmless.                                                                                                                                         |
+| `await stop({ labels })`                                                                 | Stops entries containing every requested label/value. `stop()` selects all entries.                                                                                                                                                 |
+| `await stopPid(pid)`                                                                     | Only accepts a verified registry entry; otherwise throws `ProcessNotOwnedError`.                                                                                                                                                    |
+| `await list({ labels })`                                                                 | Returns process metadata, limits, enforcement and peak memory; never environment tokens.                                                                                                                                            |
+| `await recover({ keep? })`                                                               | Clears mismatched/dead identities, adopts verified entries selected by `keep`, and stops other verified entries. Returns PID arrays `{ adopted, stopped, cleared }`. Default: stop verified orphans.                                |
+| `await stopAll()`                                                                        | Stops verified entries and releases the registry writer lease. Idempotent; closes the supervisor permanently.                                                                                                                       |
+| `await spawnPty(options)`                                                                | Optional terminal launch; adds `write(text)` and `resize(columns, rows)`.                                                                                                                                                           |
+
+Adopted processes cannot regain their original stdio pipes or exit codes.
+Their original deadline still applies. Recovery requires matching owner,
+token, PID, start time and POSIX group; it never claims a process by its command.
+Calling recovery again leaves already tracked children alone.
+If a launch was persisted at its setup gate, adopting it resumes that gate.
+There is a small crash window between OS creation and the first registry
+write: an unregistered stopped child cannot be discovered by recovery. Use
+the service manager's containment for whole-app crash cleanup when required.
+
+The registry uses private files (0600 on POSIX; restrict the directory ACL on
+Windows), a private directory when newly created, an exclusive writer lease and atomic JSON replacement. Preserve its directory
+across restarts. A stale lease is reclaimed only after its writer's PID/start
+time no longer matches. Corrupt registries, incomplete leases and interrupted
+lease reclamation require manual inspection; they do not trigger process kills.
+Do not place registries in untrusted or shared writable directories.
+
+## Limits and platform support
+
+| Platform | Identity                                                         | Enforcement                                                                                                                                                                        |
+| -------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/proc` start ticks + boot ID + environment token                | Cgroup v2 → inherited rlimit/RSS fallback. Delegated `memory.max` caps the subtree; `memory.peak` reports kernel peaks when available; cleanup uses `cgroup.kill` where permitted. |
+| macOS    | `ps` start time (`LC_ALL=C TZ=UTC`) + guardian environment token | `RLIMIT_CPU`/`RLIMIT_DATA` plus tree RSS polling (`rlimit-polling`). Softer than Linux cgroups.                                                                                    |
+| Windows  | PowerShell/CIM creation time + guardian environment token        | PID-only `taskkill /PID <pid> /T /F` tree stops; tree working-set polling (`rss-polling`). Softer than Linux cgroups.                                                              |
+
+Linux without delegation reports `enforcement: "rlimit-polling"`. Inherited
+CPU/address-space limits apply; Linux ignores `RLIMIT_RSS`, so the resident-memory
+cap is leader RSS polling only. macOS and Windows include the guardian and
+observed descendants in memory samples; shared pages can be counted more than
+once. Windows always forces the verified PID tree immediately; `stopGraceMs`
+applies to POSIX signals only. PowerShell/CIM must be available on Windows;
+observation failures surface to the caller and prevent killing. Job Objects
+are a future improvement for hard Windows containment and memory caps, and
+are not required for this release. Other OSes throw the exported
+`UnsupportedProcessPlatformError` before launching.
+
+The Linux parent must already be delegated to the application UID, with the
+memory controller enabled by its service manager. The supervisor creates a
+child directory and writes `cgroup.procs`; it neither requests root privileges
+nor changes controllers or moves the application. `cgroupRoot` may point to an
+existing delegated directory. Read-only mounts, missing controllers, disabled
+cgroup v2 or denied writes automatically select the fallback. Inspect each
+entry's `enforcement` rather than assuming a hard memory boundary.
+
+For a non-root UID, delegation must grant write access to the parent directory,
+the destination `cgroup.procs`, and the common ancestor's `cgroup.procs` for
+migration. The memory controller also requires an empty parent with `memory`
+already enabled in `cgroup.subtree_control`. Arrange the app in a separate
+leaf, then set `cgroupRoot` to its delegated parent so worker cgroups become
+siblings of the app leaf. Discovery of the app's own populated leaf often
+falls back, because the no-internal-process rule prevents enabling memory
+for its children. Once the manager prepares this layout, creating a directory
+and writing the gated child's PID to its `cgroup.procs` needs no root access.
+The supervisor performs those writes only inside the delegated hierarchy.
+
+Limits are positive safe integers: `timeoutMs`, `memoryBytes`, `cpuSeconds`
+(POSIX CPU seconds; rejected on Windows), and Linux-only `virtualMemoryBytes` (`RLIMIT_AS`).
+Address space differs from RSS; V8 reserves substantial address space, so set
+that limit only when suitable for the executable. Allocation failures from
+rlimits can produce an ordinary `exit`; `memory-cap` means an observed RSS
+violation or a cgroup OOM kill. CPU-limit exits also use `exit` and carry the
+OS signal when available.
+
+Polling may miss short peaks and overshoot the cap until the next interval.
+Linux fallback accounting covers the leader; macOS/Windows sample the tree,
+including guardian overhead. Commands and IPC add sampling latency, especially
+on Windows; `pollIntervalMs` is a minimum interval and slow samples do not overlap.
+Descendants that stay in the launch group receive stop signals. Without cgroups, a process
+that creates another session can escape; if the leader exits during graceful
+stop, the supervisor cannot safely re-verify it for escalation and will not
+signal an unverified group. Prefer delegated cgroups for process trees. When
+a cgroup exists, remaining members are killed when the leader finishes.
+
+Linux start identity includes the boot ID and start ticks. macOS reads
+headerless `ps` metadata with `LC_ALL=C TZ=UTC`: Apple's `ps(1)` defines `lstart`
+as `strftime %c`; Apple's C locale expands this to `%a %b %e %H:%M:%S %Y`, for
+example `Mon Oct 19 12:34:56 2026`. The parser validates it and records UTC epoch
+seconds, so macOS start-time precision is one second. Windows reads
+`Get-CimInstance Win32_Process` creation times, serialized as UTC DateTime ticks
+in strings to preserve precision; tree snapshots use `ParentProcessId` and
+`WorkingSetSize` (bytes), excluding children older than their apparent parent.
+
+Neither platform needs a compiled identity helper. Their live Node guardian
+reads the random token from its own environment and proves it with an HMAC
+challenge through a local Unix socket (0600) or Windows named pipe; the token
+itself never crosses that connection. This avoids treating command-line text
+as an environment token. The supervisor reads OS start identity before and
+after that proof, including during recovery. Ordinary writer leases need only
+PID/start time and do not require a guardian. Preserve the registry and restrict
+access to it; tokens remain private. Stale socket files from abrupt macOS kills
+are replaced only by a new guardian with that same UID/PID.
+
+Identity observation failures prevent signalling. The portable APIs do not
+provide atomic identity-and-kill: PID reuse can race a signal or `taskkill`,
+and Windows process-tree discovery is best effort. If a guardian exits, its
+remaining descendants cannot be safely selected later through the old PID.
+Processes that escape containment may survive. This is an ownership guard for
+cooperative applications, not a hostile-code sandbox.
+
+## Terminals
+
+Install the optional `node-pty` peer separately. It is imported only by
+`spawnPty()`, so ordinary workers need no native dependency.
+
+```ts
+import { supervisor } from "@warlock.js/process";
+
+const processes = supervisor({ owner: "terminals", registry: "storage/terminals.json" });
+await processes.recover();
+const terminal = await processes.spawnPty({
+  kind: "terminal",
+  command: "/bin/sh",
+  args: [],
+  columns: 100,
+  rows: 30,
+  labels: { room: "demo" },
+});
+terminal.stdout.pipe(process.stdout);
+terminal.write("printf 'hello\\n'\n");
+terminal.resize(120, 40);
+await terminal.stop();
+await processes.stopAll();
+```
+
+PTY stdout combines terminal output; stderr is an empty stream. PTY signal
+metadata follows node-pty and may be numeric text. PTY limits and ownership use
+the same launch gate and registry as ordinary children. Windows terminals use
+node-pty/ConPTY when installed; set `command: "powershell.exe"` and write commands
+with `terminal.write("Write-Output hello\r")` there.
+
+## Verified facilities
+
+Implementation references checked on 2026-10-19:
+[Linux cgroup v2](https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html),
+[proc start time](https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html),
+[initial environment](https://man7.org/linux/man-pages/man5/proc_pid_environ.5.html),
+[Linux resource limits](https://man7.org/linux/man-pages/man2/getrlimit.2.html),
+[Node detached children](https://nodejs.org/api/child_process.html#optionsdetached),
+[Apple ps man page](https://github.com/apple-oss-distributions/adv_cmds/blob/main/ps/ps.1),
+[Apple ps timestamp implementation](https://github.com/apple-oss-distributions/adv_cmds/blob/main/ps/print.c),
+[Apple C locale timestamp format](https://github.com/apple-oss-distributions/Libc/blob/main/stdtime/FreeBSD/timelocal.c),
+[Apple resource limits](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/setrlimit.2.html),
+[shell limit flags and units](https://github.com/apple-oss-distributions/bash/blob/main/bash-3.2/builtins/ulimit.def),
+[Windows CIM process properties](https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-process),
+[PowerShell Get-CimInstance](https://learn.microsoft.com/en-us/powershell/module/cimcmdlets/get-ciminstance?view=powershell-5.1),
+[Windows taskkill](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill),
+[Node IPC sockets and pipes](https://nodejs.org/api/net.html#ipc-support),
+[Windows Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects),
+and [node-pty typings](https://github.com/microsoft/node-pty/blob/main/typings/node-pty.d.ts).
+
+The package's ordinary process specs use children created by those specs and
+require no delegated cgroup or native PTY. A coordinator can opt into cgroup
+coverage with `WARLOCK_PROCESS_CGROUP_ROOT` set to a delegated directory, and
+PTY coverage with `WARLOCK_PROCESS_PTY_TESTS=1` after installing a working
+node-pty native binary. macOS and Windows command construction, timestamp parsing,
+PID-tree memory accounting and ownership observations also have injected unit
+specs that run on Linux without executing foreign-platform tools. No service
+port is used by these specs.

@@ -48,6 +48,7 @@ export const WARLOCK_FAMILY_PACKAGE_NAMES = Object.freeze([
   "@warlock.js/notifications",
   "@warlock.js/web",
   "@warlock.js/access",
+  "@warlock.js/process",
   "@warlock.js/queue",
   "@warlock.js/sitemap",
   "@warlock.js/devtools",

@@ -1,4 +1,5 @@
 import type { DevtoolsAiSource } from "../sources/ai-source";
+import type { ProcessPanel } from "../process-panel";
 import type { DevtoolsCollector, DevtoolsQuery, ResolvedDevtoolsOptions } from "../types";
 
 /**
@@ -18,6 +19,7 @@ export type DevtoolsRouteRow = {
  * and the optional EXPLAIN, route-listing, OpenAPI and Postman hooks.
  */
 export type MountDevtoolsRoutesDeps = {
+  processPanel?: ProcessPanel;
   collector: DevtoolsCollector;
   /** Optional Panoptic feed, attached only in development. */
   ai?: DevtoolsAiSource;

@@ -8,6 +8,7 @@
  * this mirrors.
  */
 import type { Connector, ConnectorLifecyclePhase } from "@warlock.js/core";
+import { loadProcessPanel } from "./process-panel";
 import { createCollector } from "./collector";
 import { resolveDevtoolsOptions } from "./options";
 import type { DevtoolsRouteRow } from "./server";
@@ -87,6 +88,7 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
         ai,
+        processPanel: await loadProcessPanel(),
         options: resolved,
         isDevelopment: () => Application.runtimeStrategy === "development",
         explain: (query) => explainQuery(query),

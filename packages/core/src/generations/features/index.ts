@@ -19,6 +19,7 @@ import { mongodbFeature } from "./mongodb.feature";
 import { mysqlFeature } from "./mysql.feature";
 import { notificationsFeature } from "./notifications.feature";
 import { postgresFeature } from "./postgres.feature";
+import { processFeature } from "./process.feature";
 import { queueFeature } from "./queue.feature";
 import { reactEmailFeature } from "./react-email.feature";
 import { reactFeature } from "./react.feature";
@@ -74,6 +75,7 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   // there rather than filed between queues and sockets.
   sitemap: sitemapFeature,
   devtools: devtoolsFeature,
+  process: processFeature,
   herald: heraldFeature,
   queue: queueFeature,
   // Directly after `queue`, for the same reason `tailwind` follows `web`: it

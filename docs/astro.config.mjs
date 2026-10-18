@@ -435,6 +435,7 @@ const topics = [
   pkgTopic({ label: "Sitemap", slug: "sitemap", sections: sitemapSections }, "latest"),
   // Devtools is one page (install, panels, safety): overview only.
   pkgTopic({ label: "Devtools", slug: "devtools" }, "latest"),
+  pkgTopic({ label: "Process", slug: "process" }, "latest"),
 
   // Data
   pkgTopic({ label: "Cascade", slug: "cascade", sections: cascadeSections }, "latest"),

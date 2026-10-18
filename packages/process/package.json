@@ -1,0 +1,65 @@
+{
+  "name": "@warlock.js/process",
+  "version": "5.32.0",
+  "type": "module",
+  "description": "App-owned child process supervision with verified identity and resource limits",
+  "keywords": [
+    "warlock",
+    "process",
+    "supervisor",
+    "pty"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/process"
+  },
+  "bugs": {
+    "url": "https://github.com/warlockjs/framework/issues"
+  },
+  "homepage": "https://warlock.js.org",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "generate:llms": "node scripts/generate-llms.mjs"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10",
+    "typescript": "7.0.2",
+    "@types/node": "^25.6.2"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "packageManager": "pnpm@11.24.0",
+  "peerDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "node-pty": {
+      "optional": true
+    }
+  },
+  "warlock": {
+    "environment": "server"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "skills",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ]
+}

@@ -44,6 +44,7 @@ const PACKAGE_ORDER = [
   "auth",
   "access",
   "context",
+  "process",
   "herald",
   "notifications",
   "web",
