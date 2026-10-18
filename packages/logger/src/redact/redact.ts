@@ -1,3 +1,4 @@
+import { redactRegisteredSecrets } from "./registered-secrets";
 import type { LoggingData, RedactCensor, RedactConfig } from "../types";
 import { DEFAULT_REDACT_KEY_SET, normalizeRedactKey } from "./default-keys";
 
@@ -377,19 +378,21 @@ export function resolveRedactKeys(
  *
  * ## Residual gaps (by design, documented rather than silently absent)
  *
- * - **Secrets interpolated into a `message` string** (`` `token=${t}` ``)
- *   cannot be reached — neither a path nor a key names a substring.
- * - **`Map`/`Set`/`Buffer` contents** are not traversed (see {@link isOpaque}).
- * - **Non-enumerable / getter-backed properties** are not walked, so an HTTP
- *   client that exposes request config behind a getter still slips through.
- *   Enumerable ones (axios's `.config`, `.response`) *are* covered.
+ * - **Unregistered secrets interpolated into strings** cannot be reached.
+ *   registerLogSecret protects known literal values, including Error text.
+ * - Without registered credentials, **`Map`/`Set`/`Buffer` contents** are
+ *   not traversed (see {@link isOpaque}). Registered credentials add a
+ *   final safety pass that traverses Maps/Sets and masks opaque objects.
+ * - Key/path redaction does not walk non-enumerable properties. With
+ *   registered credentials the final pass walks data descriptors and replaces
+ *   accessors without invoking them.
  */
 export function applyRedact(data: LoggingData, config: RedactConfig | undefined): LoggingData {
   const paths = config?.paths ?? [];
   const keys = resolveRedactKeys(config);
 
   if (paths.length === 0 && !keys) {
-    return data;
+    return redactRegisteredSecrets(data);
   }
 
   const censor = config?.censor ?? DEFAULT_CENSOR;
@@ -415,7 +418,7 @@ export function applyRedact(data: LoggingData, config: RedactConfig | undefined)
     });
   }
 
-  return result;
+  return redactRegisteredSecrets(result);
 }
 
 /**

@@ -40,6 +40,11 @@ describe("package exports", () => {
     expect((loggerPackage as any).logger).toBeUndefined();
   });
 
+  it("exposes registered credential masking utilities", () => {
+    expect(loggerPackage.registerLogSecret).toBeTypeOf("function");
+    expect(loggerPackage.maskRegisteredLogSecrets).toBeTypeOf("function");
+  });
+
   it("exposes clearMessage utility", () => {
     expect(typeof loggerPackage.clearMessage).toBe("function");
   });

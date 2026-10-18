@@ -5,10 +5,19 @@ import { clockFake } from "./clock-fake";
 import { idsFake } from "./ids-fake";
 import { mailFake } from "./mail-fake";
 import { queueFake } from "./queue-fake";
+import { secretsFake } from "./secrets-fake";
 import { storageFake } from "./storage-fake";
 
 /** The fakes the test kit installs. */
-export const TEST_FAKE_NAMES = ["mail", "queue", "cache", "storage", "clock", "ids"] as const;
+export const TEST_FAKE_NAMES = [
+  "mail",
+  "queue",
+  "cache",
+  "storage",
+  "clock",
+  "ids",
+  "secrets",
+] as const;
 
 export type TestFakeName = (typeof TEST_FAKE_NAMES)[number];
 
@@ -16,7 +25,7 @@ export type TestFakeName = (typeof TEST_FAKE_NAMES)[number];
  * Which fakes to install.
  *
  * - `true` (the default) — all of them.
- * - `false` — none: real drivers, real clock, real ids.
+ * - `false` — none: real drivers, real clock, real ids, real secret storage.
  * - an object — all of them except the ones set to `false`, e.g.
  *   `{ cache: false }` keeps the configured cache driver.
  */
@@ -32,6 +41,7 @@ const fakes: Record<
   storage: storageFake,
   clock: clockFake,
   ids: idsFake,
+  secrets: secretsFake,
 };
 
 let active: TestFakeName[] = [];

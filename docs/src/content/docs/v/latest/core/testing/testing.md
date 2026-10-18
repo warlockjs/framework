@@ -274,7 +274,7 @@ Everything below ships in `@warlock.js/core/tests`, next to `setupTest` and the 
 
 ### Fakes — on by default
 
-In the test environment `setupTest()` (per test file) and `startHttpTestServer()` (in `globalSetup`) install six fakes once their connectors are up, and restore them on teardown:
+In the test environment `setupTest()` (per test file) and `startHttpTestServer()` (in `globalSetup`) install seven fakes once their connectors are up, and restore them on teardown:
 
 | Fake          | Replaces                                                         | Assertions                                                                                                        |
 | ------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -284,6 +284,7 @@ In the test environment `setupTest()` (per test file) and `startHttpTestServer()
 | `storageFake` | Every storage driver (local, S3, R2, Spaces) — a temp directory  | `assertExists(path, driver?)`, `assertMissing(path, driver?)`, `files(driver?)`                                   |
 | `clockFake`   | `clock` from `@warlock.js/core` — frozen at 2026-01-01T00:00:00Z | `travel(ms)`, `travelTo(date)`, `freeze(date?)`, `now()`                                                          |
 | `idsFake`     | `ids` from `@warlock.js/core` — numbered UUIDs and tokens        | `uuid(n)` (the n-th UUID), `reset()`                                                                              |
+| `secretsFake` | The `secrets` facade — isolated namespace-aware memory           | `assertHas(name)`, `assertMissing(name)`, `assertStored(name, value)`, `clear()`                                  |
 
 ```ts title="src/app/users/tests/register-user.service.test.ts"
 import { mailFake, queueFake } from "@warlock.js/core/tests";
@@ -303,6 +304,8 @@ it("welcomes a new user and schedules the follow-up mails", async () => {
   queueFake.assertPushed(sendWelcomeSeries, { userId: user.id });
 });
 ```
+
+The [secret store](/v/latest/core/digging-deeper/secrets/) fake bypasses keychain, environment and files. It retains values only in its process; assertion failures never reveal them. Opt out with `fakes: { secrets: false }` for deliberate backend integration tests.
 
 A matcher is a predicate or an object of fields that must all match (`{ to, subject, from, contains }` for mail; a payload subset for jobs). A failing assertion lists what was actually recorded.
 
@@ -477,7 +480,7 @@ child process exit status with its captured stderr before checking stdout.
 - **The two-worlds connection split is intentional.** Don't fight it by trying to share connections — it would deadlock test parallelism. Instead, design tests so the worker write commits before the HTTP read.
 - **Test data persists across files unless you clean it up.** Vitest doesn't wrap test files in transactions. Use `afterEach` truncates or design idempotent fixtures.
 - **The HTTP server is started in dev mode (`runtimeStrategy: development`).** That's so routes get re-resolved properly under the framework's dev orchestrator. It's still a real server with real routing — just not the production builder pipeline.
-- **Fakes, not mocks.** Mail, queue, cache, storage, clock and ids are faked by default ([the test kit](#the-test-kit)); everything else runs for real. For an external API (OpenAI, Stripe), vitest's `vi.mock(...)` works fine.
+- **Fakes, not mocks.** Mail, queue, cache, storage, clock, ids and secrets are faked by default ([the test kit](#the-test-kit)); everything else runs for real. For an external API (OpenAI, Stripe), vitest's `vi.mock(...)` works fine.
 
 ## See also
 

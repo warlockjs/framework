@@ -1,3 +1,4 @@
+import { maskRegisteredLogSecrets } from "./redact/registered-secrets";
 import type { BasicLogConfigurations, LogContract, LoggingData, RedactConfig } from "./types";
 
 /**
@@ -84,7 +85,9 @@ export abstract class LogChannel<
       }
 
       const reason = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`[@warlock.js/logger] channel "${this.name}" failed: ${reason}\n`);
+      process.stderr.write(
+        maskRegisteredLogSecrets(`[@warlock.js/logger] channel "${this.name}" failed: ${reason}\n`),
+      );
     } catch {
       // Reporting a failure must never become one.
     }

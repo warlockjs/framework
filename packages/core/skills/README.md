@@ -61,7 +61,8 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 
 - `test-http` — integration tests against a real HTTP server (`startHttpTestServer()`, `testGet` / `testPost`).
 - `test-service` — pure unit tests against services/repositories/models/use-cases via `setupTest({ connectors })`.
-- `test-fakes` — mail, queue, cache, storage, clock and ids fakes, on by default in tests, and their assertions; opting out.
+- `store-secrets` — app-scoped credentials, lazy keychain/environment/encrypted file storage, memory backends and safe errors.
+- `test-fakes` — mail, queue, cache, storage, clock, ids and secrets fakes, on by default in tests, and their assertions; opting out.
 - `model-factories` — `defineFactory(Model, (seed) => attrs)`: deterministic `make()` / `create(n)` / states.
 
 ## Utilities

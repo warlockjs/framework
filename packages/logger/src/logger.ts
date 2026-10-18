@@ -1,6 +1,7 @@
 import { Random } from "@mongez/reinforcements";
 import type { LogChannel } from "./log-channel";
-import { applyRedact, mergeRedact } from "./redact";
+import { applyRedact, mergeRedact, maskRegisteredLogSecrets } from "./redact";
+import { redactRegisteredSecrets } from "./redact/registered-secrets";
 import type {
   AutoFlushEvent,
   ChannelErrorHandler,
@@ -340,7 +341,11 @@ export class Logger {
 
   private reportChannelError(error: unknown, channel: LogContract, entry: LoggingData) {
     try {
-      const outcome: unknown = this.channelErrorHandler(error, channel, entry);
+      const outcome: unknown = this.channelErrorHandler(
+        redactRegisteredSecrets(error),
+        channel,
+        redactRegisteredSecrets(entry),
+      );
 
       // An async handler that rejects must not become an unhandled rejection
       // (which an app may route straight back into this logger).
@@ -680,7 +685,9 @@ function reportChannelError(error: unknown, channel: LogContract) {
 
   try {
     process.stderr.write(
-      `[@warlock.js/logger] channel "${channel.name}" failed to log: ${reason}\n`,
+      maskRegisteredLogSecrets(
+        `[@warlock.js/logger] channel "${channel.name}" failed to log: ${reason}\n`,
+      ),
     );
   } catch {
     // stderr itself is gone; nothing left to report to.

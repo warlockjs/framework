@@ -181,6 +181,8 @@ export default defineConfig({
             // processes can guard outbound requests without loading the root
             // barrel. Same shared-chunk arrangement as `errors`.
             "net/index.ts",
+            // Optional keychain integration, also available from the root.
+            "secrets/index.ts",
             // `@warlock.js/core/tooling` (5.31): `inspectApp`, `runCheck`,
             // `runTypecheck` — the functions behind `warlock inspect`, `check` and
             // `typecheck`. Its own entry because it pulls in the TypeScript

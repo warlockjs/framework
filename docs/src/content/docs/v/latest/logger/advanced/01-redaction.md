@@ -144,14 +144,14 @@ Function censors are called for every match — keep them cheap. The `path` argu
 
 ## Immutability and edge cases
 
-- **Always returns a deep clone.** Your input data is never mutated.
+- **Your input is never mutated.** Entries are cloned when paths/keys match or registered credentials activate the safety pass.
 - **`Date` and `Error` instances are reconstructed** so `instanceof` checks still pass downstream.
 - **Circular references are tolerated** — the cloner uses an internal `WeakMap` to break cycles.
-- **No-op fast path:** the deep clone only happens when something actually matches — either a `paths` glob or a denylisted key (default or custom). With `{ defaultKeys: false }` and no `paths`/`keys`, nothing runs at all.
+- **No-op fast path:** the deep clone only happens when something actually matches — either a `paths` glob or a denylisted key (default or custom). With `{ defaultKeys: false }` and no `paths`/`keys` or registered credentials, nothing runs at all.
 
 ## What about the `message` field?
 
-If `message` is a plain object, paths under `message.*` work as expected. If `message` is a string (the most common case), redaction won't scan it — string scrubbing requires regex and is intentionally out of scope. **Wrap secrets in `context`** and they'll be redacted reliably.
+If `message` is a plain object, paths under `message.*` work as expected. Key/path redaction cannot find secrets interpolated into strings. Register known literal values with `registerLogSecret()` (below) to mask those strings, and keep structured sensitive fields in `context`.
 
 Email addresses are the exception worth handling at the call site: they end up inside message strings and cache keys, where no key can reach them. Mask them before logging with `maskEmail` / `maskEmailsInText` (see [Utilities](../reference/05-utilities.md)); Warlock's own mail and cache logs already do.
 
@@ -163,12 +163,12 @@ emails, credentials and request bodies in log calls as `WL9008`.
 
 ## Performance
 
-| Setup                                       | Cost per `log()` call                                                                                                                  |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Nothing configured                          | The default denylist still runs: a cheap presence scan for a denylisted key, with the clone + censor pass skipped when nothing matches |
-| `{ defaultKeys: false }`, no `paths`/`keys` | Zero — fast path, no clone, no scan                                                                                                    |
-| Logger-wide redact only                     | One deep clone + one path-walk, shared by every channel                                                                                |
-| Channel adds paths                          | That channel re-clones from the original input and runs the merged pass once; other channels still share the cheaper logger-wide clone |
+| Setup                                                                 | Cost per `log()` call                                                                                                                  |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Nothing configured                                                    | The default denylist still runs: a cheap presence scan for a denylisted key, with the clone + censor pass skipped when nothing matches |
+| `{ defaultKeys: false }`, no `paths`/`keys` or registered credentials | Zero — fast path, no clone, no scan                                                                                                    |
+| Logger-wide redact only                                               | One deep clone + one path-walk, shared by every channel                                                                                |
+| Channel adds paths                                                    | That channel re-clones from the original input and runs the merged pass once; other channels still share the cheaper logger-wide clone |
 
 Cost grows linearly with `paths.length`. The only pattern that truly scans every key is `**` — profile before relying on it at very high volume.
 
@@ -177,3 +177,25 @@ Cost grows linearly with `paths.length`. The only pattern that truly scans every
 - [Configuration](../getting-started/02-configuration/) — wiring `redact` through `configure()`
 - [Types · `RedactConfig`](../reference/04-types/) — the full TypeScript type
 - [`setRedact` / `getRedact`](../reference/01-logger/) — the runtime methods
+
+## Registered secret values
+
+Since 5.33, register credentials that might accidentally reach a string message:
+
+```ts
+import { log, registerLogSecret, maskRegisteredLogSecrets } from "@warlock.js/logger";
+
+registerLogSecret("provider-credential", ["vendorPrivateRef"]);
+log.info("sample", "request", "using provider-credential", {
+  vendorPrivateRef: "another-sensitive-value",
+});
+// message: "using [REDACTED]", context.vendorPrivateRef: "[REDACTED]"
+
+const safeText = maskRegisteredLogSecrets("using provider-credential");
+```
+
+Registration applies to every `Logger` instance in this module and remains for the process lifetime, including after credential rotation/removal. Empty values are ignored; duplicate registration is harmless. Registered keys use the same normalization as the default denylist. Literal values use exact substring matching with longer matches first; regular-expression punctuation is treated literally.
+
+Registered credentials add a final safety floor after configured censors. Neither `defaultKeys: false`, clearing redact configuration, nor a permissive censor can reveal a registered key's value or a registered literal. The pass protects message/context strings, property names, error messages, stacks and causes, Maps/Sets, and channel failure diagnostics. It clones data without invoking getters or custom serializers and replaces opaque objects (including Buffers) and functions with `[REDACTED]` whenever any registration is active.
+
+The registry retains literal values in memory; use it for credentials, not arbitrary large payloads. It cannot protect earlier logs, encoded/transformed versions of values, direct console calls, third-party loggers or unknown credentials. `@warlock.js/core`'s [secret store](/v/latest/core/digging-deeper/secrets/) registers encountered names and values automatically. Continue to avoid logging credentials.

@@ -73,7 +73,7 @@ export type TestSetupOptions = {
   importModule?: AppModuleImporter;
   /**
    * Which test fakes to install once the connectors are up: mail, queue,
-   * cache, storage, clock and ids (see `installTestFakes`).
+   * cache, storage, clock, ids and secrets (see `installTestFakes`).
    *
    * Precedence is `explicit option > tests.fakes config > true`, so every fake
    * is on unless the project or this call opts out. `false` keeps the real
