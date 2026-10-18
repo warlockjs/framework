@@ -226,15 +226,16 @@ Oxc config enables `devServer.healthCheckers: { eslint: false, oxlint: true }` a
 leaves TypeScript health checks enabled. Style matches the template's 100-column,
 double-quote, semicolon and trailing-comma settings. Import sorting is on in
 `.oxfmtrc.json`, kept to one block like the ESLint toolchain's
-`prettier-plugin-organize-imports`:
+`@ianvs/prettier-plugin-sort-imports`:
 
 ```json
-{ "sortImports": { "newlinesBetween": false } }
+{ "sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] } }
 ```
 
-`format` (`oxfmt --write ./src`) orders built-ins, then packages, then relative
-imports. Oxfmt does not delete unused imports, so remove them from Oxlint's
-`no-unused-vars` diagnostics. Scripts in both toolchains call local binaries
+`format` (`oxfmt --write ./src`) orders built-ins, packages, internal aliases,
+then relative imports. Neither formatter deletes unused imports. ESLint reports
+them through `unused-imports/no-unused-imports`; Oxlint uses `no-unused-vars`.
+Scripts in both toolchains call local binaries
 (`eslint --fix ./src --max-warnings=0`, `tsc --noEmit`), never `npx`.
 
 ## TypeScript 7 in 5.32
@@ -249,5 +250,22 @@ Use the Oxlint/Oxfmt lint mode with TS7. The optional ESLint scaffold is retaine
 but typescript-eslint's parser requires the removed JavaScript compiler API and
 does not support TS7. ESLint mode is scheduled for deprecation in 5.33 and removal
 in 5.34. A parser's bundled older TypeScript is separate from the app's native `tsc`.
+
+### Prettier import order with TypeScript 7
+
+The ESLint scaffold’s `@ianvs/prettier-plugin-sort-imports` uses Babel instead of
+the compiler API. Keep these options in `.prettierrc.json`:
+
+```json
+{
+  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
+  "importOrder": ["<BUILTIN_MODULES>", "<THIRD_PARTY_MODULES>", "^(app|web|@shared)/", "^[.]"],
+  "importOrderParserPlugins": ["typescript", "jsx", "decorators"]
+}
+```
+
+Leave `importOrderTypeScriptVersion` at its default to keep type and value imports
+separate. Run `npm run format`, then `npm run lint:check`; formatting preserves
+unused imports, and `npm run lint` can apply ESLint’s unused-import fixes.
 
 
