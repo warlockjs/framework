@@ -243,7 +243,17 @@ The framework sets `Content-Type: application/json` for `response.success(...)` 
 
 ### 5.3 Open redirects
 
-If you implement a "redirect back to where the user came from" feature, validate the destination URL against a whitelist of internal paths. Never blindly follow a user-supplied URL.
+If you implement a "redirect back to where the user came from" feature, validate the destination URL against a whitelist of internal paths. Never blindly follow a user-supplied URL. `safeRedirect()` from `@warlock.js/core` does it: same-origin paths and the origins you allow pass, anything else becomes the fallback.
+
+```typescript
+import { safeRedirect, type RequestHandler } from "@warlock.js/core";
+
+export const afterLoginController: RequestHandler = async ({ request, response }) => {
+  return response.redirect(safeRedirect(request.input("next"), { fallback: "/dashboard" }));
+};
+```
+
+`npx warlock check` reports a redirect target taken from request input without it as `WL9007`.
 
 ### 5.4 CORS
 
@@ -350,3 +360,4 @@ Before merging a change that touches input, identity, secrets, or persistence:
 - [ ] Logger redaction config covers any new sensitive field introduced
 - [ ] File uploads cap size, sniff MIME, server-generate the stored filename
 - [ ] Webhooks verify signature before any other work
+- [ ] `npx warlock check` reports no `WL9005`–`WL9009` problem (unvalidated `request.all()`, unguarded mutating route, unsafe redirect, sensitive value in a log, unbounded regex on input)

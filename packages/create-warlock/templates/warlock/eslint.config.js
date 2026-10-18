@@ -1,6 +1,5 @@
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
-import warlock from "@warlock.js/eslint-plugin";
 import prettierConfig from "eslint-config-prettier";
 import prettierPlugin from "eslint-plugin-prettier";
 import unusedImports from "eslint-plugin-unused-imports";
@@ -85,11 +84,6 @@ export default [
       ],
     },
   },
-
-  // Warlock rules: validated input, guarded mutating routes, safe redirects,
-  // redacted logs and the framework conventions. Every message links to its
-  // fix: https://warlock.js.org/v/latest/eslint-plugin/
-  warlock.configs.recommended,
 
   // Ignore patterns
   {

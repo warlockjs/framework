@@ -556,6 +556,14 @@ Use the project's selected toolchain: `eslint.config.js` + `.prettierrc.json`, o
 `npm run format:check` for non-mutating checks. The Oxc scaffold enables the
 Oxlint development health checker and retains TypeScript checking.
 
+`npx warlock check` is the one verify command, in either toolchain: it
+typechecks, runs the configured linter and the affected tests, and checks the
+framework's conventions — `request.validated()` instead of `request.all()`,
+guarded or `public: true` mutating routes, safe redirects, redacted logs,
+bounded regexes on input, one controller per file, `type` (not `kind`) as a
+union's discriminator. Each problem has a `WL` code and its fix
+(`npx warlock explain <CODE>`).
+
 For ESLint, consider enabling these additional rules:
 
 - `@typescript-eslint/explicit-member-accessibility` — enforces § 1.2
@@ -589,6 +597,7 @@ Before any change ships:
 - [ ] No `console.log`, `log.<level>(module, action, message, context)` signature used correctly
 - [ ] Tests co-located, public-surface-driven
 - [ ] `tsc --noEmit`, `npm run lint:check` and `npm run format:check` pass clean
+- [ ] `npx warlock check` exits 0
 
 **Non-negotiable defaults**
 - [ ] Every untrusted input has a `@warlock.js/seal` schema at the boundary

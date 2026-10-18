@@ -81,6 +81,7 @@ automatically on `postinstall`).
 - `yarn migrate` / `yarn migrate.fresh` / `yarn migrate.list` — run migrations
 - `yarn seed` — run database seeders
 - `yarn lint` / `yarn format` / `yarn tsc` — lint and format with the selected toolchain, and type-check (`tsc --noEmit`)
+- `npx warlock check` — verify a change: typecheck, lint, the affected tests and the framework's conventions in one report (`--changed` for only what changed); run it after every change and loop until it exits 0
 - `yarn skills:sync` — re-sync skills from `node_modules` and regenerate the
   derived per-agent files from this `AGENTS.md`
 
@@ -97,12 +98,13 @@ suffixes, and JSDoc on the public surface. The bar is senior-level clean code, n
 
 - Respect **module-boundaries** — do not reach across module internals.
 - Never weaken the **security-baseline** — always validate input at boundaries.
-- With the ESLint toolchain, `@warlock.js/eslint-plugin` checks these rules on
-  every `yarn lint`: pass `request.validated()` (never `request.all()`) to
-  queries and services, give every POST/PUT/PATCH/DELETE route auth middleware
-  or an explicit `public: true`, wrap request-supplied redirect targets in
-  `safeRedirect()`, and mask emails/tokens in logs. Each message links to its
-  fix; the `lint-warlock-app` skill lists them all.
+- `npx warlock check` enforces these rules whichever linter the project uses:
+  pass `request.validated()` (never `request.all()`) to queries and services
+  (`WL9005`), give every POST/PUT/PATCH/DELETE route auth middleware or an
+  explicit `public: true` (`WL9006`), wrap request-supplied redirect targets in
+  `safeRedirect()` (`WL9007`), keep raw emails, tokens and request bodies out of
+  logs (`WL9008`) and bound regexes that run on request input (`WL9009`). Each
+  problem carries its fix; `npx warlock explain <CODE>` prints it again.
 - Follow **git-workflow** for commits and branches; do not commit or push unless
   explicitly asked.
 - When you are unsure how a package or feature works, **stop and read its skill**

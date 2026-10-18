@@ -216,9 +216,6 @@ export class App {
       "@types/prettier",
       "@typescript-eslint/eslint-plugin",
       "@typescript-eslint/parser",
-      // Oxlint's JS-plugin support is alpha in the pinned 1.88, so the Warlock
-      // rules ship with the ESLint toolchain only.
-      "@warlock.js/eslint-plugin",
       "eslint",
       "eslint-config-prettier",
       "eslint-plugin-prettier",

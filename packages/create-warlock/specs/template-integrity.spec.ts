@@ -471,3 +471,25 @@ describe("optional Oxc toolchain templates", () => {
     }
   });
 });
+
+describe("framework conventions are verified by warlock check", () => {
+  it("installs no Warlock lint plugin in either toolchain", () => {
+    const pkg = JSON.parse(read("package.json"));
+    const devDependencies = Object.keys(pkg.devDependencies);
+
+    expect(devDependencies.filter((name) => name.startsWith("@warlock.js/"))).toEqual([]);
+    expect(read("eslint.config.js")).not.toContain("@warlock.js/");
+    expect(read("../toolchains/oxc/.oxlintrc.json")).not.toContain("@warlock.js/");
+  });
+
+  it("tells agents to run warlock check for the conventions it enforces", () => {
+    const agents = read("AGENTS.md");
+
+    expect(agents).toContain("npx warlock check");
+    for (const code of ["WL9005", "WL9006", "WL9007", "WL9008", "WL9009"]) {
+      expect(agents).toContain(code);
+    }
+    expect(read("skills/code-standards/SKILL.md")).toContain("npx warlock check");
+    expect(read("skills/security-baseline/SKILL.md")).toContain("WL9007");
+  });
+});

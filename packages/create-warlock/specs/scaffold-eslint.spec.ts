@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Application } from "../src/commands/create-new-app/types";
 import { App } from "../src/helpers/app";
 import { setPackageManager } from "../src/helpers/package-manager";
-import { linkEslintPlugin } from "./support/link-eslint-plugin";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const eslintEntry = path.join(packageRoot, "node_modules", "eslint", "bin", "eslint.js");
@@ -36,25 +35,15 @@ function generateApp(): string {
 
   new App(application).use("warlock").configureWebStarter(false);
   generatedRoots.push(root);
-  linkEslintPlugin(appPath);
 
   return appPath;
 }
 
-// The template's flat config imports `@warlock.js/eslint-plugin`, which this
-// workspace links as TypeScript source (the published package is built ESM).
-// `tsx` lets the spawned ESLint load that source.
-const loadTypeScriptSource = ["--import", "tsx"];
-
 function lint(appPath: string) {
-  return spawnSync(
-    process.execPath,
-    [...loadTypeScriptSource, eslintEntry, "--fix", "./src", "--max-warnings=0"],
-    {
-      cwd: appPath,
-      encoding: "utf8",
-    },
-  );
+  return spawnSync(process.execPath, [eslintEntry, "--fix", "./src", "--max-warnings=0"], {
+    cwd: appPath,
+    encoding: "utf8",
+  });
 }
 
 afterEach(() => {
