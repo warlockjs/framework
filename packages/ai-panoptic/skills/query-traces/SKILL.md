@@ -199,3 +199,17 @@ for (const trace of store.query({ sessionId })) {
 - The `observe-with-panoptic` topic — wiring the `panoptic(...)` subscriber and bring-your-own-collector so the store fills as runs complete.
 - The `export-traces` topic — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — the `BaseReport` the collector projects into the `Trace` this store retains.
+
+## Hosted-tool rollups
+
+`sumUsage` uses the framework's all-channel `mergeUsage`, so traces retain
+`usage.serverToolUse` and `usage.cost.serverTools` alongside cache lifetime
+counts and mixed-provider cache semantics. Request counts remain absent when
+unreported; unpriced requests do not erase priced siblings.
+
+```ts
+const stats = store.aggregate({ sessionId });
+console.log(stats.usage.serverToolUse?.webSearchRequests);
+console.log(stats.cost?.serverTools?.webSearch); // historical USD
+console.log(totalCost(stats.cost)); // includes hosted fees
+```

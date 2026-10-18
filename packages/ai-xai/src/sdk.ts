@@ -1,3 +1,4 @@
+import { InvalidRequestError, isProviderTool, type ModelCallOptions } from "@warlock.js/ai";
 import type {
   EmbedderContract,
   ImageModelContract,
@@ -121,7 +122,7 @@ export class XaiSDK implements SDKAdapterContract {
    * xai.model({ name: "grok-3-mini" });   // reasoning auto-true, vision false
    */
   public model(config: XaiModelConfig): ModelContract {
-    return this.openai.model({
+    const model = this.openai.model({
       ...config,
       // xAI names don't match OpenAI's vision/reasoning prefixes, so we
       // resolve them here and pass explicit flags through — explicit
@@ -129,6 +130,23 @@ export class XaiSDK implements SDKAdapterContract {
       vision: config.vision ?? inferVisionCapability(config.name),
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),
     });
+    // Preserve xAI transport constraints even when a gateway relabels the provider.
+    // https://docs.x.ai/developers/tools/web-search — native search uses Responses.
+    return {
+      name: model.name,
+      provider: model.provider,
+      capabilities: model.capabilities,
+      ...(model.pricing ? { pricing: model.pricing } : {}),
+      async complete(messages, options) {
+        rejectNativeSearch(model.provider, options);
+        return model.complete(messages, options);
+      },
+      async *stream(messages, options) {
+        rejectNativeSearch(model.provider, options);
+        yield* model.stream(messages, options);
+      },
+      ...(model.countTokens ? { countTokens: model.countTokens.bind(model) } : {}),
+    };
   }
 
   /**
@@ -161,5 +179,24 @@ export class XaiSDK implements SDKAdapterContract {
    */
   public image(config: XaiImageConfig): ImageModelContract {
     return this.openai.image(config);
+  }
+}
+
+/** A provider label does not change the underlying Chat Completions transport. */
+function rejectNativeSearch(provider: string, options: ModelCallOptions | undefined): void {
+  const entries = [
+    ...(options?.providerTools ?? []),
+    ...(options?.tools ?? []).filter(isProviderTool),
+  ];
+  if (
+    entries.some(
+      (entry) =>
+        entry.provider === provider &&
+        (entry.definition.type === "web_search" || entry.definition.type === "x_search"),
+    )
+  ) {
+    throw new InvalidRequestError(
+      "xAI native web_search / x_search requires POST /v1/responses. XaiSDK currently supports Chat Completions only; use xAI's Responses API with the vendor SDK for native search.",
+    );
   }
 }

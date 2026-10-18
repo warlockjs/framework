@@ -390,3 +390,26 @@ const webSearch = ai.providerTool({ provider: "openai", definition: { type: "web
 ```
 
 With `streamChunks` (on by default under `agent.stream()`), the Responses model yields `reasoning` for reasoning-summary and reasoning-text deltas (summaries need `body: { reasoning: { summary: "auto" } }`) and `tool-args` for `response.function_call_arguments.delta`. The Chat model yields `tool-args` for argument fragments and `reasoning` for a compatible vendor's `reasoning_content` / `reasoning` delta. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/).
+
+## Hosted-search metering and metadata
+
+On Responses, each structured `web_search_call` output item contributes one
+`usage.serverToolUse.webSearchRequests`. Streaming item events and terminal
+output are reconciled as snapshots, so the same call is counted once.
+`response.providerMetadata.openai.output` (also on streaming `done`) retains
+hosted output items with their action and sources. The adapter automatically
+requests `web_search_call.action.sources` when web-search tools are supplied.
+Agent reports preserve this metadata on each trip; it is not replayed or
+passed to function dispatch.
+
+Explicitly set `pricing.serverTools: OPENAI_SERVER_TOOL_PRICING` (exported by
+this package) for standard `web_search`: $0.01 per tool call, plus search-content
+tokens at model rates. Non-reasoning `web_search_preview` has a different fee
+and needs an explicit override. These prices were verified on 2026-10-18 from
+[OpenAI pricing](https://developers.openai.com/api/docs/pricing#built-in-tools);
+see the [official search output schema](https://developers.openai.com/api/docs/guides/tools-web-search)
+and [cost tracking](/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
+Chat Completions does not map hosted-search billing counters.
+
+Qwen's `enableSearch` flag and Kimi's `$web_search` echo continuation have
+separate verified controls; see [OpenAI-compatible native search](/v/latest/ai/providers/openai-compatible/).

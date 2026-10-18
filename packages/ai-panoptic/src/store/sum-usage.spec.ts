@@ -82,3 +82,24 @@ describe("sumUsage", () => {
     expect(b.input).toBe(40);
   });
 });
+
+it("preserves hosted counters and costs through aggregation without mutating inputs", () => {
+  const first: Usage = {
+    input: 0,
+    output: 0,
+    total: 0,
+    serverToolUse: { webSearchRequests: 2 },
+    cost: { input: 0, output: 0, serverTools: { webSearch: 0.02 } },
+  };
+  const second: Usage = {
+    input: 0,
+    output: 0,
+    total: 0,
+    serverToolUse: { webSearchRequests: 1 },
+    cost: { input: 0, output: 0, serverTools: { webSearch: 0.01 } },
+  };
+  const result = sumUsage(first, second);
+  expect(result.serverToolUse?.webSearchRequests).toBe(3);
+  expect(result.cost?.serverTools?.webSearch).toBeCloseTo(0.03);
+  expect(first.serverToolUse?.webSearchRequests).toBe(2);
+});

@@ -246,3 +246,55 @@ Per-step cost lets you spot the expensive step in a workflow — usually the one
 - [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/) — pricing configuration.
 - [Run agent](/v/latest/ai/agents/run-agent/) — `usage` on the result envelope.
 - [Attach middleware](/v/latest/ai/reliability/attach-middleware/) — the budget built-in and custom middleware.
+
+## Hosted-tool request fees
+
+`ModelPricing.serverTools` uses **USD per request**. Token rates still use USD
+per million tokens. `computeCost` adds a `cost.serverTools` object containing
+historical USD amounts by tool (`webSearch`, `webFetch`, `codeExecution` or a
+provider-specific counter key). `totalCost` includes those amounts, and
+`mergeUsage` adds both counters and costs. Unconfigured rates stay absent;
+token costs alone are a partial estimate when a hosted tool is unpriced.
+
+```ts
+import { computeCost, totalCost } from "@warlock.js/ai";
+import { ANTHROPIC_SERVER_TOOL_PRICING } from "@warlock.js/ai-anthropic";
+
+const pricing = {
+  input: 3,
+  output: 15,
+  serverTools: ANTHROPIC_SERVER_TOOL_PRICING,
+};
+const cost = computeCost(
+  {
+    input: 100,
+    output: 50,
+    total: 150,
+    serverToolUse: { webSearchRequests: 2, webFetchRequests: 1 },
+  },
+  pricing,
+);
+console.log(cost?.serverTools); // { webSearch: 0.02, webFetch: 0 }
+console.log(totalCost(cost));
+```
+
+Pass this `pricing` to the model (or SDK registry) to cost `complete()`, streaming
+`done` and agent trips automatically. Existing built-in token tables remain
+unchanged: request prices are explicit opt-ins so tool versions, free allowances
+and contract rates are not silently conflated.
+
+Verified list prices on **2026-10-18**:
+
+| Export                          | USD per request                  | Scope and official source                                                                                                                                                                                                                                                                            |
+| ------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_SERVER_TOOL_PRICING` | `webSearch: 0.01`, `webFetch: 0` | [Web search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool#usage-and-pricing) costs $10/1,000 searches; [fetch](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool#usage-and-pricing) has no extra request fee. Tokens remain additional.  |
+| `OPENAI_SERVER_TOOL_PRICING`    | `webSearch: 0.01`                | Standard `web_search`: [OpenAI pricing](https://developers.openai.com/api/docs/pricing#built-in-tools) lists $10/1,000 tool calls plus search-content tokens at model rates. Non-reasoning `web_search_preview` costs $25/1,000 with free search-content tokens: supply its rate explicitly instead. |
+| `GOOGLE_SERVER_TOOL_PRICING`    | `webSearch: 0.014`               | [Gemini 3 and newer](https://ai.google.dev/gemini-api/docs/google-search#pricing): each unique nonempty query, $14/1,000 after the shared monthly free allowance. Gemini 2.5 and older bill per grounded prompt, so this per-query table must not be used for them.                                  |
+
+Google's `webSearchRequests` counts unique nonempty queries; its
+`googleWebSearchQueries` records the full raw array length. The raw metadata
+retains duplicates and empty strings. Stream snapshots replace prior metadata
+per candidate; they are not added together. Monthly free allowances and
+provider invoice adjustments are not applied locally. Bedrock, Qwen and Kimi
+request fees remain unpriced; enabling a tool or echoing a call does not prove
+the provider billed one request.

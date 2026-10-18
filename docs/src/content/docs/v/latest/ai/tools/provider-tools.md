@@ -96,3 +96,29 @@ await model.complete(messages, {
 - [Define tools](/v/latest/ai/tools/define-tools/) — `ai.tool()` for your own functions.
 - [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/) — server-run tool inputs are not streamed as tool arguments.
 - [Anthropic provider](/v/latest/ai/providers/anthropic/) — provider blocks and `providerOptions`.
+
+## Hosted usage and metadata
+
+Hosted tools never go through application function dispatch. Read
+`usage.serverToolUse.webSearchRequests`, `webFetchRequests` and
+`codeExecutionRequests` when an adapter reports them. Missing means unreported;
+zero means the provider reported zero. Counts come from structured provider
+counters or hosted output, never the answer text. `mergeUsage` sums them across
+trips and providers. No adapter currently reports a verified code-execution
+request counter; content blocks alone do not establish billable requests.
+
+| Adapter          | Count source                                                                                                     | Raw data retained on the response and streaming `done`                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anthropic        | `usage.server_tool_use.web_search_requests` / `web_fetch_requests`; stream snapshots replace cumulative counts   | Ordered `blocks`, including `server_tool_use` and `web_search_tool_result`, replayed in history                                                |
+| Google           | Unique nonempty `groundingMetadata.webSearchQueries`; `googleWebSearchQueries` also records the raw array length | `providerMetadata.google.groundingMetadata`: indexed candidate metadata with queries, chunks and supports                                      |
+| OpenAI Responses | Number of `web_search_call` output items, counted once across stream events and terminal output                  | `providerMetadata.openai.output`: hosted output items, including actions and sources; sources are requested automatically for web-search tools |
+| Bedrock Converse | No hosted request counter in its `TokenUsage` schema                                                             | Existing adapter behavior; no search count inferred from system-tool blocks                                                                    |
+| Qwen / Kimi      | No verified billing counter mapped                                                                               | No synthetic search count from flags or echoed calls                                                                                           |
+
+Agent reports retain `providerMetadata` on each `report.trips` entry. Metadata
+is for inspection and display; it is not sent to function dispatch. Anthropic
+blocks continue to be replayed; OpenAI and Google metadata is not replayed.
+See [cost tracking](/v/latest/ai/recipes/cost-tracking/) for request-fee pricing
+and [OpenAI-compatible native search](/v/latest/ai/providers/openai-compatible/)
+for Qwen and Kimi. xAI native search requires its Responses API; the current
+`XaiSDK` rejects native `web_search` / `x_search` tools on Chat Completions.

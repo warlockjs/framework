@@ -355,3 +355,18 @@ If your exporter wraps a third-party SDK, lazily `await import(...)` it **inside
 
 - [What Panoptic traces](/v/latest/ai/observability/what-panoptic-traces/) — the `Trace` / `TraceSpan` shape this store retains.
 - [Exporter output](/v/latest/ai/observability/exporter-output/) — sending traces to a backend instead of (or alongside) retaining them in memory.
+
+## Hosted-tool usage in aggregates
+
+Panoptic uses the framework's canonical usage rollup. `aggregate().usage`
+retains additive `serverToolUse` counters, including provider-specific ones;
+`aggregate().cost.serverTools` retains historical USD per hosted tool.
+`totalCost(stats.cost)` includes hosted fees. Cache lifetimes and mixed-provider
+cache semantics follow the same rollup, so request counts and token costs
+survive across trips and traces. Missing counters/rates stay absent.
+
+```ts
+const stats = store.aggregate({ sessionId });
+console.log(stats.usage.serverToolUse?.webSearchRequests);
+console.log(stats.cost?.serverTools?.webSearch);
+```

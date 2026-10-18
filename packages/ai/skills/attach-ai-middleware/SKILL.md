@@ -311,3 +311,38 @@ Same onion semantics: `before` top-down (return a `SupervisorResult` to short-ci
 - The `run-ai-agent` topic — agent lifecycle the middleware wraps
 - The `persist-ai-data` topic — `defaultStore` for semantic cache
 - The `handle-ai-errors` topic — `BudgetExceededError` / `GuardrailViolationError`
+
+## Hosted-search fees and reservation
+
+`ModelPricing.serverTools` uses USD per request; `usage.cost.serverTools` stores
+historical USD by tool, and `totalCost` includes those amounts. Request fees
+are explicit opt-ins alongside token prices. Missing counters/rates stay
+unreported/unpriced. `mergeUsage` sums `serverToolUse` across trips.
+
+```ts
+const guard = ai.middleware.budget({
+  maxCostUSD: 0.25,
+  pricing: {
+    "claude-sonnet-4-6": {
+      input: 3,
+      output: 15,
+      serverTools: { webSearch: 0.01 },
+    },
+  },
+  reserve: { outputTokens: 4096, serverToolRequests: 3 },
+});
+```
+
+`serverToolRequests` is a nonnegative safe integer for web-search requests per
+call, priced with `serverTools.webSearch`. A positive reservation without a
+rate fails closed for USD caps unless `onUnpriced: "allow"`. Use ModelPricing,
+not legacy per-1K prices. Actual reported fees replace the reservation after
+each trip; failed trips release it. Set model pricing too if reports must use
+the same fee table as a budget override.
+
+The allowance reserves money; pair it with provider controls (Anthropic
+`max_uses: 3`) and token headroom for retrieved content. Providers without a
+verified search limit cannot promise that allowance is a hard spending bound.
+Google's exported per-query fee is only for Gemini 3+: older models bill per
+prompt. Official verified rates and sources:
+https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees

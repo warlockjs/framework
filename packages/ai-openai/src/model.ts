@@ -16,7 +16,8 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type OpenAI from "openai";
-import { mergeProviderBody } from "./provider-options";
+import { moonshotSearchCall, moonshotSearchEnabled } from "./utils/moonshot-search";
+import { compatibleSearchParams, mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
@@ -143,6 +144,7 @@ export class OpenAIModel implements ModelContract {
         mergeProviderBody<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming>(
           {
             model: this.name,
+            ...compatibleSearchParams(this.provider, options),
             messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
             ...this.buildSamplingParams(options),
             ...buildPromptCacheParams(this.provider, this.config),
@@ -181,6 +183,18 @@ export class OpenAIModel implements ModelContract {
       });
     }
 
+    const hosted = moonshotSearchEnabled(this.provider, options);
+    const serverToolCalls = (choice.message.tool_calls ?? []).flatMap((call) =>
+      hosted &&
+      choice.finish_reason === "tool_calls" &&
+      call.type === "function" &&
+      call.function.name === "$web_search"
+        ? [moonshotSearchCall(call.id, call.function.name, call.function.arguments)]
+        : [],
+    );
+    const clientCalls = choice.message.tool_calls?.filter(
+      (call) => !(hosted && call.type === "function" && call.function.name === "$web_search"),
+    );
     const finishReason = mapFinishReason(choice.finish_reason);
     const usage = this.extractUsage(response.usage);
 
@@ -193,7 +207,8 @@ export class OpenAIModel implements ModelContract {
       content: choice.message.content ?? "",
       finishReason,
       usage,
-      toolCalls: this.extractToolCalls(choice.message.tool_calls),
+      toolCalls: this.extractToolCalls(clientCalls),
+      ...(serverToolCalls.length ? { serverToolCalls } : {}),
     };
   }
 
@@ -226,6 +241,7 @@ export class OpenAIModel implements ModelContract {
         mergeProviderBody<OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming>(
           {
             model: this.name,
+            ...compatibleSearchParams(this.provider, options),
             messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
             ...this.buildSamplingParams(options),
             ...buildPromptCacheParams(this.provider, this.config),
@@ -253,6 +269,8 @@ export class OpenAIModel implements ModelContract {
     let rawFinishReason: string = "stop";
     let usage: Usage = { input: 0, output: 0, total: 0 };
     const want = resolveStreamChunks(options);
+    const hosted = moonshotSearchEnabled(this.provider, options);
+    const serverToolCalls: NonNullable<ModelResponse["serverToolCalls"]> = [];
     const toolCallAccum = new Map<
       number,
       { id: string; name: string; arguments: string; streamed: number }
@@ -289,7 +307,12 @@ export class OpenAIModel implements ModelContract {
             // The first fragment of a call carries its id and name; later
             // ones only `index` + argument text. Anything that arrived
             // before the name is flushed once the call is identified.
-            if (want.toolArgs && acc.name && acc.arguments.length > acc.streamed) {
+            if (
+              want.toolArgs &&
+              acc.name &&
+              !(hosted && acc.name === "$web_search") &&
+              acc.arguments.length > acc.streamed
+            ) {
               yield {
                 type: "tool-args",
                 callId: acc.id,
@@ -317,6 +340,11 @@ export class OpenAIModel implements ModelContract {
         // Yielding them produces nameless tool-calls the agent runtime
         // can't dispatch and would mis-attribute as a registered tool.
         if (!acc.name) continue;
+        if (hosted && acc.name === "$web_search") {
+          if (rawFinishReason === "tool_calls")
+            serverToolCalls.push(moonshotSearchCall(acc.id, acc.name, acc.arguments));
+          continue;
+        }
 
         yield {
           type: "tool-call",
@@ -343,7 +371,12 @@ export class OpenAIModel implements ModelContract {
       usage,
     });
 
-    yield { type: "done", finishReason, usage };
+    yield {
+      type: "done",
+      finishReason,
+      usage,
+      ...(serverToolCalls.length ? { serverToolCalls } : {}),
+    };
   }
 
   /**
@@ -364,6 +397,18 @@ export class OpenAIModel implements ModelContract {
       model: this.name,
       logger: this.logger,
     });
+    // Native search is a Responses-only xAI feature. Fail before transport.
+    // https://docs.x.ai/developers/tools/web-search
+    if (
+      this.provider === "xai" &&
+      definitions.some(
+        (definition) => definition.type === "web_search" || definition.type === "x_search",
+      )
+    ) {
+      throw new InvalidRequestError(
+        "xAI native web_search / x_search requires POST /v1/responses. XaiSDK currently supports Chat Completions only; use xAI's Responses API with the vendor SDK for native search.",
+      );
+    }
     const mapped = [
       ...(toOpenAITools(tools) ?? []),
       ...(definitions as unknown as OpenAI.Chat.Completions.ChatCompletionTool[]),

@@ -94,6 +94,9 @@ export type BudgetReserveOptions = {
    * model is called with, since that is the most a trip can generate.
    */
   outputTokens: number;
+  /** Maximum web-search requests to reserve per call; pair with provider-side limits.
+   * This reserves fees, it cannot limit a provider's internal search execution. */
+  serverToolRequests?: number;
   /**
    * Input tokens to reserve for a trip. Default: `estimateInputTokens`
    * over the trip's messages (an offline estimate that does not see the
@@ -267,6 +270,7 @@ function resolveTripCost(
     | "cacheWrite1hTokens"
     | "reasoningTokens"
     | "inputIncludesCache"
+    | "serverToolUse"
   >,
   budgetPricing: BudgetPricing | undefined,
 ): number | undefined {
@@ -548,6 +552,13 @@ export function readBudgetFallbackSignal(
  */
 export function budget(options: BudgetOptions): AgentMiddleware {
   const name = options.name ?? "budget";
+  const searchReservation = options.reserve?.serverToolRequests;
+  if (
+    searchReservation !== undefined &&
+    (!Number.isSafeInteger(searchReservation) || searchReservation < 0)
+  ) {
+    throw new RangeError("reserve.serverToolRequests must be a non-negative safe integer");
+  }
   const onExceeded = options.onExceeded ?? "abort";
   const hasTokenCap = typeof options.maxTokens === "number";
   const hasCostCap = typeof options.maxCostUSD === "number";
@@ -607,11 +618,23 @@ export function budget(options: BudgetOptions): AgentMiddleware {
           (await reserve.inputTokens?.(context)) ?? estimateInputTokens(context.messages),
         );
         const outputTokens = Math.max(0, reserve.outputTokens);
+        if (needsCost && (reserve.serverToolRequests ?? 0) > 0 && options.onUnpriced !== "allow") {
+          const price = options.pricing?.[context.model.name] ?? context.model.pricing;
+          if (!price || "inputPer1K" in price || price.serverTools?.webSearch === undefined) {
+            unpricedModelBreach(name, `${context.model.name} (web search)`);
+          }
+        }
         const tokens = inputTokens + outputTokens;
         const costUSD = needsCost
           ? (resolveTripCost(
               context,
-              { input: inputTokens, output: outputTokens },
+              {
+                input: inputTokens,
+                output: outputTokens,
+                ...(reserve.serverToolRequests !== undefined
+                  ? { serverToolUse: { webSearchRequests: reserve.serverToolRequests } }
+                  : {}),
+              },
               options.pricing,
             ) ?? 0)
           : 0;

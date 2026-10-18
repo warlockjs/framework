@@ -114,3 +114,8 @@ export function withAnthropicCacheWriteRates(
 
   return { ...pricing, cacheWrite, cacheWrite1h };
 }
+
+/** USD per request, verified 2026-10-18. Tokens are additional.
+ * https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool#usage-and-pricing
+ * https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool#usage-and-pricing */
+export const ANTHROPIC_SERVER_TOOL_PRICING = { webSearch: 0.01, webFetch: 0 };

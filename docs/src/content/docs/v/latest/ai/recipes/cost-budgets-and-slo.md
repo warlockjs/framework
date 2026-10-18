@@ -338,3 +338,44 @@ The budget accumulates `response.usage.total` after each trip. A semantic-cache 
 - [Attach middleware](/v/latest/ai/reliability/attach-middleware/) — the budget built-in, install order, and the onion model.
 - [Handle errors](/v/latest/ai/reliability/handle-errors/) — `BudgetExceededError`, `error.code`, and `error.category`.
 - [Cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/) — record what was actually spent alongside the cap.
+
+## Reserve hosted-search fees
+
+Add `reserve.serverToolRequests` to reserve a bounded number of **web-search
+requests per model call** alongside the input/output token allowance:
+
+```ts
+const guarded = ai.agent({
+  model: anthropic.model({
+    name: "claude-sonnet-4-6",
+    maxTokens: 4096,
+    pricing: { input: 3, output: 15, serverTools: { webSearch: 0.01 } },
+  }),
+  tools: [
+    ai.providerTool({
+      provider: "anthropic",
+      definition: { type: "web_search_20250305", name: "web_search", max_uses: 3 },
+    }),
+  ],
+  middleware: [
+    ai.middleware.budget({
+      maxCostUSD: 0.25,
+      reserve: { outputTokens: 4096, serverToolRequests: 3 },
+    }),
+  ],
+});
+```
+
+The count must be a nonnegative safe integer. With a USD cap and a positive
+search allowance, the middleware refuses the call if `serverTools.webSearch`
+has no price, unless `onUnpriced: "allow"` is explicit. Legacy per-1K pricing
+cannot reserve hosted fees; use `ModelPricing`. After the call, actual reported
+request fees replace the allowance in both run and scoped ledgers; failures
+release the reservation.
+
+This option reserves money; it does not impose a limit on the provider's
+internal searches. Pair it with a verified provider limit such as Anthropic
+`max_uses`, and include room for search-result tokens. For providers without a
+verified per-call search limit, the allowance is an estimate and cannot
+promise a hard provider-side spending bound. Kimi continuations each consume
+one agent trip and pass through the same middleware and `maxTrips` limit.

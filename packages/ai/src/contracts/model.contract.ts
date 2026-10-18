@@ -233,6 +233,10 @@ export type ModelCapabilities = {
  * };
  */
 export type ModelResponse = {
+  /** Raw provider grounding / hosted output, for inspection; never dispatched or replayed. */
+  providerMetadata?: Record<string, unknown>;
+  /** Adapter-supplied hosted continuation: echo results without function dispatch, within maxTrips. */
+  serverToolCalls?: Array<ModelToolCallRequest & { result: string }>;
   content: string;
   finishReason: FinishReason;
   /**
@@ -343,6 +347,8 @@ export type ModelStreamChunk =
     }
   | {
       type: "done";
+      providerMetadata?: ModelResponse["providerMetadata"];
+      serverToolCalls?: ModelResponse["serverToolCalls"];
       finishReason: FinishReason;
       usage: Usage;
       /** The turn's raw provider blocks — see `ModelResponse.blocks`. */

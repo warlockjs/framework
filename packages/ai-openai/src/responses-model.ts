@@ -16,6 +16,7 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type OpenAI from "openai";
+import { hostedOutput } from "./utils/hosted-output";
 import { mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
@@ -85,7 +86,8 @@ const CLIENT_RUN_ITEM_TYPES: ReadonlySet<string> = new Set([
  *
  * **Provider-defined tools.** `ai.providerTool({ provider: "openai" })`
  * definitions are appended to `tools` verbatim. Hosted tools run inside the
- * response; their output items (`web_search_call`, …) are not replayed
+ * response; their output items (`web_search_call`, …) are retained in
+ * `providerMetadata.openai.output` for inspection and are not replayed
  * (with `store: false` the next turn only needs the answer text), and a
  * reasoning item that led into one is not replayed either (see
  * `pickTurnReasoning`).
@@ -167,13 +169,20 @@ export class OpenAIResponsesModel implements ModelContract {
       hasToolCalls: toolCalls !== undefined,
     });
     const usage = this.extractUsage(response.usage);
+    const providerMetadata = hostedOutput(usage, output, this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "call to responses.create succeeded", {
       finishReason,
       usage,
     });
 
-    return { content, finishReason, usage, ...(toolCalls ? { toolCalls } : {}) };
+    return {
+      content,
+      finishReason,
+      usage,
+      ...(providerMetadata ? { providerMetadata } : {}),
+      ...(toolCalls ? { toolCalls } : {}),
+    };
   }
 
   /** Count native Responses input tokens using the same converted input and tools. */
@@ -348,13 +357,17 @@ export class OpenAIResponsesModel implements ModelContract {
       hasToolCalls: toolCalls.length > 0,
     });
     const usage = this.extractUsage(terminal.usage);
+    // Terminal output is authoritative; fall back to item.done events when absent.
+    // Never add both snapshots, which would double-count hosted calls.
+    const output = terminal.output?.length ? terminal.output : outputItems;
+    const providerMetadata = hostedOutput(usage, output, this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "Streaming call to responses.create succeeded", {
       finishReason,
       usage,
     });
 
-    yield { type: "done", finishReason, usage };
+    yield { type: "done", finishReason, usage, ...(providerMetadata ? { providerMetadata } : {}) };
   }
 
   /**
@@ -388,7 +401,18 @@ export class OpenAIResponsesModel implements ModelContract {
         store: false,
         // Stateless replay: ask for the encrypted reasoning blobs so they can be
         // sent back on the next tool turn (decision 3).
-        include: ["reasoning.encrypted_content"],
+        include: [
+          "reasoning.encrypted_content",
+          ...(tools?.some(
+            (tool) =>
+              tool.type === "web_search" ||
+              tool.type === "web_search_2025_08_26" ||
+              tool.type === "web_search_preview" ||
+              tool.type === "web_search_preview_2025_03_11",
+          )
+            ? ["web_search_call.action.sources" as const]
+            : []),
+        ],
         ...(maxTokens !== undefined ? { max_output_tokens: maxTokens } : {}),
         ...(!this.capabilities.reasoning && temperature !== undefined ? { temperature } : {}),
         ...(tools ? { tools } : {}),

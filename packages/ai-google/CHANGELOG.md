@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Gemini Developer API token counting sends the full `generateContentRequest`, including system instructions, tools and generation settings, through the existing SDK transport with cancellation and error mapping. Vertex counting is unchanged; unsupported cached-content counts carry the typed signal used by `countInputTokens` to estimate.
+### Added
+
+- Preserve raw candidate grounding metadata and normalize unique nonempty search queries in completions and streams. Export opt-in Gemini 3+ request prices as `GOOGLE_SERVER_TOOL_PRICING`; document older models’ per-prompt billing.
 
 ## 5.31.0 - 2026-10-18
 

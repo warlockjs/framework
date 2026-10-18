@@ -59,3 +59,19 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
+
+/** DashScope OpenAI-compatible request flag (not a tool).
+ * https://www.alibabacloud.com/help/en/model-studio/web-search */
+export type QwenCallOptions = { enableSearch?: boolean };
+
+export function compatibleSearchParams(
+  provider: string,
+  options: ModelCallOptions | undefined,
+): { enable_search?: boolean } {
+  if (provider !== "qwen" && provider !== "dashscope") return {};
+  const value = options?.providerOptions?.[provider]?.enableSearch;
+  if (value === undefined) return {};
+  if (typeof value !== "boolean")
+    throw new InvalidRequestError(`providerOptions.${provider}.enableSearch must be a boolean`);
+  return { enable_search: value };
+}

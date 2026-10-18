@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Verified that native token counting preserves the shared unsupported-count signal for `countInputTokens` estimation while authentication errors propagate.
+- Clarify that Converse TokenUsage exposes no hosted-search request counter; system-tool blocks cannot establish request fees and no count is fabricated.
 
 ## 5.31.0 - 2026-10-18
 

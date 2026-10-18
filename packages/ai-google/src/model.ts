@@ -19,9 +19,11 @@ import type {
   GenerateContentConfig,
   GenerateContentResponse,
   GoogleGenAI,
+  GroundingMetadata,
   Part,
   Tool,
 } from "@google/genai";
+import { applyGrounding, groundingMetadata } from "./utils/grounding";
 import { mergeProviderBody } from "./provider-options";
 import type { GoogleModelConfig } from "./config.type";
 import { inferVisionCapability } from "./known-vision-models";
@@ -157,7 +159,11 @@ export class GoogleModel implements ModelContract {
     const finishReason = toolCalls
       ? "tool_calls"
       : mapFinishReason(response.candidates?.[0]?.finishReason);
-    const usage = attachCost(this.extractUsage(response), this.pricing);
+    const usage = this.extractUsage(response);
+    const grounding = new Map<number, GroundingMetadata>();
+    applyGrounding(usage, grounding, response);
+    const providerMetadata = groundingMetadata(grounding);
+    attachCost(usage, this.pricing);
 
     this.logger.debug(LOG_MODULE, "response", "generateContent call succeeded", {
       finishReason,
@@ -165,6 +171,7 @@ export class GoogleModel implements ModelContract {
     });
 
     return {
+      ...(providerMetadata ? { providerMetadata } : {}),
       content: response.text ?? "",
       finishReason,
       usage,
@@ -302,9 +309,11 @@ export class GoogleModel implements ModelContract {
     let sawToolCall = false;
     const usage: Usage = { input: 0, output: 0, total: 0 };
     const want = resolveStreamChunks(options);
+    const grounding = new Map<number, GroundingMetadata>();
 
     try {
       for await (const chunk of iterable) {
+        applyGrounding(usage, grounding, chunk);
         // Thought parts (`thought: true`, sent when `thinkingConfig.includeThoughts`
         // is on) carry the thought summary in `text`; the SDK's `chunk.text`
         // getter already leaves them out of the answer.
@@ -367,7 +376,8 @@ export class GoogleModel implements ModelContract {
       usage,
     });
 
-    yield { type: "done", finishReason, usage };
+    const providerMetadata = groundingMetadata(grounding);
+    yield { type: "done", finishReason, usage, ...(providerMetadata ? { providerMetadata } : {}) };
   }
 
   /**

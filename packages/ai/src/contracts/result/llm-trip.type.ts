@@ -21,6 +21,8 @@ import type { Usage } from "./usage.type";
  * };
  */
 export type LLMTrip = {
+  /** Raw grounding / hosted output supplied by the adapter. */
+  providerMetadata?: Record<string, unknown>;
   /** 0-indexed position of this trip in the execution sequence */
   index: number;
   /** The prompt/input sent to the LLM for this trip */

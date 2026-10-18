@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Verified that native token counting preserves the shared unsupported-count signal for `countInputTokens` estimation while authentication errors propagate.
+### Added
+
+- Map cumulative hosted web-search/fetch usage in completions and streams while preserving server-tool blocks. Export verified request-fee prices as `ANTHROPIC_SERVER_TOOL_PRICING` for explicit pricing composition.
 
 ## 5.31.0 - 2026-10-18
 
