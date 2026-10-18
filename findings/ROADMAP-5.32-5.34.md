@@ -7,12 +7,17 @@ Owner decisions (2026-10-18). Work items for the next three releases; nothing he
 - Upgrade TypeScript to the latest stable (7.0.2, the native Go compiler) in the monorepo and in the
   create-warlock template: `tsc`/typecheck scripts, the dev-server type checker, `warlock typecheck` /
   `warlock check`, vitest typecheck.
-- TypeScript 7's npm package no longer exports the classic JS compiler API (only `version` and `unstable/*`).
-  Code that imports it — core's dev server (type generator, module loader, import parser, config reader,
-  translation-key extraction, TS health checker), `warlock check` conventions, `run-typecheck`, `inspect`,
-  doctor checks, tests, and the release gates (skill-snippet, strictness, consumer flags) — keeps the API through
-  a pinned TypeScript 6.0.3 (last release with the JS API, same config rules as 7) declared as those packages' own
-  dependency, so apps can install TS 7 for `tsc` without breaking the framework.
+- TypeScript 7 everywhere: no TypeScript 5/6 pin unless a concrete blocker is found and shown to the owner.
+  TS 7's npm package no longer exports the classic JS compiler API (only `version` and `typescript/unstable/*`),
+  so every current `import ts from "typescript"` is migrated:
+  - type checking and diagnostics (`warlock typecheck`/`check`, the dev-server TS health checker, the
+    skill-snippet and strictness gates, consumer strictness flags): `tsc` from TS 7 and/or
+    `typescript/unstable/sync` (`API` → `Snapshot` → `Program`/`Checker` diagnostics);
+  - type-aware generation (dev-server type generator, model/resource typings): the TS 7 `Checker` API;
+  - syntax-only parsing (import parsing, config AST reading, translation-key extraction, `warlock check`
+    convention checks, page discovery, doctor checks): `oxc-parser` (ESTree AST), no type checker needed;
+  - all TS 7 API calls live behind one internal module, and the exact TS version is pinned, because the
+    `unstable` API may change between TS 7 minors.
 - Remove options TS 7 dropped: `baseUrl` (use `paths` relative to the tsconfig), `moduleResolution: node`/`node10`
   (use `bundler` or `nodenext`) in every package, the template and generator stubs; fix new diagnostics.
 - Re-check tools that read TypeScript output: seal `bench:types` (instantiation counts), strictness gate,
