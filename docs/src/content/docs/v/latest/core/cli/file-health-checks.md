@@ -55,8 +55,9 @@ diagnostics keep their specific message. Command failure messages contain a
 bounded status/output summary, without the batch command line. Shutdown gives
 workers up to 500 ms to exit and reap owned CLI children before forcing termination.
 
-Source TypeScript health workers use the framework's JavaScript/tsx bootstrap on
-Node.js 22.15; published JavaScript workers start directly. Framework regression
-tests cover that bootstrap and a built `.mjs` worker with no inherited loader
-hooks. Both paths check configured declaration roots, source updates and deleted
-declarations under the supported minimum runtime.
+Source TypeScript health workers use the framework's JavaScript bootstrap to
+register tsx inside each worker on Node.js 22.15 and Node.js 24. Registration
+remains active for later TypeScript imports and lets native dependencies load
+Node builtins through `createRequire`. Published JavaScript workers start
+directly. Regression tests cover both paths without inherited loader hooks,
+including configured declaration roots, source updates and deleted declarations.
