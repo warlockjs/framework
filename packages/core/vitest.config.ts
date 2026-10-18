@@ -60,6 +60,8 @@ export default defineConfig({
      * the lead on card 7761af8f, not drifted into.)
      */
     include: ["tests/{unit,integration}/**/*.test.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
-    testTimeout: 10_000,
+    // CLI specs import the full command graph on first use; on a CPU-capped run a cold import can
+    // take longer than 10 s, which surfaced as timeouts in unrelated command specs.
+    testTimeout: 30_000,
   },
 });
