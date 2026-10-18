@@ -10,7 +10,7 @@ function mountedCgroup(membership: string): string | undefined {
   return directory === mount || directory.startsWith(`${mount}/`) ? directory : undefined;
 }
 
-export function validateLimits(limits: ProcessLimits): void {
+export function validateLimits(limits: ProcessLimits, platform: string = process.platform): void {
   for (const [key, value] of Object.entries(limits)) {
     if (
       !["timeoutMs", "memoryBytes", "cpuSeconds", "virtualMemoryBytes"].includes(key) ||
@@ -19,16 +19,18 @@ export function validateLimits(limits: ProcessLimits): void {
     )
       throw new Error(`Invalid process limit: ${key}`);
   }
-  if (process.platform === "darwin" && limits.virtualMemoryBytes !== undefined)
+  if (platform !== "linux" && limits.virtualMemoryBytes !== undefined)
     throw new Error("virtualMemoryBytes is supported only on Linux");
+  if (platform === "win32" && limits.cpuSeconds !== undefined)
+    throw new Error("cpuSeconds is supported only on POSIX platforms");
 }
 
 /**
- * POSIX shell applies inherited limits, then stops itself before executing user code.
+ * POSIX shell applies inherited limits. Linux stops here; macOS execs a gated guardian.
  * Flags/units: Apple's bash-3.2/builtins/ulimit.def and installed Bash manual.
  * https://github.com/apple-oss-distributions/bash/blob/main/bash-3.2/builtins/ulimit.def
  */
-export function launcher(limits: ProcessLimits): string {
+export function launcher(limits: ProcessLimits, platform: string = process.platform): string {
   const commands = ["set -e"];
   if (limits.cpuSeconds) commands.push(`ulimit -t ${limits.cpuSeconds}`);
   if (limits.virtualMemoryBytes)
@@ -37,9 +39,10 @@ export function launcher(limits: ProcessLimits): string {
   // Darwin's RLIMIT_DATA restricts heap growth, not total resident memory.
   if (limits.memoryBytes)
     commands.push(
-      `ulimit -${process.platform === "darwin" ? "d" : "m"} ${Math.ceil(limits.memoryBytes / 1024)}`,
+      `ulimit -${platform === "darwin" ? "d" : "m"} ${Math.ceil(limits.memoryBytes / 1024)}`,
     );
-  commands.push('kill -STOP "$$"', 'exec "$@"');
+  if (platform === "linux") commands.push('kill -STOP "$$"');
+  commands.push('exec "$@"');
   return commands.join("\n");
 }
 

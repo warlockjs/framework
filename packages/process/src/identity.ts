@@ -2,7 +2,19 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
+import { guardianProof } from "./guardian";
+import { portableIdentity, type Command } from "./platform";
+
 const execute = promisify(execFile);
+export async function executeCommand(command: Command): Promise<string> {
+  const { stdout } = await execute(command.file, command.args, {
+    env: { ...process.env, ...command.env },
+    timeout: 5000,
+    maxBuffer: 4 * 1024 * 1024,
+    windowsHide: true,
+  });
+  return stdout;
+}
 export const TOKEN_ENV = "WARLOCK_PROCESS_TOKEN";
 export type Identity = { start: string; group: number; state: string; rss: number; token?: string };
 
@@ -14,7 +26,11 @@ function statFields(stat: string): string[] {
 }
 
 /** /proc fields: https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html */
-export async function identity(pid: number, token = false): Promise<Identity | undefined> {
+export async function identity(
+  pid: number,
+  token = false,
+  expectedToken?: string,
+): Promise<Identity | undefined> {
   if (!Number.isSafeInteger(pid) || pid <= 1) return undefined;
   try {
     if (process.platform === "linux") {
@@ -42,49 +58,18 @@ export async function identity(pid: number, token = false): Promise<Identity | u
           ?.slice(TOKEN_ENV.length + 1),
       };
     }
-    if (process.platform === "darwin") {
-      const helper = process.env.WARLOCK_PROCESS_IDENTITY_HELPER;
-      if (!helper)
-        throw new Error(
-          "macOS process supervision requires WARLOCK_PROCESS_IDENTITY_HELPER; compile the shipped native/darwin-identity.c helper first",
-        );
-      const { stdout } = await execute(helper, [String(pid), ...(token ? ["--token"] : [])], {
-        timeout: 5000,
-        maxBuffer: 4096,
-      });
-      const result: unknown = JSON.parse(stdout);
-      if (
-        !result ||
-        typeof result !== "object" ||
-        !("start" in result) ||
-        typeof result.start !== "string" ||
-        !("group" in result) ||
-        typeof result.group !== "number" ||
-        !Number.isSafeInteger(result.group) ||
-        !("rss" in result) ||
-        typeof result.rss !== "number" ||
-        !Number.isFinite(result.rss) ||
-        !("state" in result) ||
-        typeof result.state !== "string" ||
-        !("token" in result) ||
-        typeof result.token !== "string" ||
-        (result.token !== "" && !/^[a-f0-9]{64}$/.test(result.token))
-      )
-        throw new Error("Invalid native process identity response");
-      return {
-        start: result.start,
-        group: result.group,
-        rss: result.rss,
-        state: result.state,
-        token: result.token || undefined,
-      };
-    }
+    if (process.platform === "darwin" || process.platform === "win32")
+      return await portableIdentity(process.platform, pid, token, executeCommand, (selected) =>
+        guardianProof(selected, undefined, expectedToken),
+      );
     return undefined;
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = (error as { code?: unknown }).code;
     if (
       (process.platform === "linux" && ["ENOENT", "ESRCH"].includes(String(code))) ||
-      (process.platform === "darwin" && (error as { code?: unknown }).code === 3)
+      (process.platform === "darwin" &&
+        code === 1 &&
+        !(error as { stdout?: string }).stdout?.trim())
     )
       return undefined;
     throw error;
@@ -99,7 +84,7 @@ export class ProcessNotOwnedError extends Error {
 }
 
 export async function owns(entry: { pid: number; start: string; token: string }): Promise<boolean> {
-  const current = await identity(entry.pid, true);
+  const current = await identity(entry.pid, true, entry.token);
   return (
     current?.start === entry.start && current.token === entry.token && current.group === entry.pid
   );

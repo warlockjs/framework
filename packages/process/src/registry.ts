@@ -54,7 +54,7 @@ export function parseRegistry(source: string, owner: string): RegistryEntry[] {
           Number.isSafeInteger(limit) &&
           limit > 0,
       ) ||
-      !["cgroup-v2", "rlimit-polling"].includes(String(entry.enforcement)) ||
+      !["cgroup-v2", "rlimit-polling", "rss-polling"].includes(String(entry.enforcement)) ||
       typeof entry.peakMemoryBytes !== "number" ||
       !Number.isFinite(entry.peakMemoryBytes) ||
       entry.peakMemoryBytes < 0 ||

@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    testTimeout: 10_000,
+    testTimeout: process.platform === "win32" ? 60_000 : 10_000,
   },
 });

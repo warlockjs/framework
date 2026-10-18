@@ -3,14 +3,15 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
-import { identity, owns, ProcessNotOwnedError, TOKEN_ENV } from "./identity";
+import { identity, owns, ProcessNotOwnedError, executeCommand } from "./identity";
+import { guardianProof, launchCommand } from "./guardian";
+import { supported, taskkillCommand } from "./platform";
 import { Registry, type RegistryEntry } from "./registry";
 import {
   attachCgroup,
   cgroupMemory,
   cleanCgroup,
   recoveredCgroup,
-  launcher,
   validateLimits,
 } from "./resources";
 import type {
@@ -81,12 +82,6 @@ function validateFilter(filter: ProcessFilter): void {
 function matches(entry: RegistryEntry, filter: ProcessFilter): boolean {
   return Object.entries(filter.labels ?? {}).every(([key, value]) => entry.labels[key] === value);
 }
-function supported(): void {
-  if (process.platform !== "linux" && process.platform !== "darwin")
-    throw new Error(
-      "Process supervision requires Linux or macOS; Windows needs a native Job Object and identity helper (not shipped)",
-    );
-}
 
 export function supervisor(options: SupervisorOptions): ProcessSupervisor {
   if (!options.owner.trim() || !options.registry.trim())
@@ -112,7 +107,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     return next;
   }
   async function open(): Promise<void> {
-    supported();
+    supported(process.platform);
     if (closing) throw new Error("Supervisor has shut down");
     ready ??= registry.open().then((saved) => {
       for (const entry of saved) {
@@ -126,6 +121,20 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
 
   async function signal(entry: RegistryEntry, value: NodeJS.Signals): Promise<void> {
     if (!(await owns(entry))) throw new ProcessNotOwnedError(entry.pid);
+    if (process.platform !== "linux" && value === "SIGCONT") {
+      const proof = await guardianProof(entry.pid, entry.token);
+      if (!proof || proof.token !== entry.token || proof.gated)
+        throw new ProcessNotOwnedError(entry.pid);
+      return;
+    }
+    if (process.platform === "win32") {
+      try {
+        await executeCommand(taskkillCommand(entry.pid));
+      } catch (error) {
+        if (await owns(entry)) throw error;
+      }
+      return;
+    }
     // Negative PID targets only the session/group established for this child.
     // Recheck for every signal, including escalation; never match a command line.
     try {
@@ -253,13 +262,14 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
   }
 
   function monitor(running: Active): void {
+    if (running.finished) return;
     let sampling = false;
     const sample = async () => {
       if (sampling || running.finished) return;
       sampling = true;
       try {
         const entry = running.entry;
-        const current = await identity(entry.pid, true);
+        const current = await identity(entry.pid, true, entry.token);
         if (running.finished) return;
         if (
           current?.start !== entry.start ||
@@ -325,8 +335,19 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     const limits = { ...options.defaults, ...input.limits };
     validateLimits(limits);
     const token = randomBytes(32).toString("hex");
-    const env: NodeJS.ProcessEnv = { ...process.env, ...input.env, [TOKEN_ENV]: token };
-    const args = ["-c", launcher(limits), "warlock-process", input.command, ...(input.args ?? [])];
+    const {
+      file: executable,
+      args,
+      env,
+    } = launchCommand(
+      process.platform,
+      process.execPath,
+      input.command,
+      input.args ?? [],
+      limits,
+      { ...process.env, ...input.env },
+      token,
+    );
     let pid: number;
     let streams: Pick<ProcessHandle, "stdin" | "stdout" | "stderr">;
     let terminalProcess: Pty | undefined;
@@ -341,7 +362,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       // Optional peer loaded only here. Structural types follow node-pty's official typings.
       const peer = "node-pty";
       const pty = (await import(peer)) as PtyModule;
-      terminalProcess = pty.spawn("/bin/sh", args, {
+      terminalProcess = pty.spawn(executable, args, {
         cwd: input.cwd,
         env: Object.fromEntries(
           Object.entries(env).filter((pair): pair is [string, string] => pair[1] !== undefined),
@@ -371,10 +392,11 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       });
       streams = { stdout: output, stderr: errors, stdin: inputStream };
     } else {
-      const child = spawnChild("/bin/sh", args, {
+      const child = spawnChild(executable, args, {
         cwd: input.cwd,
         env,
-        detached: true,
+        detached: process.platform !== "win32",
+        windowsHide: true,
         stdio: "pipe",
       });
       child.on("error", (error) => {
@@ -390,13 +412,13 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     let entry: RegistryEntry | undefined;
     try {
       const deadline = Date.now() + 5000;
-      let current = await identity(pid, true);
+      let current = await identity(pid, true, token);
       while (!current?.state.startsWith("T") || current.token !== token) {
         if (spawnError) throw spawnError;
         if (exit || Date.now() >= deadline)
           throw new Error("Child failed to reach the resource setup gate");
         await delay(10);
-        current = await identity(pid, true);
+        current = await identity(pid, true, token);
       }
       if (current.group !== pid) throw new Error("Child did not create an isolated process group");
       entry = {
@@ -408,7 +430,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
         labels: { ...input.labels },
         startedAt: Date.now(),
         limits,
-        enforcement: "rlimit-polling",
+        enforcement: process.platform === "win32" ? "rss-polling" : "rlimit-polling",
         peakMemoryBytes: current.rss,
         token,
         start: current.start,
@@ -419,10 +441,10 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       entries.set(pid, entry);
       await save();
       running = track(entry, streams);
-      monitor(running);
       await signal(entry, "SIGCONT");
       delete entry.gated;
       await save();
+      monitor(running);
       if (terminalProcess) {
         const instance = terminalProcess;
         return {
@@ -434,12 +456,13 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       return running.handle;
     } catch (error) {
       // This PID was created by this call. Kill only after its random token is verified.
-      const current = await identity(pid, true);
+      const current = await identity(pid, true, token);
       if (current?.token === token) {
         const failed = { pid, token, start: current.start };
         if (await owns(failed)) {
           try {
-            process.kill(-pid, "SIGKILL");
+            if (process.platform === "win32") await executeCommand(taskkillCommand(pid));
+            else process.kill(-pid, "SIGKILL");
           } catch {
             /* Already exited. */
           }
@@ -490,7 +513,11 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
           }
           // Never trust a persisted filesystem path for cgroup I/O after a restart.
           entry.cgroup = await recoveredCgroup(entry.pid, entry.token);
-          entry.enforcement = entry.cgroup ? "cgroup-v2" : "rlimit-polling";
+          entry.enforcement = entry.cgroup
+            ? "cgroup-v2"
+            : process.platform === "win32"
+              ? "rss-polling"
+              : "rlimit-polling";
           const keep = await recovery.keep?.(info(entry));
           if (keep) {
             const running = track(entry);

@@ -50,7 +50,8 @@ other verified entries. Default recovery stops verified orphans. Adopted childre
 cannot regain stdio or original exit codes. Always recover before spawning.
 
 The input `kind` is the workload category; listing calls it `type`.
-Ownership is random token + PID + start time + isolated group, never command text.
+Ownership is random environment token + PID + OS start time, with an isolated
+group on POSIX; commands never prove ownership.
 Do not expose tokens or the private registry. A second live supervisor for the
 same registry fails. Corruption or incomplete leases require inspection.
 
@@ -92,15 +93,27 @@ PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
   `virtualMemoryBytes`. All are positive safe integers. Linux ignores
   `RLIMIT_RSS`; fallback RSS accounting covers the leader and can overshoot.
   V8 reserves large address space; avoid small address-space limits.
-- macOS uses CPU/data limits and softer RSS polling, with the shipped native
-  identity helper configured. Windows throws before
-  launch: no native Job Object/identity helper ships in this package.
+- macOS reads `ps` start times with `LC_ALL=C TZ=UTC`, applies CPU/data rlimits
+  and polls tree RSS. Windows uses PowerShell/CIM creation times, polls tree
+  working sets (`enforcement: "rss-polling"`) and stops verified trees with
+  `taskkill /PID <pid> /T /F`. Memory caps on both are softer than Linux cgroups.
+- Both use a Node guardian as the handle PID. It proves the random token from
+  its own environment through a local socket/named pipe, gates workload launch
+  until registry persistence, and survives supervisor restarts for recovery.
+  Memory includes the guardian and its descendants. No identity-helper setup
+  or custom native compilation is needed.
+- Windows needs PowerShell/CIM. `cpuSeconds` is POSIX-only and
+  `virtualMemoryBytes` Linux-only; unsupported limits fail before launch.
+  Timeouts apply everywhere. Windows always forces the PID tree immediately;
+  Job Objects remain a future hard-containment improvement. `spawnPty` uses
+  optional `node-pty` on Windows/ConPTY too (use `powershell.exe` as the command).
 - Read `enforcement` on listed entries. Kernel cgroup peaks include descendants;
-  fallback sampled peaks do not. Reasons are `exit`, `timeout`, `memory-cap`,
+  sampled peaks can miss short-lived descendants. Reasons are `exit`, `timeout`, `memory-cap`,
   `stopped`; allocation failures from rlimits may be ordinary exits.
 - Without cgroups, descendants that create a session can escape; a leader that
   exits cannot be re-verified for escalation. This is not a hostile-code sandbox
-  or an atomic pidfd signal API. macOS needs the shipped native identity helper configured.
+  or an atomic identity-and-signal API. Windows trees also have discovery/PID-reuse
+  races and require a live verified guardian for stopping.
 - The generated `Application.onValidateBoot` awaits recovery and fails boot on
   error; `Application.onShutdown` awaits cleanup. For manual wiring, use the same
   hooks. Consume worker output to avoid backpressure.
@@ -110,20 +123,3 @@ PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
 
 Platform source references and delegation details:
 https://warlock.js.org/v/latest/process/.
-
-## macOS identity helper
-
-macOS requires the bundled helper so argv text cannot impersonate an environment
-ownership token. On a Mac with the command-line developer tools installed:
-
-```sh
-mkdir -p .warlock/bin
-cc node_modules/@warlock.js/process/native/darwin-identity.c -o .warlock/bin/process-identity
-export WARLOCK_PROCESS_IDENTITY_HELPER="$PWD/.warlock/bin/process-identity"
-```
-
-Compile during deployment and set the absolute helper path in the app's runtime
-environment. It uses Apple's `proc_pidinfo` and `KERN_PROCARGS2` and reads only
-the explicitly selected PID. It never signals processes. Without the helper,
-macOS supervision fails before spawning. The package does not compile native
-code during installation. Linux does not need this helper.

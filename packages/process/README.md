@@ -1,8 +1,8 @@
 # @warlock.js/process
 
-App-owned child process supervision for Linux and macOS. Ownership uses a random
-environment token, PID, OS start time and a private registry. Stops target only
-verified process groups; commands are never used for identity matching.
+App-owned child process supervision for Linux, macOS and Windows. Ownership uses a random
+environment token, PID, OS start time and a private registry. Stops target verified POSIX process groups or a Windows PID tree; commands are
+never used for identity matching.
 
 ```sh
 npx warlock add process
@@ -33,11 +33,23 @@ Public methods: `spawn`, `spawnPty`, `list`, `stop`, `stopPid`, `recover`,
 `stopAll`. Handles provide streams, `exited` (reason, exit code, signal, peak
 memory) and idempotent `stop`. Unowned PIDs throw `ProcessNotOwnedError`.
 
-Linux attempts delegated cgroup v2 before running user code. Without permission,
-inherited POSIX limits and leader RSS polling apply. macOS uses data/CPU limits
-and RSS polling with softer memory enforcement. Windows is explicitly
-unsupported until a native identity/Job Object helper is available.
-`spawnPty` lazily imports optional peer `node-pty`.
+| Platform | Identity and enforcement                                                                                                    |
+| -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/proc` start ticks + boot ID + environment token; cgroup v2 → inherited rlimit/RSS fallback.                               |
+| macOS    | `ps` start time (`LC_ALL=C TZ=UTC`) + environment token; inherited CPU/data rlimits and tree RSS polling.                   |
+| Windows  | PowerShell/CIM creation time + environment token; `taskkill /PID <pid> /T /F` and tree working-set polling (`rss-polling`). |
+
+macOS and Windows memory caps are softer than Linux cgroups: polling can miss
+peaks and overshoot. No custom native code or identity-helper setup is required.
+On these platforms the handle PID belongs to a small Node guardian that launches
+the workload after registry persistence. It proves its inherited environment
+token through a live local socket/named pipe; polling includes guardian overhead
+and descendants. Recovery uses the same PID/start-time/token verification.
+Windows needs Windows PowerShell with CIM available. `cpuSeconds` is POSIX-only;
+`virtualMemoryBytes` is Linux-only. Timeouts work on all three platforms.
+Windows stops force the entire PID tree immediately; Job Objects are a future
+improvement for hard containment and memory caps.
+`spawnPty` lazily imports optional peer `node-pty`, including Windows/ConPTY.
 
 Use a separate registry per app instance and consume output streams. Recovery
 adopts only identities selected by `keep`; by default it stops verified orphans.
@@ -46,20 +58,3 @@ startup, shutdown cleanup and a read-only devtools Processes panel.
 
 See [the complete documentation](https://warlock.js.org/v/latest/process/) for
 platform limits, delegation, PID reuse limitations, recovery and terminal APIs.
-
-## macOS identity helper
-
-macOS requires the bundled helper so argv text cannot impersonate an environment
-ownership token. On a Mac with the command-line developer tools installed:
-
-```sh
-mkdir -p .warlock/bin
-cc node_modules/@warlock.js/process/native/darwin-identity.c -o .warlock/bin/process-identity
-export WARLOCK_PROCESS_IDENTITY_HELPER="$PWD/.warlock/bin/process-identity"
-```
-
-Compile during deployment and set the absolute helper path in the app's runtime
-environment. It uses Apple's `proc_pidinfo` and `KERN_PROCARGS2` and reads only
-the explicitly selected PID. It never signals processes. Without the helper,
-macOS supervision fails before spawning. The package does not compile native
-code during installation. Linux does not need this helper.

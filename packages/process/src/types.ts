@@ -44,7 +44,7 @@ export type ProcessInfo = {
   labels: Record<string, string>;
   startedAt: number;
   limits: ProcessLimits;
-  enforcement: "cgroup-v2" | "rlimit-polling";
+  enforcement: "cgroup-v2" | "rlimit-polling" | "rss-polling";
   peakMemoryBytes: number;
 };
 export type ProcessHandle = {
