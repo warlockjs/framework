@@ -58,7 +58,7 @@ install/restart guidance and the other panels keep working.
 
 ```bash
 warlock add devtools
-pnpm add @warlock.js/ai @warlock.js/ai-panoptic
+npm install @warlock.js/ai @warlock.js/ai-panoptic
 ```
 
 At app boot, enable observation, then restart `warlock dev`:
