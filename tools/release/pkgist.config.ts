@@ -155,7 +155,15 @@ export default defineConfig({
         {
           name: "@warlock.js/process",
           root: "../../packages/process",
-          clone: ["README.md", "LICENSE", "CHANGELOG.md", "skills", "native", "llms.txt", "llms-full.txt"],
+          clone: [
+            "README.md",
+            "LICENSE",
+            "CHANGELOG.md",
+            "skills",
+            "native",
+            "llms.txt",
+            "llms-full.txt",
+          ],
         },
         {
           name: "@warlock.js/context",
