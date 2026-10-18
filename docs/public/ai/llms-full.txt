@@ -1599,7 +1599,9 @@ import { ai } from "@warlock.js/ai";
 import type { GuardrailBlockEvent, ModelContract } from "@warlock.js/ai";
 
 declare const model: ModelContract; // any provider model
-declare const reviewQueue: { enqueue(item: Pick<GuardrailBlockEvent, "phase" | "reason">): Promise<void> };
+declare const reviewQueue: {
+  enqueue(item: Pick<GuardrailBlockEvent, "phase" | "reason">): Promise<void>;
+};
 
 const policy = ai.guardrail({
   output: [ai.guardrail.moderation({ blockOn: ["self-harm"] })],

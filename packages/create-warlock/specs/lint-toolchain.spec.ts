@@ -117,9 +117,9 @@ describe("generated toolchains", () => {
     expect(pkg.devDependencies.eslint).toBeTruthy();
     expect(pkg.devDependencies.prettier).toBeTruthy();
     // The framework's conventions are checked by `warlock check`, not by a lint plugin.
-    expect(Object.keys(pkg.devDependencies).filter((name) => name.startsWith("@warlock.js/"))).toEqual(
-      [],
-    );
+    expect(
+      Object.keys(pkg.devDependencies).filter((name) => name.startsWith("@warlock.js/")),
+    ).toEqual([]);
     expect(pkg.devDependencies.oxlint).toBeUndefined();
     expect(pkg.scripts.lint).toBe("eslint --fix ./src --max-warnings=0");
     expect(pkg.scripts["lint:check"]).toContain("eslint ./src");

@@ -1042,9 +1042,9 @@ export function logSearch(term: string, userAgent: string) {
 ```
 
 CR/LF/tab become `\r`/`\n`/`\t`, other control characters `\uXXXX`, ANSI
-sequences are removed; `maxLength` cuts and marks `…[truncated]`. The
-`@warlock.js/no-sensitive-log` lint rule flags raw emails, credentials and
-request bodies in log calls and accepts these helpers.
+sequences are removed; `maxLength` cuts and marks `…[truncated]`. `warlock
+check` (from `@warlock.js/core`) reports raw emails, credentials and request
+bodies in log calls as `WL9008` and accepts these helpers.
 
 
 ## ship-logs-to-sentry  `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`
