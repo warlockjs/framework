@@ -1,6 +1,6 @@
 ---
 title: OpenAI-compatible native search
-description: Verified Qwen request flags and Kimi hosted-search continuation over Chat Completions.
+description: Qwen request flags and standalone first-party Kimi search and fetch tools.
 ---
 
 Use `OpenAISDK` with a vendor base URL and an explicit `provider` label.
@@ -39,50 +39,96 @@ is invented from `enableSearch` or answer text.
 
 ## Kimi / Moonshot
 
-[Kimi's official search guide](https://platform.kimi.ai/docs/guide/use-web-search)
-declares `{ type: "builtin_function", function: { name: "$web_search" } }`.
-The model returns arguments that the client must echo in a tool result before
-continuing. The adapter supplies that result; the agent loops automatically.
+Kimi's legacy `$web_search` builtin **retires on 20 October 2026** and is
+unsupported. The adapter rejects that declaration before making a request.
+Use the standalone REST tools recommended in the
+[official migration notice](https://platform.kimi.ai/docs/guide/use-web-search).
+Kimi models use `OpenAISDK` with `provider: "moonshot"` (or `"kimi"`).
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import { OpenAISDK } from "@warlock.js/ai-openai";
+import { OpenAISDK, kimiSearchTool, kimiFetchTool } from "@warlock.js/ai-openai";
 
-const moonshot = new OpenAISDK({
-  apiKey: process.env.MOONSHOT_API_KEY,
+const config = {
+  apiKey: process.env.MOONSHOT_API_KEY ?? "",
   baseURL: "https://api.moonshot.ai/v1",
-  provider: "moonshot",
-});
+};
+const moonshot = new OpenAISDK({ ...config, provider: "moonshot" });
 const assistant = ai.agent({
   model: moonshot.model({ name: "kimi-k3" }),
   maxTrips: 4,
   tools: [
-    ai.providerTool({
-      provider: "moonshot",
-      name: "$web_search",
-      definition: { type: "builtin_function", function: { name: "$web_search" } },
-    }),
+    kimiSearchTool({ ...config, mode: "pro", limit: 5, sites: ["moonshot.ai"] }),
+    kimiFetchTool({ ...config, maxContentChars: 12_000 }),
   ],
 });
 const result = await assistant.execute("Find recent research on prompt caching");
+console.log(result.usage.serverToolUse, result.usage.cost?.serverTools);
 ```
 
-`"kimi"` is also accepted when used consistently for the model and tool label.
-Only this declared builtin receives automatic continuation. The original
-arguments string is preserved in the assistant tool call and echoed verbatim
-as the tool result, including when it streams in fragments. Ordinary function
-tools still dispatch normally, including mixed hosted/function turns. Search
-never invokes an application handler. Every continuation uses one trip, with
-normal cancellation, budgets and `maxTrips`; repeated searches cannot form an
-unbounded adapter loop. Invalid JSON is rejected, and truncated calls are not
-echoed.
+These are ordinary client function tools: pass them directly in `tools`, without
+`ai.providerTool()`. They can also serve agents using other model providers.
+The configured key stays on the server; `Authorization: Bearer` authenticates
+the REST requests. Helpers default to `https://api.moonshot.ai/v1`; pass a
+`baseURL` explicitly for a proxy. `fetch`, `timeout` (transport milliseconds)
+and `defaultHeaders` follow the upstream OpenAI client options. Automatic
+transport retries are disabled to avoid repeating a potentially billed call.
 
-Direct model callers receive `response.serverToolCalls` (or streaming `done`)
-with adapter-supplied results and must manage conversation continuation
-explicitly; using an agent handles it automatically. Kimi's search-content
-tokens are included in later prompt usage. We do not derive a billable request
-counter from the echo or from `arguments.usage.total_tokens`, and no request
-list price is supplied.
+| Factory                                   | Model arguments / tool name     | REST request                                                                                | Model result                                                                          |
+| ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `kimiSearchTool({ apiKey })`              | `{ query }` / `kimi_search`     | `POST /v1/tools/search`: `{ text_query, limit, timeout_seconds, include_content }`          | `{ results: [{ title, url, snippet, siteName, date, authority, text? }], truncated }` |
+| `kimiSearchTool({ apiKey, mode: "pro" })` | `{ query }` / `kimi_search_pro` | `POST /v1/tools/search_pro`: `{ text_query, limit, timeout_seconds, sites?, time_window? }` | Same envelope; each result has `chunks: [{ text, score }]` instead of `text`          |
+| `kimiFetchTool({ apiKey })`               | `{ url }` / `kimi_fetch`        | `POST /v1/tools/fetch`: `{ url }`                                                           | `{ url, title, markdown, truncated }`                                                 |
+
+The vendor search response is `{ search_results: [...] }`; fetch returns
+`{ url, title, markdown }`. The helpers keep source information, omit search
+icons/MIME fields, and cap snippet/page/chunk text across the response to
+`maxContentChars` (default 12,000). `truncated` reports trimming; URL/title and
+source metadata stay available. Basic omits full page text unless
+`includeContent: true`; Pro retains ranked chunks and scores.
+
+Configure `limit` from 1–20 (default 5), `timeoutSeconds` from 1–60 (default 30).
+Basic alone accepts `includeContent`; Pro alone accepts `sites` (at most five,
+OR semantics, no whitespace or parentheses) and `timeWindow: { start?, end? }`.
+Kimi validates dates as `YYYY`, `YYYY-MM` or `YYYY-MM-DD`, normalizes missing
+month/day to the first day of that period, and requires start ≤ end. Fetch
+accepts only HTTP/HTTPS URLs. The service applies its own URL risk controls;
+a 403 `security_risk` or 404 `markdown_not_found` fails the tool. Rate and
+concurrency limits surface as 429; no fixed account-independent QPS is assumed.
+See the official [Basic](https://platform.kimi.ai/docs/api/tools-search),
+[Pro](https://platform.kimi.ai/docs/api/tools-search-pro) and
+[Fetch](https://platform.kimi.ai/docs/api/tools-fetch) contracts.
+
+Cancellation flows from the agent signal or `createToolContext({ signal })`.
+`invoke()` returns a `ToolExecutionError` with the provider error as `cause`:
+`ProviderAuthError` for authentication/account failures, `ProviderRateLimitError`
+for 429, `ProviderTimeoutError` for timeouts, `InvalidRequestError` for rejected
+requests, and `ProviderError` for other failures. Caller aborts use
+`AgentCancelledError` as the cause. The low-level `execute()` throws the mapped
+error and returns data alone; use `invoke()` to receive usage and reports.
+
+### Request usage and prices
+
+[Official pricing](https://platform.kimi.ai/docs/pricing/websearch), verified
+**2026-10-18**, lists USD $0.002 per Basic search, $0.003 per Pro search and
+$0.002 per fetch, excluding taxes. Search bills only HTTP 200 with nonempty
+`search_results`; fetch bills only HTTP 200 with nonblank `markdown`. Empty
+responses record zero billable units. Failed/aborted requests leave usage
+unreported when the response cannot establish billing.
+
+`invoke()` records `usage.serverToolUse.kimiSearchRequests`,
+`kimiSearchProRequests` or `kimiFetchRequests`, and also the common
+`webSearchRequests` / `webFetchRequests` counter. Costs use only the namespaced
+keys in `usage.cost.serverTools`, preventing duplicate fees. These counts come
+from actual REST responses, never from the model's function-call count. Agent
+and tool reports aggregate them in both completion and streaming runs; model
+tokens for the returned content are billed separately in later chat calls.
+
+`KIMI_SERVER_TOOL_PRICING` exports the verified per-call rates. Helpers apply
+those rates by default; `pricing: {}` leaves calls unpriced, and
+`pricing: { kimiSearchProRequests: rate }` overrides a contract rate. The keys
+are compatible with `ModelPricing.serverTools`; do not price both the generic
+and namespaced counters when recomputing costs yourself.
 
 ## xAI
 

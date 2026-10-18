@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Remove the unreleased Kimi/Moonshot `$web_search` builtin echo path; reject declarations of the builtin retiring on 20 October 2026 and document migration to standalone REST tools.
+
 - Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
 
 ### Fixed
@@ -16,7 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Retain Responses hosted output/actions/sources and count web-search calls without double-counting stream snapshots. Export opt-in `OPENAI_SERVER_TOOL_PRICING`. Support typed Qwen/DashScope `enableSearch` flags and bounded agent continuation for Kimi/Moonshot `$web_search`, echoing arguments verbatim outside function dispatch.
+- Export `kimiSearchTool()` (Basic/Pro), `kimiFetchTool()` and verified `KIMI_SERVER_TOOL_PRICING`: authenticated, cancellable first-party REST calls with compact results, mapped errors, no automatic retries, and billable response usage/costs aggregated into agent reports.
+
+- Retain Responses hosted output/actions/sources and count web-search calls without double-counting stream snapshots. Export opt-in `OPENAI_SERVER_TOOL_PRICING`. Support typed Qwen/DashScope `enableSearch` flags.
 
 ## 5.31.0 - 2026-10-18
 

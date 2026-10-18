@@ -411,5 +411,6 @@ see the [official search output schema](https://developers.openai.com/api/docs/g
 and [cost tracking](/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees).
 Chat Completions does not map hosted-search billing counters.
 
-Qwen's `enableSearch` flag and Kimi's `$web_search` echo continuation have
-separate verified controls; see [OpenAI-compatible native search](/v/latest/ai/providers/openai-compatible/).
+Qwen's `enableSearch` flag and Kimi's standalone `kimiSearchTool()` /
+`kimiFetchTool()` have separate controls; Kimi's legacy builtin retires on
+20 October 2026 and is unsupported; see [OpenAI-compatible native search](/v/latest/ai/providers/openai-compatible/).

@@ -113,7 +113,7 @@ request counter; content blocks alone do not establish billable requests.
 | Google           | Unique nonempty `groundingMetadata.webSearchQueries`; `googleWebSearchQueries` also records the raw array length | `providerMetadata.google.groundingMetadata`: indexed candidate metadata with queries, chunks and supports                                      |
 | OpenAI Responses | Number of `web_search_call` output items, counted once across stream events and terminal output                  | `providerMetadata.openai.output`: hosted output items, including actions and sources; sources are requested automatically for web-search tools |
 | Bedrock Converse | No hosted request counter in its `TokenUsage` schema                                                             | Existing adapter behavior; no search count inferred from system-tool blocks                                                                    |
-| Qwen / Kimi      | No verified billing counter mapped                                                                               | No synthetic search count from flags or echoed calls                                                                                           |
+| Qwen             | No verified billing counter mapped                                                                               | No synthetic search count from flags                                                                                                           |
 
 Agent reports retain `providerMetadata` on each `report.trips` entry. Metadata
 is for inspection and display; it is not sent to function dispatch. Anthropic
@@ -122,3 +122,34 @@ See [cost tracking](/v/latest/ai/recipes/cost-tracking/) for request-fee pricing
 and [OpenAI-compatible native search](/v/latest/ai/providers/openai-compatible/)
 for Qwen and Kimi. xAI native search requires its Responses API; the current
 `XaiSDK` rejects native `web_search` / `x_search` tools on Chat Completions.
+
+## Kimi standalone search and fetch
+
+The legacy Kimi/Moonshot `$web_search` builtin **retires on 20 October 2026**;
+it is unsupported and rejected before transport. The
+[official migration guide](https://platform.kimi.ai/docs/guide/use-web-search)
+recommends the standalone REST endpoints `/v1/tools/search`, `search_pro` and
+`fetch`. Register the ready-made client tools directly:
+
+```ts
+import { kimiSearchTool, kimiFetchTool } from "@warlock.js/ai-openai";
+
+const config = { apiKey: process.env.MOONSHOT_API_KEY ?? "" };
+const assistant = ai.agent({
+  model: moonshotModel,
+  tools: [kimiSearchTool({ ...config, mode: "pro" }), kimiFetchTool(config)],
+});
+```
+
+These execute through ordinary function dispatch with the configured key and
+abort signal. Basic is the default search mode. Search returns compact source
+results; Pro includes scored passages; fetch returns bounded Markdown.
+`invoke()` reports billable units from successful nonempty REST responses in
+`usage.serverToolUse.kimiSearchRequests`, `kimiSearchProRequests` or
+`kimiFetchRequests`, plus common `webSearchRequests` / `webFetchRequests`.
+Agent totals and tool reports include usage and `cost.serverTools`; only
+namespaced counters are priced. Empty results record zero; failures without a
+usable response remain unreported. These counters come from the REST response,
+not from counting model function calls. See the
+[Kimi provider guide](/v/latest/ai/providers/openai-compatible/#kimi--moonshot)
+for request/response shapes, limits, pricing, error handling and direct use.

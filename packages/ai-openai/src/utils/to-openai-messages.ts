@@ -46,10 +46,7 @@ export function toOpenAIMessages(
           type: "function" as const,
           function: {
             name: tc.name,
-            arguments:
-              typeof tc.providerMetadata?.moonshotArguments === "string"
-                ? tc.providerMetadata.moonshotArguments
-                : JSON.stringify(tc.input ?? {}),
+            arguments: JSON.stringify(tc.input ?? {}),
           },
         })),
       } satisfies OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam;

@@ -15,3 +15,12 @@ export type {
 export type { OpenAICallOptions, QwenCallOptions } from "./provider-options";
 
 export { OPENAI_SERVER_TOOL_PRICING } from "./known-pricing";
+
+export { kimiSearchTool, kimiFetchTool, KIMI_SERVER_TOOL_PRICING } from "./kimi-tools";
+export type {
+  KimiToolOptions,
+  KimiSearchToolOptions,
+  KimiSearchResult,
+  KimiSearchOutput,
+  KimiFetchOutput,
+} from "./kimi-tools";
