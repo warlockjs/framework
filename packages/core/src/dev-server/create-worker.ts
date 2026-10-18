@@ -19,7 +19,7 @@ export type CreateWorkerOptions = WorkerOptions & {
  *
  * The worker shares the CALLING module's extension: `.ts` when core runs from
  * source (loaded via tsx), `.mjs` when core is published. Source workers are
- * loaded through tsx's `tsImport` API from a JavaScript bootstrap; published
+ * loaded after registering tsx in a JavaScript bootstrap; published
  * `.mjs` workers run as-is.
  *
  * @param workerPath - Relative path to worker file WITHOUT extension (e.g., "./workers/ts-health.worker")
@@ -58,9 +58,13 @@ export function createWorker(
     // handle its .ts extension. Bootstrap JS, then load the entry through
     // tsx's supported API instead. Resolve from core, even when the app does
     // not depend on tsx directly.
+    // Register for the worker's lifetime without a namespace: Node 24's sync
+    // resolve hook returns no format for unprefixed require("fs"), so tsImport's
+    // namespace gets appended to node:fs and Node tries to open it as a file.
+    // Each worker already has its own module environment.
     const require = createRequire(import.meta.url);
     const tsxApi = pathToFileURL(require.resolve("tsx/esm/api")).href;
-    const bootstrap = `import(${JSON.stringify(tsxApi)}).then(({ tsImport }) => tsImport(${JSON.stringify(workerUrl.href)}, ${JSON.stringify(baseUrl)}));`;
+    const bootstrap = `import(${JSON.stringify(tsxApi)}).then(({ register }) => { register(); return import(${JSON.stringify(workerUrl.href)}); });`;
     return new Worker(bootstrap, { ...workerOptions, eval: true });
   }
 

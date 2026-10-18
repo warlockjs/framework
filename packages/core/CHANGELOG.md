@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Preserve incremental CLI checks and changed-file filtering; reuse a native compiler session for per-file development diagnostics and close it on shutdown.
 - Parse imports, configuration, translation keys, model/resource typings, convention checks, page discovery and doctor migrations with OXC instead of the removed JavaScript compiler API.
 
+### Fixed
+
+- Fix source development workers on Node.js 24 failing to load Node builtins through native dependencies, restoring background TypeScript health checks.
+
 ## 5.31.0 - 2026-10-18
 
 ### Security
