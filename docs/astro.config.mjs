@@ -509,7 +509,8 @@ function buildTopics(/** @type {string} */ version) {
       : JSON.parse(JSON.stringify(topicsForVersion).replaceAll("v/latest", `v/${version}`));
 
   /** Drop groups that exist only in the latest docs, and the marker itself. */
-  const withoutLatestOnly = (/** @type {unknown[]} */ items) =>
+  /** @type {(items: unknown[]) => unknown[]} */
+  const withoutLatestOnly = (items) =>
     items
       .filter(
         (item) =>
