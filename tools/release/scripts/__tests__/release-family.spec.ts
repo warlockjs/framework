@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import type { PublishHandoff } from "../local-registry-gate.ts";
@@ -618,6 +619,112 @@ describe("per-package own quality gate (typecheck preflight, then test)", () => 
       0,
       "a red typecheck must prevent every build command",
     );
+  });
+
+  for (const script of ["tsc --noEmit", "vitest run"]) {
+    for (const fails of [false, true]) {
+      it(`refuses sibling source leaks from ${script}, even when the script ${fails ? "fails" : "passes"}`, async () => {
+        let sources = "packages/existing/src/fixture.ts\0";
+        const control = withPackageScripts(new Map(), (request) => {
+          if (request.cwd === notificationsRoot && request.args[1] === script) {
+            sources += "packages/sibling/src/generated types.d.ts\0";
+            if (fails) return new Error("compiler failed after emitting");
+          }
+          return { stdout: "", stderr: "" };
+        });
+        const baseRun = control.dependencies.runCommand;
+        assert.ok(baseRun);
+        control.dependencies.runCommand = async (request) => {
+          if (request.command === "git" && request.args[0] === "ls-files") {
+            assert.deepEqual(request.args.slice(1), [
+              "--others",
+              "--exclude-standard",
+              "-z",
+              "--",
+              ":(glob)packages/*/src/**",
+            ]);
+            return { stdout: sources, stderr: "" };
+          }
+          return await baseRun(request);
+        };
+
+        await assert.rejects(
+          runReleaseFamily(
+            { mode: "gate", version: VERSION, ...FULL_MATRIX },
+            control.dependencies,
+          ),
+          (error) => {
+            const message = (error as Error).message;
+            assert.match(message, /Command left untracked package source files: resolved-binary/);
+            assert.ok(message.includes(script));
+            assert.match(message, /packages\/sibling\/src\/generated types.d.ts/);
+            assert.doesNotMatch(message, /packages\/existing\/src\/fixture.ts/);
+            if (fails) assert.match(message, /compiler failed after emitting/);
+            return true;
+          },
+        );
+        assert.equal(control.handoffs.length, 0);
+        assert.equal(
+          control.commands.filter(
+            (request) => request.args[1] === "build" && request.args[2] === FAMILY.members[0].name,
+          ).length,
+          0,
+        );
+      });
+    }
+  }
+
+  it("refuses a build that emits into a sibling source tree before packing", async () => {
+    const control = fixture();
+    const baseRun = control.dependencies.runCommand;
+    assert.ok(baseRun);
+    let sources = "";
+    control.dependencies.runCommand = async (request) => {
+      if (request.command === "git" && request.args[0] === "ls-files") {
+        return { stdout: sources, stderr: "" };
+      }
+      const result = await baseRun(request);
+      if (request.args[1] === "build") sources = "packages/sibling/src/index.d.ts\0";
+      return result;
+    };
+    await assert.rejects(
+      runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
+      /Command left untracked package source files:[\s\S]*build[\s\S]*packages\/sibling\/src\/index.d.ts/,
+    );
+    assert.equal(control.commands.filter((request) => request.args[1] === "pack").length, 0);
+  });
+
+  it("detects nested source leaks with Git's real pathspec and preserves existing files", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "warlock-source-guard-"));
+    try {
+      const initialized = spawnSync("git", ["init", "--quiet", root], { encoding: "utf8" });
+      assert.equal(initialized.status, 0, initialized.stderr);
+      const sourceRoot = path.join(root, "packages/sibling/src/nested");
+      mkdirSync(sourceRoot, { recursive: true });
+      writeFileSync(path.join(sourceRoot, "existing.ts"), "export {};");
+      const control = withPackageScripts(new Map(), () => {
+        writeFileSync(path.join(sourceRoot, "generated types.d.ts"), "export {};");
+        return { stdout: "", stderr: "" };
+      });
+      const baseRun = control.dependencies.runCommand;
+      assert.ok(baseRun);
+      control.dependencies.runCommand = async (request) => {
+        if (request.command === "git" && request.args[0] === "ls-files") {
+          const result = spawnSync("git", request.args, { cwd: root, encoding: "utf8" });
+          assert.equal(result.status, 0, result.stderr);
+          return { stdout: result.stdout, stderr: result.stderr };
+        }
+        return await baseRun(request);
+      };
+      await assert.rejects(
+        runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
+        /Command left untracked package source files:[\s\S]*packages\/sibling\/src\/nested\/generated types.d.ts/,
+      );
+      assert.ok(existsSync(path.join(sourceRoot, "existing.ts")));
+      assert.ok(existsSync(path.join(sourceRoot, "generated types.d.ts")));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it(

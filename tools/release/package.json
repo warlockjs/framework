@@ -5,6 +5,7 @@
   "description": "Release runner for the Warlock.js monorepo (tools/release): installs @mongez/pkgist and holds pkgist.config.ts, the release registry for every package under packages/. Not published.",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/patch-native-declaration-root.mjs",
     "release": "node --import tsx scripts/release-family.ts gate",
     "release:family": "node --import tsx scripts/release-family.ts gate",
     "release:family:publish": "node --import tsx scripts/release-family.ts publish",

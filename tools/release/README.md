@@ -50,6 +50,24 @@ node --import tsx scripts/release-family.ts gate --version <x.y.z> --matrix none
 The pkgist tool itself is `@mongez/pkgist` on npm, released separately; keep the
 pinned version in `package.json` in step with the @mongez runner.
 
+`npm ci` also applies a checked compatibility patch to `rolldown-plugin-dts`:
+native TypeScript declaration emit and the plugin's output lookup must both
+honor each member's configured `rootDir` (`..` in this workspace). The upstream
+plugin otherwise forces the member directory as the root, and `--noCheck`
+allows imported sibling sources to emit declarations beside their source files.
+The patch is idempotent and refuses an unfamiliar upstream implementation.
+Remove it when an upstream release honors the configured root in both places.
+
+Every member quality script and pkgist build is checked for newly untracked
+files across **all** members' `src/` directories. A leak reports the exact
+command and affected paths, including files in siblings built earlier. Files
+are left in place for diagnosis; the published-surface clean-tree check still
+applies independently. Run the regression with:
+
+```bash
+node --import tsx --test scripts/__tests__/native-declaration-root.spec.ts scripts/__tests__/release-family.spec.ts
+```
+
 ## Dispatching a release from automation
 
 A person can always dispatch `release.yml` from the Actions tab

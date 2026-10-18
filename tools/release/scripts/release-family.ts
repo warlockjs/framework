@@ -711,22 +711,25 @@ async function buildAndPackAllMembers(
     // HEAD for every member of the run.
     const gitHead = await getGitHead(member, runtime);
 
-    await runtime.runCommand({
-      command: process.execPath,
-      args: [
-        runtime.resolvePkgistCli(),
-        "build",
-        member.name,
-        "--bump",
-        version,
-        "--no-publish",
-        "--no-git",
-        "--config",
-        CONFIG_PATH,
-      ],
-      cwd: BUILDER_ROOT,
-      env: { ...process.env },
-    });
+    await runSourceSafeCommand(
+      {
+        command: process.execPath,
+        args: [
+          runtime.resolvePkgistCli(),
+          "build",
+          member.name,
+          "--bump",
+          version,
+          "--no-publish",
+          "--no-git",
+          "--config",
+          CONFIG_PATH,
+        ],
+        cwd: BUILDER_ROOT,
+        env: { ...process.env },
+      },
+      runtime,
+    );
 
     // Same call site, same shape again: `pkgist build` just rewrote THIS
     // member's package.json in the working tree -- its version and its exact
@@ -1291,12 +1294,15 @@ async function checkPackageQualityScripts(
     }
 
     try {
-      await runtime.runCommand({
-        command: invocation.command,
-        args: invocation.args,
-        cwd: member.root,
-        env: qualityCheckEnvironment(process.env),
-      });
+      await runSourceSafeCommand(
+        {
+          command: invocation.command,
+          args: invocation.args,
+          cwd: member.root,
+          env: qualityCheckEnvironment(process.env),
+        },
+        runtime,
+      );
     } catch (error) {
       failures.push(
         `"${scriptName}" (${invocation.command} ${invocation.args.join(" ")}): ${formatError(error)}`,
@@ -1317,6 +1323,41 @@ async function checkPackageQualityScripts(
   ].join("\n");
 
   return { passed: false, refusalMessage, skipped };
+}
+
+/** Attribute source leaks to the command that created them, including leaks into siblings. */
+async function runSourceSafeCommand(
+  request: CommandRequest,
+  runtime: Runtime,
+): Promise<CommandResult> {
+  const untrackedSources = async () => {
+    const result = await runtime.runCommand({
+      command: "git",
+      args: ["ls-files", "--others", "--exclude-standard", "-z", "--", ":(glob)packages/*/src/**"],
+      cwd: REPO_ROOT,
+      env: { ...process.env },
+    });
+    return result.stdout.split("\0").filter(Boolean);
+  };
+  const before = new Set(await untrackedSources());
+  const outcome = await runtime.runCommand(request).then(
+    (result) => ({ result }),
+    (error: unknown) => ({ error }),
+  );
+  const created = (await untrackedSources()).filter((file) => !before.has(file));
+  if (created.length > 0) {
+    throw new Error(
+      [
+        `Command left untracked package source files: ${request.command} ${request.args.join(" ")}`,
+        `Working directory: ${request.cwd}`,
+        ...created.map((file) => `  - ${file}`),
+        ...("error" in outcome ? [formatError(outcome.error)] : []),
+        "Fix the emitting command; release checks never remove or ignore these files.",
+      ].join("\n"),
+    );
+  }
+  if ("error" in outcome) throw outcome.error;
+  return outcome.result;
 }
 
 export interface PackageBranchResult {
