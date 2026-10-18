@@ -42,7 +42,6 @@ const FAMILY_NAMES = [
   "@warlock.js/seal",
   "@warlock.js/sitemap",
   "@warlock.js/devtools",
-  "@warlock.js/eslint-plugin",
   "@warlock.js/web",
   "create-warlock",
 ] as const;

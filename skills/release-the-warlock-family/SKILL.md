@@ -5,7 +5,7 @@ description: Publish and independently verify the lockstep Warlock.js package fa
 
 # Release the warlock family
 
-How to publish the 31-package `@warlock.js` family (30 `@warlock.js/*` packages
+How to publish the 32-package `@warlock.js` family (31 `@warlock.js/*` packages
 plus `create-warlock`) without half-releasing it, pushing something you did not
 intend, shipping stale docs, or believing a build that never happened.
 
@@ -240,7 +240,7 @@ untouched.
 
 ## The release set — assert the LIST, never the count
 
-**31 published names: 30 `@warlock.js/*` packages plus `create-warlock`** (5.25; `@warlock.js/devtools` joined then). The authoritative list is `tools/release/pkgist.config.ts`, and `WARLOCK_FAMILY_SIZE` in `tools/release/scripts/warlock-family.ts` must match it. Members are the direct children of `packages/`.
+**32 published names: 31 `@warlock.js/*` packages plus `create-warlock`** (5.31; `@warlock.js/ai-cli` joined then). The authoritative list is `tools/release/pkgist.config.ts`, and `WARLOCK_FAMILY_SIZE` in `tools/release/scripts/warlock-family.ts` must match it. Members are the direct children of `packages/`.
 
 - Everything under `@warlock.js/*` **except `docs`**.
 - **`create-warlock` is unscoped** and is a full lockstep member. A list built
@@ -442,7 +442,7 @@ a manual `npm publish`.**
    summary paragraph and the `releases.json` field.
 
    `none` skips the matrix and **nothing else** — the local registry is still
-   owned, all 33 tarballs are still staged, and every member is still confirmed
+   owned, all 32 tarballs are still staged, and every member is still confirmed
    installable. Skipping the matrix is not skipping the gate.
 
 ### Exact invocation (verified 5.9.0)
@@ -496,7 +496,7 @@ The runner must perform these steps in order:
 1. Independently derive the publishable family from the top-level source
    manifests and reconcile it with the `warlock` declaration in
    `tools/release/pkgist.config.ts`. Compare the **names and resolved roots**, require
-   one exact source version, and only then apply the family size (31) as a secondary invariant.
+   one exact source version, and only then apply the family size (32) as a secondary invariant.
    Two lists that merely have the same count have not agreed.
 2. Build every reconciled member in a **fresh pkgist process** with the exact
    release version and both `--no-publish` and `--no-git`. pkgist 1.6.3 accepts
@@ -514,7 +514,7 @@ The runner must perform these steps in order:
 5. Start an owned Verdaccio instance on a verified-free loopback port with
    isolated temporary storage and an npm uplink for third-party packages.
    Explicitly set and assert the registry URL, cache, environment, port, and
-   temporary roots. Stage all 33 exact tarballs there; do not rebuild them.
+   temporary roots. Stage all 32 exact tarballs there; do not rebuild them.
 6. Against that registry, run the complete zero-edit generator gate below:
    derive the feature list from the installed CLI, run every isolated
    `warlock add <feature>` path and the composed path, require exact pins and a
@@ -522,7 +522,7 @@ The runner must perform these steps in order:
    generated route/command, and run the Web browser/HMR/red-control assertions.
    Generated files are not repaired to make the gate pass.
 7. Only a fully green gate may emit a machine-readable **publish handoff**. The
-   handoff contains the exact version, ordered 31-name subject list, tarball
+   handoff contains the exact version, ordered 32-name subject list, tarball
    paths, and hashes. A failure emits no handoff.
 8. Production publication consumes that handoff, re-hashes every tarball, and
    refuses any missing, added, rebuilt, or changed input. The fenced release

@@ -8,6 +8,6 @@
     "dayjs": "^1.11.19"
   },
   "devDependencies": {
-    "@warlock.js/eslint-plugin": "^5.31.0"
+    "@warlock.js/devtools": "^5.31.0"
   }
 }

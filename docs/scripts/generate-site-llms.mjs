@@ -62,7 +62,6 @@ const PACKAGE_ORDER = [
   "ai-workspace",
   "ai-cli",
   "ai-panoptic",
-  "eslint-plugin",
   "create-warlock",
 ];
 

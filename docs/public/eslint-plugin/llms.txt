@@ -1,9 +1,0 @@
-# Warlock Eslint Plugin
-
-> Package: `@warlock.js/eslint-plugin`
-
-> ESLint rules for Warlock.js applications: validated request input, guarded mutating routes, safe redirects, redacted logs, bounded regexes and the framework's code conventions
-
-## Skills
-
-- [lint-warlock-app](@warlock.js/eslint-plugin/lint-warlock-app/SKILL.md): Enable @warlock.js/eslint-plugin and fix each of its rules: no-request-all, require-route-guard (public: true), safe-redirect (safeRedirect/safeRedirectTarget), no-sensitive-log (maskEmail, redact, escapeLogValue), no-unbounded-regex-on-input, no-await-log, no-js-import-extension, one-controller-per-file, prefer-type-discriminator. Use when a lint run reports a @warlock.js/* rule or when setting the plugin up.

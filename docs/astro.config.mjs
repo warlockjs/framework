@@ -434,15 +434,6 @@ const topics = [
   pkgTopic({ label: "Sitemap", slug: "sitemap", sections: sitemapSections }, "latest"),
   // Devtools is one page (install, panels, safety): overview only.
   pkgTopic({ label: "Devtools", slug: "devtools" }, "latest"),
-  // ESLint plugin: an overview plus one page per rule (rule messages link there).
-  pkgTopic(
-    {
-      label: "ESLint Plugin",
-      slug: "eslint-plugin",
-      sections: [{ label: "Rules", dir: "rules", collapsed: false }],
-    },
-    "latest",
-  ),
 
   // Data
   pkgTopic({ label: "Cascade", slug: "cascade", sections: cascadeSections }, "latest"),
