@@ -1,3 +1,4 @@
+import type { DevtoolsAiSource } from "../sources/ai-source";
 import type { DevtoolsCollector, DevtoolsQuery, ResolvedDevtoolsOptions } from "../types";
 
 /**
@@ -18,6 +19,8 @@ export type DevtoolsRouteRow = {
  */
 export type MountDevtoolsRoutesDeps = {
   collector: DevtoolsCollector;
+  /** Optional Panoptic feed, attached only in development. */
+  ai?: DevtoolsAiSource;
   options: ResolvedDevtoolsOptions;
   isDevelopment: () => boolean;
   explain?: (query: DevtoolsQuery) => Promise<unknown>;

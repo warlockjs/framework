@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mountDevtoolsRoutes = vi.fn();
+const disposeAi = vi.fn();
+const attachAiSource = vi.fn(async () => ({
+  available: false,
+  message: "Install Panoptic",
+  dispose: disposeAi,
+}));
+vi.mock("../src/sources/ai-source", () => ({ attachAiSource }));
 
 vi.mock("../src/server", () => ({ mountDevtoolsRoutes }));
 
@@ -18,6 +25,8 @@ vi.mock("@warlock.js/cache", () => ({}));
 describe("devtoolsConnector", () => {
   beforeEach(() => {
     mountDevtoolsRoutes.mockClear();
+    attachAiSource.mockClear();
+    disposeAi.mockClear();
   });
 
   afterEach(() => {
@@ -42,6 +51,7 @@ describe("devtoolsConnector", () => {
       expect.stringContaining("only runs in development"),
     );
     expect(mountDevtoolsRoutes).not.toHaveBeenCalled();
+    expect(attachAiSource).not.toHaveBeenCalled();
     expect(connector.isActive()).toBe(false);
 
     await connector.shutdown();
@@ -56,6 +66,7 @@ describe("devtoolsConnector", () => {
 
     await connector.boot();
 
+    expect(attachAiSource).toHaveBeenCalledWith(200);
     expect(mountDevtoolsRoutes).toHaveBeenCalledOnce();
     expect(mountDevtoolsRoutes).toHaveBeenCalledWith(
       { fastify: true },
@@ -71,6 +82,7 @@ describe("devtoolsConnector", () => {
     expect(connector.isActive()).toBe(true);
 
     await connector.shutdown();
+    expect(disposeAi).toHaveBeenCalledOnce();
     expect(connector.isActive()).toBe(false);
   });
 });
@@ -89,6 +101,8 @@ describe("devtoolsConnector OpenAPI hook", () => {
       warnings: [],
     }));
     mountDevtoolsRoutes.mockClear();
+    attachAiSource.mockClear();
+    disposeAi.mockClear();
 
     const { devtoolsConnector } = await import("../src/devtools-connector");
     const connector = devtoolsConnector();
@@ -118,6 +132,8 @@ describe("devtoolsConnector Postman hook", () => {
       async () => collection,
     );
     mountDevtoolsRoutes.mockClear();
+    attachAiSource.mockClear();
+    disposeAi.mockClear();
 
     const { devtoolsConnector } = await import("../src/devtools-connector");
     const connector = devtoolsConnector();
@@ -139,6 +155,8 @@ describe("devtoolsConnector Postman hook", () => {
     (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
     delete (core as Record<string, unknown>).getDevelopmentPostmanCollection;
     mountDevtoolsRoutes.mockClear();
+    attachAiSource.mockClear();
+    disposeAi.mockClear();
 
     const { devtoolsConnector } = await import("../src/devtools-connector");
     const connector = devtoolsConnector();

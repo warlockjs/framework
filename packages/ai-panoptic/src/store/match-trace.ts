@@ -20,6 +20,10 @@ export function matchTrace(trace: Trace, filter?: TraceQuery): boolean {
     return true;
   }
 
+  if (filter.requestId !== undefined && trace.requestId !== filter.requestId) {
+    return false;
+  }
+
   if (filter.traceId !== undefined && trace.traceId !== filter.traceId) {
     return false;
   }

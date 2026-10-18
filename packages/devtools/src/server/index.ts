@@ -1,4 +1,5 @@
 import type { FastifyError, FastifyInstance } from "fastify";
+import { registerAiRoutes } from "./ai-routes";
 import { registerBackgroundRoutes } from "./background-routes";
 import { registerExplainRoute } from "./explain-route";
 import { registerDevtoolsGuard } from "./guard";
@@ -30,6 +31,7 @@ export function mountDevtoolsRoutes(server: FastifyInstance, deps: MountDevtools
 
       registerUiAssets(instance);
       registerRequestsRoutes(instance, deps);
+      registerAiRoutes(instance, deps);
       registerBackgroundRoutes(instance, deps);
       registerMailRoutes(instance, deps);
       registerLogRoutes(instance, deps);

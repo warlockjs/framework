@@ -1,0 +1,110 @@
+---
+title: AI panel
+description: Inspect Panoptic AI runs alongside the HTTP requests that triggered them in the development dashboard.
+---
+
+The **AI** tab at `/__warlock` shows completed Panoptic traces, including failed,
+cancelled and incomplete runs. Request details also list their AI runs, with a
+link to the full run tree. A run's **Open HTTP request** button returns to its
+request record while that record is retained.
+
+## Enable collection
+
+Install devtools as usual, then add Panoptic if your app does not already use it:
+
+```bash
+warlock add devtools
+pnpm add @warlock.js/ai @warlock.js/ai-panoptic
+```
+
+Configure observation at application boot:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic";
+
+ai.config({ panoptic: { observeAll: true } });
+```
+
+Restart `warlock dev`, make a request that executes an AI flow, and open
+`http://localhost:<port>/__warlock`. No additional dashboard server or
+`dashboard: true` option is needed. Existing `panoptic().attach(...)`,
+`panoptic().middleware()`, flow-local observers and `collector.collect(...)`
+also feed the panel when they use Panoptic's built-in collector. Custom
+collectors need to delegate collection to that pipeline.
+
+Installing Panoptic alone does not enable observation. Use `observeAll: true`,
+`observe: true` on individual flows, or the explicit subscriber APIs. If Panoptic
+cannot be loaded or does not provide the trace-subscription API, the AI tab shows
+install/restart guidance; the other panels continue to work.
+
+## What appears
+
+| Field      | Meaning                                                                                                                                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model      | The provider/model identity recorded on each agent span; multiple nested agents can contribute models to one run.                                                                                                                                    |
+| Tokens     | Root input/output usage plus provider cache-read and cache-write tokens. Missing optional counters appear as `—`. The input label says whether it includes cache tokens, using `usage.inputIncludesCache`.                                           |
+| Cost       | Historical USD amounts from `usage.cost`, summed with Panoptic's `totalCostUsd`, including cache, reasoning and hosted-tool fees. Missing pricing is **unpriced**. Totals include reported costs only; a partly priced run can have a partial total. |
+| Cache hits | Number of trips with reported `cachedTokens > 0`. This measures provider prompt-cache hits. Semantic-cache hits are unreported because the current report contract carries no explicit hit flag; zero tokens alone do not prove a hit.               |
+| Tool calls | Nested tool spans with start/end timestamps, offset from run start, duration and status. Truncated tool requests that were never dispatched are not counted as executed tools.                                                                       |
+| Retries    | Retry counts and each recorded attempt's timestamps, duration and outcome.                                                                                                                                                                           |
+| Truncation | `report.status: "incomplete"` or an `AgentIncompleteError` (`AGENT_INCOMPLETE`) marks the run incomplete. Truncated-trip counts remain visible even if a later continuation recovered the run.                                                       |
+| Compaction | Applied/skipped agent decisions, trip index, input-token count, counting method, skip reason and replaced range. Provider `compaction` blocks contribute a separate count. Summary text and raw provider blocks are excluded.                        |
+
+Select a run to inspect its nested spans and diagnostic attributes. Root usage
+already includes children: totals do not add the same child usage again. Each
+span still displays its own recorded usage. A `—` cache count means unreported,
+which is different from a reported zero.
+
+Orchestrator compaction returned only on a result envelope or emitted only as
+an event is outside the report tree and cannot be reconstructed from its trace.
+The panel displays the compaction metadata actually present in agent reports
+and provider blocks.
+
+## Requests, background work and retention
+
+Devtools reads core's request-local id **synchronously when Panoptic collects**
+the finalized report, before exporters run. Concurrent requests retain their own
+ids. Work completing after the response can still link if it retains that async
+context. If no current request id exists, an explicit `Trace.requestId` is used
+when present; otherwise the run appears as **Background / no request id**.
+`sessionId` is a separate conversation identity and is never guessed to be an
+HTTP request id. Reports collected later outside their original context cannot
+be linked retroactively.
+
+The AI tab accepts an exact HTTP request id filter. Request details use that
+same filter, so late AI runs remain discoverable while their trace is retained.
+Updates arrive through the dashboard's existing event stream when collection
+finishes; this is a completed-run view, not token streaming.
+
+Devtools uses Panoptic's in-memory query store, bounded by `maxRequests` (200 by
+default) **AI traces**, independently of request retention. Recollecting a trace
+replaces the same trace id. It captures runs collected after devtools attaches;
+it does not replay boot-time runs or hydrate an application's persisted cache
+store. **Clear**, connector shutdown and process restart discard this view.
+Clearing it does not erase your application's Panoptic exporter/cache stores.
+Use [Panoptic trace stores](/v/latest/ai/observability/querying-traces/) for
+persistent history.
+
+## JSON API
+
+All paths are relative to the configured devtools prefix:
+
+- `GET /__warlock/api/ai` — `{ available, runs, aggregate }`; when unavailable,
+  `{ available: false, message, runs: [] }` contains install guidance.
+- `GET /__warlock/api/ai?requestId=<encoded-id>` — the same response scoped to
+  one HTTP request, including its usage aggregate.
+- `GET /__warlock/api/ai/runs/<encoded-trace-id>` — the content-free trace tree,
+  or `404` for an unavailable/evicted run.
+- `GET /__warlock/api/stream` adds `ai` events carrying `{ traceId, requestId? }`.
+  `DELETE /__warlock/api/requests` clears the AI view with the other panels.
+
+`DevtoolsAiRun` and `DevtoolsAiEvent` are exported as types from
+`@warlock.js/devtools`; `DevtoolsStreamEvent` includes the new `ai` event.
+
+Responses disable HTTP caching. The connector attaches the AI source only in
+development, and every AI endpoint uses the existing development and
+socket-loopback guard. Nothing is mounted in production. The view omits span
+input/output, prompts, tool arguments/results and compaction summaries, even if
+Panoptic's other exporters capture content. Names, usage, diagnostic metadata
+and normalized error type/message remain development data.

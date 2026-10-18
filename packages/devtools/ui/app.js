@@ -174,7 +174,7 @@ function queryRow(query, requestId) {
   return details;
 }
 
-function requestDetail(request) {
+async function requestDetail(request) {
   const section = el("section", { class: "detail" }, [
     el("h2", {
       text: `${request.method} ${request.path} · ${value(request.status)} · ${value(request.durationMs)} ms`,
@@ -225,6 +225,7 @@ function requestDetail(request) {
       ),
     );
   else section.append(empty("No mail captured."));
+  section.append(el("h3", { text: "AI runs" }), await requestAiView(request.id));
   return section;
 }
 
@@ -242,9 +243,184 @@ async function requestsView() {
     );
   const detail =
     state.selectedRequest && state.details.get(state.selectedRequest)
-      ? requestDetail(state.details.get(state.selectedRequest))
+      ? await requestDetail(state.details.get(state.selectedRequest))
       : el("div", { class: "panel" }, empty("Select a request to inspect it."));
   return el("div", { class: "layout" }, [list, detail]);
+}
+
+function aiUsage(usage, cost) {
+  const cacheSemantics =
+    usage.inputIncludesCache === false
+      ? "input excludes cache tokens"
+      : "input includes cache tokens";
+  return `${value(usage.input)} input · ${value(usage.output)} output · ${value(usage.cachedTokens)} cache read · ${value(usage.cacheWriteTokens)} cache write · ${cost == null ? "unpriced" : `$${cost.toFixed(6)} USD`} (${cacheSemantics})`;
+}
+
+function aiRunSummary(run) {
+  return el("div", {}, [
+    el("div", {
+      class: "row-top",
+      text: `${run.name} · ${run.status}${run.incomplete ? " · Incomplete / truncated" : ""} · ${run.duration} ms`,
+    }),
+    el("div", { class: "meta", text: run.models.join(", ") || "Model unreported" }),
+    el("p", { text: aiUsage(run.usage, run.cost) }),
+    el("div", {
+      class: "meta",
+      text: `${run.toolCalls} tool calls · ${run.retries} retries · ${value(run.cacheHits)} provider cache-hit trips · ${run.truncatedTrips} truncated trips · ${run.compactions} applied / ${run.skippedCompactions} skipped compactions · ${run.providerCompactions} provider compactions`,
+    }),
+    el("div", {
+      class: "meta",
+      text: `${run.traceId} · ${run.requestId ? `Request ${run.requestId}` : "Background / no request id"}`,
+    }),
+  ]);
+}
+
+function aiGuidance(data) {
+  return empty(
+    data.message ||
+      "Install @warlock.js/ai and @warlock.js/ai-panoptic, restart warlock dev, and enable Panoptic observation.",
+  );
+}
+
+async function requestAiView(requestId) {
+  try {
+    const data = await api(`api/ai?requestId=${encodeURIComponent(requestId)}`);
+    if (!data.available) return aiGuidance(data);
+    const section = el("div");
+    if (!data.runs.length) section.append(empty("No AI runs collected for this request yet."));
+    for (const run of data.runs) {
+      section.append(
+        el(
+          "button",
+          {
+            class: "row",
+            type: "button",
+            onclick: () => {
+              state.selectedAiRun = run.traceId;
+              state.aiRequestId = requestId;
+              setTab("ai");
+            },
+          },
+          aiRunSummary(run),
+        ),
+      );
+    }
+    return section;
+  } catch (error) {
+    return errorView(error);
+  }
+}
+
+function aiSpan(span, rootStartedAt) {
+  const incomplete =
+    span.status === "incomplete" ||
+    span.error?.type === "AgentIncompleteError" ||
+    span.error?.type === "AGENT_INCOMPLETE";
+  const start = Date.parse(span.startedAt) - Date.parse(rootStartedAt);
+  const section = el("details", { class: "ai-span", open: "" }, [
+    el("summary", {
+      text: `${span.type} ${span.name} · ${span.status}${incomplete ? " · Incomplete / truncated" : ""} · +${start} ms · ${span.duration} ms`,
+    }),
+    el("p", { class: "meta", text: `${span.startedAt} → ${span.endedAt}` }),
+    el("pre", {
+      text: JSON.stringify(
+        { usage: span.usage, attributes: span.attributes, error: span.error },
+        null,
+        2,
+      ),
+    }),
+  ]);
+  span.children.forEach((child) => section.append(aiSpan(child, rootStartedAt)));
+  return section;
+}
+
+async function aiView() {
+  const section = el("section", { class: "detail" }, el("h2", { text: "AI runs" }));
+  const input = el("input", {
+    type: "text",
+    placeholder: "HTTP request id (empty for all runs)",
+    "aria-label": "Filter AI runs by HTTP request id",
+    value: state.aiRequestId || "",
+  });
+  section.append(
+    el(
+      "form",
+      {
+        class: "toolbar",
+        onsubmit: (event) => {
+          event.preventDefault();
+          state.aiRequestId = input.value;
+          state.selectedAiRun = undefined;
+          render();
+        },
+      },
+      [input, el("button", { type: "submit", text: "Filter / refresh" })],
+    ),
+  );
+  const data = await api(
+    `api/ai${state.aiRequestId ? `?requestId=${encodeURIComponent(state.aiRequestId)}` : ""}`,
+  );
+  if (!data.available) {
+    section.append(aiGuidance(data));
+    return section;
+  }
+  if (!data.runs.length) {
+    section.append(
+      empty(
+        "No AI runs yet. Enable Panoptic observation and execute a flow; runs appear when collection completes.",
+      ),
+    );
+    return section;
+  }
+  const costs = data.runs.filter((run) => run.cost != null);
+  section.append(
+    el("p", {
+      text: `${data.aggregate.traces} runs · ${data.aggregate.usage.input} input tokens · ${data.aggregate.usage.output} output tokens · ${costs.length ? `$${costs.reduce((sum, run) => sum + run.cost, 0).toFixed(6)} USD (reported cost)` : "unpriced"}`,
+    }),
+  );
+  const list = el("div", { class: "panel list" });
+  for (const run of data.runs)
+    list.append(
+      el(
+        "button",
+        {
+          class: `row${run.traceId === state.selectedAiRun ? " is-selected" : ""}`,
+          type: "button",
+          onclick: () => {
+            state.selectedAiRun = run.traceId;
+            render();
+          },
+        },
+        aiRunSummary(run),
+      ),
+    );
+  const detail = el("div", { class: "panel detail" });
+  const selected = data.runs.find((run) => run.traceId === state.selectedAiRun);
+  if (selected) {
+    detail.append(aiRunSummary(selected));
+    if (selected.requestId)
+      detail.append(
+        el("button", {
+          type: "button",
+          text: "Open HTTP request",
+          onclick: async () => {
+            state.tab = "requests";
+            tabs.forEach((button) =>
+              button.classList.toggle("is-active", button.dataset.tab === "requests"),
+            );
+            await showRequest(selected.requestId);
+          },
+        }),
+      );
+    try {
+      const trace = await api(`api/ai/runs/${encodeURIComponent(selected.traceId)}`);
+      detail.append(aiSpan(trace.root, trace.startedAt));
+    } catch (error) {
+      detail.append(errorView(error));
+    }
+  } else detail.append(empty("Select a run to inspect tools, retries and compaction metadata."));
+  section.append(el("div", { class: "layout" }, [list, detail]));
+  return section;
 }
 
 function queriesView() {
@@ -535,23 +711,27 @@ function apiView() {
   return section;
 }
 
+let renderVersion = 0;
 async function render() {
+  const version = ++renderVersion;
   try {
     const view =
-      state.tab === "requests"
-        ? await requestsView()
-        : state.tab === "queries"
-          ? queriesView()
-          : state.tab === "mail"
-            ? await mailView()
-            : state.tab === "logs"
-              ? await logsView()
-              : state.tab === "routes"
-                ? await routesView()
-                : apiView();
-    app.replaceChildren(view);
+      state.tab === "ai"
+        ? await aiView()
+        : state.tab === "requests"
+          ? await requestsView()
+          : state.tab === "queries"
+            ? queriesView()
+            : state.tab === "mail"
+              ? await mailView()
+              : state.tab === "logs"
+                ? await logsView()
+                : state.tab === "routes"
+                  ? await routesView()
+                  : apiView();
+    if (version === renderVersion) app.replaceChildren(view);
   } catch (error) {
-    app.replaceChildren(errorView(error));
+    if (version === renderVersion) app.replaceChildren(errorView(error));
   }
 }
 
@@ -562,16 +742,18 @@ document.querySelector("#clear").addEventListener("click", async () => {
     state.requests = [];
     state.details.clear();
     state.selectedRequest = undefined;
+    state.selectedAiRun = undefined;
     render();
   } catch (error) {
     app.prepend(errorView(error));
   }
 });
 const events = new EventSource("api/stream");
-for (const type of ["request", "mail", "log"])
+for (const type of ["request", "mail", "log", "ai"])
   events.addEventListener(type, (event) => {
     try {
       const data = JSON.parse(event.data);
+      if (type === "ai" && (state.tab === "ai" || state.tab === "requests")) render();
       if (type === "request") {
         state.requests = [data, ...state.requests.filter((item) => item.id !== data.id)].slice(
           0,

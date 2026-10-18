@@ -11,6 +11,7 @@ import type { Connector, ConnectorLifecyclePhase } from "@warlock.js/core";
 import { createCollector } from "./collector";
 import { resolveDevtoolsOptions } from "./options";
 import type { DevtoolsRouteRow } from "./server";
+import { attachAiSource } from "./sources/ai-source";
 import { attachCacheSource } from "./sources/cache-source";
 import { attachLogSource } from "./sources/log-source";
 import { attachMailSource } from "./sources/mail-source";
@@ -77,11 +78,15 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       await attachSource(log, "mail", () => attachMailSource(collector));
       await attachSource(log, "log", () => attachLogSource(collector));
 
+      const ai = await attachAiSource(resolved.maxRequests);
+      disposers.push(ai.dispose);
+
       const { mountDevtoolsRoutes } = await import("./server");
       const postmanBuilder = await findPostmanBuilder();
 
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
+        ai,
         options: resolved,
         isDevelopment: () => Application.runtimeStrategy === "development",
         explain: (query) => explainQuery(query),

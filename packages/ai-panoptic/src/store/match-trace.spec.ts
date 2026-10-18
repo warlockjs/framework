@@ -46,6 +46,13 @@ describe("matchTrace", () => {
     expect(matchTrace(trace({ traceId: "a" }), { traceId: "b" })).toBe(false);
   });
 
+  it("filters HTTP request ids independently of sessions", () => {
+    const target = { ...trace({ sessionId: "conversation" }), requestId: "http-request" };
+    expect(matchTrace(target, { requestId: "http-request", sessionId: "conversation" })).toBe(true);
+    expect(matchTrace(target, { requestId: "conversation" })).toBe(false);
+    expect(matchTrace(trace(), { requestId: "http-request" })).toBe(false);
+  });
+
   it("filters by sessionId", () => {
     expect(matchTrace(trace({ sessionId: "s1" }), { sessionId: "s1" })).toBe(true);
     expect(matchTrace(trace({ sessionId: "s1" }), { sessionId: "s2" })).toBe(false);

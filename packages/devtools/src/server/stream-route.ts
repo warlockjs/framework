@@ -24,12 +24,19 @@ export function registerStreamRoute(server: FastifyInstance, deps: MountDevtools
       res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`);
     });
 
+    const disposeAi = deps.ai?.available
+      ? deps.ai.subscribe((event) => {
+          res.write(`event: ai\ndata: ${JSON.stringify(event)}\n\n`);
+        })
+      : undefined;
+
     const pingTimer = setInterval(() => res.write(": ping\n\n"), PING_INTERVAL_MS);
     pingTimer.unref();
 
     request.raw.on("close", () => {
       clearInterval(pingTimer);
       dispose();
+      disposeAi?.();
     });
   });
 }

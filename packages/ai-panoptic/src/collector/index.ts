@@ -10,3 +10,7 @@ export { normalizeError } from "./normalize-error";
 
 // Opt-in content capture
 export type { ContentCaptureOptions, ContentRedactor } from "./content-capture.type";
+
+// Process-local adapter subscriptions
+export { subscribeTraces } from "./trace-subscriptions";
+export type { TraceListener } from "./trace-subscriptions";

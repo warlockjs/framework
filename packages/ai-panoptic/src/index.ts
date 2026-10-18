@@ -14,12 +14,14 @@ export {
   normalizeError,
   reportToSpan,
   reportToTrace,
+  subscribeTraces,
 } from "./collector";
 export type {
   CollectorOptions,
   ContentCaptureOptions,
   ContentRedactor,
   ExporterErrorHandler,
+  TraceListener,
 } from "./collector";
 
 // Store

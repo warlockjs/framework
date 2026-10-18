@@ -173,3 +173,38 @@ Add exporters after construction with `observe.use(exporter)` (chainable, dedupe
 - The `export-traces` topic — the sink end: choosing/writing an exporter, the `gen_ai.*` / `warlock.*` attribute mapping.
 - The `query-traces` topic — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent and the `BaseReport` shape Panoptic consumes.
+
+## Subscribe across collectors and inspect requests in devtools
+
+`subscribeTraces(listener)` is a process-local adapter hook: it receives every
+finalized trace from built-in collectors (including ones created earlier), in
+the collecting async context, before exporter dispatch. It has no replay and
+adds no retention. It does not enable observation or subscribe to pure
+`toTrace()` calls. Treat incoming traces as read-only. Listener throws/rejections
+are isolated; promises are not awaited.
+
+```ts
+import { subscribeTraces } from "@warlock.js/ai-panoptic";
+import type { TraceListener } from "@warlock.js/ai-panoptic";
+
+const onTrace: TraceListener = (trace) => {
+  console.log(trace.traceId, trace.root.status, trace.usage);
+};
+const unsubscribe = subscribeTraces(onTrace);
+// ...later, on adapter teardown:
+unsubscribe();
+```
+
+With `@warlock.js/devtools` installed, its **AI** tab at `/__warlock` subscribes
+for you. Enable `ai.config({ panoptic: { observeAll: true } })` as above, or use
+an explicit subscriber. No `dashboard: true` is needed. Request-local context
+links runs to their HTTP request when available, independently of `sessionId`.
+The panel never mounts in production.
+
+New diagnostic attributes are `retry.attempts` (timings/outcomes),
+`agent.cacheHits` (trips reporting positive provider cache reads),
+`agent.truncatedTrips`, `agent.providerCompactions` and `agent.compactions`
+(applied/skipped decisions, trip indices, token counts and replaced ranges).
+They exclude compaction summaries and callback error text. Unknown cache hits
+remain absent; do not infer semantic-cache hits from zero tokens. An incomplete
+run is identified by its status or normalized `AGENT_INCOMPLETE` error code.

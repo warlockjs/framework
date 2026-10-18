@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.33.0
+
+### Added
+
+- AI panel at `/__warlock` and AI runs in HTTP request details, powered by optional `@warlock.js/ai-panoptic`: model, token/cache usage, historical cost, provider cache-hit trips, tool timings, retries, truncation and compaction metadata.
+- Read-only AI list/detail endpoints and `ai` stream updates behind the existing development/loopback guard, with install guidance when Panoptic is unavailable.
+- Bounded content-free trace retention, request-local correlation and cleanup with the dashboard Clear action and connector shutdown; application exporter/cache stores remain independent.
+
 ## 5.32.0 - 2026-10-18
 
 ### Changed
