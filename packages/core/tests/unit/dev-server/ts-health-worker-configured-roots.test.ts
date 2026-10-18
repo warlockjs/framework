@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import path from "node:path";
@@ -95,23 +94,34 @@ async function createHealthWorker(mode: "source" | "published", root: string): P
     );
   }
 
-  // Build the actual published worker entry as ESM, keeping its TypeScript
-  // dependency external just as the package does. The worker starts natively.
+  // pkgist externalizes all declared dependencies, including native packages.
+  // Bundling oxc-parser here relocates its binding loader to /tmp and tests a
+  // different dependency layout from the published package.
   const builtRoot = path.join(root, "built");
-  await build({
+  const manifest: {
+    dependencies: Record<string, string>;
+    peerDependencies: Record<string, string>;
+  } = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url), "utf8"));
+  const result = await build({
     entryPoints: [fileURLToPath(workerEntry)],
     outfile: path.join(builtRoot, "ts-health.worker.mjs"),
     platform: "node",
     target: "node22.15",
     format: "esm",
     bundle: true,
-    external: ["typescript", "typescript/*"],
+    external: Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies }),
+    metafile: true,
   });
-  const require = createRequire(import.meta.url);
-  await mkdir(path.join(root, "node_modules"), { recursive: true });
+  const externalImports = Object.values(result.metafile.outputs).flatMap((output) =>
+    output.imports.filter((imported) => imported.external).map((imported) => imported.path),
+  );
+  expect(externalImports).toContain("oxc-parser");
+  expect(externalImports).toContain("typescript/unstable/sync");
+  // Model core's own installed dependency tree, retaining each package's real
+  // location so native optional bindings resolve from their owning package.
   await symlink(
-    path.dirname(require.resolve("typescript/package.json")),
-    path.join(root, "node_modules", "typescript"),
+    fileURLToPath(new URL("../../../node_modules", import.meta.url)),
+    path.join(root, "node_modules"),
     "junction",
   );
   return createWorker(

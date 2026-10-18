@@ -59,5 +59,8 @@ Source TypeScript health workers use the framework's JavaScript bootstrap to
 register tsx inside each worker on Node.js 22.15 and Node.js 24. Registration
 remains active for later TypeScript imports and lets native dependencies load
 Node builtins through `createRequire`. Published JavaScript workers start
-directly. Regression tests cover both paths without inherited loader hooks,
-including configured declaration roots, source updates and deleted declarations.
+directly. Their TypeScript and native parser dependencies remain external and
+resolve from core's installed dependencies; native optional bindings load from
+the parser package's own location. Regression tests cover both paths without
+inherited loader hooks, including configured declaration roots, source updates
+and deleted declarations.
