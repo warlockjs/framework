@@ -20,6 +20,7 @@ export * from "./connectors";
 export * from "./container";
 export * from "./database";
 export * from "./encryption";
+export * from "./secrets";
 // The stable error-code registry and `WarlockError`. Not `./errors`: its HTTP
 // classes are already exported through `./http`.
 export * from "./errors/error-codes";

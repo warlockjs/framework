@@ -57,6 +57,7 @@
     "typescript": "7.0.2"
   },
   "peerDependencies": {
+    "@napi-rs/keyring": "^2.1.1",
     "@aws-sdk/client-s3": "^3.955.0",
     "@aws-sdk/client-sesv2": "^3.1025.0",
     "@aws-sdk/lib-storage": "^3.955.0",
@@ -76,6 +77,9 @@
     "ts-morph": ">=27.0.0"
   },
   "peerDependenciesMeta": {
+    "@napi-rs/keyring": {
+      "optional": true
+    },
     "sharp": {
       "optional": true
     },

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.33.0
+
+### Added
+
+- Add app-scoped `secrets.get/set/remove/has` and `environmentName`, also exported from `@warlock.js/core/secrets`, with lazy optional OS keychain storage, read-only scoped environment lookup, authenticated encrypted owner-only files, typed errors, logger masking and explicit memory backends.
+- Add `secretsFake` to the default test fakes, with isolated memory storage and assertions that never reveal credentials; opt out with `tests.fakes: { secrets: false }`.
+
 ## 5.32.0 - 2026-10-18
 
 ### Added

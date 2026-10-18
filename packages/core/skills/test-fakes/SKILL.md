@@ -1,20 +1,21 @@
 ---
 name: test-fakes
-description: 'The test fakes Warlock installs by default in the test environment — `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake` — and their assertions (`assertSent`, `assertPushed`, `assertHas`, `assertExists`, `travel`), plus how to opt out (`tests.fakes`, `setupTest({ fakes })`). Triggers: `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake`, `installTestFakes`, `restoreTestFakes`, `tests.fakes`, `FakeAssertionError`, `clock.now`, `ids.uuid`, `setDispatchInterceptor`; "assert an email was sent", "assert a job was dispatched", "freeze time in a test", "deterministic ids", "tests without Redis", "keep the real cache driver in tests". Typical import `import { mailFake, queueFake } from "@warlock.js/core/tests"`. Skip: HTTP request helpers — the `test-http` topic; fixtures — the `model-factories` topic.'
+description: 'The test fakes Warlock installs by default in the test environment — `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake`, `secretsFake` — and their assertions (`assertSent`, `assertPushed`, `assertHas`, `assertExists`, `travel`), plus how to opt out (`tests.fakes`, `setupTest({ fakes })`). Triggers: `mailFake`, `queueFake`, `cacheFake`, `storageFake`, `clockFake`, `idsFake`, `secretsFake`, `installTestFakes`, `restoreTestFakes`, `tests.fakes`, `FakeAssertionError`, `clock.now`, `ids.uuid`, `setDispatchInterceptor`; "assert an email was sent", "assert a job was dispatched", "freeze time in a test", "deterministic ids", "tests without Redis", "keep the real cache driver in tests". Typical import `import { mailFake, queueFake } from "@warlock.js/core/tests"`. Skip: HTTP request helpers — the `test-http` topic; fixtures — the `model-factories` topic.'
 ---
 
 # Warlock — test fakes
 
-In the test environment six fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
+In the test environment seven fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
 
-| Fake          | Replaces                                                        |
-| ------------- | --------------------------------------------------------------- |
-| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured         |
-| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed     |
-| `cacheFake`   | The cache's current driver: a fresh in-memory driver            |
-| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory  |
-| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z |
-| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens        |
+| Fake          | Replaces                                                              |
+| ------------- | --------------------------------------------------------------------- |
+| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured               |
+| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed           |
+| `cacheFake`   | The cache's current driver: a fresh in-memory driver                  |
+| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory        |
+| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z       |
+| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens              |
+| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files |
 
 ## Assert what your code did
 
@@ -42,7 +43,8 @@ it("queues the report, mails the requester and caches the request", async () => 
 - **queue** — `assertPushed(jobOrName, payloadSubset?)`, `assertNotPushed`, `assertPushedCount(n, job?)`, `assertNothingPushed()`, `pushed(job?, matcher?)`. Each record has `id`, `name`, `queue`, `payload`, `options` (`delay`, `priority`, `jobId`) and `pushedAt`. An explicit `jobId` stays idempotent and `job.find(id)` answers from the record. Jobs are not run — call the handler to test it.
 - **cache** — `assertHas(key)`, `assertMissing(key)`, `assertStored(key, value)` (deep equality), `driver()`, `clear()`. TTLs, tags, namespaces and locks are the real memory driver's.
 - **storage** — `assertExists(path, driver?)`, `assertMissing(path, driver?)`, `files(driver?)`, `root()`. Each configured driver name gets a folder under one temp root, shared with the HTTP test server through `WARLOCK_TEST_STORAGE_ROOT`; the process that created it deletes it.
-- A failed assertion throws `FakeAssertionError` listing what was recorded.
+- **secrets** — async `assertHas(name)`, `assertMissing(name)`, `assertStored(name, value)`, plus `clear()` and `isInstalled()`. Assertion errors never reveal values. See `store-secrets` for examples and explicit memory stores.
+- A failed assertion throws `FakeAssertionError`; secret assertions omit values. Other fakes list what was recorded.
 
 ## Time and ids
 

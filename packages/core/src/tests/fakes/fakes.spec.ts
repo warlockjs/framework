@@ -211,7 +211,15 @@ describe("clockFake and idsFake", () => {
 
 describe("installTestFakes", () => {
   it("installs every fake by default and restores them all", async () => {
-    expect(await installTestFakes()).toEqual(["mail", "queue", "cache", "storage", "clock", "ids"]);
+    expect(await installTestFakes()).toEqual([
+      "mail",
+      "queue",
+      "cache",
+      "storage",
+      "clock",
+      "ids",
+      "secrets",
+    ]);
     expect(queueSlot()).toBeDefined();
 
     await restoreTestFakes();
@@ -223,8 +231,8 @@ describe("installTestFakes", () => {
   it("reads tests.fakes from config, and an explicit selection wins over it", () => {
     config.set("tests", { fakes: { cache: false, storage: false } });
 
-    expect(resolveTestFakes()).toEqual(["mail", "queue", "clock", "ids"]);
-    expect(resolveTestFakes(true)).toHaveLength(6);
+    expect(resolveTestFakes()).toEqual(["mail", "queue", "clock", "ids", "secrets"]);
+    expect(resolveTestFakes(true)).toHaveLength(7);
     expect(resolveTestFakes(false)).toEqual([]);
 
     config.set("tests", { fakes: false });

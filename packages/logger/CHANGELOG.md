@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.33.0
+
+### Added
+
+- Add `registerLogSecret(value, keys?)` and `maskRegisteredLogSecrets(text)` for process-lifetime credential masking. Registered keys and literal values remain protected with defaults disabled or custom censors, including free text, Error causes and channel failure diagnostics. The safety pass masks opaque objects and does not invoke serializers/getters.
+
 ## 5.32.0 - 2026-10-18
 
 ### Changed
