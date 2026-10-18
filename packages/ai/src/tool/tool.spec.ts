@@ -412,6 +412,32 @@ describe("tool()", () => {
       expect(seenTenant).toBe("acme");
     });
 
+    it("preserves optional MCP request identity and authenticated principal", async () => {
+      const principal = { member: "alice" };
+      const controller = new AbortController();
+      const wrapped = tool({
+        name: "identityReader",
+        description: "Read server-supplied context",
+        execute: async (_input: unknown, ctx) => ({
+          id: ctx?.requestId,
+          principal: ctx?.principal,
+          signal: ctx?.signal,
+        }),
+      });
+      const result = await wrapped.invoke(
+        {},
+        {
+          artifacts: {},
+          requestId: 0,
+          principal,
+          signal: controller.signal,
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.data).toEqual({ id: 0, principal, signal: controller.signal });
+      expect(result.data?.principal).toBe(principal);
+    });
+
     it("supplies a degraded { artifacts: {} } ctx when none is threaded through", async () => {
       let seenCtx: { artifacts: Record<string, unknown> } | undefined;
       const wrapped = tool({

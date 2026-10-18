@@ -197,7 +197,7 @@ const { data, error } = await searchCatalog.invoke({ query: "lamps" }, ctx);
 console.log(data, error, ctx.artifacts.blocks);
 ```
 
-When a server transport runs the tool for a remote client — `ai.mcp.serve` over HTTP from `@warlock.js/ai-tools` — `ctx.request` carries the inbound request's `headers` (lower-cased names) and `remoteAddress`. Read a per-user token or a tenant header there; like `artifacts`, it never reaches the model. In-process dispatch leaves it unset. See [Connect MCP](/v/latest/ai/tools/connect-mcp/).
+When a server transport runs the tool for a remote client — `ai.mcp.serve` over HTTP from `@warlock.js/ai-tools` — `ctx.request` carries the inbound request's `headers` (lower-cased names) and `remoteAddress`. Read a per-user token or a tenant header there; like `artifacts`, it never reaches the model. Both MCP transports also supply optional `ctx.requestId` (the JSON-RPC tools/call id) and `ctx.principal` (the authenticated caller, typed `unknown`); narrow the principal before use. MCP cancellation aborts the call's `ctx.signal`. In-process dispatch can leave these fields unset. See [Connect MCP](/v/latest/ai/tools/connect-mcp/).
 
 ```ts
 execute: async (input, ctx) => {

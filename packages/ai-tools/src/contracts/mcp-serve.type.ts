@@ -1,5 +1,5 @@
 import type { JsonSchemaTarget, ToolContract, ToolRequestContext } from "@warlock.js/ai";
-import type { McpContentBlock } from "./mcp.type";
+import type { JsonRpcId, McpContentBlock, McpToolCallResult } from "./mcp.type";
 
 /**
  * Type contracts for `ai.mcp.serve(source, options)` — exposing local
@@ -49,8 +49,8 @@ export type McpHttpRequestInfo = ToolRequestContext & {
 
 /**
  * Authentication for an HTTP-served MCP endpoint. At least one of
- * `bearer` / `authorize` is required; when both are set, a request must
- * pass both. A request that fails gets HTTP 401 before its body is read.
+ * `bearer` / `authorize` / `authenticate` is required; all configured checks
+ * must pass, in that order. A request that fails gets HTTP 401 before its body is read.
  */
 export type McpHttpAuth = {
   /**
@@ -67,6 +67,12 @@ export type McpHttpAuth = {
    * request (fails closed).
    */
   authorize?: (request: McpHttpRequestInfo) => boolean | Promise<boolean>;
+  /**
+   * Resolve the caller after Host/Origin, bearer and authorize checks.
+   * Undefined or a thrown/rejected error denies with 401 and a Bearer challenge.
+   * Any other value becomes context.principal (including null or false).
+   */
+  authenticate?: (request: McpHttpRequestInfo) => unknown | Promise<unknown>;
 };
 
 /**
@@ -98,7 +104,7 @@ export type McpHttpServeTransport = {
    * @default "/mcp"
    */
   path?: string;
-  /** Bearer token(s) and/or a custom authorize hook. Required off loopback. */
+  /** Bearer, authorize and/or authenticate checks. Required off loopback. */
   auth?: McpHttpAuth;
   /**
    * Extra browser origins allowed to call the endpoint, as full origins
@@ -137,7 +143,16 @@ export type McpHttpServeTransport = {
  * - `"stdio"` — serve JSON-RPC over this process's stdin/stdout.
  * - `"http"` — serve MCP Streamable HTTP (see {@link McpHttpServeTransport}).
  */
-export type McpServeTransport = { type: "stdio" } | McpHttpServeTransport;
+export type McpServeTransport = McpStdioServeTransport | McpHttpServeTransport;
+
+/** Local caller identity for the stdio connection. */
+export type McpStdioServeTransport = {
+  type: "stdio";
+  /** Static trusted identity; never read from tool arguments. */
+  principal?: unknown;
+  /** Per-request identity provider; takes precedence over principal when set. */
+  principalProvider?: (context: McpServeCallContext) => unknown | Promise<unknown>;
+};
 
 /**
  * Per-call context handed to resource readers and prompt builders (tools
@@ -146,9 +161,26 @@ export type McpServeTransport = { type: "stdio" } | McpHttpServeTransport;
 export type McpServeCallContext = {
   /** The inbound HTTP request; absent over stdio. */
   request?: McpHttpRequestInfo;
-  /** Aborted when an HTTP server's `close()` gives up draining. */
+  /** JSON-RPC request id; populated by the serving boundary. */
+  requestId?: JsonRpcId;
+  /** Caller identity from HTTP authenticate or the stdio transport options. */
+  principal?: unknown;
+  /** Aborted on cancellation, client disconnect or server shutdown. */
   signal?: AbortSignal;
 };
+
+/** Context supplied to beforeCall after successful tool input validation. */
+export type McpServeToolContext = McpServeCallContext & { requestId: JsonRpcId };
+
+/** Native MCP error result returned by a beforeCall policy hook. */
+export type McpCallRefusal = McpToolCallResult & { isError: true };
+
+/** Validate policy before execute; a refusal bypasses result serialization. */
+export type McpBeforeCall = (
+  context: McpServeToolContext,
+  tool: ToolContract,
+  input: unknown,
+) => void | McpCallRefusal | Promise<void | McpCallRefusal>;
 
 /**
  * A static MCP resource served by `resources/list` + `resources/read`.
@@ -248,6 +280,12 @@ export interface McpServeOptions {
    * @default "text"
    */
   results?: "text" | "native";
+  /**
+   * Runs after schema validation and before invocation. Input is the validated
+   * value and should be treated as read-only. Return an isError:true native
+   * result to refuse; throw to answer with a JSON-RPC invalid-params error.
+   */
+  beforeCall?: McpBeforeCall;
   /**
    * Prefix each tool of a grouped source (`{ groups: { … } }`) with its
    * group name. `true` exposes `<group>_<tool>`; a function builds the

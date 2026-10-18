@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.33.0
+
+### Added
+
+- MCP serving now exposes per-call `requestId`, authenticated `principal` and cancellation-aware signals over HTTP and stdio. HTTP `auth.authenticate` resolves principals alongside bearer/authorize checks; stdio accepts static or provider principals. `beforeCall` validates policy after input validation and can return a native error refusal or throw a JSON-RPC error. `notifications/cancelled` aborts only the matching caller/request and suppresses its response. New hook/context/refusal and stdio transport types are exported.
+
 ## 5.32.0 - 2026-10-18
 
 ### Changed

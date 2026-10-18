@@ -45,6 +45,8 @@ export type {
   McpTransport,
 } from "./mcp.type";
 export type {
+  McpBeforeCall,
+  McpCallRefusal,
   McpGroupedToolSource,
   McpHttpAuth,
   McpHttpRequestInfo,
@@ -59,6 +61,8 @@ export type {
   McpServeResource,
   McpServeSource,
   McpServeTransport,
+  McpServeToolContext,
+  McpStdioServeTransport,
   McpServer,
   McpToolSource,
 } from "./mcp-serve.type";

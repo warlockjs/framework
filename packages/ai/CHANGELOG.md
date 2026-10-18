@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.33.0
+
+### Added
+
+- `ToolContext` adds optional `requestId` and `principal` fields for server transports, keeping authenticated identity out of tool input and model messages.
+
 ## 5.32.0 - 2026-10-18
 
 ### Changed

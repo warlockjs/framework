@@ -1,4 +1,5 @@
 import { createInterface, type Interface } from "node:readline";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { extractJsonSchema, type ToolContext, type ToolContract } from "@warlock.js/ai";
 import type {
   JsonRpcRequest,
@@ -13,6 +14,8 @@ import type {
   McpServePrompt,
   McpServeResource,
   McpServeSource,
+  McpServeToolContext,
+  McpStdioServeTransport,
   McpServer,
   McpToolCallResult,
   McpToolDescriptor,
@@ -21,6 +24,7 @@ import type {
 import { McpServeError, McpTransportError } from "../errors";
 import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
 import { startHttpServer } from "./serve-http";
+import { McpServeRequests } from "./serve-requests";
 import {
   assertMcpResult,
   isMcpResult,
@@ -215,7 +219,10 @@ class McpServeHandler {
     context: McpServeCallContext = {},
   ): Promise<JsonRpcResponse> {
     try {
-      return this.ok(request.id, await this.dispatch(request, context));
+      return this.ok(
+        request.id,
+        await this.dispatch(request, { ...context, requestId: request.id }),
+      );
     } catch (cause) {
       if (cause instanceof RpcFailure) {
         return this.error(request.id, cause.code, cause.message, cause.data);
@@ -237,7 +244,7 @@ class McpServeHandler {
       case "tools/list":
         return { tools: this.listTools() };
       case "tools/call":
-        return this.callTool(request.params, context);
+        return this.callTool(request.params, { ...context, requestId: request.id });
       default:
         break;
     }
@@ -342,7 +349,7 @@ class McpServeHandler {
    */
   private async callTool(
     params: unknown,
-    context: McpServeCallContext,
+    context: McpServeToolContext,
   ): Promise<McpToolCallResult> {
     const { name, args } = readCallParams(params);
     const contract = this.byName.get(name);
@@ -354,7 +361,11 @@ class McpServeHandler {
       });
     }
 
-    const toolContext: ToolContext = { artifacts: {} };
+    const toolContext: ToolContext = {
+      artifacts: {},
+      requestId: context.requestId,
+      principal: context.principal,
+    };
 
     if (context.signal) {
       toolContext.signal = context.signal;
@@ -366,6 +377,62 @@ class McpServeHandler {
       toolContext.request = remoteAddress === undefined ? { headers } : { headers, remoteAddress };
     }
 
+    if (this.options.beforeCall) {
+      let input = args;
+
+      // Validate at the policy boundary even for custom ToolContracts. Keep
+      // invoke as the execution boundary so custom accounting/error handling
+      // remains intact; invoke still owns its own input validation.
+      if (contract.input) {
+        let validation: StandardSchemaV1.Result<unknown>;
+
+        try {
+          validation = await contract.input["~standard"].validate(args);
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : String(cause);
+
+          return {
+            content: [
+              { type: "text", text: `Schema validation threw for tool "${name}": ${message}` },
+            ],
+            isError: true,
+          };
+        }
+
+        if (validation.issues) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Validation failed: ${validation.issues.map((issue) => issue.message).join("; ")}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        input = validation.value;
+      }
+
+      context.signal?.throwIfAborted();
+      const refusal = await this.options.beforeCall(context, contract, input);
+
+      if (refusal !== undefined) {
+        try {
+          assertMcpResult(refusal);
+
+          if (refusal.isError !== true) {
+            throw new Error("A refusal must be an error result.");
+          }
+        } catch {
+          throw new RpcFailure(JSON_RPC_INTERNAL_ERROR, "Invalid MCP beforeCall refusal.");
+        }
+
+        return refusal;
+      }
+    }
+
+    context.signal?.throwIfAborted();
     const result = await contract.invoke(args, toolContext);
 
     if (result.error) {
@@ -535,7 +602,8 @@ const JSON_RPC_INTERNAL_ERROR = -32603;
  */
 export async function answerStdioLine(
   line: string,
-  dispatch: (request: JsonRpcRequest) => Promise<JsonRpcResponse>,
+  dispatch: (request: JsonRpcRequest) => Promise<JsonRpcResponse | undefined>,
+  notify?: (message: unknown) => void,
 ): Promise<string | undefined> {
   const trimmed = line.trim();
 
@@ -565,14 +633,26 @@ export async function answerStdioLine(
   const id: unknown = request.id;
 
   if (id === undefined || id === null) {
-    // A notification (e.g. notifications/initialized) — nothing to answer.
+    notify?.(message);
+
     return undefined;
+  }
+
+  if (typeof id !== "string" && typeof id !== "number") {
+    return `${JSON.stringify({
+      jsonrpc: JSONRPC_VERSION,
+      id: null,
+      error: {
+        code: JSON_RPC_INVALID_REQUEST,
+        message: "Invalid request: id must be a string or number.",
+      },
+    })}\n`;
   }
 
   try {
     const response = await dispatch(request);
 
-    return `${JSON.stringify(response)}\n`;
+    return response === undefined ? undefined : `${JSON.stringify(response)}\n`;
   } catch {
     const failed = {
       jsonrpc: JSONRPC_VERSION,
@@ -707,7 +787,9 @@ class McpServerImpl implements McpServer {
     if (!this.running) {
       const transport = this.options.transport ?? { type: "stdio" };
       const starting =
-        transport.type === "http" ? this.startHttp(transport) : Promise.resolve(this.startStdio());
+        transport.type === "http"
+          ? this.startHttp(transport)
+          : Promise.resolve(this.startStdio(transport));
 
       // A failed start leaves the server startable again.
       this.running = starting.catch((error: unknown) => {
@@ -735,17 +817,21 @@ class McpServerImpl implements McpServer {
   }
 
   /** Wire the stdin line reader and answer each request on stdout. */
-  private startStdio(): McpServeHandle {
+  private startStdio(transport: McpStdioServeTransport): McpServeHandle {
+    const shutdown = new AbortController();
+    const requests = new McpServeRequests();
     const reader: Interface = createInterface({ input: process.stdin });
+    reader.once("close", () => shutdown.abort());
 
     reader.on("line", (line) => {
       // A failure answering one line must never become an unhandled
       // rejection: that would take the whole server process down.
-      void this.onLine(line).catch(() => {});
+      void this.onLine(line, transport, requests, shutdown.signal).catch(() => {});
     });
 
     return {
       close: async () => {
+        shutdown.abort();
         reader.close();
         this.running = undefined;
       },
@@ -753,8 +839,24 @@ class McpServerImpl implements McpServer {
   }
 
   /** Answer one stdin line on stdout (see {@link answerStdioLine}). */
-  private async onLine(line: string): Promise<void> {
-    const reply = await answerStdioLine(line, (request) => this.handler.handle(request));
+  private async onLine(
+    line: string,
+    transport: McpStdioServeTransport,
+    requests: McpServeRequests,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const reply = await answerStdioLine(
+      line,
+      (request) =>
+        requests.run(request, { signal }, async (context) => {
+          const principal = transport.principalProvider
+            ? await transport.principalProvider(context)
+            : transport.principal;
+
+          return this.handler.handle(request, { ...context, principal });
+        }),
+      (message) => requests.cancel(message),
+    );
 
     if (reply !== undefined) {
       process.stdout.write(reply);

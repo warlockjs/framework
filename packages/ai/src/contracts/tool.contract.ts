@@ -139,6 +139,10 @@ export type ToolContext<TArtifacts = Record<string, unknown>> = {
   artifacts: TArtifacts;
   /** Same signal threaded through dispatch — for cancellation-aware tools. */
   signal?: AbortSignal;
+  /** JSON-RPC tools/call id when invoked through an MCP server. */
+  requestId?: string | number;
+  /** Authenticated caller supplied by a server transport; narrow before use. */
+  principal?: unknown;
   /**
    * The inbound network request that triggered this call, when a server
    * transport invokes the tool on a remote client's behalf (for example
