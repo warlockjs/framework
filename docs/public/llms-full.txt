@@ -47168,7 +47168,7 @@ removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
 ([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
 Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
 ESLint mode prints a compatibility notice when chosen and is planned for
-deprecation in 5.33 and removal in 5.34. Both modes install with npm, pnpm and yarn.
+deprecation in 5.33 and removal in 5.34. Both modes install with every supported package manager.
 
 ### Prettier import order in ESLint mode
 
