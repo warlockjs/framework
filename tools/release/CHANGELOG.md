@@ -4,6 +4,7 @@
 
 ### Added
 
+- `scripts/dispatch-release.ts` dispatches `release.yml` (gate or publish) with a token read from `WARLOCK_RELEASE_TOKEN_FILE`, follows the run, and on failure prints each failed job with its failed steps and annotations and saves the job logs under `release-logs/`; `--watch <runId>` follows an existing run. The release skill describes the full agent-driven release cycle.
 - The zero-edit generator matrix has a generators row: a fresh scaffold with the test kit runs `warlock make endpoint --json` for a public and a guarded endpoint, is proved by the generated-output oracle (typecheck, development and production boot, new routes requested), then runs the generated tests with the app's own Vitest. It runs in every full matrix and with `--only generators`; a failed `make` report, a missing test or a failing generated test fails it.
 
 ### Fixed

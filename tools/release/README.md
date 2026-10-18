@@ -72,8 +72,10 @@ Only an organization owner can change that:
 3. If the policy requires approval, approve the request under the organization's
    **Personal access tokens → Pending requests**.
 4. Store the token outside the repository with owner-only permissions (`chmod 600`) and dispatch with
-   `gh workflow run release.yml -R warlockjs/framework -f version=<x.y.z> -f publish=<true|false>`
-   using `GH_TOKEN` from that file. Never print it or commit it.
+   `WARLOCK_RELEASE_TOKEN_FILE=<path> node --import tsx scripts/dispatch-release.ts --version <x.y.z> [--publish]`
+   from `tools/release` (it follows the run and saves failed job logs under `release-logs/`). Never
+   print the token or commit it. The organization rejects tokens whose lifetime exceeds 366 days,
+   so set an expiry of at most 366 days and renew it.
 
 Publishing itself does not use this token: `release.yml` publishes with the `NPM_TOKEN` secret of the
 `release` environment and pushes the tag with the job's own `GITHUB_TOKEN`. A new package added to the

@@ -104,6 +104,49 @@ required reviewer, by owner choice: a green gate authorises the publish.
    `https://warlock.js.org/changelog/` shows the version.
 6. Write the release summary, then post to the embassy rooms.
 
+### The release cycle an agent runs end to end
+
+An agent with the release token releases without anyone opening GitHub. The
+token is a fine-grained personal access token for `warlockjs/framework` with
+`Actions: Read and write`, kept in a `chmod 600` file outside the repository and
+passed as `WARLOCK_RELEASE_TOKEN_FILE=<path>`. **Never print it, log it or put it
+in argv.** The organization refuses fine-grained tokens whose lifetime exceeds
+366 days (the API answers 403 with that sentence), so a "no expiry" token does not
+work; renew it before it expires. Setup steps: `tools/release/README.md`,
+"Dispatching a release from automation".
+
+1. **Ready `main`.** Every 5.x item merged; the single full verification pass
+   (typecheck, all tests, strictness, skill snippets, public text, lint, format,
+   docs build, release-tool tests) green on the final tree; `pnpm release:version
+   <x.y.z>`; CHANGELOG headings dated; release summary written; pushed.
+2. **Wait for `main`'s CI to be green** (CI, create-warlock, Docs, runtimes) on the
+   pushed commit. A red check is fixed before dispatching, never waived. Read
+   failures with the token: `GET /repos/warlockjs/framework/actions/jobs/<id>/logs`
+   (the script below does it), or the public
+   `GET /repos/warlockjs/framework/check-runs/<jobId>/annotations`.
+3. **Gate run**, from `tools/release`:
+   `WARLOCK_RELEASE_TOKEN_FILE=<path> node --import tsx scripts/dispatch-release.ts --version <x.y.z>`.
+   It dispatches `release.yml` with `publish` off, follows the run, and on failure
+   prints every failed job, its failed steps and annotations, and saves the full
+   job logs under `tools/release/release-logs/`. Exit 0 = green. Fix, push, wait
+   for CI, repeat.
+4. **Publish run**: same command with `--publish`, with **no push to `main`**
+   between the green gate run and this dispatch. Announce the publish to the
+   owner first; it is outward-facing and cannot be undone.
+5. **Confirm independently**: `npm view @warlock.js/<pkg>@<x.y.z> version` for
+   every member (new packages included), `git ls-remote origin refs/tags/v<x.y.z>`
+   (exactly one tag). If confirm timed out on npm lag, follow the recovery output;
+   never republish.
+6. **Docs**: the `releases.json` entry and changelog page (step 5 of "The
+   procedure" above), push, and check the docs workflow and the site.
+7. **Re-run anything gated on the registry** (create-warlock's "Fresh scaffold
+   typechecks" installs from npm) and report the outcome to the owner: version,
+   run links, what was verified and what was not.
+
+Follow a run that is already going with `--watch <runId>`. A new family package
+is published for the first time by this same run: the `NPM_TOKEN` secret must be
+allowed to create packages in the `@warlock.js` scope.
+
 ### Driving it without the `gh` CLI
 
 - **Dispatch**: the Actions "Run workflow" dropdown often fails to load. Open
