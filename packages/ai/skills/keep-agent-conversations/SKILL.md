@@ -68,6 +68,14 @@ ai.snapshot.sqlite({ path: "./data/chat.db" }); // node:sqlite (Node 22.5+; no f
 ai.snapshot.sqlite({ database: new Database("./data/chat.db") }); // better-sqlite3 (or any exec/prepare database)
 ```
 
+Local snapshot storage is private on POSIX: new directories default to `0700`, and JSON files (including temporary files and rewrites) default to exactly `0600`. Existing directories are never chmod-ed, and directory creation is subject to umask. Untouched older JSON files keep their permissions until rewritten. To allow a trusted group to read:
+
+```ts
+ai.snapshot.file({ dir: "./shared-sessions", dirMode: 0o750, fileMode: 0o640 });
+```
+
+`dirMode` / `fileMode` must be integer permission modes (`0o000`–`0o777`); group/other write bits are refused. `sqlite({ path })` creates parents with `0700`, sets its database to `0600` before opening and protects journal/WAL/SHM sidecars; existing parent directories are unchanged. `":memory:"` creates no files. With `sqlite({ database })`, the caller manages permissions. Windows ignores POSIX modes; configure filesystem ACLs there.
+
 `ai.snapshot.sqlite` creates its table on first use (`createTable: false` to opt out) and never loads `node:sqlite` when you pass `database`. Both stores are single-host. All snapshot factories are generic, so they type themselves as `SnapshotStore<ConversationSessionRecord>` when passed as `store`.
 
 ## Long sessions

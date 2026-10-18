@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { SnapshotStore } from "../contracts/orchestrator/snapshot-store.contract";
 import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snapshot.type";
@@ -11,6 +11,10 @@ const EXTENSION = ".json";
 export type FileSnapshotStoreOptions = {
   /** Directory holding one JSON file per key. Created on the first save. */
   dir: string;
+  /** Mode for new directories (subject to umask). Default 0o700; existing directories are unchanged. */
+  dirMode?: number;
+  /** Exact mode for each saved file, including rewrites. Default 0o600. */
+  fileMode?: number;
 };
 
 /**
@@ -24,7 +28,11 @@ export type FileSnapshotStoreOptions = {
  * returns an empty string.
  */
 class FileSnapshotStore<TSnapshot extends { runId: string }> implements SnapshotStore<TSnapshot> {
-  public constructor(private readonly dir: string) {}
+  public constructor(
+    private readonly dir: string,
+    private readonly dirMode: number,
+    private readonly fileMode: number,
+  ) {}
 
   public async load(runId: string): Promise<TSnapshot | undefined> {
     let raw: string;
@@ -43,13 +51,19 @@ class FileSnapshotStore<TSnapshot extends { runId: string }> implements Snapshot
   }
 
   public async save(snapshot: TSnapshot): Promise<void> {
-    await mkdir(this.dir, { recursive: true });
+    await mkdir(this.dir, { recursive: true, mode: this.dirMode });
 
     const target = this.path(snapshot.runId);
     const temporary = `${target}.${randomUUID()}.tmp`;
 
     try {
-      await writeFile(temporary, JSON.stringify(snapshot), "utf8");
+      await writeFile(temporary, JSON.stringify(snapshot), {
+        encoding: "utf8",
+        flag: "wx",
+        mode: this.fileMode,
+      });
+      // umask can remove owner bits too; restore the requested mode before publishing.
+      await chmod(temporary, this.fileMode);
       await rename(temporary, target);
     } catch (error) {
       await rm(temporary, { force: true });
@@ -125,5 +139,16 @@ export function file<TSnapshot extends { runId: string } = SupervisorSnapshot>(
     throw new Error("File snapshot store requires a 'dir' option.");
   }
 
-  return new FileSnapshotStore<TSnapshot>(options.dir);
+  const dirMode = options.dirMode ?? 0o700;
+  const fileMode = options.fileMode ?? 0o600;
+
+  for (const [name, mode] of Object.entries({ dirMode, fileMode })) {
+    if (!Number.isInteger(mode) || mode < 0 || mode > 0o777 || (mode & 0o022) !== 0) {
+      throw new Error(
+        `File snapshot store: ${name} must be a permission mode (0o000–0o777) without group/other write.`,
+      );
+    }
+  }
+
+  return new FileSnapshotStore<TSnapshot>(options.dir, dirMode, fileMode);
 }

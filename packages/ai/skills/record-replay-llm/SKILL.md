@@ -81,6 +81,10 @@ try {
 
 Thrown only in `replay` mode on a miss (code `"VCR_CASSETTE_MISS"`). It carries the looked-up `requestHash` and the cassette `path` so a failing CI run names exactly which call was not recorded. Extends `AIError` directly (not `ProviderError`) — a miss is a harness/config failure, not a provider failure. **The whole point:** `replay` never falls back to a live call, which would silently re-introduce non-determinism into a test that asked for the opposite. Re-record by running once in `record` / `auto`.
 
+## Disk permissions
+
+On POSIX, cassette saves create missing directories with `0700` (subject to umask) and write JSON through a `0600` temporary file, chmod-ed before atomic rename. Saved files are exactly `0600`, including rewrites of older, more permissive files. Existing directories are never chmod-ed. Windows ignores POSIX modes; use filesystem ACLs there.
+
 ## `save()` — flush new entries
 
 `save()` writes newly recorded entries to `path`. It is a **no-op when nothing was recorded** (pure replay, or a record/auto run that only hit cached entries), so calling it unconditionally is safe.

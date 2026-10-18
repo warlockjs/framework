@@ -78,8 +78,22 @@ export async function saveCassette(path: string, cassette: Cassette): Promise<vo
   const dir = nodePath.dirname(path);
 
   if (dir && dir !== "." && dir !== path) {
-    await fs.mkdir(dir, { recursive: true });
+    await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   }
 
-  await fs.writeFile(path, JSON.stringify(cassette, undefined, 2), "utf8");
+  const { randomUUID } = await import("node:crypto");
+  const temporary = `${path}.${randomUUID()}.tmp`;
+
+  try {
+    await fs.writeFile(temporary, JSON.stringify(cassette, undefined, 2), {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    });
+    await fs.chmod(temporary, 0o600);
+    await fs.rename(temporary, path);
+  } catch (error) {
+    await fs.rm(temporary, { force: true });
+    throw error;
+  }
 }

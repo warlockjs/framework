@@ -6,7 +6,7 @@ sidebar:
   label: "Persist AI data"
 ---
 
-`@warlock.js/ai` owns no persistence primitives. Anything that needs durable state delegates it. As of 4.3.0 there are **two distinct persistence surfaces**, and keeping them straight matters:
+`@warlock.js/ai` provides snapshot stores and delegates cache-backed persistence to `@warlock.js/cache`. As of 4.3.0 there are **two distinct persistence surfaces**, and keeping them straight matters:
 
 - **Snapshot / checkpoint resume** — workflow + supervisor + orchestrator run state goes through the dedicated `SnapshotStore` / `CheckpointStore` contracts, constructed with `ai.snapshot.{memory,pg,redis}()` and `ai.checkpoint.{memory,pg,redis}()`.
 - **Cache-backed features** — the `semanticCache` middleware (and `ai.memory()`'s semantic tier) accept a `CacheDriver` from `@warlock.js/cache`. The cache package ships memory, lru-memory, file, redis, and pg drivers; pg adds pgvector for similarity retrieval.
@@ -102,6 +102,24 @@ const store = ai.snapshot.sqlite({ database: new Database("./data/agent.db") });
 ```
 
 Both serve every snapshot consumer: `durable` agents and planners, workflow and supervisor snapshots, and [`ai.session()`](/v/latest/ai/agents/conversation-sessions/) conversations. Both are single-host: several processes on one file race at write time, so give each process its own store or use `pg` / `redis`.
+
+### Local file permissions
+
+On POSIX, file snapshots default to `dirMode: 0o700` and `fileMode: 0o600`. Every directory the store creates uses `dirMode` (subject to umask). Existing directories, including user-created parents, are never chmod-ed. The temporary JSON file is created with `fileMode`, then chmod-ed before atomic rename so each saved file has exactly that mode, even on rewrite or under a restrictive umask. Files written before this change become private when rewritten; untouched files keep their old permissions.
+
+```ts
+const store = ai.snapshot.file({
+  dir: ".warlock/sessions",
+  dirMode: 0o700,
+  fileMode: 0o600,
+});
+// Optional read access for a trusted group:
+const shared = ai.snapshot.file({ dir: "./shared-sessions", dirMode: 0o750, fileMode: 0o640 });
+```
+
+Modes must be integers between `0o000` and `0o777`; group/other write bits are refused. SQLite stores opened with `{ path }` create missing parent directories with `0o700`, make the database file exactly `0o600` before opening it, and protect existing journal/WAL/SHM sidecars. SQLite creates new sidecars with the database's private mode. Existing parent directories are unchanged. `":memory:"` creates no files. When you pass `{ database }`, you own the database connection and its file/sidecar permissions.
+
+Windows ignores these POSIX modes; configure filesystem ACLs for private storage there.
 
 For the semantic-cache and memory vector store, pick a `@warlock.js/cache` driver instead:
 

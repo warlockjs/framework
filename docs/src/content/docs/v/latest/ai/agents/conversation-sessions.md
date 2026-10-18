@@ -61,6 +61,8 @@ Any `SnapshotStore` works:
 
 Every factory is generic over the snapshot shape, so `ai.snapshot.file({ dir })` passed as `store` is typed `SnapshotStore<ConversationSessionRecord>` for you. Session keys are prefixed `session:`, so one directory or database can hold sessions and durable run snapshots side by side (create one store per shape). See [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) for the file and SQLite stores.
 
+Local stores use private POSIX permissions by default: newly created directories are `0700`, JSON files (including temporary files and rewrites) and SQLite databases/sidecars are `0600`. Existing directories are never chmod-ed; choose a private location or secure an existing directory yourself. File stores accept `{ dirMode, fileMode }` overrides and refuse group/other write bits. For example, `ai.snapshot.file({ dir: ".warlock/sessions", dirMode: 0o750, fileMode: 0o640 })` allows a trusted group to read. Directory modes are subject to umask; saved JSON file modes are exact. With `sqlite({ database })`, the caller manages file permissions. Windows ignores POSIX modes; use filesystem ACLs there. See [Local file permissions](/v/latest/ai/reliability/persist-ai-data/#local-file-permissions).
+
 ## Concurrency
 
 Calls on one session id are serialized: two `send`s never interleave history. The second waits for the first to save, then runs with the first turn in its history. The default lock is in-process and shared by every `ai.session()` on the same store object. For several processes over one store, pass a distributed lock (any `SessionLock`, the same contract the orchestrator uses), or `lock: false` when something else already guarantees a single writer:

@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.1
+
+### Security
+
+- Local snapshot and VCR cassette stores create directories with `0700` and JSON files with exactly `0600`, including temporary files before atomic rename and rewrites of older files. Existing directories are never chmod-ed. SQLite path stores create private parents and set the database and journal/WAL/SHM sidecars to `0600`; caller-supplied database connections retain caller-managed permissions. POSIX modes are ignored on Windows.
+
+### Added
+
+- `ai.snapshot.file({ dir, dirMode?, fileMode? })` accepts custom permission modes with private defaults, refusing invalid modes and group/other write bits.
+
 ## 5.31.0 - 2026-10-18
 
 ### Changed

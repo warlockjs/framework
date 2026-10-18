@@ -1,3 +1,5 @@
+import { chmod, mkdir, open } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { SnapshotStore } from "../contracts/orchestrator/snapshot-store.contract";
 import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snapshot.type";
 
@@ -36,7 +38,7 @@ export type SqliteDatabaseLike = {
  * example a `better-sqlite3` instance) on runtimes without it.
  */
 export type SqliteSnapshotStoreOptions = {
-  /** Database file path (`":memory:"` for an in-memory database). */
+  /** Database path: 0600 files, new parents 0700 on POSIX. `":memory:"` uses no files. */
   path?: string;
   /** An already-open database. The store never closes it. */
   database?: SqliteDatabaseLike;
@@ -146,6 +148,28 @@ async function openBuiltin(path: string): Promise<SqliteDatabaseLike> {
         "Pass an open database instead, e.g. ai.snapshot.sqlite({ database: new Database(path) }) " +
         "with the 'better-sqlite3' package.",
     );
+  }
+
+  if (path !== ":memory:") {
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    // Create before SQLite opens it: SQLite derives journal/WAL/SHM modes from the database.
+    // Verified with node:sqlite on Node 22.15.0 under umask 0 (see sqlite.spec.ts).
+    const handle = await open(path, "a", 0o600);
+
+    try {
+      await handle.chmod(0o600);
+    } finally {
+      await handle.close();
+    }
+
+    // Also protect sidecars left by an earlier connection before accessing their contents.
+    for (const suffix of ["-wal", "-shm", "-journal"]) {
+      try {
+        await chmod(`${path}${suffix}`, 0o600);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
   }
 
   return new builtin.DatabaseSync(path);

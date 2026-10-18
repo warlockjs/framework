@@ -83,6 +83,14 @@ ai.snapshot.sqlite({ path: "./data/agent.db" }); // node:sqlite; table warlock_s
 ai.snapshot.sqlite({ database: betterSqliteDb, table: "runs", createTable: false }); // bring your own exec/prepare database
 ```
 
+Local snapshot storage is private on POSIX: new directories default to `0700`, and JSON files (including temporary files and rewrites) default to exactly `0600`. Existing directories are never chmod-ed, and directory creation is subject to umask. Untouched older JSON files keep their permissions until rewritten. To allow a trusted group to read:
+
+```ts
+ai.snapshot.file({ dir: "./shared-sessions", dirMode: 0o750, fileMode: 0o640 });
+```
+
+`dirMode` / `fileMode` must be integer permission modes (`0o000`–`0o777`); group/other write bits are refused. `sqlite({ path })` creates parents with `0700`, sets its database to `0600` before opening and protects journal/WAL/SHM sidecars; existing parent directories are unchanged. `":memory:"` creates no files. With `sqlite({ database })`, the caller manages permissions. Windows ignores POSIX modes; configure filesystem ACLs there.
+
 `ai.snapshot.sqlite` is the one store that creates its own table (an embedded file has no migration step); `createTable: false` turns that off and `schema()` still returns the DDL. Every `ai.snapshot.*` factory is generic over the snapshot shape (`ai.snapshot.file<AgentSnapshot>({ dir })`), so the same factories back `durable` agents and `ai.session()` conversations (the `keep-agent-conversations` topic).
 
 Table / prefix names must be safe SQL identifiers (`[A-Za-z_][A-Za-z0-9_]*`) — interpolated into DDL/DML, so anything outside that subset is rejected. Defaults: pg checkpoint table `warlock_orchestrator_sessions`, pg snapshot table `warlock_supervisor_snapshots`, redis prefix `warlock:orchestrator`.

@@ -81,6 +81,10 @@ A cassette is plain JSON — readable in a diff. It stores the **verbatim** requ
 
 Exactly one of `response` / `chunks` / `error` is populated per entry, mirroring the three outcomes of a model call. The `request` is stored verbatim — human-readable, and so the cassette can be re-hashed if the hashing format ever changes. A recorded provider error is replayed by re-throwing a reconstructed `Error` with the same `name` and `message`.
 
+## Disk permissions
+
+On POSIX, cassette saves create missing directories with `0700` (subject to umask) and write JSON through a `0600` temporary file, chmod-ed before atomic rename. Saved files are exactly `0600`, including rewrites of older, more permissive files. Existing directories are never chmod-ed. Windows ignores POSIX modes; use filesystem ACLs there.
+
 ## `save()` — flush new entries
 
 `save()` writes newly recorded entries to `path`. It's a **no-op when nothing was recorded** — pure replay, or a record/auto run that only ever hit cached entries, never dirties the file. Call it after your test body (e.g. in an `afterEach`/`afterAll`) so fresh recordings persist:
