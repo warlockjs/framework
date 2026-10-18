@@ -479,7 +479,11 @@ const topics = [
         collapsed: true,
         items: [
           { label: "OpenAI", slug: "v/latest/ai/providers/openai" },
-          { label: "OpenAI-compatible search", slug: "v/latest/ai/providers/openai-compatible" },
+          {
+            label: "OpenAI-compatible search",
+            slug: "v/latest/ai/providers/openai-compatible",
+            latestOnly: true,
+          },
           { label: "Anthropic", slug: "v/latest/ai/providers/anthropic" },
           { label: "Bedrock", slug: "v/latest/ai/providers/bedrock" },
           { label: "Google", slug: "v/latest/ai/providers/google" },
@@ -516,6 +520,10 @@ function buildTopics(/** @type {string} */ version) {
         if (item && typeof item === "object" && "latestOnly" in item) {
           const { latestOnly: _latestOnly, ...rest } = item;
           return rest;
+        }
+        // Nested groups (e.g. a provider page added after a version froze).
+        if (item && typeof item === "object" && "items" in item && Array.isArray(item.items)) {
+          return { ...item, items: withoutLatestOnly(item.items) };
         }
         return item;
       });
