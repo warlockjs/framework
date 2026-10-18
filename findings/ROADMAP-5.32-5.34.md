@@ -41,3 +41,11 @@ Owner decisions (2026-10-18). Work items for the next three releases; nothing he
 
 - Remove ESLint and Prettier support entirely: create-warlock's ESLint mode, the dev-server ESLint checker,
   Prettier/ESLint dependencies and configs in the monorepo and template, docs and skills that describe them.
+
+## After 5.34 — dependency refresh, one family per release
+
+Once TypeScript 7 and the Oxlint/Oxfmt switch are done, review every package's external dependencies version by
+version and update them family by family, one family per release (for example: the Fastify packages in one
+release, React/Vite in another), each with its own changelog notes, upgrade notes for breaking changes, and a full
+verification pass. Start with an inventory: per package, current range, installed version, latest version, and
+the breaking changes between them. Focus until then: TypeScript, Oxlint, Oxfmt.
