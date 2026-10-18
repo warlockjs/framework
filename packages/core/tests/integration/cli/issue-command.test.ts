@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -6,6 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const CORE_ROOT = path.resolve(__dirname, "../../..");
 const TEMP_ROOT = path.resolve(CORE_ROOT, "../../.tmp");
 const TIMEOUT_MS = 180_000;
+const coreVersion = (
+  JSON.parse(readFileSync(path.join(CORE_ROOT, "package.json"), "utf8")) as { version: string }
+).version;
 let fixture: string;
 
 beforeAll(async () => {
@@ -78,7 +82,7 @@ describe("warlock issue without a bootable app", () => {
       const report = JSON.parse(result.stdout);
       expect(Object.keys(report)).toEqual(["schemaVersion", "environment", "url"]);
       expect(report.schemaVersion).toBe(1);
-      expect(report.environment.packages["@warlock.js/core"]).toBe("5.32.0");
+      expect(report.environment.packages["@warlock.js/core"]).toBe(coreVersion);
       expect(report.environment.config.buildFlags).toEqual({ minify: false });
       expect(new URL(report.url).searchParams.get("title")).toBe("Public bug");
       expect(result.stdout + result.stderr).not.toMatch(/MUST_NOT_|generic-fixture/);

@@ -25,6 +25,15 @@ function statFields(stat: string): string[] {
     .split(/\s+/);
 }
 
+/**
+ * A task that is exiting has already released its memory map (stat field 23,
+ * vsize, reads 0) before it turns into a zombie. Linux then reports its /proc
+ * files as root-owned, so it is never a live child to verify or signal.
+ */
+function exiting(fields: string[]): boolean {
+  return ["Z", "X"].includes(fields[0] ?? "") || fields[20] === "0";
+}
+
 /** /proc fields: https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html */
 export async function identity(
   pid: number,
@@ -38,15 +47,27 @@ export async function identity(
       const fields = statFields(stat);
       const state = fields[0];
       const start = fields[19];
-      if (!state || !start || state === "Z" || state === "X") return undefined;
+      if (!state || !start || exiting(fields)) return undefined;
       const boot = (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim();
       const status = await readFile(`/proc/${pid}/status`, "utf8");
-      const environment = token ? await readFile(`/proc/${pid}/environ`, "utf8") : "";
+      let environment = "";
+      if (token) {
+        try {
+          environment = await readFile(`/proc/${pid}/environ`, "utf8");
+        } catch (error) {
+          // Without root, the environment of a task that started exiting after
+          // the first stat read is unreadable. Only that case counts as gone;
+          // any other unreadable environment still fails closed.
+          if ((error as { code?: unknown }).code !== "EACCES") throw error;
+          const now = statFields(await readFile(`/proc/${pid}/stat`, "utf8"));
+          if (now[19] !== start || exiting(now)) return undefined;
+          throw error;
+        }
+      }
       // /proc reads are separate operations. Reject PID reuse or a group change
       // during observation before combining a token with a start identity.
       const after = statFields(await readFile(`/proc/${pid}/stat`, "utf8"));
-      if (after[19] !== start || after[2] !== fields[2] || ["Z", "X"].includes(after[0] ?? ""))
-        return undefined;
+      if (after[19] !== start || after[2] !== fields[2] || exiting(after)) return undefined;
       return {
         start: `${boot}:${start}`,
         group: Number(fields[2]),
