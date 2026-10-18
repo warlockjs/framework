@@ -260,8 +260,8 @@ Treat every externally-provided field as hostile until a validator has vouched f
 ## Safe defaults for request-supplied output
 
 Four helpers cover the places where request input most often turns into an
-injection, and the [`@warlock.js/eslint-plugin`](/v/latest/eslint-plugin/)
-rules point at them:
+injection, and [`warlock check`](/v/latest/core/cli/check/#convention-checks)
+points at them (`WL9007`, `WL9008`):
 
 | Where the input ends up     | Helper                                                                    | What it does                                                                                            |
 | --------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -297,7 +297,7 @@ Concrete, verified-against-the-code steps. Only knobs that actually exist are li
 - **Require `middleware.idempotency()` after auth** on non-idempotent writes (`POST` / `PUT` / `PATCH` / `DELETE`) that clients may retry.
 - **Attach a validation schema to every controller that takes input.** Constrain enums, lengths, and required fields. Reject malformed input before the handler runs.
 - **Mark open mutating routes `public: true`** and guard the rest; fix every route `warlock dev` lists as unguarded.
-- **Run `@warlock.js/eslint-plugin`'s `recommended` preset** (new ESLint-mode apps already do) to catch `request.all()` in queries, unsafe redirects, secrets in logs and unbounded regexes on input.
+- **Run `warlock check`** after every change, whichever linter the app uses: it reports `request.all()` in queries (`WL9005`), unguarded mutating routes (`WL9006`), unsafe redirects (`WL9007`), secrets in logs (`WL9008`) and unbounded regexes on input (`WL9009`).
 - **Keep `http.requestId` enabled** so every request is traceable; inherited ids are already validated against log-injection.
 
 ## See also

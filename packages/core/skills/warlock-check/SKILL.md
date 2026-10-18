@@ -59,6 +59,12 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | `WL9002`            | relative import ends in `.js`                                                                                 |
 | `WL9003`            | relative import into another `src/app/<module>` — use `app/<module>/...`                                      |
 | `WL9004`            | `experimentalDecorators: true` in tsconfig                                                                    |
+| `WL9005`            | `request.all()` passed to a query, a service or `inApp()` — use `request.validated()`                         |
+| `WL9006`            | POST/PUT/PATCH/DELETE route with no auth middleware and no `public: true`                                     |
+| `WL9007`            | redirect / `navigateTo()` / `<Link to>` target from request input without `safeRedirect()`                    |
+| `WL9008`            | raw email, credential or request body in a log call                                                           |
+| `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                            |
+| `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                              |
 | `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM |
 
 ## `warlock typecheck`
@@ -117,9 +123,10 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 - Lint runs only the linters the app configures (`eslint.config.*`; an oxlint config + the `oxlint` package). No config → the step is skipped, not failed.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
+- The convention checks are the framework's own and run the same with ESLint, Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 
 ## See also
 
 - The `warlock-doctor` topic — boot-time diagnostics; `doctor --json` uses the same codes and fields.
 - The `warlock-inspect` topic — the app's routes, models and config as JSON.
-- The `warlock-conventions` topic — the rules behind `WL9001`–`WL9004`.
+- The `warlock-conventions` topic — the rules behind `WL9001`–`WL9012`, with the fix for each.

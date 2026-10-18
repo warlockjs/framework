@@ -157,9 +157,9 @@ Email addresses are the exception worth handling at the call site: they end up i
 
 Free text from the client (a user agent, a search term) can carry line breaks
 that forge a log line in console and file channels. Pass it through
-`escapeLogValue()` before putting it in a message. The
-[`no-sensitive-log`](/v/latest/eslint-plugin/rules/no-sensitive-log/) lint rule
-reports raw emails, credentials and request bodies in log calls.
+`escapeLogValue()` before putting it in a message.
+[`warlock check`](/v/latest/core/cli/check/#convention-checks) reports raw
+emails, credentials and request bodies in log calls as `WL9008`.
 
 ## Performance
 

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -8,6 +8,10 @@ import {
   isAutoLoadedFile,
   runConventions,
 } from "./conventions-step";
+import { listSourceFiles } from "./source-files";
+
+/** The app `create-warlock` scaffolds, when this runs inside the framework repository. */
+const starterTemplate = path.resolve(__dirname, "../../../../create-warlock/templates/warlock");
 
 let root: string;
 
@@ -103,6 +107,62 @@ describe("convention checks", () => {
     expect(checkTsconfigConventions(root)).toEqual([]);
   });
 
+  it("reports the source conventions as problems in source order, warnings as warnings", () => {
+    const problems = checkFileConventions(
+      "src/app/posts/routes.ts",
+      [
+        'import { router } from "@warlock.js/core";',
+        'router.post("/posts", createPostController);',
+        "async function audit() {",
+        '  await log.info("posts", "audit", "done");',
+        "}",
+      ].join("\n"),
+      root,
+    );
+
+    expect(problems).toEqual([
+      expect.objectContaining({
+        code: "WL9006",
+        severity: "error",
+        source: "convention",
+        file: "src/app/posts/routes.ts",
+        line: 2,
+        column: 1,
+        skill: "warlock-conventions",
+        docs: "https://warlock.js.org/v/latest/core/cli/error-codes/#wl9006",
+      }),
+      expect.objectContaining({ code: "WL9010", severity: "warning", line: 4, column: 3 }),
+    ]);
+  });
+
+  it("skips a problem a warlock-check-ignore comment covers", () => {
+    const file = "src/app/posts/routes.ts";
+
+    // On the line above, naming the code.
+    expect(
+      codes(file, '// warlock-check-ignore WL9006 -- signed webhook\nrouter.post("/hook", hook);'),
+    ).toEqual([]);
+    // On the same line, without codes: every code there.
+    expect(codes(file, 'router.post("/hook", hook); // warlock-check-ignore')).toEqual([]);
+    // Naming another code leaves this one reported.
+    expect(codes(file, '// warlock-check-ignore WL9005\nrouter.post("/hook", hook);')).toEqual([
+      "WL9006",
+    ]);
+    // Two lines above is too far.
+    expect(codes(file, '// warlock-check-ignore WL9006\n\nrouter.post("/hook", hook);')).toEqual([
+      "WL9006",
+    ]);
+  });
+
+  it("parses .tsx files with JSX", () => {
+    expect(
+      codes(
+        "src/app/posts/pages/back.page.tsx",
+        'export const Back = () => <Link to={useQueryString("next")}>Back</Link>;',
+      ),
+    ).toEqual(["WL9007"]);
+  });
+
   it("reads the files it is given from disk", () => {
     write("src/app/posts/controllers/show.controller.ts", 'import "../routes";\n');
 
@@ -110,4 +170,18 @@ describe("convention checks", () => {
       expect.objectContaining({ code: "WL9001", line: 1, column: 8 }),
     ]);
   });
+
+  it.skipIf(!existsSync(starterTemplate))(
+    "finds nothing in the app create-warlock scaffolds",
+    async () => {
+      const files = await listSourceFiles(starterTemplate);
+
+      expect(files.length).toBeGreaterThan(0);
+      expect(
+        runConventions(starterTemplate, files).map(
+          (problem) => `${problem.file}:${problem.line} ${problem.code} ${problem.message}`,
+        ),
+      ).toEqual([]);
+    },
+  );
 });

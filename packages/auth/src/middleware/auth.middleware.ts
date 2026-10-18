@@ -284,8 +284,8 @@ export function authMiddleware(
   // Non-enumerable so the tag never shows up in logs, spreads or JSON.
   Object.defineProperty(auth, AUTH_MIDDLEWARE_DESCRIPTOR, { value: descriptor, enumerable: false });
 
-  // Tells `warlock dev` (and the route-guard lint rule's runtime twin) that
-  // routes behind this middleware are authenticated. `{ optional: true }`
+  // Tells `warlock dev` and `warlock inspect` that routes behind this
+  // middleware are authenticated. `{ optional: true }`
   // lets anonymous requests through, so it does not count as a guard.
   return markAuthGuard(auth, !optional);
 }

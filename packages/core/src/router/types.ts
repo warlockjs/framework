@@ -336,9 +336,9 @@ export interface RouteOptions {
   /**
    * Declare a mutating route (POST/PUT/PATCH/DELETE) intentionally reachable
    * without signing in — a login, a webhook, a contact form. It changes
-   * nothing at runtime; it records the decision so `warlock dev` (and the
-   * `@warlock.js/require-route-guard` lint rule) stop warning that the route
-   * has no auth middleware. A group's `public: true` applies to every route
+   * nothing at runtime; it records the decision so `warlock dev` and
+   * `warlock check` (`WL9006`) stop reporting that the route has no auth
+   * middleware. A group's `public: true` applies to every route
    * registered inside it. `warlock make endpoint --public` writes it.
    *
    * @example

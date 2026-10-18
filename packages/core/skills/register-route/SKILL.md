@@ -107,7 +107,7 @@ If `guarded` doesn't exist in your project yet, see the shared utility conventio
 router.post("/api/contact", contactController, { public: true });
 ```
 
-`public: true` changes nothing at runtime; it records that the missing guard is deliberate, so reviewers, lint rules and route tooling can tell a decision from an omission. `warlock make endpoint --public` writes it (the `make-endpoint` topic).
+`public: true` changes nothing at runtime; it records that the missing guard is deliberate, so reviewers, `warlock check` and route tooling can tell a decision from an omission. `warlock make endpoint --public` writes it (the `make-endpoint` topic).
 
 ## RESTful resource chain
 
@@ -166,8 +166,12 @@ router.prefix("/auth", () => {
 
 Every POST/PUT/PATCH/DELETE route either runs auth middleware (on the route, its
 builder, or an enclosing group such as `guarded()`) or is marked `public: true`.
-`warlock dev` warns once per route about mutating routes with neither; the
-`@warlock.js/require-route-guard` lint rule reports the same at edit time.
+`warlock dev` warns once per route about mutating routes with neither, and
+`warlock check` reports the same from source as `WL9006` before the app runs.
+The check reads source, not runtime markers: a guard counts when its name
+contains `auth` or `guard`, or when it is a constant initialised with
+`markAuthGuard()` in the same file. A differently-named guard imported from
+another file needs a `// warlock-check-ignore WL9006` comment on its route.
 
 ```ts
 import { markAuthGuard, router, type Middleware, type RequestHandler } from "@warlock.js/core";

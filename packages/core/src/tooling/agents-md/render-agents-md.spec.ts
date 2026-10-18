@@ -111,6 +111,7 @@ describe("renderAgentsMdSection", () => {
     expect(section).toContain("- `PATCH /posts/:id` [auth]");
     expect(section).toContain("- `Post` → `posts` (module `posts`)");
     expect(section).toContain("(`WL9002`)");
+    expect(section).toContain("or says `public: true` (`WL9006`)");
     expect(section).toContain("npx warlock check --changed --json");
     expect(section).not.toContain("2026-01-01");
   });

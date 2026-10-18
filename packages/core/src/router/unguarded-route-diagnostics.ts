@@ -8,11 +8,12 @@
  * `warlock dev` lists every mutating route that has neither.
  *
  * Warning only: routes register and behave exactly as before, nothing here
- * throws, and production never runs it. The same check exists at edit time as
- * the `@warlock.js/require-route-guard` lint rule.
+ * throws, and production never runs it. `warlock check` reports the same
+ * routes from source as `WL9006`, before the app runs.
  */
 
 import { log } from "@warlock.js/logger";
+import { isAuthGuardName, isMutatingHttpMethod } from "./route-guard-names";
 import type { Route } from "./types";
 
 /**
@@ -21,11 +22,6 @@ import type { Route } from "./types";
  * recognises guards the other copy marked.
  */
 export const AUTH_GUARD_MARKER: unique symbol = Symbol.for("warlock.js.authGuard");
-
-const MUTATING_METHODS: ReadonlySet<string> = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-/** Middleware named like this counts as a guard when it carries no marker. */
-const GUARD_NAME_PATTERN = /auth|guard/i;
 
 /**
  * Declare whether a middleware authenticates the request. `authMiddleware()`
@@ -62,12 +58,12 @@ export function isAuthGuardMiddleware(middleware: unknown): boolean {
   const marker: unknown = Reflect.get(middleware, AUTH_GUARD_MARKER);
   if (typeof marker === "boolean") return marker;
 
-  return GUARD_NAME_PATTERN.test(middleware.name);
+  return isAuthGuardName(middleware.name);
 }
 
 /** Whether a route mutates state, is not a page route, and is neither guarded nor public. */
 export function isUnguardedMutatingRoute(route: Route): boolean {
-  if (!MUTATING_METHODS.has(String(route.method).toUpperCase())) return false;
+  if (!isMutatingHttpMethod(String(route.method))) return false;
   // Page actions are authorized by the page itself (`requireUser()`).
   if (route.isPage) return false;
   if (route.public === true) return false;

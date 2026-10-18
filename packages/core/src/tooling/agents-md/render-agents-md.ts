@@ -181,14 +181,16 @@ function modelsSection(report: InspectReport): string[] {
   ];
 }
 
-/** The rules `warlock check` enforces (WL9001–WL9004) and the layout every skill assumes. */
+/** The rules `warlock check` enforces (WL9001–WL9012) and the layout every skill assumes. */
 const CONVENTIONS = [
   "- Features live in `src/app/<module>/`; flow is one-way: `routes.ts` → controllers → services → repositories → models. Resources only map output.",
   "- Never import auto-loaded files: `src/app/main.ts`, `src/app/<module>/routes.ts`, `main.ts`, `worker.ts`, `events/*.ts` (`WL9001`).",
   "- No `.js` extensions in import paths (`WL9002`).",
   "- Cross-module imports use the `app/<module>/...` alias, not `../../` (`WL9003`); relative paths stay inside a module.",
   '- Cascade uses standard decorators: never set `"experimentalDecorators": true` (`WL9004`).',
-  "- Controllers are thin and read input with `request.validated()`; schemas live in `schema/<action>.schema.ts` and export the value and its `Infer` type.",
+  "- Controllers are thin and read input with `request.validated()`, never `request.all()` (`WL9005`); schemas live in `schema/<action>.schema.ts` and export the value and its `Infer` type. One controller per file (`WL9011`).",
+  "- Every POST/PUT/PATCH/DELETE route is inside `guarded()` (or has auth middleware) or says `public: true` (`WL9006`).",
+  "- Redirect targets from request input go through `safeRedirect()` / `safeRedirectTarget()` (`WL9007`); logs never carry raw emails, credentials or request bodies (`WL9008`); regexes run on request input have bounded quantifiers (`WL9009`).",
   "- Import each API from its home package: `v` from `@warlock.js/seal`, `Model` from `@warlock.js/cascade`, `router` from `@warlock.js/core`.",
 ];
 

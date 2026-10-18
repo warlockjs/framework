@@ -27,7 +27,7 @@ It boots like `warlock inspect`: every connector boots so routes register, none 
 - **Modules** — every folder under `src/app/`, with how many routes and models each one has.
 - **Routes** — counts per method, the mutating routes (`POST`, `PUT`, `PATCH`, `DELETE`) that have no auth guard, and a compact `METHOD path [auth] name` list. Past 60 routes the list stops and points at `warlock inspect --json --section routes`.
 - **Models** — model name, table and module.
-- **Conventions in force** — the rules `warlock check` enforces (`WL9001`–`WL9004`) and the layout every skill assumes.
+- **Conventions in force** — the rules `warlock check` enforces (`WL9001`–`WL9012`) and the layout every skill assumes.
 - **Skills** — every `SKILL.md` the installed packages ship under `node_modules/@warlock.js/<package>/skills/`, with its first sentence.
 - **Verify a change** — `warlock check --changed --json`, `warlock inspect --json`, `warlock explain <code>`, `warlock trace` and `warlock mcp`.
 

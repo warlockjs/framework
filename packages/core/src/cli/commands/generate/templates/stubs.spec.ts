@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { checkFileConventions } from "../../../../tooling/check/conventions-step";
 import { pluralName } from "../utils/name-parser";
 import {
   crudListControllerStub,
@@ -111,7 +112,7 @@ describe("repositoryStub / resourceStub use real exports", () => {
   });
 });
 
-describe("generated modules follow the lint rules apps run", () => {
+describe("generated modules pass the conventions `warlock check` enforces", () => {
   it("validates the list query instead of forwarding request.all()", () => {
     const source = crudListControllerStub(pluralName("post"));
 
@@ -125,5 +126,19 @@ describe("generated modules follow the lint rules apps run", () => {
     expect(crudRoutesStub(pluralName("post"))).toMatch(
       /guarded\(\(\) => \{\n  router\n    \.route/,
     );
+  });
+
+  it("reports no source convention problem in the generated routes and list controller", () => {
+    const posts = pluralName("post");
+    const problems = [
+      ...checkFileConventions("src/app/posts/routes.ts", crudRoutesStub(posts), "/nonexistent"),
+      ...checkFileConventions(
+        "src/app/posts/controllers/list-posts.controller.ts",
+        crudListControllerStub(posts),
+        "/nonexistent",
+      ),
+    ];
+
+    expect(problems.map((problem) => `${problem.file} ${problem.code}`)).toEqual([]);
   });
 });

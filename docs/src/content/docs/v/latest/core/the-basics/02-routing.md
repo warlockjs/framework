@@ -293,8 +293,10 @@ export const requireApiKey: Middleware = markAuthGuard(async ({ request, respons
 ```
 
 Turn the warning off with `http.warnUnguardedRoutes: false`. The same check runs
-at edit time as the [`require-route-guard`](/v/latest/eslint-plugin/rules/require-route-guard/)
-lint rule.
+over the source, before the app boots, as [`warlock check`](/v/latest/core/cli/check/#convention-checks)
+code `WL9006`. It reads source: a guard counts when its name contains `auth` or `guard`, or when it is a
+constant initialised with `markAuthGuard()` in the same file. A differently-named guard imported from
+another file needs a `// warlock-check-ignore WL9006` comment on its route.
 
 ## API versioning
 

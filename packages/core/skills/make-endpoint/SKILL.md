@@ -101,7 +101,7 @@ Every `generate.*` command, `make`, and `add` take both. `--dry-run` writes (and
 
 ## `public: true`
 
-`RouteOptions.public` changes nothing at runtime; it records that a route deliberately has no auth guard, so a mutating route without one reads as a decision. Lint rules and route tooling read it.
+`RouteOptions.public` changes nothing at runtime; it records that a route deliberately has no auth guard, so a mutating route without one reads as a decision. `warlock dev`, `warlock inspect` and `warlock check` (`WL9006`) read it.
 
 ## See also
 

@@ -4,7 +4,7 @@ import type { EndpointField } from "../utils/endpoint-schema";
 /**
  * Stubs for `warlock make endpoint`.
  *
- * Every stub follows the conventions the framework's lint rules enforce:
+ * Every stub follows the conventions `warlock check` enforces:
  * one controller per file, input read through `request.validated()` only,
  * the work done in a service that never sees the request, a resource for the
  * output, the response documented through `responseSchema` (OpenAPI), and a

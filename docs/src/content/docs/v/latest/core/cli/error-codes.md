@@ -444,6 +444,54 @@ Category: your code · skill: `warlock-conventions`
 
 Category: your code · skill: `lower-stage3-decorators`
 
+### WL9005
+
+**`request.all()` is passed to a query, a service or inApp().** Give the route a validation schema and pass `request.validated()`, which holds only the fields the schema accepted (mass assignment otherwise).
+
+Category: your code · skill: `warlock-conventions`
+
+### WL9006
+
+**A mutating route has no auth guard and is not marked public.** Register the POST/PUT/PATCH/DELETE route inside `guarded()` (or with auth middleware), or pass `{ public: true }` if it is meant to be open.
+
+Category: your code · skill: `warlock-conventions`
+
+### WL9007
+
+**A redirect or link target comes from request input.** Wrap the target in `safeRedirect()` (server, @warlock.js/core) or `safeRedirectTarget()` (pages, @warlock.js/web), or check it with `isSafeRedirect()` first.
+
+Category: your code · skill: `warlock-conventions`
+
+### WL9008
+
+**A raw email, credential or request body is logged.** Pass the value through `maskEmail()`, `redact()`, `escapeLogValue()` or `request.toLogSnapshot()`, or log it under a key the logger censors (`token`, `password`, ...).
+
+Category: your code · skill: `warlock-conventions`
+
+### WL9009
+
+**A regex with an unbounded quantifier runs on request input.** Bound the repetition (`{1,256}` instead of `+` or `*`) or cap the input length before matching.
+
+Category: your code · skill: `warlock-conventions`
+
+### WL9010
+
+**`await` on a synchronous log call.** Remove the `await`: `log.info()` and its siblings return the logger; `await log.flush()` waits for delivery.
+
+Category: your code (a warning: it does not fail `warlock check`) · skill: `warlock-conventions`
+
+### WL9011
+
+**A file defines more than one controller.** Move each extra controller into its own `<name>.controller.ts` file.
+
+Category: your code (a warning: it does not fail `warlock check`) · skill: `warlock-conventions`
+
+### WL9012
+
+**A tagged union uses `kind` as its discriminator.** Rename the discriminator to `type` and update the code that narrows on it.
+
+Category: your code (a warning: it does not fail `warlock check`) · skill: `warlock-conventions`
+
 ### WL9101
 
 **A module still uses the deprecated utils/locales.ts.** Run `warlock doctor --fix` to convert it to locales.json, or convert it by hand.

@@ -235,7 +235,7 @@ File name pattern: `MM-DD-YYYY_HH-MM-SS-<entity>.migration.ts`. Timestamp-prefix
 
 ### `make endpoint <module>/<name>`
 
-The spec-first generator: one endpoint, from its request schema to a passing test, following the conventions the framework's lint rules enforce.
+The spec-first generator: one endpoint, from its request schema to a passing test, following the conventions `warlock check` enforces.
 
 ```bash
 # write the request schema first, anywhere — a scratch file is fine

@@ -130,8 +130,123 @@ Within the same module, use relative paths (`./`, `../`).
 
 Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasMany` / `@MorphTo` for relations. The scaffolded `tsconfig.json` has `"experimentalDecorators": false` — these are native Stage-3 decorators, not legacy. Never set that flag to `true`; see the `lower-stage3-decorators` topic.
 
+## What `warlock check` enforces
+
+`npx warlock check` (the `warlock-check` topic) reports these with a stable code. They run the same whatever linter the app uses.
+
+| Code     | Rule                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------- |
+| `WL9001` | never import an auto-loaded file (fact 2)                                                         |
+| `WL9002` | no `.js` extension on a relative import                                                           |
+| `WL9003` | cross-module imports use `app/<module>/...` (see Path aliases)                                    |
+| `WL9004` | no `"experimentalDecorators": true`                                                               |
+| `WL9005` | queries, services and `inApp()` get `request.validated()`, never `request.all()`                  |
+| `WL9006` | every POST/PUT/PATCH/DELETE route is guarded or says `public: true`                               |
+| `WL9007` | redirect and link targets from request input go through `safeRedirect()` / `safeRedirectTarget()` |
+| `WL9008` | no raw email, credential or request body in a log call                                            |
+| `WL9009` | regexes run on request input have bounded quantifiers                                             |
+| `WL9010` | warning: no `await` on `log.info()` and its siblings                                              |
+| `WL9011` | warning: one controller per file                                                                  |
+| `WL9012` | warning: a tagged union's discriminator is `type`, not `kind`                                     |
+
+### `WL9005` — validated input only
+
+`request.all()` hands every client-sent field to whatever receives it (mass assignment). Declare a schema and pass what it accepted:
+
+```ts
+import { type RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+const createPostSchema = v.object({ title: v.string(), body: v.string() });
+
+async function createPostService(input: { title: string; body: string }) {
+  return { id: 1, ...input };
+}
+
+export const createPostController: RequestHandler = async ({ request, response }) => {
+  const post = await createPostService(request.validated());
+  return response.successCreate({ post });
+};
+
+createPostController.validation = { schema: createPostSchema };
+```
+
+### `WL9006` — guarded or public
+
+```ts
+import { authMiddleware } from "@warlock.js/auth";
+import { router, type RequestHandler } from "@warlock.js/core";
+
+const createPostController: RequestHandler = async ({ response }) => response.successCreate({});
+const contactController: RequestHandler = async ({ response }) => response.success({ sent: true });
+
+router.post("/posts", createPostController, { middleware: [authMiddleware("user")] });
+
+// Intentionally open: say so.
+router.post("/contact", contactController, { public: true });
+```
+
+A route inside `guarded(() => …)` or `router.group({ middleware: [authMiddleware()] }, …)` is guarded. A middleware counts as a guard when its name contains `auth` or `guard`, or when it is a constant initialised with `markAuthGuard()` in the same file. `warlock dev` warns about the same routes at runtime.
+
+### `WL9007` — safe redirects
+
+```ts
+import { safeRedirect, type RequestHandler } from "@warlock.js/core";
+
+export const afterLoginController: RequestHandler = async ({ request, response }) => {
+  return response.redirect(
+    safeRedirect(request.input("next"), { allowedOrigins: ["https://app.example.com"] }),
+  );
+};
+```
+
+In pages, `safeRedirectTarget(target) ?? "/"` from `@warlock.js/web` does the same for `navigateTo()` and `<Link to>`. A target checked by an enclosing `if (isSafeRedirect(target))` passes.
+
+### `WL9008` — redacted logs
+
+```ts
+import type { Request } from "@warlock.js/core";
+import { log, maskEmail } from "@warlock.js/logger";
+
+export function logLogin(request: Request, user: { id: number; email: string }, token: string) {
+  log.info("auth", "login", `Signed in ${maskEmail(user.email)}`, {
+    userId: user.id,
+    token, // `token` is a key the logger censors by default
+    request: request.toLogSnapshot(),
+  });
+}
+```
+
+Keys the logger censors by default (`token`, `password`, `apiKey`, `authorization`, …) may carry secrets as structured data. Emails are not censored by default, so they always need `maskEmail()`. Free text from the client goes through `escapeLogValue()`.
+
+### `WL9009` — bounded regexes on input
+
+```ts
+const SLUG = /^[a-z0-9-]{1,64}$/;
+
+export function isSlug(value: string): boolean {
+  return SLUG.test(value);
+}
+```
+
+Bound each repetition (`{1,64}`, not `+`) or cap the input's length before matching.
+
+### `WL9010`–`WL9012`
+
+Drop the `await` from `log.info(…)` (`await log.flush()` waits for delivery); move each extra controller into its own `<name>.controller.ts`; rename a union's `kind` tag to `type` and update the `switch`.
+
+### A deliberate exception
+
+```ts
+// warlock-check-ignore WL9006 -- authenticated by the provider's signature header
+router.post("/webhooks/billing", billingWebhookController, { middleware: [verifySignature()] });
+```
+
+The comment covers the codes it names on its own line and the next; with no code it covers every code there.
+
 ## See also
 
+- The `warlock-check` topic — running the checks and reading the report.
 - The `register-route` topic — how to wire URLs to controllers.
 - The `create-controller` topic — controller signature, validation, response shape.
 - The `send-response` topic — the full Response helper surface.

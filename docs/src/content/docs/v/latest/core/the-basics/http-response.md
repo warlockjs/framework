@@ -169,8 +169,8 @@ origin (`/posts/1?tab=2`) or an absolute `http:`/`https:` URL whose origin is in
 `//host` and `/\host`, other schemes, paths that do not start with `/`,
 credentials in the URL and any control character. `isSafeRedirect(target,
 options?)` is the boolean form. In pages, use `safeRedirectTarget()` from
-`@warlock.js/web`. The [`safe-redirect`](/v/latest/eslint-plugin/rules/safe-redirect/)
-lint rule flags request input reaching a redirect without one of them.
+`@warlock.js/web`. [`warlock check`](/v/latest/core/cli/check/#convention-checks)
+reports request input reaching a redirect without one of them as `WL9007`.
 
 ## Files
 
