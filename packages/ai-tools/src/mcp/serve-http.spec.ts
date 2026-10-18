@@ -7,12 +7,14 @@ import type {
   McpHttpServeTransport,
   McpServeOptions,
   McpServeSource,
+  McpToolCallResult,
 } from "../contracts";
 import { McpServeError } from "../errors";
 import { objectSchema, stringField } from "../schema";
 import { mcp } from "./client";
 import { isLoopbackHost } from "./serve-http";
 import { serve } from "./serve";
+import { mcpResult } from "../index";
 
 /** A tool that uppercases its `value`. */
 function upperTool(name = "upper"): ToolContract {
@@ -626,11 +628,13 @@ describe("serve() over http — close()", () => {
 type SdkClient = {
   connect(transport: unknown): Promise<void>;
   getServerCapabilities(): Record<string, unknown> | undefined;
-  listTools(): Promise<{ tools: { name: string; description?: string }[] }>;
+  listTools(): Promise<{
+    tools: { name: string; description?: string; outputSchema?: Record<string, unknown> }[];
+  }>;
   callTool(params: {
     name: string;
     arguments?: Record<string, unknown>;
-  }): Promise<{ content: { type: string; text?: string }[]; isError?: boolean }>;
+  }): Promise<McpToolCallResult>;
   listResources(): Promise<{ resources: { uri: string; name: string }[] }>;
   readResource(params: { uri: string }): Promise<{ contents: { uri: string; text?: string }[] }>;
   listPrompts(): Promise<{ prompts: { name: string }[] }>;
@@ -660,6 +664,85 @@ const SDK_CLIENT = "@modelcontextprotocol/sdk/client/index.js";
 const SDK_TRANSPORT = "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 describe("serve() over http — real MCP clients", () => {
+  it.each(["helper", "option"] as const)(
+    "round-trips native results and request identity with the official SDK via %s",
+    async (mode) => {
+      const { Client } = (await import(SDK_CLIENT)) as SdkClientModule;
+      const { StreamableHTTPClientTransport } = (await import(SDK_TRANSPORT)) as SdkTransportModule;
+      const outputSchema = {
+        type: "object",
+        properties: { tenant: { type: "string" } },
+        required: ["tenant"],
+      };
+      const identity = tool({
+        name: "identity",
+        description: "Return the calling tenant",
+        meta: { outputSchema },
+        execute: async (_input, ctx) => {
+          const tenant = ctx?.request?.headers["x-tenant-id"] ?? "missing";
+          const native = {
+            content: [{ type: "text", text: "fixture" }],
+            structuredContent: { tenant },
+            _meta: { trace: tenant },
+          };
+          return mode === "helper" ? mcpResult(native) : native;
+        },
+      });
+      const failure = tool({
+        name: "failure",
+        description: "Return a native tool error",
+        execute: async () => {
+          const native = { content: [{ type: "text", text: "fixture" }], isError: true };
+          return mode === "helper" ? mcpResult(native) : native;
+        },
+      });
+      const malformed = tool({
+        name: "malformed",
+        description: "Return an invalid payload",
+        execute: async () => {
+          const native = { content: [{ type: "text", text: 7 }] };
+          return mode === "helper" ? mcpResult(native as unknown as McpToolCallResult) : native;
+        },
+      });
+      const handle = await start(
+        [identity, failure, malformed],
+        { auth: { bearer: "native-token" } },
+        { results: mode === "option" ? "native" : "text" },
+      );
+
+      for (const tenant of ["tenant-a", "tenant-b"]) {
+        const client = new Client({ name: "native-client", version: "1.0.0" });
+        try {
+          await client.connect(
+            new StreamableHTTPClientTransport(new URL(handle.url), {
+              requestInit: {
+                headers: { authorization: "Bearer native-token", "x-tenant-id": tenant },
+              },
+            }),
+          );
+          expect(
+            (await client.listTools()).tools.find((entry) => entry.name === "identity")
+              ?.outputSchema,
+          ).toEqual(outputSchema);
+          expect(await client.callTool({ name: "identity" })).toEqual({
+            content: [{ type: "text", text: "fixture" }],
+            structuredContent: { tenant },
+            _meta: { trace: tenant },
+          });
+          expect(await client.callTool({ name: "failure" })).toEqual({
+            content: [{ type: "text", text: "fixture" }],
+            isError: true,
+          });
+          await expect(client.callTool({ name: "malformed" })).rejects.toMatchObject({
+            code: -32603,
+          });
+        } finally {
+          await client.close();
+        }
+      }
+    },
+  );
+
   it("round-trips list + call with the official MCP SDK client over bearer auth", async () => {
     const { Client } = (await import(SDK_CLIENT)) as SdkClientModule;
     const { StreamableHTTPClientTransport } = (await import(SDK_TRANSPORT)) as SdkTransportModule;

@@ -91,6 +91,58 @@ const { url, close } = await ai.mcp
 
 Header names are lower-cased; every client header is present (including `authorization`). Over stdio `ctx.request` is absent. Nothing on `ctx.request` reaches the model.
 
+## Return native MCP results
+
+Default results become one text block, even when an object resembles an MCP result. Return the exported `mcpResult(...)` helper to preserve native content blocks, `isError`, `structuredContent` and `_meta` over stdio or HTTP:
+
+```ts
+import { mcpResult } from "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+
+const count = ai.tool({
+  name: "count",
+  description: "Return a structured count",
+  meta: {
+    outputSchema: {
+      type: "object",
+      properties: { count: { type: "number" } },
+      required: ["count"],
+    },
+  },
+  execute: async (_input: unknown, ctx) =>
+    mcpResult({
+      content: [{ type: "text", text: '{"count":2}' }],
+      structuredContent: { count: 2 },
+      _meta: { tenant: ctx?.request?.headers["x-tenant-id"] ?? "unknown" },
+    }),
+});
+
+ai.mcp.serve([count], { name: "counts" });
+```
+
+The helper returns a branded `McpNativeResult` wrapper. The serving boundary validates and unwraps it without altering its payload. `isError: true` is sent as-is; thrown tool errors retain the existing mapping.
+
+For tools that already return native objects, opt in at the server or tool level:
+
+```ts
+const nativeTool = ai.tool({
+  name: "native-result",
+  description: "Return a native result",
+  meta: { mcpResults: "native" }, // this tool opts in even on a default server
+  execute: async () => ({ content: [{ type: "text", text: "fixture" }], isError: true }),
+});
+
+ai.mcp.serve([nativeTool], { name: "native-tools", results: "native" });
+// On a native-mode server, meta: { mcpResults: "text" } disables detection for a tool.
+// Explicit mcpResult(...) returns always opt in, regardless of the detection setting.
+```
+
+Native mode detects objects containing any of `content`, `isError`, `structuredContent` or `_meta`; other values keep text serialization. `content` must be an array of valid MCP text/image/audio/resource-link/embedded-resource blocks. Optional `isError` must be boolean; `structuredContent` and `_meta` must be JSON objects. Invalid or non-JSON native payloads answer a JSON-RPC internal error (`-32603`), including malformed helper payloads.
+
+`meta.outputSchema` is emitted as `outputSchema` in `tools/list`; `structuredContent` passes through unchanged. Tool authors own schema conformity. Follow the [MCP 2025-11-25 tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#structured-content): also include serialized structured output in a text block for compatibility.
+
+Request identity is unchanged: native tools receive each HTTP call's headers and remote address on `ctx.request`, plus `ctx.signal`. Over stdio, `ctx.request` is absent. Returning a native result does not automatically expose request metadata; the tool controls its response.
+
 ## Sources and tool-name collisions
 
 ```ts
@@ -136,7 +188,7 @@ ai.mcp.serve(tools, {
 
 - **`initialize`** → `{ name, version }`, capabilities `tools` (+ `resources` / `prompts` when configured); protocol version negotiated from `SUPPORTED_PROTOCOL_VERSIONS` (`2025-11-25`, `2025-06-18`, `2025-03-26`).
 - **`tools/list`** → `inputSchema` via `extractJsonSchema(contract.input, { target: schemaTarget })` (default `"draft-2020-12"`).
-- **`tools/call`** → `invoke()`; `data` → text block (JSON-stringified unless a string), `error` → `isError: true`. Unknown tool → JSON-RPC error.
+- **`tools/call`** → `invoke()`; default `data` → text block (JSON-stringified unless a string), opted-in native results → validated passthrough, `error` → `isError: true`. Unknown tool → JSON-RPC error.
 - **`ping`** → `{}`.
 
 ## Drive the protocol yourself (tests, custom servers)
