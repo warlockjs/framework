@@ -20,8 +20,15 @@ export class InvalidRequestError extends ProviderError {
   public static readonly defaultCategory: ErrorCategory = "validation";
   public static readonly defaultRetryable: boolean | undefined = false;
 
-  public constructor(message: string, options?: ProviderErrorOptions) {
+  /** Explicit count-endpoint limitation; other validation errors must still propagate. */
+  public readonly reason?: "count-unsupported";
+
+  public constructor(
+    message: string,
+    options?: ProviderErrorOptions & { reason?: "count-unsupported" },
+  ) {
     super(message, options, "PROVIDER_INVALID_REQUEST");
     this.name = "InvalidRequestError";
+    this.reason = options?.reason;
   }
 }

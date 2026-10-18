@@ -309,6 +309,13 @@ Converse messages, system blocks, tool configuration and
 Availability depends on the model and region; provider failures use the adapter's
 normal typed errors. `sdk.count(text)` remains a separate offline estimate.
 
+For budget preflight, `countInputTokens(model, messages, { tools })` from
+`@warlock.js/ai` returns `{ tokens, source }`. It estimates only when native
+counting is absent or explicitly throws `InvalidRequestError` with
+`reason: "count-unsupported"`; this adapter preserves that signal. System and
+tools are supported natively. Ordinary validation, auth, network and rate-limit
+errors propagate. See the cost/budget guide for reserve mode.
+
 ```ts
 if (model.countTokens) {
   const inputTokens = await model.countTokens(messages, options);

@@ -3,7 +3,13 @@ import {
   CountTokensCommand,
   type BedrockRuntimeClient,
 } from "@aws-sdk/client-bedrock-runtime";
-import { InvalidRequestError, type Message } from "@warlock.js/ai";
+import {
+  countInputTokens,
+  estimateInputTokens,
+  InvalidRequestError,
+  ProviderAuthError,
+  type Message,
+} from "@warlock.js/ai";
 import { describe, expect, it, vi } from "vitest";
 import { BedrockModel } from "./model";
 
@@ -31,6 +37,21 @@ function setup() {
 }
 
 describe("Bedrock provider options and native counts", () => {
+  it("preserves the unsupported-count signal for estimation, while propagating auth errors", async () => {
+    const unsupported = new InvalidRequestError("cannot count this shape", {
+      reason: "count-unsupported",
+    });
+    const { model, send } = setup();
+    send.mockRejectedValueOnce(unsupported);
+    const options = { tools: [{ name: "lookup", execute: async () => "ok" }] };
+    expect(await countInputTokens(model, messages, options)).toEqual({
+      tokens: estimateInputTokens(messages, options),
+      source: "estimate",
+    });
+    const auth = new ProviderAuthError("bad key");
+    send.mockRejectedValueOnce(auth);
+    await expect(countInputTokens(model, messages, options)).rejects.toBe(auth);
+  });
   it("counts identical Converse messages, system, tools and additional fields", async () => {
     const { model, send } = setup();
     const signal = new AbortController().signal;

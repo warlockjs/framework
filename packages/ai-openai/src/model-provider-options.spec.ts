@@ -1,5 +1,11 @@
 import type OpenAI from "openai";
-import { InvalidRequestError, type Message } from "@warlock.js/ai";
+import {
+  countInputTokens,
+  estimateInputTokens,
+  InvalidRequestError,
+  ProviderAuthError,
+  type Message,
+} from "@warlock.js/ai";
 import { describe, expect, it, vi } from "vitest";
 import { OpenAIModel } from "./model";
 import { OpenAIResponsesModel } from "./responses-model";
@@ -44,6 +50,22 @@ function setup() {
 }
 
 describe("OpenAI provider options and native Responses counts", () => {
+  it("preserves the unsupported-count signal for estimation, while propagating auth errors", async () => {
+    const unsupported = new InvalidRequestError("cannot count this shape", {
+      reason: "count-unsupported",
+    });
+    const { client, count } = setup();
+    const model = new OpenAIResponsesModel(client, { name: "gpt-5" });
+    count.mockRejectedValueOnce(unsupported);
+    const options = { tools: [{ name: "lookup", execute: async () => "ok" }] };
+    expect(await countInputTokens(model, messages, options)).toEqual({
+      tokens: estimateInputTokens(messages, options),
+      source: "estimate",
+    });
+    const auth = new ProviderAuthError("bad key");
+    count.mockRejectedValueOnce(auth);
+    await expect(countInputTokens(model, messages, options)).rejects.toBe(auth);
+  });
   it("counts the exact Responses input, instructions, tools and input-shaping options", async () => {
     const { client, create, count } = setup();
     const model = new OpenAIResponsesModel(client, { name: "gpt-5" });

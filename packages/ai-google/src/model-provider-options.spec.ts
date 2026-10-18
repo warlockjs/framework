@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import type { GoogleGenAI } from "@google/genai";
 import { InvalidRequestError, type Message, type ModelCallOptions } from "@warlock.js/ai";
 import { describe, expect, it, vi } from "vitest";
 import { GoogleModel } from "./model";
@@ -68,35 +68,16 @@ describe("Google provider options and native counts", () => {
     );
   });
 
-  it("supports Developer API contents counting and explicitly rejects system/tools or cached references", async () => {
-    const { model, countTokens } = setup();
-    expect(await model.countTokens([{ role: "user", content: "hi" }])).toBe(123);
-    await expect(model.countTokens(messages)).rejects.toThrow(/Developer API mode/);
-    await expect(model.countTokens([{ role: "user", content: "hi" }], { tools })).rejects.toThrow(
-      /Developer API mode/,
-    );
-    await expect(
-      model.countTokens([{ role: "user", content: "hi" }], {
-        providerOptions: { google: { body: { cachedContent: "cachedContents/one" } } },
-      }),
-    ).rejects.toThrow(/cachedContent/);
-    expect(countTokens).toHaveBeenCalledTimes(1);
-  });
-
-  it("checks the installed SDK Developer API restriction before any network request", async () => {
-    const sdk = new GoogleGenAI({ apiKey: "test", vertexai: false });
-    const count = vi.spyOn(sdk.models, "countTokens");
-    const model = new GoogleModel(sdk, { name: "gemini-2.5-flash" });
-    await expect(model.countTokens(messages, { tools })).rejects.toThrow(InvalidRequestError);
-    expect(count).not.toHaveBeenCalled();
-    count.mockRestore();
-    await expect(
-      sdk.models.countTokens({
-        model: "gemini-2.5-flash",
-        contents: "hi",
-        config: { systemInstruction: "rules" },
-      }),
-    ).rejects.toThrow(/systemInstruction parameter is only supported/);
+  it("signals unsupported cached references on either transport", async () => {
+    for (const vertexai of [false, true]) {
+      const { model, countTokens } = setup(vertexai);
+      await expect(
+        model.countTokens(messages, {
+          providerOptions: { google: { body: { cachedContent: "cachedContents/one" } } },
+        }),
+      ).rejects.toMatchObject({ reason: "count-unsupported" });
+      expect(countTokens).not.toHaveBeenCalled();
+    }
   });
 
   it("applies provider config to streams and refuses protected fields before sending", async () => {

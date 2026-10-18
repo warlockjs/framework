@@ -388,6 +388,13 @@ and quota guards, not for billing. For an exact count, call
 `messages.countTokens` endpoint, with the same system prompt, tools and
 thinking settings the real call would send.
 
+For budget preflight, `countInputTokens(model, messages, { tools })` from
+`@warlock.js/ai` returns `{ tokens, source }`. It estimates only when native
+counting is absent or explicitly throws `InvalidRequestError` with
+`reason: "count-unsupported"`; this adapter preserves that signal. System and
+tools are supported natively. Ordinary validation, auth, network and rate-limit
+errors propagate. See the cost/budget guide for reserve mode.
+
 For the agent/workflow surface these models plug into, see
 [`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the
 latest model ids, see the `setup-anthropic` skill.

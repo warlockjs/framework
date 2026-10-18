@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { agent } from "../../agent/agent";
-import { BudgetExceededError, ProviderOverloadedError } from "../../errors";
+import { BudgetExceededError, InvalidRequestError, ProviderOverloadedError } from "../../errors";
 import { MockSDK } from "../../mock/mock-sdk";
+import { countInputTokens } from "../../utils/estimate-input-tokens";
+import type { Message } from "../../contracts/conversation-message.type";
+import type { ModelCallOptions } from "../../contracts/model.contract";
 import { budget, memoryScopedBudgetStore, type ScopedBudgetStore } from "./budget";
 
 function todayStart(): number {
@@ -41,6 +44,63 @@ describe("budget — reserve-then-commit", () => {
 
     expect(result.error).toBeUndefined();
   });
+
+  it.each([1_000, 20])(
+    "reserves with system and tools when native counting is unsupported (cap %s)",
+    async (maxTokens) => {
+      const sdk = MockSDK({
+        responses: [{ content: "ok", usage: { input: 7, output: 3, total: 10 } }],
+      });
+      const mock = sdk.model({ name: "gemini-like", pricing: { input: 1, output: 1 } });
+      const countTokens = vi.fn(async (_messages: Message[], options?: ModelCallOptions) => {
+        if (options?.tools?.length)
+          throw new InvalidRequestError("cannot count tools", { reason: "count-unsupported" });
+        return 1;
+      });
+      const model = {
+        name: mock.name,
+        provider: "google",
+        pricing: mock.pricing,
+        countTokens,
+        complete: mock.complete.bind(mock),
+        stream: mock.stream.bind(mock),
+      };
+      const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+      const store = memoryScopedBudgetStore();
+      const result = await agent({
+        model,
+        systemPrompt: "Follow the rules",
+        tools,
+        middleware: [
+          budget({
+            maxTokens,
+            maxCostUSD: 0.01,
+            scoped: { key: "count-fallback", window: "day", maxTokens, store },
+            reserve: {
+              outputTokens: 100,
+              inputTokens: async (ctx) =>
+                (await countInputTokens(model, [...ctx.messages], { tools, signal: ctx.signal }))
+                  .tokens,
+            },
+          }),
+        ],
+      }).execute("hi");
+      expect(countTokens).toHaveBeenCalledTimes(1);
+      expect(countTokens.mock.calls[0]?.[0]).toContainEqual({
+        role: "system",
+        content: "Follow the rules",
+      });
+      if (maxTokens === 20) {
+        expect(result.error).toBeInstanceOf(BudgetExceededError);
+        expect(sdk.models[0]?.callHistory).toHaveLength(0);
+        expect(await ledger(store, "count-fallback", "tokens")).toBe(0);
+      } else {
+        expect(result.error).toBeUndefined();
+        expect(sdk.models[0]?.callHistory).toHaveLength(1);
+        expect(await ledger(store, "count-fallback", "tokens")).toBe(10);
+      }
+    },
+  );
 
   it("reserves cost at the uncached input rate and checks it against maxCostUSD", async () => {
     const result = await agent({
