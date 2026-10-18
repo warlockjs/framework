@@ -44,7 +44,7 @@ export type BootSignal = {
  * Environment flag `warlock start` sets on the process it supervises.
  *
  * An IPC channel alone is NOT proof that the parent speaks this protocol —
- * pm2, a vitest worker fork, and any custom supervisor all hand their child a
+ * a vitest worker fork or a custom supervisor may hand their child a
  * channel they use for their own messages. Writing to one of those, and then
  * closing it, corrupts someone else's protocol and can kill the process. The
  * flag is the handshake: only a parent that set it gets signalled.
@@ -54,14 +54,14 @@ export const BOOT_SIGNAL_ENV_KEY = "WARLOCK_BOOT_SIGNAL";
 /**
  * Report a completed boot to the parent process, if one is supervising.
  *
- * Two conditions must both hold: the process was spawned with an `ipc` stdio
- * channel (`process.send` exists), and the parent identified itself with
- * {@link BOOT_SIGNAL_ENV_KEY}. A bundle run directly (`node app.mjs`, a Docker
- * `CMD`) or under a foreign supervisor is a no-op, so the signal never changes
- * how a standalone process behaves and never touches a channel we don't own.
+ * The versioned signal requires an IPC channel (`process.send` exists) and
+ * the parent's {@link BOOT_SIGNAL_ENV_KEY} handshake. With IPC and `pm_id`,
+ * PM2 instead receives its documented `"ready"` message and keeps its channel
+ * open for logs and worker coordination.
+ * Standalone bundles and unrecognized supervisors remain silent.
  *
- * The channel is closed as soon as the message is flushed. An open IPC channel
- * holds a `ref` on the child's event loop, which would keep a finished or
+ * The `warlock start` channel is closed as soon as its message is flushed.
+ * An open IPC channel holds a `ref` on the child's event loop, keeping a finished or
  * wedged process alive and indistinguishable from a healthy server — the exact
  * confusion this signal exists to remove. One message, then disconnect.
  *
@@ -70,7 +70,22 @@ export const BOOT_SIGNAL_ENV_KEY = "WARLOCK_BOOT_SIGNAL";
  * healthy application.
  */
 export function sendBootSignal(signal: BootSignal): void {
-  if (typeof process.send !== "function" || process.env[BOOT_SIGNAL_ENV_KEY] !== "1") {
+  if (typeof process.send !== "function") {
+    return;
+  }
+
+  // PM2 injects pm_id (including "0") in both fork and cluster mode. Its
+  // ProcessContainer uses this channel for logs too: never disconnect it.
+  // https://github.com/Unitech/pm2/blob/master/lib/ProcessContainer.js
+  // https://pm2.keymetrics.io/docs/usage/signals-clean-restart/
+  if (process.env[BOOT_SIGNAL_ENV_KEY] !== "1") {
+    if (process.env.pm_id !== undefined) {
+      try {
+        process.send("ready", undefined, undefined, () => {});
+      } catch {
+        // A detached supervisor must not take down an already booted app.
+      }
+    }
     return;
   }
 

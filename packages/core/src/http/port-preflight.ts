@@ -1,4 +1,5 @@
 import { createServer } from "node:net";
+import cluster from "node:cluster";
 
 /**
  * Host used when the caller has no configured bind host.
@@ -80,6 +81,12 @@ export async function assertPortIsAvailable(
   port: number,
   host: string = DEFAULT_PROBE_HOST,
 ): Promise<void> {
+  // Node cluster workers intentionally share the primary's listener. An
+  // exclusive probe rejects that occupied port, blocking rolling reloads.
+  // Let the real server.listen() report bind failures in workers instead.
+  // https://nodejs.org/api/cluster.html#how-it-works
+  if (cluster.isWorker) return;
+
   const available = await isPortAvailable(port, host);
 
   if (!available) {

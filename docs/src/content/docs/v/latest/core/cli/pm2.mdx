@@ -1,0 +1,185 @@
+---
+title: "PM2 deployment"
+description: "Generate an optional PM2 ecosystem file and reload only the current application."
+---
+
+`warlock pm2 init` writes `ecosystem.config.cjs` from your app and build
+configuration. PM2 is optional operator tooling: core neither installs nor imports
+it. Install PM2 separately on the deployment host and put its CLI on `PATH`.
+Use Node 22.15 or newer for both the app and the PM2 daemon; cluster workers use
+the daemon's Node runtime.
+
+```bash
+NODE_ENV=production npx warlock build
+NODE_ENV=production npx warlock pm2 init
+# Review the generated file and its exact app name before starting it.
+pm2 start ecosystem.config.cjs --only store-api-production
+
+# After deploying another successful build:
+NODE_ENV=production npx warlock pm2 reload
+# Or reload just one verified worker:
+NODE_ENV=production npx warlock pm2 reload --id 7
+```
+
+Here `package.json` has `"name": "store"` and `src/config/app.ts` exports
+`{ appName: "api" }`. Run these commands from the app root using the same
+`NODE_ENV` and identity overrides every time. Config modules are evaluated;
+bootstrap, prestart and connectors are not run by this command.
+
+## Identity and generated settings
+
+The name is `<project>-<app>-<env>`:
+
+| Part    | Source                                                                         |
+| ------- | ------------------------------------------------------------------------------ |
+| project | `--project`, otherwise `package.json` name; `@team/store` becomes `team-store` |
+| app     | `--app`, otherwise `app.appName`, otherwise `app`                              |
+| env     | `NODE_ENV`, otherwise `development`                                            |
+
+Choose a project/app combination unique within your PM2 daemon. Components must
+start with a letter or digit and contain only letters, digits, `_` or `-`.
+Display names containing spaces need a safe `--app` override. No regular
+expressions, comma lists, selectors or arbitrary name flags are accepted.
+
+| Setting               | Value                                                                          |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `cwd`                 | Absolute app root                                                              |
+| `script`              | Resolved `build.outdir` / `build.outDirectory` + `build.outFile`               |
+| `interpreter`         | Node executable used for generation                                            |
+| `node_args`           | `--enable-source-maps` unless `build.sourcemap` is `false`                     |
+| `exec_mode`           | `fork`; `--cluster` selects `cluster`                                          |
+| `instances`           | `1` in fork mode; `2` with `--cluster`; override with `--instances 3` or `max` |
+| `wait_ready`          | `true`                                                                         |
+| `listen_timeout`      | `30000` ms; override with `--listen-timeout 60000`                             |
+| `kill_timeout`        | `app.shutdownTimeout`, default `10000` ms                                      |
+| `env.NODE_ENV`        | Environment used during generation                                             |
+| `time` / `merge_logs` | `false`, preserving logger timestamps and per-worker log files                 |
+
+`init` works before a build exists and without PM2 installed. It refuses to
+overwrite an existing ecosystem file. Review or move the old file before
+generating a replacement. The generated file contains only the selected runtime
+settings, not the rest of the app configuration or its secrets. Regenerate it
+when build paths, app identity, timeouts or environment change; `reload` uses
+the settings already registered in PM2 and does not apply edits to this file.
+
+## Readiness and shutdown
+
+The generated file runs the bundle directly. Pointing PM2 at `warlock start`
+would supervise a second supervisor instead of the process that owns HTTP.
+Rebuild with core 5.33.0 or newer to include the PM2 readiness signal.
+
+At completed boot, after early and late connectors (including the HTTP listener
+and configured socket adapter) have finished, core sends `process.send("ready")`
+when an IPC channel and PM2's `pm_id` are present. Socket-only apps also await
+their listener and reject bind failures before readiness. It sends once and keeps PM2's
+channel open. `warlock start` retains its separate versioned handshake; a plain
+Node launch without IPC sends nothing.
+
+PM2's [`wait_ready` and timeout semantics](https://pm2.keymetrics.io/docs/usage/signals-clean-restart/)
+define the deployment budget: `listen_timeout` bounds the wait for readiness;
+`kill_timeout` bounds the time from the shutdown signal to a forced kill. PM2
+sends `SIGINT` by default, which core handles with graceful shutdown. A timeout
+can force a reload/restart despite missing readiness, so choose a readiness
+budget above your observed cold boot time and use an external deployment probe.
+The IPC message reports completed boot, not continuously healthy dependencies.
+
+The generated comment and CLI output give the configured `/ready` URL, respecting
+host, port, TLS and `http.health.readinessPath`. Wildcard hosts become loopback
+addresses for local probes. HTTP disabled, health disabled or port `0` produces
+an explicit unavailable notice. PM2 does not poll this URL automatically.
+
+`kill_timeout` matches core's overall connector budget, `app.shutdownTimeout`,
+rather than PM2's short default. Keep HTTP draining below that budget, with
+room for other connectors, app shutdown hooks and log flushing:
+
+```ts title="src/config/app.ts"
+import type { AppConfigurations } from "@warlock.js/core";
+
+export default {
+  appName: "api",
+  shutdownTimeout: 20000,
+} satisfies AppConfigurations;
+```
+
+Set `http.gracefulShutdown.timeout: 10000` in `src/config/http.ts` for this
+example. Core's connector timer starts after app shutdown hooks and finishes
+before the final log flush; PM2's budget covers the entire process exit, so slow
+hooks or flushes can consume its allowance. See [Health checks](../digging-deeper/health-checks.md).
+
+## Rolling reloads and sockets
+
+```bash
+NODE_ENV=production npx warlock pm2 init --cluster --instances 2
+```
+
+PM2's [cluster reload](https://pm2.keymetrics.io/docs/usage/cluster-mode/) replaces
+workers while other workers keep serving. Fork mode falls back to a restart
+and can interrupt requests; the CLI prints that limitation. Reload refuses
+cluster workers that are offline or lack `wait_ready: true`. PM2 can still fall
+back on timeout, so zero downtime depends on successful boot and draining.
+
+Store sessions and shared state outside individual workers. Each worker also
+runs app initialization and any enabled worker tasks; separate your worker
+deployment or coordinate scheduled jobs so they do not run once per HTTP worker.
+
+With a socket configuration present, cluster generation and reload require:
+
+- A `socket.adapter` factory for cross-worker broadcasts, such as the Redis
+  adapter described in [Sockets](../digging-deeper/socket.md#multiple-servers).
+- `socket.options.transports: ["websocket"]`, with WebSocket-only clients.
+
+Core refuses sockets without an adapter, even if the single-server warning is
+silenced. It also refuses polling in this generated cluster setup: affinity to
+a shared PM2 port cannot select its individual workers. If you need polling,
+run distinct fork listeners behind sticky routing to those listeners, or arrange
+a custom cluster primary with worker affinity. An adapter alone does not provide
+sticky sessions. See the official [Socket.IO multi-node guide](https://socket.io/docs/v4/using-multiple-nodes/).
+
+## Shared-server operations
+
+`warlock pm2 reload` reads `pm2 jlist`, matches the exact generated name, and
+verifies every target's absolute working directory and bundle path before
+reloading anything. It then invokes `pm2 reload <numeric-id>` sequentially.
+`--id` narrows this to one worker and still verifies ownership. A conflicting
+same-name process causes refusal; a missing or invalid build-success marker
+also refuses reload. PM2 must already be installed and the ecosystem started.
+
+For stopping an app on a shared daemon, inspect its **current** PM2 ids and
+paths first, then stop only the intended id (repeat for each owned worker):
+
+```bash
+pm2 list
+pm2 show 7
+pm2 stop 7
+```
+
+A PM2 id is not an OS PID. Recheck it after deleting/recreating an app. Avoid
+name/pattern stops, `all`, and ecosystem-wide stop/delete operations on shared
+servers. PM2 documents [process management](https://pm2.keymetrics.io/docs/usage/process-management/)
+and [ecosystem selection](https://pm2.keymetrics.io/docs/usage/application-declaration/).
+The `.config.cjs` extension is supported in PM2's
+[configuration loader](https://github.com/Unitech/pm2/blob/master/lib/Common.js).
+
+## Logger output
+
+PM2 captures stdout/stderr; it does not convert those lines into
+`@warlock.js/logger` entries. Configure a terminal channel in production if you
+want app logs in PM2:
+
+```ts title="src/config/log.ts"
+import { ConsoleLog } from "@warlock.js/logger";
+
+export default {
+  production: { channels: [new ConsoleLog({ showContext: true })] },
+};
+```
+
+`ConsoleLog` writes the logger's level, timestamp, module, action and message;
+context is printed when enabled. Leave PM2's `time` disabled and omit
+`log_date_format` to avoid duplicate timestamps. Preserve the generated
+`merge_logs: false` when worker separation matters. For structured persistent
+entries, configure `JSONFileLog` with a distinct storage path per worker; its
+JSON format is independent of PM2's JSON envelope. PM2 JSON logging wraps
+captured text, not the logger's original fields. See
+[PM2 log management](https://pm2.keymetrics.io/docs/usage/log-management/) and
+[Logging](../digging-deeper/logging.md).
