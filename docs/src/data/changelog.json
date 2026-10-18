@@ -18,6 +18,10 @@
       "slug": "ai-bedrock"
     },
     {
+      "name": "@warlock.js/ai-cli",
+      "slug": "ai-cli"
+    },
+    {
       "name": "@warlock.js/ai-deepseek",
       "slug": "ai-deepseek"
     },
@@ -128,6 +132,1866 @@
   ],
   "releases": [
     {
+      "version": "5.31.0",
+      "id": "v5-31-0",
+      "date": "October 18, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Rate limits that actually apply in production, a toolbelt for AI coding agents, and a broad AI upgrade.</strong> Security: the global HTTP rate limiter (<code>http.rateLimit</code>, 60 requests/minute per IP by default) is now enforced in production — in 5.30 and earlier it never applied to application routes; static files and the <code>/health</code>/<code>/ready</code> probes are exempt by default. Agents get <code>warlock inspect --json</code>, <code>warlock check</code> (typecheck, lint, related tests and framework convention checks with stable <code>WLxxxx</code> codes and an environment-vs-code exit split), <code>warlock explain</code>, <code>warlock mcp</code>, <code>warlock trace</code>, a generated app <code>AGENTS.md</code>, <code>warlock board</code>, <code>warlock make endpoint</code>, <code>--dry-run --json</code> on every generator, a test kit with fakes on by default and model factories, and <code>warlock upgrade</code> codemods. AI: a run cut off by the output or context limit ends as <code>AgentIncompleteError</code> instead of an empty success, cost is cache-aware with verified price tables and reserve-then-commit budgets, reasoning/tool-argument/usage stream chunks, provider-defined tools, conversation sessions with file and SQLite stores, compaction for thinking runs, MCP serving over HTTP with auth, a coding-agent workspace tool belt, and the new <code>@warlock.js/ai-cli</code> that drives 14 vendor coding CLIs as agents. Also: built apps start on Bun and Deno (<code>warlock dev</code> stays on Node), Node 22.15 is the minimum, a confined no-follow reader in <code>@warlock.js/fs</code>, FileLog naming and retention, route-level validation failure responses, and <code>v.union</code> tries every matching object member. <strong>Breaking:</strong> enforced rate limits, incomplete agent runs, <code>v.union</code> error paths, sortable FileLog names, and more — see the upgrade notes and <code>warlock upgrade --from 5.30 --to 5.31.0</code>. Lockstep release across all 32 packages, one of them new (<code>@warlock.js/ai-cli</code>). Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.31.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 83,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 52
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 25
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>@warlock.js/core/net</code>: a side-effect-free subpath exporting the SSRF IP classifier <code>isPrivateOrReservedIp</code> (the same function the root exports). It loads only <code>node:net</code>, so workers, CLIs and standalone processes — <code>@warlock.js/ai</code> among them — can reuse the private-address rules without loading the HTTP server, database, cache or mail modules behind the root entry."
+            },
+            {
+              "type": "Added",
+              "html": "<code>http.rateLimit.staticFiles</code> (default <code>false</code>) decides whether static files count against the global rate limiter. Each static mount can decide for itself: <code>router.directory(options, { rateLimit })</code> and a fourth <code>{ rateLimit }</code> argument on <code>router.file()</code>, <code>cachedFile()</code>, <code>files()</code> and <code>cachedFiles()</code> take <code>true</code> (global limiter), <code>false</code> (exempt) or <code>{ max, timeWindow, errorMessage? }</code> (own limit and bucket)."
+            },
+            {
+              "type": "Added",
+              "html": "Route validation can answer with an application's own failure body. <code>validation.onFailure(result, { request, response, route })</code> returns <code>{ status?, body }</code> for a failed <code>schema</code> or <code>params</code> (no <code>status</code> uses <code>validation.response.status</code>, 422 by default); <code>validation.response.body(result, route)</code> in the validation config does the same for every route. The route hook wins, either may return <code>undefined</code> to fall through, and the framework body is unchanged when neither is set. Routes also accept a <code>validation</code> option merged over the handler's own, so one handler can serve several routes with different failure codes. <code>ValidationConfiguration</code> now types <code>response</code> and <code>responseStatus</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock generate.openapi</code> documents a custom validation failure body from the handler's <code>responseSchema</code> entry for the failure status instead of the framework's <code>ValidationFailed</code> shape; without one, the configured status is documented without a body and a route-level hook produces a warning."
+            },
+            {
+              "type": "Added",
+              "html": "<code>evaluateConditionalRequest()</code>, <code>matchesIfNoneMatch()</code>, <code>matchesIfMatch()</code> and <code>parseEntityTagList()</code> expose the framework's RFC 9110 precondition handling for application handlers that set their own ETags."
+            },
+            {
+              "type": "Added",
+              "html": "A route's <code>rateLimit</code> option also accepts <code>false</code> to exempt the route from the global limiter, and <code>true</code> to keep it under the global policy (the default for application routes)."
+            },
+            {
+              "type": "Added",
+              "html": "Production runtime support for Bun and Deno. An app built on Node with <code>warlock build</code> starts and serves on Bun 1.4.3 and Deno 2.9.7, either directly (<code>bun dist/app.js</code>, <code>deno run -A dist/app.js</code>) or through <code>warlock start</code> run with that runtime. A <code>runtimes</code> CI workflow builds a fixture app with pages, API routes, file cache, file logging and static files from the packed framework, starts it on Node, Bun and Deno, and checks every route plus a clean <code>SIGTERM</code> shutdown. The \"Supported runtimes\" docs page lists the commands for each runtime."
+            },
+            {
+              "type": "Added",
+              "html": "<code>detectJavaScriptRuntime()</code>, <code>describeJavaScriptRuntime()</code>, <code>nodeOnlyCommandError()</code>, <code>assertNodeOnlyCommand()</code> and <code>unverifiedBuildRuntimeNotice()</code> report which runtime is executing (<code>{ type: \"node\" | \"bun\" | \"deno\", version }</code>), and let a CLI command refuse to run anywhere but Node."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock inspect [--json] [--section routes,models,…]</code> prints the app's facts from its booted registries: routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys with types (never values), event listeners, pages (layout chain, loaders, actions, guard), queue jobs, scheduled tasks and installed <code>@warlock.js/*</code> versions. Boots like <code>warlock doctor</code> — no connection, no port. The report is versioned (<code>schemaVersion: 1</code>, fields only ever added) and published as JSON Schema: <code>schemas/inspect-report.schema.json</code> and <code>INSPECT_REPORT_JSON_SCHEMA</code>. <code>inspectApp()</code> returns the same object inside any process where the app is booted; <code>bootForInspect()</code> boots first."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check [--changed] [--base &lt;ref&gt;] [--skip …] [--json]</code> is one verify command: an incremental typecheck (in a child process, so running out of memory is reported), the app's ESLint/oxlint, the tests the change affects (<code>vitest run</code> / <code>vitest related</code>), and convention checks (importing an auto-loaded file, <code>.js</code> import extensions, relative imports across modules, <code>experimentalDecorators</code>). One JSON object per problem — <code>{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }</code> — and exit codes that split your code (1) from this machine (2: Node version, missing tool, unreachable database/Redis, busy port, git unavailable, tool crash). It detects and reports only; it never stops processes or frees ports."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code>'s conventions step also reports security and code-style problems from source, the same with ESLint, Oxlint or no linter: <code>request.all()</code> passed to a query, a service or <code>inApp()</code> (<code>WL9005</code>); a POST/PUT/PATCH/DELETE route with no auth middleware and no <code>public: true</code> (<code>WL9006</code>, the source-side twin of the <code>warlock dev</code> warning, sharing its guard-name rule); a <code>redirect()</code> / <code>navigateTo()</code> / <code>&lt;Link to|href&gt;</code> target read from request input without <code>safeRedirect()</code> / <code>safeRedirectTarget()</code> or an <code>isSafeRedirect()</code> check (<code>WL9007</code>); a raw email, credential or request body in a log call (<code>WL9008</code>, using the logger's default censored keys); a regex with an unbounded quantifier run on request input (<code>WL9009</code>); and, as warnings, <code>await log.*()</code> (<code>WL9010</code>), a second controller in one file (<code>WL9011</code>) and a <code>kind</code> union discriminator (<code>WL9012</code>). A <code>// warlock-check-ignore WL9006</code> comment on the problem's line or the line above records a deliberate exception. The generated <code>AGENTS.md</code> conventions list and the <code>warlock-conventions</code> skill cover every code."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock typecheck [--changed] [--base &lt;ref&gt;] [--project &lt;tsconfig&gt;] [--json]</code> typechecks with the TypeScript compiler API, keeping incremental state in <code>.warlock/cache/typecheck.tsbuildinfo</code>; <code>--changed</code> checks only the changed files and the files importing them."
+            },
+            {
+              "type": "Added",
+              "html": "Stable error codes: a <code>WL</code> + four-digit registry (<code>ERROR_CODES</code>, first digit = area: config, boot, routing, validation, http, database, cli, environment, convention), each with a one-line fix, a skill and a docs anchor, exported from <code>@warlock.js/core</code> and <code>@warlock.js/core/errors</code> with <code>explainErrorCode()</code>, <code>errorCodeOf()</code> (also maps <code>ECONNREFUSED</code>/<code>EADDRINUSE</code> and follows <code>cause</code>) and <code>WarlockError</code>. Framework error classes carry a <code>code</code> (<code>ModuleLoadError</code> → <code>WL2001</code>, <code>ContainerKeyMissingError</code> → <code>WL2004</code>, <code>CliOptionValueError</code> → <code>WL7001</code>, …); a duplicate route name throws <code>RouteNameTakenError</code> (<code>WL3001</code>), and unknown route names, missing URL params, invalid controller actions and refused connector lists throw coded <code>WarlockError</code>s with unchanged messages. <code>warlock explain &lt;CODE&gt; [--json]</code> prints a code's meaning and fix; <code>warlock explain</code> lists them all."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock doctor --json</code> prints the report as JSON, and every <code>warn</code>/<code>fail</code> finding (also in the plain report) carries its error code with the same <code>hint</code> / <code>skill</code> / <code>docs</code> fields <code>warlock check --json</code> uses."
+            },
+            {
+              "type": "Added",
+              "html": "<code>@warlock.js/core/tooling</code> subpath: <code>inspectApp</code>, <code>runCheck</code>, <code>runTypecheck</code>, <code>CHECK_EXIT_CODES</code> and the shared <code>ToolingProblem</code> type, kept off the root barrel because it loads the TypeScript compiler and ESLint."
+            },
+            {
+              "type": "Added",
+              "html": "Skills <code>warlock-inspect</code> and <code>warlock-check</code>; <code>warlock-doctor</code> covers <code>--json</code> and error codes. Docs pages for <code>warlock inspect</code>, <code>warlock check</code> / <code>typecheck</code> and the error-code reference."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock make endpoint &lt;module&gt;/&lt;name&gt;</code> (also <code>generate.endpoint</code> / <code>make.endpoint</code>) generates one endpoint from its request schema: <code>--schema</code> (a seal object schema file), <code>--method</code>, <code>--path</code>, <code>--resource</code>, and <code>--auth</code> (default) or <code>--public</code>. It writes the schema module, a service taking validated input, the resource shaped from the schema fields, one controller reading <code>request.validated()</code> with its <code>validation</code> and an OpenAPI <code>responseSchema</code>, the route (in a <code>guarded()</code> block, or marked <code>public: true</code>), the success message in <code>utils/locales.json</code>, and <code>tests/&lt;name&gt;.test.ts</code>, which requests the endpoint over the real HTTP stack with a valid input derived from the schema, a missing required field, and for guarded routes an anonymous <code>401</code> plus a signed-in case. Existing files are skipped and reported unless <code>--force</code>; a controller already in <code>routes.ts</code> is not registered twice. <code>warlock make &lt;generator&gt;</code> dispatches to every generator, like <code>warlock generate</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Every <code>generate.*</code> command, <code>make</code> and <code>add</code> accept <code>--dry-run</code> (write nothing; <code>add</code> also installs nothing, running feature setup against an in-memory copy of the files) and <code>--json</code> (one versioned report on stdout listing files written, files skipped because they exist, per-file actions, command details and messages; also printed when the command fails). <code>add --list --json</code> includes the feature catalog."
+            },
+            {
+              "type": "Added",
+              "html": "Test fakes at <code>@warlock.js/core/tests</code>, installed by default in the test environment: <code>mailFake</code>, <code>queueFake</code>, <code>cacheFake</code>, <code>storageFake</code>, <code>clockFake</code> and <code>idsFake</code>, with assertion helpers (<code>assertSent</code>, <code>assertSentCount</code>, <code>assertPushed</code>, <code>assertNotPushed</code>, <code>assertHas</code>, <code>assertStored</code>, <code>assertExists</code>, <code>travel</code>, ...) whose failures list what was recorded. <code>installTestFakes()</code> / <code>restoreTestFakes()</code> and the <code>fakes</code> option of <code>setupTest()</code> / <code>startHttpTestServer()</code> control them; <code>tests.fakes</code> configures them per project. The storage fake's temp root is shared between the HTTP test server and the workers."
+            },
+            {
+              "type": "Added",
+              "html": "<code>clock</code> (<code>now()</code>, <code>timestamp()</code>) and <code>ids</code> (<code>uuid()</code>, <code>token(length)</code>) runtime helpers. Outside tests they are the system clock and <code>node:crypto</code>; in tests the fakes make them deterministic without touching <code>Date</code> or timers."
+            },
+            {
+              "type": "Added",
+              "html": "<code>defineFactory(Model, (seed) =&gt; attributes)</code> model factories with <code>make()</code>, <code>makeMany(n)</code>, <code>create()</code>, <code>create(n)</code>, <code>createMany(n)</code>, named states (<code>state()</code> / <code>with()</code>) and a deterministic seed (<code>text</code>, <code>email</code>, <code>uuid</code>, <code>date</code>, <code>number</code>, <code>pick</code>); <code>resetFactorySequences()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>createTestHttpServer({ routes?, loadAppModules?, importModule? })</code> serves requests inside the test worker with the production Fastify setup, plugins and route registration on an OS-assigned port, returning request helpers, <code>actingAs(user)</code> and <code>close()</code>; the worker's fakes see what handlers did. <code>createTestRequestClient(baseUrl)</code> binds the request helpers to any URL, and <code>actingAs(user, client?)</code> accepts one."
+            },
+            {
+              "type": "Added",
+              "html": "<code>startHttpTestServer({ port: 0 })</code> binds a free port and publishes the bound port to the workers; <code>warlock add test</code> now generates it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>snapshotResponse(response, { redact })</code> reduces a response to status, content type and body with volatile paths redacted, for <code>toMatchSnapshot()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock test [filters...]</code> runs the project's own Vitest with <code>--changed</code> (optionally <code>--since &lt;ref&gt;</code>), <code>--related &lt;files&gt;</code>, <code>--watch</code>, <code>--test-name-pattern</code> and <code>--json</code>; change-scoped runs pass when no test is affected."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Storage</code> exposes <code>isInitialized</code>, <code>driverNames()</code> and <code>getDefaultName()</code>; mail exposes <code>getExplicitMailMode()</code> and <code>resetMailMode()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock upgrade --to &lt;version&gt;</code> applies the mechanical edits for each breaking change between the installed release and the target, lists every place that needs a decision with <code>file:line</code>, a hint and the skill to read, and moves every <code>@warlock.js/*</code> dependency to the target. <code>--dry-run</code> prints a unified diff and writes nothing, <code>--json</code> prints the result, <code>--from</code> sets the version upgrading from; without it the command reads the installed <code>@warlock.js/core</code>, which is already the target once the new release is installed, so pass it (<code>warlock upgrade --from 5.30 --to 5.31.0</code>). With no <code>--from</code> and the installed version equal to the target, the command stops and asks for <code>--from &lt;previous version&gt;</code>. Codemods for 5.30 and 5.31: <code>logger-sync-calls</code>, <code>request-log-snapshot</code>, <code>head-viewport</code>, <code>node-22-15</code>, <code>warlock-versions</code>, plus review lists for <code>seal-validate-result</code>, <code>ai-tool-dispatch</code>, <code>ai-anthropic-body</code>, <code>ai-finish-reason</code>, <code>rate-limit-defaults</code>, <code>seal-refine-output</code>, <code>seal-container-catch</code>, <code>seal-union-output</code> and <code>ai-compaction-opt-in</code>. Source edits use <code>ts-morph</code>, an optional peer loaded only by this command; without it the command prints the install command and changes nothing."
+            },
+            {
+              "type": "Added",
+              "html": "Route option <code>public?: boolean</code> (also on <code>router.group()</code>, inherited by its routes; a route's own <code>public: false</code> opts back out) records that a mutating route is intentionally reachable without signing in. It changes nothing at runtime."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> warns once per route about POST/PUT/PATCH/DELETE routes that have no auth middleware and no <code>public: true</code>, listing method, path and route file; HMR-added routes are reported when they commit. Page routes are skipped, production never checks, and <code>http.warnUnguardedRoutes: false</code> turns it off. Middleware counts as a guard when marked with the new <code>markAuthGuard(middleware, isGuard?)</code> (<code>authMiddleware()</code> marks itself) or, unmarked, when its function name contains <code>auth</code> or <code>guard</code>; <code>isAuthGuardMiddleware()</code>, <code>isUnguardedMutatingRoute()</code> and <code>reportUnguardedMutatingRoutes()</code> are exported for tooling."
+            },
+            {
+              "type": "Added",
+              "html": "<code>safeRedirect(target, { allowedOrigins, fallback })</code> and <code>isSafeRedirect(target, options?)</code>: an allowlist for redirect targets taken from request input. Same-origin paths and absolute http(s) URLs on an allowed origin pass; <code>//host</code>, <code>/\\host</code>, other schemes, credentials in the URL and control characters fall back to <code>\"/\"</code> (or <code>fallback</code>). <code>response.redirect()</code> itself is unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "<code>escapeHeaderValue(value)</code> makes any value a valid header value: CR/LF/NUL and other control characters (tab kept) are removed, non-Latin-1 characters become <code>?</code>, and the result is trimmed, so request input cannot split a header or make Node throw a 500."
+            },
+            {
+              "type": "Added",
+              "html": "Typed, validated configuration: a <code>src/config/&lt;name&gt;.ts</code> file may export <code>configSchema = defineConfigSchema(validator, { env })</code> next to its default export (<code>ConfigOf&lt;typeof configSchema&gt;</code> types the value). Dev boot, each config hot reload and the production loader <code>warlock build</code> generates validate it before registration and throw one <code>InvalidConfigError</code> listing every problem in every config file (key path, rule message, the environment variable to set), never the values. An invalid config never reaches its special handler; an invalid hot reload keeps the previous value. Files without a schema load as before."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock mcp</code> serves the app to coding agents over the Model Context Protocol — stdio by default, or <code>--http</code> (Streamable HTTP on <code>127.0.0.1</code>; <code>--token</code> / <code>WARLOCK_MCP_TOKEN</code> required for any other host). Tools: <code>inspect_app</code> and one <code>inspect_&lt;section&gt;</code> per inspect section (with filters, e.g. <code>inspect_routes { unguardedWrites: true }</code>), <code>db_schema</code> (tables, columns, keys and relations from the models), <code>docs_search</code> / <code>docs_read</code> (offline, over the installed <code>@warlock.js/*</code> skills, READMEs and llms files only), <code>explain</code>, <code>check_run</code>, <code>test_run</code> (one file, the tests related to changed files, or the suite), <code>requests_recent</code> (devtools: phases, queries with <code>nPlusOne</code> flags, logs, timings) and <code>generate_make</code> / <code>generate_add</code>, which run the generator in a throw-away copy of the project and return a unified diff. Read-only by default: writing needs <code>--allow-writes</code>, otherwise <code>write: true</code> is refused (<code>WL7005</code>). <code>@warlock.js/ai-tools</code> is a new optional peer, imported only by this command; a missing one fails with <code>WL7003</code> and the install line. Tool names use <code>_</code> because model APIs refuse <code>.</code> in tool names."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev --mcp</code> (or <code>devServer.mcp: true | { port, token, allowWrites }</code>) serves the same tools from the dev server over loopback HTTP, reading the live registries after each hot reload."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> records its address, devtools mount and MCP endpoint in <code>.warlock/dev-server.json</code> (removed on shutdown); <code>warlock trace</code> and <code>requests_recent</code> read it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock trace &lt;method&gt; &lt;url&gt; [--body json|@file] [--header k:v] [--json]</code> sends one request to the running dev server (correlated by <code>x-request-id</code>) and prints its devtools timeline as a versioned report (<code>schemaVersion: 1</code>): middleware with timings, the validation result and errors, handler time, queries with N+1 flags, logs, cache operations, mails, the response (authorization and cookie headers redacted, bodies capped) and timings. Devtools is checked before anything is sent: <code>WL8008</code> when the dev server is not running, <code>WL8009</code> when devtools is not, <code>WL5004</code> when devtools recorded no timeline; failures exit 2 for this machine and 1 otherwise."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock agents-md [--write] [--json]</code> generates the app-specific section of <code>AGENTS.md</code> from the booted app — modules with route and model counts, a routes summary with unguarded writes flagged, models, the conventions <code>warlock check</code> enforces, the installed skills and the verify commands — between <code>&lt;!-- warlock:generated:start --&gt;</code> and <code>&lt;!-- warlock:generated:end --&gt;</code>. Content outside the markers is never changed; malformed markers fail with <code>WL7501</code> and nothing is written. <code>warlock dev</code> refreshes the section on boot and after reloads (debounced, written only when it changed); <code>devServer.agentsMd: false</code> turns that off."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock board init|add|status|send|watch [--json]</code> is a file-based protocol for two coding agents (an implementer and a reviewer) in a git-ignored <code>.warlock/board/</code>: items with the states todo, in-progress, ready-for-review, changes-requested, approved and blocked (refused moves fail with <code>WL7403</code>), append-only numbered messages per recipient (<code>to-&lt;agent&gt;/NNNN-&lt;slug&gt;.md</code>), <code>VERDICT: APPROVED</code> / <code>VERDICT: CHANGES REQUESTED</code> lines that move the item, and a <code>watch</code> that blocks until a new message arrives or times out (<code>WL7404</code>, exit 3). New codes <code>WL7401</code>–<code>WL7404</code> cover the board."
+            },
+            {
+              "type": "Added",
+              "html": "<code>runTests({ files | changed | base })</code> runs the app's vitest for one file, the tests related to changed files, or the suite, with the <code>warlock check</code> problem shape. It and the building blocks of the commands above (<code>startWarlockMcpServer</code>, <code>createMcpContext</code>, <code>createWarlockMcpTools</code>, <code>searchDocs</code>, <code>buildDbSchema</code>, <code>sandboxBackend</code>, <code>applyGeneration</code>, <code>traceRequest</code>, <code>connectDevtools</code>, <code>renderAgentsMdSection</code>, <code>writeAgentsMd</code>, <code>createAgentsMdRefresher</code>, <code>initBoard</code>, <code>watchBoard</code>, …) are exported from <code>@warlock.js/core/tooling</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Skills <code>warlock-mcp</code>, <code>warlock-trace</code>, <code>warlock-agents-md</code> and <code>warlock-board</code>; <code>warlock-inspect</code> points agents at the MCP tools. Docs pages for <code>warlock mcp</code>, <code>warlock trace</code>, <code>warlock agents-md</code> and <code>warlock board</code>, and the new codes on the error-code reference."
+            },
+            {
+              "type": "Added",
+              "html": "End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>upgrade-from-5-29</code> skill guides application upgrades through logger delivery, tool concurrency, request snapshots, auth counter/lock resets, image cache layouts and viewport metadata. It covers Seal result narrowing and refinement/container/union behavior, AI finish reasons and replay, bounded workspace reads, and production rate-limit migration in 5.31; cut-off AI agent answers (<code>AgentIncompleteError</code> with <code>report.status: \"incomplete\"</code>, <code>continueOnOutputLimit</code>, per-run <code>modelOptions</code> and the Anthropic adapter's larger default <code>max_tokens</code>); the AI cost changes (per-provider cache billing, <code>totalCost</code>, the new built-in model prices and removed defaults, and <code>ProviderOverloadedError</code>); and the AI workspace changes (the larger <code>tools.all()</code> set, the new <code>WorkspaceOps</code> / <code>Workspace</code> methods, nested-command refusals and <code>dispose()</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "Skills include complete examples for request cancellation, stream/SSE backpressure and retention, HTTP error mapping, shared rate limits and signed-in test clients."
+            },
+            {
+              "type": "Added",
+              "html": "Notification scaffolds with test support emit real signed-in controller specs and isolated two-recipient fixtures for listing, unread counts, marking one/all read, query validation and ownership checks. Fixtures use the configured auth model and revoke/delete only their own credentials and rows."
+            },
+            {
+              "type": "Added",
+              "html": "<code>actingAs(user)</code> at <code>@warlock.js/core/tests</code> issues a real persisted access token and returns isolated authenticated HTTP helpers. Middleware remains active; <code>client.dispose()</code> revokes only its token."
+            },
+            {
+              "type": "Added",
+              "html": "Optional Oxlint background file checks during development. Install Oxlint in the app and add <code>.oxlintrc.json</code>, <code>.oxlintrc.jsonc</code>, <code>oxlint.config.ts</code> or <code>oxlint.config.mts</code>; changed files are linted in sequential batches in a worker and JSON diagnostics appear with rule, location and severity. Large boot scans stay within platform command-line limits, tool/config failures include actionable CLI output, and results omit source contents. Both configured ESLint and Oxlint run by default; ESLint still needs only its app configuration and uses core's own dependency. <code>devServer.healthCheckers</code> also accepts <code>{ typescript?, eslint?, oxlint? }</code> switches while preserving custom arrays and <code>false</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Real Redis integration coverage for cache-backed HTTP rate-limit stores, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with <code>WARLOCK_REDIS_INTEGRATION=1</code>; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys."
+            },
+            {
+              "type": "Added",
+              "html": "Image variants support object-storage disks through <code>resolveImageVariant</code>, <code>createUploadedFileController</code> and <code>generateImageVariants({ disk, urlPrefix })</code>. Remote originals retain their driver URL; derivatives are cached locally, with bounded source reads and generation keys that isolate buckets and tenant prefixes. ETag metadata avoids downloads on cache hits; sources without an ETag use content hashes. Concurrent downloads are shared, and ingest downloads once for all variants/formats. The default public uploads controller keeps returning 404 for cloud default disks; an explicit <code>disk</code> or <code>remote: true</code> deliberately opts a controller into cloud serving."
+            },
+            {
+              "type": "Added",
+              "html": "<code>uploads.images.maxCacheBytes</code> (default 512 MiB) and <code>maxCacheAge</code> (default seven days) bound cached derivatives. Expired hits render again; cleanup removes expired and oldest files, retaining the derivative being returned even when it alone exceeds the byte budget. Writes schedule a coalesced background sweep at most once per minute; hits never walk the cache and the byte budget is eventual. Idle caches are reclaimed after their next generated derivative."
+            },
+            {
+              "type": "Added",
+              "html": "SSE supports unnamed events (<code>send(undefined, data)</code>) and raw string payloads through a fourth <code>{ raw: true }</code> argument, with safe multiline <code>data:</code> encoding. SSE and streams accept explicit cache <code>headers</code> before flushing while protecting protocol/drain headers and keeping safe cache defaults."
+            },
+            {
+              "type": "Added",
+              "html": "SSE and stream controllers gain synchronous <code>enqueue()</code> with a byte cap (<code>maxQueuedBytes</code>, default 1 MiB for enqueue), disconnect/drop overflow policies with a visible <code>dropped</code> counter, ordered draining and flushing accepted queued output on <code>end()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>http.logging.private</code> applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies check raw, decoded and resolved paths plus the matched route pattern, remove input before snapshots are built and cannot be overridden by per-route logging. Dev-dispatch error URLs use the same policy."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock dev</code> exits with code 1 and a clear error when it is started on Bun or Deno: the development server is Node-only. Before, it started partway and then failed in confusing ways. The error names the runtime and points to the production start commands. <code>warlock build</code> on Bun or Deno still runs, but prints a notice that only the Node build is verified."
+            },
+            {
+              "type": "Changed",
+              "html": "A source checkout of <code>@warlock.js/core</code> run by a runtime without <code>module.registerHooks</code> now prints what is missing, instead of failing with \"registerHooks is not a function\"."
+            },
+            {
+              "type": "Changed",
+              "html": "Static file serving loads <code>@fastify/static</code> on the first file request instead of at boot, including existing public folders and <code>router.directory</code> mounts. The directory globber loads at boot only for <code>wildcard: false</code>. Concurrent first requests share initialization; upstream headers, ranges, listings, decorators and exact routes for <code>wildcard: false</code> are preserved."
+            },
+            {
+              "type": "Changed",
+              "html": "Request-log privacy rules (<code>http.logging.private</code>) are prepared once per configured array instead of on every log snapshot: each string prefix is normalised a single time, and a regex rule's need for a fresh copy (global or sticky flags) is decided once. Setting a new array applies its rules; editing the existing array in place is no longer picked up. The logging docs and <code>configure-app</code> skill now also say that a route pattern containing a <code>%</code> that does not decode withholds body and query on every request to that route."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> Node.js 22.15 or newer is required (<code>engines.node: \"&gt;=22.15\"</code>): the <code>warlock</code> CLI loads TypeScript through <code>module.registerHooks</code>, which Node added in 22.15. <code>warlock upgrade --from 5.30 --to 5.31.0</code> raises the app's <code>engines.node</code>, <code>.nvmrc</code> and <code>.node-version</code> (codemod <code>node-22-15</code>)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Skill examples compile against the current API: the LLM-streaming example iterates <code>agent.stream()</code> events (<code>agent.trip.streaming</code> / <code>event.delta</code>), the raw-query example uses <code>app.database?.driver.query(...)</code>, the environment-aware logging example sets per-channel <code>levels</code> (<code>LogConfigurations</code> has no <code>level</code>), the authenticated-test examples use <code>authService.createTokenPair(user)</code> and <code>accessToken.token</code>, <code>devServer.healthCheckers</code> shows a valid value, and examples import or declare everything they use."
+            },
+            {
+              "type": "Fixed",
+              "html": "Running <code>bin/warlock.js</code> from a source checkout (no <code>esm/</code> build next to it) no longer crashes every booting command (<code>doctor</code>, <code>inspect</code>, <code>mcp</code>, <code>routes</code>) on Node.js 22.15 with <code>TypeError: t is not a function</code> from <code>dayjs.extend</code>. The bin's TypeScript <code>load</code> hook ran in the main thread, and on 22.15 that hands a CommonJS package the empty, not-yet-run exports of a file an ES module also imports (<code>@mongez/time-wizard</code> requiring the dayjs <code>utc</code> and <code>timezone</code> plugins). The hook now runs in a <code>module.register()</code> loader worker. Bare subpaths of a package consumed as source, such as <code>@warlock.js/core/net</code>, now resolve to the directory's <code>index.ts</code> instead of failing with <code>ERR_UNSUPPORTED_DIR_IMPORT</code>, so <code>warlock mcp</code> loads <code>@warlock.js/ai</code> from source. The published package, which loads compiled output without hooks, was not affected."
+            },
+            {
+              "type": "Fixed",
+              "html": "Conditional requests follow RFC 9110: <code>If-None-Match</code> uses weak comparison on both sides (a weak current ETag now matches its strong form) and parses quoted tags containing commas; <code>If-Match</code> uses strong comparison, so a <code>W/</code> tag never satisfies it. <code>response.sendFile()</code>, <code>sendBuffer()</code>/<code>sendImage()</code> with an <code>etag</code> and the uploads variant controller answer a failed <code>If-Match</code> or <code>If-Unmodified-Since</code> with 412, and evaluate the headers in the RFC order."
+            },
+            {
+              "type": "Fixed",
+              "html": "The development wildcard dispatcher applies the global rate limiter per matched route instead of to every request, so a route exempted with <code>rateLimit: false</code> or <code>serverOptions: { config: { rateLimit: false } }</code>, a static file route and an unmatched URL are not counted, exactly as in production. Routes with a wildcard path share the global bucket in both modes."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock generate.module</code> list controllers validate their query (<code>page</code>, <code>limit</code>) with a schema and pass <code>request.validated()</code> to the list service instead of <code>request.all()</code>; the web starter's contact route is registered with <code>public: true</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "React module-resolution regressions preserve the ESM package boundary in isolated fixtures and report child-process stderr before checking output, so missing and broken React installations are tested correctly under Node.js 22.15."
+            },
+            {
+              "type": "Fixed",
+              "html": "The TypeScript worker configured-root regression uses the framework's real source-worker bootstrap on Node.js 22.15, retaining its declaration, update and deletion checks instead of starting an unsupported direct <code>.ts</code> worker entry. The same assertions also run against a built <code>.mjs</code> worker without loader hooks."
+            },
+            {
+              "type": "Fixed",
+              "html": "Upgrade guidance names <code>AgentConfig.compaction</code>, covers sub-agent dispatch and blank/default validation changes, and explains which routes the production rate quotas cover. In 5.31, <code>purgeImageVariants()</code> preserves legacy two-level cache files; retire them manually, correcting the earlier 5.30 cleanup suggestion."
+            },
+            {
+              "type": "Fixed",
+              "html": "Per-file image-cache purges refuse symlinked shard directories for local and object-storage disks. Stale-generation pruning now removes only recognized cache files from older generation-shaped folders, preserving current-generation files, unrelated entries, directories and symlinks."
+            },
+            {
+              "type": "Fixed",
+              "html": "The error-handling guide gives the schema-validation failure status as 422, matching the framework default, and the validation skill's introduction no longer says 400."
+            },
+            {
+              "type": "Fixed",
+              "html": "The validation skill shows the HTTP 422 body as strict JSON that can be copied into a JSON parser."
+            },
+            {
+              "type": "Fixed",
+              "html": "Image-variant purges remove only recognized cache files and retain the cache root, directories, unrelated files and symlinks. Purge and background eviction validate every shard/source/generation path component, so a cache nested inside storage cannot recursively delete uploads. Use a dedicated derivative folder."
+            },
+            {
+              "type": "Fixed",
+              "html": "Notification test fixtures roll back partially created users, tokens and rows on setup failure, attempt all cleanup operations and clear their reference before teardown. <code>actingAs()</code> refuses non-test environments before issuing credentials and revokes a newly issued blank token before rejecting it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Image-variant generation and purging reject a cache directory that equals or contains any configured local storage root, including runtime-registered disks and symlink aliases. Validation happens in the shared cache-directory resolver, so <code>purgeImageVariants()</code> cannot bypass it and delete uploads through an overlapping cache setting."
+            },
+            {
+              "type": "Fixed",
+              "html": "Oxlint failures preserve stdout config errors alongside stderr warnings and bound command diagnostics without echoing file arguments. Health-worker shutdown waits briefly for child cleanup before forced termination."
+            },
+            {
+              "type": "Fixed",
+              "html": "Generator selection prompts reject an empty choices list before opening terminal input; indexed reads retain their validated bounds under stricter compiler checks."
+            },
+            {
+              "type": "Fixed",
+              "html": "Framework HTTP/2 servers start with default shutdown options and track sessions even without HTTP/1 idle-connection support. Graceful HTTP/2 drains close sessions after active streams finish without setting forbidden connection headers. SSE and stream helpers omit HTTP/1 framing headers on HTTP/2."
+            },
+            {
+              "type": "Fixed",
+              "html": "Both sse() and stream() ignore caller Content-Length, Transfer-Encoding, Content-Type, Connection, Keep-Alive, Proxy-Connection and Upgrade option headers. HTTP/1.1 retains chunked framing and reusable connections; HTTP/1.0 remains close-delimited without Transfer-Encoding."
+            },
+            {
+              "type": "Fixed",
+              "html": "Generated Vitest configuration discovers both <code>.test.ts</code> and <code>.spec.ts</code>, including notification controller specs. Existing apps should use <code>include: [\"src/app/**/*.{test,spec}.ts\"]</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Source health-check workers start on Node.js 22.15 through a JavaScript bootstrap and tsx's import API; passing a <code>.ts</code> entry directly to a worker could fail before its loader hook ran. Published <code>.mjs</code> workers keep their direct startup path."
+            },
+            {
+              "type": "Fixed",
+              "html": "The cache-backed rate limiter supplies its per-window TTL on every atomic increment, so a key that expires after the create-only seed cannot be recreated without an expiry."
+            },
+            {
+              "type": "Fixed",
+              "html": "The CLI rejects unsupported Node versions with one clear message and a non-zero exit before loading the published entry or registering the source loader."
+            },
+            {
+              "type": "Fixed",
+              "html": "Image-variant cache sweeps remove writer temporaries left by a crashed write once they are an hour old, and remove a generation's <code>source.json</code> and then its empty directory (after a five-minute grace, never through a symlink) once its derivatives are gone, so object-storage generations no longer pile up when ETags change. Scheduled checks skip the cache walk while the estimate is within budget and nothing has expired; the first check after boot and one per <code>maxCacheAge</code> still walk."
+            },
+            {
+              "type": "Fixed",
+              "html": "A cache directory or disk root that cannot be resolved (<code>ENOTDIR</code>, <code>EACCES</code>, <code>ELOOP</code>) now throws <code>ImageVariantsConfigError</code>, with the original error as its <code>cause</code>, instead of the raw file-system error. The cache-overlap guard remembers its result per cache, disk root and configured local roots instead of resolving every path on each variant request; a newly registered disk is checked again."
+            },
+            {
+              "type": "Fixed",
+              "html": "Dev-server Oxlint checks no longer abort a boot scan on one over-long path: it runs in its own batch and, if the OS still refuses it, only that file is reported as unchecked. Batches count each argument's <code>argv</code> pointer on POSIX, hold at most 500 files, and a batch whose report overflows the output buffer is split and retried. Shutdown sends SIGKILL 250 ms after SIGTERM to a CLI child that ignores it, and an interrupted check reports a cancellation instead of a 30-second timeout."
+            },
+            {
+              "type": "Security",
+              "html": "In every release up to and including 5.30.0, the global <code>http.rateLimit</code> did not apply to application routes in production, and per-route <code>rateLimit</code> options had no effect in production (development enforced them). 5.31 enforces both: the shared bucket now covers pages and API routes. Static files (the public folder, <code>router.directory()</code> mounts, <code>router.file()</code> routes and the web build's assets) and the built-in liveness and readiness probes are exempt by default; <code>http.rateLimit.staticFiles: true</code> and <code>http.health.rateLimit: true</code> opt them into the global policy."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 42,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 30
+            },
+            {
+              "type": "Changed",
+              "n": 6
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Usage.inputIncludesCache</code> says whether <code>input</code> contains the cache counters (set by each first-party adapter; absent reads as <code>true</code>), and <code>Usage.cacheWrite1hTokens</code> counts 1-hour cache writes. Usage merged across providers with different semantics is normalised to <code>true</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelPricing.cacheWrite</code> and <code>cacheWrite1h</code> (USD per 1M tokens written to the cache, default and 1-hour lifetime). Cost breakdowns carry cache-write spend in <code>cost.cacheWrite</code>; <code>computeCost</code> also bills <code>reasoningTokens</code> at <code>ModelPricing.reasoning</code> when that rate is set."
+            },
+            {
+              "type": "Added",
+              "html": "<code>totalCost(cost)</code> sums every channel of a cost breakdown; <code>attachCost(usage, pricing)</code> attaches it to a usage. First-party adapters now attach <code>usage.cost</code> to <code>model.complete()</code> and the streaming <code>done</code> chunk when the model is priced, so side calls outside an agent are costed."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ProviderError.status</code> (HTTP status), <code>.billed</code> (<code>true | false | \"unknown\"</code>, failing closed to <code>\"unknown\"</code> unless the call never reached a billable account or the provider documents the status as free) and <code>.retryable</code>. <code>ProviderErrorOptions</code> and <code>ProviderBilled</code> are exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ProviderOverloadedError</code> with code <code>PROVIDER_OVERLOADED</code> (always retryable) for provider overloads; <code>fallbackModel</code> fails over on it by default."
+            },
+            {
+              "type": "Added",
+              "html": "<code>estimateInputTokens(messages, options)</code> — an offline estimate of a call's input tokens (text, tool calls, tool schemas, response schema) — and <code>countInputTokens(model, messages, options)</code>, which uses the model's native <code>countTokens</code> when it has one and reports <code>source: \"native\" | \"estimate\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>budget({ reserve: { outputTokens, inputTokens? } })</code>: reserve each trip's worst case before the call, commit the actual usage after it, release the reservation when the call fails. Applies to the run caps and, atomically through the store, to <code>scoped</code> ledgers, so concurrent runs cannot jointly overspend. <code>BudgetPricing</code> entries may now be a <code>ModelPricing</code> (cache rates included) besides <code>{ inputPer1K, outputPer1K }</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>measureTools(tools, { model, mode })</code> reports the input tokens a tool list adds per call, per tool and in total, counted natively when the model can and estimated otherwise. Registered as <code>ai.tools.measure</code> by <code>@warlock.js/ai-tools</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Compact tool schemas: <code>compactJsonSchema()</code>, <code>extractJsonSchema(schema, { compact })</code>, <code>withCompactJsonSchema()</code>, <code>compactToolSchemas()</code> and the <code>toolSchemas: \"full\" | \"compact\"</code> option on <code>ai.agent()</code> and <code>execute()</code>. Compact schemas drop annotations (descriptions, titles, examples, defaults) and collapse const unions to <code>enum</code>; validation is unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "<code>createToolContext({ artifacts?, signal? })</code> builds the <code>ToolContext</code> for invoking a tool outside the agent loop."
+            },
+            {
+              "type": "Added",
+              "html": "<code>verifyModelSignalContract({ createModel })</code> checks that a model adapter honours <code>ModelCallOptions.signal</code>: a call with an already-aborted signal rejects, and aborting mid-call rejects promptly and cancels the HTTP request, for <code>complete()</code> and <code>stream()</code>. It serves an ephemeral local port that never answers (<code>protocol: \"http2\"</code> for HTTP/2 clients), has no test-runner dependency, and throws an <code>Error</code> naming the failed check. Honouring <code>signal</code> is now part of the documented <code>ModelContract</code>, and every first-party adapter runs this check."
+            },
+            {
+              "type": "Added",
+              "html": "<code>continueOnOutputLimit: n</code> on <code>AgentConfig</code> and <code>AgentExecuteOptions</code>: up to <code>n</code> times per run, a response cut off by the output cap is continued with a continue turn and the segments are joined in <code>result.text</code> (and the structured output parsed from it), also on the stream and during repair. A tool call cut off mid-input is dropped and the model is told it did not run. Each continuation is a trip within <code>maxTrips</code>; a full context window is never continued."
+            },
+            {
+              "type": "Added",
+              "html": "<code>agent.execute(input, { modelOptions })</code> and <code>agent.stream(input, { modelOptions })</code> set model call options (reasoning effort, <code>maxTokens</code>, <code>cacheControl</code>, <code>providerOptions</code>, …) for that run only, shallow-merged over <code>AgentConfig.modelOptions</code>; the agent is not changed. <code>tools</code>, <code>signal</code> and <code>responseSchema</code> in the per-call object are ignored."
+            },
+            {
+              "type": "Added",
+              "html": "Tool events carry the provider's tool-call id as <code>callId</code>: <code>agent.tool.calling</code>, <code>agent.tool.called</code> and <code>agent.tool.failed</code> (event payloads and stream events), the <code>ToolCall</code> record (<code>report.children[].callId</code>), the tool middleware context (<code>ctx.callId</code>), and the human-approval <code>PolicyContext</code> / <code>ApprovalRequestContext</code>. Concurrent calls to the same tool in one trip can now be told apart. Tool log lines include it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>AgentIncompleteError</code>, <code>AgentIncompleteErrorOptions</code> and <code>AgentIncompleteReason</code> are exported; <code>AIErrorCode</code> gains <code>AGENT_INCOMPLETE</code>, <code>ErrorCategory</code> and <code>ReportStatus</code> gain <code>incomplete</code>, and <code>LLMTrip</code> gains <code>truncatedToolCalls</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>agent.stream()</code> emits <code>agent.trip.reasoning</code> (reasoning / thinking text), <code>agent.tool.streaming</code> (<code>{ callId, name, delta }</code> pieces of a tool call's arguments while the model writes them) and <code>agent.trip.usage</code> (running token counts for the trip) wherever the provider streams them. <code>execute()</code> is unchanged; <code>modelOptions.streamChunks</code> turns them down."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelStreamChunk</code> gains <code>reasoning</code>, <code>tool-args</code> and <code>usage</code> chunks. They are opt-in on <code>model.stream()</code> through <code>ModelCallOptions.streamChunks</code> (<code>true</code> or <code>{ reasoning?, toolArgs?, usage? }</code>), so existing chunk consumers see exactly the old <code>delta</code> / <code>tool-call</code> / <code>done</code> sequence. <code>resolveStreamChunks(options)</code> resolves the option for adapters; <code>MockModel</code> emits all three (scripted <code>reasoning</code>, the tool input as <code>tool-args</code>, a final <code>usage</code>) when asked."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.providerTool({ provider, definition, execute? })</code> declares a provider-defined tool (web search, code execution, bash, text editor, search grounding, …). The agent sends it as <code>ModelCallOptions.providerTools</code>; only the named provider receives the definition, verbatim, and every other adapter skips it with one <code>providerTool.skipped</code> warning. Client-run provider tools dispatch to <code>execute</code> by name. Also exported: <code>isProviderTool</code>, <code>selectProviderTools</code> (adapter helper), <code>ProviderTool</code>, <code>ProviderToolDefinition</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Regression fixtures assert required model and identifier segments before reading them under stricter indexed-access checks; the compiler error budget falls by ten."
+            },
+            {
+              "type": "Added",
+              "html": "Skills include complete examples for per-trip tool concurrency and native token preflight with provider-specific request options."
+            },
+            {
+              "type": "Added",
+              "html": "Agents can opt into automatic history compaction with an explicit token threshold, a summary callback and an optional native/custom counter. System prompts, current input and tool groups are preserved. Applied/skipped decisions are recorded on reports and durable snapshots."
+            },
+            {
+              "type": "Added",
+              "html": "Compaction works on thinking runs. The replaced range always ends before the open tool round, which goes back verbatim with its signed thinking. When kept turns after the range carry signed reasoning, the summary is framed as user context and those turns are marked <code>compaction: \"retained\"</code> (the summary <code>compaction: \"summary\"</code>), so adapters whose providers bind reasoning to the exact prior history can leave it out on replay."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.compaction.summarize({ model, instructions?, maxTokens?, modelOptions?, onUsage? })</code> (also <code>summarizeCompaction</code>): a ready-made <code>compaction.summarize</code> callback. It sends the slice as a tagged transcript with Anthropic's published client-side compaction prompt (<code>DEFAULT_COMPACTION_INSTRUCTIONS</code>), reads the <code>&lt;summary&gt;</code> tags, and throws on a truncated, refused or empty reply so the agent keeps the conversation. <code>renderTranscript(messages)</code> is exported for custom callbacks."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.session({ id, store, agent, lock? })</code>: a persisted multi-turn conversation with one agent — <code>send</code>, <code>stream</code>, <code>history</code>, <code>load</code>, <code>fork</code>, <code>truncate</code>, <code>resume</code>, <code>clear</code>. Each send stores the whole turn (tool rounds, provider blocks, attachment parts), failed runs leave the history unchanged, sends on one session id are serialized, the agent's compaction policy compacts long sessions, and a send interrupted by a crash resumes through a durable agent."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.snapshot.file({ dir })</code> and <code>ai.snapshot.sqlite({ path } | { database })</code> snapshot stores for local-first apps, usable for durable runs, supervisor snapshots and sessions. The SQLite store uses Node's built-in <code>node:sqlite</code> (Node 22.5+; no flag on Node 22.13+), loaded only on first use, or any open <code>exec</code> / <code>prepare</code> database such as <code>better-sqlite3</code>; it creates its table on first use unless <code>createTable: false</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Message.compaction</code> / <code>CapturedMessage.compaction</code> (<code>\"summary\" | \"retained\"</code>), and a per-call <code>captureMessages</code> option on <code>agent.execute</code> / <code>stream</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.snapshot.pg()</code> and <code>ai.snapshot.redis()</code> are generic over the snapshot shape like the other snapshot factories; the default stays <code>SupervisorSnapshot</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelContract.countTokens?()</code> represents optional native input-token preflight, separate from offline SDK estimates."
+            },
+            {
+              "type": "Added",
+              "html": "<code>SpawnSubAgentSpec</code> accepts <code>toolDispatch</code> and <code>maxConcurrentTools</code>, forwarded to the fresh agent. Defaults match <code>ai.agent()</code> (concurrent, up to four calls)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ToolContext.request</code> (<code>ToolRequestContext</code>: <code>headers</code>, <code>remoteAddress</code>) carries the inbound request when a server transport runs the tool for a remote client, such as <code>ai.mcp.serve</code> over HTTP. It is unset for in-process dispatch and never reaches the model."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>MockModel</code> infers <code>finishReason: \"tool_calls\"</code> when a scripted response has non-empty <code>toolCalls</code> and no <code>finishReason</code>, so scripted tool calls run without repeating the finish reason. An explicit <code>finishReason</code> still wins."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>MockModel</code> honours <code>signal</code>: an already-aborted signal rejects the call, an abort during a scripted <code>delay</code> rejects immediately, and <code>stream()</code> stops between chunks. The rejection is the signal's <code>reason</code> when it is an <code>Error</code>, otherwise an <code>AbortError</code> <code>DOMException</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>@warlock.js/ai</code> imports Core's private-address classifier from the new side-effect-free <code>@warlock.js/core/net</code> subpath instead of the Core root, so a standalone process running <code>ai.agent</code> no longer loads Core's HTTP server, database, cache and mail modules, and bundlers no longer need to alias Core. An import-graph test fails if anything reachable from the package entry imports the Core root. The installation guide documents <code>@warlock.js/cache</code> and <code>@warlock.js/cascade</code> as optional, lazily loaded peers for standalone use."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> An agent run whose final response was cut off — by the output token cap (<code>finishReason: \"length\"</code>) or the context window (<code>\"context_exceeded\"</code>) — no longer finishes as a success with empty or partial text. It ends with <code>result.error</code> an <code>AgentIncompleteError</code> (<code>code: \"AGENT_INCOMPLETE\"</code>, category <code>\"incomplete\"</code>, <code>reason: \"output_limit\" | \"context_window\"</code>, <code>tripIndex</code>, <code>continuations</code>) and <code>report.status: \"incomplete\"</code>; <code>result.text</code> keeps the partial text. A tool call the model was still writing is never executed and is listed on the trip's new <code>truncatedToolCalls</code>. Durable snapshots of such a run are stored as <code>failed</code>, so <code>resume()</code> retries the cut-off trip."
+            },
+            {
+              "type": "Changed",
+              "html": "The semantic cache never stores a response cut off by the output cap or the context window; a continued answer is stored whole."
+            },
+            {
+              "type": "Changed",
+              "html": "The provider matrix documents inherited <code>providerOptions.openai.body</code> on xAI, Groq, DeepSeek and Mistral, and warns against sharing provider-specific fields across incompatible fallback models."
+            },
+            {
+              "type": "Fixed",
+              "html": "Skill examples compile against the current API: the guardrail skills import from <code>@warlock.js/ai</code> (guardrails ship in core; there is no <code>@warlock.js/ai-guard</code> package), <code>ai.config({ defaultStore })</code> awaits <code>cache.driver(...)</code>, <code>MockSDK</code> is called without <code>new</code>, the observer skill no longer lists the internal <code>clearObservers</code>, the vector-store tool maps <code>{ key, score, value }</code> hits, and examples declare the agents, tools and clients they use."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>computeCost</code> bills Anthropic and Bedrock prompt caching correctly. Their <code>input</code> excludes cache reads and writes, so cache reads are no longer subtracted from it (which could floor fresh input at 0), and cache writes are now charged: at <code>ModelPricing.cacheWrite</code>, with the 1-hour share at <code>cacheWrite1h</code>. OpenAI-style usage, where <code>input</code> includes cached tokens, is billed as before."
+            },
+            {
+              "type": "Fixed",
+              "html": "Batch, planner and fallback-model usage rollups use the shared <code>mergeUsage</code>, so they keep every usage channel and the cache semantics flag."
+            },
+            {
+              "type": "Fixed",
+              "html": "The streaming agent loop reads the finish reason and usage only from the <code>done</code> chunk and ignores chunk types it does not know, instead of treating any other chunk as <code>done</code>. <code>fallbackModel().stream()</code> still falls over after a model emitted only a <code>usage</code> chunk."
+            },
+            {
+              "type": "Fixed",
+              "html": "Automatic compaction preserves the original execution input during output repair and durable resume, records its updated snapshot index, and frames a first-turn summary as user context. Legacy snapshots with missing or ambiguous input skip compaction safely."
+            },
+            {
+              "type": "Fixed",
+              "html": "A durable snapshot's persisted input index is trusted on resume only when it is an integer inside the conversation that points at a <code>user</code> message. An out-of-range, negative, fractional or non-user index (a corrupted or hand-edited snapshot) falls back to finding the unique matching input, and compaction itself refuses to protect a non-user message, recording <code>no-safe-range</code> instead of summarising the input."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-cli",
+          "slug": "ai-cli",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 10
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "First release: drive vendor coding-agent CLIs headless as agents. <code>cli.&lt;vendor&gt;(options)</code> (also <code>ai.cli.&lt;vendor&gt;</code> after importing the package) returns a CLI agent. <code>run(prompt, { cwd, resume, signal, timeoutMs, model, effort, permission, mcp, env, apiKey, args })</code> starts one session, and returns <code>CliSession</code> with <code>events</code>, <code>done()</code> and <code>cancel()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Adapters for Claude Code, Codex, Antigravity, Qwen Code, Kimi Code, Cursor, Copilot, Grok Build, OpenCode, Amp, Factory Droid, Mistral Vibe, Aider and Reasonix. Each records the CLI version, the official sources, and whether it was verified against the real <code>--help</code> or against the docs (<code>adapter.verification</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "One event model for every vendor: <code>session.started</code>, <code>message</code> (deltas and complete messages), <code>tool.call</code>, <code>tool.result</code>, <code>usage</code>, <code>error</code> and <code>session.ended</code>. <code>session.done()</code> resolves <code>{ status, text, messages, usage, sessionRef, exitCode, signal, error, stderr, durationMs }</code> and never rejects."
+            },
+            {
+              "type": "Added",
+              "html": "Capability probe: before the first run, the CLI's <code>--version</code> and help screens are read, and every flag the launch plan relies on must be listed. A missing flag fails the run with <code>CliError</code> (<code>type: \"capability\"</code>), naming the flag and the installed version."
+            },
+            {
+              "type": "Added",
+              "html": "Secrets never go to argv: - API keys travel in the environment (<code>apiKey</code>). - Per-run MCP servers are written as a mode-0600 file in a private per-run directory, removed after the run. - Each run gets a private config home by default (<code>CLAUDE_CONFIG_DIR</code>, <code>CODEX_HOME</code>, <code>COPILOT_HOME</code>, <code>GROK_HOME</code>, …). <code>home</code> also takes a path you own, or <code>\"inherit\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>permission</code> defaults to <code>\"standard\"</code>, the CLI's own non-interactive approval rules. Each vendor's approve-everything mode is used only with <code>permission: \"bypass\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Windows spawn rules: - <code>PATHEXT</code> lookup. - npm and pnpm <code>.cmd</code> shims are unwrapped to <code>node &lt;script&gt;</code> (or their native <code>.exe</code>). - Other batch files fall back to <code>cmd.exe /d /v:off /s /c</code> with every argument quoted, refusing bytes <code>cmd.exe</code> cannot carry. - The prompt moves to stdin or a prompt file when argv cannot carry it."
+            },
+            {
+              "type": "Added",
+              "html": "Cancellation (<code>signal</code>, <code>cancel()</code>) and <code>timeoutMs</code> kill the CLI's whole process tree. On POSIX this is its own process group, with SIGTERM then SIGKILL; on Windows, <code>taskkill /T /F</code> on its PID."
+            },
+            {
+              "type": "Added",
+              "html": "<code>agent.model(config)</code> / <code>cliModel(agent, config)</code> wraps a CLI agent as a <code>ModelContract</code>, so <code>ai.agent</code> and its budget, guardrail, observer and fallback middleware can drive a CLI."
+            },
+            {
+              "type": "Added",
+              "html": "<code>createCliAgent(adapter, options)</code> / <code>cli.custom(adapter)</code> and the documented <code>CliAdapter</code> interface let apps add vendors. The building blocks are exported: <code>jsonLinesParser</code>, <code>createClaudeStreamParser</code>, <code>mcpServersJson</code>, <code>toToml</code>, <code>mapEffort</code>, <code>requirePrivateHome</code> and more."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>session.cancel()</code>, or aborting the run's <code>signal</code>, after the run has finished no longer signals the CLI's old process group. Once the CLI's pipes close, cancellation is a no-op, so a <code>finally { session.cancel() }</code> cannot reach an unrelated process that reused the pid. The abort listener is also removed when the run settles."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 8
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Skills include complete examples for viewport metadata, typed Link wrappers, runtime route-name checks and independent form submissions with query parameters. Settled-outcome guidance handles action errors and dropped submissions separately from completed requests."
+            },
+            {
+              "type": "Added",
+              "html": "Development checks compile the optional Web Vitals example against its actual types; Web Vitals remains an app-installed optional dependency."
+            },
+            {
+              "type": "Added",
+              "html": "<code>&lt;Form onSettled={outcome =&gt; …}&gt;</code> observes every enhanced submission outcome, including network failures and dropped submissions, after the existing success/error callbacks. Native browser submissions do not invoke it."
+            },
+            {
+              "type": "Added",
+              "html": "A submit button marked <code>data-independent</code> opts that submission into independent mode, so a Cancel button can run beside Start within the same form."
+            },
+            {
+              "type": "Fixed",
+              "html": "Sitemap routes compare <code>If-Match</code> strongly and answer 412 when it does not name the exact strong ETag; <code>If-None-Match</code> keeps weak comparison and both use core's RFC 9110 precondition evaluation. The <code>W/</code> weakness prefix is matched case-sensitively, as the RFC defines it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Pages render on Bun and Deno. Both runtimes resolve a bare <code>react-dom/server</code> import through their own export conditions to a React build without <code>renderToPipeableStream</code>, so every page request on a built app failed with \"renderToPipeableStream is not a function\" (HTTP 500). The page renderer now loads React's Node server build, <code>react-dom/server.node</code>, when the selected build cannot stream. Node keeps the module it selected before."
+            },
+            {
+              "type": "Fixed",
+              "html": "The server-page-cache test fixture explicitly disables unrelated HTTP throttling and restores its previous configuration on teardown, so repeated cache requests exercise cache behavior after production rate-limit enforcement was corrected."
+            },
+            {
+              "type": "Fixed",
+              "html": "Published page skills include complete support modules, schemas and generated-type prerequisites; their HTTP examples and Vitest discovery match current APIs. The skill compile gate verifies them without a failure allowance."
+            },
+            {
+              "type": "Fixed",
+              "html": "The root middleware example declares its own request-local type rather than depending on another skill's augmentation."
+            },
+            {
+              "type": "Fixed",
+              "html": "Guarded <code>useUser(name)</code> retains the last committed signed-in user when a concurrent transition suspends and is abandoned. Navigation callbacks also read the committed page, and boundary reset counters commit with their page swap. A regression verifies that an abandoned transition preserves the visible error fallback and does not report its error again before the next committed swap."
+            },
+            {
+              "type": "Fixed",
+              "html": "Locale context reuse after development edits is covered by a real Vite dev-server/HMR regression: a retained provider continues to serve refreshed locale and translation hooks after repeated filesystem edits. An unshared-context control reproduces the missing-provider HTTP failure."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>&lt;Form&gt;</code>'s <code>onSettled</code> documentation says that a form unmounting drops only independent submissions (the form's <code>independent</code> prop or a <code>data-independent</code> submit button); other in-flight submissions are not aborted by an unmount. Regression tests cover <code>onSettled</code> running once when <code>onSuccess</code> throws and a <code>data-independent</code> button's submission being aborted on unmount."
+            },
+            {
+              "type": "Security",
+              "html": "The global HTTP rate limiter that 5.31 enforces covers page routes and API routes; the production client bundle (<code>/assets/*</code>) and the public files copied by <code>warlock build</code> are static files and exempt by default, so one page load's script, stylesheet, font and image requests do not spend the visitor's quota. <code>http.rateLimit.staticFiles: true</code> counts them again. In development, Vite answers module and asset requests before any route runs, so they never count."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 22,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 12
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 7
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Built-in Claude API list prices (<code>ANTHROPIC_MODEL_PRICING</code>, <code>anthropicPricingFor</code>, <code>withAnthropicCacheWriteRates</code>), from Anthropic's pricing page as of 2026-10-17, used when neither the model nor the SDK registry is priced. Dated snapshot ids resolve to their alias. Claude Haiku 5.5 (priced by prompt length) is left unpriced."
+            },
+            {
+              "type": "Added",
+              "html": "<code>complete()</code> and the streaming <code>done</code> chunk attach <code>usage.cost</code> when the model is priced."
+            },
+            {
+              "type": "Added",
+              "html": "529 / <code>overloaded_error</code> responses and mid-stream overload events throw <code>ProviderOverloadedError</code>; every wrapped error carries <code>status</code>, <code>billed</code> and <code>retryable</code>."
+            },
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> on the model and cancels the HTTP request."
+            },
+            {
+              "type": "Added",
+              "html": "<code>AnthropicModelConfig.maxOutputTokens</code> overrides the inferred model output limit that sizes the default <code>max_tokens</code>."
+            },
+            {
+              "type": "Added",
+              "html": "With <code>streamChunks</code>, <code>stream()</code> yields <code>reasoning</code> for <code>thinking_delta</code>, <code>tool-args</code> for the <code>input_json_delta</code> of client <code>tool_use</code> blocks, and <code>usage</code> after <code>message_start</code> and each <code>message_delta</code>. <code>send()</code> takes the same <code>streamChunks</code> transport option."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.providerTool({ provider: \"anthropic\", definition })</code> entries (<code>web_search</code>, <code>web_fetch</code>, <code>code_execution</code>, <code>bash</code>, <code>text_editor</code>, <code>memory</code>, …) are sent verbatim ahead of the function tools; the prompt-cache breakpoint stays on the last function tool. Other providers' tools are skipped with a warning. The reserved <code>providerOptions.anthropic.body</code> keys are unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "Typed context management on <code>providerOptions.anthropic</code>: <code>contextManagement.clearToolUses</code> / <code>clearThinking</code> (<code>clear_tool_uses_20250919</code> / <code>clear_thinking_20251015</code>, beta <code>context-management-2025-06-27</code>) and <code>serverCompaction</code> (<code>compact_20260112</code>, beta <code>compact-2026-01-12</code>, trigger of at least 50,000 input tokens). The adapter builds the edits in the order the API requires and adds the beta headers; combining them with <code>body.context_management</code> fails with <code>InvalidRequestError</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>thinkingBlockBinding: \"error\" | \"drop_block\"</code> sends <code>thinking.block_binding.prefix_mismatch_behavior</code> with the <code>thinking-binding-controls-2026-08-01</code> beta."
+            },
+            {
+              "type": "Added",
+              "html": "Preserved thinking after client-side compaction: on Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 an assistant turn marked <code>compaction: \"retained\"</code> is replayed without its thinking blocks, which were produced against the replaced history. <code>AnthropicModelConfig.preservedThinking</code> overrides the inference; <code>inferPreservedThinking(name)</code> and <code>ToAnthropicMessagesOptions</code> are exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>AnthropicModel.buildRequest()</code> creates a detached request snapshot for preflight auditing; <code>send(request)</code> sends that snapshot as a completion or stream without rebuilding its body."
+            },
+            {
+              "type": "Added",
+              "html": "Message, tool and provider-block converters and request types are exported from the package root for hosts using their own transport."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>reasoning: { effort: \"none\" }</code> now turns thinking off on Claude Sonnet 5 and Claude Haiku 5.5 with <code>thinking: { type: \"disabled\" }</code> (sent alone, so Haiku 5.5 stays at its default effort, inside the range where <code>disabled</code> is accepted). Previously no <code>thinking</code> field was sent and both models ran adaptive thinking by default."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>reasoning: { effort: \"none\" }</code> on Claude Opus 5 now sends adaptive thinking at <code>output_config.effort: \"low\"</code> instead of omitting <code>thinking</code> (which ran at the default <code>high</code>). Opus 5 is deliberately not sent <code>disabled</code>: with thinking off it can write a tool call as plain text that never runs, and leak thinking tags. Claude Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 are unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> The default <code>max_tokens</code> (when no <code>maxTokens</code> is set) rose from 4096. Streaming requests use the model's documented max output — 128K for the Claude 5 family and Opus 4.6–4.8 / Sonnet 4.6, 64K for Opus / Sonnet / Haiku 4.5 — and non-streaming requests use 16384, capped by the model's max output (the Anthropic SDK requires streaming for larger non-streaming requests unless the client sets a <code>timeout</code>). Unknown ids default to 16384. With thinking on, the default still keeps room for the thinking budget plus 4096 answer tokens, within the model's limit."
+            },
+            {
+              "type": "Fixed",
+              "html": "Usage is marked <code>inputIncludesCache: false</code> (Anthropic's <code>input_tokens</code> excludes cache reads and writes), and 1-hour cache writes are reported in <code>cacheWrite1hTokens</code> from <code>cache_creation.ephemeral_1h_input_tokens</code> — or, when the breakdown is missing, from a request whose every cache marker asked for <code>ttl: \"1h\"</code>. Cost now bills reads and writes once each, at their own rates."
+            },
+            {
+              "type": "Fixed",
+              "html": "Caller pricing that omits cache-write rates gets Anthropic's documented multipliers (5-minute writes 1.25x input, 1-hour writes 2x) instead of billing writes at nothing."
+            },
+            {
+              "type": "Fixed",
+              "html": "Usage includes server-side compaction: the <code>compaction</code> entries of <code>usage.iterations</code>, which the top-level token counts leave out, are added to <code>input</code>, <code>output</code> and the cache counts (completions and streams)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>complete()</code> always builds a non-streaming request, including when an indexed <code>stream</code> option is supplied."
+            },
+            {
+              "type": "Fixed",
+              "html": "A request that fails to build in <code>complete()</code>, <code>stream()</code> or <code>countTokens()</code> (a reserved <code>providerOptions.anthropic.body</code> key, or a <code>body</code> value <code>structuredClone</code> cannot copy, such as a function) is logged like a send failure and rejects with an <code>AIError</code>; errors that are not already one become an <code>InvalidRequestError</code> carrying the original as <code>cause</code>. Before, the raw error escaped unlogged. <code>buildRequest()</code> itself still throws the raw error."
+            },
+            {
+              "type": "Fixed",
+              "html": "The debug log line for a streaming request reads \"Starting streaming call to messages.create\" again; non-streaming requests keep \"Starting call to messages.create\"."
+            },
+            {
+              "type": "Fixed",
+              "html": "The provider docs and <code>setup-anthropic</code> skill say that <code>send()</code> passes <code>betas</code> only to the <code>\"beta.messages\"</code> endpoint."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 21,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 11
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            },
+            {
+              "type": "Security",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>list_dir</code> tool and <code>ws.listDir(path, { depth, ignore })</code>: a bounded, jailed directory listing (breadth-first, types and file sizes, <code>denyPaths</code> and <code>list.ignore</code> left out, symlinks reported but never followed), configured by the new <code>list</code> policy (<code>ignore</code>, <code>maxDepth</code>, <code>maxEntries</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>multi_edit</code> tool and <code>ws.multiEdit({ path, edits, expectHash })</code>: several exact-string replacements in one file, applied in order and written once — all of them or none. <code>WorkspaceEditError.editIndex</code> names the failing edit."
+            },
+            {
+              "type": "Added",
+              "html": "Background commands: with <code>shell.background</code> (<code>{ maxJobs?, timeoutMs? }</code>), <code>run_shell({ background: true })</code> / <code>ws.startShell()</code> start a long-running command owned by the workspace; <code>shell_output</code> / <code>ws.shellOutput(id, { since, waitMs })</code> read its new output (newest <code>shell.maxOutputBytes</code> kept, with a <code>cursor</code>), and <code>shell_kill</code> / <code>ws.shellKill(id)</code> kill its whole process tree. <code>ws.listShells()</code> lists them; <code>WorkspaceJobError</code> reports an unknown id. Backends implement the new optional <code>start()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ws.dispose()</code> kills every background command (whole process trees) and makes the workspace refuse new commands; trees still running when the Node process exits are killed too."
+            },
+            {
+              "type": "Added",
+              "html": "<code>todo_write</code> / <code>todo_read</code> tools and <code>ws.writeTodos()</code> / <code>ws.readTodos()</code>: an in-memory todo list per workspace, shared with its <code>readonly()</code> / <code>scope()</code> projections. <code>TodoStore</code> is exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>shell.denyPatterns</code> (string prefix patterns or RegExps) and <code>shell.allowCommand(argv, ctx)</code> (return <code>true</code>, <code>false</code>, or a refusal explanation) check every command's arguments, so a policy can refuse <code>git push --force</code> or <code>rm -rf /</code> while allowing <code>git</code> and <code>rm</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>shell.interpreter: \"sh\"</code> — an explicit opt-in to shell syntax. The line runs through <code>/bin/sh -c</code> (<code>cmd.exe /d /v:off /s /c</code> on Windows) after it is parsed and every simple command in it — inside <code>;</code>, <code>&amp;&amp;</code>, <code>||</code>, pipes, subshells, <code>$( )</code>, backticks, here-documents and <code>NAME=value</code> prefixes — is checked against <code>deny</code> / <code>allow</code> / <code>denyPatterns</code> / <code>allowCommand</code>. Redirection targets and <code>cd</code> directories must stay in the jail (re-checked with symlinks resolved). Syntax the parser cannot read with confidence is refused. The default stays <code>\"none\"</code> (argv, no shell)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>WorkspacePolicyError.reason</code> (<code>WorkspaceShellRefusalReason</code>: <code>\"metacharacter\"</code>, <code>\"unbalanced-quotes\"</code>, <code>\"denied-executable\"</code>, <code>\"not-allowed\"</code>, <code>\"denied-pattern\"</code>, <code>\"nested-command\"</code>, <code>\"unsupported-syntax\"</code>, <code>\"path-escape\"</code>) and <code>executable</code>, so hosts can phrase refusals themselves. In argv mode the message suggests the split, e.g. \"<code>&amp;&amp;</code> is not supported in argv mode: run <code>git add -A</code>, then <code>git commit -m …</code>, as separate commands.\""
+            },
+            {
+              "type": "Added",
+              "html": "<code>checkShellCommand(policy, command)</code> returns the shell policy's verdict (reason, message, every checked argv, paths) without running anything; <code>analyzeArgvCommand()</code> and <code>tokenizeCommand()</code> are exported."
+            },
+            {
+              "type": "Added",
+              "html": "Backends may implement an optional <code>stat()</code>; the local and mock backends do. The mock backend's scripted commands accept <code>running: true</code> for background starts."
+            },
+            {
+              "type": "Added",
+              "html": "The workspace skill and docs cover the new tools, shell mode, argument rules, background commands and <code>dispose()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The docs, the skill and the path resolver's comments explain how the workspace jail differs from <code>@warlock.js/fs</code>'s new confined reader (<code>fs.confined</code>) and why the workspace keeps its own resolver: it accepts absolute paths inside the jail, <code>allowPaths</code> roots, <code>denyPaths</code>, links that stay inside and paths that do not exist yet. Behaviour is unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "The package README no longer ends with a stray empty code block."
+            },
+            {
+              "type": "Fixed",
+              "html": "The workspace tools now publish a JSON Schema of their input, so providers send the model the real parameter names instead of an empty object schema."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>run_tests</code> quotes its <code>pattern</code> for the shell in use: single quotes under <code>interpreter: \"sh\"</code>, so <code>$</code> and backticks in a test-name filter stay literal."
+            },
+            {
+              "type": "Security",
+              "html": "Wrapper commands no longer hide the command they run: <code>env</code>, <code>time</code>, <code>timeout</code>, <code>nice</code>, <code>nohup</code>, <code>command</code>, <code>builtin</code>, <code>exec</code> and <code>find -exec</code> are unwrapped and the inner command is checked too, and a wrapper used with options the policy cannot read is refused. Before, <code>env rm -rf /</code> passed a <code>deny: [\"rm\"]</code> policy."
+            },
+            {
+              "type": "Security",
+              "html": "<code>shell.deny</code> matches executable names case-insensitively, so <code>RM</code> on a case-insensitive filesystem no longer slips past <code>deny: [\"rm\"]</code>."
+            },
+            {
+              "type": "Security",
+              "html": "A model-supplied <code>timeoutMs</code> on <code>run_shell</code> can now only lower <code>shell.timeoutMs</code>, as documented, never raise it."
+            },
+            {
+              "type": "Security",
+              "html": "Shell mode removes <code>ENV</code>, <code>BASH_ENV</code>, <code>SHELLOPTS</code>, <code>BASHOPTS</code>, <code>CDPATH</code>, <code>IFS</code>, <code>PS4</code>, <code>GLOBIGNORE</code> and <code>BASH_FUNC_*</code> from the spawned environment, refuses assignments to such variables, refuses <code>&amp;</code> (use background commands), and refuses arithmetic-evaluating constructs (<code>$(( ))</code>, array subscripts in builtins) that bash can use to run hidden commands."
+            },
+            {
+              "type": "Security",
+              "html": "The docs, README and skill now state plainly that shell mode is a policy layer checked before <code>/bin/sh</code> runs the line (defence in depth), not an OS sandbox, and recommend running untrusted agents in a container, microVM or as a separate unprivileged user."
+            },
+            {
+              "type": "Security",
+              "html": "Killing a background command, a timeout and <code>dispose()</code> signal only the process tree the workspace spawned (its own process group on POSIX, <code>taskkill /T</code> on its PID on Windows)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 16,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.mcp(server, { signal })</code> binds the client to a run: when the signal aborts the client closes its transport, and later handshakes and tool calls fail with an <code>McpTransportError</code> of type <code>\"closed\"</code>. Every <code>tools/call</code> honors both the client signal and the per-call <code>ctx.signal</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.tools.measure(tools, { model, mode })</code> — the <code>measureTools</code> helper from <code>@warlock.js/ai</code> — measures the input tokens a tool list costs per call."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.mcp.serve(source, { transport: { type: \"http\" } })</code> serves the MCP Streamable HTTP transport on <code>node:http</code> (no extra dependency). It binds <code>127.0.0.1</code> on a free port at <code>/mcp</code> by default (<code>host</code>, <code>port</code>, <code>path</code> override them), and <code>start()</code> resolves <code>{ url, close }</code>. <code>close()</code> stops accepting connections, waits up to <code>drainTimeoutMs</code> (default 5 s) for in-flight calls, then aborts their <code>ctx.signal</code> and frees the port. The endpoint is stateless: JSON responses, <code>202</code> for notifications, <code>405</code> for <code>GET</code> / <code>DELETE</code>, <code>400</code> for batches or an unsupported <code>MCP-Protocol-Version</code>."
+            },
+            {
+              "type": "Added",
+              "html": "HTTP auth: <code>auth: { bearer }</code> accepts one token or a rotation list; <code>auth: { authorize(request) }</code> runs a custom check; with both set, a request must pass both. Failures get <code>401</code> before the body is read."
+            },
+            {
+              "type": "Added",
+              "html": "Tools served over HTTP receive the inbound request on <code>ctx.request</code> (<code>headers</code>, <code>remoteAddress</code>), for per-user tokens, tenant headers or trace ids."
+            },
+            {
+              "type": "Added",
+              "html": "Grouped sources: <code>serve({ groups: { name: tools } }, { prefixToolNames: true })</code> exposes <code>&lt;group&gt;_&lt;tool&gt;</code>; a function builds custom names."
+            },
+            {
+              "type": "Added",
+              "html": "Optional MCP resources (<code>resources: [{ uri, name, read }]</code>) and prompts (<code>prompts: [{ name, arguments, get }]</code>), with their capabilities advertised only when configured. The server also answers <code>ping</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>McpServeError</code> (<code>type</code>: <code>\"collision\"</code>, <code>\"config\"</code>, <code>\"listen\"</code>), <code>SUPPORTED_PROTOCOL_VERSIONS</code>, and the <code>McpHttpServeTransport</code>, <code>McpHttpAuth</code>, <code>McpHttpRequestInfo</code>, <code>McpServeHandle</code>, <code>McpHttpServeHandle</code>, <code>McpServeResource</code>, <code>McpServePrompt</code>, <code>McpServeCallContext</code>, <code>McpToolSource</code>, <code>McpGroupedToolSource</code> types. <code>createServeHandler(...).handle(request, context?)</code> takes an optional call context."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>initialize</code> negotiates the protocol version: a client's requested version is echoed when supported (<code>2025-11-25</code>, <code>2025-06-18</code>, <code>2025-03-26</code>), otherwise the newest is offered. It previously always answered <code>2025-06-18</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>McpServer.start()</code> resolves a handle (<code>{ url?, close }</code>) instead of <code>void</code>. The http transport's <code>port</code> is optional."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>@modelcontextprotocol/sdk</code> is no longer listed as an optional peer dependency. The MCP client never imported it: it speaks MCP's JSON-RPC itself over a child process (stdio) and <code>fetch</code> (http). The SDK is now a development dependency, used only by the interoperability test against the official client. The MCP docs, README and <code>connect-mcp-server</code> skill now say so, and name <code>ajv</code> as the client's only optional peer."
+            },
+            {
+              "type": "Fixed",
+              "html": "The stdio transport of <code>ai.mcp.serve()</code> no longer crashes the process when a line is JSON but not a request object (<code>null</code>, a number, an array): it answers a JSON-RPC \"Invalid Request\" error (<code>-32600</code>, <code>id: null</code>). A failure while answering a line is answered as an internal error and can no longer become an unhandled rejection."
+            },
+            {
+              "type": "Security",
+              "html": "The HTTP transport binds loopback by default and refuses to start on any non-loopback host without <code>auth</code> (<code>McpServeError</code>, <code>type: \"config\"</code>)."
+            },
+            {
+              "type": "Security",
+              "html": "Bearer tokens are compared with <code>crypto.timingSafeEqual</code> over SHA-256 digests, so neither content nor length leaks through timing; every configured token is checked. Empty tokens are refused, and an <code>authorize</code> hook that throws denies the request."
+            },
+            {
+              "type": "Security",
+              "html": "<code>Origin</code> is validated on every request, per the MCP transport's DNS-rebinding guidance: loopback origins and <code>allowedOrigins</code> pass, others (including <code>null</code>) get <code>403</code>. While bound to loopback, a <code>Host</code> header other than <code>localhost</code>, <code>127.0.0.1</code>, <code>[::1]</code> or <code>allowedHosts</code> also gets <code>403</code>."
+            },
+            {
+              "type": "Security",
+              "html": "Request bodies over <code>maxBodyBytes</code> (default 1 MiB) get <code>413</code> and the connection is closed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 15,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 10
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "With a <code>cacheControl</code> breakpoint, a <code>cachePoint</code> is also placed after the system prompt and, for Claude, after the tool definitions — the prefix segments Bedrock caches in <code>tools</code> → <code>system</code> → <code>messages</code> order. <code>ttl: \"1h\"</code> (per call, or the new <code>promptCacheTtl</code> model option) is sent only to models that accept it."
+            },
+            {
+              "type": "Added",
+              "html": "Built-in Claude prices for <code>global.</code> and <code>us.</code> inference profiles (<code>BEDROCK_GLOBAL_PRICING</code>, <code>BEDROCK_US_PRICING</code>, <code>bedrockPricingFor</code>), from AWS's Bedrock price list as of 2026-10-17; caller pricing for Claude models gets the 1.25x / 2x cache-write rates filled (<code>withClaudeCacheWriteRates</code>). <code>complete()</code> and the streaming <code>done</code> chunk attach <code>usage.cost</code> when priced."
+            },
+            {
+              "type": "Added",
+              "html": "Claude 5 families and Nova 2 Lite are recognised as prompt-caching capable."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ServiceUnavailableException</code> throws <code>ProviderOverloadedError</code>; wrapped errors carry <code>status</code>, <code>billed</code> and <code>retryable</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>new BedrockSDK({ apiKey, region })</code> authenticates with an Amazon Bedrock API key: requests carry <code>Authorization: Bearer &lt;apiKey&gt;</code> instead of a SigV4 signature and the AWS credential chain is not consulted (the adapter sets the AWS SDK's <code>token</code> and <code>authSchemePreference: [\"httpBearerAuth\"]</code>). An empty key, or a key combined with <code>credentials</code> or <code>token</code>, throws <code>InvalidRequestError</code>."
+            },
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> and cancels the HTTP/2 request."
+            },
+            {
+              "type": "Added",
+              "html": "With <code>streamChunks</code>, <code>stream()</code> yields <code>reasoning</code> for <code>reasoningContent.text</code> deltas and <code>tool-args</code> for client <code>toolUse.input</code> deltas."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.providerTool({ provider: \"bedrock\", definition })</code> appends a Converse <code>Tool</code> member such as <code>{ systemTool: { name: \"nova_grounding\" } }</code> verbatim; other providers' tools are skipped with a warning."
+            },
+            {
+              "type": "Added",
+              "html": "<code>providerOptions.bedrock.body</code> forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions."
+            },
+            {
+              "type": "Added",
+              "html": "Models expose native <code>countTokens()</code> preflight using the generation request's Converse conversation, tools and additional model fields."
+            },
+            {
+              "type": "Fixed",
+              "html": "Usage is marked <code>inputIncludesCache: false</code> (Converse <code>inputTokens</code> excludes cache reads and writes) and reports 1-hour cache writes from <code>cacheDetails</code> in <code>cacheWrite1hTokens</code>, so cost bills each cache token once at its own rate."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>toolUse</code> block with <code>type: \"server_tool_use\"</code> (a system tool run by Bedrock) is no longer returned as a tool call for the agent to dispatch."
+            },
+            {
+              "type": "Fixed",
+              "html": "Converse conversion compiles with strict indexed-access checks while preserving empty and system-only histories."
+            },
+            {
+              "type": "Fixed",
+              "html": "Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys."
+            },
+            {
+              "type": "Fixed",
+              "html": "Converse conversion combines adjacent same-role turns in content order, preserving parallel tool results and automatic compaction summaries beside assistant tool calls."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 15,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 8
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The starter's <code>src/config/tests.ts</code> documents the test fakes that are on by default and how to opt out (<code>fakes: false</code>, or per fake such as <code>{ cache: false }</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "The generated <code>AGENTS.md</code> and the <code>code-standards</code> / <code>security-baseline</code> skills tell coding agents to run <code>npx warlock check</code>, which reports unvalidated <code>request.all()</code> input, unguarded mutating routes, unsafe redirects, sensitive values in logs and unbounded regexes on input with a <code>WL</code> code, in both <code>--lint=eslint</code> and <code>--lint=oxc</code> projects."
+            },
+            {
+              "type": "Added",
+              "html": "The scaffold's sign-in and password-recovery routes, contact form and locale switch are marked <code>public: true</code>; <code>/auth/login</code> uses <code>loginThrottleMiddleware()</code>, <code>/auth/forgot-password</code> <code>tokenIssueThrottleMiddleware()</code>, <code>/auth/reset-password</code> <code>tokenConsumeThrottleMiddleware()</code>, and <code>/auth/refresh-token</code> a 30-per-minute route limit. The user list validates its query (<code>page</code>, <code>limit</code>, <code>id</code>, <code>name</code>, <code>email</code>) and passes <code>request.validated()</code> to the repository."
+            },
+            {
+              "type": "Added",
+              "html": "Opt-in <code>--lint=oxc</code> / <code>--lint oxc</code> flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating <code>lint:check</code> and <code>format:check</code> scripts. Oxc projects configure and recommend the official VS Code extension for format-on-save and lint fixes; default projects retain their Prettier/ESLint editor settings. Help and headless diagnostics include <code>--lint</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> Node.js 22.15 or newer is required, both in <code>engines</code> and in the scaffolder's own startup check (which used to accept Node 20), matching what the <code>warlock</code> CLI needs. In an existing app, <code>warlock upgrade --from 5.30 --to 5.31.0</code> raises <code>engines.node</code>, <code>.nvmrc</code> and <code>.node-version</code> (codemod <code>node-22-15</code>)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>--lint=oxc</code> projects sort imports on <code>format</code>: the generated <code>.oxfmtrc.json</code> sets <code>\"sortImports\": { \"newlinesBetween\": false }</code>, keeping imports in one block as <code>prettier-plugin-organize-imports</code> does in the ESLint toolchain. Oxfmt does not remove unused imports; Oxlint reports them."
+            },
+            {
+              "type": "Fixed",
+              "html": "Scaffolder source formatting and tests use the workspace Oxfmt configuration, including standalone installs; template formatting continues to use each generated app toolchain."
+            },
+            {
+              "type": "Fixed",
+              "html": "Group feature selection preserves explicit unticks when selecting the remaining group, and returns the category cursor to the group last edited."
+            },
+            {
+              "type": "Fixed",
+              "html": "The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback. Wrapped values align under their labels, and the summary retains its label, command and link styling."
+            },
+            {
+              "type": "Fixed",
+              "html": "On terminals narrower than 50 columns the project-ready heading keeps its bold green styling, as in the boxed layout."
+            },
+            {
+              "type": "Fixed",
+              "html": "The ESLint-toolchain <code>lint</code>, <code>format</code> and <code>tsc</code> scripts call the local <code>eslint</code>, <code>prettier</code> and <code>tsc</code> binaries instead of <code>npx</code>, matching <code>lint:check</code>/<code>format:check</code> and the Oxc scripts. <code>format</code> now quotes its glob, so Prettier formats nested files under <code>src/</code> rather than relying on the shell's expansion."
+            },
+            {
+              "type": "Fixed",
+              "html": "The starter's <code>AGENTS.md</code> ends with a <code>## This app (generated)</code> section whose <code>warlock:generated</code> markers <code>warlock dev</code> (and <code>warlock agents-md --write</code>) fills with the app's modules, routes, models, installed skills and verify commands."
+            },
+            {
+              "type": "Fixed",
+              "html": "Opt-in <code>--lint=oxc</code> / <code>--lint oxc</code> flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating <code>lint:check</code> and <code>format:check</code> scripts. Oxc projects configure and recommend the official VS Code extension for format-on-save and lint fixes; default projects retain their Prettier/ESLint editor settings. Help and headless diagnostics include <code>--lint</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Built-in OpenAI list prices (<code>OPENAI_MODEL_PRICING</code>, <code>openAIPricingFor</code>) for flat-priced models, from OpenAI's pricing page as of 2026-10-17, applied only on the <code>\"openai\"</code> provider label and exact ids. Models priced by prompt length stay unpriced."
+            },
+            {
+              "type": "Added",
+              "html": "Usage is marked <code>inputIncludesCache: true</code>, reports Chat Completions <code>prompt_tokens_details.cache_write_tokens</code>, and <code>complete()</code> / the streaming <code>done</code> chunk attach <code>usage.cost</code> when priced."
+            },
+            {
+              "type": "Added",
+              "html": "503 / <code>server_is_overloaded</code> throws <code>ProviderOverloadedError</code>; wrapped errors carry <code>status</code>, <code>billed</code> and <code>retryable</code>."
+            },
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> on the Chat Completions and Responses models and cancels the HTTP request."
+            },
+            {
+              "type": "Added",
+              "html": "With <code>streamChunks</code>, the Responses model yields <code>reasoning</code> for reasoning-summary / reasoning-text deltas and <code>tool-args</code> for <code>response.function_call_arguments.delta</code>; the Chat model yields <code>tool-args</code> for tool-call argument fragments and <code>reasoning</code> for a compatible vendor's <code>reasoning_content</code> / <code>reasoning</code> delta field (DeepSeek, Groq)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.providerTool({ provider: \"openai\", definition })</code> adds Responses built-in tools (<code>web_search</code>, <code>file_search</code>, <code>code_interpreter</code>, …) verbatim. A reasoning item that led into a hosted tool call is left out of the stateless replay, and built-in calls the caller would have to execute (<code>shell_call</code>, <code>apply_patch_call</code>, <code>computer_call</code>, <code>custom_tool_call</code>, …) throw <code>InvalidRequestError</code> instead of being dropped. Chat Completions sends a provider tool only when its <code>provider</code> equals the model's provider label (e.g. <code>\"groq\"</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>providerOptions.openai.body</code> forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions."
+            },
+            {
+              "type": "Added",
+              "html": "Responses models expose native input-token preflight through <code>countTokens()</code>; Chat Completions keeps offline estimates separate."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>promptCacheKey</code> is sent as <code>prompt_cache_key</code> for the <code>\"xai\"</code> and <code>\"mistral\"</code> provider labels as well, since both endpoints document the field. <code>prompt_cache_retention</code> and explicit cache breakpoints stay OpenAI-only; other labels receive no cache fields."
+            },
+            {
+              "type": "Fixed",
+              "html": "Provider body objects replace the adapter-built object when their string <code>type</code> discriminator changes, so format and tool-choice overrides do not retain incompatible fields from the old variant. Same-type and undiscriminated objects keep the one-level merge."
+            },
+            {
+              "type": "Fixed",
+              "html": "Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 8
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "A failed rule result may carry <code>errors: [{ error, path }]</code> to report several errors, each at its own path, under the rule's type."
+            },
+            {
+              "type": "Added",
+              "html": "Successful custom rules may return a <code>data</code> property to replace the current validated value, including explicit <code>undefined</code>; omitting the property preserves the value."
+            },
+            {
+              "type": "Changed",
+              "html": "Object factories return their already typed class directly, avoiding a duplicate Standard Schema intersection and reducing compiler work for composed schemas. CI now checks the Seal inference benchmark against its updated baseline."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.union(...)</code> tries every member whose type matches before failing, so a union of several object schemas accepts a value that matches a later member; <code>firstErrorOnly</code> limits the errors reported, not the members tried. A failing union reports its closest member: fewest mismatched literals, then fewest errors, then the deepest error path, then declaration order."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failing union no longer stores its last member error on the shared rule, so a later validation with no type-matching member reports the default message instead of a stale one."
+            },
+            {
+              "type": "Fixed",
+              "html": "The custom-error locale example is strict JSON, with its filename outside the code fence."
+            },
+            {
+              "type": "Fixed",
+              "html": "Standalone string replacement mutators accept an omitted context or options and preserve the stringified input instead of throwing."
+            },
+            {
+              "type": "Fixed",
+              "html": "Object <code>.merge()</code> retains refinements from both schemas, in their original order; cloning, extending and selecting fields preserve the original schema's refinements."
+            },
+            {
+              "type": "Fixed",
+              "html": "Union and record Standard Schema types now distinguish child input from validated output; <code>Infer.Output</code> reads the Standard Schema output parameter. Defaults and catches remain guaranteed in output."
+            },
+            {
+              "type": "Fixed",
+              "html": "Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.tuple([...])</code> infers one type per position: <code>v.tuple([v.string(), v.int()])</code> is typed <code>[string, number]</code> for input and output instead of <code>(string | number)[]</code>, so a value with swapped positions no longer type-checks. A <code>BaseValidator[]</code> variable is still accepted."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Usage is marked <code>inputIncludesCache: true</code> (<code>promptTokenCount</code> includes cached content), and <code>complete()</code> / the streaming <code>done</code> chunk attach <code>usage.cost</code> when priced."
+            },
+            {
+              "type": "Added",
+              "html": "A built-in list price for <code>gemini-3.5-flash-lite</code> (<code>GOOGLE_MODEL_PRICING</code>, <code>googlePricingFor</code>), from the Gemini API pricing page as of 2026-10-17. Models priced by prompt length, by input modality, or with a scheduled price change stay unpriced."
+            },
+            {
+              "type": "Added",
+              "html": "503 <code>UNAVAILABLE</code> throws <code>ProviderOverloadedError</code>. 400 and 500 failures are marked <code>billed: false</code>, as Google's billing docs state."
+            },
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> on the model and cancels the HTTP request."
+            },
+            {
+              "type": "Added",
+              "html": "With <code>streamChunks</code>, <code>stream()</code> yields <code>reasoning</code> for thought parts (sent when <code>thinkingConfig.includeThoughts</code> is on) and <code>usage</code> for every chunk carrying <code>usageMetadata</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.providerTool({ provider: \"google\", definition })</code> entries (<code>{ googleSearch: {} }</code>, <code>{ codeExecution: {} }</code>, <code>{ urlContext: {} }</code>) are sent verbatim as their own <code>Tool</code> after the function declarations; other providers' tools are skipped with a warning."
+            },
+            {
+              "type": "Added",
+              "html": "<code>providerOptions.google.body</code> forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions."
+            },
+            {
+              "type": "Added",
+              "html": "Models expose native <code>countTokens()</code> preflight. Vertex counts system instructions and tools; unsupported Developer API system/tool and cached-content counts fail explicitly."
+            },
+            {
+              "type": "Fixed",
+              "html": "Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys."
+            },
+            {
+              "type": "Fixed",
+              "html": "Consecutive messages that map to the same Gemini role are sent as one content with their parts in order. The results of parallel tool calls now travel as a single <code>user</code> turn of <code>functionResponse</code> parts in call order instead of one turn per result, and an agent compaction summary next to a same-role turn merges into it, so requests keep alternating <code>user</code> and <code>model</code> turns. Each <code>functionCall</code> keeps its own <code>thoughtSignature</code>, and <code>countTokens()</code> counts the same contents."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>FileLog</code> <code>fileName</code> option: a pattern (<code>\"app-{YYYY}-{MM}-{DD}\"</code>, tokens <code>{YYYY}</code> <code>{MM}</code> <code>{DD}</code> <code>{HH}</code> <code>{mm}</code> <code>{name}</code> in local time) or a <code>(date) =&gt; string</code> function, evaluated at every write; it replaces the chunk's default name. <code>rotateFileName</code> takes the same forms and is rendered at each rotation (a getter passed in the config was read once, at construction, so every archive kept the boot date). Exported <code>FileNameOption</code>, <code>FileLogRetention</code>, <code>DAILY_FILE_NAME</code>, <code>HOURLY_FILE_NAME</code> and <code>ROTATE_FILE_NAME</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>FileLog</code> <code>retention: { maxFiles?, maxAgeDays?, match? }</code>: removes old log files on boot and whenever the channel starts a new file (a size rotation or a dated name rolling over), plus <code>channel.prune()</code> on demand. It only considers files in the log directory (each group directory with <code>groupBy</code>) whose names match the channel's file name pattern, keeps the file being written, and reports failures to <code>onChannelError</code> instead of throwing. A function <code>fileName</code> needs <code>retention.match</code>. Invalid <code>maxFiles</code>/<code>maxAgeDays</code> throw a <code>TypeError</code> at construction."
+            },
+            {
+              "type": "Added",
+              "html": "<code>LogChannel.reportError(error, entry)</code> and <code>setErrorReporter(reporter)</code> (type <code>ChannelErrorReporter</code>): a channel reports failures outside <code>log()</code> to the <code>onChannelError</code> handler of the logger it was added to (<code>addChannel</code>, <code>setChannels</code>, <code>configure({ channels })</code>), or one stderr line without one."
+            },
+            {
+              "type": "Added",
+              "html": "<code>escapeLogValue(value, { maxLength? })</code> makes client-controlled text safe inside a log line: CR/LF/tab become visible <code>\\r</code>/<code>\\n</code>/<code>\\t</code>, other control characters (NUL, DEL, C1, U+2028/U+2029) become <code>\\uXXXX</code>, ANSI escape sequences are removed, and <code>maxLength</code> cuts with a <code>…[truncated]</code> marker. A user agent or form field can no longer forge entries in console or file logs."
+            },
+            {
+              "type": "Added",
+              "html": "Skills demonstrate email masking inside text, channel-error observation and bounded asynchronous log drains."
+            },
+            {
+              "type": "Fixed",
+              "html": "With <code>groupBy</code>, size rotation renames the group file that grew too large instead of the ungrouped top-level file."
+            },
+            {
+              "type": "Fixed",
+              "html": "A file name that throws while a buffer is written (a <code>fileName</code> function, or an overridden <code>fileName</code> getter) is reported as a failed write instead of leaving the channel stuck in its writing state; later writes go through."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>complete()</code> and the streaming <code>done</code> chunk attach <code>usage.cost</code> when the model is given <code>pricing</code>."
+            },
+            {
+              "type": "Added",
+              "html": "With <code>streamChunks</code>, <code>stream()</code> yields <code>reasoning</code> for each <code>message.thinking</code> piece. Provider-defined tools for other providers are left out of the request with a warning."
+            },
+            {
+              "type": "Added",
+              "html": "<code>providerOptions.ollama.body</code> forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>complete()</code> now honours <code>signal</code>: the <code>ollama</code> client takes no per-request signal, so <code>OllamaSDK</code> wraps the client's <code>fetch</code> (the caller's own <code>fetch</code> option included) to apply each call's signal. Aborting cancels the HTTP request before or after the response starts, on <code>complete()</code> and <code>stream()</code>, and a call with an already-aborted signal rejects without sending a request. An adapter contract test covers both calls."
+            },
+            {
+              "type": "Fixed",
+              "html": "Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> on the model and cancels the HTTP request."
+            },
+            {
+              "type": "Added",
+              "html": "<code>MistralModelConfig.promptCacheKey</code> is sent as <code>prompt_cache_key</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Chat calls inherit <code>providerOptions.openai.body</code> from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native <code>countTokens</code> remains absent; <code>sdk.count(text)</code> is an offline estimate."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>MISTRAL_DEFAULT_PRICING</code> matches Mistral's current price list (2026-10-17), with cache-read rates and API ids beside the <code>-latest</code> aliases. Retired Pixtral and Magistral entries are removed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> on the model and cancels the HTTP request."
+            },
+            {
+              "type": "Added",
+              "html": "<code>XaiModelConfig.promptCacheKey</code> is sent as <code>prompt_cache_key</code> (xAI routes it to <code>x-grok-conv-id</code>), so requests sharing a prefix reuse the same cache."
+            },
+            {
+              "type": "Changed",
+              "html": "Chat calls inherit <code>providerOptions.openai.body</code> from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native <code>countTokens</code> remains absent; <code>sdk.count(text)</code> is an offline estimate."
+            },
+            {
+              "type": "Fixed",
+              "html": "The provider-body and token-estimate guidance renders as prose instead of being swallowed by a stray code fence."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> on the model and cancels the HTTP request."
+            },
+            {
+              "type": "Changed",
+              "html": "Chat calls inherit <code>providerOptions.openai.body</code> from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native <code>countTokens</code> remains absent; <code>sdk.count(text)</code> is an offline estimate."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>DEEPSEEK_DEFAULT_PRICING</code> (now exported) matches DeepSeek's price list (2026-10-17) for <code>deepseek-flash</code>, <code>deepseek-v4-flash</code> and <code>deepseek-v4-pro</code>. DeepSeek bills by time of day; the defaults are the peak rates, an upper bound, and <code>DEEPSEEK_OFF_PEAK_PRICING</code> holds the off-peak rates."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "An adapter contract test verifies that aborting <code>signal</code> rejects <code>complete()</code> and <code>stream()</code> on the model and cancels the HTTP request."
+            },
+            {
+              "type": "Changed",
+              "html": "Chat calls inherit <code>providerOptions.openai.body</code> from the OpenAI adapter, including its protected fields and one-level plain-object merge. Use only this provider's accepted fields when sharing fallback options. Native <code>countTokens</code> remains absent; <code>sdk.count(text)</code> is an offline estimate."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>GROQ_DEFAULT_PRICING</code> (now exported) matches Groq's published prices (2026-10-17): <code>openai/gpt-oss-120b</code> output is 0.60, the gpt-oss models get their 50% cache-read rate, and <code>qwen/qwen3.8-27b</code> is added."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Tool spans carry the provider's tool-call id as the <code>tool.callId</code> attribute."
+            },
+            {
+              "type": "Added",
+              "html": "Agent runs with <code>status: \"incomplete\"</code> (their final answer was cut off) are exported as errors: OTel <code>ERROR</code> status, Langfuse level <code>ERROR</code>, the console exporter's error stream (marked <code>INCOMPLETE</code>), the dashboard's error filter, and the <code>failed</code> count of trace-store aggregates. <code>?status=incomplete</code> is accepted by the dashboard API."
+            },
+            {
+              "type": "Fixed",
+              "html": "Trace cost totals (exporters, the dashboard and trace filters) include the new cache-write cost channel."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>authMiddleware()</code> marks itself as an auth guard (<code>markAuthGuard()</code> from <code>@warlock.js/core</code>), so <code>warlock dev</code>'s unguarded-route warning recognises routes behind it; the <code>{ optional: true }</code> form is marked as not a guard. Docs and skills list what throttles auth endpoints by default (core's global limit, plus the throttles new apps attach to sign-in and password recovery) and how to add them to an existing app."
+            },
+            {
+              "type": "Added",
+              "html": "Real Redis integration coverage for login failure counters and lockouts, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with <code>WARLOCK_REDIS_INTEGRATION=1</code>; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys."
+            },
+            {
+              "type": "Fixed",
+              "html": "Login, token and OTP throttles pass their counting-window TTL into each atomic increment. A counter that expires between the create-only seed and increment is recreated with an expiry rather than becoming permanent. Token middleware regression assertions cover the issue counters' one-hour window and the consume counter's fifteen-minute window."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>fs.confined(root, options)</code> / <code>createConfinedReader(root, options)</code>: a reader confined to one folder, for folders you do not control (a user-chosen import folder, an extracted upload). <code>readText</code>, <code>readBuffer</code>, <code>readJson</code> (optional Standard Schema), <code>stat</code>, <code>exists</code>, <code>list</code> and <code>walk</code> (async, depth-first) take root-relative paths. The root is canonicalised once and refused when it is itself a symlink (unless <code>allowSymlinkedRoot</code>); absolute paths and <code>..</code> that climb above the root throw <code>FsPathEscapeError</code>; every path component is checked with <code>lstat</code> and a symlink or Windows junction anywhere throws <code>FsLinkRefusedError</code>; files are opened with <code>O_NOFOLLOW</code> where available and the opened handle's device/inode must match the checked entry, so a file or parent folder swapped between check and open is refused. <code>maxFileBytes</code> (default 16 MiB) is enforced while reading, <code>maxEntries</code> (default 100 000) and <code>maxDepth</code> (default 64) bound <code>list</code>/<code>walk</code>, with <code>FsLimitExceededError</code>. <code>followLinks: true</code> follows only links whose target stays inside the root."
+            },
+            {
+              "type": "Added",
+              "html": "<code>FsPathEscapeError</code>, <code>FsLinkRefusedError</code>, <code>FsLimitExceededError</code> (each with a <code>type</code> discriminator, <code>path</code> and the reason or limit), the <code>ConfinedReader</code> / <code>ConfinedEntry</code> / <code>ConfinedStats</code> types, and <code>isPathInside(child, root)</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Clarify the concurrency contract of <code>moveDirectoryNoReplaceAsync</code> / <code>fs.dirs.moveNoReplace</code> at the call-site documentation: the exclusive destination claim protects cooperating writers, while an empty placeholder swapped before its first identity read or after its last check can still be replaced. <code>expectedSource</code> and <code>syncParents</code> do not eliminate those windows. Deterministic interleaving tests preserve these documented limits."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>registeredJobs()</code> and <code>queueOf()</code> are exported, so tools can list the jobs an app defined with <code>defineJob()</code> and the queue each runs on; <code>warlock inspect</code> reads them for its <code>jobs</code> section."
+            },
+            {
+              "type": "Added",
+              "html": "<code>setDispatchInterceptor({ dispatch, find? })</code> / <code>getDispatchInterceptor()</code>: while an interceptor is set, every job's <code>dispatch()</code> and <code>find()</code> go to it instead of BullMQ, so nothing connects to Redis. The slot is process-wide. <code>queueFake</code> in <code>@warlock.js/core/tests</code> is built on it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Local Redis integration tests skip with a clear service message when Redis is unavailable; CI and explicitly requested integration runs fail instead. Unit cases remain runnable without Redis."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Real Redis integration coverage for atomic counters and their expiry behavior, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with <code>WARLOCK_REDIS_INTEGRATION=1</code>; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>cache.increment(key, amount, { ttl })</code> supplies a TTL when an atomic increment creates or recreates a counter, through direct, tagged and scoped calls. Existing expiry deadlines are preserved; an explicit TTL also repairs a live permanent counter across drivers. Redis applies the count and TTL together, so an expired seed cannot leave a permanent counter even when the driver has no default TTL."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Access skills no longer end in stray code fences, and the cache configuration recipe is an object expression rather than a labelled statement."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The model-events skill uses <code>Model.globalEvents().on()</code> for global listeners; the abstract base model's per-model <code>on()</code> shortcut requires a concrete subclass."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The <code>devtools-overview</code> skill shows how to read a request's devtools timeline from the terminal with <code>warlock trace</code>, and how coding agents read recent requests through the <code>requests_recent</code> tool of <code>warlock mcp</code>. The JSON API they use (<code>GET &lt;path&gt;/api/requests</code>, <code>GET &lt;path&gt;/api/requests/:id</code>) is unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Local Redis integration tests skip with a clear service message when Redis is unavailable; CI and explicitly requested integration runs fail instead. Unit cases remain runnable without Redis."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.30.0",
       "id": "v5-30-0",
       "date": "October 16, 2026",
@@ -222,7 +2086,7 @@
             },
             {
               "type": "Changed",
-              "html": "<strong>BREAKING (only for a custom log channel that reads <code>context.request</code>/<code>context.response</code>):</strong> <strong>request log entries carry a <code>RequestLogSnapshot</code>, not the <code>Request</code>/<code>Response</code> instances</strong> (<code>context.request</code> is <code>{ id, method, url, route, name, ip, userAgent, query?, body? }</code>; <code>response.log</code> adds <code>{ statusCode }</code>). Native request/reply graphs no longer reach log channels, and credential-bearing query values (<code>secret</code>, <code>token</code>, <code>apiKey</code>, <code>signature</code>, <code>code</code>, <code>X-Amz-*</code>, …) are masked in the logged URL."
+              "html": "<strong>BREAKING (only for a custom log channel that reads <code>context.request</code>/<code>context.response</code>):</strong> <strong>request log entries carry a <code>RequestLogSnapshot</code>, not the <code>Request</code>/<code>Response</code> instances</strong> (<code>context.request</code> is <code>{ id, method, url, route, name, ip, userAgent, query?, body? }</code>; <code>response.log</code> adds <code>{ statusCode }</code>). Native request/reply graphs no longer reach log channels, and credential-bearing query values (<code>secret</code>, <code>token</code>, <code>apiKey</code>, <code>signature</code>, <code>code</code>, <code>X-Amz-*</code>, …) are masked in the logged URL. <code>warlock upgrade --from 5.29 --to 5.31.0</code> applies the mechanical part (codemod <code>request-log-snapshot</code>)."
             },
             {
               "type": "Changed",
