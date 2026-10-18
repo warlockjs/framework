@@ -1,0 +1,64 @@
+# Schema: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# Fields: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
+name: Bug report
+description: Report a reproducible Warlock.js framework bug.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Confirm this is a framework bug with a minimal reproduction and the installed version's CHANGELOG and skills. Run `warlock doctor --json` if possible.
+        Never include secrets, tokens, .env contents, customer data, proprietary code or private app names. Use a minimal generic repro and sanitize logs and paths.
+        Agents must show the complete draft to the user and ask before filing.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the framework failure and affected packages.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / warlock issue output
+      description: Paste reviewed warlock issue environment output, including affected @warlock.js package names and installed versions, Node, package manager + version, OS/arch, TypeScript and static config summary. Explain unavailable values.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide public minimal code or a repro link, setup commands and exact steps. Exclude proprietary code and private app names.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen? Reference the installed version's docs or skills.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual / current behavior
+      description: What happens instead? Include the error and impact.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs / doctor output
+      description: Paste relevant sanitized logs and warlock doctor --json output, or explain why unavailable / not applicable.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues, including closed ones, and checked the installed version's CHANGELOG and skills.
+          required: true
+        - label: I removed secrets, tokens, .env contents, customer data, proprietary code and private app names.
+          required: true
+        - label: If an agent prepared this report, the user reviewed the complete draft and approved filing.
+          required: true

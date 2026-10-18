@@ -1,0 +1,8 @@
+# Encourage complete bug/feature reports rather than unstructured blank issues.
+# gh issue create can still submit a reviewed, approved Markdown draft.
+# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository#configuring-the-template-chooser
+blank_issues_enabled: false
+contact_links:
+  - name: Warlock.js documentation
+    url: https://warlock.js.org/
+    about: Check the documentation and installed package skills before reporting an issue.

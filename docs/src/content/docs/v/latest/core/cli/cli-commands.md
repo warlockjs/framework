@@ -34,6 +34,10 @@ Look at the project's `package.json > scripts` to see the local shortcuts. Under
 
 ---
 
+## Reporting issues
+
+[`warlock issue`](./issue.md) prepares a framework bug report or feature request with installed versions and a safe static config summary, even when the app cannot boot. Search existing reports, review a minimal public repro, and ask the user before filing an agent-prepared draft.
+
 ## Development
 
 ### `dev`

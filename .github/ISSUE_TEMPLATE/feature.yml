@@ -1,0 +1,71 @@
+# Schema: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# Fields: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
+name: Feature request
+description: Propose a missing Warlock.js framework capability.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the installed version's CHANGELOG and skills, and describe why existing framework APIs or app-level workarounds are insufficient. Run `warlock doctor --json` if relevant.
+        Never include secrets, tokens, .env contents, customer data, proprietary code or private app names. Use a minimal generic example and sanitize logs and paths.
+        Agents must show the complete draft to the user and ask before filing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: Describe the missing framework capability and affected packages.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / warlock issue output
+      description: Paste reviewed warlock issue environment output, including affected @warlock.js package names and installed versions, Node, package manager + version, OS/arch, TypeScript and static config summary. Explain unavailable values.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide a minimal public example of the capability that cannot currently be expressed. Exclude proprietary code and private app names.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired API or behavior with an example and why it belongs in the framework.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual / current behavior
+      description: Describe today's limitation and relevant installed-version docs or skills.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe existing APIs, app-level workarounds and their limitations.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs / doctor output
+      description: Paste relevant sanitized logs and warlock doctor --json output, or explain why unavailable / not applicable.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues, including closed ones, and checked the installed version's CHANGELOG and skills.
+          required: true
+        - label: I removed secrets, tokens, .env contents, customer data, proprietary code and private app names.
+          required: true
+        - label: If an agent prepared this report, the user reviewed the complete draft and approved filing.
+          required: true

@@ -14,6 +14,8 @@ Core is the application runtime: it boots the app, auto-loads each module's spec
 4. Return via `response.*` (`send-response.md`) and shape output with a resource (`define-resource.md`); declare `responseSchema` for typed clients and docs (`create-controller.md`, `generate-openapi.md`).
 5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md` (or serve it to an agent with `warlock-mcp.md`), verify a change with `warlock-check.md`, and a request's runtime behaviour with `warlock-trace.md`.
 
+When the framework is wrong or missing a capability, follow `report-framework-issue.md` to prepare a public report and ask the user before filing.
+
 ## Topics by area
 
 - **Foundations:** warlock-conventions, create-module, make-endpoint, configure-app, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators
