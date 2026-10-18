@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import * as ast from "../syntax/ast";
 import { connectorsManager } from "../../connectors/connectors-manager";
 import type { InspectPage, InspectWarning } from "./inspect-report.types";
 
@@ -75,7 +75,7 @@ export function layoutChainOf(pageFile: string, cwd: string): string[] {
 
 /**
  * Whether a module's source exports a binding named `name`, read with the
- * TypeScript parser (the page files are TSX that Node cannot import directly).
+ * OXC parser (the page files are TSX that Node cannot import directly).
  */
 export function exportsName(file: string, name: string): boolean {
   let source: string;
@@ -86,40 +86,33 @@ export function exportsName(file: string, name: string): boolean {
     return false;
   }
 
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.TSX,
-  );
+  const sourceFile = ast.parseSourceFile(file, source);
 
-  for (const statement of sourceFile.statements) {
-    const exported = ts.canHaveModifiers(statement)
-      ? (ts.getModifiers(statement) ?? []).some(
-          (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
-        )
-      : false;
+  for (const statement of ast.topLevelDeclarations(sourceFile)) {
+    const exported = ast.hasModifier(statement, "export");
 
-    if (exported && ts.isVariableStatement(statement)) {
+    if (exported && ast.isVariableStatement(statement)) {
       if (
-        statement.declarationList.declarations.some(
-          (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name,
+        statement.declarations.some(
+          (declaration) =>
+            ast.isIdentifier(ast.nameNode(declaration)) && ast.valueText(declaration.id) === name,
         )
       ) {
         return true;
       }
     }
 
-    if (exported && ts.isFunctionDeclaration(statement) && statement.name?.text === name) {
+    if (
+      exported &&
+      ast.isFunctionDeclaration(statement) &&
+      ast.declarationName(statement) === name
+    ) {
       return true;
     }
 
     if (
-      ts.isExportDeclaration(statement) &&
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause) &&
-      statement.exportClause.elements.some((element) => element.name.text === name)
+      ast.isExportDeclaration(statement) &&
+      statement.specifiers.some((element) => ast.valueText(element.exported) === name)
     ) {
       return true;
     }

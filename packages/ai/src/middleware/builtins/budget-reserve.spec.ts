@@ -1,3 +1,4 @@
+import { tool } from "../../tool/tool";
 import { describe, expect, it, vi } from "vitest";
 import { agent } from "../../agent/agent";
 import { BudgetExceededError, InvalidRequestError, ProviderOverloadedError } from "../../errors";
@@ -65,7 +66,9 @@ describe("budget — reserve-then-commit", () => {
         complete: mock.complete.bind(mock),
         stream: mock.stream.bind(mock),
       };
-      const tools = [{ name: "lookup", description: "Look up data", execute: async () => "ok" }];
+      const tools = [
+        tool({ name: "lookup", description: "Look up data", execute: async () => "ok" }),
+      ];
       const store = memoryScopedBudgetStore();
       const result = await agent({
         model,

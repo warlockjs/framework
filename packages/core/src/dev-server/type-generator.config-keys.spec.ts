@@ -1,7 +1,8 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import ts from "typescript";
+import { parseSync } from "oxc-parser";
+import { parseSourceFile } from "../tooling/syntax/ast";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { FilesOrchestrator as FilesOrchestratorType } from "./files-orchestrator";
 import type {
@@ -91,16 +92,7 @@ describe("TypeGenerator — quoted config keys", () => {
   }
 
   function syntaxErrors(source: string) {
-    // Parsed as a `.ts` module: transpileModule cannot emit a `.d.ts` name,
-    // and the declarations here are just as valid in a module file.
-    const output = ts.transpileModule(source, {
-      reportDiagnostics: true,
-      fileName: "generated-typings.ts",
-    });
-
-    return (output.diagnostics ?? []).map((diagnostic) =>
-      ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
-    );
+    return parseSync("generated-typings.d.ts", source).errors.map((error) => error.message);
   }
 
   it("writes quoted keys without their quotes, as valid TypeScript", async () => {
@@ -177,16 +169,14 @@ describe("TypeGenerator — quoted config keys", () => {
 
   describe("readPropertyName", () => {
     function nameOf(source: string) {
-      const file = ts.createSourceFile(
-        "x.ts",
-        `const x = { ${source}: 1 };`,
-        ts.ScriptTarget.Latest,
-      );
-      const statement = file.statements[0] as ts.VariableStatement;
-      const literal = statement.declarationList.declarations[0]!
-        .initializer as ts.ObjectLiteralExpression;
-
-      return readPropertyName((literal.properties[0] as ts.PropertyAssignment).name);
+      const file = parseSourceFile("x.ts", `const x = { ${source}: 1 };`);
+      const statement = file.body[0];
+      if (statement?.type !== "VariableDeclaration") throw new Error("Expected declaration");
+      const literal = statement.declarations[0]?.init;
+      if (literal?.type !== "ObjectExpression") throw new Error("Expected object");
+      const property = literal.properties[0];
+      if (property?.type !== "Property") throw new Error("Expected property");
+      return readPropertyName(property.key);
     }
 
     it("reads identifiers, string, numeric and template keys without quotes", () => {

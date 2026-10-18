@@ -601,6 +601,11 @@ export class FilesHealthcareManager {
       }),
     );
 
+    await Promise.all(
+      this.healthCheckers
+        .filter((checker) => !checker.workerPath)
+        .map((checker) => checker.shutdown?.()),
+    );
     this.workers.clear();
     this.workerInitPromises.clear();
     this.checkerStats.clear();

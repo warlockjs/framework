@@ -21,6 +21,8 @@
   // catches "the template drifted from the workspace's uncommitted source" on every
   // commit, before anything is published.
   "compilerOptions": {
+    "rootDir": "..",
+    "types": ["node"],
     "target": "ESNext",
     // "dom" alone, matching templates/warlock/tsconfig.json, drops `Headers.entries()`
     // and friends. The template itself never calls those, but this config also
@@ -36,7 +38,6 @@
     "experimentalDecorators": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "downlevelIteration": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
@@ -46,7 +47,6 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
       // The template's own aliases (templates/warlock/tsconfig.json), rebased
       // from that file's location to this one's.

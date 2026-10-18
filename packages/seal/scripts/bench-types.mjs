@@ -43,7 +43,9 @@ const pkgRoot = join(scriptDir, "..");
 const repoRoot = join(pkgRoot, "..", "..");
 const baselinePath = join(pkgRoot, "bench", "types-baseline.json");
 const require = createRequire(join(pkgRoot, "package.json"));
-const tscPath = require.resolve("typescript/bin/tsc");
+const tsManifestPath = require.resolve("typescript/package.json");
+const tsManifest = require(tsManifestPath);
+const tscPath = join(dirname(tsManifestPath), tsManifest.bin.tsc);
 const tsVersion = require("typescript/package.json").version;
 
 const args = process.argv.slice(2);
@@ -221,7 +223,6 @@ function writeFixture(root) {
           noEmit: true,
           typeRoots: [join(repoRoot, "node_modules", "@types")],
           types: ["node"],
-          baseUrl: ".",
           paths: { "@warlock.js/seal": [join(pkgRoot, "src", "index.ts")] },
         },
         include: ["src/**/*.ts"],
@@ -270,7 +271,7 @@ try {
 
   const run = spawnSync(
     process.execPath,
-    [tscPath, "-p", join(root, "tsconfig.json"), "--extendedDiagnostics"],
+    [tscPath, "-p", join(root, "tsconfig.json"), "--extendedDiagnostics", "--checkers", "1"],
     {
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
@@ -292,6 +293,7 @@ try {
   } else {
     const result = {
       typescript: tsVersion,
+      checkers: 1,
       node: process.version,
       entities,
       services,

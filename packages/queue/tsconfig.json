@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["node"],
     "target": "ES2020",
     // Raised from the ES2020 default because the shared source in sibling packages
     // uses ES2022 APIs (Object.hasOwn, String.replaceAll, Array.at), and a consumer
@@ -13,7 +14,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "..",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true

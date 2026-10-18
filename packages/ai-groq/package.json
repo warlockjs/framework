@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@warlock.js/ai": "workspace:^",
-    "typescript": "^5.0.0",
+    "typescript": "7.0.2",
     "vitest": "4.1.10"
   },
   "peerDependencies": {

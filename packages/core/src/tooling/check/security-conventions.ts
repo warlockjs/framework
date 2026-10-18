@@ -1,5 +1,5 @@
 import { DEFAULT_REDACT_KEY_SET, normalizeRedactKey } from "@warlock.js/logger";
-import ts from "typescript";
+import * as ast from "../syntax/ast";
 import { isAuthGuardName, isMutatingHttpMethod } from "../../router/route-guard-names";
 import {
   containsRequestInput,
@@ -46,15 +46,15 @@ const IGNORED_RECEIVERS: ReadonlySet<string> = new Set([
   "logger",
 ]);
 
-function displayCallee(callee: ts.Node): string {
+function displayCallee(callee: ast.Node): string {
   const target = unwrap(callee);
 
-  if (ts.isIdentifier(target)) return `${target.text}()`;
+  if (ast.isIdentifier(target)) return `${ast.valueText(target)}()`;
 
   if (isMemberAccess(target)) {
     const name = memberName(target);
-    const object = unwrap(target.expression);
-    const owner = ts.isIdentifier(object) ? `${object.text}.` : "";
+    const object = unwrap(ast.expressionOf(target));
+    const owner = ast.isIdentifier(object) ? `${ast.valueText(object)}.` : "";
 
     return name ? `${owner}${name}()` : "a call";
   }
@@ -62,45 +62,45 @@ function displayCallee(callee: ts.Node): string {
   return "a call";
 }
 
-function isIgnoredReceiver(callee: ts.Node): boolean {
+function isIgnoredReceiver(callee: ast.Node): boolean {
   const target = unwrap(callee);
 
   if (!isMemberAccess(target)) return false;
 
-  const object = unwrap(target.expression);
+  const object = unwrap(ast.expressionOf(target));
 
-  return ts.isIdentifier(object) && IGNORED_RECEIVERS.has(object.text);
+  return ast.isIdentifier(object) && IGNORED_RECEIVERS.has(ast.valueText(object));
 }
 
 /** When `node` flows into a call's arguments, the callee's display name. */
-function callReceiving(node: ts.Node): string | undefined {
+function callReceiving(node: ast.Node): string | undefined {
   let current = node;
 
   for (;;) {
-    const parent = current.parent;
+    const parent = ast.parentOf(current);
 
     if (!parent) return undefined;
 
-    if (ts.isCallExpression(parent) || ts.isNewExpression(parent)) {
+    if (ast.isCallExpression(parent) || ast.isNewExpression(parent)) {
       if (!(parent.arguments ?? []).some((argument) => argument === current)) return undefined;
-      if (isIgnoredReceiver(parent.expression)) return undefined;
+      if (isIgnoredReceiver(ast.expressionOf(parent))) return undefined;
 
-      return displayCallee(parent.expression);
+      return displayCallee(ast.expressionOf(parent));
     }
 
     if (
-      ts.isSpreadElement(parent) ||
-      ts.isSpreadAssignment(parent) ||
-      ts.isObjectLiteralExpression(parent) ||
-      ts.isArrayLiteralExpression(parent) ||
-      (ts.isPropertyAssignment(parent) && parent.initializer === current) ||
-      ts.isShorthandPropertyAssignment(parent) ||
-      ts.isAsExpression(parent) ||
-      ts.isNonNullExpression(parent) ||
-      ts.isSatisfiesExpression(parent) ||
-      ts.isTypeAssertionExpression(parent) ||
-      ts.isParenthesizedExpression(parent) ||
-      ts.isAwaitExpression(parent)
+      ast.isSpreadElement(parent) ||
+      ast.isSpreadAssignment(parent) ||
+      ast.isObjectLiteralExpression(parent) ||
+      ast.isArrayLiteralExpression(parent) ||
+      (ast.isPropertyAssignment(parent) && parent.value === current) ||
+      ast.isShorthandPropertyAssignment(parent) ||
+      ast.isAsExpression(parent) ||
+      ast.isNonNullExpression(parent) ||
+      ast.isSatisfiesExpression(parent) ||
+      ast.isTypeAssertionExpression(parent) ||
+      ast.isParenthesizedExpression(parent) ||
+      ast.isAwaitExpression(parent)
     ) {
       current = parent;
       continue;
@@ -115,19 +115,19 @@ function callReceiving(node: ts.Node): string | undefined {
  * into an object/array argument, or through a local constant later passed to
  * a call.
  */
-function receivingCall(node: ts.Node): string | undefined {
+function receivingCall(node: ast.Node): string | undefined {
   const direct = callReceiving(node);
 
   if (direct) return direct;
 
   // `const data = request.all(); await Model.create(data);`
-  const parent = node.parent;
+  const parent = ast.parentOf(node);
 
   if (
     parent &&
-    ts.isVariableDeclaration(parent) &&
-    parent.initializer === node &&
-    ts.isIdentifier(parent.name)
+    ast.isVariableDeclaration(parent) &&
+    parent.init === node &&
+    ast.isIdentifier(parent.id)
   ) {
     for (const reference of referencesOf(parent)) {
       const name = callReceiving(reference);
@@ -138,16 +138,16 @@ function receivingCall(node: ts.Node): string | undefined {
   return undefined;
 }
 
-function checkRequestAll(node: ts.Node, findings: SourceFinding[]): void {
-  if (!ts.isCallExpression(node)) return;
+function checkRequestAll(node: ast.Node, findings: SourceFinding[]): void {
+  if (!ast.isCallExpression(node)) return;
 
-  const callee = unwrap(node.expression);
+  const callee = unwrap(ast.expressionOf(node));
 
   if (!isMemberAccess(callee)) return;
 
-  const object = unwrap(callee.expression);
+  const object = unwrap(ast.expressionOf(callee));
 
-  if (!ts.isIdentifier(object) || !REQUEST_NAMES.has(object.text)) return;
+  if (!ast.isIdentifier(object) || !REQUEST_NAMES.has(ast.valueText(object))) return;
 
   const method = memberName(callee);
 
@@ -160,7 +160,7 @@ function checkRequestAll(node: ts.Node, findings: SourceFinding[]): void {
   findings.push({
     code: "WL9005",
     node,
-    message: `\`${object.text}.${method}()\` passes every client-sent field to \`${target}\`. Use \`${object.text}.validated()\` so only the fields the validation schema accepted reach it.`,
+    message: `\`${ast.valueText(object)}.${method}()\` passes every client-sent field to \`${target}\`. Use \`${ast.valueText(object)}.validated()\` so only the fields the validation schema accepted reach it.`,
   });
 }
 
@@ -191,10 +191,10 @@ const MUTATING_BUILDER_METHODS: ReadonlySet<string> = new Set([
 
 const READ_ONLY_RESOURCE_METHODS: ReadonlySet<string> = new Set(["list", "get", "show"]);
 
-function isRouter(node: ts.Node): boolean {
+function isRouter(node: ast.Node): boolean {
   const target = unwrap(node);
 
-  return ts.isIdentifier(target) && ROUTER_NAMES.has(target.text);
+  return ast.isIdentifier(target) && ROUTER_NAMES.has(ast.valueText(target));
 }
 
 function isGuardName(name: string | undefined): boolean {
@@ -202,31 +202,32 @@ function isGuardName(name: string | undefined): boolean {
 }
 
 /** Whether a constant is initialised with `markAuthGuard(fn)` (not `markAuthGuard(fn, false)`). */
-function isMarkedGuard(identifier: ts.Identifier): boolean {
+function isMarkedGuard(identifier: ast.Identifier): boolean {
   const initializer = resolveInitializer(identifier);
   const value = initializer ? unwrap(initializer) : undefined;
 
   return (
     value !== undefined &&
-    ts.isCallExpression(value) &&
+    ast.isCallExpression(value) &&
     calleeName(value) === "markAuthGuard" &&
-    value.arguments[1]?.kind !== ts.SyntaxKind.FalseKeyword
+    !(value.arguments[1]?.type === "Literal" && value.arguments[1].value === false)
   );
 }
 
-function middlewareHasGuard(node: ts.Node): boolean {
+function middlewareHasGuard(node: ast.Node): boolean {
   const value = unwrap(node);
 
   // A variable or a call: the check cannot see into it, so it trusts it.
-  if (!ts.isArrayLiteralExpression(value)) return true;
+  if (!ast.isArrayLiteralExpression(value)) return true;
 
   return value.elements.some((element) => {
-    if (ts.isSpreadElement(element)) return true;
+    if (!element) return false;
+    if (ast.isSpreadElement(element)) return true;
 
     const item = unwrap(element);
 
-    if (ts.isIdentifier(item)) return isGuardName(item.text) || isMarkedGuard(item);
-    if (ts.isCallExpression(item)) return isGuardName(calleeName(item));
+    if (ast.isIdentifier(item)) return isGuardName(ast.valueText(item)) || isMarkedGuard(item);
+    if (ast.isCallExpression(item)) return isGuardName(calleeName(item));
     if (isMemberAccess(item)) return isGuardName(memberName(item));
 
     return false;
@@ -234,34 +235,35 @@ function middlewareHasGuard(node: ts.Node): boolean {
 }
 
 /** `public: true`, a guard in `middleware`, or an options value the check cannot see into. */
-function optionsGuard(node: ts.Node | undefined): "guarded" | "unguarded" | "none" {
+function optionsGuard(node: ast.Node | undefined): "guarded" | "unguarded" | "none" {
   if (!node) return "none";
 
   const value = unwrap(node);
 
-  if (!ts.isObjectLiteralExpression(value)) return "guarded";
+  if (!ast.isObjectLiteralExpression(value)) return "guarded";
 
   let verdict: "guarded" | "unguarded" = "unguarded";
 
   for (const property of value.properties) {
-    if (ts.isSpreadAssignment(property)) {
+    if (ast.isSpreadAssignment(property)) {
       verdict = "guarded";
       continue;
     }
 
     let key: string | undefined;
-    let propertyValue: ts.Node | undefined;
+    let propertyValue: ast.Node | undefined;
 
-    if (ts.isPropertyAssignment(property)) {
-      key = keyName(property.name);
-      propertyValue = unwrap(property.initializer);
-    } else if (ts.isShorthandPropertyAssignment(property)) {
-      key = property.name.text;
-      propertyValue = property.name;
+    if (ast.isPropertyAssignment(property)) {
+      key = keyName(property.key);
+      propertyValue = unwrap(property.value);
+    } else if (ast.isShorthandPropertyAssignment(property)) {
+      key = ast.valueText(property.key);
+      propertyValue = property.key;
     }
 
     if (!propertyValue) continue;
-    if (key === "public" && propertyValue.kind === ts.SyntaxKind.TrueKeyword) return "guarded";
+    if (key === "public" && propertyValue.type === "Literal" && propertyValue.value === true)
+      return "guarded";
     if (key === "middleware" && middlewareHasGuard(propertyValue)) return "guarded";
   }
 
@@ -269,25 +271,25 @@ function optionsGuard(node: ts.Node | undefined): "guarded" | "unguarded" | "non
 }
 
 /** Whether an enclosing function is a guarded (or public) group callback. */
-function insideGuardedGroup(node: ts.Node): boolean {
+function insideGuardedGroup(node: ast.Node): boolean {
   for (const ancestor of ancestors(node)) {
-    if (!ts.isArrowFunction(ancestor) && !ts.isFunctionExpression(ancestor)) continue;
+    if (!ast.isArrowFunction(ancestor) && !ast.isFunctionExpression(ancestor)) continue;
 
-    const parent = ancestor.parent;
+    const parent = ast.parentOf(ancestor);
 
-    if (!parent || !ts.isCallExpression(parent)) continue;
+    if (!parent || !ast.isCallExpression(parent)) continue;
     if (!parent.arguments.some((argument) => argument === ancestor)) continue;
 
     const name = calleeName(parent);
 
     if (name !== undefined && GUARD_FUNCTIONS.has(name)) return true;
 
-    const callee = unwrap(parent.expression);
+    const callee = unwrap(ast.expressionOf(parent));
 
     if (
       isMemberAccess(callee) &&
       memberName(callee) === "group" &&
-      isRouter(callee.expression) &&
+      isRouter(ast.expressionOf(callee)) &&
       optionsGuard(parent.arguments[0]) === "guarded"
     ) {
       return true;
@@ -297,7 +299,7 @@ function insideGuardedGroup(node: ts.Node): boolean {
   return false;
 }
 
-function pathText(node: ts.Node | undefined): string {
+function pathText(node: ast.Node | undefined): string {
   return literalString(node) ?? "(dynamic path)";
 }
 
@@ -305,18 +307,18 @@ function pathText(node: ts.Node | undefined): string {
  * Walk a builder chain back to `router.route(path, options)`, collecting every
  * options object passed along the way (`route()`, `nest()`).
  */
-function builderChain(node: ts.Node): { path: string; optionNodes: ts.Node[] } | undefined {
-  const optionNodes: ts.Node[] = [];
+function builderChain(node: ast.Node): { path: string; optionNodes: ast.Node[] } | undefined {
+  const optionNodes: ast.Node[] = [];
   let current = unwrap(node);
 
-  while (ts.isCallExpression(current)) {
-    const callee = unwrap(current.expression);
+  while (ast.isCallExpression(current)) {
+    const callee = unwrap(ast.expressionOf(current));
 
     if (!isMemberAccess(callee)) return undefined;
 
     const name = memberName(callee);
 
-    if (name === "route" && isRouter(callee.expression)) {
+    if (name === "route" && isRouter(ast.expressionOf(callee))) {
       const options = current.arguments[1];
       if (options) optionNodes.push(options);
 
@@ -328,27 +330,28 @@ function builderChain(node: ts.Node): { path: string; optionNodes: ts.Node[] } |
       if (options) optionNodes.push(options);
     }
 
-    current = unwrap(callee.expression);
+    current = unwrap(ast.expressionOf(callee));
   }
 
   return undefined;
 }
 
-function resourceIsReadOnly(node: ts.Node | undefined): boolean {
+function resourceIsReadOnly(node: ast.Node | undefined): boolean {
   if (!node) return false;
 
   const value = unwrap(node);
 
-  if (!ts.isObjectLiteralExpression(value)) return false;
+  if (!ast.isObjectLiteralExpression(value)) return false;
 
   for (const property of value.properties) {
-    if (!ts.isPropertyAssignment(property) || keyName(property.name) !== "only") continue;
+    if (!ast.isPropertyAssignment(property) || keyName(property.key) !== "only") continue;
 
-    const only = unwrap(property.initializer);
+    const only = unwrap(property.value);
 
-    if (!ts.isArrayLiteralExpression(only)) return false;
+    if (!ast.isArrayLiteralExpression(only)) return false;
 
     return only.elements.every((element) => {
+      if (!element) return false;
       const method = literalString(element);
       return method !== undefined && READ_ONLY_RESOURCE_METHODS.has(method);
     });
@@ -357,7 +360,7 @@ function resourceIsReadOnly(node: ts.Node | undefined): boolean {
   return false;
 }
 
-function unguardedRoute(node: ts.Node, route: string): SourceFinding {
+function unguardedRoute(node: ast.Node, route: string): SourceFinding {
   return {
     code: "WL9006",
     node,
@@ -365,10 +368,10 @@ function unguardedRoute(node: ts.Node, route: string): SourceFinding {
   };
 }
 
-function checkRouteGuard(node: ts.Node, findings: SourceFinding[]): void {
-  if (!ts.isCallExpression(node)) return;
+function checkRouteGuard(node: ast.Node, findings: SourceFinding[]): void {
+  if (!ast.isCallExpression(node)) return;
 
-  const callee = unwrap(node.expression);
+  const callee = unwrap(ast.expressionOf(node));
 
   if (!isMemberAccess(callee)) return;
 
@@ -376,10 +379,10 @@ function checkRouteGuard(node: ts.Node, findings: SourceFinding[]): void {
 
   if (!method) return;
 
-  const guarded = (options: ts.Node | undefined) =>
+  const guarded = (options: ast.Node | undefined) =>
     optionsGuard(options) === "guarded" || insideGuardedGroup(node);
 
-  if (isRouter(callee.expression)) {
+  if (isRouter(ast.expressionOf(callee))) {
     // router.post(path, handler, options)
     if (MUTATING_ROUTER_METHODS.has(method)) {
       if (!guarded(node.arguments[2])) {
@@ -419,7 +422,7 @@ function checkRouteGuard(node: ts.Node, findings: SourceFinding[]): void {
   // router.route(path, options).create(handler, options)
   if (!MUTATING_BUILDER_METHODS.has(method)) return;
 
-  const chain = builderChain(callee.expression);
+  const chain = builderChain(ast.expressionOf(callee));
 
   if (!chain) return;
   if (optionsGuard(node.arguments[1]) === "guarded") return;
@@ -457,8 +460,8 @@ const CLIENT_INPUT_CALLS: ReadonlySet<string> = new Set([
 /** Identifiers whose members are client-controlled (a loader's `query`, URLSearchParams). */
 const CLIENT_INPUT_NAMES: ReadonlySet<string> = new Set(["query", "searchParams"]);
 
-function isClientSource(node: ts.Node): boolean {
-  if (ts.isCallExpression(node)) {
+function isClientSource(node: ast.Node): boolean {
+  if (ast.isCallExpression(node)) {
     const name = calleeName(node);
     if (name !== undefined && CLIENT_INPUT_CALLS.has(name)) return true;
   }
@@ -466,15 +469,15 @@ function isClientSource(node: ts.Node): boolean {
   if (isMemberAccess(node)) {
     const root = rootIdentifier(node);
 
-    if (root && CLIENT_INPUT_NAMES.has(root.text)) return true;
+    if (root && CLIENT_INPUT_NAMES.has(ast.valueText(root))) return true;
 
     // location.search / window.location.hash
     const name = memberName(node);
 
     if (name === "search" || name === "hash") {
-      const object = unwrap(node.expression);
+      const object = unwrap(ast.expressionOf(node));
 
-      if (ts.isIdentifier(object) && object.text === "location") return true;
+      if (ast.isIdentifier(object) && ast.valueText(object) === "location") return true;
       if (isMemberAccess(object) && memberName(object) === "location") return true;
     }
   }
@@ -482,23 +485,23 @@ function isClientSource(node: ts.Node): boolean {
   return false;
 }
 
-function isRedirectTainted(node: ts.Node): boolean {
+function isRedirectTainted(node: ast.Node): boolean {
   return containsRequestInput(node, { sanitizers: REDIRECT_SANITIZERS, isSource: isClientSource });
 }
 
 /** An enclosing `if (isSafeRedirect(x))` or `isSafeRedirect(x) ? … : …` validated the target. */
-function checkedByValidator(node: ts.Node): boolean {
+function checkedByValidator(node: ast.Node): boolean {
   for (const ancestor of ancestors(node)) {
-    let test: ts.Node | undefined;
+    let test: ast.Node | undefined;
 
-    if (ts.isIfStatement(ancestor)) test = ancestor.expression;
-    else if (ts.isConditionalExpression(ancestor)) test = ancestor.condition;
+    if (ast.isIfStatement(ancestor)) test = ast.expressionOf(ancestor);
+    else if (ast.isConditionalExpression(ancestor)) test = ancestor.test;
     else continue;
 
     let validated = false;
 
     walk(test, (child) => {
-      if (ts.isCallExpression(child)) {
+      if (ast.isCallExpression(child)) {
         const name = calleeName(child);
         if (name !== undefined && REDIRECT_VALIDATORS.has(name)) validated = true;
       }
@@ -512,7 +515,7 @@ function checkedByValidator(node: ts.Node): boolean {
   return false;
 }
 
-function unsafeRedirect(node: ts.Node, what: string, helper: string, from: string): SourceFinding {
+function unsafeRedirect(node: ast.Node, what: string, helper: string, from: string): SourceFinding {
   return {
     code: "WL9007",
     node,
@@ -520,23 +523,23 @@ function unsafeRedirect(node: ts.Node, what: string, helper: string, from: strin
   };
 }
 
-function checkRedirect(node: ts.Node, findings: SourceFinding[]): void {
-  if (ts.isCallExpression(node)) {
+function checkRedirect(node: ast.Node, findings: SourceFinding[]): void {
+  if (ast.isCallExpression(node)) {
     const name = calleeName(node);
 
     if (name === undefined || !REDIRECT_CALLS.has(name)) return;
 
     // `router.redirect(from, to)` registers a static redirect, not a request-time one.
-    const callee = unwrap(node.expression);
+    const callee = unwrap(ast.expressionOf(node));
 
     if (isMemberAccess(callee)) {
-      const owner = unwrap(callee.expression);
-      if (ts.isIdentifier(owner) && owner.text === "router") return;
+      const owner = unwrap(ast.expressionOf(callee));
+      if (ast.isIdentifier(owner) && ast.valueText(owner) === "router") return;
     }
 
     const target = node.arguments[0];
 
-    if (!target || ts.isSpreadElement(target)) return;
+    if (!target || ast.isSpreadElement(target)) return;
     if (!isRedirectTainted(target) || checkedByValidator(node)) return;
 
     findings.push(
@@ -548,17 +551,19 @@ function checkRedirect(node: ts.Node, findings: SourceFinding[]): void {
     return;
   }
 
-  if (!ts.isJsxAttribute(node) || !ts.isIdentifier(node.name)) return;
-  if (node.name.text !== "to" && node.name.text !== "href") return;
+  if (!ast.isJsxAttribute(node) || ast.nameNode(node).type !== "JSXIdentifier") return;
+  if (ast.valueText(ast.nameNode(node)) !== "to" && ast.valueText(ast.nameNode(node)) !== "href")
+    return;
 
-  const element = node.parent.parent;
+  const element = ast.parentOf(node);
 
-  if (!ts.isJsxOpeningElement(element) && !ts.isJsxSelfClosingElement(element)) return;
-  if (!ts.isIdentifier(element.tagName) || !LINK_COMPONENTS.has(element.tagName.text)) return;
+  if (!element || (!ast.isJsxOpeningElement(element) && !ast.isJsxSelfClosingElement(element)))
+    return;
+  if (element.name.type !== "JSXIdentifier" || !LINK_COMPONENTS.has(element.name.name)) return;
 
-  const initializer = node.initializer;
+  const initializer = node.value;
 
-  if (!initializer || !ts.isJsxExpression(initializer) || !initializer.expression) return;
+  if (!initializer || !ast.isJsxExpression(initializer) || !initializer.expression) return;
 
   const expression = initializer.expression;
 
@@ -644,29 +649,29 @@ function describeMember(member: string): string {
 }
 
 /** `request.all()` / `request.body` itself, not `request.body.title`. */
-function isWholeAccess(node: ts.Node, member: string): boolean {
-  if (ts.isCallExpression(node)) {
-    const callee = unwrap(node.expression);
+function isWholeAccess(node: ast.Node, member: string): boolean {
+  if (ast.isCallExpression(node)) {
+    const callee = unwrap(ast.expressionOf(node));
     return isMemberAccess(callee) && memberName(callee) === member;
   }
 
   return isMemberAccess(node) && memberName(node) === member;
 }
 
-type LogFinding = { node: ts.Node; what: string };
+type LogFinding = { node: ast.Node; what: string };
 
-function inspectLogged(node: ts.Node, censoredKey: boolean, found: LogFinding[]): void {
+function inspectLogged(node: ast.Node, censoredKey: boolean, found: LogFinding[]): void {
   const value = unwrap(node);
 
   if (isFunctionLike(value)) return;
 
-  if (ts.isCallExpression(value)) {
+  if (ast.isCallExpression(value)) {
     const name = calleeName(value);
     if (name !== undefined && REDACTORS.has(name)) return;
   }
 
   // request.all() / request.body / request.headers / request.input("email")
-  if (ts.isCallExpression(value) || isMemberAccess(value)) {
+  if (ast.isCallExpression(value) || isMemberAccess(value)) {
     const member = requestMemberAccess(value);
 
     if (member !== undefined && isWholeAccess(value, member)) {
@@ -681,7 +686,7 @@ function inspectLogged(node: ts.Node, censoredKey: boolean, found: LogFinding[])
       }
     }
 
-    if (ts.isCallExpression(value) && member !== undefined) {
+    if (ast.isCallExpression(value) && member !== undefined) {
       const key = literalString(value.arguments[0]);
       const category = key ? sensitiveCategory(key) : undefined;
 
@@ -692,8 +697,8 @@ function inspectLogged(node: ts.Node, censoredKey: boolean, found: LogFinding[])
     }
   }
 
-  if (ts.isIdentifier(value) || isMemberAccess(value)) {
-    const name = ts.isIdentifier(value) ? value.text : memberName(value);
+  if (ast.isIdentifier(value) || isMemberAccess(value)) {
+    const name = ast.isIdentifier(value) ? ast.valueText(value) : memberName(value);
     const category = name ? sensitiveCategory(name) : undefined;
 
     if (category && !(censoredKey && category === "secret")) {
@@ -703,76 +708,83 @@ function inspectLogged(node: ts.Node, censoredKey: boolean, found: LogFinding[])
 
     // `request.body.title` reads one field; only the whole body is reported.
     if (isMemberAccess(value) && requestMemberAccess(value) === undefined) {
-      inspectLogged(value.expression, false, found);
+      inspectLogged(ast.expressionOf(value), false, found);
 
-      if (ts.isElementAccessExpression(value))
-        inspectLogged(value.argumentExpression, false, found);
+      if (ast.isElementAccessExpression(value)) inspectLogged(value.property, false, found);
     }
 
     return;
   }
 
-  if (ts.isObjectLiteralExpression(value)) {
+  if (ast.isObjectLiteralExpression(value)) {
     for (const property of value.properties) {
-      if (ts.isSpreadAssignment(property)) {
-        inspectLogged(property.expression, false, found);
-      } else if (ts.isPropertyAssignment(property)) {
-        const key = keyName(property.name);
-        inspectLogged(property.initializer, key !== undefined && isCensoredKey(key), found);
-      } else if (ts.isShorthandPropertyAssignment(property)) {
-        inspectLogged(property.name, isCensoredKey(property.name.text), found);
+      if (ast.isSpreadAssignment(property)) {
+        inspectLogged(ast.expressionOf(property), false, found);
+      } else if (ast.isPropertyAssignment(property)) {
+        const key = keyName(property.key);
+        inspectLogged(property.value, key !== undefined && isCensoredKey(key), found);
+      } else if (ast.isShorthandPropertyAssignment(property)) {
+        inspectLogged(property.key, isCensoredKey(ast.valueText(property.key)), found);
       }
     }
 
     return;
   }
 
-  if (ts.isTemplateExpression(value)) {
-    for (const span of value.templateSpans) inspectLogged(span.expression, false, found);
+  if (ast.isTemplateExpression(value)) {
+    for (const expression of value.expressions) inspectLogged(expression, false, found);
     return;
   }
 
-  if (ts.isBinaryExpression(value)) {
+  if (ast.isBinaryExpression(value)) {
     inspectLogged(value.left, false, found);
     inspectLogged(value.right, false, found);
     return;
   }
 
-  if (ts.isConditionalExpression(value)) {
-    inspectLogged(value.whenTrue, censoredKey, found);
-    inspectLogged(value.whenFalse, censoredKey, found);
+  if (ast.isConditionalExpression(value)) {
+    inspectLogged(value.consequent, censoredKey, found);
+    inspectLogged(value.alternate, censoredKey, found);
     return;
   }
 
-  if (ts.isArrayLiteralExpression(value)) {
+  if (ast.isArrayLiteralExpression(value)) {
     for (const element of value.elements) {
-      if (ts.isOmittedExpression(element)) continue;
-      inspectLogged(ts.isSpreadElement(element) ? element.expression : element, false, found);
+      if (ast.isOmittedExpression(element)) continue;
+      inspectLogged(
+        ast.isSpreadElement(element) ? ast.expressionOf(element) : element,
+        false,
+        found,
+      );
     }
 
     return;
   }
 
-  if (ts.isCallExpression(value)) {
+  if (ast.isCallExpression(value)) {
     // JSON.stringify(request.all()), String(user.email), user.email.trim()
-    const callee = unwrap(value.expression);
+    const callee = unwrap(ast.expressionOf(value));
 
-    if (isMemberAccess(callee)) inspectLogged(callee.expression, false, found);
+    if (isMemberAccess(callee)) inspectLogged(ast.expressionOf(callee), false, found);
 
     for (const argument of value.arguments) {
-      inspectLogged(ts.isSpreadElement(argument) ? argument.expression : argument, false, found);
+      inspectLogged(
+        ast.isSpreadElement(argument) ? ast.expressionOf(argument) : argument,
+        false,
+        found,
+      );
     }
 
     return;
   }
 
-  if (ts.isAwaitExpression(value)) inspectLogged(value.expression, censoredKey, found);
+  if (ast.isAwaitExpression(value)) inspectLogged(ast.expressionOf(value), censoredKey, found);
 }
 
-function checkSensitiveLog(node: ts.Node, findings: SourceFinding[]): void {
-  if (!ts.isCallExpression(node)) return;
+function checkSensitiveLog(node: ast.Node, findings: SourceFinding[]): void {
+  if (!ast.isCallExpression(node)) return;
 
-  const callee = unwrap(node.expression);
+  const callee = unwrap(ast.expressionOf(node));
 
   if (!isMemberAccess(callee)) return;
 
@@ -780,20 +792,25 @@ function checkSensitiveLog(node: ts.Node, findings: SourceFinding[]): void {
 
   if (!method || !LOG_METHODS.has(method)) return;
 
-  const owner = unwrap(callee.expression);
+  const owner = unwrap(ast.expressionOf(callee));
 
-  if (!ts.isIdentifier(owner)) return;
+  if (!ast.isIdentifier(owner)) return;
 
   // log.info(…), console.log(…), and request.log(…)
   const isLogger =
-    LOGGER_NAMES.has(owner.text) || (REQUEST_NAMES.has(owner.text) && method === "log");
+    LOGGER_NAMES.has(ast.valueText(owner)) ||
+    (REQUEST_NAMES.has(ast.valueText(owner)) && method === "log");
 
   if (!isLogger) return;
 
   const found: LogFinding[] = [];
 
   for (const argument of node.arguments) {
-    inspectLogged(ts.isSpreadElement(argument) ? argument.expression : argument, false, found);
+    inspectLogged(
+      ast.isSpreadElement(argument) ? ast.expressionOf(argument) : argument,
+      false,
+      found,
+    );
   }
 
   for (const finding of found) {
@@ -860,24 +877,24 @@ export function findUnboundedQuantifier(source: string): string | undefined {
 }
 
 /** The pattern of a regex literal, `new RegExp("…")`, or a constant holding either. */
-function regexSource(node: ts.Node | undefined, depth = 0): string | undefined {
+function regexSource(node: ast.Node | undefined, depth = 0): string | undefined {
   if (!node || depth > 8) return undefined;
 
   const value = unwrap(node);
 
-  if (ts.isRegularExpressionLiteral(value)) {
-    return value.text.slice(1, value.text.lastIndexOf("/"));
+  if (ast.isRegularExpressionLiteral(value)) {
+    return ast.valueText(value).slice(1, ast.valueText(value).lastIndexOf("/"));
   }
 
   if (
-    (ts.isNewExpression(value) || ts.isCallExpression(value)) &&
-    ts.isIdentifier(value.expression) &&
-    value.expression.text === "RegExp"
+    (ast.isNewExpression(value) || ast.isCallExpression(value)) &&
+    ast.isIdentifier(ast.expressionOf(value)) &&
+    ast.valueText(ast.expressionOf(value)) === "RegExp"
   ) {
     return literalString(value.arguments?.[0]);
   }
 
-  if (ts.isIdentifier(value)) {
+  if (ast.isIdentifier(value)) {
     const initializer = resolveInitializer(value);
     return initializer ? regexSource(initializer, depth + 1) : undefined;
   }
@@ -885,10 +902,10 @@ function regexSource(node: ts.Node | undefined, depth = 0): string | undefined {
   return undefined;
 }
 
-function checkUnboundedRegex(node: ts.Node, findings: SourceFinding[]): void {
-  if (!ts.isCallExpression(node)) return;
+function checkUnboundedRegex(node: ast.Node, findings: SourceFinding[]): void {
+  if (!ast.isCallExpression(node)) return;
 
-  const callee = unwrap(node.expression);
+  const callee = unwrap(ast.expressionOf(node));
 
   if (!isMemberAccess(callee)) return;
 
@@ -897,16 +914,16 @@ function checkUnboundedRegex(node: ts.Node, findings: SourceFinding[]): void {
   if (!method) return;
 
   const first = node.arguments[0];
-  const firstArgument = first && !ts.isSpreadElement(first) ? first : undefined;
-  let regex: ts.Node | undefined;
-  let input: ts.Node | undefined;
+  const firstArgument = first && !ast.isSpreadElement(first) ? first : undefined;
+  let regex: ast.Node | undefined;
+  let input: ast.Node | undefined;
 
   if (REGEX_METHODS.has(method)) {
-    regex = callee.expression;
+    regex = ast.expressionOf(callee);
     input = firstArgument;
   } else if (STRING_METHODS.has(method)) {
     regex = firstArgument;
-    input = callee.expression;
+    input = ast.expressionOf(callee);
   } else {
     return;
   }
@@ -941,7 +958,7 @@ function checkUnboundedRegex(node: ts.Node, findings: SourceFinding[]): void {
  * - `WL9008` a raw email, credential or request body passed to a logger;
  * - `WL9009` a regex with an unbounded quantifier run on request input.
  */
-export function securityFindings(sourceFile: ts.SourceFile): SourceFinding[] {
+export function securityFindings(sourceFile: ast.SourceFile): SourceFinding[] {
   const findings: SourceFinding[] = [];
 
   walk(

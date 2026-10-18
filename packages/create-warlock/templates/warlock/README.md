@@ -148,3 +148,16 @@ This project ships instructions and skills for AI coding agents:
 
 - [Documentation](https://warlock.js.org)
 - [Changelog](https://warlock.js.org/changelog)
+
+## TypeScript 7 in 5.32
+
+New projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
+The template uses `module: "ESNext"`, `moduleResolution: "bundler"`, explicit
+Node types, and `paths` relative to its tsconfig, without `baseUrl`.
+Existing apps must remove `baseUrl`, rebase alias targets, and replace
+`moduleResolution: "node"` / `"node10"` before typechecking.
+
+Use the Oxlint/Oxfmt lint mode with TS7. The optional ESLint scaffold is retained,
+but typescript-eslint's parser requires the removed JavaScript compiler API and
+does not support TS7. ESLint mode is scheduled for deprecation in 5.33 and removal
+in 5.34. A parser's bundled older TypeScript is separate from the app's native `tsc`.

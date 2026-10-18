@@ -1,4 +1,5 @@
-import ts from "typescript";
+import { parseSync } from "oxc-parser";
+import * as ast from "../../../tooling/syntax/ast";
 
 /** What {@link mergeWebSitemapConfig} did, or could not do, to the source it was given. */
 export type WebSitemapMergeResult =
@@ -40,13 +41,7 @@ export type WebSitemapMergeResult =
  * @returns What happened, and the new text when there is any.
  */
 export function mergeWebSitemapConfig(source: string): WebSitemapMergeResult {
-  const sourceFile = ts.createSourceFile(
-    "web.ts",
-    source,
-    ts.ScriptTarget.ESNext,
-    /* setParentNodes */ true,
-    ts.ScriptKind.TS,
-  );
+  const sourceFile = ast.parseSourceFile("web.ts", source);
 
   const objectLiteral = findExportedConfigObjectLiteral(sourceFile);
 
@@ -58,8 +53,8 @@ export function mergeWebSitemapConfig(source: string): WebSitemapMergeResult {
     return { status: "already-present" };
   }
 
-  const bodyStart = objectLiteral.getStart(sourceFile) + 1;
-  const closingBraceIndex = objectLiteral.getEnd() - 1;
+  const bodyStart = objectLiteral.start + 1;
+  const closingBraceIndex = objectLiteral.end - 1;
   const body = source.slice(bodyStart, closingBraceIndex);
 
   const indentMatch = /\n([ \t]*)\S/.exec(body);
@@ -89,12 +84,7 @@ export function mergeWebSitemapConfig(source: string): WebSitemapMergeResult {
 
 /** Whether TEXT fails to parse as TypeScript source. */
 function hasSyntaxErrors(text: string): boolean {
-  const { diagnostics } = ts.transpileModule(text, {
-    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext },
-    reportDiagnostics: true,
-  });
-
-  return Boolean(diagnostics && diagnostics.length > 0);
+  return parseSync("web.ts", text).errors.length > 0;
 }
 
 /**
@@ -103,18 +93,18 @@ function hasSyntaxErrors(text: string): boolean {
  * property (e.g. `seo: { sitemap: true }`) is a different feature's field
  * and must not block adding the top-level one.
  */
-function hasTopLevelSitemapProperty(objectLiteral: ts.ObjectLiteralExpression): boolean {
+function hasTopLevelSitemapProperty(objectLiteral: ast.ObjectExpression): boolean {
   return objectLiteral.properties.some(
     (property) =>
-      (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) &&
-      propertyKeyName(property.name) === "sitemap",
+      (ast.isPropertyAssignment(property) || ast.isShorthandPropertyAssignment(property)) &&
+      propertyKeyName(ast.nameNode(property)) === "sitemap",
   );
 }
 
 /** The literal text of a property name node, when it is one of the plain shapes we care about. */
-function propertyKeyName(name: ts.PropertyName): string | undefined {
-  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
-    return name.text;
+function propertyKeyName(name: ast.Node): string | undefined {
+  if (ast.isIdentifier(name) || ast.isStringLiteral(name) || ast.isNumericLiteral(name)) {
+    return ast.valueText(name);
   }
 
   return undefined;
@@ -126,36 +116,35 @@ function propertyKeyName(name: ts.PropertyName): string | undefined {
  * file.
  */
 function findExportedConfigObjectLiteral(
-  sourceFile: ts.SourceFile,
-): ts.ObjectLiteralExpression | undefined {
-  const exportAssignment = sourceFile.statements.find(
-    (statement): statement is ts.ExportAssignment =>
-      ts.isExportAssignment(statement) && !statement.isExportEquals,
+  sourceFile: ast.SourceFile,
+): ast.ObjectExpression | undefined {
+  const exportAssignment = sourceFile.body.find(
+    (statement): statement is ast.ExportDefaultDeclaration => ast.isExportAssignment(statement),
   );
 
   if (!exportAssignment) return undefined;
 
-  const { expression } = exportAssignment;
+  const expression = exportAssignment.declaration;
 
-  if (ts.isObjectLiteralExpression(expression)) {
+  if (ast.isObjectLiteralExpression(expression)) {
     return expression;
   }
 
-  if (!ts.isIdentifier(expression)) return undefined;
+  if (!ast.isIdentifier(expression)) return undefined;
 
-  const identifier = expression.text;
+  const identifier = ast.valueText(expression);
 
-  for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
+  for (const statement of ast.topLevelDeclarations(sourceFile)) {
+    if (!ast.isVariableStatement(statement)) continue;
 
-    for (const declaration of statement.declarationList.declarations) {
+    for (const declaration of statement.declarations) {
       if (
-        ts.isIdentifier(declaration.name) &&
-        declaration.name.text === identifier &&
-        declaration.initializer &&
-        ts.isObjectLiteralExpression(declaration.initializer)
+        ast.isIdentifier(ast.nameNode(declaration)) &&
+        ast.valueText(declaration.id) === identifier &&
+        declaration.init &&
+        ast.isObjectLiteralExpression(declaration.init)
       ) {
-        return declaration.initializer;
+        return declaration.init;
       }
     }
   }

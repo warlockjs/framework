@@ -411,3 +411,28 @@ export default defineConfig({
 It also writes `.warlock/dev-server.json` (the server's address, for
 `warlock trace` and `warlock mcp`); `.warlock/` is already git-ignored by the
 starter. See the `warlock-agents-md` topic.
+
+## 5.31 to 5.32 TypeScript 7
+
+Pin the app's development dependency to `typescript@7.0.2`. The regular `tsc`
+command is now the native Go compiler; no native-preview package is needed.
+Remove `baseUrl` from every app tsconfig and resolve each `paths` target relative
+to the config. For example, `baseUrl: "src"` with `"app/*": ["app/*"]` becomes
+`"app/*": ["./src/app/*"]`. Replace `moduleResolution: "node"` / `"node10"` with
+`"bundler"` and use `module: "ESNext"` for Warlock's build pipeline. Explicitly
+include Node ambient types with `"types": ["node"]`; set `rootDir` if sources
+sit outside the config folder. Keep strict checking enabled.
+
+```bash
+npm install --save-dev --save-exact typescript@7.0.2
+npx tsc --noEmit
+npx warlock typecheck
+npx warlock typecheck --changed
+```
+
+The CLI preserves incremental state and changed-file filtering. Development
+health checks keep one native compiler session and update its snapshots. Syntax
+analysis uses OXC. `warlock upgrade` still parses/transforms with ts-morph's own
+bundled TypeScript, without using it as the app's compiler. Prefer Oxlint/Oxfmt:
+typescript-eslint still requires the old JavaScript API; ESLint mode is scheduled
+for deprecation in 5.33 and removal in 5.34.

@@ -188,15 +188,15 @@ Use a Date input rule or convert after validation when you need Date methods.
 
 ### 5. Very large composed schemas still have a compiler cost
 
-The deterministic 16-entity/8-service fixture currently uses about 655,000 type
-instantiations and 663 MB of compiler memory with TypeScript 5.9.3 (roughly 41,000
-instantiations and 41 MB per entity for this fixture). Returning an object's
-already typed class directly removed a duplicate Standard Schema intersection
-and reduced instantiations by about 63% from the previous baseline. Larger or
-more deeply nested schemas can still need a larger compiler heap; memory varies
-by environment. Run `pnpm bench:types --check` from `packages/seal` after inference
-changes; CI gates deterministic type/instantiation counts within 5% of the
-baseline. Time and memory are diagnostic only.
+The deterministic 16-entity/8-service fixture uses 655,949 instantiations,
+266,344 types and about 439 MiB of compiler memory with TypeScript 7.0.2 and
+`--checkers 1` (3.237 seconds total in the recorded run). The benchmark fixes the
+checker count because parallel checkers maintain separate caches and inflate
+aggregate counts; this replaces the TypeScript 5.9.3 baseline rather than
+comparing counts across compiler versions. Larger or more deeply nested schemas
+still have a memory cost. Run `npm run bench:types -- --check` from `packages/seal`
+after inference changes. CI gates types and instantiations within 5% of the
+baseline; time and memory remain diagnostic only.
 
 ## Standard Schema interop
 

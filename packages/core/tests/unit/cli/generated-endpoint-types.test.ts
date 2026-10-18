@@ -3,28 +3,13 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import ts from "typescript";
+import { compileSources } from "../../../src/tooling/typescript/compiler";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createEndpointGenerator } from "../../../src/cli/commands/generate/generators/endpoint.generator";
 import { setDryRun } from "../../../src/cli/commands/generate/utils/writer";
 
-/**
- * `warlock make endpoint` output, compiled for real.
- *
- * The generator runs into a temp directory exactly as the CLI would, and every
- * file it wrote is then compiled — in one `ts.createProgram` call, against the
- * real `@warlock.js/*` sources (`tsconfig.typecheck.json` paths) — next to the
- * two app files generated code imports from the starter: the guarded request
- * type and the `guarded()` router helper, read from the create-warlock template
- * itself so this cannot drift from what a new app ships.
- *
- * A guarded and a public endpoint, with a schema copied from a spec file, cover
- * both controller shapes, both route shapes and both test shapes. A broken
- * snippet (a typo'd response key in `responseSchema`) proves the program
- * actually type-checks rather than resolving everything to `any`.
- *
- * Same cost note as `generated-notifications-stub-types.test.ts`: building
- * core's graph takes tens of seconds, so it is paid once.
+/** Compile generated public and guarded endpoints against the real workspace source
+ * using the native compiler's virtual filesystem. A broken schema is a negative control.
  */
 
 const CORE_DIR = path.resolve(__dirname, "../../..").split(path.sep).join("/");
@@ -33,74 +18,11 @@ const VIRTUAL_ROOT = `${CORE_DIR}/__generated-endpoint-types-test__`;
 
 const virtualFiles: Record<string, string> = {};
 
-function loadCompilerOptions(): ts.CompilerOptions {
-  const configPath = path.join(CORE_DIR, "tsconfig.typecheck.json");
-  const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-
-  if (configFile.error) {
-    throw new Error(ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n"));
-  }
-
-  const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, CORE_DIR);
-
-  return {
-    ...parsed.options,
-    paths: {
-      ...parsed.options.paths,
-      "@warlock.js/core/tests": ["./src/tests/index.ts"],
-      "app/*": ["./__generated-endpoint-types-test__/src/app/*"],
-    },
-  };
-}
-
 function compile(files: Record<string, string>): Record<string, string[]> {
-  const options = loadCompilerOptions();
-  const host = ts.createCompilerHost(options, true);
-  const virtualPaths = new Set(Object.keys(files));
-  const virtualDirectories = new Set(
-    [...virtualPaths].flatMap((file) => {
-      const parts = file.split("/");
-
-      return parts.slice(1, -1).map((_, index) => parts.slice(0, index + 2).join("/"));
-    }),
-  );
-
-  const fileExists = host.fileExists.bind(host);
-  host.fileExists = (fileName) => virtualPaths.has(fileName) || fileExists(fileName);
-
-  const directoryExists = host.directoryExists?.bind(host);
-  host.directoryExists = (directory) =>
-    virtualDirectories.has(directory.replace(/\/$/, "")) ||
-    (directoryExists ? directoryExists(directory) : true);
-
-  const readFileFromHost = host.readFile.bind(host);
-  host.readFile = (fileName) => files[fileName] ?? readFileFromHost(fileName);
-
-  const getSourceFile = host.getSourceFile.bind(host);
-  host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
-    const content = files[fileName];
-
-    if (content !== undefined) {
-      return ts.createSourceFile(fileName, content, languageVersion, true, ts.ScriptKind.TS);
-    }
-
-    return getSourceFile(fileName, languageVersion, onError, shouldCreate);
-  };
-
-  const program = ts.createProgram({ rootNames: [...virtualPaths], options, host });
-  const byFile: Record<string, string[]> = {};
-
-  for (const file of virtualPaths) byFile[file] = [];
-
-  for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
-    const fileName = diagnostic.file?.fileName;
-
-    if (fileName && virtualPaths.has(fileName)) {
-      byFile[fileName]?.push(ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
-    }
-  }
-
-  return byFile;
+  return compileSources(path.join(CORE_DIR, "tsconfig.typecheck.json"), files, {
+    "@warlock.js/core/tests": [path.join(CORE_DIR, "src/tests/index.ts")],
+    "app/*": [`${VIRTUAL_ROOT}/src/app/*`],
+  });
 }
 
 async function collect(directory: string, base: string): Promise<void> {

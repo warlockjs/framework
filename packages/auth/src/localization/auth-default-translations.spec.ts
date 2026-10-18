@@ -33,7 +33,8 @@ function inventoryTranslationKeys(): string[] {
       }
 
       for (const match of readFileSync(path, "utf8").matchAll(keyPattern)) {
-        keys.add(match[1]);
+        const key = match[1];
+        if (key !== undefined) keys.add(key);
       }
     }
   };

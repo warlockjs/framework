@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0
 
+### Changed
+
+- Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
+
 ### Fixed
 
 - Opted-in native MCP tool results preserve content blocks, `isError`, `structuredContent` and `_meta` over stdio and HTTP, including tools with an advertised output schema. Per-request headers and abort signals remain available to tools; default result serialization and thrown-tool error handling are unchanged.

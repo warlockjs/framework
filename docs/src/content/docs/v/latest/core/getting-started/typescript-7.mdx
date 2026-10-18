@@ -1,0 +1,60 @@
+---
+title: TypeScript 7
+description: Native compiler requirements and tsconfig migration for Warlock 5.32.
+---
+
+Warlock 5.32 pins `typescript` to **7.0.2**. The regular `tsc` command now runs
+the native Go compiler. Install `typescript@7.0.2` in the app's development
+dependencies; no preview package or alternate command is needed.
+
+## Update tsconfig.json
+
+Remove `baseUrl`. Resolve every `paths` target relative to the tsconfig that
+declares it. For example, replace `baseUrl: "./src"` and `"app/*": ["app/*"]`
+with `"app/*": ["./src/app/*"]`.
+
+Replace `moduleResolution: "node"` / `"node10"` with `"bundler"` and use
+`module: "ESNext"` for Warlock's esbuild pipeline. A separately emitted Node
+project may use `"NodeNext"` for both options and follow Node's import rules.
+Declare the ambient types the app uses explicitly: TS7 no longer includes all
+visible `@types` packages automatically. Node apps need `"types": ["node"]`.
+Set `rootDir` explicitly when a project checks source outside its config folder.
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "paths": {
+      "app/*": ["./src/app/*"],
+      "web/*": ["./src/web/*"]
+    }
+  },
+  "include": ["src", "warlock.config.ts", ".warlock/typings/*.d.ts"]
+}
+```
+
+Keep other app options such as JSX and library settings. Run `npx tsc --noEmit`
+and `npx warlock typecheck` after upgrading. The latter retains incremental
+state in `.warlock/cache/typecheck.tsbuildinfo`; `--changed` retains diagnostics
+for changed files and their direct importers. The dev checker keeps one native
+compiler session, updates snapshots, and requests diagnostics for changed files.
+Config, translation, import and convention analysis uses OXC without executing
+application source.
+
+## Tool compatibility
+
+The `typescript` main entry exports the compiler version rather than the old
+JavaScript compiler API. Core isolates its native unstable API in
+`src/tooling/typescript/compiler.ts` and pins the version exactly.
+`warlock upgrade` continues to use ts-morph's own bundled parser for source
+transformations; it does not use that parser to typecheck apps.
+
+The scaffold's ESLint mode still emits its existing configuration, but
+`@typescript-eslint/parser` does not support TS7's removed JavaScript API.
+Use the Oxlint/Oxfmt mode for TS7 projects. ESLint mode is scheduled for
+deprecation in 5.33 and removal in 5.34; its parser dependency's older compiler
+is a compatibility constraint, not the compiler used by `tsc`.

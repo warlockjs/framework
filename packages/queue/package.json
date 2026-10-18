@@ -48,7 +48,7 @@
     "@warlock.js/core": "workspace:^",
     "@warlock.js/logger": "workspace:^",
     "fastify": "^5.12.5",
-    "typescript": "^5.9.3",
+    "typescript": "7.0.2",
     "vitest": "4.1.10"
   },
   "repository": {

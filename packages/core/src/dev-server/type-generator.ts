@@ -4,7 +4,7 @@ import { access, readFile, writeFile } from "fs/promises";
 import { moduleResolve } from "import-meta-resolve";
 import { join, resolve } from "path";
 import { pathToFileURL } from "node:url";
-import ts from "typescript";
+import * as ast from "../tooling/syntax/ast";
 import { warlockPath } from "../utils";
 import { devLogDim, devLogError, devLogInfo, devLogSuccess, devServeLog } from "./dev-logger";
 import { readConfigAst } from "./read-config-ast";
@@ -81,17 +81,8 @@ export async function listRouteLocaleKeysForTypeGeneration(
  * broke the generated `config.d.ts`. Computed names (`[KEY]`) and
  * private names have no static key and return `undefined`.
  */
-export function readPropertyName(name: ts.PropertyName): string | undefined {
-  if (
-    ts.isIdentifier(name) ||
-    ts.isStringLiteral(name) ||
-    ts.isNumericLiteral(name) ||
-    ts.isNoSubstitutionTemplateLiteral(name)
-  ) {
-    return name.text;
-  }
-
-  return undefined;
+export function readPropertyName(name: ast.Node): string | undefined {
+  return ast.keyName(name);
 }
 
 /** True only for the route-locales convention under the canonical web root. */
@@ -136,7 +127,7 @@ type TypingsManifest = {
 /**
  * TypeGenerator - Generates TypeScript type definitions from config files
  *
- * Parses source config files using the TypeScript Compiler API to extract
+ * Parses source config files using OXC to extract
  * keys and generate module augmentation types for IDE autocomplete.
  *
  * Uses manifest-based reconciliation to only regenerate when source files change.
@@ -783,70 +774,55 @@ ${keyEntries}
     // === Keys Extraction ===
     const keys: string[] = [];
 
-    const visitForTypes = (node: ts.Node): void => {
-      // Collect imported types
-      if (ts.isImportDeclaration(node)) {
-        const moduleSpecifier = node.moduleSpecifier;
-        if (ts.isStringLiteral(moduleSpecifier)) {
-          const source = moduleSpecifier.text;
-          const importClause = node.importClause;
-          if (importClause?.namedBindings && ts.isNamedImports(importClause.namedBindings)) {
-            for (const element of importClause.namedBindings.elements) {
-              importedTypes.set(element.name.text, source);
-            }
-          }
+    const visitForTypes = (node: ast.Node): void => {
+      if (ast.isImportDeclaration(node)) {
+        for (const specifier of node.specifiers) {
+          if (specifier.type === "ImportSpecifier")
+            importedTypes.set(specifier.local.name, node.source.value);
         }
       }
-
-      // Collect locally exported types
-      if (ts.isTypeAliasDeclaration(node)) {
-        const modifiers = ts.getModifiers(node);
-        if (modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
-          localExportedTypes.add(node.name.text);
-        }
-      }
-
-      // Collect locally exported interfaces
-      if (ts.isInterfaceDeclaration(node)) {
-        const modifiers = ts.getModifiers(node);
-        if (modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
-          localExportedTypes.add(node.name.text);
-        }
-      }
+      if (
+        (ast.isTypeAliasDeclaration(node) || ast.isInterfaceDeclaration(node)) &&
+        ast.hasModifier(node, "export")
+      )
+        localExportedTypes.add(node.id.name);
 
       // Find type used on config variable + extract keys
-      if (ts.isVariableDeclaration(node)) {
+      if (ast.isVariableDeclaration(node)) {
         // Type info
-        if (node.type && ts.isTypeReferenceNode(node.type)) {
-          foundTypeName = node.type.typeName.getText(sourceFile);
+        if (
+          node.id.type === "Identifier" &&
+          node.id.typeAnnotation?.typeAnnotation.type === "TSTypeReference"
+        ) {
+          foundTypeName = ast.textOf(node.id.typeAnnotation.typeAnnotation.typeName);
         }
 
         // Keys extraction
-        if (node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
-          const visitKeys = (objNode: ts.ObjectLiteralExpression, prefix: string): void => {
+        if (node.init && ast.isObjectLiteralExpression(node.init)) {
+          const visitKeys = (objNode: ast.ObjectExpression, prefix: string): void => {
             for (const prop of objNode.properties) {
-              if (ts.isPropertyAssignment(prop) && prop.name) {
-                const keyName = readPropertyName(prop.name);
+              if (ast.isPropertyAssignment(prop) && prop.key) {
+                const keyName = readPropertyName(prop.key);
 
                 // A computed name (`[KEY]`) has no static key to register.
                 if (keyName === undefined) continue;
 
                 const fullKey = prefix ? `${prefix}.${keyName}` : keyName;
                 keys.push(fullKey);
-                if (ts.isObjectLiteralExpression(prop.initializer)) {
-                  visitKeys(prop.initializer, fullKey);
+                if (ast.isObjectLiteralExpression(prop.value)) {
+                  visitKeys(prop.value, fullKey);
                 }
               }
             }
           };
-          visitKeys(node.initializer, configName);
+          visitKeys(node.init, configName);
         }
       }
 
-      ts.forEachChild(node, visitForTypes);
+      ast.forEachChild(node, visitForTypes);
     };
 
-    ts.forEachChild(sourceFile, visitForTypes);
+    ast.forEachChild(sourceFile, visitForTypes);
 
     // Resolve type info
     let typeName: string | null = null;
@@ -886,14 +862,14 @@ ${keyEntries}
 
     const keys: string[] = [];
 
-    const visit = (node: ts.Node): void => {
-      if (ts.isPropertyAssignment(node)) {
-        const propName = readPropertyName(node.name);
+    const visit = (node: ast.Node): void => {
+      if (ast.isPropertyAssignment(node)) {
+        const propName = readPropertyName(node.key);
 
-        if (propName === "drivers" && ts.isObjectLiteralExpression(node.initializer)) {
-          for (const prop of node.initializer.properties) {
-            if (ts.isPropertyAssignment(prop) || ts.isShorthandPropertyAssignment(prop)) {
-              const keyName = readPropertyName(prop.name);
+        if (propName === "drivers" && ast.isObjectLiteralExpression(node.value)) {
+          for (const prop of node.value.properties) {
+            if (ast.isPropertyAssignment(prop) || ast.isShorthandPropertyAssignment(prop)) {
+              const keyName = readPropertyName(prop.key);
 
               if (keyName) {
                 keys.push(keyName);
@@ -903,10 +879,10 @@ ${keyEntries}
         }
       }
 
-      ts.forEachChild(node, visit);
+      ast.forEachChild(node, visit);
     };
 
-    ts.forEachChild(sourceFile, visit);
+    ast.forEachChild(sourceFile, visit);
 
     return keys;
   }

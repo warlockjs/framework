@@ -197,3 +197,7 @@ The split keeps app concerns (port, mail-from, DB connection) separate from fram
 ## Next
 
 Continue to **[First route](./04-first-route.md)** — the page where Warlock actually does something.
+
+## TypeScript 7 compiler
+
+Warlock 5.32 pins the native `typescript@7.0.2` compiler. Follow the [TypeScript 7 guide](./typescript-7.mdx) to remove legacy tsconfig options, rebase aliases, and declare Node types explicitly.

@@ -100,11 +100,13 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { readJsonc } from "./read-jsonc";
+import { runCompiler } from "../../../packages/core/src/tooling/typescript/compiler";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -429,7 +431,6 @@ function buildTsconfig(packages: WorkspacePackage[]): object {
       skipLibCheck: true,
       noEmit: true,
       types: ["node"],
-      baseUrl: ".",
       paths: buildPackagePaths(packages),
     },
     include: ["**/*.ts", "**/*.tsx"],
@@ -483,147 +484,29 @@ function normalizeForCompare(p: string): string {
   return path.resolve(p).toLowerCase();
 }
 
-/**
- * Given a file somewhere under `<gateTmpRoot>/<package>/<skillDir>/…`,
- * returns `<gateTmpRoot>/<package>/<skillDir>` — that file's own isolated
- * skill directory, and the root `app/*` / `web/*` resolve against.
- */
-function skillRootForFile(gateTmpRoot: string, fileName: string): string | undefined {
-  const relative = path.relative(gateTmpRoot, fileName);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) return undefined;
-  const [pkgDir, skillDir] = relative.split(path.sep);
-  if (!pkgDir || !skillDir) return undefined;
-  return path.join(gateTmpRoot, pkgDir, skillDir);
-}
-
-const APP_ALIAS_CANDIDATES: ReadonlyArray<readonly [string, ts.Extension]> = [
-  [".ts", ts.Extension.Ts],
-  [".tsx", ts.Extension.Tsx],
-  ["/index.ts", ts.Extension.Ts],
-  ["/index.tsx", ts.Extension.Tsx],
-];
-
-function resolveAppAlias(
-  moduleName: string,
-  containingFile: string,
-  gateTmpRoot: string,
-): ts.ResolvedModuleFull | undefined {
-  if (!moduleName.startsWith("app/") && !moduleName.startsWith("web/")) return undefined;
-  const skillRoot = skillRootForFile(gateTmpRoot, containingFile);
-  if (!skillRoot) return undefined;
-  const candidateBase = path.join(skillRoot, "src", moduleName);
-  for (const [suffix, extension] of APP_ALIAS_CANDIDATES) {
-    const candidate = candidateBase + suffix;
-    if (existsSync(candidate)) {
-      return { resolvedFileName: candidate, extension, isExternalLibraryImport: false };
+/** Each skill gets its own bare app/web packages and its owner's dependency scope. */
+function linkSkillDependencies(unit: WrittenSkillUnit): void {
+  const modules = path.join(unit.skillRoot, "node_modules");
+  mkdirSync(modules, { recursive: true });
+  const ownerModules = path.join(unit.skill.package.absPath, "node_modules");
+  if (existsSync(ownerModules)) {
+    for (const entry of readdirSync(ownerModules)) {
+      if (entry === "app" || entry === "web" || entry.startsWith(".")) continue;
+      symlinkSync(path.join(ownerModules, entry), path.join(modules, entry), "junction");
     }
   }
-  return undefined;
+  for (const alias of ["app", "web"])
+    symlinkSync(path.join(unit.skillRoot, "src", alias), path.join(modules, alias), "junction");
 }
 
-/**
- * A process-lifetime `SourceFile` cache keyed by absolute file path. Every
- * compiled skill shares the same handful of `@warlock.js/*` package trees
- * (and the same lib.d.ts / node_modules type packages) — reusing their
- * parsed ASTs across repeated `compileManySkills` calls (e.g. across the
- * unit tests, which each build a small isolated fixture) avoids re-parsing
- * them from scratch every time. Files under `gateTmpRoot` are NEVER
- * cached — those are exactly the files a run just (re)wrote, and a stale
- * cache entry there would mean re-running the gate could report a pass that
- * was never re-derived from what is actually on disk, which is the
- * "type-checked stale copies" failure mode this gate exists to avoid.
- */
-const sharedSourceFileCache = new Map<string, ts.SourceFile>();
-
-function createCombinedHost(
-  options: ts.CompilerOptions,
-  gateTmpRoot: string,
-  packages: WorkspacePackage[],
-): ts.CompilerHost {
-  const host = ts.createCompilerHost(options, true);
-  const gateTmpNormalized = normalizeForCompare(gateTmpRoot);
-
-  const originalGetSourceFile = host.getSourceFile.bind(host);
-  host.getSourceFile = (fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile) => {
-    const cacheable = !normalizeForCompare(fileName).startsWith(gateTmpNormalized);
-    if (cacheable && !shouldCreateNewSourceFile) {
-      const cached = sharedSourceFileCache.get(fileName);
-      if (cached) return cached;
-    }
-    const sourceFile = originalGetSourceFile(
-      fileName,
-      languageVersionOrOptions,
-      onError,
-      shouldCreateNewSourceFile,
-    );
-    if (cacheable && sourceFile) sharedSourceFileCache.set(fileName, sourceFile);
-    return sourceFile;
-  };
-
-  host.resolveModuleNames = (moduleNames, containingFile) =>
-    moduleNames.map((moduleName) => {
-      const alias = resolveAppAlias(moduleName, containingFile, gateTmpRoot);
-      if (alias) return alias;
-      const resolved = ts.resolveModuleName(
-        moduleName,
-        containingFile,
-        options,
-        host,
-      ).resolvedModule;
-      if (
-        resolved ||
-        moduleName.startsWith(".") ||
-        moduleName.startsWith("app/") ||
-        moduleName.startsWith("web/")
-      ) {
-        return resolved;
-      }
-      // pnpm keeps dependencies/devDependencies beside their owning package.
-      // A scratch file outside that package must use the same dependency scope
-      // as the skill it represents, while retaining isolated app-relative files.
-      const skillRoot = skillRootForFile(gateTmpRoot, containingFile);
-      const packageDir = skillRoot && path.basename(path.dirname(skillRoot));
-      const owner = packages.find((pkg) => pkg.dir === packageDir);
-      return owner
-        ? ts.resolveModuleName(moduleName, path.join(owner.absPath, "__skill__.ts"), options, host)
-            .resolvedModule
-        : undefined;
-    });
-
-  return host;
-}
-
-function formatDiagnostic(diagnostic: ts.Diagnostic): string {
-  const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
-  const file = diagnostic.file;
-  const position =
-    file && diagnostic.start !== undefined
-      ? file.getLineAndCharacterOfPosition(diagnostic.start)
-      : undefined;
-  const location = position ? `(${position.line + 1},${position.character + 1})` : "";
-  const fileLabel = file ? path.basename(file.fileName) : "";
-  return `${fileLabel}${location}: error TS${diagnostic.code}: ${message}`;
-}
-
-/**
- * Compiles ordinary skills together in one shared TypeScript program,
- * with separate programs for skills that augment application registries.
- * Each skill's isolated files — see the header comment and `createCombinedHost` for why this is
- * both correct (each skill still only sees its own `app/*` / `web/*` files)
- * and far cheaper than one `ts.createProgram` per skill (each of which would
- * otherwise re-bind and re-check the entire `@warlock.js/*` dependency graph
- * from scratch). Writing to disk first — and reading that write back with
- * `ts.parseJsonConfigFileContent` before compiling — is deliberate: it is
- * what makes "compiled what it extracted" checkable after the fact, not
- * merely asserted. Every written path is returned on every result so a stale
- * run is detectable by inspecting them.
- */
+/** Compile ordinary snippets together, isolating declaration-merging skills. */
 export function compileManySkills(
   skills: DiscoveredSkill[],
   packages: WorkspacePackage[],
   gateTmpRoot: string,
 ): SkillCompileResult[] {
   const units = skills.map((skill) => writeSkillUnit(skill, packages, gateTmpRoot));
+  for (const unit of units) linkSkillDependencies(unit);
   const allWritten = units.flatMap((u) => u.written);
   // Declaration merging changes the meaning of shared package types. Keep
   // those application registries in their own program, just like separate apps.
@@ -644,29 +527,28 @@ export function compileManySkills(
       `${JSON.stringify(buildTsconfig(packages), null, 2)}\n`,
       "utf8",
     );
-    const configFile = ts.readConfigFile(sharedTsconfigPath, ts.sys.readFile);
-    if (configFile.error) {
-      throw new Error(
-        `Cannot read generated tsconfig at ${sharedTsconfigPath}: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n")}`,
-      );
-    }
-    const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, gateTmpRoot);
-    const host = createCombinedHost(parsed.options, gateTmpRoot, packages);
+    const assetsPath = path.join(gateTmpRoot, "assets.d.ts");
+    writeFileSync(assetsPath, 'declare module "*.css" {}\n', "utf8");
     const diagnostics = compileGroups
       .filter((group) => group.length > 0)
-      .flatMap((group) => {
-        const program = ts.createProgram({
-          rootNames: group.map((written) => written.absolutePath),
-          options: parsed.options,
-          host,
-        });
-        return ts.getPreEmitDiagnostics(program);
+      .flatMap((group, index) => {
+        const configPath = path.join(gateTmpRoot, `tsconfig.group-${index}.json`);
+        writeFileSync(
+          configPath,
+          JSON.stringify({
+            ...buildTsconfig(packages),
+            files: [assetsPath, ...group.map((file) => file.absolutePath)],
+            include: [],
+          }),
+          "utf8",
+        );
+        return runCompiler(gateTmpRoot, ["-p", configPath, "--noEmit"]).diagnostics;
       });
 
     const gateTmpNormalized = normalizeForCompare(gateTmpRoot);
     for (const diagnostic of diagnostics) {
-      if (!diagnostic.file) continue;
-      const fileName = normalizeForCompare(diagnostic.file.fileName);
+      if (!diagnostic.fileName) continue;
+      const fileName = normalizeForCompare(diagnostic.fileName);
       // Only diagnostics against files INSIDE the gate's own tmp tree are
       // ours to report — a cascading error surfaced against a real
       // package's own source (e.g. a snippet passed it a wrong argument
@@ -674,7 +556,9 @@ export function compileManySkills(
       // the package source itself.
       if (!fileName.startsWith(gateTmpNormalized)) continue;
       const list = diagnosticsByFile.get(fileName) ?? [];
-      list.push(formatDiagnostic(diagnostic));
+      list.push(
+        `${path.basename(diagnostic.fileName)}(${diagnostic.line},${diagnostic.column}): ${diagnostic.severity} TS${diagnostic.code}: ${diagnostic.message}`,
+      );
       diagnosticsByFile.set(fileName, list);
     }
   }
@@ -760,7 +644,7 @@ export function runSkillSnippetGate(repoRoot: string): GateReport {
  * fails the gate; a fixed one can only lower a baseline.
  */
 export function readAllowances(filePath = ALLOWANCES_PATH): Record<string, number> {
-  const parsed = ts.parseConfigFileTextToJson(filePath, readFileSync(filePath, "utf8"));
+  const parsed = readJsonc(readFileSync(filePath, "utf8"));
   if (parsed.error || !parsed.config || typeof parsed.config !== "object") {
     throw new Error(`Cannot read skill-snippet allowances at ${filePath}.`);
   }

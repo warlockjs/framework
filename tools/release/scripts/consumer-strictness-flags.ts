@@ -24,7 +24,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { readJsonc } from "./read-jsonc";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,9 +74,9 @@ export function consumerStrictnessFlags(filePath = CONSUMER_TSCONFIG_PATH): Cons
   } catch {
     throw new Error(`Cannot read consumer tsconfig at ${filePath}.`);
   }
-  const parsed = ts.parseConfigFileTextToJson(filePath, text);
+  const parsed = readJsonc(text);
   const options = parsed.config?.compilerOptions;
   if (parsed.error || !options || typeof options !== "object")
     throw new Error(`Cannot parse consumer tsconfig at ${filePath}.`);
-  return CONSUMER_FLAG_ALLOWLIST.filter((flag) => options[flag] === true);
+  return CONSUMER_FLAG_ALLOWLIST.filter((flag) => Reflect.get(options, flag) === true);
 }

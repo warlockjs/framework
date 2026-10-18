@@ -30,15 +30,16 @@
     "directory": "packages/ai"
   },
   "dependencies": {
-    "@warlock.js/core": "workspace:^",
-    "@standard-schema/spec": "^1.0.0"
+    "@standard-schema/spec": "^1.0.0",
+    "@warlock.js/core": "workspace:^"
   },
   "devDependencies": {
     "@warlock.js/ai-openai": "workspace:^",
     "@warlock.js/cache": "workspace:^",
     "@warlock.js/cascade": "workspace:^",
     "@warlock.js/logger": "workspace:^",
-    "typescript": "^5.9.3",
+    "oxc-parser": "0.154.0",
+    "typescript": "7.0.2",
     "vitest": "4.1.10"
   },
   "peerDependencies": {

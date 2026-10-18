@@ -34,7 +34,7 @@
     "vitest": "4.1.10",
     "jose": "^6.1.0",
     "@simplewebauthn/server": "^13.1.0",
-    "typescript": "^5.9.3"
+    "typescript": "7.0.2"
   },
   "peerDependencies": {
     "@warlock.js/fs": "*",

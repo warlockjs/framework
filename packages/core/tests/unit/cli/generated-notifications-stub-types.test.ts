@@ -1,5 +1,5 @@
 import path from "node:path";
-import ts from "typescript";
+import { compileSources } from "../../../src/tooling/typescript/compiler";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,40 +16,9 @@ import {
   unreadNotificationsCountControllerStub,
 } from "../../../src/generations/stubs";
 
-/**
- * `warlock add notifications` scaffolds `src/app/notifications` from the
- * notification stubs in `src/generations/stubs.ts`. The release gate's own
- * acceptance run — scaffold a fresh app, `warlock add notifications`,
- * `tsc --noEmit` — once found a generated controller that did NOT compile:
- * `request.locals.user` is untyped from core's own perspective (see the
- * 5.12.0 CHANGELOG: `RequestUser` moved out of core to `@warlock.js/auth`).
- * Since 5.30.0 the controllers are typed with the module's own
- * `NotificationsRequestHandler`, whose request guarantees `locals.user.id`.
- * This test compiles the generated request type, schema, resource, service
- * and the four controllers together, and pins that a plain `RequestHandler`
- * reading `locals.user.id` is a compile error, not merely a style choice.
- *
- * `stub-handler-signature.test.ts` (this same directory's sibling under
- * `tests/unit/generations/`) documents an EARLIER attempt at exactly this
- * kind of guard and records it as abandoned: pointing `ts.createProgram` at
- * `@warlock.js/core`'s full barrel (`src/index.ts`) pulls in the whole
- * framework's transitive graph (~3000 source files) purely to type-check one
- * two-import file, at a cost that test measured at roughly 250s.
- *
- * Re-measured on this machine (see `PROGRAM_BUILD_ALLOWANCE_MS` below): a
- * `ts.createProgram` + `getPreEmitDiagnostics` pass against
- * `tsconfig.typecheck.json`'s REAL `paths` (source, not dist, so the check
- * tracks what actually ships) for a single virtual file cost ~50s total on a
- * warm run. That is real cost, not free — this file is deliberately the
- * ONLY spec in the suite that pays it, and it pays it once by compiling the
- * red-control snippet and the real stub in the SAME `ts.createProgram` call
- * (one graph build, two root files) rather than once per case.
- *
- * This is therefore a GENUINE compile against the real, shipped
- * `@warlock.js/core` + `@warlock.js/notifications` declarations — not a
- * text-matching stand-in. A text-matching test would have passed on the
- * broken stub (it contained the string `request.user`, same as the fix
- * does) and proven nothing.
+/** Compile notification stubs against the actual workspace source using a native
+ * compiler snapshot. The negative control reads authenticated user data through an
+ * unguarded RequestHandler and must fail, while the generated guarded handlers pass.
  */
 
 const CORE_DIR = path.resolve(__dirname, "../../..").split(path.sep).join("/");
@@ -98,90 +67,10 @@ export const unreadNotificationsCountController: RequestHandler = async ({ reque
 };
 `;
 
-/** Loads the REAL typecheck compiler options — the same ones the release gate's own `tsc -p tsconfig.typecheck.json` run uses, `paths`-mapped to source. */
-function loadTypecheckCompilerOptions(): ts.CompilerOptions {
-  const configFile = ts.readConfigFile(TSCONFIG_TYPECHECK_PATH, ts.sys.readFile);
-
-  if (configFile.error) {
-    throw new Error(
-      `Failed to read ${TSCONFIG_TYPECHECK_PATH}: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n")}`,
-    );
-  }
-
-  const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, CORE_DIR);
-
-  return {
-    ...parsed.options,
-    paths: { ...parsed.options.paths, "@warlock.js/core/tests": ["./src/tests/index.ts"] },
-  };
-}
-
-/**
- * Compiles a set of in-memory virtual files against the real
- * `@warlock.js/*` declaration graph, in ONE `ts.createProgram` call (so the
- * ~3000-file transitive graph is built once, not once per case), and returns
- * each file's own diagnostics as plain message strings.
- */
 function compileVirtualFiles(files: Record<string, string>): Record<string, string[]> {
-  const options = loadTypecheckCompilerOptions();
-  const host = ts.createCompilerHost(options, true);
-  const virtualPaths = new Set(Object.keys(files));
-
-  const originalFileExists = host.fileExists.bind(host);
-  host.fileExists = (fileName) => virtualPaths.has(fileName) || originalFileExists(fileName);
-
-  // Relative imports between the virtual files only resolve when their
-  // directories are reported as existing; none of them exist on disk.
-  const virtualDirectories = new Set(
-    [...virtualPaths].flatMap((file) => {
-      const parts = file.split("/");
-
-      return parts.slice(1, -1).map((_, index) => parts.slice(0, index + 2).join("/"));
-    }),
-  );
-  const originalDirectoryExists = host.directoryExists?.bind(host);
-  host.directoryExists = (directory) =>
-    virtualDirectories.has(directory.replace(/\/$/, "")) ||
-    (originalDirectoryExists ? originalDirectoryExists(directory) : true);
-
-  const originalReadFile = host.readFile.bind(host);
-  host.readFile = (fileName) =>
-    virtualPaths.has(fileName) ? files[fileName] : originalReadFile(fileName);
-
-  const originalGetSourceFile = host.getSourceFile.bind(host);
-  host.getSourceFile = (fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile) => {
-    if (virtualPaths.has(fileName)) {
-      return ts.createSourceFile(
-        fileName,
-        files[fileName],
-        languageVersionOrOptions,
-        true,
-        ts.ScriptKind.TS,
-      );
-    }
-
-    return originalGetSourceFile(
-      fileName,
-      languageVersionOrOptions,
-      onError,
-      shouldCreateNewSourceFile,
-    );
-  };
-
-  const program = ts.createProgram({ rootNames: [...virtualPaths], options, host });
-  const diagnostics = ts.getPreEmitDiagnostics(program);
-
-  const byFile: Record<string, string[]> = {};
-  for (const virtualPath of virtualPaths) byFile[virtualPath] = [];
-
-  for (const diagnostic of diagnostics) {
-    const fileName = diagnostic.file?.fileName;
-    if (fileName && virtualPaths.has(fileName)) {
-      byFile[fileName].push(ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
-    }
-  }
-
-  return byFile;
+  return compileSources(TSCONFIG_TYPECHECK_PATH, files, {
+    "@warlock.js/core/tests": [path.join(CORE_DIR, "src/tests/index.ts")],
+  });
 }
 
 describe("the generated notifications module type-checks against the real @warlock.js/core + @warlock.js/notifications declarations", () => {

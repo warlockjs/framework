@@ -6,9 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.32.0
 
+### Changed
+
+- Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
+
 ### Fixed
 
 - Verified that Responses native token counting preserves the shared unsupported-count signal for `countInputTokens` estimation while authentication errors propagate.
+
 ### Added
 
 - Retain Responses hosted output/actions/sources and count web-search calls without double-counting stream snapshots. Export opt-in `OPENAI_SERVER_TOOL_PRICING`. Support typed Qwen/DashScope `enableSearch` flags and bounded agent continuation for Kimi/Moonshot `$web_search`, echoing arguments verbatim outside function dispatch.

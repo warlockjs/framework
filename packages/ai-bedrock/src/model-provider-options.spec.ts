@@ -1,3 +1,4 @@
+import { tool } from "@warlock.js/ai";
 import {
   ConverseStreamCommand,
   CountTokensCommand,
@@ -43,7 +44,9 @@ describe("Bedrock provider options and native counts", () => {
     });
     const { model, send } = setup();
     send.mockRejectedValueOnce(unsupported);
-    const options = { tools: [{ name: "lookup", execute: async () => "ok" }] };
+    const options = {
+      tools: [tool({ name: "lookup", description: "Look up data", execute: async () => "ok" })],
+    };
     expect(await countInputTokens(model, messages, options)).toEqual({
       tokens: estimateInputTokens(messages, options),
       source: "estimate",
@@ -60,7 +63,7 @@ describe("Bedrock provider options and native counts", () => {
       reasoning: { maxTokens: 2048 },
       temperature: 0.4,
       maxTokens: 4096,
-      tools: [{ name: "lookup", description: "Look up data", execute: async () => "ok" }],
+      tools: [tool({ name: "lookup", description: "Look up data", execute: async () => "ok" })],
       providerOptions: {
         bedrock: {
           body: {

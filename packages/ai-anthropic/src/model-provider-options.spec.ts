@@ -1,3 +1,4 @@
+import { tool } from "@warlock.js/ai";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   countInputTokens,
@@ -102,7 +103,9 @@ describe("AnthropicModel provider blocks", () => {
       { role: "system", content: "rules" },
       { role: "user", content: "hi" },
     ];
-    const options = { tools: [{ name: "lookup", execute: async () => "ok" }] };
+    const options = {
+      tools: [tool({ name: "lookup", description: "Look up data", execute: async () => "ok" })],
+    };
     const { client } = makeClient({
       countError: new InvalidRequestError("cannot count this shape", {
         reason: "count-unsupported",

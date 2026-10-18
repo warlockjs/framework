@@ -1,4 +1,4 @@
-import ts from "typescript";
+import * as ast from "../syntax/ast";
 import { isMemberAccess, keyName, memberName, type SourceFinding, unwrap } from "./source-ast";
 
 // ── WL9010: await on a synchronous log call ─────────────────────────────────
@@ -17,20 +17,20 @@ const SYNC_LOG_METHODS: ReadonlySet<string> = new Set([
   "assert",
 ]);
 
-function checkAwaitLog(node: ts.Node, findings: SourceFinding[]): void {
-  if (!ts.isAwaitExpression(node)) return;
+function checkAwaitLog(node: ast.Node, findings: SourceFinding[]): void {
+  if (!ast.isAwaitExpression(node)) return;
 
-  const argument = unwrap(node.expression);
+  const argument = unwrap(ast.expressionOf(node));
 
-  if (!ts.isCallExpression(argument)) return;
+  if (!ast.isCallExpression(argument)) return;
 
-  const callee = unwrap(argument.expression);
+  const callee = unwrap(ast.expressionOf(argument));
 
   if (!isMemberAccess(callee)) return;
 
-  const owner = unwrap(callee.expression);
+  const owner = unwrap(ast.expressionOf(callee));
 
-  if (!ts.isIdentifier(owner) || !AWAITED_LOGGER_NAMES.has(owner.text)) return;
+  if (!ast.isIdentifier(owner) || !AWAITED_LOGGER_NAMES.has(ast.valueText(owner))) return;
 
   const method = memberName(callee);
 
@@ -40,7 +40,7 @@ function checkAwaitLog(node: ts.Node, findings: SourceFinding[]): void {
     code: "WL9010",
     severity: "warning",
     node,
-    message: `\`${owner.text}.${method}()\` returns the logger synchronously; \`await\` does nothing here. Remove it (use \`await log.flush()\` to wait for delivery).`,
+    message: `\`${ast.valueText(owner)}.${method}()\` returns the logger synchronously; \`await\` does nothing here. Remove it (use \`await log.flush()\` to wait for delivery).`,
   });
 }
 
@@ -51,33 +51,32 @@ const HANDLER_TYPE_PATTERN = /RequestHandler$/;
 
 const CONTROLLER_NAME_PATTERN = /Controller$/;
 
-function hasHandlerType(declaration: ts.VariableDeclaration): boolean {
-  const type = declaration.type;
-
+function hasHandlerType(declaration: ast.VariableDeclarator): boolean {
+  const type = declaration.id.typeAnnotation?.typeAnnotation;
   return (
-    type !== undefined &&
-    ts.isTypeReferenceNode(type) &&
-    ts.isIdentifier(type.typeName) &&
-    HANDLER_TYPE_PATTERN.test(type.typeName.text)
+    type?.type === "TSTypeReference" &&
+    type.typeName.type === "Identifier" &&
+    HANDLER_TYPE_PATTERN.test(type.typeName.name)
   );
 }
 
-function controllerIdentifiers(statement: ts.Statement): ts.Identifier[] {
-  if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
-    return statement.name && CONTROLLER_NAME_PATTERN.test(statement.name.text)
-      ? [statement.name]
-      : [];
+function controllerIdentifiers(statement: ast.Node): ast.Identifier[] {
+  if (ast.isFunctionDeclaration(statement) || ast.isClassDeclaration(statement)) {
+    return statement.id && CONTROLLER_NAME_PATTERN.test(statement.id.name) ? [statement.id] : [];
   }
 
-  if (!ts.isVariableStatement(statement)) return [];
+  if (!ast.isVariableStatement(statement)) return [];
 
-  const found: ts.Identifier[] = [];
+  const found: ast.Identifier[] = [];
 
-  for (const declaration of statement.declarationList.declarations) {
-    if (!ts.isIdentifier(declaration.name)) continue;
+  for (const declaration of statement.declarations) {
+    if (!ast.isIdentifier(declaration.id)) continue;
 
-    if (CONTROLLER_NAME_PATTERN.test(declaration.name.text) || hasHandlerType(declaration)) {
-      found.push(declaration.name);
+    if (
+      CONTROLLER_NAME_PATTERN.test(ast.valueText(declaration.id)) ||
+      hasHandlerType(declaration)
+    ) {
+      found.push(declaration.id);
     }
   }
 
@@ -91,8 +90,10 @@ function ordinal(position: number): string {
   return `${position}th`;
 }
 
-function checkOneControllerPerFile(sourceFile: ts.SourceFile, findings: SourceFinding[]): void {
-  const controllers = sourceFile.statements.flatMap(controllerIdentifiers);
+function checkOneControllerPerFile(sourceFile: ast.SourceFile, findings: SourceFinding[]): void {
+  const controllers = ast
+    .topLevelDeclarations(sourceFile)
+    .flatMap((node) => controllerIdentifiers(node));
   const first = controllers[0];
 
   if (!first) return;
@@ -102,7 +103,7 @@ function checkOneControllerPerFile(sourceFile: ts.SourceFile, findings: SourceFi
       code: "WL9011",
       severity: "warning",
       node: identifier,
-      message: `\`${identifier.text}\` is the ${ordinal(index + 2)} controller in this file (after \`${first.text}\`). Move it to its own \`*.controller.ts\` file.`,
+      message: `\`${ast.valueText(identifier)}\` is the ${ordinal(index + 2)} controller in this file (after \`${ast.valueText(first)}\`). Move it to its own \`*.controller.ts\` file.`,
     });
   });
 }
@@ -110,21 +111,22 @@ function checkOneControllerPerFile(sourceFile: ts.SourceFile, findings: SourceFi
 // ── WL9012: a union discriminator named `kind` ──────────────────────────────
 
 /** A string/number literal type, or a union made only of them. */
-function isLiteralType(node: ts.TypeNode | undefined): boolean {
+function isLiteralType(node: ast.Node | undefined): boolean {
   if (!node) return false;
-  if (ts.isLiteralTypeNode(node)) return true;
+  if (ast.isLiteralTypeNode(node)) return true;
 
-  return ts.isUnionTypeNode(node) && node.types.every((member) => ts.isLiteralTypeNode(member));
+  return ast.isUnionTypeNode(node) && node.types.every((member) => ast.isLiteralTypeNode(member));
 }
 
-function checkKindDiscriminator(node: ts.Node, findings: SourceFinding[]): void {
-  if (!ts.isPropertySignature(node) || ts.isComputedPropertyName(node.name)) return;
-  if (keyName(node.name) !== "kind" || !isLiteralType(node.type)) return;
+function checkKindDiscriminator(node: ast.Node, findings: SourceFinding[]): void {
+  if (!ast.isPropertySignature(node) || ast.isComputedPropertyName(ast.nameNode(node))) return;
+  if (keyName(ast.nameNode(node)) !== "kind" || !isLiteralType(node.typeAnnotation?.typeAnnotation))
+    return;
 
   findings.push({
     code: "WL9012",
     severity: "warning",
-    node: node.name,
+    node: ast.nameNode(node),
     message:
       "Name this discriminator `type`, not `kind` (the framework's convention for tagged unions).",
   });
@@ -137,16 +139,16 @@ function checkKindDiscriminator(node: ts.Node, findings: SourceFinding[]): void 
  * - `WL9011` a second (third, …) controller in one file;
  * - `WL9012` a tagged union whose discriminator is `kind` instead of `type`.
  */
-export function codeStyleFindings(sourceFile: ts.SourceFile): SourceFinding[] {
+export function codeStyleFindings(sourceFile: ast.SourceFile): SourceFinding[] {
   const findings: SourceFinding[] = [];
 
   checkOneControllerPerFile(sourceFile, findings);
 
   // Every node, type nodes included: discriminators live in type literals and interfaces.
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ast.Node): void => {
     checkAwaitLog(node, findings);
     checkKindDiscriminator(node, findings);
-    ts.forEachChild(node, visit);
+    ast.forEachChild(node, visit);
   };
 
   visit(sourceFile);

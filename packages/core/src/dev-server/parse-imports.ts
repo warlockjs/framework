@@ -1,7 +1,7 @@
 import { fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
 import { type ImportSpecifier, parse } from "es-module-lexer";
 import path from "node:path";
-import ts from "typescript";
+import { parseSync } from "oxc-parser";
 import { Path } from "../utils/normalized-path";
 import { tsconfigManager } from "./tsconfig-manager";
 
@@ -385,7 +385,7 @@ function isSameFile(first: string, second: string): boolean {
  * line-based matches keep their lines). Only the regex fallback needs it; the
  * lexer already skips comments.
  *
- * Comment ranges come from a real TypeScript parse, never from scanning
+ * Comment ranges come from an OXC parse, never from scanning
  * characters: only the parser can tell a regex literal (`/\/*$/`), a template
  * literal or JSX text (`<p>// not a comment</p>`) from a comment. A character
  * scanner read the `/*` in `p.replace(/\/*$/, "")` as a block comment and
@@ -395,86 +395,18 @@ function isSameFile(first: string, second: string): boolean {
  * source is parsed as TSX.
  */
 export function stripComments(source: string, filePath = "source.tsx"): string {
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    source,
-    ts.ScriptTarget.Latest,
-    false,
-    scriptKindFor(filePath),
-  );
-  const ranges: ts.CommentRange[] = [];
-  const seen = new Set<number>();
-
-  const collect = (node: ts.Node): void => {
-    // A JSDoc node is itself a comment, already reported as trivia of the
-    // token that follows it; its inner tokens are not code.
-    if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) {
-      return;
-    }
-
-    const children = node.getChildren(sourceFile);
-
-    if (children.length > 0) {
-      for (const child of children) collect(child);
-
-      return;
-    }
-
-    // JSX text has no trivia: its content starts at `pos` and may contain `//`.
-    if (node.kind === ts.SyntaxKind.JsxText || node.kind === ts.SyntaxKind.JsxTextAllWhiteSpaces) {
-      return;
-    }
-
-    const tokenStart = node.getStart(sourceFile);
-
-    // Trivia before a token holds trailing comments of the previous line
-    // (`a; // x`) and leading comments of this one; collect both.
-    const trivia = [
-      ...(ts.getTrailingCommentRanges(source, node.pos) ?? []),
-      ...(ts.getLeadingCommentRanges(source, node.pos) ?? []),
-    ];
-
-    for (const range of trivia) {
-      if (range.end <= tokenStart && !seen.has(range.pos)) {
-        seen.add(range.pos);
-        ranges.push(range);
-      }
-    }
-  };
-
-  collect(sourceFile);
-  ranges.sort((first, second) => first.pos - second.pos);
+  const ranges = parseSync(filePath, source).comments;
 
   let output = "";
   let cursor = 0;
 
   for (const range of ranges) {
-    output += source.slice(cursor, range.pos);
-    output += source.slice(range.pos, range.end).replace(/[^\n]/g, "");
+    output += source.slice(cursor, range.start);
+    output += source.slice(range.start, range.end).replace(/[^\n]/g, "");
     cursor = range.end;
   }
 
   return output + source.slice(cursor);
-}
-
-/** The parse dialect for a file: JSX only where the extension allows it. */
-function scriptKindFor(filePath: string): ts.ScriptKind {
-  const extension = path.extname(filePath).toLowerCase();
-
-  switch (extension) {
-    case ".ts":
-    case ".mts":
-    case ".cts":
-      return ts.ScriptKind.TS;
-    case ".js":
-    case ".mjs":
-    case ".cjs":
-      return ts.ScriptKind.JS;
-    case ".jsx":
-      return ts.ScriptKind.JSX;
-    default:
-      return ts.ScriptKind.TSX;
-  }
 }
 
 /**

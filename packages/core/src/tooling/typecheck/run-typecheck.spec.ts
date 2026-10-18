@@ -107,3 +107,26 @@ describe("runTypecheck", () => {
     expect(broken.problems[0]).toMatchObject({ code: "WL7102", file: "tsconfig.json" });
   });
 });
+
+it("invalidates native incremental state after edits and follows changed-file aliases", () => {
+  write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: "ES2022",
+        module: "ESNext",
+        moduleResolution: "bundler",
+        types: [],
+        paths: { "app/*": ["./src/*"] },
+      },
+      include: ["src"],
+    }),
+  );
+  write("src/use.ts", 'import { double } from "app/math";\nexport const result = double("two");\n');
+  expect(
+    runTypecheck({ cwd: root, files: ["src/math.ts"] }).problems.map((problem) => problem.file),
+  ).toEqual(["src/use.ts"]);
+  write("src/use.ts", 'import { double } from "app/math";\nexport const result = double(2);\n');
+  expect(runTypecheck({ cwd: root, files: ["src/math.ts"] }).problems).toEqual([]);
+});

@@ -10,6 +10,8 @@
   // A package may ADD to this contract. It must never subtract.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "..",
+    "types": ["node"],
     "target": "ES2020",
     // Raised from the ES2020 default because the shared source in sibling packages
     // uses ES2022 APIs (Object.hasOwn, String.replaceAll, Array.at), and a consumer
@@ -18,7 +20,7 @@
     // without it would silently drop DOM types this package already relied on.
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "Bundler",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -26,7 +28,6 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "paths": {
       "@warlock.js/ai": ["../ai/src"]
     }

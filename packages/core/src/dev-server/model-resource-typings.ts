@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative } from "node:path";
-import ts from "typescript";
+import * as ast from "../tooling/syntax/ast";
 
 /**
  * Static `ModelResourceRegistry` generation.
@@ -14,7 +14,7 @@ import ts from "typescript";
  * "User": { model: import("<model file>").User; resource: typeof import("<resource file>").UserResource };
  * ```
  *
- * Everything here is syntactic. It reads one `ts.createSourceFile` AST per model
+ * Everything here is syntactic. It reads one OXC syntax tree per model
  * file, follows the identifier through that file's own imports, and never
  * imports or executes application code (`read-config-ast.ts` explains why a
  * type checker is not an option). Anything it cannot prove from the AST alone
@@ -65,24 +65,20 @@ type ImportBinding = { specifier: string; exportName: string };
 
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
-  return (
-    ts.canHaveModifiers(node) && (ts.getModifiers(node)?.some((m) => m.kind === kind) ?? false)
-  );
-}
+const hasModifier = ast.hasModifier;
 
-function unwrapParentheses(expression: ts.Expression): ts.Expression {
+function unwrapParentheses(expression: ast.Node): ast.Node {
   let current = expression;
 
-  while (ts.isParenthesizedExpression(current)) {
-    current = current.expression;
+  while (ast.isParenthesizedExpression(current)) {
+    current = ast.expressionOf(current);
   }
 
   return current;
 }
 
 /** Top-level names this file declares, and the names each is exported under. */
-function readLocalDeclarations(sourceFile: ts.SourceFile): {
+function readLocalDeclarations(sourceFile: ast.SourceFile): {
   declared: Set<string>;
   exportNames: Map<string, string[]>;
 } {
@@ -96,64 +92,55 @@ function readLocalDeclarations(sourceFile: ts.SourceFile): {
     exportNames.set(local, names);
   };
 
-  for (const statement of sourceFile.statements) {
-    const exported = hasModifier(statement, ts.SyntaxKind.ExportKeyword);
-    const isDefault = hasModifier(statement, ts.SyntaxKind.DefaultKeyword);
+  for (const statement of ast.topLevelDeclarations(sourceFile)) {
+    const exported = hasModifier(statement, "export");
+    const isDefault = hasModifier(statement, "default");
 
     if (
-      (ts.isClassDeclaration(statement) ||
-        ts.isFunctionDeclaration(statement) ||
-        ts.isEnumDeclaration(statement)) &&
-      statement.name
+      (ast.isClassDeclaration(statement) ||
+        ast.isFunctionDeclaration(statement) ||
+        ast.isEnumDeclaration(statement)) &&
+      statement.id
     ) {
-      declared.add(statement.name.text);
+      declared.add(ast.valueText(statement.id));
 
       if (exported) {
-        addExport(statement.name.text, isDefault ? "default" : statement.name.text);
+        addExport(ast.valueText(statement.id), isDefault ? "default" : ast.valueText(statement.id));
       }
 
       continue;
     }
 
-    if (ts.isVariableStatement(statement)) {
-      for (const declaration of statement.declarationList.declarations) {
-        if (!ts.isIdentifier(declaration.name)) continue;
+    if (ast.isVariableStatement(statement)) {
+      for (const declaration of statement.declarations) {
+        if (!ast.isIdentifier(declaration.id)) continue;
 
-        declared.add(declaration.name.text);
+        declared.add(ast.valueText(declaration.id));
 
         if (exported) {
-          addExport(declaration.name.text, declaration.name.text);
+          addExport(ast.valueText(declaration.id), ast.valueText(declaration.id));
         }
       }
 
       continue;
     }
-
-    // `export { A, B as C }` (local form only; a `from` clause re-exports a foreign name).
+  }
+  for (const statement of sourceFile.body) {
     if (
-      ts.isExportDeclaration(statement) &&
-      !statement.moduleSpecifier &&
-      !statement.isTypeOnly &&
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause)
+      statement.type === "ExportNamedDeclaration" &&
+      !statement.source &&
+      statement.exportKind !== "type"
     ) {
-      for (const element of statement.exportClause.elements) {
-        if (element.isTypeOnly) continue;
-
-        addExport((element.propertyName ?? element.name).text, element.name.text);
+      for (const element of statement.specifiers) {
+        if (element.exportKind !== "type")
+          addExport(ast.valueText(element.local), ast.valueText(element.exported));
       }
-
-      continue;
     }
-
-    // `export default UserResource;`
     if (
-      ts.isExportAssignment(statement) &&
-      !statement.isExportEquals &&
-      ts.isIdentifier(statement.expression)
-    ) {
-      addExport(statement.expression.text, "default");
-    }
+      statement.type === "ExportDefaultDeclaration" &&
+      statement.declaration.type === "Identifier"
+    )
+      addExport(statement.declaration.name, "default");
   }
 
   return { declared, exportNames };
@@ -168,32 +155,22 @@ function pickExportName(names: readonly string[] | undefined): string | undefine
   return named[0] ?? "default";
 }
 
-function readImportBindings(sourceFile: ts.SourceFile): Map<string, ImportBinding> {
+function readImportBindings(sourceFile: ast.SourceFile): Map<string, ImportBinding> {
   const bindings = new Map<string, ImportBinding>();
 
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
-      continue;
-    }
-
-    const clause = statement.importClause;
-    const specifier = statement.moduleSpecifier.text;
-
-    if (!clause) continue;
-
-    if (clause.name) {
-      bindings.set(clause.name.text, { specifier, exportName: "default" });
-    }
-
-    // A namespace import (`import * as ns`) cannot be the bare identifier a
-    // `static resource = X` reads, so it never becomes a binding.
-    if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
-      for (const element of clause.namedBindings.elements) {
-        bindings.set(element.name.text, {
-          specifier,
-          exportName: (element.propertyName ?? element.name).text,
+  for (const statement of ast.topLevelDeclarations(sourceFile)) {
+    if (!ast.isImportDeclaration(statement)) continue;
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === "ImportDefaultSpecifier")
+        bindings.set(specifier.local.name, {
+          specifier: statement.source.value,
+          exportName: "default",
         });
-      }
+      else if (specifier.type === "ImportSpecifier")
+        bindings.set(specifier.local.name, {
+          specifier: statement.source.value,
+          exportName: ast.valueText(specifier.imported),
+        });
     }
   }
 
@@ -202,22 +179,22 @@ function readImportBindings(sourceFile: ts.SourceFile): Map<string, ImportBindin
 
 /** The identifier a class assigns to `static resource`, when it is a bare identifier. */
 function readStaticResourceReference(
-  member: ts.ClassElement,
+  member: ast.ClassElement,
 ): { name: string } | "computed" | undefined {
-  if (!ts.isPropertyDeclaration(member)) return undefined;
-  if (!hasModifier(member, ts.SyntaxKind.StaticKeyword)) return undefined;
-  if (hasModifier(member, ts.SyntaxKind.DeclareKeyword)) return undefined;
+  if (!ast.isPropertyDeclaration(member)) return undefined;
+  if (!hasModifier(member, "static")) return undefined;
+  if (hasModifier(member, "declare")) return undefined;
 
   const isResourceName =
-    (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) &&
-    member.name.text === "resource";
+    (ast.isIdentifier(member.key) || ast.isStringLiteral(member.key)) &&
+    ast.valueText(member.key) === "resource";
 
   if (!isResourceName) return undefined;
-  if (!member.initializer) return undefined;
+  if (!member.value) return undefined;
 
-  const initializer = unwrapParentheses(member.initializer);
+  const initializer = unwrapParentheses(member.value);
 
-  return ts.isIdentifier(initializer) ? { name: initializer.text } : "computed";
+  return ast.isIdentifier(initializer) ? { name: ast.valueText(initializer) } : "computed";
 }
 
 /**
@@ -233,25 +210,19 @@ export function extractModelResourceEntries(
   // Cheap exit: most model files declare no resource.
   if (!input.source.includes("resource")) return result;
 
-  const sourceFile = ts.createSourceFile(
-    input.absolutePath,
-    input.source,
-    ts.ScriptTarget.ESNext,
-    /* setParentNodes */ false,
-    input.absolutePath.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
+  const sourceFile = ast.parseSourceFile(input.absolutePath, input.source);
 
   const { declared, exportNames } = readLocalDeclarations(sourceFile);
   const imports = readImportBindings(sourceFile);
 
-  for (const statement of sourceFile.statements) {
-    if (!ts.isClassDeclaration(statement) || !statement.name) continue;
+  for (const statement of ast.topLevelDeclarations(sourceFile)) {
+    if (!ast.isClassDeclaration(statement) || !statement.id) continue;
 
-    const className = statement.name.text;
+    const className = ast.valueText(statement.id);
 
     let reference: { name: string } | "computed" | undefined;
 
-    for (const member of statement.members) {
+    for (const member of statement.body.body) {
       reference = readStaticResourceReference(member) ?? reference;
     }
 
@@ -266,8 +237,8 @@ export function extractModelResourceEntries(
       continue;
     }
 
-    const requiresTypeArguments = statement.typeParameters?.some(
-      (parameter) => parameter.default === undefined,
+    const requiresTypeArguments = statement.typeParameters?.params.some(
+      (parameter) => parameter.default == null,
     );
 
     if (requiresTypeArguments) {

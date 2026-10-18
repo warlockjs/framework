@@ -8,8 +8,7 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "baseUrl": "./src",
-    "paths": { "app/*": ["app/*"], "web/*": ["web/*"] }
+    "paths": { "app/*": ["./src/app/*"], "web/*": ["./src/web/*"] }
   },
   "include": ["src", "warlock.config.ts"],
   "exclude": ["node_modules", "dist", ".warlock"]
