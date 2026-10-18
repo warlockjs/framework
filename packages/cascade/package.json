@@ -46,7 +46,7 @@
     "@testcontainers/postgresql": "^10.28.0",
     "@types/node": "^22.10.5",
     "@vitest/coverage-v8": "4.1.10",
-    "esbuild": "^0.27.2",
+    "esbuild": "^0.28.2",
     "eslint": "^8.46.0",
     "eslint-config-prettier": "^8.9.0",
     "eslint-plugin-prettier": "^5.0.0",

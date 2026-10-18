@@ -15,6 +15,11 @@ Five minutes from zero to a project that loads Cascade. No conceptual content on
 - **TypeScript 7.0.2** in the project.
 - **A database** — either MongoDB or PostgreSQL — running locally or reachable by connection string. If you don't have one yet, install [MongoDB](https://www.mongodb.com/docs/manual/installation/) or [PostgreSQL](https://www.postgresql.org/download/) first. Cascade works the same against either.
 
+Cascade 5.32 updates its development esbuild dependency to the 0.28.2 line,
+which includes the Windows development-server fix in
+[GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr).
+No model, decorator, or migration configuration changes are required for this update.
+
 ## Step 1 — Install Cascade and seal
 
 Cascade ships with `@warlock.js/seal` as a dependency, but you'll import directly from seal in your schemas (`v` and `Infer`). Install both explicitly so they're both in your `package.json` — stricter package managers (pnpm strict mode, Yarn PnP) need it.

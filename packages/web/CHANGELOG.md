@@ -4,6 +4,10 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ## 5.32.0
 
+### Security
+
+- Upgrade esbuild to ^0.28.2, past the Windows development-server advisory [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr) (patched in 0.28.1).
+
 ### Changed
 
 - Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.

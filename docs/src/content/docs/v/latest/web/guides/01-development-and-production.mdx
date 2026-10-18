@@ -63,6 +63,10 @@ immediately before it.
 
 ## Production build
 
+Web 5.32 uses the esbuild 0.28.2 line for build tooling, including the Windows
+development-server fix in [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr).
+Existing build and CSS Modules configuration continues to work without changes.
+
 `warlock build` uses the same `discoverPages()` scan and:
 
 - emits `page-routes.manifest.json` with each page's method, path, name, and
