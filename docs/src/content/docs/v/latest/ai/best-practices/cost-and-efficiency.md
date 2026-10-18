@@ -183,6 +183,8 @@ systemPrompt: ai.systemPrompt()
 
 ## Measure the tool schemas — then send them compact
 
+Use [`ai.measure()`](/v/latest/ai/recipes/measure-call/) to measure the complete call input by messages, system prompt, skills catalogue, and tools, with optional input USD and signed before/after comparisons. The matching terminal command is [`warlock ai measure`](/v/latest/core/cli/ai/).
+
 Tool schemas ride along on every trip, and for a tool-heavy agent they are often the largest fixed part of the prompt. Measure them before guessing:
 
 ```ts

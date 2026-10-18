@@ -231,6 +231,10 @@ production install with dev dependencies excluded.
 
 The Web starter keeps the page's universal non-component setup in `src/web/index.register.ts`, while `src/web/index.page.tsx` re-exports `register`. Warlock still discovers and runs the hook from the page namespace in both SSR and the browser, but editing the page component remains inside React's Fast Refresh boundary. Do not move the `register()` declaration inline beside the component: React Refresh treats that non-component export as incompatible and reloads the page, losing component state.
 
+### AI input measurement
+
+`warlock ai measure --model <id> [--tools <module>] [--system <file>] [--skills <dir>] [--json]` loads `@warlock.js/ai` lazily without app bootstrap. Model IDs default to OpenAI Responses or use `openai:`, `anthropic:`, `google:` prefixes and the corresponding installed adapter/environment API key. `--model-module <module>` accepts `model`, `default`, or `resolveModel(id)` for custom providers/prices. Tools modules export a `tools` or default array; paths resolve from cwd. The report breaks down messages, system, skills catalogue, and tools, labels native counts versus estimates, and includes uncached input USD only when priced. CLI reports include an explicit `.` user probe and do not preload skill bodies or add skill tools. JSON stdout contains one report. No CLI config registration is required.
+
 ### Misc
 
 | Command                                         | Purpose                                                   |
