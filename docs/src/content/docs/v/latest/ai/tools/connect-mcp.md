@@ -328,8 +328,93 @@ transport: {
 
 - `bearer` matches `Authorization: Bearer <token>`. Tokens are compared in constant time over SHA-256 digests with `crypto.timingSafeEqual`, so neither a token's content nor its length leaks through timing. Empty tokens are refused at `start()`.
 - `authorize(request)` receives `{ method, path, headers, remoteAddress }` (lower-cased header names). A hook that throws denies the request.
-- With both set, a request must pass both.
-- A failed check answers `401` (with `WWW-Authenticate: Bearer` when a bearer token is configured) before the body is read.
+- Checks run in order: `bearer`, `authorize`, then `authenticate`. Every configured check must pass; a failed check skips later hooks. `authenticate` can also be used alone, including on non-loopback binds. Host/Origin checks always run first.
+- A failed check answers `401` before the body is read. Bearer and `authenticate` failures include `WWW-Authenticate: Bearer realm="mcp"`. A throwing authentication hook denies without exposing its error.
+
+### Authenticated context and call policy
+
+`transport.auth.authenticate(request)` resolves the caller. Return any principal value except `undefined` to allow; return `undefined` or throw to deny with HTTP `401`. Principals stay in server context and are typed as `unknown`, so narrow them before use. The request argument contains `{ method, path, headers, remoteAddress }`.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-tools";
+import type { McpHttpRequestInfo, McpCallRefusal } from "@warlock.js/ai-tools";
+
+type Member = { memberId: string; canCall: boolean };
+declare function authenticateMember(request: McpHttpRequestInfo): Promise<Member | undefined>;
+
+const denied: McpCallRefusal = {
+  isError: true,
+  content: [{ type: "text", text: "This member cannot call tools." }],
+  _meta: { policy: "membership" },
+};
+
+const identity = ai.tool({
+  name: "identity",
+  description: "Read the authenticated member and call id",
+  execute: async (_input: unknown, ctx) => {
+    ctx?.signal?.throwIfAborted();
+    return { requestId: ctx?.requestId, principal: ctx?.principal };
+  },
+});
+
+const server = ai.mcp.serve([identity], {
+  name: "member-tools",
+  transport: { type: "http", auth: { authenticate: authenticateMember } },
+  beforeCall: async (context, tool, input) => {
+    const member = context.principal;
+    if (
+      typeof member !== "object" ||
+      member === null ||
+      !("canCall" in member) ||
+      member.canCall !== true
+    ) {
+      return denied;
+    }
+    // context.requestId is the original JSON-RPC tools/call id (string or number).
+    // tool is the original ToolContract; input is schema-validated, read-only data.
+  },
+});
+```
+
+`beforeCall(context, tool, input)` runs after successful input validation and before invocation. Return nothing to continue, or return a native `McpCallRefusal` (`isError: true` with valid MCP content) to refuse. Refusals, including `_meta` and `structuredContent`, are sent unchanged regardless of `results` mode. A thrown hook answers a JSON-RPC error (`-32602`); a malformed refusal answers `-32603`. Invalid input skips the hook and remains a tool error. With a policy hook, the serving boundary validates input before the hook and the contract's `invoke()` retains its own validation; schemas must be deterministic and hooks must treat input as read-only.
+
+Both tools and serve hooks receive `requestId`, `principal`, `signal` and, over HTTP, the request metadata. `ToolContext.requestId` and `.principal` are optional additions; in-process tool dispatch can omit them. `McpServeToolContext`, `McpBeforeCall`, `McpCallRefusal` and `McpStdioServeTransport` are exported from `@warlock.js/ai-tools`.
+
+For a trusted local stdio client, supply a static principal or a provider. The provider runs per request and takes precedence over the static value; its context includes the request id and signal. Provider errors answer JSON-RPC internal errors. `ctx.request` stays absent.
+
+```ts
+ai.mcp.serve([identity], {
+  name: "local-tools",
+  transport: { type: "stdio", principal: { memberId: "local", canCall: true } },
+});
+
+ai.mcp.serve([identity], {
+  name: "local-tools",
+  transport: {
+    type: "stdio",
+    principalProvider: async (context) => ({ memberId: "local", callId: context.requestId }),
+  },
+});
+```
+
+### Cancellation
+
+Following the [MCP 2025-11-25 cancellation specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation), send a notification with the original request id:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "notifications/cancelled",
+  "params": { "requestId": 42, "reason": "Caller cancelled" }
+}
+```
+
+The matching call's `ctx.signal` aborts and its JSON-RPC result or error is suppressed, even if the tool finishes later. Tools should pass the signal to their cancellable work. Unknown, completed or malformed cancellation ids are ignored; `initialize` cannot be cancelled. Number and string ids stay distinct. Existing calls with duplicate in-flight ids still execute, but cancellation is ignored while the id is ambiguous within one caller scope.
+
+Stdio cancellation applies to that connection. HTTP is stateless: a cancellation POST must repeat the original caller's credential and application headers (for example `Authorization`, `Cookie`, `x-tenant-id`), from the same remote address. Transport headers such as `Content-Length`, `Accept` and `MCP-Protocol-Version` can differ. Different credentials can reuse the same id without cancelling each other's calls; clients sharing credentials and application headers must use distinct in-flight ids for cancellation to identify a call. No principal serialization or object identity comparison is required. Notification POSTs get `202`; the cancelled call's HTTP exchange ends with `202` and no JSON-RPC body when its handler settles. Concurrent calls keep separate contexts and controllers.
+
+A client disconnect also aborts its HTTP call. Stdio EOF/close and server stop abort pending stdio work; HTTP shutdown preserves the existing drain timeout before aborting remaining calls.
 
 ### Tools see the request headers
 

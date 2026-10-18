@@ -1,6 +1,15 @@
+import { PassThrough } from "node:stream";
 import { tool, type ToolContract } from "@warlock.js/ai";
-import { describe, expect, it } from "vitest";
-import type { JsonRpcRequest, McpToolCallResult, McpToolDescriptor } from "../contracts";
+import { describe, expect, it, vi } from "vitest";
+import type {
+  JsonRpcRequest,
+  JsonRpcResponse,
+  McpServeOptions,
+  McpServeToolContext,
+  McpStdioServeTransport,
+  McpToolCallResult,
+  McpToolDescriptor,
+} from "../contracts";
 import { objectSchema, stringField } from "../schema";
 import { McpServeError } from "../errors";
 import { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
@@ -711,6 +720,16 @@ async function echoDispatch(message: JsonRpcRequest) {
 }
 
 describe("answerStdioLine() — the stdio transport's line handler", () => {
+  it.each([true, {}, []])("refuses a malformed request id: %j", async (id) => {
+    const dispatch = vi.fn();
+    const reply = await answerStdioLine(
+      JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name: "guarded" } }),
+      dispatch,
+    );
+    expect(JSON.parse(reply ?? "")).toMatchObject({ id: null, error: { code: -32600 } });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   const dispatch = echoDispatch;
 
   it("answers a JSON value that is not a request object with Invalid Request", async () => {
@@ -750,4 +769,293 @@ describe("answerStdioLine() — the stdio transport's line handler", () => {
       error: { code: -32603, message: "Internal error." },
     });
   });
+});
+
+/** Exercise the real stdio reader/writer without spawning or modifying host stdin. */
+async function withStdio(
+  tools: ToolContract[],
+  options: Omit<McpServeOptions, "name" | "transport">,
+  transport: Omit<McpStdioServeTransport, "type">,
+  run: (io: {
+    send(message: unknown): void;
+    replies: JsonRpcResponse[];
+    disconnect(): void;
+    stop(): Promise<void>;
+  }) => Promise<void>,
+): Promise<void> {
+  const input = new PassThrough();
+  const replies: JsonRpcResponse[] = [];
+  const stdin = vi.spyOn(process, "stdin", "get").mockReturnValue(input as typeof process.stdin);
+  const stdout = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    replies.push(JSON.parse(String(chunk)) as JsonRpcResponse);
+    return true;
+  });
+  const server = serve(tools, {
+    name: "stdio-context",
+    ...options,
+    transport: { type: "stdio", ...transport },
+  });
+  try {
+    await server.start();
+    await run({
+      send: (message) => {
+        input.write(`${JSON.stringify(message)}\n`);
+      },
+      replies,
+      disconnect: () => {
+        input.end();
+      },
+      stop: () => server.stop(),
+    });
+  } finally {
+    await server.stop();
+    stdin.mockRestore();
+    stdout.mockRestore();
+    input.destroy();
+  }
+}
+
+describe("serve() over stdio — call context and policy", () => {
+  it("threads a static principal and the request id through policy and execute", async () => {
+    const principal = { member: "local" };
+    const guarded = tool({
+      name: "whoami",
+      description: "Report context",
+      execute: async (_input: unknown, ctx) => {
+        expect(ctx?.request).toBeUndefined();
+        expect(ctx?.signal).toBeInstanceOf(AbortSignal);
+        expect(ctx?.principal).toBe(principal);
+        return { id: ctx?.requestId, principal: ctx?.principal };
+      },
+    });
+    const beforeCall = vi.fn();
+    await withStdio([guarded], { beforeCall }, { principal }, async ({ send, replies }) => {
+      send(request("call-stdio", "tools/call", { name: "whoami" }));
+      await vi.waitFor(() => expect(replies).toHaveLength(1));
+      expect(replies[0]).toEqual({
+        jsonrpc: "2.0",
+        id: "call-stdio",
+        result: {
+          content: [{ type: "text", text: JSON.stringify({ id: "call-stdio", principal }) }],
+          isError: false,
+        },
+      });
+      expect(beforeCall).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: "call-stdio", principal }),
+        guarded,
+        {},
+      );
+    });
+  });
+
+  it("sends native refusals, maps thrown policy errors and skips policy for invalid input", async () => {
+    const execute = vi.fn(async () => "never");
+    const guarded = tool({
+      name: "guarded",
+      description: "Guarded",
+      input: objectSchema<{ value: string }>({ value: stringField() }),
+      execute,
+    });
+    const refusal = {
+      isError: true as const,
+      content: [{ type: "text" as const, text: "Denied" }],
+      _meta: { policy: true },
+    };
+    const beforeCall = vi.fn((context: McpServeToolContext) => {
+      if (context.requestId === 2) throw new Error("Policy failed");
+      return refusal;
+    });
+    await withStdio([guarded], { beforeCall }, {}, async ({ send, replies }) => {
+      send(request(1, "tools/call", { name: "guarded", arguments: { value: "ok" } }));
+      send(request(2, "tools/call", { name: "guarded", arguments: { value: "ok" } }));
+      send(request(3, "tools/call", { name: "guarded", arguments: { value: 7 } }));
+      await vi.waitFor(() => expect(replies).toHaveLength(3));
+      expect(replies.find((reply) => reply.id === 1)?.result).toEqual(refusal);
+      expect(replies.find((reply) => reply.id === 2)?.error).toEqual({
+        code: -32602,
+        message: "Policy failed",
+      });
+      expect(replies.find((reply) => reply.id === 3)?.result).toMatchObject({ isError: true });
+      expect(beforeCall).toHaveBeenCalledTimes(2);
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
+
+  it("fails a throwing stdio principal provider with a JSON-RPC error", async () => {
+    const execute = vi.fn(async () => "never");
+    await withStdio(
+      [tool({ name: "guarded", description: "Guarded", execute })],
+      {},
+      {
+        principalProvider: () => {
+          throw new Error("Provider failed");
+        },
+      },
+      async ({ send, replies }) => {
+        send(request(1, "tools/call", { name: "guarded" }));
+        await vi.waitFor(() => expect(replies).toHaveLength(1));
+        expect(replies[0].error).toEqual({ code: -32603, message: "Internal error." });
+        expect(execute).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  it("isolates concurrent ids and provider principals and suppresses a cancelled result", async () => {
+    const signals = new Map<string | number | undefined, AbortSignal>();
+    const releases = new Map<string | number | undefined, () => void>();
+    const policy: unknown[] = [];
+    const slow = tool({
+      name: "slow",
+      description: "Wait for cancellation",
+      execute: async (_input: unknown, context) => {
+        if (!context?.signal) throw new Error("Missing signal");
+        signals.set(context.requestId, context.signal);
+        await new Promise<void>((resolve) => {
+          releases.set(context.requestId, resolve);
+          context.signal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+        return { id: context.requestId, principal: context.principal };
+      },
+    });
+    await withStdio(
+      [slow],
+      {
+        beforeCall: (context) => {
+          policy.push({ id: context.requestId, principal: context.principal });
+        },
+      },
+      {
+        principal: "overridden",
+        principalProvider: async (context) => ({ member: context.requestId }),
+      },
+      async ({ send, replies }) => {
+        try {
+          send(request(0, "tools/call", { name: "slow" }));
+          send(request("0", "tools/call", { name: "slow" }));
+          await vi.waitFor(() => expect(signals.size).toBe(2));
+          send({
+            jsonrpc: "2.0",
+            method: "notifications/cancelled",
+            params: { requestId: "missing" },
+          });
+          send({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: {} } });
+          expect(signals.get(0)?.aborted).toBe(false);
+          send({
+            jsonrpc: "2.0",
+            method: "notifications/cancelled",
+            params: { requestId: 0, reason: "Caller cancelled" },
+          });
+          await vi.waitFor(() => expect(signals.get(0)?.aborted).toBe(true));
+          expect(signals.get("0")?.aborted).toBe(false);
+          releases.get("0")?.();
+          send(request("barrier", "ping"));
+          await vi.waitFor(() => expect(replies).toHaveLength(2));
+          expect(replies.some((reply) => reply.id === 0)).toBe(false);
+          const completed = replies.find((reply) => reply.id === "0")?.result as McpToolCallResult;
+          expect(JSON.parse(completed.content[0].text ?? "")).toEqual({
+            id: "0",
+            principal: { member: "0" },
+          });
+          expect(policy).toEqual(
+            expect.arrayContaining([
+              { id: 0, principal: { member: 0 } },
+              { id: "0", principal: { member: "0" } },
+            ]),
+          );
+        } finally {
+          for (const release of releases.values()) release();
+        }
+      },
+    );
+  });
+
+  it("ignores cancellation of initialize while its principal provider is pending", async () => {
+    let signal: AbortSignal | undefined;
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await withStdio(
+      [],
+      {},
+      {
+        principalProvider: async (context) => {
+          signal = context.signal;
+          await gate;
+          return "local";
+        },
+      },
+      async ({ send, replies }) => {
+        try {
+          send(request("initialize", "initialize", { protocolVersion: "2025-11-25" }));
+          await vi.waitFor(() => expect(signal).toBeDefined());
+          send({
+            jsonrpc: "2.0",
+            method: "notifications/cancelled",
+            params: { requestId: "initialize" },
+          });
+          expect(signal?.aborted).toBe(false);
+          release?.();
+          await vi.waitFor(() => expect(replies).toHaveLength(1));
+          expect(replies[0].id).toBe("initialize");
+          expect(replies[0].error).toBeUndefined();
+        } finally {
+          release?.();
+        }
+      },
+    );
+  });
+
+  it("cancels while policy is pending and never starts execute", async () => {
+    let releasePolicy: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      releasePolicy = resolve;
+    });
+    const execute = vi.fn(async () => "never");
+    const beforeCall = vi.fn(async () => {
+      await gate;
+    });
+    const guarded = tool({ name: "guarded", description: "Wait for policy", execute });
+    await withStdio([guarded], { beforeCall }, {}, async ({ send, replies }) => {
+      try {
+        send(request(1, "tools/call", { name: "guarded" }));
+        await vi.waitFor(() => expect(beforeCall).toHaveBeenCalledOnce());
+        send({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 1 } });
+        releasePolicy?.();
+        send(request("barrier", "ping"));
+        await vi.waitFor(() => expect(replies).toHaveLength(1));
+        expect(replies[0].id).toBe("barrier");
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        releasePolicy?.();
+      }
+    });
+  });
+
+  it.each(["disconnect", "stop"])(
+    "aborts pending work on %s without sending its result",
+    async (mode) => {
+      let signal: AbortSignal | undefined;
+      const slow = tool({
+        name: "slow",
+        description: "Wait for shutdown",
+        execute: async (_input: unknown, ctx) => {
+          signal = ctx?.signal;
+          await new Promise<void>((resolve) =>
+            signal?.addEventListener("abort", () => resolve(), { once: true }),
+          );
+          return "never sent";
+        },
+      });
+      await withStdio([slow], {}, {}, async ({ send, replies, disconnect, stop }) => {
+        send(request(1, "tools/call", { name: "slow" }));
+        await vi.waitFor(() => expect(signal).toBeDefined());
+        if (mode === "stop") await stop();
+        else disconnect();
+        await vi.waitFor(() => expect(signal?.aborted).toBe(true));
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(replies).toEqual([]);
+      });
+    },
+  );
 });

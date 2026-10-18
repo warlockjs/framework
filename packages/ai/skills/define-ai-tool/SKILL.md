@@ -145,6 +145,28 @@ const { data } = await pinLocale.invoke({}, ctx);
 console.log(data, ctx.artifacts.locale); // { ok: true } "en-GB"
 ```
 
+## MCP request identity
+
+When served by `@warlock.js/ai-tools`, `ToolContext` also carries optional
+`requestId` (the original JSON-RPC string/number id), `principal` (unknown,
+from HTTP `auth.authenticate` or stdio identity options), and `signal` that
+aborts on request cancellation or disconnect/shutdown. Narrow the principal
+before using it; none of this metadata is automatically returned to the model.
+
+```ts
+const identity = ai.tool({
+  name: "identity",
+  description: "Read server-provided identity",
+  execute: async (_input: unknown, ctx) => {
+    ctx?.signal?.throwIfAborted();
+    return { requestId: ctx?.requestId, principal: ctx?.principal };
+  },
+});
+```
+
+See the `expose-as-mcp-server` skill in `@warlock.js/ai-tools` for
+`authenticate`, `beforeCall` and `notifications/cancelled`.
+
 ## Type contract for artifacts
 
 The supervisor declares an `artifactsSchema`; tools registered to it inherit typed `ctx.artifacts.*`. Standalone tools fall back to `Record<string, unknown>`.

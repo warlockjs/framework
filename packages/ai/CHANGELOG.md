@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Use root Oxlint/Oxfmt binaries and configuration for package lint/fix and format scripts. Legacy ESLint/Prettier dependencies and configs remain until the 5.34.0 removal.
+### Added
+
+- `ToolContext` adds optional `requestId` and `principal` fields for server transports, keeping authenticated identity out of tool input and model messages.
 
 ## 5.32.0 - 2026-10-18
 

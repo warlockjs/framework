@@ -1,7 +1,7 @@
 import { createServer as createNetServer } from "node:net";
 import { request as httpRequest } from "node:http";
-import { tool, type ToolContract } from "@warlock.js/ai";
-import { afterEach, describe, expect, it } from "vitest";
+import { tool, type ToolContext, type ToolContract } from "@warlock.js/ai";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   McpHttpServeHandle,
   McpHttpServeTransport,
@@ -627,14 +627,16 @@ describe("serve() over http — close()", () => {
 /** The slice of the official SDK client these specs drive. */
 type SdkClient = {
   connect(transport: unknown): Promise<void>;
+  onerror?: (error: Error) => void;
   getServerCapabilities(): Record<string, unknown> | undefined;
   listTools(): Promise<{
     tools: { name: string; description?: string; outputSchema?: Record<string, unknown> }[];
   }>;
-  callTool(params: {
-    name: string;
-    arguments?: Record<string, unknown>;
-  }): Promise<McpToolCallResult>;
+  callTool(
+    params: { name: string; arguments?: Record<string, unknown> },
+    resultSchema?: unknown,
+    options?: { signal?: AbortSignal },
+  ): Promise<McpToolCallResult>;
   listResources(): Promise<{ resources: { uri: string; name: string }[] }>;
   readResource(params: { uri: string }): Promise<{ contents: { uri: string; text?: string }[] }>;
   listPrompts(): Promise<{ prompts: { name: string }[] }>;
@@ -832,4 +834,425 @@ describe("serve() over http — real MCP clients", () => {
       await client.close();
     }
   });
+});
+
+describe("serve() over http — authenticated call context and policy", () => {
+  it("keeps concurrent request ids, authenticated principals and headers isolated", async () => {
+    const seen: unknown[] = [];
+    const execute = vi.fn(async (_input: unknown, ctx?: ToolContext) => {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      return {
+        id: ctx?.requestId,
+        principal: ctx?.principal,
+        tenant: ctx?.request?.headers["x-tenant-id"],
+      };
+    });
+    const contract = tool({ name: "identity", description: "Read the caller", execute });
+    const { url } = await start(
+      [contract],
+      {
+        auth: { authenticate: async (request) => ({ member: request.headers["x-tenant-id"] }) },
+      },
+      {
+        beforeCall: async (context, called, input) => {
+          expect(called).toBe(contract);
+          expect(input).toEqual({});
+          seen.push({ id: context.requestId, principal: context.principal });
+        },
+      },
+    );
+
+    const responses = await Promise.all(
+      ["alice", "bob"].map((tenant, index) =>
+        rpc(
+          url,
+          {
+            jsonrpc: "2.0",
+            id: index === 0 ? "call-a" : 0,
+            method: "tools/call",
+            params: { name: "identity" },
+          },
+          { "x-tenant-id": tenant },
+        ),
+      ),
+    );
+
+    for (const [index, response] of responses.entries()) {
+      const tenant = index === 0 ? "alice" : "bob";
+      const id = index === 0 ? "call-a" : 0;
+      const body = JSON.parse(response.body);
+      expect(body.id).toBe(id);
+      expect(JSON.parse(body.result.content[0].text)).toEqual({
+        id,
+        principal: { member: tenant },
+        tenant,
+      });
+      expect(seen).toContainEqual({ id, principal: { member: tenant } });
+    }
+  });
+
+  it.each(["undefined", "throw"])("denies authenticate %s with a challenge", async (mode) => {
+    const execute = vi.fn(async () => "never");
+    const { url } = await start([tool({ name: "guarded", description: "Guarded", execute })], {
+      auth: {
+        authenticate: async () => {
+          if (mode === "throw") throw new Error("secret authentication details");
+          return undefined;
+        },
+      },
+    });
+    const response = await rpc(url, LIST);
+    expect(response.status).toBe(401);
+    expect(response.headers["www-authenticate"]).toBe('Bearer realm="mcp"');
+    expect(response.body).not.toContain("secret authentication details");
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("requires bearer, authorize and authenticate in order after Host/Origin checks", async () => {
+    const order: string[] = [];
+    const { url } = await start([upperTool()], {
+      auth: {
+        bearer: "token",
+        authorize: () => {
+          order.push("authorize");
+          return true;
+        },
+        authenticate: () => {
+          order.push("authenticate");
+          return false;
+        },
+      },
+    });
+    expect(
+      (await rpc(url, LIST, { authorization: "Bearer token", origin: "https://foreign.example" }))
+        .status,
+    ).toBe(403);
+    expect((await rpc(url, LIST, { authorization: "Bearer wrong" })).status).toBe(401);
+    expect(order).toEqual([]);
+    expect((await rpc(url, LIST, { authorization: "Bearer token" })).status).toBe(200);
+    expect(order).toEqual(["authorize", "authenticate"]);
+
+    const authenticate = vi.fn(() => "caller");
+    const denied = await start([upperTool()], { auth: { authorize: () => false, authenticate } });
+    expect((await rpc(denied.url, LIST)).status).toBe(401);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it("accepts authenticate alone on a non-loopback bind", async () => {
+    const handle = await start([upperTool()], {
+      host: "0.0.0.0",
+      auth: { authenticate: () => "caller" },
+    });
+    expect((await rpc(handle.url.replace("0.0.0.0", "127.0.0.1"), LIST)).status).toBe(200);
+  });
+
+  it("sends a policy refusal unchanged and maps a thrown hook to a JSON-RPC error", async () => {
+    const execute = vi.fn(async () => "never");
+    const contract = tool({ name: "guarded", description: "Guarded", execute });
+    const refusal: McpToolCallResult & { isError: true } = {
+      content: [{ type: "text", text: "Policy denied" }],
+      isError: true,
+      structuredContent: { allowed: false },
+      _meta: { policy: "membership" },
+    };
+    const handle = await start(
+      [contract],
+      { auth: { authenticate: () => "alice" } },
+      {
+        beforeCall: (context) => {
+          expect(context.principal).toBe("alice");
+          if (context.requestId === "throw") throw new Error("Policy unavailable");
+          return refusal;
+        },
+      },
+    );
+    const call = (id: string) =>
+      rpc(handle.url, { jsonrpc: "2.0", id, method: "tools/call", params: { name: "guarded" } });
+    expect(JSON.parse((await call("refuse")).body).result).toEqual(refusal);
+    expect(JSON.parse((await call("throw")).body).error).toEqual({
+      code: -32602,
+      message: "Policy unavailable",
+    });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("runs policy only after input validation and passes the validated value", async () => {
+    const beforeCall = vi.fn();
+    const { url } = await start([upperTool()], {}, { beforeCall });
+    const call = (value: unknown) =>
+      rpc(url, {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "upper", arguments: { value } },
+      });
+    expect(JSON.parse((await call(7)).body).result.isError).toBe(true);
+    expect(beforeCall).not.toHaveBeenCalled();
+    await call("ok");
+    expect(beforeCall).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 1 }),
+      expect.objectContaining({ name: "upper" }),
+      { value: "ok" },
+    );
+  });
+});
+
+describe("serve() over http — request cancellation", () => {
+  it("aborts only the matching caller/id and suppresses its JSON-RPC response", async () => {
+    const signals = new Map<string, AbortSignal>();
+    const releases = new Map<string, () => void>();
+    const contract = tool({
+      name: "slow",
+      description: "Wait for cancellation or release",
+      execute: async (_input: unknown, context) => {
+        const key = `${String(context?.principal)}:${typeof context?.requestId}:${String(context?.requestId)}`;
+        if (!context?.signal) throw new Error("Missing call signal");
+        signals.set(key, context.signal);
+        await new Promise<void>((resolve) => {
+          releases.set(key, resolve);
+          context.signal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+        return "done";
+      },
+    });
+    const { url } = await start([contract], {
+      auth: { authenticate: (request) => request.headers.authorization },
+    });
+    const call = (id: string | number, principal: string) =>
+      rpc(
+        url,
+        {
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name: "slow" },
+        },
+        { authorization: principal },
+      );
+    const cancel = (requestId: unknown, principal = "alice") =>
+      rpc(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "notifications/cancelled",
+          params: { requestId, reason: "Cancelled by caller" },
+        },
+        { authorization: principal },
+      );
+    const alice = call(1, "alice");
+    const bob = call(1, "bob");
+    const other = call("1", "alice");
+    try {
+      await vi.waitFor(() => expect(signals.size).toBe(3));
+      expect((await cancel("missing")).status).toBe(202);
+      expect((await cancel({ invalid: true })).status).toBe(202);
+      expect((await cancel(1, "mallory")).status).toBe(202);
+      expect(signals.get("alice:number:1")?.aborted).toBe(false);
+      expect((await cancel(1)).status).toBe(202);
+      const cancelled = await alice;
+      expect(cancelled.status).toBe(202);
+      expect(cancelled.body).toBe("");
+      expect(signals.get("alice:number:1")?.aborted).toBe(true);
+      // Both number and string ids are distinct even for one principal.
+      expect(signals.get("bob:number:1")?.aborted).toBe(false);
+      expect(signals.get("alice:string:1")?.aborted).toBe(false);
+    } finally {
+      for (const release of releases.values()) release();
+    }
+    expect(JSON.parse((await bob).body).result.isError).toBe(false);
+    expect(JSON.parse((await other).body).result.isError).toBe(false);
+    await cancel(1); // already completed: ignored
+  });
+
+  it("preserves calls sharing credentials and ids, ignoring ambiguous cancellation", async () => {
+    const signals: AbortSignal[] = [];
+    const releases: Array<() => void> = [];
+    const { url } = await start([
+      tool({
+        name: "slow",
+        description: "Wait for cancellation or release",
+        execute: async (_input: unknown, context) => {
+          if (!context?.signal) throw new Error("Missing signal");
+          signals.push(context.signal);
+          await new Promise<void>((resolve) => {
+            releases.push(resolve);
+            context.signal?.addEventListener("abort", () => resolve(), { once: true });
+          });
+          return "done";
+        },
+      }),
+    ]);
+    const call = () =>
+      rpc(url, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "slow" } });
+    const cancel = () =>
+      rpc(url, { jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 1 } });
+    const first = call();
+    const second = call();
+    try {
+      await vi.waitFor(() => expect(signals).toHaveLength(2));
+      expect(signals[0]).not.toBe(signals[1]);
+      await cancel();
+      expect(signals.every((signal) => !signal.aborted)).toBe(true);
+    } finally {
+      for (const release of releases) release();
+    }
+    expect(JSON.parse((await first).body).result.isError).toBe(false);
+    expect(JSON.parse((await second).body).result.isError).toBe(false);
+    // Once both are removed, the same id is unambiguous and cancellable again.
+    const third = call();
+    try {
+      await vi.waitFor(() => expect(signals).toHaveLength(3));
+      await cancel();
+      expect(signals[2].aborted).toBe(true);
+      expect((await third).body).toBe("");
+    } finally {
+      releases[2]?.();
+    }
+  });
+
+  it("aborts a tool on client disconnect", async () => {
+    let signal: AbortSignal | undefined;
+    const { url } = await start([
+      tool({
+        name: "slow",
+        description: "Wait for disconnect",
+        execute: async (_input: unknown, context) => {
+          signal = context?.signal;
+          await new Promise<void>((resolve) =>
+            signal?.addEventListener("abort", () => resolve(), { once: true }),
+          );
+          return "done";
+        },
+      }),
+    ]);
+    const outgoing = httpRequest(url, { method: "POST", headers: JSON_HEADERS });
+    outgoing.on("error", () => {});
+    outgoing.end(
+      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "slow" } }),
+    );
+    try {
+      await vi.waitFor(() => expect(signal).toBeDefined());
+      outgoing.destroy();
+      await vi.waitFor(() => expect(signal?.aborted).toBe(true));
+    } finally {
+      outgoing.destroy();
+    }
+  });
+});
+
+describe("serve() over http — SDK request context", () => {
+  it("round-trips authenticated context and policy refusals with the official client", async () => {
+    const { Client } = (await import(SDK_CLIENT)) as SdkClientModule;
+    const { StreamableHTTPClientTransport } = (await import(SDK_TRANSPORT)) as SdkTransportModule;
+    const policy: unknown[] = [];
+    const contract = tool({
+      name: "identity",
+      description: "Report authenticated context",
+      execute: async (_input: unknown, context) =>
+        mcpResult({
+          content: [{ type: "text", text: "caller" }],
+          _meta: {
+            requestId: context?.requestId,
+            principal: context?.principal,
+            remoteAddress: context?.request?.remoteAddress,
+          },
+        }),
+    });
+    const guarded = tool({
+      name: "guarded",
+      description: "Refused by policy",
+      execute: async () => "never",
+    });
+    const { url } = await start(
+      [contract, guarded],
+      {
+        auth: { authenticate: (request) => ({ member: request.headers.authorization }) },
+      },
+      {
+        beforeCall: (context, called) => {
+          policy.push({ id: context.requestId, principal: context.principal });
+          if (called.name === "guarded")
+            return {
+              isError: true,
+              content: [{ type: "text", text: "Denied" }],
+              _meta: { policy: true },
+            };
+        },
+      },
+    );
+    const clients = ["alice", "bob"].map((name) => new Client({ name, version: "1.0.0" }));
+    try {
+      await Promise.all(
+        clients.map((client, index) =>
+          client.connect(
+            new StreamableHTTPClientTransport(new URL(url), {
+              requestInit: { headers: { authorization: index === 0 ? "alice" : "bob" } },
+            }),
+          ),
+        ),
+      );
+      const results = await Promise.all(
+        clients.map((client) => client.callTool({ name: "identity" })),
+      );
+      for (const [index, result] of results.entries()) {
+        const principal = { member: index === 0 ? "alice" : "bob" };
+        const { _meta: metadata } = result;
+        expect(metadata?.principal).toEqual(principal);
+        expect(typeof metadata?.requestId).toBe("number");
+        expect(metadata?.remoteAddress).toMatch(/127\.0\.0\.1/);
+        expect(policy).toContainEqual({ id: metadata?.requestId, principal });
+      }
+      expect(await clients[0].callTool({ name: "guarded" })).toEqual({
+        isError: true,
+        content: [{ type: "text", text: "Denied" }],
+        _meta: { policy: true },
+      });
+    } finally {
+      await Promise.all(clients.map((client) => client.close()));
+    }
+  });
+});
+
+it("honours cancellation sent by the official SDK without a JSON-RPC response", async () => {
+  const { Client } = (await import(SDK_CLIENT)) as SdkClientModule;
+  const { StreamableHTTPClientTransport } = (await import(SDK_TRANSPORT)) as SdkTransportModule;
+  let signal: AbortSignal | undefined;
+  const contract = tool({
+    name: "slow",
+    description: "Wait for SDK cancellation",
+    execute: async (_input: unknown, context) => {
+      signal = context?.signal;
+      await new Promise<void>((resolve) =>
+        signal?.addEventListener("abort", () => resolve(), { once: true }),
+      );
+      return mcpResult({ content: [{ type: "text", text: "must not be sent" }] });
+    },
+  });
+  const { url } = await start([contract], {
+    auth: { authenticate: (request) => request.headers.authorization },
+  });
+  const client = new Client({ name: "cancelling-client", version: "1.0.0" });
+  const onerror = vi.fn();
+  Object.assign(client, { onerror });
+  const controller = new AbortController();
+  try {
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(url), {
+        requestInit: { headers: { authorization: "alice" } },
+      }),
+    );
+    const call = client
+      .callTool({ name: "slow" }, undefined, { signal: controller.signal })
+      .catch((cause: unknown) => cause);
+    await vi.waitFor(() => expect(signal).toBeDefined());
+    controller.abort(new Error("Caller cancelled"));
+    expect(await call).toBeInstanceOf(Error);
+    await vi.waitFor(() => expect(signal?.aborted).toBe(true));
+    // A subsequent RPC is a barrier after processing the cancellation POST.
+    expect((await client.listTools()).tools[0].name).toBe("slow");
+    expect(onerror).not.toHaveBeenCalled();
+  } finally {
+    controller.abort();
+    await client.close();
+  }
 });

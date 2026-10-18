@@ -1,6 +1,6 @@
 ---
 name: expose-as-mcp-server
-description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Expose tools AS an MCP server (Direction B)
@@ -64,7 +64,7 @@ transport: {
 }
 ```
 
-- With `bearer` and `authorize` both set, a request must pass both. A throwing hook denies. Failures → `401`.
+- Checks run in order: `bearer`, `authorize`, `authenticate`; every configured check must pass. A failed check skips later hooks. `authenticate` alone satisfies the non-loopback auth requirement. Host/Origin checks run first. A throwing authentication hook denies. Failures → `401`; bearer or authenticate failures include a Bearer `WWW-Authenticate` challenge.
 - A foreign or `null` `Origin` → `403` (DNS-rebinding guard from the MCP spec). Requests without `Origin` pass.
 - On loopback, a `Host` other than `localhost` / `127.0.0.1` / `[::1]` (or `allowedHosts`) → `403`.
 - Stateless: no session id; `GET` / `DELETE` → `405`; batches → `400`; unsupported `MCP-Protocol-Version` → `400`.
@@ -90,6 +90,58 @@ const { url, close } = await ai.mcp
 ```
 
 Header names are lower-cased; every client header is present (including `authorization`). Over stdio `ctx.request` is absent. Nothing on `ctx.request` reaches the model.
+
+## Authenticated context, policy and cancellation
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-tools";
+import type { McpHttpRequestInfo, McpCallRefusal } from "@warlock.js/ai-tools";
+
+declare function findMember(
+  request: McpHttpRequestInfo,
+): Promise<{ id: string; canCall: boolean } | undefined>;
+const denied: McpCallRefusal = {
+  isError: true,
+  content: [{ type: "text", text: "Member cannot call tools" }],
+  _meta: { policy: "membership" },
+};
+const identity = ai.tool({
+  name: "identity",
+  description: "Report the authenticated caller and request id",
+  execute: async (_input: unknown, ctx) => {
+    ctx?.signal?.throwIfAborted();
+    return { requestId: ctx?.requestId, principal: ctx?.principal };
+  },
+});
+
+const server = ai.mcp.serve([identity], {
+  name: "member-tools",
+  transport: { type: "http", auth: { authenticate: findMember } },
+  beforeCall: async (context, tool, input) => {
+    const member = context.principal; // unknown — narrow before use
+    if (
+      typeof member !== "object" ||
+      member === null ||
+      !("canCall" in member) ||
+      member.canCall !== true
+    ) {
+      return denied;
+    }
+    // context.requestId: JSON-RPC id; tool: original ToolContract;
+    // input: validated data, treated as read-only.
+  },
+});
+```
+
+- `authenticate(request)` may be synchronous or async. `undefined` or a thrown error → `401` with `WWW-Authenticate: Bearer realm="mcp"`; every other value becomes `context.principal` and `ctx.principal`. Secrets in thrown auth errors are not exposed.
+- `beforeCall(context, tool, input)` runs after schema validation. Return nothing to allow; return `McpCallRefusal` (`isError: true`) to send native content/metadata unchanged, independent of result mode. Throw → JSON-RPC `-32602`. Invalid refusals → `-32603`. Invalid input skips policy. The boundary validates before policy and `invoke` keeps its own validation, so schemas must be deterministic and policy input read-only.
+- Stdio identity: `transport: { type: "stdio", principal: { id: "local" } }` or `transport: { type: "stdio", principalProvider: async (context) => ({ id: "local", requestId: context.requestId }) }`. The provider runs per request, takes precedence over static principal, and receives the request id and abort signal. A provider throw → JSON-RPC internal error. No HTTP request metadata exists over stdio.
+- Public types: `McpBeforeCall`, `McpCallRefusal`, `McpServeToolContext`, `McpStdioServeTransport`; `ToolContext` in `@warlock.js/ai` adds optional `requestId` and `principal`.
+
+[Cancellation (MCP 2025-11-25)](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation): send `{ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 42, reason: "Caller cancelled" } }`. The matching signal aborts; no JSON-RPC response is sent even if the tool later returns or throws. Unknown/completed/malformed ids are ignored; `initialize` cannot be cancelled. String and numeric ids are distinct; calls sharing an in-flight id still execute, but ambiguous cancellation in one scope is ignored.
+
+HTTP cancellation POSTs must repeat caller credentials and application headers (`Authorization`, `Cookie`, tenant/custom auth headers), from the same remote address. Transport headers such as content length, accept, protocol version and connection may differ. Different credentials can reuse ids safely. Clients sharing credential/application headers must use unique in-flight ids for cancellation to identify a call. Notifications get `202`; a cancelled HTTP call ends with `202`, no JSON-RPC body, when its handler settles. Stdio scopes cancellation to the connection. HTTP disconnect, stdio EOF/close/stop, or HTTP shutdown after the drain timeout also abort tools. Pass `ctx.signal` into cancellable work.
 
 ## Return native MCP results
 

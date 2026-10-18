@@ -17,6 +17,7 @@ import type {
 } from "../contracts";
 import { McpServeError } from "../errors";
 import { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
+import { McpServeRequests } from "./serve-requests";
 
 /**
  * MCP Streamable HTTP server transport for `ai.mcp.serve`.
@@ -127,6 +128,7 @@ type ResolvedSettings = {
   drainTimeoutMs: number;
   tokenDigests: Buffer[];
   authorize: McpHttpAuth["authorize"];
+  authenticate: McpHttpAuth["authenticate"];
   authRequired: boolean;
   allowedOrigins: Set<string>;
   allowedHosts: Set<string>;
@@ -201,18 +203,19 @@ function resolveSettings(transport: McpHttpServeTransport): ResolvedSettings {
     throw new McpServeError("MCP http auth.bearer needs at least one token.", { type: "config" });
   }
 
-  if (auth && tokens.length === 0 && !auth.authorize) {
-    throw new McpServeError("MCP http auth needs `bearer` and/or `authorize`.", {
+  if (auth && tokens.length === 0 && !auth.authorize && !auth.authenticate) {
+    throw new McpServeError("MCP http auth needs `bearer`, `authorize` and/or `authenticate`.", {
       type: "config",
     });
   }
 
-  const authRequired = tokens.length > 0 || auth?.authorize !== undefined;
+  const authRequired =
+    tokens.length > 0 || auth?.authorize !== undefined || auth?.authenticate !== undefined;
 
   if (!loopback && !authRequired) {
     throw new McpServeError(
       `Refusing to serve MCP over http on non-loopback host "${host}" without auth. ` +
-        "Set transport.auth ({ bearer } or { authorize }), or bind 127.0.0.1.",
+        "Set transport.auth ({ bearer }, { authorize } or { authenticate }), or bind 127.0.0.1.",
       { type: "config", context: { host } },
     );
   }
@@ -226,6 +229,7 @@ function resolveSettings(transport: McpHttpServeTransport): ResolvedSettings {
     drainTimeoutMs,
     tokenDigests: tokens.map(digest),
     authorize: auth?.authorize,
+    authenticate: auth?.authenticate,
     authRequired,
     allowedOrigins: new Set((transport.allowedOrigins ?? []).map(normalizeOrigin)),
     allowedHosts: new Set((transport.allowedHosts ?? []).map((name) => hostnameOf(name))),
@@ -312,6 +316,7 @@ export async function startHttpServer(
 ): Promise<RunningMcpHttpServer> {
   const settings = resolveSettings(transport);
   const shutdown = new AbortController();
+  const requests = new McpServeRequests();
   const inFlight = new Set<Promise<void>>();
   let closing: Promise<void> | undefined;
 
@@ -324,7 +329,14 @@ export async function startHttpServer(
       return;
     }
 
-    const work = handleRequest(request, response, settings, dispatch, shutdown.signal).catch(() => {
+    const work = handleRequest(
+      request,
+      response,
+      settings,
+      dispatch,
+      shutdown.signal,
+      requests,
+    ).catch(() => {
       sendRefusal(response, 500, JSON_RPC_SERVER_ERROR, "Internal server error.");
     });
 
@@ -411,6 +423,7 @@ async function handleRequest(
   settings: ResolvedSettings,
   dispatch: McpHttpDispatch,
   signal: AbortSignal,
+  requests: McpServeRequests,
 ): Promise<void> {
   const headers = flattenHeaders(request.headers);
   const method = (request.method ?? "GET").toUpperCase();
@@ -441,9 +454,13 @@ async function handleRequest(
     info.remoteAddress = request.socket.remoteAddress;
   }
 
-  if (!(await authorized(info, settings))) {
+  const authentication = await authorized(info, settings);
+
+  if (!authentication.allowed) {
     const challenge: Record<string, string> =
-      settings.tokenDigests.length > 0 ? { "www-authenticate": 'Bearer realm="mcp"' } : {};
+      settings.tokenDigests.length > 0 || settings.authenticate
+        ? { "www-authenticate": 'Bearer realm="mcp"' }
+        : {};
 
     sendRefusal(response, 401, JSON_RPC_SERVER_ERROR, "Unauthorized.", challenge);
 
@@ -530,7 +547,8 @@ async function handleRequest(
 
   if (typeof record.method === "string") {
     if (typeof id !== "string" && typeof id !== "number") {
-      // A notification (notifications/initialized, notifications/cancelled…).
+      // Only the same caller credentials can cancel an in-flight request.
+      requests.cancel(record, cancellationScope(info));
       sendEmpty(response, 202);
 
       return;
@@ -542,9 +560,31 @@ async function handleRequest(
       rpcRequest.params = record.params;
     }
 
-    const rpcResponse = await dispatch(rpcRequest, { request: info, signal });
+    const disconnected = new AbortController();
+    const onClose = () => disconnected.abort();
+    response.once("close", onClose);
 
-    sendJson(response, 200, rpcResponse);
+    try {
+      const rpcResponse = await requests.run(
+        rpcRequest,
+        {
+          request: info,
+          principal: authentication.principal,
+          signal: AbortSignal.any([signal, disconnected.signal]),
+        },
+        (context) => dispatch(rpcRequest, context),
+        cancellationScope(info),
+      );
+
+      if (rpcResponse === undefined) {
+        // End the HTTP exchange without a JSON-RPC response for cancelled work.
+        sendEmpty(response, 202);
+      } else {
+        sendJson(response, 200, rpcResponse);
+      }
+    } finally {
+      response.off("close", onClose);
+    }
 
     return;
   }
@@ -620,9 +660,14 @@ function originAllowed(origin: string | undefined, settings: ResolvedSettings): 
  * every configured token is compared so the match position does not leak.
  * An `authorize` hook that throws denies the request.
  */
-async function authorized(info: McpHttpRequestInfo, settings: ResolvedSettings): Promise<boolean> {
+type Authentication = { allowed: false } | { allowed: true; principal?: unknown };
+
+async function authorized(
+  info: McpHttpRequestInfo,
+  settings: ResolvedSettings,
+): Promise<Authentication> {
   if (!settings.authRequired) {
-    return true;
+    return { allowed: true };
   }
 
   if (settings.tokenDigests.length > 0) {
@@ -635,19 +680,51 @@ async function authorized(info: McpHttpRequestInfo, settings: ResolvedSettings):
     }
 
     if (!match || !matched) {
-      return false;
+      return { allowed: false };
     }
   }
 
-  if (settings.authorize) {
-    try {
-      return (await settings.authorize(info)) === true;
-    } catch {
-      return false;
+  try {
+    if (settings.authorize && (await settings.authorize(info)) !== true) {
+      return { allowed: false };
     }
-  }
 
-  return true;
+    if (settings.authenticate) {
+      const principal = await settings.authenticate(info);
+
+      return principal === undefined ? { allowed: false } : { allowed: true, principal };
+    }
+
+    return { allowed: true };
+  } catch {
+    return { allowed: false };
+  }
+}
+
+/**
+ * Stateless HTTP has no connection/session id. Repeat the caller's credential
+ * and application headers on notifications; per-message transport headers do
+ * not identify a caller. Hash the material rather than retaining secrets as keys.
+ */
+function cancellationScope(info: McpHttpRequestInfo): string {
+  const transportHeaders = new Set([
+    "host",
+    "origin",
+    "accept",
+    "accept-encoding",
+    "accept-language",
+    "connection",
+    "content-type",
+    "content-length",
+    "transfer-encoding",
+    "mcp-protocol-version",
+    "user-agent",
+  ]);
+  const credentials = Object.entries(info.headers)
+    .filter(([name]) => !transportHeaders.has(name))
+    .sort(([left], [right]) => left.localeCompare(right));
+
+  return digest(JSON.stringify([info.remoteAddress, credentials])).toString("hex");
 }
 
 /** True for `application/json` (any parameters, e.g. `; charset=utf-8`). */
