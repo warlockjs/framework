@@ -66,6 +66,8 @@ export type PageConfig<TLoader extends LoaderFunction | undefined = undefined> =
   readonly validation?: PageConfigValidation;
   /** Resolved after a successful loader, using its concrete return type. */
   readonly metadata?: PageMetadata<TLoader>;
+  /** `false` suppresses declared font preloads for this page and its descendants. */
+  readonly fontPreload?: boolean;
   /** Page sitemap policy or dynamic URL supplier. */
   readonly sitemap?: SitemapPageExport;
   /** Settings for the unnamed `action` export; requires that export. */
@@ -88,6 +90,8 @@ export type LayoutConfig<TLoader extends LoaderFunction | undefined = undefined>
   readonly sitemap?: false | SitemapPageOptions;
   /** Static metadata defaults or a callback composing resolved child metadata. */
   readonly metadata?: PageMetadata<TLoader>;
+  /** `false` suppresses declared font preloads for this page and its descendants. */
+  readonly fontPreload?: boolean;
 };
 
 /**
@@ -100,4 +104,6 @@ export type RootConfig<TLoader extends LoaderFunction | undefined = undefined> =
   /** Render the application tree in React Strict Mode. */
   readonly strictMode?: boolean;
   readonly metadata?: PageMetadata<TLoader>;
+  /** `false` suppresses declared font preloads for this page and its descendants. */
+  readonly fontPreload?: boolean;
 };

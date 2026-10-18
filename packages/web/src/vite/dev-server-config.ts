@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { webFontsPlugin } from "./fonts-plugin";
 import path from "node:path";
 import type { Alias, HttpServer, InlineConfig, PluginOption } from "vite";
 import type { DevelopmentAppModules, DevelopmentModelModules } from "@warlock.js/core";
@@ -205,6 +206,7 @@ export type WebConnectorViteConfigOptions = {
   hmrServer: HttpServer;
   /** `web.sites`: each per-site hydration entry then imports only its own site's page registry. */
   sites?: SitesConfig;
+  fonts?: readonly import("../fonts/types").WebFont[];
   handlePageHotUpdate: (file: string) => Promise<boolean>;
   /** Plugins that must run ahead of the client-boundary gates, e.g. `devErrorTransportPlugin`. */
   leadingPlugins: PluginOption[];
@@ -273,6 +275,9 @@ export async function createWebConnectorViteConfig(
       // why the layer has to be registered from a plugin and not from
       // `vite.middlewares.use(...)` after this call returns.
       ...options.leadingPlugins,
+      ...(options.fonts?.length
+        ? [webFontsPlugin({ appRoot: options.appRoot, fonts: options.fonts })]
+        : []),
       ...warlockClientBoundary({
         appRoot: options.appRoot,
         srcDir: path.relative(options.appRoot, options.appSrcRoot),

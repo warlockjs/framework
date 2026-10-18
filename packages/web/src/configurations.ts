@@ -30,6 +30,8 @@ export type WebFormsConfigurations = {
 
 /** Application-owned configuration for the Web connector's server features. */
 export type WebConfigurations = {
+  /** Self-hosted faces, emitted CSS variables, preloads and metric-matched fallbacks. */
+  fonts?: readonly import("./fonts/types").WebFont[];
   streaming?: WebStreamingConfigurations;
   forms?: WebFormsConfigurations;
   /** Milliseconds for the non-deferred app → layout → page loader chain; `0` disables it. */

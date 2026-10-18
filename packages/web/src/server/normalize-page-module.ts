@@ -50,6 +50,7 @@ export type NormalizedPageModule = {
   sitemap?: SitemapPageExport | false | SitemapPageOptions;
   prefix?: string;
   strictMode?: boolean;
+  fontPreload?: boolean;
 };
 
 const MODULE_EXPORTS = new Set<string>(MODULE_EXPORT_NAMES);
@@ -488,6 +489,12 @@ export function normalizePageModule(
     ...(raw.loader === undefined ? {} : { loader: raw.loader as PipelineLoader }),
     ...(raw.register === undefined ? {} : { register: raw.register as () => unknown }),
   };
+
+  if (configValue.fontPreload !== undefined) {
+    if (typeof configValue.fontPreload !== "boolean")
+      fail(sourceFile, "config.fontPreload must be a boolean.");
+    normalized.fontPreload = configValue.fontPreload;
+  }
 
   if (configValue.middleware !== undefined)
     normalized.middleware = validateMiddleware(configValue.middleware, sourceFile);

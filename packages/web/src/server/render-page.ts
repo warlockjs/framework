@@ -1,3 +1,4 @@
+import { documentFonts } from "./document-fonts";
 import { createElement, StrictMode, type ComponentType, type ReactNode } from "react";
 import type { PipeableStream, RenderToPipeableStreamOptions } from "react-dom/server";
 import {
@@ -155,6 +156,8 @@ type RouteRegistry = {
 };
 
 export type RenderPageRequestOptions = {
+  /** Application root for resolving declared font sources in development. */
+  appRoot?: string;
   routes: readonly PageRouteEntry[];
   /** Core's already-resolved HTTP route, when this is serving a live request. */
   matched?: Pick<PageRouteMatch, "entry" | "params">;
@@ -787,6 +790,7 @@ async function finishRender(
   loadErrorPage: ErrorPageModuleLoader | undefined,
   dataRequest: boolean,
   streamOptions: {
+    appRoot?: string;
     stylesheetUrls: readonly string[] | undefined;
     hydrationClientModuleUrl: string | undefined;
     hydrationClientModulePreloadUrls?: readonly string[];
@@ -1099,13 +1103,21 @@ async function finishRender(
   const hasExplicitAlternates =
     bundle.metadata?.alternates !== undefined && Object.keys(bundle.metadata.alternates).length > 0;
 
+  const fonts = dataRequest ? undefined : documentFonts(streamOptions.appRoot);
+  const preloadFonts = [triple.app, triple.layout, triple.page].every(
+    (module) => module.fontPreload !== false,
+  );
+
   let documentValue: DocumentContextValue = {
     metadata: bundle.metadata,
     payload: buildHydrationPayload(bundle, documentSlots.locale, sessionExtras(bundle)),
     nonce: documentSlots.nonce,
     lang: documentSlots.locale,
+    fontPreloads: preloadFonts ? fonts?.preloads : undefined,
     stylesheetUrls: documentStylesheetUrls(
-      streamOptions.stylesheetUrls,
+      fonts
+        ? [fonts.stylesheetUrl, ...(streamOptions.stylesheetUrls ?? [])]
+        : streamOptions.stylesheetUrls,
       requestStylesheetSources(request),
       streamOptions.resolveRequestStylesheetUrls,
     ),
@@ -1592,6 +1604,7 @@ export async function renderPageRequest(
         options.loadErrorPage,
         options.dataRequest ?? false,
         {
+          appRoot: options.appRoot,
           stylesheetUrls: options.stylesheetUrls,
           hydrationClientModuleUrl: options.hydrationClientModuleUrl,
           hydrationClientModulePreloadUrls: options.hydrationClientModulePreloadUrls,

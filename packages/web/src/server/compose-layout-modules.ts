@@ -35,6 +35,7 @@ export function composeLayoutModules(
 
   return {
     ...host,
+    ...(modules.some((module) => module.fontPreload === false) ? { fontPreload: false } : {}),
     // Keep every original definition, including undefined slots. Metadata
     // evaluation needs this exact indexing to pair each layout with the value
     // its loader produced; it cannot recover a discarded ancestor later.

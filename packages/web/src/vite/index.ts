@@ -4,6 +4,7 @@
  * a project that doesn't build with Vite.
  */
 import path from "node:path";
+import { webFontsPlugin } from "./fonts-plugin";
 import type { Plugin } from "vite";
 import {
   buildHydrationClient,
@@ -80,6 +81,7 @@ export type WarlockClientBoundaryOptions = Parameters<typeof gateAResolve>[0] & 
 
 export type BuildWarlockHydrationClientOptions = Readonly<{
   appRoot: string;
+  fonts?: readonly import("../fonts/types").WebFont[];
   webRoot: string;
   /** Forwarded to {@link warlockClientBoundary}; must match the server's `build.srcDir`. */
   srcDir?: WarlockClientBoundaryOptions["srcDir"];
@@ -233,6 +235,9 @@ export async function buildWarlockHydrationClient(
         srcDir: options.srcDir,
         sites: options.sites,
       }),
+      ...(options.fonts?.length
+        ? [webFontsPlugin({ appRoot: options.appRoot, fonts: options.fonts })]
+        : []),
       ...(options.plugins ?? []),
     ],
   });

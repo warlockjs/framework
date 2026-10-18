@@ -204,6 +204,7 @@ export function createWebBuildContribution(
   };
   let publicFiles: string[] = [];
   let sites: SitesConfig | undefined;
+  let fonts: readonly import("../fonts/types").WebFont[] | undefined;
 
   return {
     async generate(context: ConnectorBuildContext): Promise<ConnectorBuildGenerateResult | void> {
@@ -235,7 +236,9 @@ export function createWebBuildContribution(
       // Core's production builder only evaluates its generated config-loader
       // inside the server bundle. Build hooks therefore import this one config
       // module directly, then retain only the serialisable site shape.
-      sites = options.sites ?? (await loadWebBuildConfig(context.appRoot)).sites;
+      const webConfig = await loadWebBuildConfig(context.appRoot);
+      sites = options.sites ?? webConfig.sites;
+      fonts = webConfig.fonts;
 
       const result = await generatePagesBarrel({
         appRoot: context.appRoot,
@@ -340,6 +343,7 @@ export function createWebBuildContribution(
           ],
           external: options.external,
           sites,
+          fonts,
           plugins: connectorPlugins,
         });
 

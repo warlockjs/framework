@@ -799,6 +799,7 @@ async function installDiscoveredPageRoutes(
     // Vite appears here only as the dev answer to "how do I load a module";
     // the handler takes that as an input and knows nothing else about it.
     const handlerOptions: PageRouteHandlerOptions = {
+      appRoot: stylesheetRoot,
       path: effectivePath,
       name,
       appFile,
@@ -920,6 +921,7 @@ async function installDiscoveredPageRoutes(
       notFoundPageFile === undefined
         ? undefined
         : createPageRouteHandler({
+            appRoot: stylesheetRoot,
             ...notFoundPageHandlerOptions({
               site: siteScope?.site,
               appFile,

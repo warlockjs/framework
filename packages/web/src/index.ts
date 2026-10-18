@@ -324,3 +324,5 @@ export type {
 // The build→runtime handoff surface (page manifest, build contribution) is
 // NOT re-exported here: this barrel's graph reaches React, and a config file
 // that merely constructs a connector must not. It lives at `@warlock.js/web/connector` — `src/connector/index.ts`.
+
+export type { WebFont, WebFontFace, SystemFont } from "./fonts/types";
