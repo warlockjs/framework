@@ -6,6 +6,10 @@ import type { UpgradeNote } from "./types";
  */
 export const UPGRADE_NOTES: readonly UpgradeNote[] = [
   {
+    version: "5.34.0",
+    text: "ESLint and Prettier support is gone in 5.34.0. Oxlint/Oxfmt is the only toolchain. The oxc-toolchain-removal step migrates remaining legacy configs/dependencies; review its manual findings. New/migrated templates enable correctness: error, which may report additional defects.",
+  },
+  {
     version: "5.30.0",
     text: "Auth login throttle keys are hashed: counters and lockouts written by 5.29 are forgotten on upgrade (locked accounts and IPs unlock).",
   },

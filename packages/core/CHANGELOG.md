@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.34.0
+
+### Removed
+
+- **BREAKING** Remove the ESLint development checker, CLI selection, checker config option and production dependency. `warlock check --lint eslint` now fails with the 5.34.0 removal and Oxlint/Oxfmt migration guidance.
+
+### Added
+
+- `oxc-toolchain-removal` runs on `warlock upgrade --from 5.33 --to 5.34.0`, reusing the preserved 5.33 `oxc-toolchain` migration. It ports literal folder restrictions, native TypeScript rule equivalents, unused-import checks, globals and ignores; unsupported rules/options report their source and file scope without executing config. Native type-aware equivalents enable the optional app engine automatically.
+
+### Fixed
+
+- Detect a real lockfile beside `pnpm-workspace.yaml` before treating the directory as pnpm. npm apps with only `package-lock.json` now receive the correct install hint.
+- Validate Postman draft-04 schemas with an explicit development-only Ajv adapter instead of resolving ESLint's private dependency. Generated source formatting checks use Oxfmt.
+
+### Changed
+
+- **BREAKING** Migrated template configs enable Oxlint `correctness: error`; stale literal `healthCheckers.eslint` options are removed.
+
+### Upgrading
+
+- Run `npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run`, review the findings, apply the migration and run `npm install`. Remove remaining custom ESLint checkers and formatting scripts after porting them. Existing Oxc rules are retained on conflict. Additional correctness diagnostics must be fixed in newly migrated apps. See `upgrade-from-5-29`, section “5.33 to 5.34 toolchain removal”.
+
 ## 5.33.0 - 2026-10-19
 
 ### Added

@@ -160,30 +160,6 @@ describe("createWarlockApp — template + base install", () => {
     logSpy.mockRestore();
   });
 
-  it.each([undefined, "oxc", "eslint"] as const)(
-    "prints the deprecation warning only for lint=%s",
-    async (lint) => {
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-      try {
-        await run(makeFakeApp({ lint }));
-        const notices = logSpy.mock.calls
-          .map((call) => String(call[0]))
-          .filter((line) => line.includes("ESLint mode uses TypeScript"));
-        expect(notices).toHaveLength(lint === "eslint" ? 1 : 0);
-        if (lint === "eslint") {
-          expect(notices[0]).toContain(
-            "6.0.3 because typescript-eslint does not support TypeScript 7 yet",
-          );
-          expect(notices[0]).toContain("removed in 5.34.0");
-          expect(notices[0]).toContain("--lint=oxc");
-          expect(notices[0]).toContain("npx warlock upgrade --from 5.32 --to 5.33.0");
-        }
-      } finally {
-        logSpy.mockRestore();
-      }
-    },
-  );
-
   it("invokes the base install at least once (so the warlock binary exists)", async () => {
     const fake = makeFakeApp();
 

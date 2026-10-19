@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { insertImportInSortedPosition } from "../src/helpers/insert-import";
 
 /**
- * The scaffolded app formats with `@ianvs/prettier-plugin-sort-imports`, which
+ * The scaffolded app formats with Oxfmt's built-in import sorter, which
  * orders imports alphabetically by module specifier. Injecting a feature's
  * import at the TOP of a config that already imports `@warlock.js/auth` and
- * `@warlock.js/core` therefore produced a `prettier/prettier` error on the
+ * `@warlock.js/core` therefore produced a format check failure on the
  * developer's first `warlock dev` — in a file they did not write, about code
  * they did not add.
  *

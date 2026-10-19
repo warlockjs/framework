@@ -41,9 +41,15 @@ export async function detectPackageManager(startDir: string = rootPath()): Promi
     if (declared) return declared;
   }
 
-  // 2. a pnpm workspace marker beats any (possibly stray) lockfile
+  // 2. a workspace governs descendants, but its own real lockfile wins over a marker
   for (const dir of dirs) {
-    if (await fileExistsAsync(path.join(dir, "pnpm-workspace.yaml"))) return "pnpm";
+    if (await fileExistsAsync(path.join(dir, "pnpm-workspace.yaml"))) {
+      if (await fileExistsAsync(path.join(dir, "pnpm-lock.yaml"))) return "pnpm";
+      for (const { file, packageManager } of LOCKFILES) {
+        if (await fileExistsAsync(path.join(dir, file))) return packageManager;
+      }
+      return "pnpm";
+    }
   }
 
   // 3. lockfiles, nearest level first

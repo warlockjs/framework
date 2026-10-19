@@ -51,9 +51,8 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
     defaultValue: "inferred from the invoking agent (npm_config_user_agent) or the system",
   },
   {
-    usage: "--lint=<oxc|eslint>",
-    description:
-      "Linter and formatter: Oxlint/Oxfmt or ESLint/Prettier (deprecated; removed in 5.34.0)",
+    usage: "--lint=<oxc>",
+    description: "Linter and formatter: Oxlint/Oxfmt",
     defaultValue: "oxc",
   },
   {

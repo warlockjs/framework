@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import", "react"],
+  "env": { "node": true, "es2021": true },
+  "categories": { "correctness": "error" },
+  "rules": {
+    "typescript/no-explicit-any": "off",
+    "no-unused-vars": [
+      "warn",
+      {
+        "vars": "all",
+        "varsIgnorePattern": "^_",
+        "args": "after-used",
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "typescript/explicit-member-accessibility": ["error", { "accessibility": "explicit" }],
+    "typescript/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "disallowTypeAnnotations": false }
+    ]
+  },
+  "ignorePatterns": ["node_modules/", "dist/"]
+}

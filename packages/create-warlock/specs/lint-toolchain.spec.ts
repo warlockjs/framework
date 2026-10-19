@@ -1,8 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { resolveNonInteractiveOptions } from "../src/commands/create-new-app";
 import type { Application, LintToolchain } from "../src/commands/create-new-app/types";
 import { buildHelpText } from "../src/flags/definitions";
@@ -10,31 +11,18 @@ import { seedFromFlags } from "../src/flags/seed-from-flags";
 import { App } from "../src/helpers/app";
 import { setPackageManager } from "../src/helpers/package-manager";
 import { parseFlags } from "../src/index";
-import { askLintToolchain } from "../src/prompts/ask-lint-toolchain";
-
-const { select } = vi.hoisted(() => ({ select: vi.fn() }));
-vi.mock("@clack/prompts", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  select,
-}));
-
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = path.resolve(packageRoot, "../..");
-const oxlint = path.join(repoRoot, "node_modules/oxlint/bin/oxlint");
-const oxfmt = path.join(repoRoot, "node_modules/oxfmt/bin/oxfmt");
-const hasOxc = existsSync(oxlint) && existsSync(oxfmt);
+const oxlint = path.join(packageRoot, "node_modules/oxlint/bin/oxlint");
+const oxfmt = path.join(packageRoot, "node_modules/oxfmt/bin/oxfmt");
 const roots: string[] = [];
 
-beforeEach(() => {
-  select.mockReset();
-});
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
 function scaffold(lint?: LintToolchain, web = false) {
   setPackageManager("yarn");
-  const root = mkdtempSync(path.join(packageRoot, ".lint-scaffold-"));
+  const root = mkdtempSync(path.join(tmpdir(), "warlock-lint-scaffold-"));
   roots.push(root);
   const appPath = path.join(root, "app");
   const application: Application = {
@@ -67,6 +55,7 @@ function run(tool: string, appPath: string, args: string[]) {
     encoding: "utf8",
   });
   return {
+    pid: result.pid,
     status: result.status,
     stdout: result.stdout,
     stderr: result.stderr,
@@ -77,50 +66,30 @@ function assertPass(result: ReturnType<typeof run>) {
   expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
 }
 
-describe("lint toolchain flags and prompt", () => {
-  it("parses both flag forms and defaults to oxc", () => {
-    expect(parseFlags(["app", "--lint=oxc"]).lint).toBe("oxc");
-    expect(parseFlags(["app", "--lint", "eslint"]).lint).toBe("eslint");
+describe("lint toolchain flags", () => {
+  it("defaults to Oxc and documents its single supported value", () => {
     expect(resolveNonInteractiveOptions({}).lint).toBe("oxc");
     expect(resolveNonInteractiveOptions({ lint: "oxc" }).lint).toBe("oxc");
-    expect(resolveNonInteractiveOptions({ lint: "eslint" }).lint).toBe("eslint");
     expect(seedFromFlags({}).lint).toBe("oxc");
-    expect(seedFromFlags({ lint: "eslint" }).lint).toBe("eslint");
-    expect(seedFromFlags({ lint: "oxc" }).lint).toBe("oxc");
-    expect(buildHelpText()).toContain("--lint=<oxc|eslint>");
-    expect(buildHelpText()).toContain("deprecated; removed in 5.34.0");
+    expect(buildHelpText()).toContain("--lint=<oxc>");
   });
-
-  it.each(["", "other"])("rejects an invalid toolchain %j before writing files", (lint) => {
-    expect(() => resolveNonInteractiveOptions({ lint })).toThrow(/--lint=eslint or --lint=oxc/);
+  it("rejects ESLint with removal and default guidance", () => {
+    expect(() => resolveNonInteractiveOptions(parseFlags(["app", "--lint", "eslint"]))).toThrow(
+      /removed in 5\.34\.0.*Oxlint\/Oxfmt.*default/,
+    );
   });
-
-  it("rejects a valueless --lint rather than accepting the default", () => {
+  it.each(["", "other"])("rejects invalid toolchain %j", (lint) => {
+    expect(() => resolveNonInteractiveOptions({ lint })).toThrow(/Use --lint=oxc/);
+  });
+  it("rejects a valueless flag", () => {
     expect(() => resolveNonInteractiveOptions(parseFlags(["app", "--lint"]))).toThrow(
       /Unknown lint toolchain/,
     );
   });
-
-  it("offers both toolchains and preselects Oxc by default", async () => {
-    select.mockResolvedValueOnce("oxc");
-    expect(await askLintToolchain()).toBe("oxc");
-    expect(select.mock.calls[0][0]).toMatchObject({
-      initialValue: "oxc",
-      options: [
-        { value: "eslint", label: "ESLint + Prettier (deprecated)" },
-        { value: "oxc", label: "Oxlint + Oxfmt" },
-      ],
-    });
-  });
-  it("preselects explicit ESLint in the wizard", async () => {
-    select.mockResolvedValueOnce("eslint");
-    expect(await askLintToolchain("eslint")).toBe("eslint");
-    expect(select.mock.calls[0][0].initialValue).toBe("eslint");
-  });
 });
 
 describe("generated toolchains", () => {
-  it.each(["oxc", "eslint"] as const)("uses supported tsconfig options for %s", (lint) => {
+  it.each(["oxc"] as const)("uses supported tsconfig options for %s", (lint) => {
     const { appPath } = scaffold(lint);
     const config = readFileSync(path.join(appPath, "tsconfig.json"), "utf8");
     expect(config).not.toContain('"baseUrl"');
@@ -128,50 +97,6 @@ describe("generated toolchains", () => {
     expect(config).toContain('"moduleResolution": "bundler"');
     expect(config).toContain('"types": ["node"]');
     expect(config).toContain('"app/*": ["./src/app/*"]');
-  });
-
-  it("retains explicit ESLint/Prettier on TypeScript 6.0.3 and provides non-mutating scripts", () => {
-    const { appPath } = scaffold("eslint");
-    const pkg = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
-    expect(pkg.devDependencies.typescript).toBe("6.0.3");
-    expect(pkg.devDependencies.eslint).toBeTruthy();
-    expect(pkg.devDependencies.prettier).toBeTruthy();
-    expect(pkg.devDependencies["@ianvs/prettier-plugin-sort-imports"]).toBe("^4.7.1");
-    // The framework's conventions are checked by `warlock check`, not by a lint plugin.
-    expect(
-      Object.keys(pkg.devDependencies).filter((name) => name.startsWith("@warlock.js/")),
-    ).toEqual([]);
-    expect(pkg.devDependencies.oxlint).toBeUndefined();
-    expect(pkg.scripts.lint).toBe("eslint --fix ./src --max-warnings=0");
-    expect(pkg.scripts["lint:check"]).toContain("eslint ./src");
-    expect(pkg.scripts["format:check"]).toContain("prettier --check");
-    expect(pkg.scripts["format:check"]).toContain("removed in 5.34.0");
-    expect(readFileSync(path.join(appPath, "warlock.config.ts"), "utf8")).toContain(
-      "healthCheckers: { eslint: true, oxlint: false }",
-    );
-    expect(existsSync(path.join(appPath, "eslint.config.js"))).toBe(true);
-    expect(existsSync(path.join(appPath, ".oxlintrc.json"))).toBe(false);
-    expect(readFileSync(path.join(appPath, ".vscode/settings.json"), "utf8")).toBe(
-      readFileSync(path.join(packageRoot, "templates/warlock/.vscode/settings.json"), "utf8"),
-    );
-  });
-
-  it.each([false, true])("emits ESLint/Prettier-clean source for web=%s", (web) => {
-    const { appPath } = scaffold("eslint", web);
-    assertPass(
-      run(path.join(packageRoot, "node_modules/eslint/bin/eslint.js"), appPath, [
-        "./src",
-        "--max-warnings=0",
-      ]),
-    );
-    assertPass(
-      run(path.join(packageRoot, "node_modules/prettier/bin/prettier.cjs"), appPath, [
-        "--config",
-        ".prettierrc.json",
-        "--check",
-        "./src/**/*.{js,jsx,ts,tsx,css,md,json}",
-      ]),
-    );
   });
 
   it.each([false, true])(
@@ -205,7 +130,7 @@ describe("generated toolchains", () => {
         expect(existsSync(path.join(appPath, name))).toBe(false);
       const config = readFileSync(path.join(appPath, "warlock.config.ts"), "utf8");
       expect(config.match(/healthCheckers:/g)).toHaveLength(1);
-      expect(config).toContain("healthCheckers: { eslint: false, oxlint: true }");
+      expect(config).toContain("healthCheckers: { oxlint: true }");
       const settings = JSON.parse(
         readFileSync(path.join(appPath, ".vscode/settings.json"), "utf8"),
       );
@@ -244,19 +169,16 @@ describe("generated toolchains", () => {
     },
   );
 
-  // Standalone scaffolder checkouts do not install the monorepo's root tools.
-  it.skipIf(!hasOxc).each([false, true])(
-    "emits Oxc-clean source for web=%s with the pinned tools",
-    (web) => {
-      const { appPath } = scaffold("oxc", web);
-      assertPass(run(oxlint, appPath, ["--config", ".oxlintrc.json", "./src", "--max-warnings=0"]));
-      assertPass(
-        run(oxfmt, appPath, ["--config", ".oxfmtrc.json", "--check", "./src", "warlock.config.ts"]),
-      );
-    },
-  );
+  // Both standalone and workspace installs declare the pinned tools locally.
+  it.each([false, true])("emits Oxc-clean source for web=%s with the pinned tools", (web) => {
+    const { appPath } = scaffold("oxc", web);
+    assertPass(run(oxlint, appPath, ["--config", ".oxlintrc.json", "./src", "--max-warnings=0"]));
+    assertPass(
+      run(oxfmt, appPath, ["--config", ".oxfmtrc.json", "--check", "./src", "warlock.config.ts"]),
+    );
+  });
 
-  it.skipIf(!hasOxc)("honors the emitted Oxfmt ignore file", () => {
+  it("honors the emitted Oxfmt ignore file", () => {
     const { appPath } = scaffold("oxc");
     writeFileSync(
       path.join(appPath, "src/ignored.ts"),
@@ -276,7 +198,7 @@ describe("generated toolchains", () => {
     expect(run(oxfmt, appPath, args).status).toBe(1);
   });
 
-  it.skipIf(!hasOxc)("detects lint and format regressions and fixes formatting", () => {
+  it("detects lint and format regressions and fixes formatting", () => {
     const { appPath } = scaffold("oxc");
     const fixture = path.join(appPath, "src", "lint-proof.ts");
     writeFileSync(
@@ -300,7 +222,7 @@ describe("generated toolchains", () => {
     expect(readFileSync(fixture, "utf8")).toContain('from "node:fs";');
   });
 
-  it.skipIf(!hasOxc)("sorts imports into one block on format", () => {
+  it("sorts imports into one block on format", () => {
     const { appPath } = scaffold("oxc");
     const fixture = path.join(appPath, "src", "sort-proof.ts");
     writeFileSync(

@@ -41,13 +41,22 @@ test("package discovery ignores scratch directories and files", (t) => {
 test("workspace package defaults do not invoke deprecated lint/format tooling", () => {
   const manifests = [path.join(root, "package.json"), ...packageManifests(root)];
   for (const file of manifests) {
-    const { scripts = {} } = JSON.parse(readFileSync(file, "utf8"));
+    const {
+      scripts = {},
+      dependencies = {},
+      devDependencies = {},
+      peerDependencies = {},
+    } = JSON.parse(readFileSync(file, "utf8"));
+    assert.deepEqual(
+      Object.keys({ ...dependencies, ...devDependencies, ...peerDependencies }).filter((name) =>
+        /eslint|prettier/.test(name),
+      ),
+      [],
+      file,
+    );
     for (const [name, command] of Object.entries(scripts)) {
       if (!/^(lint|fix|format)(:|$)/.test(name)) continue;
-      if (name.startsWith("format:prettier")) {
-        assert.match(command, /Deprecated:.*5\.34\.0/);
-        continue;
-      }
+      assert.doesNotMatch(name, /eslint|prettier/, `${file} scripts.${name}`);
       assert.doesNotMatch(command, /\b(?:eslint|prettier)\b/, `${file} scripts.${name}`);
     }
   }

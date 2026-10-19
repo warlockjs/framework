@@ -35,7 +35,7 @@ type FileHealthMessage = {
    */
   length?: number;
   /**
-   * Rule ID (for ESLint)
+   * Linter rule ID
    */
   ruleId?: string;
 };

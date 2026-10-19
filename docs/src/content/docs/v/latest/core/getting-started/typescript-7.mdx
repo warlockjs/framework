@@ -53,23 +53,25 @@ JavaScript compiler API. Core isolates its native unstable API in
 `warlock upgrade` continues to use ts-morph's own bundled parser for source
 transformations; it does not use that parser to typecheck apps.
 
-New scaffolds default to Oxlint + Oxfmt (`--lint=oxc`). Explicit `--lint=eslint`
-keeps ESLint + Prettier and pins the app's compiler to **TypeScript 6.0.3**,
-the newest version typescript-eslint supports. Its parser needs the JavaScript
-compiler API removed in TS7 and declares a TypeScript peer range of
-`>=4.8.4 <6.1.0`
-([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
-The tsconfig cleanups above also work with TypeScript 6; both modes share them.
-ESLint selection prints a deprecation warning. ESLint + Prettier support is
-deprecated in 5.33.0 and removed in **5.34.0**. Migrate with
-`npx warlock upgrade --from 5.32 --to 5.33.0`; the `oxc-toolchain` codemod
-replaces legacy dependencies and pins the app to TypeScript 7.0.2. Preview with
-`--dry-run`, review customized configs, then install and run format/lint/check.
+Oxlint **1.88.0** and Oxfmt **0.73.0** are the only supported tools. New apps
+pin TypeScript **7.0.2** and include `.oxlintrc.json`, `.oxfmtrc.json`,
+`.oxfmtignore`, and VS Code settings for `oxc.oxc-vscode`.
+`--lint=oxc` is optional; `--lint=eslint` fails with the 5.34.0 removal message.
+The wizard has no toolchain choice.
 
 ```bash
-# Default: Oxlint + Oxfmt and TypeScript 7.0.2
 npm create warlock@latest my-app -- --yes
-
-# Explicit opt-in: ESLint + Prettier and TypeScript 6.0.3
-npm create warlock@latest my-eslint-app -- --yes --lint=eslint
+cd my-app
+npm run lint:check
+npm run format:check
 ```
+
+Oxlint enables `"categories": { "correctness": "error" }`, unused-variable/import
+checks, explicit class accessibility and type-import style. Oxfmt sorts imports
+with `"sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] }`.
+It keeps built-ins, packages, internal aliases and relative imports in one block.
+Formatting retains unused imports; lint reports them. Local package scripts use
+`oxlint`, `oxfmt` and `tsc` directly. The non-mutating scripts are `lint:check`
+and `format:check`. Background checks run TypeScript and configured Oxlint.
+
+For existing ESLint apps, follow [the migration guide](../../cli/toolchain).

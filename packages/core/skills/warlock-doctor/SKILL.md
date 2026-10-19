@@ -174,7 +174,6 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 `warlock doctor` checks application wiring and HTTP health probes. Use
 `npx warlock check` for source lint diagnostics and `npm run format:check` for
-formatting. In 5.33, Oxlint/Oxfmt are the defaults; ESLint requires
-`warlock check --lint eslint` or `devServer.healthCheckers.eslint: true` for
-background checks. ESLint/Prettier are deprecated and removed in 5.34.0.
+formatting. Oxlint/Oxfmt are the only supported tools in 5.34.0. Use the
+`oxc-toolchain-removal` upgrade step to migrate remaining legacy configs.
 Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`).

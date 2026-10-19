@@ -232,9 +232,6 @@ material are excluded; regenerate their source projections instead. Scaffolder
 source uses this root formatter even in its standalone test job. Generated app
 templates retain their own toolchain checks.
 
-`format:prettier` and `format:prettier:check` preserve the previous commands during
-migration. Repository import sorting stays disabled. Generated ESLint/Prettier
-apps use `@ianvs/prettier-plugin-sort-imports`, which sorts through Babel without
-depending on the TypeScript compiler API. Neither formatter removes unused
-imports; ESLint or Oxlint reports them. The generated-template Prettier gate
-checks the scaffold's separate configuration.
+Oxlint/Oxfmt are the only supported lint and format tools in 5.34.0.
+Repository import sorting stays disabled; generated apps use Oxfmt's built-in
+import sorting. Migrate legacy apps with `npx warlock upgrade --from 5.33 --to 5.34.0`.

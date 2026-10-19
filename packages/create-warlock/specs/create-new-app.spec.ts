@@ -20,7 +20,6 @@ const text = vi.fn();
 const select = vi.fn();
 const multiselect = vi.fn();
 const confirm = vi.fn();
-const askLintToolchain = vi.fn(async (value: string) => value);
 const cancel = vi.fn();
 
 vi.mock("@clack/prompts", () => ({
@@ -40,10 +39,6 @@ vi.mock("@clack/prompts", () => ({
 // command-level harness's feature answer in the existing prompt queue.
 vi.mock("../src/prompts/ask-features", () => ({
   askFeatures: (initialValues: string[]) => multiselect({ initialValues }),
-}));
-
-vi.mock("../src/prompts/ask-lint-toolchain", () => ({
-  askLintToolchain: (value: string) => askLintToolchain(value),
 }));
 
 // --- @warlock.js/fs (version read) ------------------------------------------
@@ -146,7 +141,6 @@ beforeEach(() => {
   // somewhere unrelated. Drain the prompt queues explicitly.
   [text, select, multiselect, confirm].forEach((mock) => mock.mockReset());
   // Re-seed the defaults the mocks lost on clear.
-  askLintToolchain.mockReset().mockImplementation(async (value: string) => value);
   getSystemPackageManagers.mockReturnValue(["npm", "yarn", "pnpm"]);
   getPreferredPackageManager.mockReturnValue("yarn");
   getPackageManager.mockReturnValue("yarn");
@@ -1131,19 +1125,19 @@ describe("wizard lint toolchain", () => {
   it("seeds the wizard with Oxc when --lint is omitted", async () => {
     primeHappyPath();
     await createNewApp({ interactive: true });
-    expect(askLintToolchain).toHaveBeenCalledWith("oxc");
     expect(capturedApp().options.lint).toBe("oxc");
   });
 
-  it("carries explicit ESLint into headless scaffolding", async () => {
-    await createNewApp({ name: "eslint-app", yes: true, lint: "eslint" });
-    expect(capturedApp().options.lint).toBe("eslint");
+  it.each([true, false])("rejects removed ESLint before scaffolding (headless=%s)", async (yes) => {
+    await expect(createNewApp({ name: "example-app", yes, lint: "eslint" })).rejects.toThrow(
+      /removed in 5\.34\.0.*Oxlint\/Oxfmt/,
+    );
+    expect(createWarlockApp).not.toHaveBeenCalled();
   });
 
-  it("preselects --lint and carries the chosen toolchain into scaffolding", async () => {
+  it("uses Oxc in the full wizard without a toolchain prompt", async () => {
     primeHappyPath();
     await createNewApp({ interactive: true, lint: "oxc" });
-    expect(askLintToolchain).toHaveBeenCalledWith("oxc");
     expect(capturedApp().options.lint).toBe("oxc");
   });
 });

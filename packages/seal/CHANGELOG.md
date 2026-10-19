@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.34.0
+
+### Removed
+
+- Remove the remaining ESLint, Prettier and typescript-eslint development dependencies; package linting and formatting use Oxlint/Oxfmt.
+
 ## 5.33.0 - 2026-10-19
 
 ### Changed

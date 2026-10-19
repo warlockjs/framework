@@ -50,7 +50,7 @@ The contrast with `src/config/*`:
 | You want to...                                 | File                                                    |
 | ---------------------------------------------- | ------------------------------------------------------- |
 | Change the HTTP port your app listens on       | `src/config/http.ts` → `port: ...`                      |
-| Add a new CLI command to `pnpm warlock`        | `warlock.config.ts` → `cli.commands`                    |
+| Add a new CLI command to `npx warlock`         | `warlock.config.ts` → `cli.commands`                    |
 | Configure your cache driver                    | `src/config/cache.ts`                                   |
 | Skip dev-server health checks                  | `warlock.config.ts` → `devServer.healthCheckers: false` |
 | Pull migrations from `@warlock.js/auth`        | `warlock.config.ts` → `database.migrations`             |
@@ -150,7 +150,7 @@ cli: {
 }
 ```
 
-Each entry is a `CLICommand` produced by a framework helper or package. The reference codebase pulls two from `@warlock.js/auth` — they show up as `pnpm warlock auth.generateJWTSecret` and `pnpm warlock auth.cleanup` after this file loads.
+Each entry is a `CLICommand` produced by a framework helper or package. The reference codebase pulls two from `@warlock.js/auth` — they show up as `npx warlock auth.generateJWTSecret` and `npx warlock auth.cleanup` after this file loads.
 
 Use this for:
 
@@ -185,7 +185,7 @@ devServer: {
 
 You'll usually leave these alone. The defaults are tuned for typical TypeScript projects.
 
-`healthCheckers: false` disables every background file check; `warlock dev --skip-health` does the same for one run. An array still replaces the default list with custom checkers. For individual built-ins, use `healthCheckers: { typescript: true, eslint: false, oxlint: true }`. TypeScript runs by default, and ESLint runs when its app-root configuration exists, while Oxlint additionally needs its package installed in the app. Setting a linter to `true` still requires that configuration; both run when available. See [background file health checks](../cli/file-health-checks).
+`healthCheckers: false` disables every background file check; `warlock dev --skip-health` does the same for one run. An array still replaces the default list with custom checkers. For individual built-ins, use `healthCheckers: { typescript: true, oxlint: true }`. TypeScript runs by default; Oxlint needs its app-installed package and app-root configuration. See [background file health checks](../cli/file-health-checks).
 
 `generateTypings: false` skips the typings regeneration at dev-server boot. Speeds up cold starts in big projects; turn off only if you don't rely on the autocomplete it produces.
 
@@ -223,7 +223,7 @@ database: {
 }
 ```
 
-After this, `pnpm warlock migrate` runs both the project's discovered migrations and these package migrations in order.
+After this, `npx warlock migrate` runs both the project's discovered migrations and these package migrations in order.
 
 ### `testing` — test discovery (optional)
 
@@ -311,7 +311,7 @@ A package that is genuinely not installed is not a fallback case: the native imp
 2. The framework picks up the new values.
 3. Some changes apply immediately (dev-server flags like `transpileCacheDebug`).
 4. Some changes require a hard restart of the dev server (server port, build flags).
-5. CLI command changes take effect on the next `pnpm warlock <command>` invocation; running commands aren't restarted.
+5. CLI command changes take effect on the next `npx warlock <command>` invocation; running commands aren't restarted.
 
 In practice, the safe pattern: when you change `warlock.config.ts`, stop the dev server (Ctrl+C) and restart. The reload story is best-effort and not every field is HMR-friendly.
 
@@ -363,7 +363,7 @@ export default defineConfig({
 });
 ```
 
-Each command factory returns a `CLICommand`. The framework registers them under `pnpm warlock <namespace>.<name>`.
+Each command factory returns a `CLICommand`. The framework registers them under `npx warlock <namespace>.<name>`.
 
 ### Tightening file watching
 

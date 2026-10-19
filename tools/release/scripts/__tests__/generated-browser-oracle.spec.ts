@@ -254,7 +254,7 @@ describe("findIncrementMutationCandidate — real generated-app source", () => {
 
     // Assert the PROPERTIES the gate requires of a mutation, not a literal
     // token. This spec previously pinned `setCount(c => c + 1)` and went red
-    // the moment the stub was formatted under the scaffold's own prettier
+    // the moment the stub was formatted under the scaffold's own Oxfmt
     // config (`arrowParens: "always"` makes it `setCount((c) => c + 1)`) —
     // even though the adapter was correct. A literal here pins the formatter,
     // not the behaviour.

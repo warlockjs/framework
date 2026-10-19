@@ -1,6 +1,6 @@
 ---
 name: module-boundaries
-description: 'Architecture rules for how modules under `src/app/**` relate — each module owns one domain noun (`orders`, `users`, `carts`, `payments`); standard layout per module (`controllers/`, `services/`, `models/<noun>/`, `repositories/`, `schema/`, `resources/`, `types/`, `utils/`, `events/`, `errors/`, `routes.ts`); public surface exposed through sub-folder barrels (`services/index.ts`, `utils/index.ts`, `types/index.ts`) — NEVER a module-root `index.ts` re-exporting everything; no module reaches into another module''s internal files; zero circular dependencies between modules; inter-module communication is explicit — direct service call OR `@mongez/events` bus, never shared mutable globals; cross-cutting helpers live in `src/app/shared/`. Triggers: adding a new module under `src/app/**`; importing from another module; deciding where new code belongs; circular import error; ESLint `import/no-restricted-paths` violation; user asks "can module A use module B''s internals", "how should modules talk", "where should this code live", "I''m getting a circular dependency", "what folders does a module need", "what goes in shared". Skip: intra-module file organization (load `skills/code-standards/SKILL.md` § 4); barrel mechanics within a module (load `skills/code-standards/SKILL.md` § 2.2); deploying / packaging / monorepo questions; framework primitive details — load relevant `@warlock.js/*` skill.'
+description: 'Architecture rules for how modules under `src/app/**` relate — each module owns one domain noun (`orders`, `users`, `carts`, `payments`); standard layout per module (`controllers/`, `services/`, `models/<noun>/`, `repositories/`, `schema/`, `resources/`, `types/`, `utils/`, `events/`, `errors/`, `routes.ts`); public surface exposed through sub-folder barrels (`services/index.ts`, `utils/index.ts`, `types/index.ts`) — NEVER a module-root `index.ts` re-exporting everything; no module reaches into another module''s internal files; zero circular dependencies between modules; inter-module communication is explicit — direct service call OR `@mongez/events` bus, never shared mutable globals; cross-cutting helpers live in `src/app/shared/`. Triggers: adding a new module under `src/app/**`; importing from another module; deciding where new code belongs; circular import error; Oxlint `import/no-restricted-paths` violation; user asks "can module A use module B''s internals", "how should modules talk", "where should this code live", "I''m getting a circular dependency", "what folders does a module need", "what goes in shared". Skip: intra-module file organization (load `skills/code-standards/SKILL.md` § 4); barrel mechanics within a module (load `skills/code-standards/SKILL.md` § 2.2); deploying / packaging / monorepo questions; framework primitive details — load relevant `@warlock.js/*` skill.'
 ---
 
 # Module boundaries
@@ -116,26 +116,35 @@ See `skills/code-standards/SKILL.md` § 2.2 for the reasoning.
 - `src/app/<module>/schema/*` — schemas belong to the endpoint that uses them
 - `src/app/<module>/routes.ts` — registers routes for the framework, nobody imports it
 
-### 3.3 Enforce with ESLint
+### 3.3 Enforce with Oxlint
 
-Add `eslint-plugin-import/no-restricted-paths` rules:
+Add scoped native rules to `.oxlintrc.json`:
 
-```js
-// eslint.config.js — proposed addition
+```json
 {
-  rules: {
-    "import/no-restricted-paths": ["error", {
-      zones: [
-        { target: "src/app/*/controllers", from: "src/app/*/controllers", except: ["./"] },
-        { target: "src/app", from: "src/app/*/repositories", except: ["./*/services"] },
-        { target: "src/app", from: "src/app/*/schema", except: ["./*/controllers"] },
-      ],
-    }],
-  },
+  "overrides": [
+    {
+      "files": ["src/app/orders/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["app/*/controllers/**", "app/*/repositories/**"],
+                "message": "Import public services instead"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }
 ```
 
-The exact rule shape depends on the eslint config — but the principle is: cross-module imports go through services / utils / types / resources / models / errors, never through the private folders.
+Cross-module imports go through public services, utils, types, resources, models
+and errors. Adapt each override to the module's public surface.
 
 ---
 
@@ -192,7 +201,7 @@ Or, if the shared concept is purely cross-cutting (not a domain), it goes to `ap
 
 ### 5.4 Detect in CI
 
-`eslint-plugin-import/no-cycle` catches cycles at lint time. Enable it.
+`import/no-cycle` catches cycles at lint time. Enable it.
 
 ---
 
@@ -244,13 +253,13 @@ Top-level mutable exports across modules are the worst kind of coupling — invi
 
 ## 7. Where shared code lives
 
-| If the code is...                       | Put it in                                     |
-| --------------------------------------- | --------------------------------------------- |
-| Used by 2+ modules, stable, cross-domain | `src/app/shared/`                            |
-| Used by 2+ modules, domain-specific      | Extract a new domain module                   |
-| Used by exactly 1 module                 | Stays inside that module's `utils/`           |
-| Third-party integration glue (SDK wrappers) | `src/app/shared/` (or a dedicated module)  |
-| Build-time config                        | `src/config/` (one file per concern)          |
+| If the code is...                           | Put it in                                 |
+| ------------------------------------------- | ----------------------------------------- |
+| Used by 2+ modules, stable, cross-domain    | `src/app/shared/`                         |
+| Used by 2+ modules, domain-specific         | Extract a new domain module               |
+| Used by exactly 1 module                    | Stays inside that module's `utils/`       |
+| Third-party integration glue (SDK wrappers) | `src/app/shared/` (or a dedicated module) |
+| Build-time config                           | `src/config/` (one file per concern)      |
 
 ### 7.1 Promotion to `shared/` is a deliberate choice
 
@@ -285,7 +294,7 @@ Before merging a change that adds, restructures, or imports across modules:
 - [ ] No module-root `index.ts` created
 - [ ] Sub-folder barrels exist for `services/`, `utils/`, `types/` where applicable
 - [ ] No imports from another module's `controllers/`, `repositories/`, `schema/`
-- [ ] No circular imports between modules (ESLint `no-cycle` clean)
+- [ ] No circular imports between modules (Oxlint `no-cycle` clean)
 - [ ] Cross-module communication uses direct service call or `@mongez/events` — never shared mutable globals
 - [ ] Shared code that's used by 2+ modules lives in `src/app/shared/`, not duplicated
 - [ ] Module has a `README.md` describing purpose, public surface, and ownership

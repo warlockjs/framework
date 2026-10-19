@@ -36,8 +36,8 @@ export type TypecheckRunner = (
 export type CheckOptions = {
   /** Project root. Default: `process.cwd()`. */
   cwd?: string;
-  /** Oxlint by default; ESLint is deprecated and requires explicit selection. */
-  lint?: "oxlint" | "eslint";
+  /** Oxlint is the only supported linter. */
+  lint?: "oxlint";
   /** Limit every step to the files changed against `base` (default HEAD) plus untracked files. */
   changed?: boolean;
   /** Compare with `git merge-base <base> HEAD` instead of HEAD. Implies `changed`. */
@@ -84,6 +84,11 @@ type StepOutcome = { status?: CheckStepStatus; detail: string | null; problems: 
  * list, and every step after `environment` is `blocked`.
  */
 export async function runCheck(options: CheckOptions = {}): Promise<CheckReport> {
+  const selection: unknown = options.lint;
+  if (selection !== undefined && selection !== "oxlint")
+    throw new Error(
+      "ESLint support was removed in 5.34.0. Oxlint/Oxfmt is the default; run npx warlock upgrade --from 5.33 --to 5.34.0.",
+    );
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const changed = options.changed === true || options.base !== undefined;
   const skip = new Set(options.skip ?? []);
@@ -183,12 +188,12 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
       return { status: "skipped", detail: "no files to lint", problems: [] };
     }
 
-    const { linters, problems: found } = await runLint(cwd, lintFiles, options.lint);
+    const { linters, problems: found } = await runLint(cwd, lintFiles);
 
     if (linters.length === 0) {
       return {
         status: "skipped",
-        detail: "no Oxlint config (ESLint requires --lint eslint)",
+        detail: "no Oxlint config",
         problems: [],
       };
     }

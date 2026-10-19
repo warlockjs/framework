@@ -71,7 +71,5 @@ export interface FileHealthCheckerContract {
 /** Select background checks; TypeScript and configured Oxlint run by default. */
 export type BuiltInHealthCheckerOptions = {
   typescript?: boolean;
-  /** @deprecated Removed in 5.34.0. Explicit opt-in only; default false. */
-  eslint?: boolean;
   oxlint?: boolean;
 };

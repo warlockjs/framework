@@ -19,14 +19,14 @@
     "gen.mig": "warlock generate.migration",
     "gen.r": "warlock generate.repository",
     "gen.rs": "warlock generate.resource",
-    "lint": "eslint --fix ./src --max-warnings=0",
-    "format": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; migrate with npx warlock upgrade --from 5.32 --to 5.33.0.')\" && prettier --write \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json",
+    "lint": "oxlint --fix ./src --max-warnings=0",
+    "format": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --write ./src",
     "tsc": "warlock generate.typings && tsc --noEmit",
     "postinstall": "agent-kit init && agent-kit sync || echo \"warning: AI agent skills were NOT synced, so coding agents will not see the @warlock.js skills. Run the skills:sync script.\"",
     "skills:sync": "agent-kit sync",
     "skills:watch": "agent-kit watch",
-    "lint:check": "eslint ./src --max-warnings=0",
-    "format:check": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; migrate with npx warlock upgrade --from 5.32 --to 5.33.0.')\" && prettier --check \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json"
+    "lint:check": "oxlint ./src --max-warnings=0",
+    "format:check": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --check ./src"
   },
   "dependencies": {
     "@mongez/reinforcements": "^4.0.2",
@@ -43,18 +43,11 @@
     "dayjs": "^1.11.19"
   },
   "devDependencies": {
-    "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
     "@mongez/agent-kit": "^1.3.1",
     "@types/node": "^25.0.3",
-    "@types/prettier": "^3.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.50.0",
-    "@typescript-eslint/parser": "^8.50.0",
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
-    "eslint-plugin-unused-imports": "^4.3.0",
-    "prettier": "^3.7.4",
     "typescript": "7.0.2",
-    "vitest": "4.0.5"
+    "vitest": "4.0.5",
+    "oxlint": "1.88.0",
+    "oxfmt": "0.73.0"
   }
 }

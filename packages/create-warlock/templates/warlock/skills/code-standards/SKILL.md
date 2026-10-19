@@ -1,6 +1,6 @@
 ---
 name: code-standards
-description: 'Project-level TypeScript code standards for apps built on Warlock.js — `interface` vs `type`, access modifiers, no `any`, no inline-duplicated unions, file-naming suffixes (`.contract.ts` / `.type.ts` / `.service.ts` / `.model.ts` / `.resource.ts` / `.spec.ts`), single-responsibility files, FP-factory + internal-class pattern, brace-every-control-block readability with blank lines between consecutive blocks, JSDoc on public surface and non-obvious logic, error classes extending framework errors, async/await + `Promise.all`, `undefined` over `null`, Vitest co-located, ESLint/Prettier or Oxlint/Oxfmt. Triggers: writing/editing any `.ts` / `.tsx` file in this project; user asks "what are the code standards / style rules / conventions"; spawning a sub-agent that will write code; reviewing a diff for style issues; deciding `interface` vs `type`, when to use a class, where helpers live, how to name a file, or whether something needs JSDoc. Skip: pure-Markdown / JSON / YAML edits with no code change; runtime / behavior questions about a specific framework primitive — load the relevant `@warlock.js/<pkg>` skill instead; package-publishing or CI workflow questions.'
+description: 'Project-level TypeScript code standards for apps built on Warlock.js — `interface` vs `type`, access modifiers, no `any`, no inline-duplicated unions, file-naming suffixes (`.contract.ts` / `.type.ts` / `.service.ts` / `.model.ts` / `.resource.ts` / `.spec.ts`), single-responsibility files, FP-factory + internal-class pattern, brace-every-control-block readability with blank lines between consecutive blocks, JSDoc on public surface and non-obvious logic, error classes extending framework errors, async/await + `Promise.all`, `undefined` over `null`, Vitest co-located, Oxlint/Oxfmt. Triggers: writing/editing any `.ts` / `.tsx` file in this project; user asks "what are the code standards / style rules / conventions"; spawning a sub-agent that will write code; reviewing a diff for style issues; deciding `interface` vs `type`, when to use a class, where helpers live, how to name a file, or whether something needs JSDoc. Skip: pure-Markdown / JSON / YAML edits with no code change; runtime / behavior questions about a specific framework primitive — load the relevant `@warlock.js/<pkg>` skill instead; package-publishing or CI workflow questions.'
 ---
 
 # Code Standards
@@ -52,14 +52,16 @@ Never omit `public` / `private` / `protected`. Explicit is faster to read than i
 export class CartService {
   public readonly currency: string;
   private items: CartItem[] = [];
-  public add(item: CartItem) { /* ... */ }
+  public add(item: CartItem) {
+    /* ... */
+  }
 }
 
 // ❌
 export class CartService {
-  readonly currency: string;     // missing public
-  items: CartItem[] = [];        // missing private
-  add(item: CartItem) {}         // missing public
+  readonly currency: string; // missing public
+  items: CartItem[] = []; // missing private
+  add(item: CartItem) {} // missing public
 }
 ```
 
@@ -75,12 +77,12 @@ If a union appears in more than one place, extract it to a named exported type o
 // ✅
 export type OrderStatus = "pending" | "paid" | "shipped" | "cancelled";
 
-export type Order = { status: OrderStatus; /* ... */ };
-export type OrderEvent = { status: OrderStatus; /* ... */ };
+export type Order = { status: OrderStatus /* ... */ };
+export type OrderEvent = { status: OrderStatus /* ... */ };
 
 // ❌ inline duplication — changing the set means N edits and N chances to miss one
-export type Order = { status: "pending" | "paid" | "shipped" | "cancelled"; /* ... */ };
-export type OrderEvent = { status: "pending" | "paid" | "shipped" | "cancelled"; /* ... */ };
+export type Order = { status: "pending" | "paid" | "shipped" | "cancelled" /* ... */ };
+export type OrderEvent = { status: "pending" | "paid" | "shipped" | "cancelled" /* ... */ };
 ```
 
 ### 1.5 Constrain generics
@@ -89,10 +91,14 @@ Open generics are almost always wrong. If `T` has a contract, declare it.
 
 ```typescript
 // ✅
-export function publish<T extends DomainEvent>(event: T): void { /* ... */ }
+export function publish<T extends DomainEvent>(event: T): void {
+  /* ... */
+}
 
 // ❌
-export function publish<T>(event: T): void { /* ... */ }
+export function publish<T>(event: T): void {
+  /* ... */
+}
 ```
 
 ### 1.6 Prefer `undefined` for "absent"
@@ -102,7 +108,9 @@ Use `undefined` everywhere — optional properties, optional parameters, "not fo
 ```typescript
 // ✅
 export type User = { id: string; phone?: string };
-function find(id: string): User | undefined { /* ... */ }
+function find(id: string): User | undefined {
+  /* ... */
+}
 
 // ❌ mixed
 export type User = { id: string; phone: string | null };
@@ -162,14 +170,14 @@ Always bare: `from "./order.service"`, never `from "./order.service.ts"` or `.js
 
 ## 3. File naming
 
-| Suffix         | Purpose                              | Example                |
-| -------------- | ------------------------------------ | ---------------------- |
-| `.contract.ts` | Interface only (blueprint)           | `payment.contract.ts`  |
-| `.type.ts`     | Types only (data shapes)             | `order.type.ts`        |
-| `.service.ts`  | Service class                        | `cart.service.ts`      |
-| `.model.ts`    | Domain model class                   | `user.model.ts`        |
-| `.resource.ts` | Output mapper (model → wire format)  | `order.resource.ts`    |
-| `.spec.ts`     | Co-located test for a sibling `.ts`  | `cart.service.spec.ts` |
+| Suffix         | Purpose                             | Example                |
+| -------------- | ----------------------------------- | ---------------------- |
+| `.contract.ts` | Interface only (blueprint)          | `payment.contract.ts`  |
+| `.type.ts`     | Types only (data shapes)            | `order.type.ts`        |
+| `.service.ts`  | Service class                       | `cart.service.ts`      |
+| `.model.ts`    | Domain model class                  | `user.model.ts`        |
+| `.resource.ts` | Output mapper (model → wire format) | `order.resource.ts`    |
+| `.spec.ts`     | Co-located test for a sibling `.ts` | `cart.service.spec.ts` |
 
 **One primary export per file.** If a `.contract.ts` also defines closely-related data types used only by that contract, that's fine — but the primary export is the interface.
 
@@ -216,9 +224,15 @@ export function placeOrder(config: OrderConfig) {
 class PlacementRun {
   private items: ResolvedItem[] = [];
   private total = 0;
-  public async run(): Promise<OrderResult> { /* ... */ }
-  private async validate(): Promise<void> { /* ... */ }
-  private async charge(): Promise<void> { /* ... */ }
+  public async run(): Promise<OrderResult> {
+    /* ... */
+  }
+  private async validate(): Promise<void> {
+    /* ... */
+  }
+  private async charge(): Promise<void> {
+    /* ... */
+  }
 }
 ```
 
@@ -283,7 +297,9 @@ Identifiers carry the meaning. Add a comment only when the **why** is non-obviou
 ```typescript
 // ❌ noise
 // Loop over items
-for (const item of items) { /* ... */ }
+for (const item of items) {
+  /* ... */
+}
 
 // ✅ the WHY isn't obvious from the code
 // Stripe returns idempotency_key on retry but not on first call —
@@ -362,7 +378,7 @@ Every promise is either awaited, returned, or explicitly `.catch()`'d. A "fire a
 
 ```typescript
 // ❌
-sendWelcomeEmail(user);  // floating — if it rejects, you'll never know
+sendWelcomeEmail(user); // floating — if it rejects, you'll never know
 
 // ✅
 await sendWelcomeEmail(user);
@@ -481,7 +497,7 @@ Validation runs once at the route boundary; everything inward consumes the typed
 type Order = { totalCents: number; placedAtUtc: Date };
 
 // ❌
-type Order = { total: number; placedAt: string };  // float money, ambiguous tz
+type Order = { total: number; placedAt: string }; // float money, ambiguous tz
 ```
 
 See `skills/data-and-persistence/SKILL.md`.
@@ -551,12 +567,11 @@ A secret with no safe default (a payment key, a signing secret) should fail loud
 
 ## 11. Tooling
 
-Use the project's selected toolchain: `eslint.config.js` + `.prettierrc.json`, or
-`.oxlintrc.json` + `.oxfmtrc.json`. Run `npm run lint:check` and
+Use the project's toolchain: `.oxlintrc.json` + `.oxfmtrc.json`. Run `npm run lint:check` and
 `npm run format:check` for non-mutating checks. The Oxc scaffold enables the
 Oxlint development health checker and retains TypeScript checking.
 
-`npx warlock check` is the one verify command, in either toolchain: it
+`npx warlock check` is the one verify command, with Oxlint: it
 typechecks, runs the configured linter and the affected tests, and checks the
 framework's conventions — `request.validated()` instead of `request.all()`,
 guarded or `public: true` mutating routes, safe redirects, redacted logs,
@@ -564,17 +579,17 @@ bounded regexes on input, one controller per file, `type` (not `kind`) as a
 union's discriminator. Each problem has a `WL` code and its fix
 (`npx warlock explain <CODE>`).
 
-For ESLint, consider enabling these additional rules:
+For Oxlint, consider enabling these additional rules:
 
-- `@typescript-eslint/explicit-member-accessibility` — enforces § 1.2
-- `@typescript-eslint/no-explicit-any` — enforces § 1.3
-- `@typescript-eslint/consistent-type-definitions` — supports § 1.1
-- `@typescript-eslint/no-floating-promises` — enforces § 6.3
-- `@typescript-eslint/await-thenable`
+- `typescript/explicit-member-accessibility` — enforces § 1.2
+- `typescript/no-explicit-any` — enforces § 1.3
+- `typescript/consistent-type-definitions` — supports § 1.1
+- `typescript/no-floating-promises` — enforces § 6.3 (requires `oxlint-tsgolint` and `options.typeAware: true`)
+- `typescript/await-thenable` (same type-aware engine requirement)
 - `curly` — enforces braces (§ 4.4)
 - `no-console` — enforces § 8
 
-Match the selected formatter config: `.prettierrc.json` or `.oxfmtrc.json`. Both use 100 columns, double quotes, semicolons and trailing commas. Prettier uses `@ianvs/prettier-plugin-sort-imports` (Babel, independent of TypeScript); it sorts built-ins, packages, aliases (`app/*`, `web/*`, `@shared/*`) and relatives in one block while preserving separate type imports. Oxfmt sorts imports through its own configuration. Both retain unused imports: ESLint reports them through `unused-imports/no-unused-imports`, and Oxlint through `no-unused-vars`. Run the formatter, then the linter.
+Match `.oxfmtrc.json`: 100 columns, double quotes, semicolons, trailing commas and built-in import sorting.
 
 ---
 
@@ -583,6 +598,7 @@ Match the selected formatter config: `.prettierrc.json` or `.oxfmtrc.json`. Both
 Before any change ships:
 
 **Craft**
+
 - [ ] All class members have access modifiers
 - [ ] No `any`
 - [ ] No inline-duplicated unions or literal sets
@@ -600,6 +616,7 @@ Before any change ships:
 - [ ] `npx warlock check` exits 0
 
 **Non-negotiable defaults**
+
 - [ ] Every untrusted input has a `@warlock.js/seal` schema at the boundary
 - [ ] Money fields are integer minor units, time stored as UTC
 - [ ] IDs exposed in URLs are opaque (UUID / nanoid)

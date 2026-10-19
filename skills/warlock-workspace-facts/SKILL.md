@@ -44,9 +44,9 @@ pnpm --filter @warlock.js/web test
 
 The same two scripts CI and the release gate run for each package are `typecheck` and `test`; `pnpm --filter <name> typecheck` reproduces CI for one package. `queue` and `notifications` need Redis on port 6390.
 
-## Prettier: say the scope
+## Oxfmt: say the scope
 
-From the root, `pnpm format:check` runs `prettier --ignore-path .prettierignore --check .`. Always report a formatting result **with its scope and its cwd** — "clean on the 5 files I touched, from `packages/core`" is evidence; a bare "clean" is not.
+From the root, `pnpm format:check` runs Oxfmt with the root `.oxfmtrc.json`. Always report a formatting result **with its scope and its cwd** — "clean on the 5 files I touched, from `packages/core`" is evidence; a bare "clean" is not.
 
 **If a gate's binary cannot be found, the gate is `BLOCKED`** — never `passed` with a caveat.
 
@@ -86,7 +86,7 @@ for p in core cache logger; do ln -s "$PWD/packages/$p" "$fx/node_modules/@warlo
 
 - **No `.js` extensions in import paths.**
 - **Use `type`, never `kind`** — discriminators, props, fields, variables.
-- **No reference that only resolves inside Bureau** in shipped source, comments, test titles or error messages.
+- **No reference that only resolves inside a private app** in shipped source, comments, test titles or error messages.
 - Match the surrounding code's style, error conventions, and test location.
 
 ## Known events pitfall
@@ -116,7 +116,5 @@ mock the availability preflight too; their port numbers never need to be free.
 Use the root Oxfmt configuration for repository source, including scaffolder
 source. `pnpm format:check` is the CI check; `pnpm format` writes it. Preserve
 BOMs and generated-byte oracles. Generated app templates retain their separate
-Prettier/Oxc checks. Repository import sorting stays disabled. The Prettier
-scaffold uses `@ianvs/prettier-plugin-sort-imports` with Babel, without depending
-on the TypeScript compiler API. Both app formatters retain unused imports;
-ESLint or Oxlint reports them.
+Oxfmt checks. Repository import sorting stays disabled. Generated apps use
+Oxfmt's built-in import sorting and Oxlint to report unused imports.

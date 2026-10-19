@@ -27,6 +27,29 @@ describe("detectPackageManager", () => {
     expect(await detectPackageManager(app)).toBe("pnpm");
   });
 
+  it.each([
+    ["package-lock.json", "npm"],
+    ["yarn.lock", "yarn"],
+    ["bun.lock", "bun"],
+    ["pnpm-lock.yaml", "pnpm"],
+  ])("prefers %s to a workspace marker at the same level", async (lockfile, expected) => {
+    writeFileSync(path.join(app, "pnpm-workspace.yaml"), "allowBuilds: {}\n");
+    writeFileSync(path.join(app, lockfile), "{}");
+    expect(await detectPackageManager(app)).toBe(expected);
+  });
+
+  it("retains a locked pnpm workspace ahead of compatibility lockfiles", async () => {
+    for (const file of ["pnpm-workspace.yaml", "pnpm-lock.yaml", "bun.lock", "package-lock.json"])
+      writeFileSync(path.join(app, file), "{}");
+    expect(await detectPackageManager(app)).toBe("pnpm");
+  });
+
+  it("honours the parent lockfile alongside its workspace marker", async () => {
+    writeFileSync(path.join(tmp, "pnpm-workspace.yaml"), "allowBuilds: {}\n");
+    writeFileSync(path.join(tmp, "package-lock.json"), "{}");
+    expect(await detectPackageManager(app)).toBe("npm");
+  });
+
   it("detects a lockfile in a parent directory", async () => {
     writeFileSync(path.join(tmp, "yarn.lock"), "");
     expect(await detectPackageManager(app)).toBe("yarn");

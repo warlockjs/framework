@@ -226,7 +226,7 @@ export function findIncrementMutationCandidate(source) {
 
   for (const setter of setters) {
     // The parameter may or may not be parenthesised. The scaffold's own
-    // .prettierrc sets `arrowParens: "always"`, so the generated source says
+    // .oxfmtrc.json sets `arrowParens: "always"`, so the generated source says
     // `setCount((c) => c + 1)` — but a hand-written page, or one formatted
     // under a different config, says `setCount(c => c + 1)`. Matching only the
     // bare form made this finder silently blind to the exact shape `warlock

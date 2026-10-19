@@ -8,7 +8,6 @@ import {
 /** The tool that found a problem. */
 export type ProblemSource =
   | "typescript"
-  | "eslint"
   | "oxlint"
   | "vitest"
   | "convention"

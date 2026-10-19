@@ -8,13 +8,13 @@ description: The official project scaffolder — one command spins up a complete
 Migrating an existing app? Start with the [v5 migration guide](/v/latest/core/upgrade-to-v5/#create-warlock).
 
 ```bash
-pnpm create warlock my-app
+npm create warlock@latest my-app
 cd my-app
 ```
 
 With a terminal, that command asks for the project name (if you did not pass one), API-only or full-stack web, and a database unless `--db` or `--no-db` already supplied it. The database selector offers MongoDB and PostgreSQL, shows MySQL as disabled, and includes **None** for a database-free app. Everything else — package manager, optional features, git, JWT secrets — takes a sensible default, printed as a summary after scaffolding, with the flag to change each one. See [Headless / non-interactive mode](#headless--non-interactive-mode) below for scripting it fully, or `--interactive` for the question-by-question flow.
 
-What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `pnpm dev`.
+What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `npm run dev`.
 
 ## Headless / non-interactive mode
 
@@ -26,16 +26,16 @@ What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/
 
 ```bash
 # Scripting it in CI, or driving it from an agent: one command, zero prompts
-pnpm create warlock my-app --yes \
+npm create warlock@latest my-app -- --yes \
   --db=postgres --pm=pnpm --stack=web \
   --features=test,redis --ai=ai-openai \
   --git --jwt --agents=claude,cursor
 
 # The one structural fork, still headless
-pnpm create warlock my-web-app --yes --stack=web
+npm create warlock@latest my-web-app -- --yes --stack=web
 
 # The full long-form wizard, one prompt at a time
-pnpm create warlock --interactive
+npm create warlock@latest -- --interactive
 ```
 
 The first positional argument (or `--name`) is the project name. Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--db`, `--features`, `--ai`, `--pm`, `--agents`, or `--lint` values fail fast — before anything is written to disk — so a typo (or a hostile value) never leaves you with a half-scaffolded project.
@@ -47,7 +47,7 @@ The first positional argument (or `--name`) is the project name. Value flags acc
 | `--db` / `--no-db`             | yes / no    | `mongodb`                                                           | Database driver — `mongodb`, `postgres`, or `none` (`--no-db` is shorthand for `--db=none`)                                                                                 |
 | `--pm`                         | yes         | inferred (`npm_config_user_agent` or the system)                    | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts                                                            |
 | `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys                                                                                                                                       |
-| `--lint`                       | yes         | `oxc`                                                               | Development toolchain: `oxc` for Oxlint/Oxfmt or `eslint` for ESLint/Prettier (deprecated); invalid or missing values fail before writes                                    |
+| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes                                                                                                          |
 | `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`)                                                                                                              |
 | `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets to derive docs/skills for — validated against the published target list, cached after the first lookup |
 | `--git` / `--no-git`           | no          | off                                                                 | Force-enable or force-disable git initialization                                                                                                                            |
@@ -68,7 +68,7 @@ The one thing that can't fall back to a default is the project name. With no TTY
 ```
 A project name is required and no terminal is available to ask for one. Pass it as
 the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
---db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc|eslint>, --git|--no-git, --jwt|--no-jwt.
+--db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc>, --git|--no-git, --jwt|--no-jwt.
 ```
 
 ### AI choice in Customize
@@ -91,9 +91,9 @@ A scaffold failure surfaces the error and halts — there is no automatic rollba
 
 ### Framework conventions
 
-Both toolchains leave the framework's own rules to
+The toolchain leaves the framework's own rules to
 [`warlock check`](/v/latest/core/cli/check/#convention-checks), which runs the
-same whether the project lints with ESLint or Oxlint. It reports
+same with or without Oxlint. It reports
 `request.all()` reaching a query or service, mutating routes with no auth
 middleware and no `public: true`, redirects to request-supplied targets without
 `safeRedirect()`, raw emails and tokens in logs, unbounded regexes on request
@@ -103,53 +103,28 @@ routes say `public: true` and are throttled, and its user list validates its
 query. The generated `AGENTS.md` tells coding agents to run `npx warlock check`
 after every change.
 
-### Prettier import sorting
+### Oxlint and Oxfmt
 
-The ESLint toolchain uses `@ianvs/prettier-plugin-sort-imports` 4.7.1, which parses
-imports with Babel and works independently of the app’s TypeScript compiler. The template config keeps built-ins, packages, internal aliases
-(`app/*`, `web/*`, `@shared/*`), then relative imports in one block:
+Oxlint **1.88.0** and Oxfmt **0.73.0** are the only supported tools. New apps
+pin TypeScript **7.0.2** and include `.oxlintrc.json`, `.oxfmtrc.json`,
+`.oxfmtignore`, and VS Code settings for `oxc.oxc-vscode`.
+`--lint=oxc` is optional; `--lint=eslint` fails with the 5.34.0 removal message.
+The wizard has no toolchain choice.
 
-```json
-{
-  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
-  "importOrder": ["<BUILTIN_MODULES>", "<THIRD_PARTY_MODULES>", "^(app|web|@shared)/", "^[.]"],
-  "importOrderParserPlugins": ["typescript", "jsx", "decorators"]
-}
+```bash
+npm create warlock@latest my-app -- --yes
+cd my-app
+npm run lint:check
+npm run format:check
 ```
 
-Keep the default `importOrderTypeScriptVersion` to preserve separate type and
-value imports; inline `type` specifiers remain supported. Side-effect imports
-keep their execution order. See the plugin’s
-[options documentation](https://github.com/IanVS/prettier-plugin-sort-imports#options).
-Formatting retains unused imports; run `npm run lint:check` to report them or
-`npm run lint` to apply ESLint’s unused-import fixes.
-
-### Oxc tooling
-
-`--lint=oxc` is the default and installs pinned Oxlint 1.88.0 and Oxfmt 0.73.0, generates
-`.oxlintrc.json` and `.oxfmtrc.json`, and provides `lint`/`format` plus
-non-mutating `lint:check`/`format:check` scripts. It enables the Oxlint dev-server
-checker, disables the ESLint checker and keeps TypeScript checks enabled.
-
-`.oxfmtrc.json` turns on Oxfmt's import sorting with
-`"sortImports": { "newlinesBetween": false }`, the counterpart of the ESLint
-toolchain's `@ianvs/prettier-plugin-sort-imports`. Its `internalPattern` includes
-`app/`, `web/` and `@shared/`, matching the template aliases. `format` reorders imports by
-group and keeps them in one block without blank lines between groups. Neither
-formatter deletes unused imports; ESLint's `unused-imports/no-unused-imports` or
-Oxlint's `no-unused-vars` reports them instead. See the
-[Oxfmt config reference](https://oxc.rs/docs/guide/usage/formatter/config-file-reference)
-for the `sortImports` options.
-
-In both toolchains the package scripts call the local binaries directly
-(`eslint --fix ./src`, `oxlint --fix ./src`, `tsc --noEmit`), so they behave the
-same under npm, pnpm and yarn without going through `npx`.
-
-Oxc scaffolds also write VS Code settings that select the official
-[Oxc extension](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode)
-for format-on-save (`editor.defaultFormatter: "oxc.oxc-vscode"`) and lint fixes
-(`source.fixAll.oxc`), and recommend it in `.vscode/extensions.json`. The opt-in
-ESLint toolchain retains its existing Prettier/ESLint editor settings.
+Oxlint enables `"categories": { "correctness": "error" }`, unused-variable/import
+checks, explicit class accessibility and type-import style. Oxfmt sorts imports
+with `"sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] }`.
+It keeps built-ins, packages, internal aliases and relative imports in one block.
+Formatting retains unused imports; lint reports them. Local package scripts use
+`oxlint`, `oxfmt` and `tsc` directly. The non-mutating scripts are `lint:check`
+and `format:check`. Background checks run TypeScript and configured Oxlint.
 
 ## Scaffolding without a database
 
@@ -157,7 +132,7 @@ Not every app needs a database. Pick **None** in the wizard's database step — 
 
 ```bash
 # A database-free API in one command
-pnpm create warlock my-api --yes --no-db --features=test
+npm create warlock@latest my-api -- --yes --no-db --features=test
 ```
 
 :::note
@@ -190,40 +165,49 @@ Node types, and `paths` relative to its tsconfig, without `baseUrl`.
 Existing apps must remove `baseUrl`, rebase alias targets, and replace
 `moduleResolution: "node"` / `"node10"` before typechecking.
 
-Explicit `--lint=eslint` projects pin `typescript` to **6.0.3**, the newest version
-supported by typescript-eslint. Its parser requires the JavaScript compiler API
-removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
-([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
-Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
-ESLint mode prints a deprecation warning naming removal in 5.34.0 and the Oxc migration command. Both modes install with npm, pnpm and yarn.
+## Migrate existing apps
 
-## Migrate to Oxlint and Oxfmt in 5.33
-
-ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
-New apps should use `--lint=oxc`. To migrate an existing app, install the new
-core release and `ts-morph`, then run:
+ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
 
 ```bash
-npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
-npx warlock upgrade --from 5.32 --to 5.33.0
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Review every reported `file:line`: customized configs are preserved and need
-manual translation before removal. The codemod installs the template's Oxlint
-and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
-scripts, removes legacy dependencies, and deletes only recognized generated
-configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
-configs are preserved. `--dry-run --json` reports the same planned changes
-without writing files.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
-Explicit deprecated ESLint scaffolds set `devServer.healthCheckers.eslint: true`;
-existing apps must set this themselves to retain background ESLint checking.
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
 
-Oxc formatting scripts explicitly read `.gitignore` and `.oxfmtignore`. Oxfmt
-0.73 otherwise defaults to `.prettierignore` (`oxfmt --help`); the explicit
-paths make migrated ignore rules effective. The package template format gate
-also defaults to Oxfmt; `--lint=eslint` is its deprecated compatibility mode.
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.

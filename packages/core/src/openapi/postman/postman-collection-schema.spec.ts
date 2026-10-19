@@ -7,24 +7,12 @@ import { openApiToPostmanCollection } from "./openapi-to-postman-collection";
 
 type SchemaValidator = ((data: unknown) => boolean) & { errors?: unknown };
 
-type AjvInstance = {
-  addMetaSchema(schema: unknown): void;
-  compile(schema: unknown): SchemaValidator;
-};
-
-type AjvConstructor = new (options: Record<string, unknown>) => AjvInstance;
-
-/**
- * The official Postman v2.1.0 schema is JSON Schema draft-04, which ajv 8 dropped. ajv 6 is
- * what eslint (a dev dependency of core) already brings, so it is resolved through eslint
- * instead of being added as a dependency of its own.
- */
+/** Postman's draft-04 schema needs the Ajv draft-04 adapter. */
 function compilePostmanValidator(): SchemaValidator {
-  const requireFromEslint = createRequire(createRequire(__filename).resolve("eslint/package.json"));
-  const Ajv: AjvConstructor = requireFromEslint("ajv");
-  const ajv = new Ajv({ schemaId: "auto", allErrors: true, unknownFormats: "ignore" });
-
-  ajv.addMetaSchema(requireFromEslint("ajv/lib/refs/json-schema-draft-04.json"));
+  const Ajv = createRequire(import.meta.url)(
+    "ajv-draft-04",
+  ) as typeof import("ajv-draft-04").default;
+  const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false });
 
   // Source: https://schema.getpostman.com/json/collection/v2.1.0/collection.json
   const schemaPath = path.resolve(

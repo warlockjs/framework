@@ -4,6 +4,20 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.34.0
+
+### Removed
+
+- **BREAKING** Remove the ESLint/Prettier scaffold, prompt, configs, dependencies and TypeScript 6.0.3 compatibility pin. `--lint eslint` fails before scaffolding and names 5.34.0 and the Oxlint/Oxfmt default. Remove Prettier compatibility scripts and validation paths.
+
+### Changed
+
+- **BREAKING** Enable Oxlint `correctness: error` in the only app template. Move the footer's year calculation outside render to satisfy its purity check. Standalone specs use locally declared, pinned Oxlint/Oxfmt tools.
+
+### Upgrading
+
+- Omit `--lint` or pass `--lint=oxc`. Existing apps use `npx warlock upgrade --from 5.33 --to 5.34.0`; review custom-rule findings and additional correctness diagnostics before committing.
+
 ## 5.33.0 - 2026-10-19
 
 ### Changed

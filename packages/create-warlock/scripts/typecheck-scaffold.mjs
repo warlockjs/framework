@@ -36,7 +36,6 @@
  * Usage:
  *   node scripts/typecheck-scaffold.mjs            # scaffold, check, clean up
  *   node scripts/typecheck-scaffold.mjs --keep     # leave the project in place
- *   node scripts/typecheck-scaffold.mjs --lint=eslint # opt-in TS6 toolchain
  *   node scripts/typecheck-scaffold.mjs --pm=pnpm  # also accepts yarn
  */
 
@@ -58,9 +57,9 @@ const { values } = parseArgs({
 const keepArtifacts = values.keep;
 const lint = values.lint ?? "oxc";
 const packageManager = values.pm;
-if (!["oxc", "eslint"].includes(lint) || !["npm", "pnpm", "yarn"].includes(packageManager)) {
+if (lint !== "oxc" || !["npm", "pnpm", "yarn"].includes(packageManager)) {
   throw new Error(
-    "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc|eslint] [--pm=npm|pnpm|yarn] [--keep]",
+    "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc] [--pm=npm|pnpm|yarn] [--keep]",
   );
 }
 
@@ -146,7 +145,7 @@ async function main() {
       return;
     }
 
-    const expectedTypeScript = lint === "eslint" ? "6.0.3" : "7.0.2";
+    const expectedTypeScript = "7.0.2";
     const installedTypeScript = JSON.parse(
       readFileSync(path.join(appPath, "node_modules", "typescript", "package.json"), "utf8"),
     ).version;

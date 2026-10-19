@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.34.0
+
+### Changed
+
+- Document the 5.34 ESLint/Prettier removal, Oxlint-only checkers and scaffolds, the retained 5.33 migration and new 5.34 upgrade step, native custom-rule porting, correctness diagnostics and lockfile precedence.
+
 ## 5.33.0
 
 ### Fixed

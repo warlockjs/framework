@@ -25,9 +25,7 @@
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "format": "oxfmt --config .oxfmtrc.json --disable-nested-config --ignore-path .gitignore --ignore-path .oxfmtignore --write .",
     "format:check": "oxfmt --config .oxfmtrc.json --disable-nested-config --ignore-path .gitignore --ignore-path .oxfmtignore --check .",
-    "docs:references": "node scripts/regenerate-llms.mjs",
-    "format:prettier": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; use format or format:check (Oxfmt).')\" && node node_modules/prettier/bin/prettier.cjs --ignore-path .prettierignore --write .",
-    "format:prettier:check": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; use format or format:check (Oxfmt).')\" && node node_modules/prettier/bin/prettier.cjs --ignore-path .prettierignore --check ."
+    "docs:references": "node scripts/regenerate-llms.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
@@ -66,7 +64,6 @@
     "oxlint": "1.88.0",
     "pg": "^8.16.3",
     "pluralize-esm": "^9.0.5",
-    "prettier": "^3.9.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "redis": "^5.10.0",

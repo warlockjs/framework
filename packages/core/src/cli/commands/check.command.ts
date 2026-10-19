@@ -3,7 +3,7 @@ import { checkCommandAction } from "./check/check-command.action";
 
 /**
  * `warlock check` — the single verify command: typecheck, lint (the app's
- * Oxlint config, or explicitly selected deprecated ESLint), the tests affected by the change, and framework
+ * Oxlint config), the tests affected by the change, and framework
  * convention checks, reported as one problem list. Exit 0 clean, 1 problems
  * in the code, 2 problems with this machine.
  *
@@ -19,7 +19,7 @@ export const checkCommand = command({
   options: [
     {
       text: "--lint",
-      description: "Lint tool: oxlint (default) or eslint (deprecated; removed in 5.34.0)",
+      description: "Lint tool: oxlint (default)",
       type: "string",
     },
     {

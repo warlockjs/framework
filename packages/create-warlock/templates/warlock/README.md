@@ -29,22 +29,22 @@ It restarts on file changes.
 
 ## Scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Development server with live reload |
-| `npm run build` | Type-check and build for production |
-| `npm run start` | Run the production build (run `build` first) |
-| `npm run migrate` | Run pending database migrations |
-| `npm run migrate.fresh` | Drop everything and re-run all migrations |
-| `npm run migrate.list` | List migrations and their status |
-| `npm run seed` | Run the database seeders |
-| `npm run jwt` | Generate a JWT secret into `.env` |
-| `npm run tsc` | Type-check without building |
-| `npm run lint` | The configured linter, auto-fixing what it can |
-| `npm run format` | The configured formatter over `src/` |
-| `npm run lint:check` | Lint without changing files |
-| `npm run format:check` | Check formatting without changing files |
-| `npm run skills:sync` | Refresh the AI agent skills (see below) |
+| Command                 | What it does                                   |
+| ----------------------- | ---------------------------------------------- |
+| `npm run dev`           | Development server with live reload            |
+| `npm run build`         | Type-check and build for production            |
+| `npm run start`         | Run the production build (run `build` first)   |
+| `npm run migrate`       | Run pending database migrations                |
+| `npm run migrate.fresh` | Drop everything and re-run all migrations      |
+| `npm run migrate.list`  | List migrations and their status               |
+| `npm run seed`          | Run the database seeders                       |
+| `npm run jwt`           | Generate a JWT secret into `.env`              |
+| `npm run tsc`           | Type-check without building                    |
+| `npm run lint`          | The configured linter, auto-fixing what it can |
+| `npm run format`        | The configured formatter over `src/`           |
+| `npm run lint:check`    | Lint without changing files                    |
+| `npm run format:check`  | Check formatting without changing files        |
+| `npm run skills:sync`   | Refresh the AI agent skills (see below)        |
 
 The `warlock` CLI has more than the scripts expose — run `npx warlock --help`
 for the full list. Two worth knowing:
@@ -157,7 +157,5 @@ Node types, and `paths` relative to its tsconfig, without `baseUrl`.
 Existing apps must remove `baseUrl`, rebase alias targets, and replace
 `moduleResolution: "node"` / `"node10"` before typechecking.
 
-Use the Oxlint/Oxfmt lint mode with TS7. The optional ESLint scaffold is retained,
-but typescript-eslint's parser requires the removed JavaScript compiler API and
-does not support TS7. ESLint mode is scheduled for deprecation in 5.33 and removal
-in 5.34. A parser's bundled older TypeScript is separate from the app's native `tsc`.
+Oxlint/Oxfmt is the only toolchain in 5.34.0. Correctness rules report errors;
+use `npm run lint:check` and `npm run format:check` before committing.

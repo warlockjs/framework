@@ -37,7 +37,7 @@ beforeEach(async () => {
   cwd = await fs.mkdtemp(path.join(os.tmpdir(), "warlock-oxlint-"));
   await fs.mkdir(path.join(cwd, "node_modules"));
   await write("package.json", JSON.stringify({ type: "module" }));
-  for (const name of ["oxlint", "eslint"]) {
+  for (const name of ["oxlint"]) {
     const packageDirectory = path.dirname(require.resolve(`${name}/package.json`));
     await fs.symlink(packageDirectory, path.join(cwd, "node_modules", name), "junction");
   }
@@ -176,15 +176,6 @@ describe("Oxlint background file checks", () => {
     const file = await write("changed.ts", "debugger;\n");
     await expect(runner.checkFiles([file])).rejects.toThrow(
       /Oxlint could not check changed files:.*Failed/s,
-    );
-  });
-
-  it("retains explicitly enabled ESLint checks when its app configuration exists", async () => {
-    await write("eslint.config.mjs", "export default [];\n");
-    await fs.rm(path.join(cwd, "node_modules", "eslint"));
-    expect(defaultHealthCheckers({}, cwd).map((checker) => checker.name)).not.toContain("ESLint");
-    expect(defaultHealthCheckers({ eslint: true }, cwd).map((checker) => checker.name)).toContain(
-      "ESLint",
     );
   });
 
@@ -497,24 +488,25 @@ describe("Oxlint background file checks", () => {
     expect(result.getStats()).toEqual({ state: "defective", errors: 1, warnings: 0 });
   });
 
-  it("defaults to Oxlint and runs ESLint only with an explicit opt-in", async () => {
+  it("runs only TypeScript and configured Oxlint", async () => {
     await write("eslint.config.mjs", "export default [];\n");
     expect(defaultHealthCheckers({}, cwd).map((checker) => checker.name)).toEqual([
       "TypeScript",
       "Oxlint",
     ]);
     expect(
-      defaultHealthCheckers({ typescript: false, eslint: false, oxlint: true }, cwd).map(
+      defaultHealthCheckers({ typescript: false, oxlint: true }, cwd).map(
         (checker) => checker.name,
       ),
     ).toEqual(["Oxlint"]);
-    expect(
-      defaultHealthCheckers({ oxlint: false, eslint: true }, cwd).map((checker) => checker.name),
-    ).toEqual(["TypeScript", "ESLint"]);
-    await fs.rm(path.join(cwd, "node_modules", "oxlint"));
-    expect(defaultHealthCheckers({ typescript: false, eslint: false, oxlint: true }, cwd)).toEqual(
-      [],
+    expect(() => defaultHealthCheckers({ ...{ eslint: true } }, cwd)).toThrow(
+      /removed in 5\.34\.0/,
     );
+    expect(defaultHealthCheckers({ oxlint: false }, cwd).map((checker) => checker.name)).toEqual([
+      "TypeScript",
+    ]);
+    await fs.rm(path.join(cwd, "node_modules", "oxlint"));
+    expect(defaultHealthCheckers({ typescript: false, oxlint: true }, cwd)).toEqual([]);
   });
 
   it("rejects malformed reports and reports tool failures instead of inventing diagnostics", async () => {

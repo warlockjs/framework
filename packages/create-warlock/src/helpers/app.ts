@@ -31,7 +31,7 @@ import { fallbackRange } from "./warlock-versions";
  *
  * A shell that exports `NODE_ENV=production` makes the package managers skip
  * every devDependency — and still exit 0. The scaffolded project needs its dev
- * toolchain (typescript, vitest, eslint) to be usable at all, so the install
+ * toolchain (typescript, vitest, oxlint) to be usable at all, so the install
  * child is pinned to `development` regardless of the ambient environment. A
  * silently incomplete install that reports success is the exact failure mode
  * this file exists to prevent.
@@ -210,38 +210,9 @@ export class App {
       scripts: Record<string, string>;
     };
     const deps = content.devDependencies;
-    // Registry peer range: @typescript-eslint/parser@8.71.2 supports >=4.8.4 <6.1.0.
-    // Keep npm, pnpm and yarn installs valid without peer-dependency overrides.
-    deps.typescript = toolchain === "eslint" ? "6.0.3" : "7.0.2";
-    if (toolchain === "eslint") {
-      const config = this.file("warlock.config.ts");
-      if (!config.content.includes("healthCheckers:")) {
-        config
-          .replace(
-            "export default defineConfig({",
-            `export default defineConfig({
-  devServer: {
-    healthCheckers: { eslint: true, oxlint: false },
-  },`,
-          )
-          .save();
-      }
-      pkg.save();
-      return this;
-    }
-
-    for (const dependency of [
-      "@types/prettier",
-      "@typescript-eslint/eslint-plugin",
-      "@typescript-eslint/parser",
-      "eslint",
-      "eslint-config-prettier",
-      "eslint-plugin-prettier",
-      "eslint-plugin-unused-imports",
-      "prettier",
-      "@ianvs/prettier-plugin-sort-imports",
-    ])
-      delete deps[dependency];
+    if (toolchain !== "oxc")
+      throw new Error("ESLint support was removed in 5.34.0. Oxlint/Oxfmt is the default.");
+    deps.typescript = "7.0.2";
     Object.assign(deps, { oxlint: "1.88.0", oxfmt: "0.73.0" });
     content.devDependencies = Object.fromEntries(
       Object.entries(deps).sort(([left], [right]) => left.localeCompare(right)),
@@ -254,9 +225,6 @@ export class App {
     });
     pkg.save();
 
-    for (const fileName of ["eslint.config.js", ".prettierrc.json", ".prettierignore"]) {
-      rmSync(path.join(this.path, fileName), { force: true });
-    }
     for (const fileName of [".oxlintrc.json", ".oxfmtrc.json", ".oxfmtignore"]) {
       copyFile(
         packageRoot("templates", "toolchains", "oxc", fileName),
@@ -278,7 +246,7 @@ export class App {
           "export default defineConfig({",
           `export default defineConfig({
   devServer: {
-    healthCheckers: { eslint: false, oxlint: true },
+    healthCheckers: { oxlint: true },
   },`,
         )
         .save();

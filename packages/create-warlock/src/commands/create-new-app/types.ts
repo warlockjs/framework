@@ -1,4 +1,4 @@
-export type LintToolchain = "eslint" | "oxc";
+export type LintToolchain = "oxc";
 
 /** The one structural fork that changes the generated app's shape. */
 export type Stack = "api" | "web";
@@ -18,7 +18,7 @@ export type AppOptions = {
   aiProviders: string[];
   useGit: boolean;
   useJWT: boolean;
-  /** Linter/formatter choice; omitted options retain ESLint/Prettier. */
+  /** Oxlint/Oxfmt, the only supported toolchain. */
   lint?: LintToolchain;
   /** `agent-kit` targets to derive per-agent docs/skills for. Default: `["claude"]`. */
   agents: string[];
@@ -47,7 +47,7 @@ export type CliFlags = {
   features?: string[];
   ai?: string[];
   pm?: string;
-  /** `--lint=eslint|oxc`; validated before scaffolding. */
+  /** `--lint=oxc`; validated before scaffolding. */
   lint?: string;
   /** `agent-kit` targets for `--agents`. Comma-separated on the CLI. */
   agents?: string[];

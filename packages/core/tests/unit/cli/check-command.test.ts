@@ -135,6 +135,14 @@ describe("warlock check", () => {
     expect(hoisted.exit).not.toHaveBeenCalled();
   });
 
+  it("rejects the removed ESLint selection before checks run", async () => {
+    const { checkCommand } = await import("../../../src/cli/commands/check.command");
+    await expect(checkCommand.execute({ args: [], options: { lint: "eslint" } })).rejects.toThrow(
+      /removed in 5\.34\.0.*Oxlint\/Oxfmt/,
+    );
+    expect(hoisted.runCheck).not.toHaveBeenCalled();
+  });
+
   it("refuses an unknown --skip step", async () => {
     const { checkCommand } = await import("../../../src/cli/commands/check.command");
 
