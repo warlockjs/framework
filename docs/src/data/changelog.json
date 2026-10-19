@@ -136,6 +136,316 @@
   ],
   "releases": [
     {
+      "version": "5.34.0",
+      "id": "v5-34-0",
+      "date": "October 19, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>ESLint and Prettier support removed, plus multi-file transactions, browser end-to-end tests, an AI tool catalogue, a local queue driver and MCP serving hooks.</strong> The ESLint checker, <code>--lint eslint</code>, <code>devServer.healthCheckers.eslint</code> and Prettier scripts are gone; each removed option fails with a message naming 5.34.0, and no published package depends on ESLint or Prettier. <code>warlock upgrade --from 5.33 --to 5.34.0</code> migrates apps and now ports custom ESLint rules to Oxlint where an equivalent exists, reporting the rest; new and migrated apps enable Oxlint's <code>correctness</code> rules, and npm apps with a <code>pnpm-workspace.yaml</code> get the right install hint. fs: <code>fs.transaction()</code> stages multi-file writes with read-your-writes, hash or epoch preconditions, a durable journal with crash recovery, operation-id replay and consistent reads. Core: <code>warlock e2e</code> and <code>@warlock.js/core/e2e</code> drive Chrome or Edge over the DevTools protocol with hit-tested clicks, overflow checks at 1280 and 390 px, console and network checks, evidence and PID-verified teardown; an in-memory secrets backend for built-app tests. AI: <code>ai.tools.catalogue()</code> advertises a small core plus governed search and call meta-tools; <code>ai.mcp.serve</code> adds <code>listFilter</code>, HTTP <code>transport.routes</code>, <code>validateCallParams</code> and keeps <code>McpError</code> codes. Queue: <code>driver: \"local\"</code> (SQLite via <code>node:sqlite</code>, no Redis) and <code>driver: \"memory\"</code>. Seal: <code>v.record(key, value)</code>. Web: refresh events carry a <code>reason</code>, and shared data stays fresh across shell swaps. <strong>Breaking:</strong> ESLint/Prettier removal, Oxlint correctness rules, <code>v.object()</code> refuses arrays and non-plain objects. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Select an isolated in-memory secrets backend through <code>SECRETS_DRIVER=memory</code> or <code>secrets.driver</code>, including built-server test deployments and explicit <code>SecretStore</code> options. Configuration overrides the environment; unknown drivers fail closed."
+            },
+            {
+              "type": "Added",
+              "html": "Refuse the memory driver under <code>NODE_ENV=production</code> unless <code>allowMemoryInProduction: true</code> is explicitly configured; preserve log masking and namespace isolation without keychain/environment/file access."
+            },
+            {
+              "type": "Added",
+              "html": "Add <code>warlock e2e</code> and the isolated <code>@warlock.js/core/e2e</code> Node subpath: owned app/build fixtures and browser profiles, direct CDP with native WebSocket, stable hit-tested clicks, editable text and navigation waits, responsive screenshots and overflow assertions, console/network allowlists, per-run evidence and PID-verified process-group cleanup. Include fake-CDP coverage, real-browser integration specs and a complete browser-testing guide/skill."
+            },
+            {
+              "type": "Added",
+              "html": "<code>oxc-toolchain-removal</code> runs on <code>warlock upgrade --from 5.33 --to 5.34.0</code>, reusing the preserved 5.33 <code>oxc-toolchain</code> migration. It ports literal folder restrictions, native TypeScript rule equivalents, unused-import checks, globals and ignores; unsupported rules/options report their source and file scope without executing config. Native type-aware equivalents enable the optional app engine automatically."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> Migrated template configs enable Oxlint <code>correctness: error</code>; stale literal <code>healthCheckers.eslint</code> options are removed."
+            },
+            {
+              "type": "Fixed",
+              "html": "Detect a real lockfile beside <code>pnpm-workspace.yaml</code> before treating the directory as pnpm. npm apps with only <code>package-lock.json</code> now receive the correct install hint."
+            },
+            {
+              "type": "Fixed",
+              "html": "Validate Postman draft-04 schemas with an explicit development-only Ajv adapter instead of resolving ESLint's private dependency. Generated source formatting checks use Oxfmt."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>BREAKING</strong> Remove the ESLint development checker, CLI selection, checker config option and production dependency. <code>warlock check --lint eslint</code> now fails with the 5.34.0 removal and Oxlint/Oxfmt migration guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.mcp.serve</code> supports async <code>listFilter(context, tools)</code> for per-request discovery independent of callability, and <code>validateCallParams(context, params)</code> for application envelope policy before lookup, schema validation and call policy, over HTTP and stdio. Default handling of unknown fields and unsupported task metadata is unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "HTTP <code>transport.routes</code> adds exact method/path application routes beneath the MCP URL with shared authentication, principal/context, Host/Origin guards, body limits, disconnect signals and shutdown draining. Conflicting or invalid route configuration fails before binding."
+            },
+            {
+              "type": "Added",
+              "html": "Export <code>McpError(code, message, data?)</code> and the new discovery, envelope and HTTP route contracts."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>beforeCall</code> and envelope policy preserve a thrown <code>McpError</code>'s integer code, message and optional data, including official SDK errors, without a runtime SDK dependency. Other throws retain the existing invalid-params mapping."
+            },
+            {
+              "type": "Fixed",
+              "html": "Extend the core <code>ai.tools</code> namespace on registration, preserving <code>catalogue</code> and <code>measure</code> while adding the ready-made factories. <code>AiToolsNamespace</code> remains re-exported for consumers."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Select <code>driver: \"local\"</code> for durable single-host SQLite queues using Node's built-in <code>node:sqlite</code> without Redis, or <code>driver: \"memory\"</code> for tests executing real handlers. Existing configuration defaults to BullMQ."
+            },
+            {
+              "type": "Added",
+              "html": "A shared <code>QueueDriver</code> contract and <code>getQueueDriver()</code> for dispatch, snapshots, failed-job recovery, and worker lifecycle across all backends."
+            },
+            {
+              "type": "Added",
+              "html": "Local/memory delays, priorities, retries with fixed/exponential backoff, retention, per-queue concurrency, context propagation, progress, and results through the existing <code>defineJob()</code> API."
+            },
+            {
+              "type": "Added",
+              "html": "Transactional claims, renewable fenced leases, recovery after worker crashes, and bounded graceful shutdown releasing unfinished local jobs. Local/memory handlers receive an optional cancellation <code>signal</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>v.record(keyValidator, valueValidator, errorMessage?)</code> validates original property names and values, infers partial literal-key dictionaries, and emits key JSON Schema. Existing value-only and error-message forms remain supported."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> <code>v.object()</code> requires a plain or null-prototype object; arrays, built-ins, class instances and custom prototypes fail even with unknown-key options enabled."
+            },
+            {
+              "type": "Fixed",
+              "html": "Reject malformed record validator arguments at schema definition with a clear <code>TypeError</code>."
+            },
+            {
+              "type": "Removed",
+              "html": "Remove the remaining ESLint, Prettier and typescript-eslint development dependencies; package linting and formatting use Oxlint/Oxfmt."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>fs.transaction</code> and <code>fs.openTransactions</code>: root-scoped multi-file staging with read-your-writes, content-hash/root-epoch preconditions, process ownership, durable intent journals, automatic roll-forward recovery and operation-id result replay."
+            },
+            {
+              "type": "Added",
+              "html": "Read-only <code>fs.inspectTransactions</code>, bounded epoch-checked <code>fs.read</code>, and root-bound <code>read</code> / <code>readMany</code> for consistent snapshots. Document single-host cooperating-process limits and explicit file-only durability on Windows."
+            },
+            {
+              "type": "Added",
+              "html": "Optional <code>atomicWriteAsync(path, content, { durability: \"file\" | \"full\" })</code> flushes file bytes before rename and, with full durability, directory entries afterward. Existing unflushed defaults remain unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/process",
+          "slug": "process",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Validate supervisor configuration before accessing options; errors name the missing or invalid <code>owner</code> or <code>registry</code> option."
+            },
+            {
+              "type": "Security",
+              "html": "Strip guardian ownership and launch variables from macOS/Windows workload environments, including Windows casing aliases. Guardian proof remains intact; Linux retains its <code>/proc</code> ownership token."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Refresh lifecycle events carry a <code>reason</code> distinguishing explicit refreshes from live-data, polling/reconnect and focus revalidation. Export <code>RefreshReason</code> and <code>RefreshOptions</code>; allow app-owned background <code>refresh({ reason })</code> calls."
+            },
+            {
+              "type": "Fixed",
+              "html": "Seal and publish each successful page/shell swap's shared snapshot at the central swap boundary, updating retained <code>useShared()</code> consumers."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> Enable Oxlint <code>correctness: error</code> in the only app template. Move the footer's year calculation outside render to satisfy its purity check. Standalone specs use locally declared, pinned Oxlint/Oxfmt tools."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>BREAKING</strong> Remove the ESLint/Prettier scaffold, prompt, configs, dependencies and TypeScript 6.0.3 compatibility pin. <code>--lint eslint</code> fails before scaffolding and names 5.34.0 and the Oxlint/Oxfmt default. Remove Prettier compatibility scripts and validation paths."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.tools.catalogue({ core, searchable, limit?, searchName?, callName? })</code> (also <code>catalogue</code>) keeps a stable advertised core plus bounded schema search and governed hidden calls. Supports deterministic name/description/tag ranking, lazy cached tool loading, provider-tool passthrough, durable inventory drift detection and measurement with <code>ai.measure</code> / <code>ai.tools.measure</code>. Hidden calls resolve before the normal agent tool pipeline so target validation, policy, HITL, accounting, context and tracing remain intact."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Removed",
+              "html": "Remove the remaining ESLint and Prettier development dependencies; package linting and formatting use Oxlint/Oxfmt."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.33.0",
       "id": "v5-33-0",
       "date": "October 19, 2026",

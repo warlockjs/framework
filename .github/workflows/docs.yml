@@ -61,6 +61,7 @@ jobs:
         run: |
           pnpm run test:changelog
           pnpm run test:changelog-freshness
+          pnpm run test:gfm-check
 
       - name: Build site
         working-directory: docs
