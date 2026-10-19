@@ -14,7 +14,8 @@ Two layers: flat functions (`getFile`, `putFile`, `copyFile`, ...; append `Async
 4. Prefer the facade for chained work: `use-the-fs-facade.md`.
 5. Anything that must not be half-written (config, state, indexes): `write-atomically.md`.
 6. Content checks and cache keys: `hash-files.md`.
-7. Reading a folder you do not control (user-chosen, extracted upload): `read-a-folder-confined.md`.
+7. Multi-file state, CAS, recovery, replay and consistent snapshots: `multi-file-transactions.md`.
+8. Reading a folder you do not control (user-chosen, extracted upload): `read-a-folder-confined.md`.
 
 ## Conventions and pitfalls
 

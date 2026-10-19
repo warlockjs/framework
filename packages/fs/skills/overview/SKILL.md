@@ -58,6 +58,13 @@ Sibling temp file + atomic rename — last-writer-wins on contention, no locking
 
 Load when writing a file that other processes / file watchers / build steps consume in parallel (config, manifest, state, lockfile).
 
+### `multi-file-transactions`
+
+Use `fs.transaction` / `fs.openTransactions` for cooperating local multi-file
+state, hash/epoch CAS, durable roll-forward recovery, idempotent result replay,
+`fs.inspectTransactions`, and bounded consistent `fs.read` / root `readMany`.
+See this topic for the platform durability and writer-ownership limits.
+
 ### `hash-files`
 
 Compute hex digests for files (streaming) or in-memory content. Covers

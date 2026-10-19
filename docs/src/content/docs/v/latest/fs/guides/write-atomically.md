@@ -62,11 +62,23 @@ Atomic is about _visibility_, not _coordination_ or _durability_. Know the edges
 - **No read-modify-write safety.** Two atomic writes to the same path both
   succeed and serialize at the rename — last writer wins. If each writer must
   see the previous one's content, wrap the operation in a lock (for cross-process
-  work, `@warlock.js/cache`'s `cache.lock(key, ttl, fn)`).
-- **No `fsync`.** After the rename returns, the bytes sit in the OS write cache
-  and flush on the OS's schedule. For the "readers never see half a file" case
-  that's exactly right; for ironclad power-loss durability (financial ledgers,
-  replicated state) drop to `node:fs/promises` and `fsync` yourself.
+  work, use [multi-file transactions](./multi-file-transactions)).
+- **No default `fsync`.** The facade's atomic writes remain unflushed. For a
+  durable single-file replacement on POSIX use the flat helper:
+
+  ```ts
+  import { atomicWriteAsync } from "@warlock.js/fs";
+
+  await atomicWriteAsync("./state.json", "{}", { durability: "full" });
+  ```
+
+  This flushes file bytes before rename and the parent directory afterward,
+  including newly created parent entries. Full durability is refused on Windows;
+  explicit `durability: "file"` flushes file bytes without a power-loss guarantee.
+  A directory-sync error can occur after the target changed. For journaled
+  recovery and coordinated readers, use
+  [multi-file transactions](./multi-file-transactions).
+
 - **Same-mount only.** The temp file is placed beside the target so the rename
   stays intra-mount. Renames across mounts aren't atomic — not a concern unless
   you've engineered an unusual union mount.

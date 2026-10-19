@@ -1,0 +1,200 @@
+---
+title: "Multi-file transactions"
+description: "Cooperating local writers, content and epoch preconditions, durable recovery, idempotent replay and consistent snapshots."
+sidebar:
+  order: 4
+  label: "Multi-file transactions"
+---
+
+Use `fs.transaction` when several files must describe one logical change. The
+root must already exist. Paths inside the callback are root-relative; writes
+and removals stay in memory until the callback succeeds.
+
+```ts
+import { fs } from "@warlock.js/fs";
+
+const root = "/srv/state";
+const result = await fs.transaction(
+  root,
+  async (tx) => {
+    const current = JSON.parse((await tx.read("counter.json")) ?? "0") as number;
+    await tx.write("counter.json", JSON.stringify(current + 1));
+    await tx.write("latest.txt", String(current + 1));
+    // Reads include this callback's staged changes.
+    return { count: Number(await tx.read("latest.txt")) };
+  },
+  { operationId: "request-2026-10-19-001" },
+);
+```
+
+The async facade also exposes `fs.openTransactions(root, options)` and
+`fs.inspectTransactions(root)`. Flat exports are `transactionAsync`,
+`openTransactionRootAsync`, `inspectTransactionsAsync` and
+`readTransactionFileAsync`. Public types include `FileTransaction`,
+`TransactionRoot`, `TransactionOptions`, `TransactionWriteOptions`,
+`TransactionReadOptions`, `TransactionInspection` and `WriteDurability`.
+
+## Preconditions and staging
+
+`tx.read(path)` returns UTF-8 text or `null` for absence. `tx.readBuffer(path)`
+returns a defensive copy or `null`. `tx.hash(path)` returns the SHA-256 digest
+of the staged view, or `null`. `tx.write(path, stringOrBuffer)` and
+`tx.remove(path)` stage changes. Await every call; handles become invalid when
+the callback ends. Throwing from the callback discards staging. Keep external
+side effects out of the callback: filesystem recovery cannot undo them.
+
+```ts
+const store = await fs.openTransactions(root);
+const { epoch } = await store.inspect();
+
+await store.transaction(
+  async (tx) => {
+    await tx.write("settings.json", '{"enabled":true}', {
+      expectedHash: fs.hash.string('{"enabled":false}'),
+    });
+    await tx.write("initialized.txt", "yes", { expectedHash: null });
+  },
+  { expectedEpoch: epoch, operationId: "enable-settings-001" },
+);
+```
+
+`expectedEpoch` compares the root's committed epoch while holding the writer
+lock. `expectedHash` compares the original file bytes, even if this callback
+has already staged a replacement. `null` requires absence. Every file read or
+changed is checked again against its original bytes before journaling.
+Precondition failures throw `FsTransactionError` with `type: "cas-conflict"`
+and publish no intent. Concurrent writers with the same expected epoch cannot
+both commit. Do not nest transactions or open the same root from inside its
+transaction callback; the bounded lock wait will expire.
+
+Paths cannot escape the root, name reserved `.warlock-transactions` metadata,
+contain symlinks, use Windows device/alternate-stream names, or alias another
+file in the same transaction by case or file/parent relationships. The root
+is canonicalized. These checks assume a trusted directory; they do not
+sandbox hostile processes swapping parent directories during system calls.
+
+## Durable intent and recovery
+
+After the callback and preconditions succeed, publication follows this order:
+
+1. Save the complete intent: operation id, next epoch, result, and each file's
+   original and replacement bytes.
+2. Save a busy head containing the operation id and previous epoch.
+3. Apply each replacement using the existing sibling-temp atomic writer, or
+   unlink a removed file.
+4. Save the committed journal record, then publish the stable next epoch.
+
+With default `durability: "full"`, every saved file is fsynced **before** its
+rename, and its parent directory is fsynced **after** rename/unlink. Newly
+created directory chains are synced from leaf to their existing parent.
+The intent and busy head reach storage before targets change; all targets
+reach storage before the committed marker and stable epoch.
+
+```ts
+// Open on startup, before accepting requests. The returned object holds no lock.
+const store = await fs.openTransactions(root);
+
+// Diagnostic inspection does not recover or write, including after a crash.
+const inspection = await fs.inspectTransactions(root);
+console.log(inspection.epoch, inspection.pending, inspection.operations);
+```
+
+Opening, or starting another transaction, acquires writer ownership and
+**completes** an interrupted intent before proceeding. Recovery always rolls
+forward; there is no caller-supplied rollback image. If only the committed
+marker's head publication was interrupted, recovery finishes that publication.
+Recovery is repeatable if interrupted again. It never invokes the callback.
+Before applying an intent it checks _all_ targets against the saved original
+or replacement bytes. Foreign bytes produce `type: "recovery-conflict"` and
+leave the pending operation for inspection. Invalid or discontinuous history
+fails closed. Inspection is diagnostic and may race a live writer; it is not
+a consistent data snapshot.
+
+An I/O failure after intent publication begins produces
+`type: "durability-uncertain"`: the transaction may still complete on reopen.
+Do not assume a rejection means the writes were rolled back. Inspect and
+reopen with the same operation id.
+
+## Idempotent results
+
+Operation ids are root-scoped strings of 1–256 characters. Supply a stable id
+for retries; omitting it generates a fresh UUID. A committed replay returns
+the recorded result, skips the callback and preconditions, and writes nothing,
+including no lock ticket after the operation has published its epoch. Later transactions do
+not invalidate historical results. Concurrent first uses of an id serialize
+and run one callback. Reusing an id means replaying its original request;
+callers must bind ids to their own request identity and authorization.
+
+Return a JSON value (finite numbers, plain objects, arrays, strings, booleans,
+null) or top-level `undefined`. Other values are rejected before journaling.
+The first success and replays return the saved JSON representation. History,
+results and full file images are retained indefinitely: there is no automatic
+compaction or id expiration. Plan disk space accordingly; this API is intended
+for bounded application state, not large media or an unbounded event stream.
+Journal files contain the original and new data; protect the root like the
+underlying files. Newly replaced files use mode `0600`; existing inode metadata,
+permissions, hard links and extended attributes are not preserved.
+
+## Consistent reads
+
+```ts
+const text = await fs.read("latest.txt", {
+  root,
+  consistent: true,
+  attempts: 5, // total attempts, default 5, maximum 100
+  retryDelayMs: 10, // default 10; range 0–1000
+});
+
+// Bracket several reads with a single epoch to avoid mixing file generations.
+const [counter, latest] = await store.readMany(["counter.json", "latest.txt"], {
+  consistent: true,
+});
+const settings = await store.read("settings.json", { consistent: true });
+```
+
+A consistent read samples the head before and after reading. A busy head or
+changed epoch causes a retry, including when the raced read produced an I/O
+error such as `ENOENT`. A stable missing file still throws `ENOENT`. Exhaustion
+throws `type: "snapshot-changed"`; readers never clear a writer's busy marker.
+Open the root to recover an abandoned operation. Separate `read` calls can
+observe separate epochs; use `readMany` for a group. Retry count and delay are
+bounded, but filesystem calls themselves have no hard wall-clock deadline.
+Without `consistent: true`, reads can observe intermediate complete files.
+`fs.read(path)` without a root is an ordinary UTF-8 read.
+
+## Scope and platform limits
+
+This protocol supports **one host, one PID namespace, cooperating processes,
+and coherent local filesystems** with atomic replacement and reliable fsync.
+All writers for a root must use these transactions. Ordinary fs helpers,
+manual edits, hostile processes, network filesystems and cross-host locking
+are outside the guarantee. Readers that need logical atomicity must use the
+consistent reader; independent filesystem readers and watchers can see a
+partly applied multi-file operation.
+
+Writer ownership uses atomically published Lamport bakery tickets with unique
+names under the metadata directory. A live owner is never evicted because a
+lease expired; a paused writer keeps ownership. Dead PID tickets are removed
+without unlinking another owner's ticket. `lockTimeoutMs` defaults to 5000.
+An unknown/foreign host fails closed. PID reuse or inability to prove death
+can delay recovery with `type: "lock-timeout"`; an operator may remove an old
+ticket only after verifying that its owner cannot still write. Never delete
+metadata or move/copy a live root: journals bind to its canonical path. Keep
+the existing root and its ancestors durably established before opening it.
+
+On Windows, full directory durability is refused before starting a new
+transaction. Explicitly select `durability: "file"` on every open/transaction
+(or set it once on a store). This flushes file bytes and supports recovery
+from **process termination while the OS remains running**, with no promise
+across OS crashes or power loss. Rename retains the existing bounded retries
+for transient `EPERM`, `EBUSY` and `EACCES`; it never deletes the destination
+first or falls back to a direct write. Persistent Windows locks leave an intent
+for retrying recovery. On POSIX, full durability still depends on the OS,
+filesystem and storage hardware honoring fsync; errors are propagated.
+
+The ordering uses Node's documented
+[`FileHandle.sync`](https://nodejs.org/docs/latest-v22.x/api/fs.html#filehandlesync)
+and [rename](https://nodejs.org/docs/latest-v22.x/api/fs.html#fspromisesrenameoldpath-newpath)
+primitives. PID liveness uses
+[`process.kill(pid, 0)`](https://nodejs.org/docs/latest-v22.x/api/process.html#processkillpid-signal)
+solely as an existence probe.

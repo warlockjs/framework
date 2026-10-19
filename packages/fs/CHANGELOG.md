@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/fs` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.34.0
+
+### Added
+
+- `fs.transaction` and `fs.openTransactions`: root-scoped multi-file staging with read-your-writes, content-hash/root-epoch preconditions, process ownership, durable intent journals, automatic roll-forward recovery and operation-id result replay.
+- Read-only `fs.inspectTransactions`, bounded epoch-checked `fs.read`, and root-bound `read` / `readMany` for consistent snapshots. Document single-host cooperating-process limits and explicit file-only durability on Windows.
+- Optional `atomicWriteAsync(path, content, { durability: "file" | "full" })` flushes file bytes before rename and, with full durability, directory entries afterward. Existing unflushed defaults remain unchanged.
+
 ## 5.32.0 - 2026-10-18
 
 ### Changed
