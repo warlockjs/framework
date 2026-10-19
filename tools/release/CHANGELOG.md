@@ -1,5 +1,11 @@
 ﻿# Changelog — release tooling
 
+## 5.34.0
+
+### Added
+
+- Publish the Node-only `@warlock.js/core/e2e` entry independently from the application barrel.
+
 ## 5.33.0 - 2026-10-19
 
 ### Fixed

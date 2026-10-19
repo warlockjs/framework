@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Select an isolated in-memory secrets backend through `SECRETS_DRIVER=memory` or `secrets.driver`, including built-server test deployments and explicit `SecretStore` options. Configuration overrides the environment; unknown drivers fail closed.
 - Refuse the memory driver under `NODE_ENV=production` unless `allowMemoryInProduction: true` is explicitly configured; preserve log masking and namespace isolation without keychain/environment/file access.
+- Add `warlock e2e` and the isolated `@warlock.js/core/e2e` Node subpath: owned app/build fixtures and browser profiles, direct CDP with native WebSocket, stable hit-tested clicks, editable text and navigation waits, responsive screenshots and overflow assertions, console/network allowlists, per-run evidence and PID-verified process-group cleanup. Include fake-CDP coverage, real-browser integration specs and a complete browser-testing guide/skill.
 
 ## 5.33.0 - 2026-10-19
 
