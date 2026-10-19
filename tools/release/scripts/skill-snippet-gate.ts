@@ -308,15 +308,48 @@ function isDirectory(p: string): boolean {
  * first occurrence at its real path and routing the rest to a synthetic
  * path so neither is silently dropped nor allowed to overwrite the other.
  */
+const RELATIVE_IMPORT_RE = /\bfrom\s+["'](\.{1,2}\/[^"']+)["']/g;
+const SIBLING_EXTENSIONS = ["", ".ts", ".tsx", "/index.ts", "/index.tsx"];
+
+/**
+ * The latest earlier titled block each relative import of `block` names, keyed
+ * by that block's title path. A skill shows a file evolving: a page that imports
+ * `./x.setup` means the most recent `x.setup` shown before it.
+ */
+function resolveSiblings(
+  block: ExtractedBlock,
+  virtualPath: string,
+  latest: ReadonlyMap<string, ExtractedBlock>,
+): Map<string, ExtractedBlock> {
+  const siblings = new Map<string, ExtractedBlock>();
+  for (const [, specifier] of block.body.matchAll(RELATIVE_IMPORT_RE)) {
+    const target = path.posix.normalize(
+      path.posix.join(path.posix.dirname(virtualPath), specifier),
+    );
+    for (const extension of SIBLING_EXTENSIONS) {
+      const candidate = latest.get(target + extension);
+      if (candidate) {
+        siblings.set(target + extension, candidate);
+        break;
+      }
+    }
+  }
+  return siblings;
+}
+
 export function planSkillCompileUnit(
   skill: DiscoveredSkill,
   blocks: ExtractedBlock[],
 ): {
   files: Map<string, ExtractedBlock>;
+  /** Copies of earlier blocks that a paired block imports: compiled, never reported. */
+  support: Set<string>;
   skipped: Array<{ block: ExtractedBlock; reason: string }>;
   duplicateTitles: Array<{ block: ExtractedBlock; titlePath: string; syntheticPath: string }>;
 } {
   const files = new Map<string, ExtractedBlock>();
+  const support = new Set<string>();
+  const latest = new Map<string, ExtractedBlock>();
   const skipped: Array<{ block: ExtractedBlock; reason: string }> = [];
   const duplicateTitles: Array<{
     block: ExtractedBlock;
@@ -331,15 +364,36 @@ export function planSkillCompileUnit(
       continue;
     }
     let virtualPath = classified.virtualPath;
-    if (files.has(virtualPath)) {
+    const duplicate = files.has(virtualPath);
+    const siblings = block.titlePath ? resolveSiblings(block, virtualPath, latest) : new Map();
+    // Isolate a block whose relative imports would otherwise resolve to a
+    // different version of a sibling than the one shown just before it.
+    const needsPairing = [...siblings].some(
+      ([siblingPath, sibling]) => files.get(siblingPath) !== sibling,
+    );
+    if (needsPairing || (duplicate && siblings.size > 0)) {
+      const directory = `__paired/block-${block.index}`;
+      if (duplicate)
+        duplicateTitles.push({
+          block,
+          titlePath: virtualPath,
+          syntheticPath: `${directory}/${virtualPath}`,
+        });
+      for (const [siblingPath, sibling] of siblings) {
+        files.set(`${directory}/${siblingPath}`, sibling);
+        support.add(`${directory}/${siblingPath}`);
+      }
+      virtualPath = `${directory}/${virtualPath}`;
+    } else if (duplicate) {
       const ext = block.lang === "tsx" ? "tsx" : "ts";
       const synthetic = `__duplicate-title/block-${block.index}.${ext}`;
       duplicateTitles.push({ block, titlePath: virtualPath, syntheticPath: synthetic });
       virtualPath = synthetic;
     }
     files.set(virtualPath, block);
+    if (block.titlePath) latest.set(classified.virtualPath, block);
   }
-  return { files, skipped, duplicateTitles };
+  return { files, support, skipped, duplicateTitles };
 }
 
 /**
@@ -442,7 +496,12 @@ interface WrittenSkillUnit {
   skill: DiscoveredSkill;
   skillRoot: string;
   tsconfigPath: string;
-  written: Array<{ virtualPath: string; absolutePath: string; block: ExtractedBlock }>;
+  written: Array<{
+    virtualPath: string;
+    absolutePath: string;
+    block: ExtractedBlock;
+    support: boolean;
+  }>;
   skipped: Array<{ block: ExtractedBlock; reason: string }>;
   duplicateTitles: Array<{ block: ExtractedBlock; titlePath: string; syntheticPath: string }>;
 }
@@ -461,18 +520,18 @@ function writeSkillUnit(
 ): WrittenSkillUnit {
   const markdown = readFileSync(skill.filePath, "utf8");
   const blocks = extractFencedBlocks(markdown, skill);
-  const { files, skipped, duplicateTitles } = planSkillCompileUnit(skill, blocks);
+  const { files, support, skipped, duplicateTitles } = planSkillCompileUnit(skill, blocks);
 
   const skillRoot = path.join(gateTmpRoot, skill.package.dir, skill.slug.replace(/[\\/]/g, "__"));
   rmSync(skillRoot, { recursive: true, force: true });
   mkdirSync(skillRoot, { recursive: true });
 
-  const written: Array<{ virtualPath: string; absolutePath: string; block: ExtractedBlock }> = [];
+  const written: WrittenSkillUnit["written"] = [];
   for (const [virtualPath, block] of files) {
     const absolutePath = path.join(skillRoot, ...virtualPath.split("/"));
     mkdirSync(path.dirname(absolutePath), { recursive: true });
     writeFileSync(absolutePath, block.body, "utf8");
-    written.push({ virtualPath, absolutePath, block });
+    written.push({ virtualPath, absolutePath, block, support: support.has(virtualPath) });
   }
 
   const tsconfigPath = path.join(skillRoot, "tsconfig.json");
@@ -568,12 +627,14 @@ export function compileManySkills(
     skill: unit.skill,
     skillRoot: unit.skillRoot,
     tsconfigPath: unit.tsconfigPath,
-    files: unit.written.map(({ virtualPath, absolutePath, block }) => ({
-      virtualPath,
-      absolutePath,
-      block,
-      diagnostics: diagnosticsByFile.get(normalizeForCompare(absolutePath)) ?? [],
-    })),
+    files: unit.written
+      .filter(({ support }) => !support)
+      .map(({ virtualPath, absolutePath, block }) => ({
+        virtualPath,
+        absolutePath,
+        block,
+        diagnostics: diagnosticsByFile.get(normalizeForCompare(absolutePath)) ?? [],
+      })),
     skipped: unit.skipped,
     duplicateTitles: unit.duplicateTitles,
   }));

@@ -69,7 +69,7 @@ Declare the loader so TypeScript infers its return type, then pass `typeof loade
 to the matching props type (`PageProps<typeof loader>`). Two spellings do that, and
 this skill uses both:
 
-```ts title="src/web/example.setup.ts"
+```ts
 // Either: a named function, with the context typed on the parameter.
 export async function loader({
   request,
@@ -348,6 +348,9 @@ export async function loader({
 A page's `config.validation` declares a [Seal](https://www.npmjs.com/package/@warlock.js/seal) schema per source, `params` and `query` kept as separate keys. Declare either or both:
 
 ```ts title="src/web/example.setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig } from "@warlock.js/web";
+
 export const config = {
   validation: {
     params: v.object({ id: v.int().coerce() }),

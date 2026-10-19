@@ -217,6 +217,8 @@ fields override `child.metadata`, while omitted child fields are not retained. P
 descendant metadata deliberately by spreading `child.metadata`:
 
 ```ts title="src/web/root.setup.ts"
+import type { RootConfig } from "@warlock.js/web";
+
 export async function loader() {
   return { applicationName: "Acme" };
 }

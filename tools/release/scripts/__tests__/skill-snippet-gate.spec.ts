@@ -234,6 +234,46 @@ describe("planSkillCompileUnit — duplicate titles within one skill", () => {
   });
 });
 
+describe("planSkillCompileUnit — relative imports pair with the latest earlier block", () => {
+  const pkg: WorkspacePackage = { dir: "x", absPath: "/x", name: "@fixture/x" };
+  const skill = skillFor(pkg, "s", "/x/skills/s/SKILL.md");
+  const block = (title: string, body: string) => [`\`\`\`ts title="${title}"`, body, "```", ""];
+
+  it("compiles a page with the setup version shown just before it", () => {
+    const markdown = [
+      ...block("src/web/root.tsx", "export default 1;"),
+      ...block("src/web/root.setup.ts", "export const loader = 2;"),
+      ...block(
+        "src/web/root.tsx",
+        'import type { loader } from "./root.setup";\nexport type L = typeof loader;',
+      ),
+    ].join("\n");
+    const plan = planSkillCompileUnit(skill, extractFencedBlocks(markdown, skill));
+    const paired = [...plan.files.keys()].filter((key) => key.startsWith("__paired/"));
+    assert.deepEqual(paired.sort(), [
+      "__paired/block-2/src/web/root.setup.ts",
+      "__paired/block-2/src/web/root.tsx",
+    ]);
+    assert.deepEqual([...plan.support], ["__paired/block-2/src/web/root.setup.ts"]);
+    assert.equal(plan.duplicateTitles[0].syntheticPath, "__paired/block-2/src/web/root.tsx");
+  });
+
+  it("isolates a first-occurrence page whose real-path setup is an older version", () => {
+    const markdown = [
+      ...block("src/web/home.setup.ts", "export const config = {};"),
+      ...block("src/web/home.setup.ts", "export const loader = 1;"),
+      ...block(
+        "src/web/home.page.tsx",
+        'import type { loader } from "./home.setup";\nexport type L = typeof loader;',
+      ),
+    ].join("\n");
+    const plan = planSkillCompileUnit(skill, extractFencedBlocks(markdown, skill));
+    const supportBody = plan.files.get("__paired/block-2/src/web/home.setup.ts")?.body ?? "";
+    assert.match(supportBody, /loader/);
+    assert.ok(plan.files.has("__paired/block-2/src/web/home.page.tsx"));
+  });
+});
+
 describe("compileSkill — real compilation against real declarations, with a red control", () => {
   it("passes a correct snippet, fails the SAME snippet once an import is stripped, then passes again restored", async () => {
     const root = await fixtureRoot();

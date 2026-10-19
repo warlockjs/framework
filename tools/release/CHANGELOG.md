@@ -1,5 +1,11 @@
 ﻿# Changelog — release tooling
 
+## 5.34.1
+
+### Fixed
+
+- The skill snippet gate resolves a block's relative imports to the most recent earlier block with that title, so a page shown after its setup file compiles against that version instead of an older one or a missing duplicate.
+
 ## 5.34.0 - 2026-10-19
 
 ### Added

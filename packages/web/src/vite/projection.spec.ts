@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { webHomePageStub, webHomeRegisterStub } from "@warlock.js/core/src/generations/stubs";
+import { webHomePageStub, webHomeSetupStub } from "@warlock.js/core/src/generations/stubs";
 import type { Plugin } from "vite";
 import { describe, expect, it } from "vitest";
 import { projectModule, projection } from "./projection";
@@ -434,13 +434,13 @@ describe("projection — register lifecycle hook", () => {
   it("projects Core's generated Web page without any manual repair", async () => {
     const code = await transformSource(webHomePageStub, "index.page.tsx");
 
-    expect(code).toContain('export { register } from "./index.register";');
+    // The generated page is UI only; its logic lives in the paired setup file.
+    expect(code).not.toMatch(/export (const|function) (config|loader|register)\b/);
     expect(code).not.toContain('extend("en", {');
-    expect(webHomeRegisterStub).toContain("export function register()");
-    expect(webHomeRegisterStub).toContain('extend("en", {');
-    expect(webHomeRegisterStub).toContain('extend("ar", {');
-    expect(code).not.toMatch(/export const config/);
-    expect(code).not.toMatch(/^export const loader/m);
+    expect(webHomeSetupStub).toContain("export function register()");
+    expect(webHomeSetupStub).toContain('extend("en", {');
+    expect(webHomeSetupStub).toContain('extend("ar", {');
+    expect(webHomeSetupStub).toMatch(/export const config/);
   });
 
   it.each([
