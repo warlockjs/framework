@@ -23,6 +23,7 @@ describe("secretsFake", () => {
   it("isolates the facade from keychain and environment and resets between installs", async () => {
     const load = vi.spyOn(KeyringSecretBackend, "load");
     secretsFake.install();
+    expect(await secrets.backend()).toBe("memory");
     vi.stubEnv(secrets.environmentName("vendor-key"), "production-environment-credential");
     await secretsFake.assertMissing("vendor-key");
     await secrets.set("vendor-key", "test-memory-credential");
@@ -59,6 +60,7 @@ describe("secretsFake", () => {
     ).rejects.toThrow("The stored secret does not match the expected value.");
     secretsFake.restore();
     expect(secretsFake.isInstalled()).toBe(false);
+    expect(await secrets.backend()).toBe("file");
     expect(() => secretsFake.clear()).toThrow(FakeAssertionError);
     vi.stubEnv(secrets.environmentName("restored-key"), "restored-environment-credential");
     expect(await secrets.get("restored-key")).toBe("restored-environment-credential");

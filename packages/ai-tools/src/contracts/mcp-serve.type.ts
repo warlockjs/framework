@@ -50,7 +50,7 @@ export type McpHttpRequestInfo = ToolRequestContext & {
 /**
  * Authentication for an HTTP-served MCP endpoint. At least one of
  * `bearer` / `authorize` / `authenticate` is required; all configured checks
- * must pass, in that order. A request that fails gets HTTP 401 before its body is read.
+ * must pass, in that order. A request that fails is refused before its body is read.
  */
 export type McpHttpAuth = {
   /**
@@ -74,6 +74,45 @@ export type McpHttpAuth = {
    */
   authenticate?: (request: McpHttpRequestInfo) => unknown | Promise<unknown>;
 };
+
+/** Safe refusal metadata: no credentials, principal, body or thrown error. */
+export type McpHttpAuthRefusalContext = Readonly<{
+  check: "bearer" | "authorize" | "authenticate";
+  method: string;
+  /** Pathname only; excludes the query string. */
+  path: string;
+  target: "mcp" | "route";
+}>;
+
+/** JSON values accepted in an authentication refusal body. */
+export type McpHttpAuthRefusalBody =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly McpHttpAuthRefusalBody[]
+  | { readonly [key: string]: McpHttpAuthRefusalBody };
+
+/** Headers an auth refusal may set; framing, cookies and CORS stay transport-owned. */
+export type McpHttpAuthRefusalHeader =
+  | "www-authenticate"
+  | "cache-control"
+  | "retry-after"
+  | "content-language"
+  | "x-request-id";
+
+export type McpHttpAuthRefusalResponse = {
+  /** Integer from 400 through 599. Defaults to 401. */
+  status?: number;
+  /** Merged over the default challenge. Names are case-insensitive at runtime. */
+  headers?: Partial<Record<McpHttpAuthRefusalHeader, string>>;
+  body: McpHttpAuthRefusalBody;
+};
+
+/** Customize a denial only. Throws, invalid results or void retain the default 401. */
+export type McpHttpAuthRefusal = (
+  context: McpHttpAuthRefusalContext,
+) => void | McpHttpAuthRefusalResponse | Promise<void | McpHttpAuthRefusalResponse>;
 
 /** Authenticated context for an extra HTTP route; there is no JSON-RPC id. */
 export type McpHttpRouteContext = McpServeCallContext & {
@@ -137,6 +176,8 @@ export type McpHttpServeTransport = {
   path?: string;
   /** Bearer, authorize and/or authenticate checks. Required off loopback. */
   auth?: McpHttpAuth;
+  /** Shared by MCP and routes after failed auth; never runs for Host/Origin refusals. */
+  onAuthRefusal?: McpHttpAuthRefusal;
   /** Extra HTTP routes with the same Host/Origin and authentication checks. */
   routes?: readonly McpHttpRoute[];
   /**

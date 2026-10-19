@@ -344,7 +344,44 @@ transport: {
 - `bearer` matches `Authorization: Bearer <token>`. Tokens are compared in constant time over SHA-256 digests with `crypto.timingSafeEqual`, so neither a token's content nor its length leaks through timing. Empty tokens are refused at `start()`.
 - `authorize(request)` receives `{ method, path, headers, remoteAddress }` (lower-cased header names). A hook that throws denies the request.
 - Checks run in order: `bearer`, `authorize`, then `authenticate`. Every configured check must pass; a failed check skips later hooks. `authenticate` can also be used alone, including on non-loopback binds. Host/Origin checks always run first.
-- A failed check answers `401` before the body is read. Bearer and `authenticate` failures include `WWW-Authenticate: Bearer realm="mcp"`. A throwing authentication hook denies without exposing its error.
+- By default a failed check answers `401` before the body is read. When bearer or `authenticate` is configured, refusals include `WWW-Authenticate: Bearer realm="mcp"`. A throwing authentication hook denies without exposing its error.
+
+### Custom authentication refusals
+
+Use `transport.onAuthRefusal` to keep an application's JSON error contract on both the MCP endpoint and `transport.routes`:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import type { McpHttpAuthRefusal } from "@warlock.js/ai-tools";
+import "@warlock.js/ai-tools";
+
+const refuse: McpHttpAuthRefusal = async (context) => ({
+  status: 401,
+  headers: { "cache-control": "no-store" },
+  body: { error: "MEMBER_UNAUTHORIZED", check: context.check },
+});
+
+const server = ai.mcp.serve([], {
+  name: "member-tools",
+  transport: {
+    type: "http",
+    auth: { authorize: () => false },
+    onAuthRefusal: refuse,
+    routes: [{ method: "GET", path: "/policy", handler: () => ({ body: {} }) }],
+  },
+});
+const { url, close } = await server.start();
+// Both url and `${url}/policy` return the custom denial.
+await close();
+```
+
+The hook receives only `{ check, method, path, target }`: `check` is `"bearer"`, `"authorize"` or `"authenticate"`; `method` is uppercase, `path` excludes the query string, and `target` is `"mcp"` or `"route"`. It never receives request headers, body, credentials, principal or thrown authentication errors. False/undefined auth results and thrown/rejected auth checks use the same safe context.
+
+Return `{ status?, headers?, body }`, synchronously or asynchronously. Status defaults to `401` and must be an integer from `400` through `599`. The required body accepts plain JSON, including arrays, primitives and `null`; cycles, non-finite numbers, undefined entries, functions and class instances are invalid. Headers may contain only `www-authenticate`, `cache-control`, `retry-after`, `content-language` and `x-request-id` (names are case-insensitive at runtime; the public type uses lowercase). They merge over the default challenge. Header values must be valid HTTP strings. Cookies, redirects, CORS and framing headers cannot be set; content type stays `application/json` and content length is computed by the transport.
+
+Returning nothing, throwing/rejecting, or returning an invalid status, body or header falls back to the complete original `401` JSON-RPC `Unauthorized.` response and its default headers. Host/Origin refusals remain unchanged and never call this hook. A custom response always ends the denied exchange: later authentication checks, route handlers, call policy and tools never run. Successful authentication never calls the hook.
+
+Public types: `McpHttpAuthRefusal`, `McpHttpAuthRefusalContext`, `McpHttpAuthRefusalResponse`, `McpHttpAuthRefusalBody`, `McpHttpAuthRefusalHeader`.
 
 ### Authenticated context and call policy
 

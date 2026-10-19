@@ -6,13 +6,13 @@ import { FileSecretBackend } from "./file-backend";
 import { MemorySecretBackend } from "./memory-backend";
 import { resolveSecretsDriver } from "./resolve-driver";
 import { KeyringSecretBackend } from "./keyring-backend";
-import type { SecretBackend, SecretStoreOptions } from "./types";
+import type { SecretBackend, SecretBackendType, SecretStoreOptions } from "./types";
 
 /** Lazily prepared, application-scoped credentials. All operations are asynchronous. */
 export class SecretStore {
   private primary: Promise<KeyringSecretBackend | undefined> | undefined;
   private readonly file: FileSecretBackend;
-  private readonly backend: SecretBackend | undefined;
+  private readonly selectedBackend: SecretBackend | undefined;
   public readonly namespace: string;
 
   public constructor(options: SecretStoreOptions) {
@@ -25,7 +25,8 @@ export class SecretStore {
     }
     this.namespace = options.namespace;
     const driver = options.backend ? "auto" : resolveSecretsDriver(options);
-    this.backend = options.backend ?? (driver === "memory" ? new MemorySecretBackend() : undefined);
+    this.selectedBackend =
+      options.backend ?? (driver === "memory" ? new MemorySecretBackend() : undefined);
     const encryptionKey = options.encryptionKey;
     this.file = new FileSecretBackend(
       options.directory ?? storagePath("secrets"),
@@ -56,6 +57,18 @@ export class SecretStore {
   private keyring(): Promise<KeyringSecretBackend | undefined> {
     this.primary ??= KeyringSecretBackend.load(this.namespace);
     return this.primary;
+  }
+
+  /** Resolve the active store using the same memoized probe as credential operations. */
+  public async backend(): Promise<SecretBackendType> {
+    return this.safe(async () => {
+      if (this.selectedBackend) {
+        const type = this.selectedBackend.type ?? "memory";
+        if (type === "keychain" || type === "file" || type === "memory") return type;
+        throw new SecretStoreError("UNAVAILABLE");
+      }
+      return (await this.keyring()) ? "keychain" : "file";
+    });
   }
 
   private register(name: string, value?: string): void {
@@ -89,8 +102,8 @@ export class SecretStore {
     this.register(name);
     return this.safe(async () => {
       let value: string | undefined;
-      if (this.backend) {
-        value = await this.backend.get(this.namespace, name);
+      if (this.selectedBackend) {
+        value = await this.selectedBackend.get(this.namespace, name);
       } else {
         const primary = await this.keyring();
         value = await primary?.get(this.namespace, name);
@@ -112,10 +125,10 @@ export class SecretStore {
     // Register before any backend call, including failed writes.
     this.register(name, value);
     return this.safe(async () => {
-      if (this.backend) {
-        const previous = await this.backend.get(this.namespace, name);
+      if (this.selectedBackend) {
+        const previous = await this.selectedBackend.get(this.namespace, name);
         if (previous !== undefined) this.register(name, previous);
-        return this.backend.set(this.namespace, name, value);
+        return this.selectedBackend.set(this.namespace, name, value);
       }
       this.assertWritable(name);
       const primary = await this.keyring();
@@ -137,10 +150,10 @@ export class SecretStore {
     this.validate(name);
     this.register(name);
     return this.safe(async () => {
-      if (this.backend) {
-        const previous = await this.backend.get(this.namespace, name);
+      if (this.selectedBackend) {
+        const previous = await this.selectedBackend.get(this.namespace, name);
         if (previous !== undefined) this.register(name, previous);
-        return this.backend.remove(this.namespace, name);
+        return this.selectedBackend.remove(this.namespace, name);
       }
       this.assertWritable(name);
       const primary = await this.keyring();

@@ -2,6 +2,7 @@ import type { SecretBackend } from "./types";
 
 /** Isolated, namespace-aware storage. No OS, environment or filesystem access. */
 export class MemorySecretBackend implements SecretBackend {
+  public readonly type = "memory";
   private readonly values = new Map<string, Map<string, string>>();
 
   public async get(namespace: string, name: string): Promise<string | undefined> {

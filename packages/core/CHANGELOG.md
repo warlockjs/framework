@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.34.1
 
+### Added
+
+- Async `secrets.backend()` and `SecretStore.backend()` report `"keychain"`, `"file"` or `"memory"` without credentials, sharing lazy selection and its memoized keychain probe. Resolved driver configuration, environment lookups and injected backend metadata have documented reporting semantics; memory fakes report `"memory"` without probing.
+
 ### Changed
 
 - Generate `root.setup.ts` and `index.setup.ts` with Web starter policy and universal registration, keeping the UI files focused on components.

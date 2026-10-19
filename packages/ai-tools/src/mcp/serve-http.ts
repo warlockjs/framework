@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
   createServer,
+  validateHeaderValue,
   type IncomingHttpHeaders,
   type IncomingMessage,
   type Server,
@@ -11,6 +12,8 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpHttpAuth,
+  McpHttpAuthRefusalBody,
+  McpHttpAuthRefusalContext,
   McpHttpRequestInfo,
   McpHttpRoute,
   McpHttpServeTransport,
@@ -19,6 +22,7 @@ import type {
 import { McpServeError } from "../errors";
 import { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
 import { McpServeRequests } from "./serve-requests";
+import { isRecord } from "./result";
 
 /**
  * MCP Streamable HTTP server transport for `ai.mcp.serve`.
@@ -130,6 +134,7 @@ type ResolvedSettings = {
   tokenDigests: Buffer[];
   authorize: McpHttpAuth["authorize"];
   authenticate: McpHttpAuth["authenticate"];
+  onAuthRefusal: McpHttpServeTransport["onAuthRefusal"];
   authRequired: boolean;
   allowedOrigins: Set<string>;
   allowedHosts: Set<string>;
@@ -284,6 +289,7 @@ function resolveSettings(transport: McpHttpServeTransport): ResolvedSettings {
     tokenDigests: tokens.map(digest),
     authorize: auth?.authorize,
     authenticate: auth?.authenticate,
+    onAuthRefusal: transport.onAuthRefusal,
     authRequired,
     allowedOrigins: new Set((transport.allowedOrigins ?? []).map(normalizeOrigin)),
     allowedHosts: new Set((transport.allowedHosts ?? []).map((name) => hostnameOf(name))),
@@ -339,6 +345,87 @@ function sendRefusal(
   headers: Record<string, string> = {},
 ): void {
   sendJson(response, status, { jsonrpc: "2.0", id: null, error: { code, message } }, headers);
+}
+
+const AUTH_REFUSAL_HEADERS = new Set([
+  "www-authenticate",
+  "cache-control",
+  "retry-after",
+  "content-language",
+  "x-request-id",
+]);
+
+/** Snapshot plain JSON, rejecting cycles and values JSON would silently coerce/drop. */
+function copyRefusalBody(value: unknown, ancestors = new Set<object>()): McpHttpAuthRefusalBody {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "object" || value === null || ancestors.has(value)) {
+    throw new TypeError("Invalid auth refusal body.");
+  }
+
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError("Invalid auth refusal body.");
+  }
+
+  ancestors.add(value);
+  const result = Array.isArray(value)
+    ? Array.from(value, (entry: unknown) => copyRefusalBody(entry, ancestors))
+    : Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [key, copyRefusalBody(entry, ancestors)]),
+      );
+  ancestors.delete(value);
+  return result;
+}
+
+/** A custom response can only end a denied exchange; it cannot authorize dispatch. */
+async function sendAuthRefusal(
+  response: ServerResponse,
+  settings: ResolvedSettings,
+  context: McpHttpAuthRefusalContext,
+): Promise<void> {
+  const challenge: Record<string, string> =
+    settings.tokenDigests.length > 0 || settings.authenticate
+      ? { "www-authenticate": 'Bearer realm="mcp"' }
+      : {};
+
+  if (settings.onAuthRefusal) {
+    try {
+      const result: unknown = await settings.onAuthRefusal(Object.freeze(context));
+      if (!isRecord(result)) throw new TypeError("Invalid auth refusal response.");
+      const customStatus = result.status;
+      const status = customStatus === undefined ? 401 : customStatus;
+      if (typeof status !== "number" || !Number.isInteger(status) || status < 400 || status > 599) {
+        throw new TypeError("Invalid auth refusal status.");
+      }
+      const headers = { ...challenge };
+      const customHeaders = result.headers;
+      if (customHeaders !== undefined) {
+        if (!isRecord(customHeaders)) throw new TypeError("Invalid auth refusal headers.");
+        const prototype: unknown = Object.getPrototypeOf(customHeaders);
+        if (prototype !== Object.prototype && prototype !== null) {
+          throw new TypeError("Invalid auth refusal headers.");
+        }
+        for (const [name, value] of Object.entries(customHeaders)) {
+          const normalized = name.toLowerCase();
+          if (!AUTH_REFUSAL_HEADERS.has(normalized) || typeof value !== "string") {
+            throw new TypeError("Invalid auth refusal header.");
+          }
+          // Node's own HTTP validation rejects CR/LF and invalid header characters.
+          // https://nodejs.org/docs/latest-v22.x/api/http.html#httpvalidateheadervaluename-value
+          validateHeaderValue(normalized, value);
+          headers[normalized] = value;
+        }
+      }
+      const body = copyRefusalBody(result.body);
+      sendJson(response, status, body, headers);
+      return;
+    } catch {
+      // Neither authentication nor refusal-hook errors become wire content.
+    }
+  }
+
+  sendRefusal(response, 401, JSON_RPC_SERVER_ERROR, "Unauthorized.", challenge);
 }
 
 /** Write an empty-bodied status (202 / 405). */
@@ -514,12 +601,12 @@ async function handleRequest(
   const authentication = await authorized(info, settings);
 
   if (!authentication.allowed) {
-    const challenge: Record<string, string> =
-      settings.tokenDigests.length > 0 || settings.authenticate
-        ? { "www-authenticate": 'Bearer realm="mcp"' }
-        : {};
-
-    sendRefusal(response, 401, JSON_RPC_SERVER_ERROR, "Unauthorized.", challenge);
+    await sendAuthRefusal(response, settings, {
+      check: authentication.check,
+      method,
+      path,
+      target: routes ? "route" : "mcp",
+    });
 
     return;
   }
@@ -786,7 +873,9 @@ function originAllowed(origin: string | undefined, settings: ResolvedSettings): 
  * every configured token is compared so the match position does not leak.
  * An `authorize` hook that throws denies the request.
  */
-type Authentication = { allowed: false } | { allowed: true; principal?: unknown };
+type Authentication =
+  | { allowed: false; check: McpHttpAuthRefusalContext["check"] }
+  | { allowed: true; principal?: unknown };
 
 async function authorized(
   info: McpHttpRequestInfo,
@@ -806,25 +895,33 @@ async function authorized(
     }
 
     if (!match || !matched) {
-      return { allowed: false };
+      return { allowed: false, check: "bearer" };
     }
   }
 
-  try {
-    if (settings.authorize && (await settings.authorize(info)) !== true) {
-      return { allowed: false };
+  if (settings.authorize) {
+    try {
+      if ((await settings.authorize(info)) !== true) {
+        return { allowed: false, check: "authorize" };
+      }
+    } catch {
+      return { allowed: false, check: "authorize" };
     }
+  }
 
-    if (settings.authenticate) {
+  if (settings.authenticate) {
+    try {
       const principal = await settings.authenticate(info);
 
-      return principal === undefined ? { allowed: false } : { allowed: true, principal };
+      return principal === undefined
+        ? { allowed: false, check: "authenticate" }
+        : { allowed: true, principal };
+    } catch {
+      return { allowed: false, check: "authenticate" };
     }
-
-    return { allowed: true };
-  } catch {
-    return { allowed: false };
   }
+
+  return { allowed: true };
 }
 
 /**

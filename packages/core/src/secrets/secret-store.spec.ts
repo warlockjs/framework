@@ -38,6 +38,87 @@ function store(namespace = "sample-app") {
   });
 }
 
+describe("active secrets backend", () => {
+  it("lazily selects a working keychain and shares its probe across concurrent calls and CRUD", async () => {
+    const secrets = store();
+    expect(KeyringSecretBackend.load).not.toHaveBeenCalled();
+    expect(
+      await Promise.all([secrets.backend(), secrets.backend(), secrets.get("missing")]),
+    ).toEqual(["keychain", "keychain", undefined]);
+    expect(KeyringSecretBackend.load).toHaveBeenCalledTimes(1);
+    expect(fake.state.calls).toEqual(["get", "get"]); // One availability read, one named read.
+    await secrets.set("vendor-key", "keychain-credential");
+    expect(await secrets.backend()).toBe("keychain");
+    await secrets.remove("vendor-key");
+    expect(KeyringSecretBackend.load).toHaveBeenCalledTimes(1);
+    expect(existsSync(path.join(root, "private"))).toBe(false);
+  });
+
+  it("selects file after a failed probe and never retries even if keychain recovers", async () => {
+    fake.state.unavailable = true;
+    const secrets = store();
+    expect(await Promise.all([secrets.backend(), secrets.backend()])).toEqual(["file", "file"]);
+    expect(fake.state.calls).toEqual(["get"]);
+    fake.state.unavailable = false;
+    vi.stubEnv(secrets.environmentName("vendor-key"), "environment-credential");
+    expect(await secrets.get("vendor-key")).toBe("environment-credential");
+    expect(await secrets.backend()).toBe("file");
+    expect(KeyringSecretBackend.load).toHaveBeenCalledTimes(1);
+    expect(fake.state.calls).toEqual(["get"]);
+    // Backend inspection and environment reads do not create files or need an encryption key.
+    expect(existsSync(path.join(root, "private"))).toBe(false);
+  });
+
+  it("reports the selected keychain despite environment lookups or a later keychain failure", async () => {
+    const secrets = store();
+    vi.stubEnv(secrets.environmentName("vendor-key"), "environment-credential");
+    expect(await secrets.get("vendor-key")).toBe("environment-credential");
+    expect(await secrets.backend()).toBe("keychain");
+    fake.state.unavailable = true;
+    await expect(secrets.get("vendor-key")).rejects.toMatchObject({ code: "UNAVAILABLE" });
+    expect(await secrets.backend()).toBe("keychain");
+    expect(KeyringSecretBackend.load).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports explicit memory and file backends without probing or reading credentials", async () => {
+    const memory = new MemorySecretBackend();
+    const file = new FileSecretBackend(path.join(root, "private"), () => undefined);
+    const readMemory = vi.spyOn(memory, "get");
+    const readFile = vi.spyOn(file, "get");
+    expect(await new SecretStore({ namespace: "memory", backend: memory }).backend()).toBe(
+      "memory",
+    );
+    expect(await new SecretStore({ namespace: "file", backend: file }).backend()).toBe("file");
+    expect(readMemory).not.toHaveBeenCalled();
+    expect(readFile).not.toHaveBeenCalled();
+    expect(KeyringSecretBackend.load).not.toHaveBeenCalled();
+    expect(existsSync(path.join(root, "private"))).toBe(false);
+  });
+
+  it("reports custom injected metadata, defaulting untyped test overrides to memory", async () => {
+    const read = vi.fn(async () => undefined);
+    const backend = { get: read, set: async () => {}, remove: async () => false };
+    expect(await new SecretStore({ namespace: "custom", backend }).backend()).toBe("memory");
+    expect(
+      await new SecretStore({
+        namespace: "custom-file",
+        backend: { ...backend, type: "file" },
+      }).backend(),
+    ).toBe("file");
+    expect(read).not.toHaveBeenCalled();
+    expect(KeyringSecretBackend.load).not.toHaveBeenCalled();
+  });
+
+  it("reports an explicitly injected keychain without a second availability probe", async () => {
+    const backend = await loadKeyring("injected", async () => fake.module);
+    if (!backend) throw new Error("Expected fake keychain to be available");
+    const secrets = new SecretStore({ namespace: "injected", backend });
+    expect(await secrets.backend()).toBe("keychain");
+    expect(fake.state.calls).toEqual(["get"]);
+    expect(KeyringSecretBackend.load).not.toHaveBeenCalled();
+  });
+});
+
 describe("memory secrets", () => {
   it("supports CRUD, overwrites, empty strings and missing values", async () => {
     const backend = new MemorySecretBackend();

@@ -1,6 +1,6 @@
 ---
 name: expose-as-mcp-server
-description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `listFilter`, `validateCallParams`, `McpError`, `routes`, `McpHttpRouteContext`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `onAuthRefusal`, `McpHttpAuthRefusal`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `listFilter`, `validateCallParams`, `McpError`, `routes`, `McpHttpRouteContext`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Expose tools AS an MCP server (Direction B)
@@ -64,11 +64,59 @@ transport: {
 }
 ```
 
-- Checks run in order: `bearer`, `authorize`, `authenticate`; every configured check must pass. A failed check skips later hooks. `authenticate` alone satisfies the non-loopback auth requirement. Host/Origin checks run first. A throwing authentication hook denies. Failures → `401`; bearer or authenticate failures include a Bearer `WWW-Authenticate` challenge.
+- Checks run in order: `bearer`, `authorize`, `authenticate`; every configured check must pass. A failed check skips later hooks. `authenticate` alone satisfies the non-loopback auth requirement. Host/Origin checks run first. A throwing authentication hook denies. By default, failures → `401`; bearer or authenticate failures include a Bearer `WWW-Authenticate` challenge.
 - A foreign or `null` `Origin` → `403` (DNS-rebinding guard from the MCP spec). Requests without `Origin` pass.
 - On loopback, a `Host` other than `localhost` / `127.0.0.1` / `[::1]` (or `allowedHosts`) → `403`.
 - Stateless: no session id; `GET` / `DELETE` → `405`; batches → `400`; unsupported `MCP-Protocol-Version` → `400`.
 - Plain HTTP: put TLS in front before exposing beyond the machine.
+
+## Customize HTTP authentication refusals
+
+Use `transport.onAuthRefusal` for a JSON error contract shared by the MCP endpoint
+and `transport.routes`. It runs only after a failed bearer/authorize/authenticate
+check. Host/Origin refusals always take precedence and never call it.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import type { McpHttpAuthRefusal } from "@warlock.js/ai-tools";
+import "@warlock.js/ai-tools";
+
+const onAuthRefusal: McpHttpAuthRefusal = async ({ check, target }) => ({
+  status: 401,
+  headers: { "cache-control": "no-store" },
+  body: { error: "MEMBER_UNAUTHORIZED", check, target },
+});
+
+const server = ai.mcp.serve([], {
+  name: "member-tools",
+  transport: {
+    type: "http",
+    auth: { authorize: () => false },
+    onAuthRefusal,
+    routes: [{ method: "GET", path: "/policy", handler: () => ({ body: {} }) }],
+  },
+});
+const { url, close } = await server.start();
+// url and `${url}/policy` share the custom refusal; no handler runs.
+await close();
+```
+
+- Context has only `check: "bearer" | "authorize" | "authenticate"`, uppercase
+  `method`, query-free `path`, and `target: "mcp" | "route"`. No error, credentials,
+  headers, principal or request body is passed. Thrown auth details stay private.
+- Return `{ status?, headers?, body }` or a promise. Status defaults to 401 and
+  must be an integer 400–599. Required body is plain JSON, including primitives,
+  arrays and null; no cycles, class instances, non-finite numbers or undefined entries.
+- Header allowlist: `www-authenticate`, `cache-control`, `retry-after`,
+  `content-language`, `x-request-id`. Public types use lowercase keys; runtime
+  matches names case-insensitively and validates HTTP string values. Headers merge
+  over the default challenge. Framing, cookies, CORS and redirects cannot be set.
+- Void, throws/rejections and any invalid result fall back to the original 401
+  JSON-RPC `Unauthorized.` response and default headers. A custom denial cannot
+  grant authority: it ends the request without later auth, route, policy or tool
+  handlers. Successful auth skips the refusal hook.
+- Exported types: `McpHttpAuthRefusal`, `McpHttpAuthRefusalContext`,
+  `McpHttpAuthRefusalResponse`, `McpHttpAuthRefusalBody`, `McpHttpAuthRefusalHeader`.
 
 ## Tools read request headers from `ctx.request`
 
