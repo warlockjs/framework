@@ -132,4 +132,26 @@ PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
 Platform source references and delegation details:
 https://warlock.js.org/v/latest/process/.
 
+## Configuration validation and guardian credentials
+
+`supervisor()` requires nonempty string `owner` and `registry` options. Missing,
+null or invalid configuration throws `TypeError` immediately, naming the first
+invalid option (owner before registry). Validate deployment configuration before
+starting work:
+
+```ts
+import { supervisor } from "@warlock.js/process";
+
+const processes = supervisor({
+  owner: "test-workers",
+  registry: "storage/test-workers.json",
+});
+```
+
+On macOS and Windows, only the guardian receives `WARLOCK_PROCESS_TOKEN` and
+`WARLOCK_PROCESS_LAUNCH`. It authenticates ownership over its socket/named pipe;
+both private variables are removed before spawning the workload (case-insensitively
+on Windows). Ordinary environment entries reach the workload. Linux continues
+to forward the token because ownership is checked through `/proc/<pid>/environ`.
+
 

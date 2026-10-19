@@ -147,7 +147,7 @@ The MCP client does not use `@modelcontextprotocol/sdk`: it speaks MCP's JSON-RP
 
 ---
 name: expose-as-mcp-server
-description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `listFilter`, `validateCallParams`, `McpError`, `routes`, `McpHttpRouteContext`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Expose tools AS an MCP server (Direction B)
@@ -282,13 +282,113 @@ const server = ai.mcp.serve([identity], {
 ```
 
 - `authenticate(request)` may be synchronous or async. `undefined` or a thrown error → `401` with `WWW-Authenticate: Bearer realm="mcp"`; every other value becomes `context.principal` and `ctx.principal`. Secrets in thrown auth errors are not exposed.
-- `beforeCall(context, tool, input)` runs after schema validation. Return nothing to allow; return `McpCallRefusal` (`isError: true`) to send native content/metadata unchanged, independent of result mode. Throw → JSON-RPC `-32602`. Invalid refusals → `-32603`. Invalid input skips policy. The boundary validates before policy and `invoke` keeps its own validation, so schemas must be deterministic and policy input read-only.
+- `beforeCall(context, tool, input)` runs after schema validation. Return nothing to allow; return `McpCallRefusal` (`isError: true`) to send native content/metadata unchanged, independent of result mode. Throw `McpError` → its own code/message/data; other throws → JSON-RPC `-32602`. Invalid refusals → `-32603`. Invalid input skips policy. The boundary validates before policy and `invoke` keeps its own validation, so schemas must be deterministic and policy input read-only.
 - Stdio identity: `transport: { type: "stdio", principal: { id: "local" } }` or `transport: { type: "stdio", principalProvider: async (context) => ({ id: "local", requestId: context.requestId }) }`. The provider runs per request, takes precedence over static principal, and receives the request id and abort signal. A provider throw → JSON-RPC internal error. No HTTP request metadata exists over stdio.
 - Public types: `McpBeforeCall`, `McpCallRefusal`, `McpServeToolContext`, `McpStdioServeTransport`; `ToolContext` in `@warlock.js/ai` adds optional `requestId` and `principal`.
 
 [Cancellation (MCP 2025-11-25)](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation): send `{ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 42, reason: "Caller cancelled" } }`. The matching signal aborts; no JSON-RPC response is sent even if the tool later returns or throws. Unknown/completed/malformed ids are ignored; `initialize` cannot be cancelled. String and numeric ids are distinct; calls sharing an in-flight id still execute, but ambiguous cancellation in one scope is ignored.
 
 HTTP cancellation POSTs must repeat caller credentials and application headers (`Authorization`, `Cookie`, tenant/custom auth headers), from the same remote address. Transport headers such as content length, accept, protocol version and connection may differ. Different credentials can reuse ids safely. Clients sharing credential/application headers must use unique in-flight ids for cancellation to identify a call. Notifications get `202`; a cancelled HTTP call ends with `202`, no JSON-RPC body, when its handler settles. Stdio scopes cancellation to the connection. HTTP disconnect, stdio EOF/close/stop, or HTTP shutdown after the drain timeout also abort tools. Pass `ctx.signal` into cancellable work.
+
+## Control discovery, call envelopes and HTTP side routes
+
+Use this complete example for hidden-but-callable tools, custom protocol errors,
+unknown envelope policy, and side routes under the same authentication:
+
+```ts
+import { randomBytes } from "node:crypto";
+import { ai } from "@warlock.js/ai";
+import { McpError } from "@warlock.js/ai-tools";
+
+const tools = [ai.tools.calculator(), ai.tools.dateTime()];
+const token = randomBytes(32).toString("hex");
+const canCall = (principal: unknown, name: string) =>
+  principal === "member" && tools.some((tool) => tool.name === name);
+
+const server = ai.mcp.serve(tools, {
+  name: "member-tools",
+  listFilter: async (context, descriptors) =>
+    context.principal === "member"
+      ? descriptors.filter((entry) => entry.name === "calculator")
+      : [],
+  validateCallParams: (_context, params) => {
+    const unsupported = Object.keys(params).filter(
+      (key) => !["name", "arguments", "_meta"].includes(key),
+    );
+    if (unsupported.length > 0) {
+      throw new McpError(-32600, "Unsupported call envelope", { fields: unsupported });
+    }
+  },
+  beforeCall: (context, tool) => {
+    if (!canCall(context.principal, tool.name)) {
+      throw new McpError(-32600, "Denied");
+    }
+  },
+  transport: {
+    type: "http",
+    path: "/mcp",
+    auth: { bearer: token, authenticate: () => "member" },
+    routes: [
+      {
+        method: "GET",
+        path: "/tool-policy",
+        handler: (context) => ({
+          body: { allowed: canCall(context.principal, context.url.searchParams.get("name") ?? "") },
+        }),
+      },
+    ],
+  },
+});
+const { url, close } = await server.start();
+// `${url}/tool-policy?name=date_time` requires the same bearer token.
+// date_time stays callable via tools/call, under beforeCall, despite being hidden.
+await close();
+```
+
+- `listFilter(context, tools)` runs per `tools/list`, on fresh wire descriptors
+  with schemas and exposed (possibly prefixed) names. Return a descriptor array,
+  possibly empty or reordered. It only affects discovery; call lookup and policy
+  are independent. A throwing filter fails that list request, leaving tools callable.
+- `validateCallParams(context, params)` runs after the basic object/name check,
+  before lookup/schema validation/`beforeCall`/invoke. It sees the full read-only
+  params including unknown fields, `_meta` and `task`. Return nothing or throw.
+  Both hooks support promises and the same request id/principal/request/signal
+  as `beforeCall`, on HTTP and stdio. For stdio, use
+  `transport: { type: "stdio", principal: "member" }` with these same hooks.
+- `McpError(code, message, data?)` extends `Error`. `beforeCall` and
+  `validateCallParams` preserve its integer code, message and optional data in
+  JSON-RPC errors. SDK `McpError` is recognized by Error/name/integer code without
+  a runtime SDK dependency; its `.message` is preserved including the SDK prefix.
+  Other thrown values stay `-32602`; tool execution errors stay `isError: true`.
+- Defaults continue ignoring extra envelope fields. The server speaks
+  `2025-11-25`, `2025-06-18`, `2025-03-26`, and advertises no task capability.
+  [MCP 2025-11-25 task handling](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks#task-support-and-handling)
+  requires ignoring task metadata without that capability. The example's
+  rejection of `task` is an explicit app policy; omit it to retain default behavior.
+  Allow `_meta`, which is protocol metadata.
+- `transport.routes` is HTTP-only. Host/Origin and all configured bearer,
+  authorize and authenticate checks run before body reads/handlers. Auth is
+  optional on loopback and required elsewhere, just as for MCP. `context` has
+  `request`, `principal`, parsed `url`, raw UTF-8 `body`, `signal`; no request id.
+  Route bodies share `maxBodyBytes`. MCP-only JSON/header checks do not apply.
+  A handler returns `{ status?: number, headers?: Record<string, string>, body?: unknown }`;
+  status defaults to 200, body is JSON, omitted body is empty, HEAD suppresses it.
+  Exceptions return a generic 500. Disconnect and shutdown abort the signal;
+  routes share `close()` draining. Reuse your policy function explicitly;
+  route requests do not invoke `beforeCall`.
+- Route suffix `/tool-policy` appends to MCP path `/mcp` or `/mcp/` as
+  `/mcp/tool-policy` (root MCP path `/` gives `/tool-policy`). Exact methods:
+  GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS. No wildcard, automatic HEAD or CORS.
+  Query strings do not affect matching; read them with `url.searchParams`.
+  Known path + wrong method → 405 with Allow; unknown path → 404.
+- Route suffixes require nonempty segments containing letters/digits/`_-.~`.
+  Empty suffix, `/`, dot segments, percent escapes, repeated or trailing slashes,
+  queries, fragments and wildcards fail start with `McpServeError.type: "config"`.
+  With routes, the MCP base must be a canonical pathname. All methods on the
+  MCP endpoint are reserved, so routes cannot override it. Duplicate method/path
+  pairs fail start with `"collision"`; different methods on a suffix are allowed.
+- Public types: `McpListFilter`, `McpValidateCallParams`, `McpHttpRoute`,
+  `McpHttpRouteContext`, `McpHttpRouteResponse`.
 
 ## Return native MCP results
 
@@ -582,3 +682,24 @@ if (error instanceof WebToolError && error.type === "denied-host") {
 - The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
 - The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every tool here is built on.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes these tools.
+
+## Add the belt to a discovery catalogue
+
+Registration extends the core namespace, preserving `ai.tools.catalogue` and `ai.tools.measure`:
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai, type ModelContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+const surface = ai.tools.catalogue({
+  core: [ai.tools.calculator()],
+  searchable: [ai.tools.dateTime()],
+  limit: 8,
+});
+const assistant = ai.agent({ model, tools: surface.tools });
+const measured = await ai.measure({ model, tools: surface.tools });
+console.log(measured.parts.tools.tokens);
+```
+
+The core plus `tool_search` / `tool_call` stays advertised. Hidden calls still traverse target policy, approval, validation, accounting and tracing. The `define-ai-tool` topic covers lazy descriptors, ranking and measurement comparisons. Native provider tools stay alongside the catalogue; eager ones included in its lists pass through unchanged and are excluded from discovery.

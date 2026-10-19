@@ -1888,8 +1888,8 @@ await warmupProductCache();
 
 ## Verify generated imports
 
-Generated web starter files match the scaffold’s Prettier configuration, using
-`@ianvs/prettier-plugin-sort-imports` with Babel independently of TypeScript 7.
+Generated web starter files match the scaffold’s Oxfmt configuration and its
+built-in import sorting.
 After editing generated code, run `npm run format` and `npm run lint:check`.
 Formatting retains unused imports; the linter reports them.
 
@@ -4589,7 +4589,7 @@ export default defineConfig({
 
 - **`watch.include` / `watch.exclude`** — globs piped into the file watcher. Override when you have non-`.ts(x)` files driving reloads (e.g. SQL fixtures), or to exclude a generated folder.
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
-- **`healthCheckers`** — built-in switches (`{ typescript?, eslint?, oxlint? }`), custom file health checker contracts, or `false` to disable. The `--skip-health` flag disables all checkers for that run. TypeScript runs by default. ESLint uses core's dependency and requires only an app-root flat config; Oxlint requires its package installed in the app plus a config. ESLint is disabled by default; explicitly set `eslint: true` to retain it until removal in 5.34.0. Enabling it prints one deprecation warning and the Oxc migration command.
+- **`healthCheckers`** — built-in switches (`{ typescript?, oxlint? }`), custom checker arrays, or `false`. TypeScript and installed/configured Oxlint run by default. `--skip-health` disables checks for one run. ESLint support was removed in 5.34.0; use `npx warlock upgrade --from 5.33 --to 5.34.0` to remove stale options.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
 - **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See the `update-packages` topic.
 - **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
@@ -4612,12 +4612,12 @@ import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   devServer: {
-    healthCheckers: { typescript: true, eslint: false, oxlint: true },
+    healthCheckers: { typescript: true, oxlint: true },
   },
 });
 ```
 
-Omit the switches to run TypeScript and installed/configured Oxlint; ESLint is off by default and requires `eslint: true`; `true` still requires the linter's config, and Oxlint also requires its app-installed package. Set `oxlint: false` to disable only Oxlint while leaving other defaults intact. A custom checker array replaces the built-in list. Config discovery also accepts `.oxlintrc.jsonc`, `oxlint.config.ts` and `oxlint.config.mts`; use JSON/JSONC on Node 22.15 because current Oxlint TypeScript configs need Node 22.18 or newer.
+Omit switches to run TypeScript and installed/configured Oxlint. Set `oxlint: false` to disable only Oxlint. A custom checker array replaces the built-in list. JSON/JSONC configs work on Node 22.15; current Oxlint TypeScript configs require Node 22.18 or newer.
 
 ## `warlock build` — production bundle
 
@@ -6534,7 +6534,7 @@ Names are case-sensitive, nonempty strings of at most 256 UTF-16 code units. Val
 
 - Default namespace: app name plus the SHA-256 hash of the absolute project root. For changing release directories, configure a stable unique namespace including the deployment environment.
 - Reads: OS keychain → exact scoped environment variable → encrypted file.
-- Optional peer: `pnpm add @napi-rs/keyring`. Core lazily uses its 2.1.1 `AsyncEntry` API. Linux requires `secret-service` for persistence; it does not use the memory-only keyutils fallback. Sources: [official README](https://github.com/Brooooooklyn/keyring-node#readme), [published declarations](https://www.npmjs.com/package/@napi-rs/keyring?activeTab=code), verified 2026-10-19.
+- Optional peer: `npm install @napi-rs/keyring`. Core lazily uses its 2.1.1 `AsyncEntry` API. Linux requires `secret-service` for persistence; it does not use the memory-only keyutils fallback. Sources: [official README](https://github.com/Brooooooklyn/keyring-node#readme), [published declarations](https://www.npmjs.com/package/@napi-rs/keyring?activeTab=code), verified 2026-10-19.
 - One initial read-only probe selects the keychain for that store lifetime. Missing peer/initially unavailable service falls back automatically. A later keychain failure throws `UNAVAILABLE`; do not silently change backends mid-operation. Keep backend availability consistent between deployments; independent backend writes are not reconciled automatically.
 - Environment names are `WARLOCK_SECRET_<namespace UTF-8 uppercase hex>_<name UTF-8 uppercase hex>`; use `environmentName()` to avoid guessing. No unscoped environment fallback. Both mutation methods throw `READ_ONLY` if that variable is present, including `""` and shadowed environment values.
 - File fallback derives a per-namespace HKDF-SHA256 key from `encryption.key` (64 hex characters, conventionally `APP_ENCRYPTION_KEY`) and uses AES-256-GCM with name/namespace authenticated data. It never stores an unencrypted value/key file. Core's global `encrypt()` helper cannot accept a derived key, so the backend uses Node crypto without changing global config. Consult `encrypt-data` for app key provisioning.
@@ -6597,9 +6597,171 @@ Options also allow a `directory` and `encryptionKey` (string or lazy callback); 
 
 ## Error and logging contract
 
-`SecretStoreError.code` is `INVALID_NAME`, `INVALID_VALUE`, `INVALID_NAMESPACE`, `READ_ONLY`, `KEY_REQUIRED`, `UNAVAILABLE`, `UNSAFE_FILE` or `CORRUPT_FILE`. Errors never include names, values, paths or vendor causes. `KEY_REQUIRED` means provision/fix the app encryption key; `CORRUPT_FILE` means wrong key, invalid format or failed authentication. Never replace an unreadable store with an empty one.
+`SecretStoreError.code` is `INVALID_DRIVER`, `MEMORY_IN_PRODUCTION`, `INVALID_NAME`, `INVALID_VALUE`, `INVALID_NAMESPACE`, `READ_ONLY`, `KEY_REQUIRED`, `UNAVAILABLE`, `UNSAFE_FILE` or `CORRUPT_FILE`. Errors never include names, values, paths or vendor causes. `KEY_REQUIRED` means provision/fix the app encryption key; `CORRUPT_FILE` means wrong key, invalid format or failed authentication. Never replace an unreadable store with an empty one.
 
 The store never logs credentials. It registers encountered names and literal values with `@warlock.js/logger` for process-lifetime masking, including old/removed/failed-write values, interpolated messages, Error text/causes, and channel error reports. Keys and exact values stay protected even with permissive custom censors. Registration retains values in memory. It cannot mask direct console/third-party logging, earlier logs, transformed/encoded values, or credentials never encountered by the store. Keep secrets out of logs even with masking enabled. Fake assertion errors do not print values.
+
+## Built-app tests with the memory driver
+
+Run the built server with `SECRETS_DRIVER=memory`, or select the driver in
+`src/config/secrets.ts`. Explicit config takes precedence over the environment;
+`"auto"` (the default) keeps keychain/environment/file behavior. Unknown driver
+names fail with `SecretStoreError.code === "INVALID_DRIVER"`.
+
+```ts title="src/config/secrets.ts"
+import type { SecretsConfigurations } from "@warlock.js/core";
+
+export default {
+  namespace: "browser-test-server",
+  driver: "memory",
+  allowMemoryInProduction: true,
+} satisfies SecretsConfigurations;
+```
+
+`allowMemoryInProduction: true` is required only when the test server runs with
+`NODE_ENV=production`. Without it, memory selection fails closed with
+`MEMORY_IN_PRODUCTION`; a built bundle does not bypass this check. Set this
+option explicitly in the test deployment configuration. `SecretStore` accepts
+the same `driver` and `allowMemoryInProduction` options for standalone stores.
+
+The selected memory driver bypasses keychain, scoped environment secrets and
+files, and still registers values for log masking. Values are isolated by app
+namespace, lost on process exit, and never shared across workers or with a
+separate browser-test process. Seed fixtures through application startup or a
+test-only endpoint in the server process using the normal `secrets.set()` API:
+
+```ts
+import { secrets } from "@warlock.js/core";
+
+await secrets.set("vendor-token", "browser-test-credential");
+const token = await secrets.get("vendor-token");
+```
+
+The normal test harness still installs `secretsFake`; explicit `backend`
+instances and that fake continue to bypass configured backend selection.
+
+
+## test-browser  `@warlock.js/core/test-browser/SKILL.md`
+
+---
+name: test-browser
+description: Write or repair browser e2e specs using warlock e2e and @warlock.js/core/e2e, with owned app fixtures, direct CDP interaction, responsive screenshots and run evidence. Use for real browser flows, click races or viewport overflow; use test-http for API-only tests.
+---
+
+# Browser e2e
+
+Use `@warlock.js/core/e2e`, a Node-only subpath, and default-export `defineE2E` from
+`e2e/*.e2e.ts`. Run `npx warlock e2e`. The CLI loads TypeScript itself; no Vitest
+bootstrap, Playwright, Puppeteer or external browser server is needed.
+
+Every run copies the app into a temporary directory, excludes dotenv files and
+symlinks, links installed dependencies for reads, seeds its own environment and
+owns the app/browser process groups. Keep foreground commands in the fixture;
+never use a shared dev server or daemonize. Map the disposable `dataRoot` into the
+app's actual storage/database config. The harness cannot infer that mapping.
+`prepare` is where seeds and fake executables belong; `app.path` is relative to the
+copied app. Do not install dependencies through the shared `node_modules` link.
+
+## Complete standalone spec
+
+This spec creates its own small app; it can be pasted into an existing project
+with core installed and run with `npx warlock e2e`.
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { defineE2E } from "@warlock.js/core/e2e";
+
+export default defineE2E({
+  app: {
+    start: [process.execPath, "form-fixture.mjs"],
+    portFromFile: true,
+    path: ["fake-bin"],
+    env: ({ dataRoot }) => ({ FORM_DATA: dataRoot }),
+    prepare: async ({ directory, dataRoot }) => {
+      await mkdir(join(directory, "fake-bin"));
+      await writeFile(join(dataRoot, "prefix.txt"), "Saved");
+      await writeFile(
+        join(directory, "form-fixture.mjs"),
+        `
+        import { createServer } from 'node:http';
+        import { readFileSync, writeFileSync } from 'node:fs';
+        import { join } from 'node:path';
+        const prefix = readFileSync(join(process.env.FORM_DATA, 'prefix.txt'), 'utf8');
+        const server = createServer((request, response) => {
+          if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
+          response.setHeader('Content-Type', 'text/html');
+          response.end('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">'
+            + '<input id="name"><button id="save"><span>Save</span></button><h1 id="result">Ready</h1>'
+            + '<script>document.querySelector("#save").onclick=()=>{history.pushState({},"","/saved");document.querySelector("#result").textContent='
+            + JSON.stringify(prefix) + '+" "+document.querySelector("#name").value}</script>');
+        });
+        server.listen(0, '127.0.0.1', () => writeFileSync(process.env.WARLOCK_E2E_PORT_FILE, String(server.address().port)));
+      `,
+      );
+    },
+  },
+  run: async ({ page, step }) => {
+    await page.goto("/");
+    await step("save the form", async () => {
+      await page.fill("#name", "Ada");
+      await page.type("#name", " Lovelace");
+      await page.waitForNavigation(() => page.click("#save"), { url: "/saved" });
+      await page.waitFor({ selector: "#result", text: "Saved Ada Lovelace" });
+    });
+    await page.captureViewports("saved");
+  },
+});
+```
+
+For an existing app, replace `prepare` and `start`; default start is
+`[process.execPath, "dist/app.js"]`. Optional
+`build: [process.execPath, "node_modules/@warlock.js/core/bin/warlock.js", "build"]`
+builds inside the copy. Supply app-specific test service variables via `env` and
+exclude production data directories with `exclude: ["storage", "data"]`.
+By default the fixture supplies an OS-assigned `PORT`/`HTTP_PORT`. Prefer the
+port-file handshake above when the app supports binding `0` itself.
+
+## Interaction and evidence
+
+- Use `page.click` for scrolling, settled boxes and hit testing, including a fresh
+  check after hover. Do not replace it with `element.click()` or fixed sleeps.
+- `fill` clears editable content, then sends CDP text input; `type` appends Unicode
+  text. Values do not appear in step names. `type` does not simulate shortcuts.
+- `waitFor({ selector, text, url, timeoutMs })` combines conditions. Arm navigation
+  **before** clicking with `waitForNavigation(() => page.click(...))`.
+- `setViewport({ name, width, height, mobile })`, `assertViewport()` and
+  `screenshot(name)` are available independently. `captureViewports(name)` checks
+  and captures 1280×800 desktop and 390×844 phone by default, restoring the
+  original viewport. `viewports` overrides the list. Final captures are automatic.
+- Overflow compares document/body scrollWidth **and innerWidth** against the
+  requested width, so a phone that expands to 448 px fails. Keep the viewport meta
+  tag; inspect the reported widest element IDs, classes and dimensions.
+- Health requires zero console errors, exceptions, HTTP statuses >=400 and failed
+  loads (including cancellation). Narrow exceptions use
+  `allowConsoleErrors: [/^Expected warning$/]` and
+  `allowNetworkFailures: [{ url: "/missing", status: 404 }]`. Canceled-request rules
+  can match `errorText`. Strings match substrings; regexps are also accepted.
+- `allowPendingRequests: ["/events"]` exempts an intentional stream from network
+  idle, without allowing its errors. `waitForNetworkIdle()` remains available.
+- `page.evaluate<T>(expression)` is an escape hatch for assertions in the main
+  document. Selector helpers do not enter frames or closed shadow roots.
+
+Use `--browser /path/to/chrome` or `WARLOCK_E2E_BROWSER` if discovery fails.
+`browser: { args: ["--no-sandbox"] }` is an explicit option for controlled root
+containers; it is not a default. On Windows, command arrays should invoke JS tools
+through `process.execPath`, avoiding `.cmd` executables that require a shell.
+
+Read `.warlock/e2e/run-*/evidence.json` and the PNGs/logs on failure. Evidence keeps
+allowed errors, step timings, viewport dimensions and recorded process identities.
+`--out` changes the evidence parent; `--path ./fake-bin,./engine-bin` prepends fake
+binary paths. `runE2E(spec, { outputDirectory, browser, path, signal })` is the
+programmatic runner; `E2ERunError.result` exposes evidence on failure.
+
+Cleanup verifies the unique supervisor command line before stopping only its
+recorded process group (Windows: verified PID tree). It retains disposable files
+if ownership verification fails and reports the failure in evidence. Do not add
+process-name or port-based kills to a spec.
 
 
 ## test-fakes  `@warlock.js/core/test-fakes/SKILL.md`
@@ -8238,54 +8400,95 @@ The CLI preserves incremental state and changed-file filtering. Development
 health checks keep one native compiler session and update its snapshots. Syntax
 analysis uses OXC. `warlock upgrade` still parses/transforms with ts-morph's own
 bundled TypeScript, without using it as the app's compiler. New scaffolds default
-to Oxlint/Oxfmt (`--lint=oxc`). Explicit `--lint=eslint` pins the app's compiler to
-TypeScript **6.0.3** because typescript-eslint requires the old JavaScript API
-and supports `>=4.8.4 <6.1.0`. Keep ESLint apps on 6.0.3 until switching tools:
-
-```bash
-npm install --save-dev --save-exact typescript@6.0.3
-npx tsc --noEmit
-```
-
-The same tsconfig cleanups work with TS6. Starting in 5.33, ESLint mode prints
-a deprecation warning naming removal in 5.34.0 and the Oxc migration command.
+to Oxlint/Oxfmt (`--lint=oxc`) with TypeScript 7.0.2. ESLint support was
+removed in 5.34.0; migrate legacy apps using the steps below.
 
 ## 5.32 to 5.33
 
-**BREAKING:** ESLint background health checking and automatic ESLint selection
-in `warlock check` are disabled by default. Oxlint/Oxfmt replace ESLint/Prettier
-as the default toolchain. Legacy support is deprecated now and removed in
-5.34.0. Temporary opt-ins are `devServer.healthCheckers: { eslint: true }`,
-`warlock check --lint eslint`, and `create-warlock --lint=eslint`; each warns
-about removal and migration. The legacy scaffold stays on TypeScript 6.0.3;
-Oxc apps use TypeScript 7.0.2.
-
-ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
-New apps should use `--lint=oxc`. To migrate an existing app, install the new
-core release and `ts-morph`, then run:
+The original `oxc-toolchain` codemod remains available:
 
 ```bash
 npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
 npx warlock upgrade --from 5.32 --to 5.33.0
+```
+
+## 5.33 to 5.34 toolchain removal
+
+**BREAKING:** ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
+
+```bash
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Review every reported `file:line`: customized configs are preserved and need
-manual translation before removal. The codemod installs the template's Oxlint
-and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
-scripts, removes legacy dependencies, and deletes only recognized generated
-configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
-configs are preserved. `--dry-run --json` reports the same planned changes
-without writing files.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
 The `oxc-toolchain` codemod also updates generated VS Code settings and literal
 ESLint/Oxlint health-check switches. Custom editor settings, checker arrays,
 computed options and nonstandard scripts require review. Oxc diagnostics keep
 framework conventions in `warlock check`. Re-run the migration after addressing
 manual findings if needed; an app with only Oxc tooling is a no-op for this codemod.
+
+## 5.33 to 5.34 plain object validation
+
+**BREAKING:** Seal `v.object()` rejects arrays, dates, maps, sets, class instances
+and objects with custom prototypes, including under `.allowUnknown()` and
+`.stripUnknown()`. Plain and null-prototype dictionaries remain accepted. There
+is no permissive opt-in: choose an array/instance validator or construct a plain
+DTO explicitly before validation.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+class User {
+  name = "Ada";
+}
+const instance = new User();
+const user = v.object({ name: v.string() });
+await v.validate(user, { name: instance.name });
+const names = v.array(v.string());
+await v.validate(names, ["Ada"]);
+```
+
+`v.record(valueValidator)` remains supported. To validate dictionary keys, use
+`v.record(keyValidator, valueValidator)`; malformed arguments now fail while
+defining the schema. Literal-key records infer partial dictionaries because
+only present keys are checked.
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
+
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.
 
 
 ## upload-file  `@warlock.js/core/upload-file/SKILL.md`
@@ -10979,7 +11182,7 @@ const { messages } = await watchBoard({ agent: "implementer", timeoutMs: 30 * 60
 
 ---
 name: warlock-check
-description: 'Verify a change with one command: `warlock check [--changed] [--json]` runs an incremental typecheck, the app''s ESLint/oxlint, the tests affected by the change and framework convention checks, and reports one JSON object per problem `{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }` with exit 1 for problems in your code and 2 for problems with this machine (missing Redis/DB, busy port, Node version, missing tool). Also `warlock typecheck [--changed]`, `warlock explain <CODE>` and the stable `WL` error codes (`errorCodeOf`, `WarlockError`). Triggers: `warlock check`, `warlock typecheck`, `warlock explain`, `--changed`, `--base`, `runCheck`, `runTypecheck`, `CHECK_EXIT_CODES`, `ToolingProblem`, `WL7101`, `WL8003`, `errorCodeOf`, `explainErrorCode`, `WarlockError`, "verify my change", "run the checks", "is this failure my code or the machine", "what does WL3001 mean", "typecheck only changed files". Skip: app diagnostics at boot — the `warlock-doctor` topic; reading the app''s routes/models — the `warlock-inspect` topic; writing tests — the `test-http` / `test-service` topics.'
+description: 'Verify a change with one command: `warlock check [--changed] [--json]` runs an incremental typecheck, the app''s Oxlint, the tests affected by the change and framework convention checks, and reports one JSON object per problem `{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }` with exit 1 for problems in your code and 2 for problems with this machine (missing Redis/DB, busy port, Node version, missing tool). Also `warlock typecheck [--changed]`, `warlock explain <CODE>` and the stable `WL` error codes (`errorCodeOf`, `WarlockError`). Triggers: `warlock check`, `warlock typecheck`, `warlock explain`, `--changed`, `--base`, `runCheck`, `runTypecheck`, `CHECK_EXIT_CODES`, `ToolingProblem`, `WL7101`, `WL8003`, `errorCodeOf`, `explainErrorCode`, `WarlockError`, "verify my change", "run the checks", "is this failure my code or the machine", "what does WL3001 mean", "typecheck only changed files". Skip: app diagnostics at boot — the `warlock-doctor` topic; reading the app''s routes/models — the `warlock-inspect` topic; writing tests — the `test-http` / `test-service` topics.'
 ---
 
 # Warlock — `warlock check`, `typecheck`, `explain`
@@ -11099,10 +11302,10 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 ## Gotchas
 
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
-- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint requires `--lint eslint` (or `runCheck({ lint: "eslint" })`); its flat config alone never enables it. This deprecated selection prints one warning on stderr and is removed in 5.34.0.
+- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint support was removed in 5.34.0; see `upgrade-from-5-29`.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
-- The convention checks are the framework's own and run the same with ESLint, Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
+- The convention checks are the framework's own and run the same with Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 
 ## See also
 
@@ -11550,9 +11753,8 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 `warlock doctor` checks application wiring and HTTP health probes. Use
 `npx warlock check` for source lint diagnostics and `npm run format:check` for
-formatting. In 5.33, Oxlint/Oxfmt are the defaults; ESLint requires
-`warlock check --lint eslint` or `devServer.healthCheckers.eslint: true` for
-background checks. ESLint/Prettier are deprecated and removed in 5.34.0.
+formatting. Oxlint/Oxfmt are the only supported tools in 5.34.0. Use the
+`oxc-toolchain-removal` upgrade step to migrate remaining legacy configs.
 Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`).
 
 
@@ -17250,8 +17452,9 @@ v.object({
 });
 ```
 
+- **Plain objects only.** Arrays and non-plain objects fail even with `.allowUnknown()` or `.stripUnknown()`. Null-prototype dictionaries work. Convert class instances to explicit DTOs; no permissive opt-in is provided.
 - **Required by default.** `.optional()` to opt out — the `{ isOptional: true }` brand makes the key optional in `Infer<>`.
-- **Unknown keys policy.** By default extra keys are silently dropped from `data`. Toggle with `.allowUnknown()` (forward as-is), `.stripUnknown()` (explicit drop), or `.allow(...keys)` (whitelist specific extras). See [`object-methods.md`](./object-methods.md).
+- **Unknown keys policy.** By default extra keys fail validation. Toggle with `.allowUnknown()` (forward as-is), `.stripUnknown()` (explicit drop), or `.allow(...keys)` (whitelist specific extras). See [`object-methods.md`](./object-methods.md).
 - **Schema composition.** `.extend(schema)`, `.merge(other)`, `.pick(...keys)`, `.without(...keys)`, `.partial(...keys)`, `.requiredFields(...keys)` — all in [`object-methods.md`](./object-methods.md).
 - **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`) attach to fields _inside_ a `v.object`. Without a parent, sibling resolution silently passes.
 
@@ -17273,7 +17476,7 @@ v.record(v.object({ count: v.int() })); // type: Record<string, { count: number 
 v.record(); // type: Record<string, any>
 ```
 
-Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. If keys are also constrained (e.g. only `"draft" | "published"`), use `v.object` with literal keys instead — the constraint lives in the type.
+Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. Use `v.record(keyValidator, valueValidator)` to constrain present keys, or `v.object` to require named keys.
 
 ## `v.tuple` — positional types
 
@@ -17383,6 +17586,24 @@ Use for: trees (categories, file systems), threaded data (comment chains), mutua
 - [`array-methods.md`](./array-methods.md) — `.minLength` / `.maxLength` / `.length` / `.between` / `.unique` / `.sorted` / `.flip` / `.sort` / `.onlyUnique`.
 
 `v.record` and `v.tuple` share the array-style length surface. `v.union` and `v.discriminatedUnion` have no chainable methods beyond what's shown above. `v.lazy` is a single-call factory.
+
+## Validate dictionary keys (5.34)
+
+```ts
+import { v, type Infer } from "@warlock.js/seal";
+
+const counts = v.record(v.literal("draft", "published"), v.int());
+type Counts = Infer.Output<typeof counts>; // Partial<Record<"draft" | "published", number>>
+await v.validate(counts, { draft: 2 });
+const dictionary = v.record(v.string(), v.int()); // Record<string, number>
+await v.validate(dictionary, { arbitrary: 1 });
+```
+
+`v.record(valueValidator)` and its optional string error message still work.
+Two validator arguments mean key then value; an optional third string sets the
+object error. Invalid arguments throw at definition. Key transforms never
+rename entries; present keys are validated as strings. Literal keys are optional
+in the inferred dictionary; use `v.object` for required named fields.
 
 
 ### define-structural-shape/array-methods.md  `@warlock.js/seal/define-structural-shape/array-methods.md`
@@ -21581,6 +21802,98 @@ const tsFiles = await walk("./src");
 - Don't list a directory you're concurrently modifying — readdir snapshots aren't atomic across concurrent writes.
 
 
+## multi-file-transactions  `@warlock.js/fs/multi-file-transactions/SKILL.md`
+
+---
+name: multi-file-transactions
+description: "Use fs.transaction, fs.openTransactions, fs.inspectTransactions and fs.read for cooperating local multi-file writes, CAS, durable roll-forward recovery, operation-id replay and consistent snapshots."
+---
+
+# Multi-file state transactions
+
+Use this for bounded application state on a trusted local root shared by
+cooperating processes on one host and PID namespace. All writers must use
+transactions; ordinary fs writes bypass the lock and epoch. The root already
+exists. This is not distributed storage or a hostile-directory sandbox.
+
+```ts
+import { fs, FsTransactionError } from "@warlock.js/fs";
+
+const root = "/srv/state";
+const store = await fs.openTransactions(root); // recovers interrupted intents
+const { epoch } = await store.inspect();
+
+try {
+  const result = await fs.transaction(
+    root,
+    async (tx) => {
+      const previous = await tx.readBuffer("state.json"); // Buffer copy or null
+      const expectedHash = previous === null ? null : fs.hash.buffer(previous);
+      await tx.write("state.json", '{"ready":true}', { expectedHash });
+      await tx.write("status.txt", "ready");
+      await tx.remove("obsolete.txt");
+      const hash = await tx.hash("state.json"); // staged bytes
+      return { status: await tx.read("status.txt"), hash };
+    },
+    { operationId: "initialize-001", expectedEpoch: epoch },
+  );
+  console.log(result);
+} catch (error) {
+  if (error instanceof FsTransactionError && error.type === "cas-conflict") {
+    // Refresh the original snapshot and decide whether to submit a new operation.
+  } else {
+    throw error;
+  }
+}
+
+// Same id returns its recorded JSON result, ignores CAS, and skips the callback.
+const replayed = await store.transaction(async () => ({ unused: true }), {
+  operationId: "initialize-001",
+});
+
+const diagnostic = await fs.inspectTransactions(root); // read-only, no recovery
+console.log(diagnostic.pending, diagnostic.operations, replayed);
+
+const status = await fs.read("status.txt", { root, consistent: true, attempts: 5 });
+const boundStatus = await store.read("status.txt", { consistent: true });
+const [state, matchingStatus] = await store.readMany(["state.json", "status.txt"], {
+  consistent: true,
+});
+console.log(status, boundStatus, state, matchingStatus);
+```
+
+- Await every tx call. Reads see staged changes; missing files return null.
+  `expectedHash` always compares original bytes; null requires absence.
+- Root epochs serialize CAS. Lock waits default to 5000 ms (`lockTimeoutMs`).
+  Never nest/open the same root within its transaction callback.
+- Results must be JSON values or top-level undefined. A key always means its
+  original operation; bind it to request identity yourself. Historical replay
+  does not invoke your callback or authorization logic.
+- The durable journal holds full before/after file bytes and the callback result.
+  After intent publication, errors mean uncertainty, not rollback. Open again
+  to roll forward; recovery validates all original/replacement images, refuses
+  foreign bytes and never invokes the callback. Inspection does not repair.
+- Default full durability flushes file before rename and directory afterward,
+  including new parent entries. Keep the existing root/ancestors durable.
+  Windows must explicitly use `{ durability: "file" }` when opening a store
+  or calling fs.transaction: process-termination recovery only, no OS-crash or
+  power-loss guarantee. Rename retries transient locks without deleting targets.
+- Consistent readers retry busy/changed epochs, at most `attempts` (1–100,
+  default 5), with `retryDelayMs` (0–1000, default 10). Exhaustion throws
+  `snapshot-changed`. `readMany` protects a group; separate reads may differ.
+- Bakery tickets never evict live paused writers. Dead PID tickets are safely
+  removed by unique filename. PID reuse/uncertain liveness may require operator
+  inspection; foreign-host tickets fail closed. Do not manually clear a live lock.
+- Paths must be relative, free of symlinks/Windows aliases, and outside reserved
+  `.warlock-transactions`. Do not move a root or modify/delete its journal.
+  History is retained without compaction. Protect it as sensitive application data.
+  Replacements use mode 0600 and do not preserve inode metadata.
+
+Flat APIs: `transactionAsync`, `openTransactionRootAsync`,
+`inspectTransactionsAsync`, `readTransactionFileAsync`. The facade is preferred.
+For one file without CAS or locking, use the `write-atomically` topic.
+
+
 ## overview  `@warlock.js/fs/overview/SKILL.md`
 
 ---
@@ -21642,6 +21955,13 @@ Write files so concurrent readers never see a half-written state. Covers
 Sibling temp file + atomic rename — last-writer-wins on contention, no locking.
 
 Load when writing a file that other processes / file watchers / build steps consume in parallel (config, manifest, state, lockfile).
+
+### `multi-file-transactions`
+
+Use `fs.transaction` / `fs.openTransactions` for cooperating local multi-file
+state, hash/epoch CAS, durable roll-forward recovery, idempotent result replay,
+`fs.inspectTransactions`, and bounded consistent `fs.read` / root `readMany`.
+See this topic for the platform durability and writer-ownership limits.
 
 ### `hash-files`
 
@@ -22052,7 +22372,7 @@ The random 6-byte suffix prevents two concurrent writers from racing on the same
 
 Two `atomicWriteAsync` calls to the same target serialize at the rename. Whichever rename completes last wins. **No locking** — last-writer-wins is the contract.
 
-If you need read-modify-write atomicity (each writer sees the previous writer's result), wrap the calls in a distributed lock — e.g. the `use-cache-lock` topic of the `warlock-js-cache` skill.
+For local read-modify-write safety, use `fs.transaction`; see the `multi-file-transactions` topic. All writers must cooperate with that protocol.
 
 ## Common shapes
 
@@ -22109,8 +22429,8 @@ try {
 
 ## What it doesn't protect against
 
-- **Filesystem corruption.** Power-loss between `writeFile` and `rename` leaves the temp file behind — that's `fsync` territory, not handled here. For ironclad durability, you'd need a `writeFile + fsync + rename + fsync(parent)` sequence; this helper skips the fsyncs for write speed.
-- **Cross-filesystem renames.** If `dir` is a different mount from the target's actual storage (unusual), `rename` may fall back to copy + delete, which isn't atomic. Keep the temp on the same mount — the helper does this automatically.
+- **Default durability.** The default skips fsync. Select `{ durability: "full" }` for file-before-rename and directory-after-rename flushes on POSIX, subject to filesystem/hardware guarantees. Windows requires explicit `file` durability and offers no power-loss guarantee.
+- **Cross-filesystem renames.** The temp is a sibling on the same mount. Rename failures are propagated; there is no copy/delete fallback.
 - **Race conditions in your callers.** `atomicWriteAsync` makes the file write atomic; it doesn't serialize callers. Two callers stomping each other is your problem, not the helper's.
 
 ## See also
@@ -22123,7 +22443,22 @@ try {
 - Don't use `atomicWriteAsync` when you don't need atomicity — `putFileAsync` is slightly faster (no rename round-trip). For ephemeral files, plain write is fine.
 - Don't store the temp file outside the target directory. The helper picks the same dir on purpose so the rename is intra-mount; if you reach inside the source and change that, you lose the atomicity guarantee on cross-mount setups.
 - Don't pair atomic writes with locked reads expecting consistency. A reader between the rename and your next write sees the intermediate complete state — that's the point of the helper. If you want every read to see a particular write, serialize with a lock.
-- Don't sync after atomic write expecting "definitely persisted to disk" — the helper doesn't fsync. For durability guarantees, fsync the parent directory after the rename yourself.
+- For durable single-file replacement, select `{ durability: "full" }`; default writes remain unflushed. A post-rename directory flush alone does not establish file-byte durability.
+
+## Optional durability
+
+```ts
+import { atomicWriteAsync } from "@warlock.js/fs";
+
+await atomicWriteAsync("./state.json", JSON.stringify({ ready: true }), {
+  durability: "full", // POSIX: file fsync, rename, directory fsync
+});
+// Windows must choose file-only; no OS-crash/power-loss promise.
+await atomicWriteAsync("./state.json", "{}", { durability: "file" });
+```
+
+A directory-sync error may occur after the new target is visible. This helper
+has no journal; use the `multi-file-transactions` topic for automatic recovery.
 
 
 ================================================================================
@@ -24724,7 +25059,7 @@ description: 'Configure `@warlock.js/queue`: the declarative `src/config/queue.t
 
 # Configure the queue
 
-Redis is required. The config is declarative; the connector applies it.
+BullMQ is the default and requires Redis. Select `driver: "local"` for durable SQLite without Redis (Node >= 22.15), or `driver: "memory"` for tests; see `local-queues` for working examples, leases, and cancellation. The config is declarative; the connector applies it.
 
 ```ts title="src/config/queue.ts"
 import type { QueueConfig } from "@warlock.js/queue";
@@ -24879,6 +25214,131 @@ Jobs are not run — call the handler to test it. Opt out with `tests.fakes: { q
 - Defining the same name again replaces the handler (this is what keeps dev reloads working), so keep names unique.
 
 
+## local-queues  `@warlock.js/queue/local-queues/SKILL.md`
+
+---
+name: local-queues
+description: 'Run @warlock.js/queue without Redis: driver: "local" for durable single-host SQLite jobs using node:sqlite on Node >= 22.15, or driver: "memory" for real handler execution in tests. Covers local.path, leases, crash recovery, polling, concurrency, cancellation, graceful shutdown, and at-least-once delivery. Use for local/desktop background jobs, testing workers without Redis, or configuring SQLite queues.'
+---
+
+# Local and memory queues
+
+Select a backend in the usual queue config; register `queueConnector()` as usual.
+No extra dependency is needed. Existing config defaults to BullMQ.
+
+```ts title="src/config/queue.ts"
+import type { QueueConfig } from "@warlock.js/queue";
+
+export default {
+  driver: "local",
+  prefix: "my-app",
+  local: {
+    path: "/var/lib/my-app/jobs.sqlite",
+    leaseDuration: 30_000,
+    pollInterval: 100,
+  },
+  workers: { concurrency: 3, shutdownTimeout: 5000 },
+  defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 1000 } },
+} satisfies QueueConfig;
+```
+
+Node's built-in SQLite is available without flags from Node 22.13, still
+experimental in Node 22.15. A no-flags import/query was verified on Node
+22.15.0. Require Node >= 22.15 with `node:sqlite` available; unavailable
+runtimes throw on selecting local storage. Sources:
+[Node changelog](https://nodejs.org/en/blog/release/v22.13.0),
+[Node 22.15 API](https://nodejs.org/download/release/v22.15.0/docs/api/sqlite.html).
+BullMQ/memory do not load SQLite.
+
+## Define, dispatch, inspect, and retry
+
+```ts
+import { defineJob, failedJobs, retryFailedJob } from "@warlock.js/queue";
+
+const resize = defineJob({
+  name: "images.resize",
+  async handle(payload: { imageId: string }, ctx) {
+    ctx.signal?.throwIfAborted();
+    await ctx.progress(50);
+    await ctx.log(`resizing ${payload.imageId}`);
+    return { ready: true };
+  },
+});
+
+const { id } = await resize.dispatch(
+  { imageId: "42" },
+  {
+    jobId: "resize-42",
+    delay: "2s",
+    priority: 1,
+    attempts: 4,
+    backoff: { type: "fixed", delay: 500 },
+  },
+);
+const snapshot = await resize.find(id);
+console.log(snapshot?.state, snapshot?.result);
+for (const job of await failedJobs()) await job.retry();
+// For an id known to be failed: await retryFailedJob(id);
+```
+
+The same API supports fixed/numeric or exponential backoff, priority/FIFO,
+retention, context propagation, `UnrecoverableJobError`, and failed-job retry.
+Payload/context/result/progress are JSON data. Attempts include the first
+execution; crashed leases re-deliver without consuming a settled attempt.
+
+## Memory tests and scripts
+
+```ts
+import {
+  closeQueue,
+  defineJob,
+  setDispatchInterceptor,
+  setQueueConfig,
+  startWorkers,
+} from "@warlock.js/queue";
+
+setDispatchInterceptor(undefined); // opt out of queueFake for real execution
+setQueueConfig({ driver: "memory", workers: { concurrency: 2 } });
+const double = defineJob({ name: "numbers.double", handle: (value: number) => value * 2 });
+await startWorkers();
+const { id } = await double.dispatch(21);
+try {
+  const deadline = Date.now() + 5000;
+  while ((await double.find(id))?.state !== "completed") {
+    if (Date.now() >= deadline) throw new Error("Job did not complete");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  console.log((await double.find(id))?.result); // 42
+} finally {
+  await closeQueue({ timeout: 1000 });
+}
+```
+
+Memory storage belongs to one process and is cleared by `closeQueue()`.
+Use temporary SQLite files for restart/crash tests. `workers.enabled: false`
+and process-role gating work for every backend.
+
+## Durability and shutdown rules
+
+- Use the same absolute file path, namespace (`prefix`), and job definitions
+  in every producer/worker. Default file: `.warlock/queue.sqlite`, relative
+  to cwd. Parents are created; use writable local disk, never a network share.
+- SQLite WAL plus FULL synchronous writes persist jobs. Short synchronous
+  transactions claim jobs atomically. A unique token fences every renewal,
+  progress update, and completion; an expired owner cannot write.
+- The lease defaults to 30 seconds, renews every third of its duration, and
+  must be at least 30 ms. Polling defaults to 100 ms, minimum 1 ms. Concurrency
+  is per queue per process. Avoid blocking the event loop longer than the lease.
+- Shutdown stops claims immediately, finishes handlers within the timeout,
+  then aborts `ctx.signal` and releases remaining leases. Observe cancellation
+  in handlers and operations. Await close before changing config or restarting.
+- A crashed process's jobs re-deliver after lease expiry. Delivery is at least
+  once: make external side effects idempotent. Expired/released handlers that
+  ignore cancellation can keep running even though queue writes are fenced.
+- `getQueue()` and bull-board require BullMQ. Use `find()` / `failedJobs()`
+  with local/memory queues. Prefer BullMQ for multi-host/high-volume workloads.
+
+
 ## manage-failed-jobs  `@warlock.js/queue/manage-failed-jobs/SKILL.md`
 
 ---
@@ -24960,12 +25420,12 @@ description: "@warlock.js/queue overview for orientation and choosing the focuse
 
 # `@warlock.js/queue` — overview
 
-Durable background jobs. Jobs are stored in **Redis** (required), retried on failure, and processed by workers — inside the app process by default.
+Durable background jobs. Jobs are stored in **Redis** (default), local SQLite without Redis, or memory for tests, retried on failure, and processed by workers — inside the app process by default.
 
 ## Mental model
 
 - **Job definition** — `defineJob({ name, handle })` registers a handler by name and returns a typed job.
-- **Dispatch** — `job.dispatch(payload, options)` stores the job in Redis. Any process with the same definition and a worker can run it.
+- **Dispatch** — `job.dispatch(payload, options)` stores the job in the configured backend. Any process with the same definition and a worker can run it.
 - **Worker** — one per queue name, started by `queueConnector()` (or `startWorkers()`); routes each job to the handler with its name.
 - **Shutdown** — workers stop taking jobs, active jobs finish (up to `workers.shutdownTimeout`), then connections close.
 
@@ -24975,6 +25435,7 @@ Durable background jobs. Jobs are stored in **Redis** (required), retried on fai
 
 ## Skills index
 
+- `local-queues` — SQLite/memory configuration, leases, crash recovery, cancellation.
 - `configure-queue` — `src/config/queue.ts`, `queueConnector()`, workers on/off, shutdown.
 - `define-jobs` — `defineJob`, `dispatch` options, retries, progress, `find`.
 - `manage-failed-jobs` — `failedJobs`, `retryFailedJob`, the bull-board dashboard.
@@ -28249,6 +28710,28 @@ PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
 
 Platform source references and delegation details:
 https://warlock.js.org/v/latest/process/.
+
+## Configuration validation and guardian credentials
+
+`supervisor()` requires nonempty string `owner` and `registry` options. Missing,
+null or invalid configuration throws `TypeError` immediately, naming the first
+invalid option (owner before registry). Validate deployment configuration before
+starting work:
+
+```ts
+import { supervisor } from "@warlock.js/process";
+
+const processes = supervisor({
+  owner: "test-workers",
+  registry: "storage/test-workers.json",
+});
+```
+
+On macOS and Windows, only the guardian receives `WARLOCK_PROCESS_TOKEN` and
+`WARLOCK_PROCESS_LAUNCH`. It authenticates ownership over its socket/named pipe;
+both private variables are removed before spawning the workload (case-insensitively
+on Windows). Ordinary environment entries reach the workload. Linux continues
+to forward the token because ownership is checked through `/proc/<pid>/environ`.
 
 
 ================================================================================
@@ -32929,6 +33412,35 @@ export function knownDestination(name: string): string | undefined {
 table exists and narrows a dynamic name for `href()`; it does not generate a
 route or validate that all required parameters were supplied.
 
+## Refresh triggers and shared shell data
+
+Refresh lifecycle events (`onNavigating`, `onNavigated`, `onNavigationError`)
+carry `reason`: `"refresh"` for an explicit `refresh()`, `"live"` for live-data
+invalidation, `"poll"` for polling/reconnect catch-up, and `"focus"` for window
+focus catch-up on live pages. Ordinary route navigations omit `reason`.
+
+```ts
+import { refresh, routerEvents } from "@warlock.js/web";
+
+const stop = routerEvents.onNavigated((event) => {
+  if (event.reason === "refresh") console.log("Refresh complete");
+});
+await refresh(); // explicit/user refresh
+await refresh({ reason: "poll" }); // app-owned background revalidation
+stop();
+```
+
+Background reasons bypass page caches. Built-in live updates still wait for
+navigation and unsent form edits; explicit refreshes remain user requests.
+`RefreshReason` and `RefreshOptions` are exported types. Filter background
+reasons explicitly instead of treating every history `replace` as background.
+
+Each successful client page/shell swap installs and recursively freezes that
+payload's `shared` snapshot before rendering. Retained components using
+`useShared()` subscribe to the new snapshot, including across consecutive shell
+switches. Write shared values in server middleware on each request; client
+writes remain refused.
+
 ## observe-page-requests  `@warlock.js/web/observe-page-requests/SKILL.md`
 
 ---
@@ -36404,7 +36916,7 @@ https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fe
 
 ---
 name: define-ai-tool
-description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `createToolContext`, `measureTools`, `ai.tools.measure`, `toolSchemas`, `compactJsonSchema`, `compactToolSchemas`, `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`, `ai.providerTool`, `ProviderTool`, `providerTools`, `isProviderTool`, `web_search`, `code_execution`, `text_editor`, `googleSearch`, `nova_grounding`; ''define a tool'', ''enable the provider's web search'', ''use Claude's bash / text editor tool'', ''built-in provider tools'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
+description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tools.catalogue`, `catalogue`, `createToolContext`, `measureTools`, `ai.tools.measure`, `toolSchemas`, `compactJsonSchema`, `compactToolSchemas`, `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`, `ai.providerTool`, `ProviderTool`, `providerTools`, `isProviderTool`, `web_search`, `code_execution`, `text_editor`, `googleSearch`, `nova_grounding`; ''define a tool'', ''enable the provider's web search'', ''use Claude's bash / text editor tool'', ''built-in provider tools'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
 ---
 
 # `ai.tool()` — typed tool factory
@@ -36662,7 +37174,7 @@ Workflow errors surface as `ToolExecutionError` with `cause` pointing at the ori
 
 ## Schema token cost — measure, then go compact
 
-Every tool's JSON schema is re-sent on every trip. `measureTools` (also `ai.tools.measure` with `@warlock.js/ai-tools`) reports what the list costs per call: native and exact when the model has `countTokens` (Anthropic, Google, Bedrock, OpenAI Responses — `tools.length + 2` count calls, `perTool` = each tool's marginal cost, `overhead` = the provider's once-per-request tool preamble), estimated from the schema JSON otherwise. `source` says which.
+Every tool's JSON schema is re-sent on every trip. `measureTools` (also `ai.tools.measure` in AI core) reports what the list costs per call: native and exact when the model has `countTokens` (Anthropic, Google, Bedrock, OpenAI Responses — `tools.length + 2` count calls, `perTool` = each tool's marginal cost, `overhead` = the provider's once-per-request tool preamble), estimated from the schema JSON otherwise. `source` says which.
 
 ```ts
 import { ai, compactJsonSchema, extractJsonSchema, measureTools } from "@warlock.js/ai";
@@ -36741,6 +37253,66 @@ Pro and Fetch have separate namespaced counters and prices. Qwen's flag still
 has no verified billing counter mapped. xAI's hosted search uses Responses and
 is rejected by the current Chat Completions XaiSDK. Full shapes and official
 sources: https://warlock.js.org/v/latest/ai/providers/openai-compatible/
+
+## Stable discovery catalogue
+
+`ai.tools.catalogue` (also named `catalogue`) ships in AI core; no belt import is needed. Pass its `tools` array to an agent. Core tools and `tool_search` / `tool_call` stay advertised for every trip. Searchable tools can be eager contracts (`meta.tags` supplies tags), or lazy descriptors:
+
+```ts
+import { ai, type ModelContract } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+declare const model: ModelContract;
+const core = [
+  ai.tool({
+    name: "health",
+    description: "Read service health",
+    execute: async () => ({ ready: true }),
+  }),
+];
+const surface = ai.tools.catalogue({
+  core,
+  limit: 8,
+  searchable: [
+    {
+      name: "archive_note",
+      description: "Archive a note",
+      tags: ["notes"],
+      load: async () =>
+        ai.tool({
+          name: "archive_note",
+          description: "Archive a note",
+          input: v.object({ id: v.string() }),
+          execute: async ({ id }) => ({ archived: id }),
+        }),
+    },
+  ],
+});
+const assistant = ai.agent({
+  model,
+  tools: surface.tools,
+  middleware: [
+    ai.human.approval({
+      policy: { type: "allowlist", tools: ["archive_note"] },
+      handler: async () => ({ type: "reject", reason: "Operator review required" }),
+    }),
+  ],
+});
+const measured = await ai.measure({ model, tools: surface.tools });
+console.log(measured.parts.tools.tokens, measured.parts.tools.source);
+const schemas = await ai.tools.measure(surface.tools, { model });
+console.log(schemas.tokens);
+```
+
+The model searches `{ query: "notes" }` and receives at most `limit` tools with real `inputSchema` values; it then uses `tool_call({ name: "archive_note", input: { id: "n-1" } })`. `limit` is a positive integer (default 8). Customize meta-tool names with `searchName` / `callName`. Search scores every whitespace-separated, case-insensitive term by exact name (100), name substring (20), tag substring (10), then description (1); all terms must match, scores sum, ties use code-unit name order. `*` lists alphabetically; blank queries return nothing. Maximum query length is 500 characters.
+
+Only selected search results or named calls load a lazy tool. Successful and concurrent loads are shared for the catalogue lifetime; failures are retryable. Use dynamic imports inside the loader to defer modules. The resolved tool must have the declared name and expose JSON schema when it has an input schema; missing JSON conversion fails search rather than fabricating a schema. Search always returns full draft-2020-12 schemas. Discovery does not change advertisement.
+
+The agent resolves calls before its normal target dispatch. Scope policy and HITL to the target name; approval edits still undergo that target's validation. Events/reports identify the target with the original call id; history retains the meta-call. Budgets, nested usage, cancellation, artifacts, identity context, concurrency and silent semantics use the direct-call path. Standalone `surface.call.invoke()` / `.execute()` fails closed. Core and meta-tools cannot be invoked through the catalogue. Search reveals inventory metadata even when middleware would deny execution; build user-appropriate inventories when metadata is sensitive. Hidden names participate in durable signature checks without loading; bump the agent version for behavior/schema changes.
+
+Keep provider-hosted tools alongside `...surface.tools`. Eager provider tools accidentally placed in either list pass through unchanged and are excluded from search/call. Lazy loaders may not return them.
+
+For savings, compare `ai.measure({ model, tools: fullEagerList })` with `ai.measure({ model, tools: surface.tools })` and inspect `ai.measure.diff(full, discovered).parts.tools`; negative tokens mean a reduction. Measurement does not load hidden tools. Search-result schemas and extra trips still cost context tokens; include representative discovery messages when measuring the whole run.
 
 
 ## detect-and-redact-pii  `@warlock.js/ai/detect-and-redact-pii/SKILL.md`
@@ -45411,7 +45983,7 @@ The MCP client does not use `@modelcontextprotocol/sdk`: it speaks MCP's JSON-RP
 
 ---
 name: expose-as-mcp-server
-description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `listFilter`, `validateCallParams`, `McpError`, `routes`, `McpHttpRouteContext`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Expose tools AS an MCP server (Direction B)
@@ -45546,13 +46118,113 @@ const server = ai.mcp.serve([identity], {
 ```
 
 - `authenticate(request)` may be synchronous or async. `undefined` or a thrown error → `401` with `WWW-Authenticate: Bearer realm="mcp"`; every other value becomes `context.principal` and `ctx.principal`. Secrets in thrown auth errors are not exposed.
-- `beforeCall(context, tool, input)` runs after schema validation. Return nothing to allow; return `McpCallRefusal` (`isError: true`) to send native content/metadata unchanged, independent of result mode. Throw → JSON-RPC `-32602`. Invalid refusals → `-32603`. Invalid input skips policy. The boundary validates before policy and `invoke` keeps its own validation, so schemas must be deterministic and policy input read-only.
+- `beforeCall(context, tool, input)` runs after schema validation. Return nothing to allow; return `McpCallRefusal` (`isError: true`) to send native content/metadata unchanged, independent of result mode. Throw `McpError` → its own code/message/data; other throws → JSON-RPC `-32602`. Invalid refusals → `-32603`. Invalid input skips policy. The boundary validates before policy and `invoke` keeps its own validation, so schemas must be deterministic and policy input read-only.
 - Stdio identity: `transport: { type: "stdio", principal: { id: "local" } }` or `transport: { type: "stdio", principalProvider: async (context) => ({ id: "local", requestId: context.requestId }) }`. The provider runs per request, takes precedence over static principal, and receives the request id and abort signal. A provider throw → JSON-RPC internal error. No HTTP request metadata exists over stdio.
 - Public types: `McpBeforeCall`, `McpCallRefusal`, `McpServeToolContext`, `McpStdioServeTransport`; `ToolContext` in `@warlock.js/ai` adds optional `requestId` and `principal`.
 
 [Cancellation (MCP 2025-11-25)](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation): send `{ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 42, reason: "Caller cancelled" } }`. The matching signal aborts; no JSON-RPC response is sent even if the tool later returns or throws. Unknown/completed/malformed ids are ignored; `initialize` cannot be cancelled. String and numeric ids are distinct; calls sharing an in-flight id still execute, but ambiguous cancellation in one scope is ignored.
 
 HTTP cancellation POSTs must repeat caller credentials and application headers (`Authorization`, `Cookie`, tenant/custom auth headers), from the same remote address. Transport headers such as content length, accept, protocol version and connection may differ. Different credentials can reuse ids safely. Clients sharing credential/application headers must use unique in-flight ids for cancellation to identify a call. Notifications get `202`; a cancelled HTTP call ends with `202`, no JSON-RPC body, when its handler settles. Stdio scopes cancellation to the connection. HTTP disconnect, stdio EOF/close/stop, or HTTP shutdown after the drain timeout also abort tools. Pass `ctx.signal` into cancellable work.
+
+## Control discovery, call envelopes and HTTP side routes
+
+Use this complete example for hidden-but-callable tools, custom protocol errors,
+unknown envelope policy, and side routes under the same authentication:
+
+```ts
+import { randomBytes } from "node:crypto";
+import { ai } from "@warlock.js/ai";
+import { McpError } from "@warlock.js/ai-tools";
+
+const tools = [ai.tools.calculator(), ai.tools.dateTime()];
+const token = randomBytes(32).toString("hex");
+const canCall = (principal: unknown, name: string) =>
+  principal === "member" && tools.some((tool) => tool.name === name);
+
+const server = ai.mcp.serve(tools, {
+  name: "member-tools",
+  listFilter: async (context, descriptors) =>
+    context.principal === "member"
+      ? descriptors.filter((entry) => entry.name === "calculator")
+      : [],
+  validateCallParams: (_context, params) => {
+    const unsupported = Object.keys(params).filter(
+      (key) => !["name", "arguments", "_meta"].includes(key),
+    );
+    if (unsupported.length > 0) {
+      throw new McpError(-32600, "Unsupported call envelope", { fields: unsupported });
+    }
+  },
+  beforeCall: (context, tool) => {
+    if (!canCall(context.principal, tool.name)) {
+      throw new McpError(-32600, "Denied");
+    }
+  },
+  transport: {
+    type: "http",
+    path: "/mcp",
+    auth: { bearer: token, authenticate: () => "member" },
+    routes: [
+      {
+        method: "GET",
+        path: "/tool-policy",
+        handler: (context) => ({
+          body: { allowed: canCall(context.principal, context.url.searchParams.get("name") ?? "") },
+        }),
+      },
+    ],
+  },
+});
+const { url, close } = await server.start();
+// `${url}/tool-policy?name=date_time` requires the same bearer token.
+// date_time stays callable via tools/call, under beforeCall, despite being hidden.
+await close();
+```
+
+- `listFilter(context, tools)` runs per `tools/list`, on fresh wire descriptors
+  with schemas and exposed (possibly prefixed) names. Return a descriptor array,
+  possibly empty or reordered. It only affects discovery; call lookup and policy
+  are independent. A throwing filter fails that list request, leaving tools callable.
+- `validateCallParams(context, params)` runs after the basic object/name check,
+  before lookup/schema validation/`beforeCall`/invoke. It sees the full read-only
+  params including unknown fields, `_meta` and `task`. Return nothing or throw.
+  Both hooks support promises and the same request id/principal/request/signal
+  as `beforeCall`, on HTTP and stdio. For stdio, use
+  `transport: { type: "stdio", principal: "member" }` with these same hooks.
+- `McpError(code, message, data?)` extends `Error`. `beforeCall` and
+  `validateCallParams` preserve its integer code, message and optional data in
+  JSON-RPC errors. SDK `McpError` is recognized by Error/name/integer code without
+  a runtime SDK dependency; its `.message` is preserved including the SDK prefix.
+  Other thrown values stay `-32602`; tool execution errors stay `isError: true`.
+- Defaults continue ignoring extra envelope fields. The server speaks
+  `2025-11-25`, `2025-06-18`, `2025-03-26`, and advertises no task capability.
+  [MCP 2025-11-25 task handling](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks#task-support-and-handling)
+  requires ignoring task metadata without that capability. The example's
+  rejection of `task` is an explicit app policy; omit it to retain default behavior.
+  Allow `_meta`, which is protocol metadata.
+- `transport.routes` is HTTP-only. Host/Origin and all configured bearer,
+  authorize and authenticate checks run before body reads/handlers. Auth is
+  optional on loopback and required elsewhere, just as for MCP. `context` has
+  `request`, `principal`, parsed `url`, raw UTF-8 `body`, `signal`; no request id.
+  Route bodies share `maxBodyBytes`. MCP-only JSON/header checks do not apply.
+  A handler returns `{ status?: number, headers?: Record<string, string>, body?: unknown }`;
+  status defaults to 200, body is JSON, omitted body is empty, HEAD suppresses it.
+  Exceptions return a generic 500. Disconnect and shutdown abort the signal;
+  routes share `close()` draining. Reuse your policy function explicitly;
+  route requests do not invoke `beforeCall`.
+- Route suffix `/tool-policy` appends to MCP path `/mcp` or `/mcp/` as
+  `/mcp/tool-policy` (root MCP path `/` gives `/tool-policy`). Exact methods:
+  GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS. No wildcard, automatic HEAD or CORS.
+  Query strings do not affect matching; read them with `url.searchParams`.
+  Known path + wrong method → 405 with Allow; unknown path → 404.
+- Route suffixes require nonempty segments containing letters/digits/`_-.~`.
+  Empty suffix, `/`, dot segments, percent escapes, repeated or trailing slashes,
+  queries, fragments and wildcards fail start with `McpServeError.type: "config"`.
+  With routes, the MCP base must be a canonical pathname. All methods on the
+  MCP endpoint are reserved, so routes cannot override it. Duplicate method/path
+  pairs fail start with `"collision"`; different methods on a suffix are allowed.
+- Public types: `McpListFilter`, `McpValidateCallParams`, `McpHttpRoute`,
+  `McpHttpRouteContext`, `McpHttpRouteResponse`.
 
 ## Return native MCP results
 
@@ -45846,6 +46518,27 @@ if (error instanceof WebToolError && error.type === "denied-host") {
 - The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
 - The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every tool here is built on.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes these tools.
+
+## Add the belt to a discovery catalogue
+
+Registration extends the core namespace, preserving `ai.tools.catalogue` and `ai.tools.measure`:
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai, type ModelContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+const surface = ai.tools.catalogue({
+  core: [ai.tools.calculator()],
+  searchable: [ai.tools.dateTime()],
+  limit: 8,
+});
+const assistant = ai.agent({ model, tools: surface.tools });
+const measured = await ai.measure({ model, tools: surface.tools });
+console.log(measured.parts.tools.tokens);
+```
+
+The core plus `tool_search` / `tool_call` stays advertised. Hidden calls still traverse target policy, approval, validation, accounting and tracing. The `define-ai-tool` topic covers lazy descriptors, ranking and measurement comparisons. Native provider tools stay alongside the catalogue; eager ones included in its lists pass through unchanged and are excluded from discovery.
 
 
 ================================================================================
@@ -47717,7 +48410,7 @@ that is just the project name, the one required answer with no default:
 ```
 A project name is required and no terminal is available to ask for one. Pass it as
 the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
---db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc|eslint>, --git|--no-git, --jwt|--no-jwt.
+--db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc>, --git|--no-git, --jwt|--no-jwt.
 ```
 
 ## After scaffolding: the decisions summary
@@ -47743,7 +48436,7 @@ Features: none
 | `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                                     |
 | `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
 | `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default.                |
-| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier, deprecated); unknown or missing values fail before writes.          |
+| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                                    |
 | `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                                        |
 | `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                                       |
 | `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                                   |
@@ -47870,104 +48563,75 @@ Flags preselect their existing feature keys. Both menus and checklists retain
 terminal paging. The decisions overview previews up to six feature/AI keys with
 a total count; the success screen shows the complete list.
 
-## Choose the linter and formatter
+## Oxlint and Oxfmt
 
-`--lint=oxc` is the default. It also accepts `--lint oxc` and installs exact
-`oxlint@1.88.0` and `oxfmt@0.73.0` versions, emits `.oxlintrc.json` and
-`.oxfmtrc.json`, and removes the template's ESLint/Prettier configs and dependencies.
-Pass `--lint=eslint` to opt in to ESLint/Prettier. The custom wizard prompts for
-the same choice; a flag preselects it.
+Oxlint **1.88.0** and Oxfmt **0.73.0** are the only supported tools. New apps
+pin TypeScript **7.0.2** and include `.oxlintrc.json`, `.oxfmtrc.json`,
+`.oxfmtignore`, and VS Code settings for `oxc.oxc-vscode`.
+`--lint=oxc` is optional; `--lint=eslint` fails with the 5.34.0 removal message.
+The wizard has no toolchain choice.
 
 ```bash
-# Default: Oxlint + Oxfmt, TypeScript 7.0.2
 npm create warlock@latest my-app -- --yes
-
-# Explicit opt-in: ESLint + Prettier, TypeScript 6.0.3
-npm create warlock@latest my-eslint-app -- --lint=eslint --yes
+cd my-app
+npm run lint:check
+npm run format:check
 ```
 
-Both choices provide `lint`/`format` and non-mutating `lint:check`/`format:check`
-scripts. Oxc projects also configure VS Code format-on-save with the official
-`oxc.oxc-vscode` formatter, use `source.fixAll.oxc` for lint fixes and recommend
-that extension. The ESLint toolchain retains its Prettier/ESLint editor settings.
-Oxc config enables `devServer.healthCheckers: { eslint: false, oxlint: true }` and
-leaves TypeScript health checks enabled. Style matches the template's 100-column,
-double-quote, semicolon and trailing-comma settings. Import sorting is on in
-`.oxfmtrc.json`, kept to one block like the ESLint toolchain's
-`@ianvs/prettier-plugin-sort-imports`:
+Oxlint enables `"categories": { "correctness": "error" }`, unused-variable/import
+checks, explicit class accessibility and type-import style. Oxfmt sorts imports
+with `"sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] }`.
+It keeps built-ins, packages, internal aliases and relative imports in one block.
+Formatting retains unused imports; lint reports them. Local package scripts use
+`oxlint`, `oxfmt` and `tsc` directly. The non-mutating scripts are `lint:check`
+and `format:check`. Background checks run TypeScript and configured Oxlint.
 
-```json
-{ "sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] } }
-```
+## Migration
 
-`format` (`npm run format`) orders built-ins, packages, internal aliases,
-then relative imports. Neither formatter deletes unused imports. ESLint reports
-them through `unused-imports/no-unused-imports`; Oxlint uses `no-unused-vars`.
-Scripts in both toolchains call local binaries
-(`eslint --fix ./src --max-warnings=0`, `tsc --noEmit`), never `npx`.
-
-## TypeScript 7 in 5.32
-
-Default Oxlint/Oxfmt projects pin `typescript` to `7.0.2`; `tsc` is the native Go compiler.
-The template uses `module: "ESNext"`, `moduleResolution: "bundler"`, explicit
-Node types, and `paths` relative to its tsconfig, without `baseUrl`.
-Existing apps must remove `baseUrl`, rebase alias targets, and replace
-`moduleResolution: "node"` / `"node10"` before typechecking.
-
-Explicit `--lint=eslint` projects pin `typescript` to **6.0.3**, the newest version
-supported by typescript-eslint. Its parser requires the JavaScript compiler API
-removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
-([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
-Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
-ESLint mode prints a deprecation warning naming removal in 5.34.0 and the Oxc migration command. Both modes install with every supported package manager.
-
-### Prettier import order in ESLint mode
-
-The ESLint scaffold’s `@ianvs/prettier-plugin-sort-imports` uses Babel instead of
-the compiler API. Keep these options in `.prettierrc.json`:
-
-```json
-{
-  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
-  "importOrder": ["<BUILTIN_MODULES>", "<THIRD_PARTY_MODULES>", "^(app|web|@shared)/", "^[.]"],
-  "importOrderParserPlugins": ["typescript", "jsx", "decorators"]
-}
-```
-
-Leave `importOrderTypeScriptVersion` at its default to keep type and value imports
-separate. Run `npm run format`, then `npm run lint:check`; formatting preserves
-unused imports, and `npm run lint` can apply ESLint’s unused-import fixes.
-
-## Migrate to Oxlint and Oxfmt in 5.33
-
-ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
-New apps should use `--lint=oxc`. To migrate an existing app, install the new
-core release and `ts-morph`, then run:
+ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
 
 ```bash
-npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
-npx warlock upgrade --from 5.32 --to 5.33.0
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Review every reported `file:line`: customized configs are preserved and need
-manual translation before removal. The codemod installs the template's Oxlint
-and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
-scripts, removes legacy dependencies, and deletes only recognized generated
-configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
-configs are preserved. `--dry-run --json` reports the same planned changes
-without writing files.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
-Explicit deprecated ESLint scaffolds set `devServer.healthCheckers.eslint: true`;
-existing apps must set this themselves to retain background ESLint checking.
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
 
-Oxc formatting scripts explicitly read `.gitignore` and `.oxfmtignore`. Oxfmt
-0.73 otherwise defaults to `.prettierignore` (`oxfmt --help`); the explicit
-paths make migrated ignore rules effective. The package template format gate
-also defaults to Oxfmt; `--lint=eslint` is its deprecated compatibility mode.
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.
 
 
 ================================================================================
@@ -48042,7 +48706,7 @@ install/restart guidance and the other panels keep working.
 
 ```bash
 warlock add devtools
-pnpm add @warlock.js/ai @warlock.js/ai-panoptic
+npm install @warlock.js/ai @warlock.js/ai-panoptic
 ```
 
 At app boot, enable observation, then restart `warlock dev`:

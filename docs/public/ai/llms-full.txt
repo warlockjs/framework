@@ -900,7 +900,7 @@ https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fe
 
 ---
 name: define-ai-tool
-description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `createToolContext`, `measureTools`, `ai.tools.measure`, `toolSchemas`, `compactJsonSchema`, `compactToolSchemas`, `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`, `ai.providerTool`, `ProviderTool`, `providerTools`, `isProviderTool`, `web_search`, `code_execution`, `text_editor`, `googleSearch`, `nova_grounding`; ''define a tool'', ''enable the provider's web search'', ''use Claude's bash / text editor tool'', ''built-in provider tools'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
+description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tools.catalogue`, `catalogue`, `createToolContext`, `measureTools`, `ai.tools.measure`, `toolSchemas`, `compactJsonSchema`, `compactToolSchemas`, `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`, `ai.providerTool`, `ProviderTool`, `providerTools`, `isProviderTool`, `web_search`, `code_execution`, `text_editor`, `googleSearch`, `nova_grounding`; ''define a tool'', ''enable the provider's web search'', ''use Claude's bash / text editor tool'', ''built-in provider tools'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
 ---
 
 # `ai.tool()` — typed tool factory
@@ -1158,7 +1158,7 @@ Workflow errors surface as `ToolExecutionError` with `cause` pointing at the ori
 
 ## Schema token cost — measure, then go compact
 
-Every tool's JSON schema is re-sent on every trip. `measureTools` (also `ai.tools.measure` with `@warlock.js/ai-tools`) reports what the list costs per call: native and exact when the model has `countTokens` (Anthropic, Google, Bedrock, OpenAI Responses — `tools.length + 2` count calls, `perTool` = each tool's marginal cost, `overhead` = the provider's once-per-request tool preamble), estimated from the schema JSON otherwise. `source` says which.
+Every tool's JSON schema is re-sent on every trip. `measureTools` (also `ai.tools.measure` in AI core) reports what the list costs per call: native and exact when the model has `countTokens` (Anthropic, Google, Bedrock, OpenAI Responses — `tools.length + 2` count calls, `perTool` = each tool's marginal cost, `overhead` = the provider's once-per-request tool preamble), estimated from the schema JSON otherwise. `source` says which.
 
 ```ts
 import { ai, compactJsonSchema, extractJsonSchema, measureTools } from "@warlock.js/ai";
@@ -1237,6 +1237,66 @@ Pro and Fetch have separate namespaced counters and prices. Qwen's flag still
 has no verified billing counter mapped. xAI's hosted search uses Responses and
 is rejected by the current Chat Completions XaiSDK. Full shapes and official
 sources: https://warlock.js.org/v/latest/ai/providers/openai-compatible/
+
+## Stable discovery catalogue
+
+`ai.tools.catalogue` (also named `catalogue`) ships in AI core; no belt import is needed. Pass its `tools` array to an agent. Core tools and `tool_search` / `tool_call` stay advertised for every trip. Searchable tools can be eager contracts (`meta.tags` supplies tags), or lazy descriptors:
+
+```ts
+import { ai, type ModelContract } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+declare const model: ModelContract;
+const core = [
+  ai.tool({
+    name: "health",
+    description: "Read service health",
+    execute: async () => ({ ready: true }),
+  }),
+];
+const surface = ai.tools.catalogue({
+  core,
+  limit: 8,
+  searchable: [
+    {
+      name: "archive_note",
+      description: "Archive a note",
+      tags: ["notes"],
+      load: async () =>
+        ai.tool({
+          name: "archive_note",
+          description: "Archive a note",
+          input: v.object({ id: v.string() }),
+          execute: async ({ id }) => ({ archived: id }),
+        }),
+    },
+  ],
+});
+const assistant = ai.agent({
+  model,
+  tools: surface.tools,
+  middleware: [
+    ai.human.approval({
+      policy: { type: "allowlist", tools: ["archive_note"] },
+      handler: async () => ({ type: "reject", reason: "Operator review required" }),
+    }),
+  ],
+});
+const measured = await ai.measure({ model, tools: surface.tools });
+console.log(measured.parts.tools.tokens, measured.parts.tools.source);
+const schemas = await ai.tools.measure(surface.tools, { model });
+console.log(schemas.tokens);
+```
+
+The model searches `{ query: "notes" }` and receives at most `limit` tools with real `inputSchema` values; it then uses `tool_call({ name: "archive_note", input: { id: "n-1" } })`. `limit` is a positive integer (default 8). Customize meta-tool names with `searchName` / `callName`. Search scores every whitespace-separated, case-insensitive term by exact name (100), name substring (20), tag substring (10), then description (1); all terms must match, scores sum, ties use code-unit name order. `*` lists alphabetically; blank queries return nothing. Maximum query length is 500 characters.
+
+Only selected search results or named calls load a lazy tool. Successful and concurrent loads are shared for the catalogue lifetime; failures are retryable. Use dynamic imports inside the loader to defer modules. The resolved tool must have the declared name and expose JSON schema when it has an input schema; missing JSON conversion fails search rather than fabricating a schema. Search always returns full draft-2020-12 schemas. Discovery does not change advertisement.
+
+The agent resolves calls before its normal target dispatch. Scope policy and HITL to the target name; approval edits still undergo that target's validation. Events/reports identify the target with the original call id; history retains the meta-call. Budgets, nested usage, cancellation, artifacts, identity context, concurrency and silent semantics use the direct-call path. Standalone `surface.call.invoke()` / `.execute()` fails closed. Core and meta-tools cannot be invoked through the catalogue. Search reveals inventory metadata even when middleware would deny execution; build user-appropriate inventories when metadata is sensitive. Hidden names participate in durable signature checks without loading; bump the agent version for behavior/schema changes.
+
+Keep provider-hosted tools alongside `...surface.tools`. Eager provider tools accidentally placed in either list pass through unchanged and are excluded from search/call. Lazy loaders may not return them.
+
+For savings, compare `ai.measure({ model, tools: fullEagerList })` with `ai.measure({ model, tools: surface.tools })` and inspect `ai.measure.diff(full, discovered).parts.tools`; negative tokens mean a reduction. Measurement does not load hidden tools. Search-result schemas and extra trips still cost context tokens; include representative discovery messages when measuring the whole run.
 
 
 ## detect-and-redact-pii  `@warlock.js/ai/detect-and-redact-pii/SKILL.md`

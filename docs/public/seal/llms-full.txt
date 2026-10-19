@@ -500,8 +500,9 @@ v.object({
 });
 ```
 
+- **Plain objects only.** Arrays and non-plain objects fail even with `.allowUnknown()` or `.stripUnknown()`. Null-prototype dictionaries work. Convert class instances to explicit DTOs; no permissive opt-in is provided.
 - **Required by default.** `.optional()` to opt out — the `{ isOptional: true }` brand makes the key optional in `Infer<>`.
-- **Unknown keys policy.** By default extra keys are silently dropped from `data`. Toggle with `.allowUnknown()` (forward as-is), `.stripUnknown()` (explicit drop), or `.allow(...keys)` (whitelist specific extras). See [`object-methods.md`](./object-methods.md).
+- **Unknown keys policy.** By default extra keys fail validation. Toggle with `.allowUnknown()` (forward as-is), `.stripUnknown()` (explicit drop), or `.allow(...keys)` (whitelist specific extras). See [`object-methods.md`](./object-methods.md).
 - **Schema composition.** `.extend(schema)`, `.merge(other)`, `.pick(...keys)`, `.without(...keys)`, `.partial(...keys)`, `.requiredFields(...keys)` — all in [`object-methods.md`](./object-methods.md).
 - **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`) attach to fields _inside_ a `v.object`. Without a parent, sibling resolution silently passes.
 
@@ -523,7 +524,7 @@ v.record(v.object({ count: v.int() })); // type: Record<string, { count: number 
 v.record(); // type: Record<string, any>
 ```
 
-Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. If keys are also constrained (e.g. only `"draft" | "published"`), use `v.object` with literal keys instead — the constraint lives in the type.
+Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. Use `v.record(keyValidator, valueValidator)` to constrain present keys, or `v.object` to require named keys.
 
 ## `v.tuple` — positional types
 
@@ -633,6 +634,24 @@ Use for: trees (categories, file systems), threaded data (comment chains), mutua
 - [`array-methods.md`](./array-methods.md) — `.minLength` / `.maxLength` / `.length` / `.between` / `.unique` / `.sorted` / `.flip` / `.sort` / `.onlyUnique`.
 
 `v.record` and `v.tuple` share the array-style length surface. `v.union` and `v.discriminatedUnion` have no chainable methods beyond what's shown above. `v.lazy` is a single-call factory.
+
+## Validate dictionary keys (5.34)
+
+```ts
+import { v, type Infer } from "@warlock.js/seal";
+
+const counts = v.record(v.literal("draft", "published"), v.int());
+type Counts = Infer.Output<typeof counts>; // Partial<Record<"draft" | "published", number>>
+await v.validate(counts, { draft: 2 });
+const dictionary = v.record(v.string(), v.int()); // Record<string, number>
+await v.validate(dictionary, { arbitrary: 1 });
+```
+
+`v.record(valueValidator)` and its optional string error message still work.
+Two validator arguments mean key then value; an optional third string sets the
+object error. Invalid arguments throw at definition. Key transforms never
+rename entries; present keys are validated as strings. Literal keys are optional
+in the inferred dictionary; use `v.object` for required named fields.
 
 
 ### define-structural-shape/array-methods.md  `@warlock.js/seal/define-structural-shape/array-methods.md`

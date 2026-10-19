@@ -1879,8 +1879,8 @@ await warmupProductCache();
 
 ## Verify generated imports
 
-Generated web starter files match the scaffold’s Prettier configuration, using
-`@ianvs/prettier-plugin-sort-imports` with Babel independently of TypeScript 7.
+Generated web starter files match the scaffold’s Oxfmt configuration and its
+built-in import sorting.
 After editing generated code, run `npm run format` and `npm run lint:check`.
 Formatting retains unused imports; the linter reports them.
 
@@ -4580,7 +4580,7 @@ export default defineConfig({
 
 - **`watch.include` / `watch.exclude`** — globs piped into the file watcher. Override when you have non-`.ts(x)` files driving reloads (e.g. SQL fixtures), or to exclude a generated folder.
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
-- **`healthCheckers`** — built-in switches (`{ typescript?, eslint?, oxlint? }`), custom file health checker contracts, or `false` to disable. The `--skip-health` flag disables all checkers for that run. TypeScript runs by default. ESLint uses core's dependency and requires only an app-root flat config; Oxlint requires its package installed in the app plus a config. ESLint is disabled by default; explicitly set `eslint: true` to retain it until removal in 5.34.0. Enabling it prints one deprecation warning and the Oxc migration command.
+- **`healthCheckers`** — built-in switches (`{ typescript?, oxlint? }`), custom checker arrays, or `false`. TypeScript and installed/configured Oxlint run by default. `--skip-health` disables checks for one run. ESLint support was removed in 5.34.0; use `npx warlock upgrade --from 5.33 --to 5.34.0` to remove stale options.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
 - **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See the `update-packages` topic.
 - **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
@@ -4603,12 +4603,12 @@ import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   devServer: {
-    healthCheckers: { typescript: true, eslint: false, oxlint: true },
+    healthCheckers: { typescript: true, oxlint: true },
   },
 });
 ```
 
-Omit the switches to run TypeScript and installed/configured Oxlint; ESLint is off by default and requires `eslint: true`; `true` still requires the linter's config, and Oxlint also requires its app-installed package. Set `oxlint: false` to disable only Oxlint while leaving other defaults intact. A custom checker array replaces the built-in list. Config discovery also accepts `.oxlintrc.jsonc`, `oxlint.config.ts` and `oxlint.config.mts`; use JSON/JSONC on Node 22.15 because current Oxlint TypeScript configs need Node 22.18 or newer.
+Omit switches to run TypeScript and installed/configured Oxlint. Set `oxlint: false` to disable only Oxlint. A custom checker array replaces the built-in list. JSON/JSONC configs work on Node 22.15; current Oxlint TypeScript configs require Node 22.18 or newer.
 
 ## `warlock build` — production bundle
 
@@ -6588,9 +6588,171 @@ Options also allow a `directory` and `encryptionKey` (string or lazy callback); 
 
 ## Error and logging contract
 
-`SecretStoreError.code` is `INVALID_NAME`, `INVALID_VALUE`, `INVALID_NAMESPACE`, `READ_ONLY`, `KEY_REQUIRED`, `UNAVAILABLE`, `UNSAFE_FILE` or `CORRUPT_FILE`. Errors never include names, values, paths or vendor causes. `KEY_REQUIRED` means provision/fix the app encryption key; `CORRUPT_FILE` means wrong key, invalid format or failed authentication. Never replace an unreadable store with an empty one.
+`SecretStoreError.code` is `INVALID_DRIVER`, `MEMORY_IN_PRODUCTION`, `INVALID_NAME`, `INVALID_VALUE`, `INVALID_NAMESPACE`, `READ_ONLY`, `KEY_REQUIRED`, `UNAVAILABLE`, `UNSAFE_FILE` or `CORRUPT_FILE`. Errors never include names, values, paths or vendor causes. `KEY_REQUIRED` means provision/fix the app encryption key; `CORRUPT_FILE` means wrong key, invalid format or failed authentication. Never replace an unreadable store with an empty one.
 
 The store never logs credentials. It registers encountered names and literal values with `@warlock.js/logger` for process-lifetime masking, including old/removed/failed-write values, interpolated messages, Error text/causes, and channel error reports. Keys and exact values stay protected even with permissive custom censors. Registration retains values in memory. It cannot mask direct console/third-party logging, earlier logs, transformed/encoded values, or credentials never encountered by the store. Keep secrets out of logs even with masking enabled. Fake assertion errors do not print values.
+
+## Built-app tests with the memory driver
+
+Run the built server with `SECRETS_DRIVER=memory`, or select the driver in
+`src/config/secrets.ts`. Explicit config takes precedence over the environment;
+`"auto"` (the default) keeps keychain/environment/file behavior. Unknown driver
+names fail with `SecretStoreError.code === "INVALID_DRIVER"`.
+
+```ts title="src/config/secrets.ts"
+import type { SecretsConfigurations } from "@warlock.js/core";
+
+export default {
+  namespace: "browser-test-server",
+  driver: "memory",
+  allowMemoryInProduction: true,
+} satisfies SecretsConfigurations;
+```
+
+`allowMemoryInProduction: true` is required only when the test server runs with
+`NODE_ENV=production`. Without it, memory selection fails closed with
+`MEMORY_IN_PRODUCTION`; a built bundle does not bypass this check. Set this
+option explicitly in the test deployment configuration. `SecretStore` accepts
+the same `driver` and `allowMemoryInProduction` options for standalone stores.
+
+The selected memory driver bypasses keychain, scoped environment secrets and
+files, and still registers values for log masking. Values are isolated by app
+namespace, lost on process exit, and never shared across workers or with a
+separate browser-test process. Seed fixtures through application startup or a
+test-only endpoint in the server process using the normal `secrets.set()` API:
+
+```ts
+import { secrets } from "@warlock.js/core";
+
+await secrets.set("vendor-token", "browser-test-credential");
+const token = await secrets.get("vendor-token");
+```
+
+The normal test harness still installs `secretsFake`; explicit `backend`
+instances and that fake continue to bypass configured backend selection.
+
+
+## test-browser  `@warlock.js/core/test-browser/SKILL.md`
+
+---
+name: test-browser
+description: Write or repair browser e2e specs using warlock e2e and @warlock.js/core/e2e, with owned app fixtures, direct CDP interaction, responsive screenshots and run evidence. Use for real browser flows, click races or viewport overflow; use test-http for API-only tests.
+---
+
+# Browser e2e
+
+Use `@warlock.js/core/e2e`, a Node-only subpath, and default-export `defineE2E` from
+`e2e/*.e2e.ts`. Run `npx warlock e2e`. The CLI loads TypeScript itself; no Vitest
+bootstrap, Playwright, Puppeteer or external browser server is needed.
+
+Every run copies the app into a temporary directory, excludes dotenv files and
+symlinks, links installed dependencies for reads, seeds its own environment and
+owns the app/browser process groups. Keep foreground commands in the fixture;
+never use a shared dev server or daemonize. Map the disposable `dataRoot` into the
+app's actual storage/database config. The harness cannot infer that mapping.
+`prepare` is where seeds and fake executables belong; `app.path` is relative to the
+copied app. Do not install dependencies through the shared `node_modules` link.
+
+## Complete standalone spec
+
+This spec creates its own small app; it can be pasted into an existing project
+with core installed and run with `npx warlock e2e`.
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { defineE2E } from "@warlock.js/core/e2e";
+
+export default defineE2E({
+  app: {
+    start: [process.execPath, "form-fixture.mjs"],
+    portFromFile: true,
+    path: ["fake-bin"],
+    env: ({ dataRoot }) => ({ FORM_DATA: dataRoot }),
+    prepare: async ({ directory, dataRoot }) => {
+      await mkdir(join(directory, "fake-bin"));
+      await writeFile(join(dataRoot, "prefix.txt"), "Saved");
+      await writeFile(
+        join(directory, "form-fixture.mjs"),
+        `
+        import { createServer } from 'node:http';
+        import { readFileSync, writeFileSync } from 'node:fs';
+        import { join } from 'node:path';
+        const prefix = readFileSync(join(process.env.FORM_DATA, 'prefix.txt'), 'utf8');
+        const server = createServer((request, response) => {
+          if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
+          response.setHeader('Content-Type', 'text/html');
+          response.end('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">'
+            + '<input id="name"><button id="save"><span>Save</span></button><h1 id="result">Ready</h1>'
+            + '<script>document.querySelector("#save").onclick=()=>{history.pushState({},"","/saved");document.querySelector("#result").textContent='
+            + JSON.stringify(prefix) + '+" "+document.querySelector("#name").value}</script>');
+        });
+        server.listen(0, '127.0.0.1', () => writeFileSync(process.env.WARLOCK_E2E_PORT_FILE, String(server.address().port)));
+      `,
+      );
+    },
+  },
+  run: async ({ page, step }) => {
+    await page.goto("/");
+    await step("save the form", async () => {
+      await page.fill("#name", "Ada");
+      await page.type("#name", " Lovelace");
+      await page.waitForNavigation(() => page.click("#save"), { url: "/saved" });
+      await page.waitFor({ selector: "#result", text: "Saved Ada Lovelace" });
+    });
+    await page.captureViewports("saved");
+  },
+});
+```
+
+For an existing app, replace `prepare` and `start`; default start is
+`[process.execPath, "dist/app.js"]`. Optional
+`build: [process.execPath, "node_modules/@warlock.js/core/bin/warlock.js", "build"]`
+builds inside the copy. Supply app-specific test service variables via `env` and
+exclude production data directories with `exclude: ["storage", "data"]`.
+By default the fixture supplies an OS-assigned `PORT`/`HTTP_PORT`. Prefer the
+port-file handshake above when the app supports binding `0` itself.
+
+## Interaction and evidence
+
+- Use `page.click` for scrolling, settled boxes and hit testing, including a fresh
+  check after hover. Do not replace it with `element.click()` or fixed sleeps.
+- `fill` clears editable content, then sends CDP text input; `type` appends Unicode
+  text. Values do not appear in step names. `type` does not simulate shortcuts.
+- `waitFor({ selector, text, url, timeoutMs })` combines conditions. Arm navigation
+  **before** clicking with `waitForNavigation(() => page.click(...))`.
+- `setViewport({ name, width, height, mobile })`, `assertViewport()` and
+  `screenshot(name)` are available independently. `captureViewports(name)` checks
+  and captures 1280×800 desktop and 390×844 phone by default, restoring the
+  original viewport. `viewports` overrides the list. Final captures are automatic.
+- Overflow compares document/body scrollWidth **and innerWidth** against the
+  requested width, so a phone that expands to 448 px fails. Keep the viewport meta
+  tag; inspect the reported widest element IDs, classes and dimensions.
+- Health requires zero console errors, exceptions, HTTP statuses >=400 and failed
+  loads (including cancellation). Narrow exceptions use
+  `allowConsoleErrors: [/^Expected warning$/]` and
+  `allowNetworkFailures: [{ url: "/missing", status: 404 }]`. Canceled-request rules
+  can match `errorText`. Strings match substrings; regexps are also accepted.
+- `allowPendingRequests: ["/events"]` exempts an intentional stream from network
+  idle, without allowing its errors. `waitForNetworkIdle()` remains available.
+- `page.evaluate<T>(expression)` is an escape hatch for assertions in the main
+  document. Selector helpers do not enter frames or closed shadow roots.
+
+Use `--browser /path/to/chrome` or `WARLOCK_E2E_BROWSER` if discovery fails.
+`browser: { args: ["--no-sandbox"] }` is an explicit option for controlled root
+containers; it is not a default. On Windows, command arrays should invoke JS tools
+through `process.execPath`, avoiding `.cmd` executables that require a shell.
+
+Read `.warlock/e2e/run-*/evidence.json` and the PNGs/logs on failure. Evidence keeps
+allowed errors, step timings, viewport dimensions and recorded process identities.
+`--out` changes the evidence parent; `--path ./fake-bin,./engine-bin` prepends fake
+binary paths. `runE2E(spec, { outputDirectory, browser, path, signal })` is the
+programmatic runner; `E2ERunError.result` exposes evidence on failure.
+
+Cleanup verifies the unique supervisor command line before stopping only its
+recorded process group (Windows: verified PID tree). It retains disposable files
+if ownership verification fails and reports the failure in evidence. Do not add
+process-name or port-based kills to a spec.
 
 
 ## test-fakes  `@warlock.js/core/test-fakes/SKILL.md`
@@ -8229,54 +8391,95 @@ The CLI preserves incremental state and changed-file filtering. Development
 health checks keep one native compiler session and update its snapshots. Syntax
 analysis uses OXC. `warlock upgrade` still parses/transforms with ts-morph's own
 bundled TypeScript, without using it as the app's compiler. New scaffolds default
-to Oxlint/Oxfmt (`--lint=oxc`). Explicit `--lint=eslint` pins the app's compiler to
-TypeScript **6.0.3** because typescript-eslint requires the old JavaScript API
-and supports `>=4.8.4 <6.1.0`. Keep ESLint apps on 6.0.3 until switching tools:
-
-```bash
-npm install --save-dev --save-exact typescript@6.0.3
-npx tsc --noEmit
-```
-
-The same tsconfig cleanups work with TS6. Starting in 5.33, ESLint mode prints
-a deprecation warning naming removal in 5.34.0 and the Oxc migration command.
+to Oxlint/Oxfmt (`--lint=oxc`) with TypeScript 7.0.2. ESLint support was
+removed in 5.34.0; migrate legacy apps using the steps below.
 
 ## 5.32 to 5.33
 
-**BREAKING:** ESLint background health checking and automatic ESLint selection
-in `warlock check` are disabled by default. Oxlint/Oxfmt replace ESLint/Prettier
-as the default toolchain. Legacy support is deprecated now and removed in
-5.34.0. Temporary opt-ins are `devServer.healthCheckers: { eslint: true }`,
-`warlock check --lint eslint`, and `create-warlock --lint=eslint`; each warns
-about removal and migration. The legacy scaffold stays on TypeScript 6.0.3;
-Oxc apps use TypeScript 7.0.2.
-
-ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
-New apps should use `--lint=oxc`. To migrate an existing app, install the new
-core release and `ts-morph`, then run:
+The original `oxc-toolchain` codemod remains available:
 
 ```bash
 npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
 npx warlock upgrade --from 5.32 --to 5.33.0
+```
+
+## 5.33 to 5.34 toolchain removal
+
+**BREAKING:** ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
+
+```bash
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Review every reported `file:line`: customized configs are preserved and need
-manual translation before removal. The codemod installs the template's Oxlint
-and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
-scripts, removes legacy dependencies, and deletes only recognized generated
-configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
-configs are preserved. `--dry-run --json` reports the same planned changes
-without writing files.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
 The `oxc-toolchain` codemod also updates generated VS Code settings and literal
 ESLint/Oxlint health-check switches. Custom editor settings, checker arrays,
 computed options and nonstandard scripts require review. Oxc diagnostics keep
 framework conventions in `warlock check`. Re-run the migration after addressing
 manual findings if needed; an app with only Oxc tooling is a no-op for this codemod.
+
+## 5.33 to 5.34 plain object validation
+
+**BREAKING:** Seal `v.object()` rejects arrays, dates, maps, sets, class instances
+and objects with custom prototypes, including under `.allowUnknown()` and
+`.stripUnknown()`. Plain and null-prototype dictionaries remain accepted. There
+is no permissive opt-in: choose an array/instance validator or construct a plain
+DTO explicitly before validation.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+class User {
+  name = "Ada";
+}
+const instance = new User();
+const user = v.object({ name: v.string() });
+await v.validate(user, { name: instance.name });
+const names = v.array(v.string());
+await v.validate(names, ["Ada"]);
+```
+
+`v.record(valueValidator)` remains supported. To validate dictionary keys, use
+`v.record(keyValidator, valueValidator)`; malformed arguments now fail while
+defining the schema. Literal-key records infer partial dictionaries because
+only present keys are checked.
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
+
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.
 
 
 ## upload-file  `@warlock.js/core/upload-file/SKILL.md`
@@ -10970,7 +11173,7 @@ const { messages } = await watchBoard({ agent: "implementer", timeoutMs: 30 * 60
 
 ---
 name: warlock-check
-description: 'Verify a change with one command: `warlock check [--changed] [--json]` runs an incremental typecheck, the app''s ESLint/oxlint, the tests affected by the change and framework convention checks, and reports one JSON object per problem `{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }` with exit 1 for problems in your code and 2 for problems with this machine (missing Redis/DB, busy port, Node version, missing tool). Also `warlock typecheck [--changed]`, `warlock explain <CODE>` and the stable `WL` error codes (`errorCodeOf`, `WarlockError`). Triggers: `warlock check`, `warlock typecheck`, `warlock explain`, `--changed`, `--base`, `runCheck`, `runTypecheck`, `CHECK_EXIT_CODES`, `ToolingProblem`, `WL7101`, `WL8003`, `errorCodeOf`, `explainErrorCode`, `WarlockError`, "verify my change", "run the checks", "is this failure my code or the machine", "what does WL3001 mean", "typecheck only changed files". Skip: app diagnostics at boot — the `warlock-doctor` topic; reading the app''s routes/models — the `warlock-inspect` topic; writing tests — the `test-http` / `test-service` topics.'
+description: 'Verify a change with one command: `warlock check [--changed] [--json]` runs an incremental typecheck, the app''s Oxlint, the tests affected by the change and framework convention checks, and reports one JSON object per problem `{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }` with exit 1 for problems in your code and 2 for problems with this machine (missing Redis/DB, busy port, Node version, missing tool). Also `warlock typecheck [--changed]`, `warlock explain <CODE>` and the stable `WL` error codes (`errorCodeOf`, `WarlockError`). Triggers: `warlock check`, `warlock typecheck`, `warlock explain`, `--changed`, `--base`, `runCheck`, `runTypecheck`, `CHECK_EXIT_CODES`, `ToolingProblem`, `WL7101`, `WL8003`, `errorCodeOf`, `explainErrorCode`, `WarlockError`, "verify my change", "run the checks", "is this failure my code or the machine", "what does WL3001 mean", "typecheck only changed files". Skip: app diagnostics at boot — the `warlock-doctor` topic; reading the app''s routes/models — the `warlock-inspect` topic; writing tests — the `test-http` / `test-service` topics.'
 ---
 
 # Warlock — `warlock check`, `typecheck`, `explain`
@@ -11090,10 +11293,10 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 ## Gotchas
 
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
-- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint requires `--lint eslint` (or `runCheck({ lint: "eslint" })`); its flat config alone never enables it. This deprecated selection prints one warning on stderr and is removed in 5.34.0.
+- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint support was removed in 5.34.0; see `upgrade-from-5-29`.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
-- The convention checks are the framework's own and run the same with ESLint, Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
+- The convention checks are the framework's own and run the same with Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 
 ## See also
 
@@ -11541,9 +11744,8 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 `warlock doctor` checks application wiring and HTTP health probes. Use
 `npx warlock check` for source lint diagnostics and `npm run format:check` for
-formatting. In 5.33, Oxlint/Oxfmt are the defaults; ESLint requires
-`warlock check --lint eslint` or `devServer.healthCheckers.eslint: true` for
-background checks. ESLint/Prettier are deprecated and removed in 5.34.0.
+formatting. Oxlint/Oxfmt are the only supported tools in 5.34.0. Use the
+`oxc-toolchain-removal` upgrade step to migrate remaining legacy configs.
 Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`).
 
 
