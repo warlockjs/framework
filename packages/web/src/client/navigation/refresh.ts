@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { HydrationDocumentPayloadSource } from "../../hydration-payload";
-import { routerEvents } from "../../routing/router-events";
+import { routerEvents, type RefreshReason } from "../../routing/router-events";
 import { withFragmentFrom, withoutFragment } from "../../routing/url-fragment";
 import { hydrateShared } from "../../shared";
 import { fetchPageData } from "./fetch-page-data";
@@ -109,7 +109,8 @@ export type RefreshRuntime = {
  * overtook this one — and none of them left the page in a worse state than
  * they found it.
  */
-export type Refresher = () => Promise<boolean>;
+export type RefreshOptions = { reason?: RefreshReason };
+export type Refresher = (options?: RefreshOptions) => Promise<boolean>;
 
 /**
  * A refresh is a "replace" as far as history and its listeners are concerned:
@@ -146,7 +147,8 @@ const REFRESH_MODE = "replace" as const;
  * this file looks at a path.
  */
 export function createRefresher(runtime: RefreshRuntime, liveGuard?: () => boolean): Refresher {
-  return async () => {
+  return async (options) => {
+    const reason = options?.reason ?? (liveGuard ? "live" : "refresh");
     // Not merely defensive: `refresh()` is importable from a universal module,
     // so a component can call it during the server render. There is no page on
     // screen to refresh there, and no address bar to read one from.
@@ -160,9 +162,11 @@ export function createRefresher(runtime: RefreshRuntime, liveGuard?: () => boole
     let completionWaitsForCommit = false;
 
     try {
-      routerEvents.emitNavigating({ url, mode: REFRESH_MODE });
+      routerEvents.emitNavigating({ url, mode: REFRESH_MODE, reason });
 
-      const result = await fetchPageData(url, signal, { live: liveGuard !== undefined });
+      const result = await fetchPageData(url, signal, {
+        live: liveGuard !== undefined || reason !== "refresh",
+      });
 
       // Superseded, and silently: this is the answer to a question the user
       // stopped asking. Not an error, and not an event — the operation that
@@ -182,7 +186,7 @@ export function createRefresher(runtime: RefreshRuntime, liveGuard?: () => boole
         const error = new Error(`Warlock refresh failed: ${result.reason}`);
 
         console.warn("Warlock refresh could not re-fetch the current page:", result.reason);
-        routerEvents.emitNavigationError({ url, mode: REFRESH_MODE, error });
+        routerEvents.emitNavigationError({ url, mode: REFRESH_MODE, reason, error });
 
         return false;
       }
@@ -195,7 +199,7 @@ export function createRefresher(runtime: RefreshRuntime, liveGuard?: () => boole
         // A stale bundle after a deploy is the realistic cause. A navigation
         // reloads to fix it; a refresh cannot, for the same reason as above.
         console.warn("Warlock refresh could not build the page tree:", error);
-        routerEvents.emitNavigationError({ url, mode: REFRESH_MODE, error });
+        routerEvents.emitNavigationError({ url, mode: REFRESH_MODE, reason, error });
 
         return false;
       }
@@ -241,7 +245,7 @@ export function createRefresher(runtime: RefreshRuntime, liveGuard?: () => boole
       );
       completionWaitsForCommit = true;
 
-      routerEvents.emitNavigated({ url, resolvedUrl: result.url, mode: REFRESH_MODE });
+      routerEvents.emitNavigated({ url, resolvedUrl: result.url, mode: REFRESH_MODE, reason });
 
       return true;
     } finally {
@@ -303,8 +307,10 @@ export function connectRefresher(next: Refresher | undefined): Refresher | undef
  * hydration), the re-fetch failed, or a navigation overtook the refresh. Safe
  * to call in any of those — it never throws.
  */
-export async function refresh(): Promise<boolean> {
+export function refresh(): Promise<boolean>;
+export function refresh(options: RefreshOptions): Promise<boolean>;
+export async function refresh(options?: RefreshOptions): Promise<boolean> {
   if (!connected) return false;
 
-  return connected();
+  return connected(options);
 }

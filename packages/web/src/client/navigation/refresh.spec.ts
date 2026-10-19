@@ -274,8 +274,10 @@ describe("refresh — the happy path", () => {
 
     await createRefresher(harness(pageOf(payloadOf("products.list"))).runtime)();
 
-    expect(events.navigating).toEqual([{ url: HREF, mode: "replace" }]);
-    expect(events.navigated).toEqual([{ url: HREF, resolvedUrl: HREF, mode: "replace" }]);
+    expect(events.navigating).toEqual([{ url: HREF, mode: "replace", reason: "refresh" }]);
+    expect(events.navigated).toEqual([
+      { url: HREF, resolvedUrl: HREF, mode: "replace", reason: "refresh" },
+    ]);
     expect(events.failed).toEqual([]);
   });
 });
@@ -528,5 +530,32 @@ describe("refresh — races", () => {
     await expect(pending).resolves.toBe(false);
     expect(scenario.writes).toHaveLength(0);
     expect(scenario.onScreen()).toBe(onScreenBefore);
+  });
+});
+
+describe("refresh trigger events", () => {
+  it.each(["refresh", "live", "poll", "focus"] as const)(
+    "carries %s through start and completion",
+    async (reason) => {
+      stubBrowser();
+      respondWith(payloadOf("products.list"));
+      const runtime = harness(pageOf(payloadOf("products.list"))).runtime;
+      await createRefresher(runtime)({ reason });
+      expect(events.navigating[0]).toMatchObject({ reason });
+      expect(events.navigated[0]).toMatchObject({ reason });
+    },
+  );
+
+  it("identifies guarded background refresh errors", async () => {
+    stubBrowser();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("offline");
+      }),
+    );
+    const runtime = harness(pageOf(payloadOf("products.list"))).runtime;
+    await createRefresher(runtime, () => true)();
+    expect(events.failed[0]).toMatchObject({ reason: "live" });
   });
 });

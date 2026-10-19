@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.34.0
+
+### Added
+
+- Select an isolated in-memory secrets backend through `SECRETS_DRIVER=memory` or `secrets.driver`, including built-server test deployments and explicit `SecretStore` options. Configuration overrides the environment; unknown drivers fail closed.
+- Refuse the memory driver under `NODE_ENV=production` unless `allowMemoryInProduction: true` is explicitly configured; preserve log masking and namespace isolation without keychain/environment/file access.
+
 ## 5.33.0 - 2026-10-19
 
 ### Added

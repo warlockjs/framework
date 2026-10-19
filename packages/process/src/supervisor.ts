@@ -84,8 +84,11 @@ function matches(entry: RegistryEntry, filter: ProcessFilter): boolean {
 }
 
 export function supervisor(options: SupervisorOptions): ProcessSupervisor {
-  if (!options.owner.trim() || !options.registry.trim())
-    throw new Error("owner and registry are required");
+  for (const option of ["owner", "registry"] as const) {
+    if (!options || typeof options[option] !== "string" || !options[option].trim()) {
+      throw new TypeError(`Invalid supervisor configuration: ${option} must be a nonempty string`);
+    }
+  }
   validateLimits(options.defaults ?? {});
   // Caller-owned configuration must not change an active supervisor's identity.
   options = { ...options, defaults: { ...options.defaults } };

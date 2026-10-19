@@ -46,6 +46,25 @@ describe("union and record output types", () => {
     expect(standard.value).toEqual({ first: { count: 1, rescued: 2 } });
   });
 
+  it("infers key-constrained input/output without requiring every allowed key", async () => {
+    const schema = v.record(v.literal("draft", "published"), entry);
+    expectTypeOf<Infer.Input<typeof schema>>().toEqualTypeOf<
+      Partial<Record<"draft" | "published", EntryInput>>
+    >();
+    expectTypeOf<Infer.Output<typeof schema>>().toEqualTypeOf<
+      Partial<Record<"draft" | "published", EntryOutput>>
+    >();
+    expectTypeOf<StandardSchemaV1.InferOutput<typeof schema>>().toEqualTypeOf<
+      Partial<Record<"draft" | "published", EntryOutput>>
+    >();
+    const broad = v.record(v.string(), entry);
+    expectTypeOf<Infer.Output<typeof broad>>().toEqualTypeOf<Record<string, EntryOutput>>();
+    const result = await validate(schema, { draft: {} });
+    if (!result.isValid) throw new Error("expected valid output");
+    expectTypeOf(result.data).toEqualTypeOf<Partial<Record<"draft" | "published", EntryOutput>>>();
+    expect(result.data).toEqual({ draft: { count: 1, rescued: 2 } });
+  });
+
   it("keeps nested record/union outputs and nullable members", async () => {
     const schema = v.object({ entries: v.record(v.union([entry, v.literal("skip")]).nullable()) });
     expectTypeOf<Infer.Output<typeof schema>>().toEqualTypeOf<{

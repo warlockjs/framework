@@ -112,3 +112,48 @@ describe("RecordValidator", () => {
     });
   });
 });
+
+describe("record key validators", () => {
+  it("supports direct validation without a caller-supplied context", async () => {
+    const schema = v.record(v.string(), v.number());
+    expect((await schema.validate({ a: 1 })).isValid).toBe(true);
+    expect((await schema.validate({ a: "x" })).isValid).toBe(false);
+    expect((await v.record(v.number()).validate({ a: 1 })).isValid).toBe(true);
+  });
+  it("validates keys and values and reports the entry path", async () => {
+    const schema = v.object({ counts: v.record(v.literal("draft", "published"), v.int()) });
+    expect((await validate(schema, { counts: { draft: 2 } })).data).toEqual({
+      counts: { draft: 2 },
+    });
+    const badKey = await validate(schema, { counts: { other: 2 } });
+    expect(badKey.isValid).toBe(false);
+    expect(badKey.errors[0]?.input).toBe("counts.other");
+    expect((await validate(schema, { counts: { draft: "two" } })).isValid).toBe(false);
+  });
+
+  it("refuses non-dictionaries instead of skipping keyed validation", async () => {
+    const schema = v.record(v.string(), v.int());
+    for (const input of [[1], new Map(), new Date()]) {
+      expect((await validate(schema, input)).isValid).toBe(false);
+    }
+  });
+
+  it("clones key rules and emits propertyNames", async () => {
+    const schema = v.record(v.literal("draft"), v.int()).clone();
+    expect((await validate(schema, { other: 2 })).isValid).toBe(false);
+    expect(schema.toJsonSchema().propertyNames).toEqual(v.literal("draft").toJsonSchema());
+  });
+
+  it("rejects malformed arguments when defining a schema", () => {
+    expect(() => Reflect.apply(v.record, undefined, [v.string(), {}])).toThrow("second argument");
+    expect(() => Reflect.apply(v.record, undefined, [v.string(), null])).toThrow("second argument");
+    expect(() => Reflect.apply(v.record, undefined, [null])).toThrow("expected a value validator");
+    expect(() => Reflect.construct(RecordValidator, [v.string(), {}])).toThrow("second argument");
+  });
+
+  it("retains the single-value and custom error message forms", async () => {
+    expect((await validate(v.record(v.int()), { count: 2 })).data).toEqual({ count: 2 });
+    const result = await validate(v.record(v.int(), "Expected a dictionary"), "bad");
+    expect(result.errors[0]?.error).toBe("Expected a dictionary");
+  });
+});

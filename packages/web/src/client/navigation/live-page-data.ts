@@ -1,6 +1,7 @@
 import { PAGE_INVALIDATED_EVENT, type LivePageOptions } from "../../live-page-data";
 import { hasDirtyForms, subscribeDirtyForms } from "./dirty-form-store";
 import { readNavigationPending, subscribeNavigationPending } from "./navigation-pending-store";
+import type { Refresher } from "./refresh";
 import { clearPrefetchCache } from "./prefetch";
 
 /** Structural subset of a Socket.IO client; the application owns its lifecycle. */
@@ -22,12 +23,13 @@ export function configureLivePageData(options: { socket?: LivePageSocket }): voi
 /** One controller per mounted navigation runtime, across page swaps. */
 export function startLivePageData(runtime: {
   readOptions: () => LivePageOptions | undefined;
-  refresh: () => Promise<boolean>;
+  refresh: Refresher;
 }): () => void {
   let disposed = false;
   let running = false;
   const queuedTags = new Set<string>();
   let pollQueued = false;
+  let focusQueued = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let detachSocket: (() => void) | undefined;
 
@@ -35,16 +37,21 @@ export function startLivePageData(runtime: {
     if (disposed || running || readNavigationPending() || hasDirtyForms()) return;
     const options = runtime.readOptions();
     const tags = [...queuedTags];
-    const shouldRefresh = options && (pollQueued || tags.some((tag) => options.tags.includes(tag)));
+    const shouldRefresh =
+      options && (pollQueued || focusQueued || tags.some((tag) => options.tags.includes(tag)));
     queuedTags.clear();
     const polled = pollQueued;
+    const focused = focusQueued;
     pollQueued = false;
+    focusQueued = false;
     if (!shouldRefresh) return;
 
     running = true;
     let applied = false;
     try {
-      applied = await runtime.refresh();
+      applied = await runtime.refresh({
+        reason: tags.length > 0 ? "live" : focused ? "focus" : "poll",
+      });
     } catch {
       // A failed background refresh keeps the current page and retries later.
     } finally {
@@ -53,6 +60,7 @@ export function startLivePageData(runtime: {
         if (!applied) {
           for (const tag of tags) queuedTags.add(tag);
           pollQueued ||= polled;
+          focusQueued ||= focused;
         }
         // Events received during the request need another pass, but failures
         // must wait for a new event, an idle/clean transition, or the next tick.
@@ -110,6 +118,12 @@ export function startLivePageData(runtime: {
     wake();
   };
 
+  const onFocus = (): void => {
+    focusQueued = true;
+    wake();
+  };
+  if (typeof window !== "undefined") window.addEventListener("focus", onFocus);
+
   const unsubscribeNavigation = subscribeNavigationPending(wake);
   const unsubscribeDirty = subscribeDirtyForms(wake);
   configurationListeners.add(bindSocket);
@@ -119,6 +133,7 @@ export function startLivePageData(runtime: {
     disposed = true;
     if (timer !== undefined) clearTimeout(timer);
     detachSocket?.();
+    if (typeof window !== "undefined") window.removeEventListener("focus", onFocus);
     configurationListeners.delete(bindSocket);
     unsubscribeNavigation();
     unsubscribeDirty();

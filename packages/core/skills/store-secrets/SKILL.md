@@ -97,6 +97,45 @@ Options also allow a `directory` and `encryptionKey` (string or lazy callback); 
 
 ## Error and logging contract
 
-`SecretStoreError.code` is `INVALID_NAME`, `INVALID_VALUE`, `INVALID_NAMESPACE`, `READ_ONLY`, `KEY_REQUIRED`, `UNAVAILABLE`, `UNSAFE_FILE` or `CORRUPT_FILE`. Errors never include names, values, paths or vendor causes. `KEY_REQUIRED` means provision/fix the app encryption key; `CORRUPT_FILE` means wrong key, invalid format or failed authentication. Never replace an unreadable store with an empty one.
+`SecretStoreError.code` is `INVALID_DRIVER`, `MEMORY_IN_PRODUCTION`, `INVALID_NAME`, `INVALID_VALUE`, `INVALID_NAMESPACE`, `READ_ONLY`, `KEY_REQUIRED`, `UNAVAILABLE`, `UNSAFE_FILE` or `CORRUPT_FILE`. Errors never include names, values, paths or vendor causes. `KEY_REQUIRED` means provision/fix the app encryption key; `CORRUPT_FILE` means wrong key, invalid format or failed authentication. Never replace an unreadable store with an empty one.
 
 The store never logs credentials. It registers encountered names and literal values with `@warlock.js/logger` for process-lifetime masking, including old/removed/failed-write values, interpolated messages, Error text/causes, and channel error reports. Keys and exact values stay protected even with permissive custom censors. Registration retains values in memory. It cannot mask direct console/third-party logging, earlier logs, transformed/encoded values, or credentials never encountered by the store. Keep secrets out of logs even with masking enabled. Fake assertion errors do not print values.
+
+## Built-app tests with the memory driver
+
+Run the built server with `SECRETS_DRIVER=memory`, or select the driver in
+`src/config/secrets.ts`. Explicit config takes precedence over the environment;
+`"auto"` (the default) keeps keychain/environment/file behavior. Unknown driver
+names fail with `SecretStoreError.code === "INVALID_DRIVER"`.
+
+```ts title="src/config/secrets.ts"
+import type { SecretsConfigurations } from "@warlock.js/core";
+
+export default {
+  namespace: "browser-test-server",
+  driver: "memory",
+  allowMemoryInProduction: true,
+} satisfies SecretsConfigurations;
+```
+
+`allowMemoryInProduction: true` is required only when the test server runs with
+`NODE_ENV=production`. Without it, memory selection fails closed with
+`MEMORY_IN_PRODUCTION`; a built bundle does not bypass this check. Set this
+option explicitly in the test deployment configuration. `SecretStore` accepts
+the same `driver` and `allowMemoryInProduction` options for standalone stores.
+
+The selected memory driver bypasses keychain, scoped environment secrets and
+files, and still registers values for log masking. Values are isolated by app
+namespace, lost on process exit, and never shared across workers or with a
+separate browser-test process. Seed fixtures through application startup or a
+test-only endpoint in the server process using the normal `secrets.set()` API:
+
+```ts
+import { secrets } from "@warlock.js/core";
+
+await secrets.set("vendor-token", "browser-test-credential");
+const token = await secrets.get("vendor-token");
+```
+
+The normal test harness still installs `secretsFake`; explicit `backend`
+instances and that fake continue to bypass configured backend selection.

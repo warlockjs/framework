@@ -100,3 +100,25 @@ describe("ObjectValidator", () => {
     expect((await validate(topLevel, null)).isValid).toBe(true);
   });
 });
+
+describe("plain object inputs", () => {
+  it.each([
+    [],
+    ["x"],
+    new Date(),
+    new Map(),
+    new Set(),
+    Object.create({ value: 1 }),
+    new (class Entry {
+      value = 1;
+    })(),
+  ])("rejects non-plain objects even with unknown keys allowed", async (input) => {
+    expect((await validate(v.object({}).allowUnknown(), input)).isValid).toBe(false);
+    expect((await validate(v.object({}).stripUnknown(), input)).isValid).toBe(false);
+  });
+
+  it("accepts plain objects and dictionaries without a prototype", async () => {
+    expect((await validate(v.object({}).allowUnknown(), { value: 1 })).isValid).toBe(true);
+    expect((await validate(v.object({}).allowUnknown(), Object.create(null))).isValid).toBe(true);
+  });
+});

@@ -21,12 +21,36 @@ import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json
  * ```
  */
 export class RecordValidator extends BaseValidator {
+  public valueValidator: BaseValidator;
+  public keyValidator?: BaseValidator;
+
+  public constructor(valueValidator: BaseValidator, errorMessage?: string);
   public constructor(
-    public valueValidator: BaseValidator,
+    keyValidator: BaseValidator,
+    valueValidator: BaseValidator,
     errorMessage?: string,
-  ) {
+  );
+  public constructor(first: BaseValidator, second?: BaseValidator | string, errorMessage?: string) {
     super();
-    this.addMutableRule(objectRule, errorMessage);
+    if (!(first instanceof BaseValidator)) {
+      throw new TypeError(
+        "v.record(): expected a value validator or a key validator followed by a value validator",
+      );
+    }
+    if (second !== undefined && typeof second !== "string" && !(second instanceof BaseValidator)) {
+      throw new TypeError(
+        "v.record(): second argument must be a value validator or an error message",
+      );
+    }
+    if (errorMessage !== undefined && typeof errorMessage !== "string") {
+      throw new TypeError("v.record(): error message must be a string");
+    }
+    this.keyValidator = second instanceof BaseValidator ? first : undefined;
+    this.valueValidator = second instanceof BaseValidator ? second : first;
+    this.addMutableRule(
+      this.keyValidator ? { ...plainObjectRule, name: "object" } : objectRule,
+      typeof second === "string" ? second : errorMessage,
+    );
   }
 
   /**
@@ -49,6 +73,7 @@ export class RecordValidator extends BaseValidator {
   public override clone(): this {
     const cloned = super.clone();
     cloned.valueValidator = this.valueValidator.clone();
+    cloned.keyValidator = this.keyValidator?.clone();
     return cloned;
   }
 
@@ -59,7 +84,18 @@ export class RecordValidator extends BaseValidator {
    * so the parent ObjectValidator can omit the key. Without this, optional record
    * fields would silently materialise as `{}` in the validated output.
    */
-  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public async validate(
+    data: any,
+    context: SchemaContext = {
+      allValues: data,
+      parent: null,
+      value: data,
+      key: "",
+      path: "",
+      translateRule: () => "",
+      translateAttribute: ({ attribute }) => attribute,
+    },
+  ): Promise<ValidationResult> {
     // Apply default when absent, then mutate. Mirrors BaseValidator's
     // `valueForRules = data ?? this.getDefaultValue()` so `.default({...})`
     // works on records too.
@@ -90,6 +126,11 @@ export class RecordValidator extends BaseValidator {
         path: setKeyPath(context.path, key),
       };
 
+      if (this.keyValidator) {
+        // Keys are checked as supplied; transforms never rename properties.
+        const keyResult = await this.keyValidator.validate(key, { ...childContext, value: key });
+        if (!keyResult.isValid) errors.push(...keyResult.errors);
+      }
       const childResult = await this.valueValidator.validate(mutatedData[key], childContext);
 
       // Update mutated data with validated result
@@ -134,6 +175,7 @@ export class RecordValidator extends BaseValidator {
       additionalProperties: this.valueValidator.toJsonSchema(target),
     };
 
+    if (this.keyValidator) schema.propertyNames = this.keyValidator.toJsonSchema(target);
     if (this.isNullable) applyNullable(schema, target);
 
     return schema;

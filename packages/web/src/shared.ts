@@ -356,6 +356,8 @@ function freezeBrowserSnapshot(value: object, seen: Set<object>): void {
  * observes the same identity; this never reads or writes the server ALS scope.
  */
 export function hydrateShared(value: unknown): void {
+  // A runtime seam can prepare the same payload before the central swap.
+  if (browserSharedInstalled && value === browserSharedSnapshot) return;
   if (value !== null && typeof value === "object") {
     freezeBrowserSnapshot(value, new Set<object>());
   }

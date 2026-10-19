@@ -3,6 +3,8 @@ import { config } from "../config/config-getter";
 import { storagePath } from "../utils/paths";
 import { SecretStoreError } from "./errors";
 import { FileSecretBackend } from "./file-backend";
+import { MemorySecretBackend } from "./memory-backend";
+import { resolveSecretsDriver } from "./resolve-driver";
 import { KeyringSecretBackend } from "./keyring-backend";
 import type { SecretBackend, SecretStoreOptions } from "./types";
 
@@ -22,7 +24,8 @@ export class SecretStore {
       throw new SecretStoreError("INVALID_NAMESPACE");
     }
     this.namespace = options.namespace;
-    this.backend = options.backend;
+    const driver = options.backend ? "auto" : resolveSecretsDriver(options);
+    this.backend = options.backend ?? (driver === "memory" ? new MemorySecretBackend() : undefined);
     const encryptionKey = options.encryptionKey;
     this.file = new FileSecretBackend(
       options.directory ?? storagePath("secrets"),

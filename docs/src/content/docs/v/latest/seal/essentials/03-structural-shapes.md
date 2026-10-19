@@ -18,6 +18,7 @@ v.object({
 });
 ```
 
+- **Plain objects only.** Arrays, dates, maps, sets, custom-prototype objects and class instances fail, including with `.allowUnknown()` or `.stripUnknown()`. Objects with a null prototype are accepted. Convert an instance to an explicit plain DTO before validation; there is no permissive opt-in.
 - **Required by default.** `.optional()` to opt out. The inferred type marks optional keys with `?`.
 - **Cross-field rules live here.** `.sameAs("password")`, `.requiredIf("role", "admin")` resolve siblings against the parent `v.object`. Without a parent, sibling resolution silently passes.
 - **Unknown keys are rejected by default** — validation fails with _"The schema contains unknown keys: …"_. Toggle behavior:
@@ -99,7 +100,20 @@ v.record(v.object({ count: v.int() })); // type: Record<string, { count: number 
 v.record(); // type: Record<string, any>
 ```
 
-Reach for `v.record` when keys are dynamic (user-supplied, dictionary-style) but values share a schema. If keys are also constrained (e.g. only `"draft" | "published"`), use `v.object` with literal keys instead — the constraint lives in the type.
+Reach for `v.record` when keys are dynamic but values share a schema. Supply a key validator first to constrain the present keys:
+
+```ts
+const counts = v.record(v.literal("draft", "published"), v.int());
+await v.validate(counts, { draft: 2 }); // valid; published may be absent
+await v.validate(counts, { other: 2 }); // invalid key, input: other
+await v.validate(counts, { draft: "two" }); // invalid value
+```
+
+Both forms infer the value validator's distinct input and output types. String key validators infer `Record<string, Value>`; literal keys infer `Partial<Record<"draft" | "published", Value>>`, because absent keys are not required. Use `v.object` when every named key must exist. Key validators check original string property names; their transforms do not rename keys. JSON Schema includes `propertyNames` for the key schema. Malformed validators throw `TypeError` at definition time. The existing `v.record(valueValidator, "Custom object error")` form remains supported; the keyed form accepts that message as a third argument.
+
+### Upgrading from 5.33
+
+**BREAKING:** `v.object()` now refuses non-plain objects. Use `v.array(itemSchema)` for arrays, `v.instanceof(YourClass)` for instance identity checks, or validate an explicitly constructed DTO such as `{ name: instance.name }`. Unknown-key options do not relax the input type.
 
 ## `v.tuple` — positional types
 

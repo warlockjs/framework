@@ -2,8 +2,9 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { config } from "../config/config-getter";
 import { rootPath, storagePath } from "../utils/paths";
+import { resolveSecretsDriver } from "./resolve-driver";
 import { SecretStore } from "./secret-store";
-import type { SecretBackend } from "./types";
+import type { SecretBackend, SecretsConfigurations } from "./types";
 
 let testBackend: SecretBackend | undefined;
 let stores = new Map<string, SecretStore>();
@@ -27,10 +28,15 @@ function current(): SecretStore {
     config.key<string | undefined>("secrets.namespace") ??
     `${appName}:${createHash("sha256").update(root).digest("hex")}`;
   const directory = config.key<string | undefined>("secrets.directory") ?? storagePath("secrets");
-  const identity = JSON.stringify([root, namespace, directory]);
+  const options: SecretsConfigurations = {
+    driver: config.key<SecretsConfigurations["driver"]>("secrets.driver"),
+    allowMemoryInProduction: config.key<boolean | undefined>("secrets.allowMemoryInProduction"),
+  };
+  const driver = testBackend ? "auto" : resolveSecretsDriver(options);
+  const identity = JSON.stringify([root, namespace, directory, driver]);
   let store = stores.get(identity);
   if (!store) {
-    store = new SecretStore({ namespace, directory, backend: testBackend });
+    store = new SecretStore({ ...options, driver, namespace, directory, backend: testBackend });
     stores.set(identity, store);
   }
   return store;
