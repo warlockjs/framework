@@ -20,12 +20,16 @@ import {
   startWorkers,
   closeQueue,
   getQueue,
+  getQueueDriver,
   runningWorkers,
   toMilliseconds,
 } from "@warlock.js/queue";
 
 import type {
   QueueConfig,
+  LocalQueueConfig,
+  QueueDriver,
+  DriverDispatch,
   QueueWorkersConfig,
   JobOptions,
   JobBackoff,
@@ -184,11 +188,19 @@ that id.
 
 ```ts
 type QueueConfig = {
-  connection: ConnectionOptions; // any BullMQ connection option, or an ioredis instance
-  prefix?: string; // default "warlock"
+  driver?: "bullmq" | "local" | "memory"; // default bullmq
+  local?: LocalQueueConfig;
+  connection?: ConnectionOptions; // any BullMQ connection option, or an ioredis instance
+  prefix?: string; // namespace, default "warlock"
   defaultQueue?: string; // default "default"
   defaultJobOptions?: JobOptions;
   workers?: QueueWorkersConfig;
+};
+
+type LocalQueueConfig = {
+  path?: string; // SQLite file, default .warlock/queue.sqlite
+  leaseDuration?: number; // ms, default 30000, minimum 30
+  pollInterval?: number; // ms, default 100, minimum 1
 };
 
 type QueueWorkersConfig = {
@@ -242,6 +254,35 @@ connection. Safe to call more than once, and when nothing was started.
 `getQueue` returns (creating on first use) the BullMQ `Queue` for
 `name`. `runningWorkers()` lists the queue names with a running worker
 in this process.
+
+### `getQueueDriver()` / `QueueDriver`
+
+`getQueueDriver(): QueueDriver` lazily creates the configured backend. The
+same instance powers every job and worker until `closeQueue()` closes it.
+The built-in BullMQ, SQLite, and memory drivers implement:
+
+```ts
+interface QueueDriver {
+  dispatch(request: DriverDispatch): Promise<DispatchedJob>;
+  find(queue: string, id: string): Promise<JobSnapshot | undefined>;
+  failed(queue: string, start: number, end: number): Promise<FailedJob[]>;
+  retry(queue: string, id: string): Promise<void>;
+  start(queue: string): Promise<void>;
+  running(): string[];
+  close(timeout: number): Promise<void>;
+}
+```
+
+`DriverDispatch` is `{ name, queue, data, options }`: `data` is the serialized
+payload/context envelope, `options` is merged job/dispatch configuration
+with numeric millisecond delay. Prefer `defineJob()` and `startWorkers()`
+for normal use: they capture context, merge defaults, register handlers,
+and honour process roles and `workers.enabled`.
+
+`connection` is required by BullMQ only. `getQueue()` and bull-board throw
+with the other backends. Local/memory contexts also have `signal?: AbortSignal`,
+aborted on lease loss or a shutdown timeout. Local shutdown releases leases;
+crashes re-deliver after expiry. See [Local and memory queues](../../guides/local-queues/).
 
 ### `toMilliseconds(duration: Duration): number`
 

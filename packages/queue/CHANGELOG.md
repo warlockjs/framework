@@ -1,8 +1,17 @@
-﻿# Changelog — @warlock.js/queue
+# Changelog — @warlock.js/queue
 
 All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
+
+## 5.34.0
+
+### Added
+
+- Select `driver: "local"` for durable single-host SQLite queues using Node's built-in `node:sqlite` without Redis, or `driver: "memory"` for tests executing real handlers. Existing configuration defaults to BullMQ.
+- A shared `QueueDriver` contract and `getQueueDriver()` for dispatch, snapshots, failed-job recovery, and worker lifecycle across all backends.
+- Local/memory delays, priorities, retries with fixed/exponential backoff, retention, per-queue concurrency, context propagation, progress, and results through the existing `defineJob()` API.
+- Transactional claims, renewable fenced leases, recovery after worker crashes, and bounded graceful shutdown releasing unfinished local jobs. Local/memory handlers receive an optional cancellation `signal`.
 
 ## 5.32.0 - 2026-10-18
 

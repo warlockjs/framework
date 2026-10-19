@@ -5,7 +5,7 @@ description: 'Configure `@warlock.js/queue`: the declarative `src/config/queue.t
 
 # Configure the queue
 
-Redis is required. The config is declarative; the connector applies it.
+BullMQ is the default and requires Redis. Select `driver: "local"` for durable SQLite without Redis (Node >= 22.15), or `driver: "memory"` for tests; see `local-queues` for working examples, leases, and cancellation. The config is declarative; the connector applies it.
 
 ```ts title="src/config/queue.ts"
 import type { QueueConfig } from "@warlock.js/queue";

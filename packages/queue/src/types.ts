@@ -80,16 +80,28 @@ export type QueueDashboardConfig = {
   middleware?: Middleware[];
 };
 
-/**
- * The `queue` configuration key — `src/config/queue.ts`.
- */
+/** Single-host storage and local worker timing. */
+export type LocalQueueConfig = {
+  /** SQLite file on a local disk. Default `.warlock/queue.sqlite`. */
+  path?: string;
+  /** Renewable worker lease in milliseconds. Default `30000`, minimum `30`. */
+  leaseDuration?: number;
+  /** Idle worker polling interval in milliseconds. Default `100`. */
+  pollInterval?: number;
+};
+
+/** The `queue` configuration key — `src/config/queue.ts`. */
 export type QueueConfig = {
+  /** Backend. Default `"bullmq"`; `"local"` uses SQLite; `"memory"` is process-local. */
+  driver?: "bullmq" | "local" | "memory";
+  /** Local driver storage and worker timing (timing also applies to memory). */
+  local?: LocalQueueConfig;
   /**
    * Redis connection. Any BullMQ connection option: `{ host, port, password, db }`,
    * `{ url }`, or an ioredis instance.
    */
-  connection: ConnectionOptions;
-  /** Redis key prefix for every queue. Default `"warlock"`. */
+  connection?: ConnectionOptions;
+  /** Storage namespace for every queue. Default `"warlock"`. */
   prefix?: string;
   /** Queue name used when a job does not name one. Default `"default"`. */
   defaultQueue?: string;
@@ -124,6 +136,8 @@ export type JobContext = {
   log(line: string): Promise<void>;
   /** State captured at dispatch by the registered queue context, if any. */
   context: unknown;
+  /** Aborted when a local/memory worker loses its lease or shutdown times out. */
+  signal?: AbortSignal;
 };
 
 /**

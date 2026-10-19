@@ -30,6 +30,27 @@ export default queueConfig;
 `defaultJobOptions` is the bottom layer of a three-way merge: dispatch
 options override `defineJob`, which overrides `defaultJobOptions`.
 
+## Backend selection
+
+`driver` defaults to `"bullmq"` and requires `connection`. Select `"local"`
+for durable SQLite without Redis on Node >= 22.15, or `"memory"` for tests.
+`connection` is optional for those backends. `prefix` is the storage namespace
+for every backend. `local: { path, leaseDuration, pollInterval }` configures
+SQLite storage and worker timing (timing also applies to memory).
+
+```ts
+const queueConfig: QueueConfig = {
+  driver: "local",
+  local: { path: "/var/lib/my-app/jobs.sqlite", leaseDuration: 30_000, pollInterval: 100 },
+  workers: { concurrency: 4, shutdownTimeout: 5000 },
+};
+```
+
+See [Local and memory queues](../../guides/local-queues/) for cancellation,
+leases, crash recovery, and storage requirements. `getQueue()` and the
+bull-board dashboard require BullMQ. Close the current backend before
+changing configuration.
+
 ## The connector
 
 ```ts title="warlock.config.ts"

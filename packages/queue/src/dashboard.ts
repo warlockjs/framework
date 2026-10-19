@@ -1,5 +1,5 @@
 import type { Middleware } from "@warlock.js/core";
-import { defaultQueueName } from "./config";
+import { defaultQueueName, getQueueConfig } from "./config";
 import { buildDashboardGuardPlugin } from "./dashboard-guard-plugin";
 import { QueueDashboardDependencyError } from "./errors";
 import { queueOf, registeredJobs } from "./job-registry";
@@ -52,6 +52,11 @@ export async function queueDashboard(
   server: DashboardServer,
   options: QueueDashboardOptions = {},
 ): Promise<void> {
+  if ((getQueueConfig().driver ?? "bullmq") !== "bullmq") {
+    throw new Error(
+      "The bull-board dashboard requires the bullmq queue driver. Use job.find() and failedJobs() with local or memory queues.",
+    );
+  }
   const basePath = options.basePath ?? "/admin/queues";
   const { createBullBoard, BullMQAdapter, FastifyAdapter } = await loadBullBoard();
   const queueNames = options.queues ?? [

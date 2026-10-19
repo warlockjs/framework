@@ -1,0 +1,171 @@
+---
+title: "Local and memory queues"
+sidebar:
+  order: 2
+---
+
+Use `driver: "local"` for durable jobs on one host without Redis, or
+`driver: "memory"` for tests that execute real handlers. The default remains
+`"bullmq"`; existing Redis configuration continues to work.
+
+## Durable local jobs
+
+```ts title="src/config/queue.ts"
+import type { QueueConfig } from "@warlock.js/queue";
+
+export default {
+  driver: "local",
+  prefix: "my-app",
+  local: {
+    path: "/var/lib/my-app/jobs.sqlite",
+    leaseDuration: 30_000,
+    pollInterval: 100,
+  },
+  defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 1000 } },
+  workers: { concurrency: 4, shutdownTimeout: 30_000 },
+} satisfies QueueConfig;
+```
+
+Register `queueConnector()` in `warlock.config.ts` as usual. No Redis
+connection or extra native dependency is needed. The file's parent directory
+is created automatically and must be writable. The default path is
+`.warlock/queue.sqlite`, relative to the process working directory. Use the
+same absolute path and `prefix` in every process sharing jobs.
+
+The backend uses Node's built-in `node:sqlite`. It was unflagged in
+[Node 22.13's changelog](https://nodejs.org/en/blog/release/v22.13.0);
+[the Node 22.15 API documentation](https://nodejs.org/download/release/v22.15.0/docs/api/sqlite.html)
+still marks it experimental. A direct import and database query without
+flags was verified on Node 22.15.0. Use Node 22.15 or newer with that module
+available; if the runtime cannot load it, selecting this driver throws
+instead of silently losing durability. Other backends do not load SQLite.
+
+SQLite runs synchronous, short database operations, with WAL journaling,
+`FULL` synchronous writes, and a five-second busy timeout. Use this driver
+for local/desktop and modest single-host workloads. Keep the database and
+its WAL files on a local disk; do not share it over a network filesystem.
+Use BullMQ for a distributed worker fleet or workloads needing Redis scale.
+
+## The same job API
+
+```ts
+import { defineJob, failedJobs, retryFailedJob } from "@warlock.js/queue";
+
+const thumbnail = defineJob({
+  name: "images.thumbnail",
+  attempts: 4,
+  backoff: { type: "exponential", delay: 500 },
+  async handle(payload: { imageId: string }, ctx) {
+    ctx.signal?.throwIfAborted();
+    await ctx.log(`processing ${payload.imageId}`);
+    await ctx.progress(100);
+    return { imageId: payload.imageId, ready: true };
+  },
+});
+
+const { id } = await thumbnail.dispatch(
+  { imageId: "42" },
+  {
+    jobId: "thumbnail-42",
+    delay: "2s",
+    priority: 1,
+  },
+);
+const snapshot = await thumbnail.find(id);
+console.log(snapshot?.state);
+
+for (const failure of await failedJobs()) {
+  console.log(failure.failedReason);
+  await failure.retry();
+}
+// Alternatively, for an id known to be failed:
+// await retryFailedJob(id);
+```
+
+Both backends support delays, fixed and exponential backoff, priorities,
+idempotent dispatch IDs, progress, stored results, captured queue context,
+failed-job inspection/retry, and completed/failed retention. Dispatch options
+override job options, which override `defaultJobOptions`. Payloads, context,
+progress, and results must be JSON serializable. Jobs without a matching
+handler, and handlers throwing `UnrecoverableJobError`, fail immediately.
+
+Unprioritized jobs run first; positive priorities run in ascending order,
+with FIFO ordering within a priority. Delays are minimum waits: polling and
+available concurrency determine when a ready job actually starts. Concurrency
+is per queue, per process; each process has its own configured limit.
+`attemptsMade` counts settled attempts, including success. A lease lost to a
+crash is re-delivered without consuming an attempt.
+
+`getQueue()` returns a native BullMQ `Queue` and is only available with
+`driver: "bullmq"`. The bull-board dashboard also requires BullMQ; enabling
+it with local/memory queues throws. Use `find()` and `failedJobs()` to
+inspect these backends.
+
+## Leases, crashes, and shutdown
+
+Claims and job state updates run inside SQLite `BEGIN IMMEDIATE`
+transactions. Each claim gets a unique lease token. Only the current,
+unexpired owner can renew the lease, report progress, or settle the job.
+Healthy workers renew every third of `leaseDuration`; two processes cannot
+hold a valid lease on the same job. A killed process stops renewing, so any
+remaining worker can claim its jobs after the lease deadline.
+
+`leaseDuration` defaults to 30 seconds (minimum 30 milliseconds).
+`pollInterval` defaults to 100 milliseconds (minimum 1 millisecond).
+Both and `workers.concurrency` must be positive integers within Node's timer
+range. Keep the lease comfortably longer than database contention and event
+loop stalls. CPU-heavy synchronous handlers can prevent renewal; move that
+work to another thread/process or use a longer lease.
+
+`closeQueue({ timeout })` and the connector's shutdown stop new claims
+immediately. Active jobs keep renewing while they finish, bounded by
+`timeout` (default `workers.shutdownTimeout`, then 30 seconds). On timeout,
+the worker aborts `ctx.signal`, releases its remaining leases for immediate
+re-delivery, and closes storage. Subsequent progress/result writes from the
+old handler are rejected or ignored. After closing, a new dispatch opens a
+producer connection without restarting workers. Await `closeQueue()` before
+changing configuration or restarting workers.
+
+Delivery is **at least once**. A handler may perform an external side effect
+and crash before acknowledging it. JavaScript cannot forcibly stop a handler
+that ignores cancellation, so an expired or released handler can continue
+external work while a replacement runs. Make side effects idempotent, use
+unique operation keys, and pass `ctx.signal` to operations that support
+cancellation. Transactions prevent duplicate ownership and stale queue writes;
+they cannot make external services part of the queue transaction.
+
+## In-memory execution in tests
+
+```ts
+import {
+  closeQueue,
+  defineJob,
+  setDispatchInterceptor,
+  setQueueConfig,
+  startWorkers,
+} from "@warlock.js/queue";
+
+// Disable core's queueFake when testing real execution.
+setDispatchInterceptor(undefined);
+setQueueConfig({ driver: "memory", workers: { concurrency: 2 } });
+const job = defineJob({ name: "example.run", handle: (value: number) => value * 2 });
+await startWorkers();
+const dispatched = await job.dispatch(21);
+try {
+  const deadline = Date.now() + 5000;
+  while ((await job.find(dispatched.id))?.state !== "completed") {
+    if (Date.now() >= deadline) throw new Error("Job did not complete");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  console.log((await job.find(dispatched.id))?.result); // 42
+} finally {
+  await closeQueue();
+}
+```
+
+The memory driver uses the same scheduler, retries, leases, and shutdown
+logic but stores JSON copies in a process-local map. It does not persist
+across processes or `closeQueue()`. Use a temporary SQLite file when testing
+restart or process-crash recovery. With `workers.enabled: false`, both
+backends can dispatch without starting handlers; another process can consume
+local jobs using the same SQLite file, namespace, and definitions.

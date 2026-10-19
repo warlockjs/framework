@@ -1,6 +1,6 @@
 # @warlock.js/queue
 
-Durable background jobs for Warlock.js, built on [BullMQ](https://docs.bullmq.io).
+Background jobs for Warlock.js with [BullMQ](https://docs.bullmq.io), durable local SQLite, or memory for tests.
 
 - `defineJob({ name, handle, attempts, backoff })` → a typed job with `.dispatch(payload, { delay, priority, jobId })`
 - Retries with fixed or exponential backoff, delays, priorities, progress
@@ -11,13 +11,15 @@ Durable background jobs for Warlock.js, built on [BullMQ](https://docs.bullmq.io
 
 ## Requirements
 
-**Redis is required.** BullMQ stores every job in Redis (5.0 or newer; any Redis-compatible server BullMQ supports, such as Valkey or Dragonfly, also works). This package does not start or bundle Redis.
+**BullMQ (the default)** stores jobs in Redis (5.0 or newer; any Redis-compatible server BullMQ supports, such as Valkey or Dragonfly, also works). This package does not start or bundle Redis.
+
+Select `driver: "local"` for SQLite on Node >= 22.15 (built-in `node:sqlite`, no flags; experimental in 22.15), or `driver: "memory"` for tests. Both use the same `defineJob` API. See the [local queues guide](https://warlock.js.org/v/latest/queue/guides/local-queues/) for leases, crash recovery, shutdown, and cancellation.
 
 ## Not the same as core's `Queue`
 
 `@warlock.js/core` exports a `Queue` class (`core/src/utils/queue.ts`). That one is an **in-memory batcher inside one process**: it collects items and flushes them when a size or time limit is reached. Nothing is stored; items are lost when the process exits; there are no retries.
 
-`@warlock.js/queue` is for **durable jobs**: they are stored in Redis, survive restarts, retry on failure, and can be processed by another process.
+`@warlock.js/queue` provides retries and worker execution; Redis and local SQLite storage survive restarts and support multiple worker processes. The memory driver is process-local and loses jobs on close/exit.
 
 ## Install
 
@@ -52,6 +54,19 @@ export default defineConfig({
 The connector starts after your app code is loaded, so every `defineJob` is registered before workers start. On shutdown (SIGINT/SIGTERM) it stops the workers, waits up to `shutdownTimeout` ms for running jobs, then closes the Redis connections.
 
 Set `workers.enabled: false` in a process that should only dispatch jobs.
+
+### Without Redis
+
+```ts
+setQueueConfig({
+  driver: "local",
+  local: { path: "/var/lib/my-app/jobs.sqlite", leaseDuration: 30_000, pollInterval: 100 },
+  workers: { concurrency: 4, shutdownTimeout: 5000 },
+});
+// Tests: setQueueConfig({ driver: "memory" });
+```
+
+Import `setQueueConfig` from `@warlock.js/queue`, or put these options in the config file. Share the same absolute path and `prefix` across processes on one host. Local storage uses transactions and renewable leases; crashed jobs re-deliver after lease expiry. Shutdown releases unfinished jobs after its timeout and aborts their `ctx.signal`. Handlers must be idempotent and observe cancellation. Keep SQLite on local disk. The memory driver clears jobs on close/exit; bull-board and `getQueue()` require BullMQ.
 
 ## Define and dispatch
 

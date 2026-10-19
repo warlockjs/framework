@@ -1,5 +1,5 @@
 /**
- * `@warlock.js/queue` — durable background jobs on BullMQ + Redis.
+ * `@warlock.js/queue` — background jobs on BullMQ, local SQLite, or memory.
  */
 export * from "./config";
 export * from "./dashboard";
@@ -31,3 +31,5 @@ export {
   type CloseQueueOptions,
 } from "./queue-manager";
 export * from "./types";
+export { getQueueDriver } from "./queue-driver";
+export type { DriverDispatch, QueueDriver } from "./driver";

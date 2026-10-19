@@ -1,10 +1,10 @@
 ---
-description: 'Durable background jobs on BullMQ + Redis: retries, delays, priorities, workers, failed-job recovery. Exports `defineJob`, `queueConnector`, `startWorkers`, `closeQueue`, `getQueue`, `failedJobs`, `retryFailedJob`, `mountQueueDashboard`, `QueueConfig`, `QueueJob`. Use for: "run this in the background", "retry a failed job", "delay a job", "survive restarts", "job dashboard". Not this package: cron or recurring schedules → @warlock.js/scheduler; broker pub/sub messaging → @warlock.js/herald; core `Queue` is an in-memory batcher.'
+description: 'Background jobs on BullMQ + Redis, local SQLite, or memory: retries, delays, priorities, workers, failed-job recovery. Exports `defineJob`, `queueConnector`, `startWorkers`, `closeQueue`, `getQueue`, `failedJobs`, `retryFailedJob`, `mountQueueDashboard`, `QueueConfig`, `QueueJob`. Use for: "run this in the background", "retry a failed job", "delay a job", "survive restarts", "job dashboard". Not this package: cron or recurring schedules → @warlock.js/scheduler; broker pub/sub messaging → @warlock.js/herald; core `Queue` is an in-memory batcher.'
 ---
 
 # @warlock.js/queue
 
-Jobs are stored in Redis (required; not bundled), retried on failure, and run by workers, in the app process by default. `defineJob({ name, handle })` registers a handler and returns a typed job; `job.dispatch(payload, options)` enqueues it. Any process with the same definition and a worker can run it. Server-only.
+Jobs are stored in Redis (default; not bundled), local SQLite without Redis, or memory for tests, retried on failure, and run by workers, in the app process by default. `defineJob({ name, handle })` registers a handler and returns a typed job; `job.dispatch(payload, options)` enqueues it. Any process with the same definition and a worker can run it. Server-only.
 
 ## The 80% path
 
@@ -22,3 +22,5 @@ Jobs are stored in Redis (required; not bundled), retried on failure, and run by
 - Guard the dashboard with middleware; an unguarded one is refused on purpose.
 - Core `Queue` is an in-memory batcher, lost on exit; use this package when work must survive.
 - Do not value-import from client code.
+
+Use the `local-queues` topic for `driver: "local"` / `"memory"`, Node requirements, leases, crash recovery, and cancellation.

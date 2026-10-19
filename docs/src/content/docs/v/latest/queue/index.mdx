@@ -1,16 +1,16 @@
 ---
 title: Queue
-description: Durable background jobs on BullMQ + Redis — retries, delay, priority, progress, failed-job recovery.
+description: Background jobs on Redis, local SQLite, or memory — retries, delay, priority, progress, failed-job recovery.
 ---
 
 `@warlock.js/queue` runs background work **outside the request/response
 cycle** — sending an invoice email, syncing inventory, generating a
-report — as durable jobs stored in Redis via [BullMQ](https://docs.bullmq.io).
-A job survives a process restart, retries on failure with backoff, and
-can be picked up by any worker process that shares the same Redis and
-job definitions.
+report — as durable jobs stored in Redis via [BullMQ](https://docs.bullmq.io)
+or in a local SQLite file without Redis. Both survive restarts and retry on
+failure. Use the memory driver for tests that execute real handlers.
 
-> Redis is required. BullMQ has no other backend.
+See [Local and memory queues](./guides/local-queues/) for backend selection,
+leases, crash recovery, and cancellation on Node >= 22.15.
 
 This is **not** the same as `@warlock.js/core`'s `Queue` class, which is
 an in-memory batcher inside one process (nothing stored, no retries,
