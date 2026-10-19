@@ -44,8 +44,13 @@ export function parseSkippedSteps(value: string | undefined): CheckStepName[] {
  */
 export async function checkCommandAction({ options }: CommandActionData): Promise<void> {
   const lint = stringOption(options.lint);
-  if (lint !== undefined && lint !== "oxlint" && lint !== "eslint") {
-    throw new Error("Unknown lint tool. Use --lint oxlint or --lint eslint (deprecated).");
+  if (lint === "eslint") {
+    throw new Error(
+      "ESLint support was removed in 5.34.0. Oxlint/Oxfmt is the default. Run npx warlock upgrade --from 5.33 --to 5.34.0.",
+    );
+  }
+  if (lint !== undefined && lint !== "oxlint") {
+    throw new Error("Unknown lint tool. Use --lint oxlint.");
   }
   const base = stringOption(options.base);
   const changed = options.changed === true || base !== undefined;

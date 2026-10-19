@@ -57,7 +57,7 @@ describe("check exit codes", () => {
   it("is 0 clean or with warnings only, 1 for code problems, 2 once the machine is involved", () => {
     const warning = createProblem({
       code: "WL7202",
-      source: "eslint",
+      source: "oxlint",
       severity: "warning",
       message: "w",
     });

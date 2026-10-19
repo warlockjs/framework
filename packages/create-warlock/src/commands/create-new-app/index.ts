@@ -28,7 +28,6 @@ import { hasInteractiveStdin } from "../../helpers/tty";
 import { askAgentTargets } from "../../prompts/ask-agent-targets";
 import { askAiFeatures } from "../../prompts/ask-ai-features";
 import { askFeatures } from "../../prompts/ask-features";
-import { askLintToolchain } from "../../prompts/ask-lint-toolchain";
 import { askProjectName } from "../../prompts/ask-project-name";
 import { askStack } from "../../prompts/ask-stack";
 import { showIntroBanner } from "../../ui/banner";
@@ -37,6 +36,7 @@ import getAppPath from "./get-app-path";
 import { AppOptions, App as AppType, CliFlags, SetupChoice, Stack } from "./types";
 
 export default async function createNewApp(cli: CliFlags = {}) {
+  resolveLintToolchain(cli.lint);
   // Start detecting package managers in the background to avoid delay later
   const pmDetectionPromise = detectPackageManagers();
 
@@ -145,11 +145,7 @@ async function createFullWizard(cli: CliFlags, pmDetectionPromise: Promise<void>
 
   setPackageManager(packageManager as string);
 
-  const lint = await askLintToolchain(seeds.lint);
-  if (isCancel(lint)) {
-    cancel("Toolchain selection cancelled");
-    process.exit(0);
-  }
+  const lint = seeds.lint;
 
   // Step 3: Database driver selection
   const databaseDriver = await select({
@@ -335,10 +331,7 @@ export type SyncAppOptions = Omit<AppOptions, "agents">;
  * before any file is written.
  */
 export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
-  const lint = cli.lint ?? "oxc";
-  if (lint !== "eslint" && lint !== "oxc") {
-    throw new Error(`Unknown lint toolchain "${lint}". Use --lint=eslint or --lint=oxc.`);
-  }
+  const lint = resolveLintToolchain(cli.lint);
   const databaseDriver = cli.db ?? "mongodb";
   const noDatabase = isNoDatabase(databaseDriver);
   const driver = noDatabase ? undefined : getDatabaseDriver(databaseDriver);
@@ -417,7 +410,7 @@ async function createNonInteractive(cli: CliFlags) {
       "A project name is required and no terminal is available to ask for one. " +
         "Pass it as the first argument or --name=<name>. Non-interactive flags: " +
         "--yes, --pm=<npm|yarn|pnpm|bun>, --db=<driver>|--no-db, --features=<list>, " +
-        "--ai=<list>, --lint=<oxc|eslint>, --git|--no-git, --jwt|--no-jwt.",
+        "--ai=<list>, --lint=<oxc>, --git|--no-git, --jwt|--no-jwt.",
     );
     process.exit(1);
   }
@@ -452,4 +445,17 @@ async function createNonInteractive(cli: CliFlags) {
   };
 
   await scaffold(appDetails);
+}
+
+/** Reject removed modes before prompts, network discovery or filesystem writes. */
+function resolveLintToolchain(lint: string | undefined): "oxc" {
+  if (lint === "eslint") {
+    throw new Error(
+      "ESLint + Prettier support was removed in 5.34.0. Oxlint/Oxfmt is the default; use --lint=oxc or omit --lint.",
+    );
+  }
+  if (lint !== undefined && lint !== "oxc") {
+    throw new Error(`Unknown lint toolchain "${lint}". Use --lint=oxc.`);
+  }
+  return "oxc";
 }

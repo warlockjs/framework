@@ -91,33 +91,49 @@ changedFiles, diff, installHint? }`. `applied` and `manual` entries carry
 `codemod`, `file` and `line`; `manual` entries add the `hint` and the `skill`
 to read.
 
-## 5.32 to 5.33: Oxlint and Oxfmt
+## 5.33 to 5.34: toolchain removal
 
-The `oxc-toolchain` codemod runs when the upgrade crosses 5.33.0:
+ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
 
 ```bash
-npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run --json
-npx warlock upgrade --from 5.32 --to 5.33.0
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Install the target core release and the optional `ts-morph` development dependency
-before running the command. It writes the create-warlock Oxc configs when absent,
-updates lint/format scripts, replaces ESLint/Prettier development dependencies with
-Oxlint 1.88.0, Oxfmt 0.73.0 and TypeScript 7.0.2, and updates generated editor settings
-and literal background-checker switches. Existing Oxc configs are preserved.
-Recognized generated legacy configs are deleted; a generated `.prettierignore`
-becomes `.oxfmtignore`, which the new formatting scripts explicitly select.
-Customized configs and conflicting ignore files remain with `file:line` guidance.
-Translate those settings and remove the old files after reviewing the report.
-`--dry-run` buffers additions, edits and deletions without writing any files;
-`--json` includes the same changed-file list, diff and manual findings.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
-ESLint and Prettier support is deprecated in 5.33.0 and removed in **5.34.0**.
-ESLint is off by default even when its config exists. Temporary opt-ins are
-`devServer.healthCheckers: { eslint: true }` and `warlock check --lint eslint`;
-both print a one-time deprecation warning with the migration command. New apps
-should use the default `create-warlock --lint=oxc`.
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
+
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.

@@ -27,23 +27,9 @@ describe("lint selection", () => {
     expect(await runLint(app(), ["src/test.js"])).toEqual({ linters: [], problems: [] });
     expect(warn).not.toHaveBeenCalled();
   });
-  it("retains explicitly selected ESLint with one deprecation warning on stderr", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("reports a missing Oxlint package when its config exists", async () => {
     const root = app();
-    for (let i = 0; i < 2; i++) {
-      const result = await runLint(root, ["src/test.js"], "eslint");
-      expect(result.linters).toEqual(["eslint"]);
-      expect(result.problems).toMatchObject([{ source: "eslint", rule: "no-debugger", line: 1 }]);
-    }
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]?.[0]).toContain("5.34.0");
-    expect(warn.mock.calls[0]?.[0]).toContain("npx warlock upgrade --from 5.32 --to 5.33.0");
-  });
-  it("reports a missing explicitly selected ESLint config", async () => {
-    const root = app();
-    rmSync(path.join(root, "eslint.config.mjs"));
-    expect((await runLint(root, ["src/test.js"], "eslint")).problems).toMatchObject([
-      { code: "WL8002" },
-    ]);
+    writeFileSync(path.join(root, ".oxlintrc.json"), "{}");
+    expect((await runLint(root, ["src/test.js"])).problems).toMatchObject([{ code: "WL8002" }]);
   });
 });

@@ -1,6 +1,6 @@
 ---
 title: "warlock check & typecheck"
-description: The single verify command — incremental typecheck, the app's ESLint/oxlint, the tests affected by a change and framework convention checks — reporting one JSON object per problem with a stable code, and exit codes that separate "your code" (1) from "this machine" (2). Plus `warlock typecheck [--changed]` on its own.
+description: The single verify command — incremental typecheck, the app's Oxlint, the tests affected by a change and framework convention checks — reporting one JSON object per problem with a stable code, and exit codes that separate "your code" (1) from "this machine" (2). Plus `warlock typecheck [--changed]` on its own.
 sidebar:
   order: 9
   label: "warlock check"
@@ -37,7 +37,7 @@ src/app/posts/services/publish.service.ts:2:24  WL9003  "../../users/models/user
 | `--changed, -c` | boolean | Limit every step to the files changed against `HEAD` plus untracked files.                 |
 | `--base, -b`    | string  | Compare with `git merge-base <ref> HEAD` instead of `HEAD`. Implies `--changed`.           |
 | `--skip, -s`    | string  | Comma-separated steps to skip: `environment`, `typecheck`, `lint`, `tests`, `conventions`. |
-| `--lint`        | string  | `oxlint` (default) or `eslint` (deprecated; removed in 5.34.0).                            |
+| `--lint`        | string  | `oxlint` (default and only supported value).                                               |
 | `--project, -p` | string  | tsconfig path (default `tsconfig.json`).                                                   |
 | `--json, -j`    | boolean | Print the report as JSON. stdout carries only the JSON.                                    |
 
@@ -63,7 +63,7 @@ All steps run, even after one fails, so one run lists every problem.
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `environment` | Checks the running Node.js against core's minimum (22.15) and the app's own `engines.node` when it is a `>=` range. With `--changed`, lists the changed files with git; if git cannot, every later step is `blocked`.         |
 | `typecheck`   | Runs [`warlock typecheck`](#warlock-typecheck) in a child process, so a heap overflow on a large app is reported as `WL8007` instead of ending `check`.                                                                       |
-| `lint`        | Oxlint when an app-root Oxlint config exists. Lints `src/**` (or changed files). A missing Oxlint package is `WL8002`. ESLint requires explicit `--lint eslint` and a flat config; its presence alone does not enable it.     |
+| `lint`        | Oxlint when an app-root Oxlint config exists. Lints `src/**` (or changed files). A missing Oxlint package is `WL8002`.                                                                                                        |
 | `tests`       | The app's own vitest (never a global one): `vitest run` for a full check, `vitest related <changed files> --run` with `--changed`, both with `--passWithNoTests` and the JSON reporter. Skipped when there are no test files. |
 | `conventions` | Static checks over `src/**` (or the changed files) and `tsconfig.json`, the same whichever linter the app uses — see [Convention checks](#convention-checks).                                                                 |
 
@@ -142,7 +142,7 @@ router.post("/webhooks/billing", billingWebhookController, { middleware: [verify
 }
 ```
 
-Every problem has every key; `file`, `line`, `column` and `rule` are `null` when they do not apply. `rule` is the tool's own identifier: `TS2322`, an ESLint rule id, or the failing test's full name. `warlock doctor --json` uses the same `code` / `hint` / `skill` / `docs` fields.
+Every problem has every key; `file`, `line`, `column` and `rule` are `null` when they do not apply. `rule` is the tool's own identifier: `TS2322`, an Oxlint rule id, or the failing test's full name. `warlock doctor --json` uses the same `code` / `hint` / `skill` / `docs` fields.
 
 Within `schemaVersion: 1` fields are only added, never removed or retyped; ignore keys you do not know.
 
@@ -207,28 +207,47 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 
 ## Legacy lint selection
 
-`warlock check --lint eslint` keeps ESLint working until 5.34.0 and prints one
-deprecation warning to stderr per process, including with `--json`. `check`
-does not execute `warlock.config.ts`; select the legacy linter explicitly for
-each check invocation. Background dev-server checks use their own config switches.
-
-ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
-New apps should use `--lint=oxc`. To migrate an existing app, install the new
-core release and `ts-morph`, then run:
+ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
 
 ```bash
-npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
-npx warlock upgrade --from 5.32 --to 5.33.0
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Review every reported `file:line`: customized configs are preserved and need
-manual translation before removal. The codemod installs the template's Oxlint
-and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
-scripts, removes legacy dependencies, and deletes only recognized generated
-configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
-configs are preserved. `--dry-run --json` reports the same planned changes
-without writing files.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
+
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
+
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.

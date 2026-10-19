@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.34.0
+
+### Removed
+
+- **BREAKING** Remove root ESLint/Prettier configs and compatibility formatting scripts, all published-package dependency declarations and obsolete typescript-eslint TypeScript package extensions. Oxlint/Oxfmt remain the toolchain for the workspace and new apps.
+
+### Upgrading
+
+- Migrate legacy apps with `npx warlock upgrade --from 5.33 --to 5.34.0`; review reported custom rules and the enabled correctness category.
+
 ## 5.33.0
 
 ### Changed

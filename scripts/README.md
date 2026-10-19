@@ -17,7 +17,7 @@ Run its regression tests with `node --test scripts/check-public-text.test.mjs`.
 
 `pnpm lint:oxlint` runs the exact pinned Oxlint version with the root
 `.oxlintrc.json`: correctness and suspicious rules plus TypeScript, import, React
-and Unicorn plugins. Existing package ESLint commands remain available.
+and Unicorn plugins. All package lint commands use Oxlint; formatting uses Oxfmt.
 CI reports this step without blocking while existing diagnostics are addressed;
 remove `continue-on-error` when the repository has no errors. The normal root
 script exits nonzero for errors, so it can become blocking without changing rules.

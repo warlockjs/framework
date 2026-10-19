@@ -2,7 +2,7 @@ import type { Codemod } from "../types";
 import { headViewport } from "./head-viewport";
 import { loggerSyncCalls } from "./logger-sync-calls";
 import { node2215, warlockVersions } from "./package-json";
-import { oxcToolchain } from "./oxc-toolchain";
+import { oxcToolchain, oxcToolchainRemoval } from "./oxc-toolchain";
 import { requestLogSnapshot } from "./request-log-snapshot";
 import {
   aiAnthropicBody,
@@ -37,6 +37,7 @@ export const CODEMODS: readonly Codemod[] = [
   sealUnionOutput,
   aiCompactionOptIn,
   oxcToolchain,
+  oxcToolchainRemoval,
   warlockVersions,
 ];
 

@@ -168,7 +168,7 @@ describe("--help lists every flag together with its default", () => {
     }
 
     expect(help).toContain("default:");
-    expect(help).toMatch(/--lint=<oxc\|eslint>[^\n]*\(default: oxc\)/);
+    expect(help).toMatch(/--lint=<oxc>[^\n]*\(default: oxc\)/);
   });
 
   it("lists the accepted prefixed AI keys, including capability packages", () => {

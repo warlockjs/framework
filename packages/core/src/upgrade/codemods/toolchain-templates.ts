@@ -215,7 +215,7 @@ dist
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "import", "react"],
   "env": { "node": true, "es2021": true },
-  "categories": { "correctness": "off" },
+  "categories": { "correctness": "error" },
   "rules": {
     "typescript/no-explicit-any": "off",
     "no-unused-vars": [

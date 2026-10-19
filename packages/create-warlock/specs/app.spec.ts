@@ -398,13 +398,4 @@ describe("App.configureLintToolchain", () => {
     expect(pkg.devDependencies.oxlint).toBe("1.88.0");
     expect(pkg.devDependencies.eslint).toBeUndefined();
   });
-
-  it("pins explicit ESLint to TypeScript 6 and preserves database edits", () => {
-    const instance = makeApp(workdir).use("warlock").updatePackageJson();
-    instance.configureDatabaseEnv("postgres").configureLintToolchain("eslint");
-    const pkg = JSON.parse(readFileSync(path.join(workdir, "package.json"), "utf8"));
-    expect(pkg.dependencies.pg).toBeTruthy();
-    expect(pkg.devDependencies.typescript).toBe("6.0.3");
-    expect(pkg.devDependencies.eslint).toBeTruthy();
-  });
 });

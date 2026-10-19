@@ -596,7 +596,7 @@ describe("App template emission", () => {
     app.use("warlock");
 
     // copyDirectory is cpSync({ recursive: true }) so dotfiles must survive.
-    expect(existsSync(path.join(appPath, ".prettierrc.json"))).toBe(true);
+    expect(existsSync(path.join(appPath, ".oxfmtrc.json"))).toBe(true);
     expect(existsSync(path.join(appPath, ".gitattributes"))).toBe(true);
     expect(existsSync(path.join(appPath, ".vscode/settings.json"))).toBe(true);
     // husky was removed entirely (card b683be27) — the template no longer

@@ -5,6 +5,9 @@
 ### Added
 
 - Document browser end-to-end specs, owned fixtures, direct CDP interactions, responsive assertions, evidence and process cleanup, with complete runnable examples.
+### Changed
+
+- Document the 5.34 ESLint/Prettier removal, Oxlint-only checkers and scaffolds, the retained 5.33 migration and new 5.34 upgrade step, native custom-rule porting, correctness diagnostics and lockfile precedence.
 
 ## 5.33.0
 

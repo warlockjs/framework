@@ -191,7 +191,7 @@ await warmupProductCache();
 
 ## Verify generated imports
 
-Generated web starter files match the scaffold’s Prettier configuration, using
-`@ianvs/prettier-plugin-sort-imports` with Babel independently of TypeScript 7.
+Generated web starter files match the scaffold’s Oxfmt configuration and its
+built-in import sorting.
 After editing generated code, run `npm run format` and `npm run lint:check`.
 Formatting retains unused imports; the linter reports them.

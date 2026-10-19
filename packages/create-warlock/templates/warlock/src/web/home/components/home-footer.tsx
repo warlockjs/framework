@@ -1,5 +1,7 @@
 import { HomeLogo } from "./logo";
 
+const copyrightYear = new Date().getFullYear();
+
 export function HomeFooter() {
   return (
     <>
@@ -27,7 +29,7 @@ export function HomeFooter() {
           <a href="https://github.com/warlockjs" target="_blank" rel="noreferrer">
             GitHub
           </a>
-          <span>MIT © {new Date().getFullYear()}</span>
+          <span>MIT © {copyrightYear}</span>
         </div>
       </footer>
     </>

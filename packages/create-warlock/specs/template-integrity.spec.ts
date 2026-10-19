@@ -436,31 +436,18 @@ describe("the scaffolded root is mobile-ready", () => {
 });
 
 describe("lint toolchain source templates", () => {
-  it("retains the ESLint base template and supplies matching default Oxc style", () => {
+  it("ships only Oxc with correctness errors and import sorting", () => {
     const pkg = JSON.parse(read("package.json"));
-    // The selected toolchain sets the final compiler version before install.
     expect(pkg.devDependencies.typescript).toBe("7.0.2");
-    expect(pkg.devDependencies.eslint).toBeTruthy();
-    expect(pkg.devDependencies.oxlint).toBeUndefined();
-    const lint = JSON.parse(read("../toolchains/oxc/.oxlintrc.json"));
-    const format = JSON.parse(read("../toolchains/oxc/.oxfmtrc.json"));
-    const prettier = JSON.parse(read(".prettierrc.json"));
+    expect(pkg.devDependencies.oxlint).toBe("1.88.0");
+    expect(Object.keys(pkg.devDependencies).filter((name) => /eslint|prettier/.test(name))).toEqual(
+      [],
+    );
+    const lint = JSON.parse(read(".oxlintrc.json"));
+    const format = JSON.parse(read(".oxfmtrc.json"));
+    expect(lint.categories.correctness).toBe("error");
     expect(lint.rules["typescript/explicit-member-accessibility"][0]).toBe("error");
     expect(lint.rules["typescript/consistent-type-imports"][0]).toBe("error");
-    for (const key of [
-      "semi",
-      "tabWidth",
-      "printWidth",
-      "singleQuote",
-      "arrowParens",
-      "trailingComma",
-      "endOfLine",
-    ]) {
-      expect(format[key]).toEqual(prettier[key]);
-    }
-    // Prettier sorts imports through @ianvs/prettier-plugin-sort-imports; oxfmt
-    // sorts them itself, kept to one block like the Prettier toolchain does.
-    expect(prettier.plugins).toContain("@ianvs/prettier-plugin-sort-imports");
     expect(format.sortImports).toEqual({
       newlinesBetween: false,
       internalPattern: ["app/", "web/", "@shared/"],
@@ -469,8 +456,8 @@ describe("lint toolchain source templates", () => {
 
   it("runs every package script through the local binary, never npx", () => {
     const pkg = JSON.parse(read("package.json"));
-    expect(pkg.scripts.lint).toBe("eslint --fix ./src --max-warnings=0");
-    expect(pkg.scripts["lint:check"]).toBe("eslint ./src --max-warnings=0");
+    expect(pkg.scripts.lint).toBe("oxlint --fix ./src --max-warnings=0");
+    expect(pkg.scripts["lint:check"]).toBe("oxlint ./src --max-warnings=0");
     for (const [name, script] of Object.entries<string>(pkg.scripts)) {
       expect(script, name).not.toMatch(/(^|&&\s*|\|\|\s*)npx\s/);
     }
@@ -478,12 +465,11 @@ describe("lint toolchain source templates", () => {
 });
 
 describe("framework conventions are verified by warlock check", () => {
-  it("installs no Warlock lint plugin in either toolchain", () => {
+  it("installs no Warlock lint plugin", () => {
     const pkg = JSON.parse(read("package.json"));
     const devDependencies = Object.keys(pkg.devDependencies);
 
     expect(devDependencies.filter((name) => name.startsWith("@warlock.js/"))).toEqual([]);
-    expect(read("eslint.config.js")).not.toContain("@warlock.js/");
     expect(read("../toolchains/oxc/.oxlintrc.json")).not.toContain("@warlock.js/");
   });
 

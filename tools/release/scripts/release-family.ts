@@ -1795,7 +1795,7 @@ function resolveLocalBinaryEntry(startDirectory: string, binaryName: string): st
   );
 }
 
-/** The common case: the binary name IS the package name (`vitest`, `eslint`). */
+/** The common case: the binary name IS the package name (`vitest`, `oxlint`). */
 function binaryEntryFromManifest(modulesDirectory: string, binaryName: string): string | undefined {
   const manifestPath = path.join(modulesDirectory, binaryName, "package.json");
 

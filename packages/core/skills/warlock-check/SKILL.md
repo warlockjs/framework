@@ -1,6 +1,6 @@
 ---
 name: warlock-check
-description: 'Verify a change with one command: `warlock check [--changed] [--json]` runs an incremental typecheck, the app''s ESLint/oxlint, the tests affected by the change and framework convention checks, and reports one JSON object per problem `{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }` with exit 1 for problems in your code and 2 for problems with this machine (missing Redis/DB, busy port, Node version, missing tool). Also `warlock typecheck [--changed]`, `warlock explain <CODE>` and the stable `WL` error codes (`errorCodeOf`, `WarlockError`). Triggers: `warlock check`, `warlock typecheck`, `warlock explain`, `--changed`, `--base`, `runCheck`, `runTypecheck`, `CHECK_EXIT_CODES`, `ToolingProblem`, `WL7101`, `WL8003`, `errorCodeOf`, `explainErrorCode`, `WarlockError`, "verify my change", "run the checks", "is this failure my code or the machine", "what does WL3001 mean", "typecheck only changed files". Skip: app diagnostics at boot — the `warlock-doctor` topic; reading the app''s routes/models — the `warlock-inspect` topic; writing tests — the `test-http` / `test-service` topics.'
+description: 'Verify a change with one command: `warlock check [--changed] [--json]` runs an incremental typecheck, the app''s Oxlint, the tests affected by the change and framework convention checks, and reports one JSON object per problem `{ code, category, severity, source, file, line, column, message, hint, skill, docs, rule }` with exit 1 for problems in your code and 2 for problems with this machine (missing Redis/DB, busy port, Node version, missing tool). Also `warlock typecheck [--changed]`, `warlock explain <CODE>` and the stable `WL` error codes (`errorCodeOf`, `WarlockError`). Triggers: `warlock check`, `warlock typecheck`, `warlock explain`, `--changed`, `--base`, `runCheck`, `runTypecheck`, `CHECK_EXIT_CODES`, `ToolingProblem`, `WL7101`, `WL8003`, `errorCodeOf`, `explainErrorCode`, `WarlockError`, "verify my change", "run the checks", "is this failure my code or the machine", "what does WL3001 mean", "typecheck only changed files". Skip: app diagnostics at boot — the `warlock-doctor` topic; reading the app''s routes/models — the `warlock-inspect` topic; writing tests — the `test-http` / `test-service` topics.'
 ---
 
 # Warlock — `warlock check`, `typecheck`, `explain`
@@ -120,10 +120,10 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 ## Gotchas
 
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
-- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint requires `--lint eslint` (or `runCheck({ lint: "eslint" })`); its flat config alone never enables it. This deprecated selection prints one warning on stderr and is removed in 5.34.0.
+- Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint support was removed in 5.34.0; see `upgrade-from-5-29`.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
-- The convention checks are the framework's own and run the same with ESLint, Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
+- The convention checks are the framework's own and run the same with Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 
 ## See also
 

@@ -65,7 +65,6 @@ describe("FilesOrchestrator background checker selection", () => {
     const set = isolateManager();
     await filesOrchestrator.startCheckingHealth({
       typescript: false,
-      eslint: false,
       oxlint: false,
     });
     expect(set).toHaveBeenCalledWith([]);

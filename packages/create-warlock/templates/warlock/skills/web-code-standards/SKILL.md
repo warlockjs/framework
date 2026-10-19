@@ -292,7 +292,7 @@ and refresh primitives so state and loader data stay in sync.
 
 Apply the shared `code-standards` rules to web TypeScript as well: `type` for
 plain props/data, no `any`, no swallowed catches, no unsafe assertions used
-to hide an unknown data contract. Configure non-mutating ESLint and formatting
+to hide an unknown data contract. Configure non-mutating Oxlint and formatting
 checks to enforce rules that can be automated; do not rely on a lint command
 that rewrites files as the only quality gate.
 

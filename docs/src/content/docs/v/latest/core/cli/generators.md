@@ -10,10 +10,8 @@ Warlock's CLI ships a scaffolding suite that creates files in the layout the fra
 
 This page is the deep dive on the `generate.*` family and the `add` installer. For the bare command reference, see [CLI commands](./cli-commands.md). Here we cover _what_ each generator produces, _how_ the naming pipeline transforms your input, and the two workflows you'll actually use day to day.
 
-Generated web starter files are checked against the scaffold’s actual Prettier
-configuration, including `@ianvs/prettier-plugin-sort-imports`. Its Babel parser
-sorts imports independently of TypeScript 7. Formatting retains unused imports;
-run the app’s linter to report them.
+Generated web starter files match the scaffold's Oxfmt configuration, including
+its built-in import sorting. Formatting preserves unused imports for Oxlint to report.
 
 ## The mental model
 

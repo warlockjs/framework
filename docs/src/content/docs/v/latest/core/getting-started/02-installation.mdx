@@ -28,7 +28,7 @@ Pick your package manager — the rest of this page assumes the same one end to 
   <TabItem label="pnpm">
 
 ```bash
-pnpm create warlock my-app
+npm create warlock@latest my-app
 cd my-app
 ```
 
@@ -93,15 +93,15 @@ my-app/
   .env.example            sample env vars
   .gitattributes
   .husky/                 git hooks
-  .prettierrc.json        formatter config
-  .prettierignore
+  .oxfmtrc.json        formatter config
+  .oxfmtignore
   .vscode/                editor settings + recommended extensions
   src/
     app/                  modules live here (one folder per feature)
     config/               one file per subsystem (http, mail, storage, …)
   public/                 static assets served as-is
   docs/                   project-local docs scaffold
-  eslint.config.js
+  .oxlintrc.json
   package.json
   tsconfig.json           strict + standard decorators + path aliases configured
   warlock.config.ts       project-level config (server, build, CLI extensions)
@@ -119,7 +119,7 @@ Two layers of config and it's worth knowing which is which from the start:
   <TabItem label="pnpm">
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
   </TabItem>

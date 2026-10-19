@@ -37,18 +37,18 @@ refactor(cart): extract totals calculation into a util
 
 ### 1.2 Types
 
-| Type        | Use for                                          |
-| ----------- | ------------------------------------------------ |
-| `feat`      | New user-visible feature or capability           |
-| `fix`       | Bug fix                                          |
-| `refactor`  | Internal restructure with no behaviour change    |
-| `docs`      | Documentation only (skills, README, code docs)   |
-| `test`      | Adding or updating tests only                    |
-| `chore`     | Tooling, config, scripts — no app code change    |
-| `perf`      | Performance improvement                          |
-| `build`     | Build system or external dependencies            |
-| `ci`        | CI configuration                                 |
-| `style`     | Formatting only (rare — Prettier handles this)   |
+| Type       | Use for                                        |
+| ---------- | ---------------------------------------------- |
+| `feat`     | New user-visible feature or capability         |
+| `fix`      | Bug fix                                        |
+| `refactor` | Internal restructure with no behaviour change  |
+| `docs`     | Documentation only (skills, README, code docs) |
+| `test`     | Adding or updating tests only                  |
+| `chore`    | Tooling, config, scripts — no app code change  |
+| `perf`     | Performance improvement                        |
+| `build`    | Build system or external dependencies          |
+| `ci`       | CI configuration                               |
+| `style`    | Formatting only (rare — Oxfmt handles this)    |
 
 ### 1.3 Scope
 
@@ -143,18 +143,23 @@ Each PR is independently mergeable, independently reviewable.
 
 ```markdown
 ## What
+
 One-line summary of the change.
 
 ## Why
+
 The reason — link to a ticket, design doc, or bug report.
 
 ## How to verify
+
 Steps a reviewer can take to confirm it works.
 
 ## Screenshots / recordings
+
 If UI or output changed.
 
 ## Notes for reviewer
+
 Anything that's intentionally weird or worth knowing.
 ```
 
@@ -195,14 +200,14 @@ A drive-by approve is worse than no approve — it gives false confidence. If yo
 
 Every PR runs these. All must pass before merge. The exact commands match `package.json` scripts:
 
-| Gate                          | Command                       | Blocks on                          |
-| ----------------------------- | ----------------------------- | ---------------------------------- |
-| Type-check                    | `yarn tsc`                    | Any TS error                       |
-| Lint                          | `yarn lint`                   | Any ESLint error                   |
-| Tests                         | `yarn test --run`             | Any failed test                    |
-| Coverage (recommended floor)  | `yarn test:coverage`          | TBD per team policy                |
-| Dependency audit              | `yarn audit --level=high`     | High / critical vulnerabilities    |
-| Format check                  | `yarn format --check`         | Any unformatted file               |
+| Gate                         | Command                   | Blocks on                       |
+| ---------------------------- | ------------------------- | ------------------------------- |
+| Type-check                   | `yarn tsc`                | Any TS error                    |
+| Lint                         | `yarn lint`               | Any Oxlint error                |
+| Tests                        | `yarn test --run`         | Any failed test                 |
+| Coverage (recommended floor) | `yarn test:coverage`      | TBD per team policy             |
+| Dependency audit             | `yarn audit --level=high` | High / critical vulnerabilities |
+| Format check                 | `yarn format --check`     | Any unformatted file            |
 
 Additional rules:
 

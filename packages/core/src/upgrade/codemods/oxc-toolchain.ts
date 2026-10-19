@@ -1,4 +1,6 @@
 import type { Codemod, CodemodContext, CodemodOutput } from "../types";
+import { isRecord } from "./validate-oxlint-rule";
+import { portEslintRules } from "./port-eslint-rules";
 import { TOOLCHAIN_TEMPLATES } from "./toolchain-templates";
 
 /** Snapshots ship with core; parity specs keep them aligned with create-warlock. */
@@ -18,8 +20,9 @@ export const OXC_SCRIPTS = {
 
 function legacyDependency(name: string): boolean {
   return (
-    /^(eslint|prettier|@types\/prettier|eslint-config-prettier)$/.test(name) ||
+    /^(eslint|prettier|typescript-eslint|@types\/prettier)$/.test(name) ||
     name.startsWith("@typescript-eslint/") ||
+    /(?:^|\/)eslint-config-/.test(name) ||
     /(?:^|\/)eslint-plugin-/.test(name) ||
     /(?:^|\/)prettier-plugin-/.test(name) ||
     name.startsWith("@prettier/plugin-")
@@ -66,14 +69,17 @@ function migrateHealthSwitches(context: CodemodContext, output: CodemodOutput): 
       review(
         output,
         file,
-        "Review spread healthCheckers options; set eslint: false and oxlint: true explicitly after the spread.",
+        "Review spread healthCheckers options; remove eslint and enable oxlint after the spread.",
         spread.getStartLineNumber(),
       );
     }
-    for (const [name, next] of [
-      ["eslint", "false"],
-      ["oxlint", "true"],
-    ] as const) {
+    const eslint = value.getProperty("eslint");
+    if (!eslint) continue;
+    if (eslint) {
+      eslint.remove();
+      changed = true;
+    }
+    for (const [name, next] of [["oxlint", "true"]] as const) {
       const option = value.getProperty(name);
       if (!option) continue;
       if (
@@ -115,11 +121,13 @@ export const oxcToolchain: Codemod = {
       scripts?: Record<string, string>;
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
+      eslintConfig?: unknown;
+      prettier?: unknown;
     };
     const legacyFiles = context.text
       .list()
       .filter((file) =>
-        /^(eslint\.config\..+|\.eslintrc(?:\..+)?|\.prettierrc(?:\..+)?|prettier\.config\..+|\.prettierignore)$/.test(
+        /^(eslint\.config\..+|\.eslintrc(?:\..+)?|\.prettierrc(?:\..+)?|prettier\.config\..+|\.prettierignore|\.eslintignore)$/.test(
           file,
         ),
       );
@@ -130,9 +138,16 @@ export const oxcToolchain: Codemod = {
     if (
       !legacyFiles.length &&
       !legacyScripts &&
+      pkg.eslintConfig === undefined &&
+      pkg.prettier === undefined &&
       !dependencies.some((deps) => Object.keys(deps ?? {}).some(legacyDependency))
-    )
+    ) {
+      if (
+        /\beslint\b|EslintHealthChecker|ESLint/.test(context.text.read("warlock.config.ts") ?? "")
+      )
+        migrateHealthSwitches(context, output);
       return output;
+    }
 
     const change = {
       line: 1,
@@ -154,21 +169,76 @@ export const oxcToolchain: Codemod = {
           `Replace the custom ${name} script (${command}) with oxlint or oxfmt; the legacy tools have been removed from dependencies.`,
         );
     }
-    context.text.write("package.json", `${JSON.stringify(pkg, null, 2)}\n`, change);
 
+    const hadOxlint = context.text.read(".oxlintrc.json") !== undefined;
     for (const file of [".oxlintrc.json", ".oxfmtrc.json"]) {
       if (context.text.read(file) === undefined)
         context.text.write(file, asset(file.slice(1)), change);
     }
+    if (pkg.eslintConfig !== undefined) {
+      const findings = output.manual.length;
+      if (portEslintRules(context, output, "package.json", source, hadOxlint, "eslintConfig"))
+        pkg.devDependencies["oxlint-tsgolint"] = "7.0.2004";
+      if (output.manual.length === findings) delete pkg.eslintConfig;
+    }
+    if (pkg.prettier !== undefined) {
+      if (sameGenerated(JSON.stringify(pkg.prettier), asset("legacy-prettierrc.json")))
+        delete pkg.prettier;
+      else
+        review(
+          output,
+          "package.json",
+          "Port the custom prettier field to .oxfmtrc.json, then remove it. Prettier support is gone in 5.34.0.",
+        );
+    }
     for (const file of legacyFiles) {
       const content = context.text.read(file);
+      if (file === ".eslintignore" && content !== undefined) {
+        try {
+          const config: unknown = JSON.parse(context.text.read(".oxlintrc.json") ?? "{}");
+          if (
+            !isRecord(config) ||
+            (config.ignorePatterns !== undefined &&
+              (!Array.isArray(config.ignorePatterns) ||
+                !config.ignorePatterns.every((pattern) => typeof pattern === "string")))
+          )
+            throw new Error("Invalid ignore patterns");
+          config.ignorePatterns = [
+            ...new Set([
+              ...(Array.isArray(config.ignorePatterns) ? config.ignorePatterns : []),
+              ...content
+                .split(/\r?\n/)
+                .filter((line) => line.trim() && !line.trimStart().startsWith("#")),
+            ]),
+          ];
+          context.text.write(".oxlintrc.json", `${JSON.stringify(config, null, 2)}\n`, change);
+        } catch {
+          review(
+            output,
+            file,
+            "Port these ignore patterns after repairing .oxlintrc.json; ESLint support is gone in 5.34.0.",
+          );
+          continue;
+        }
+        context.text.remove(file, change);
+        continue;
+      }
       const known = ["eslint.config.js", ".prettierrc.json", ".prettierignore"].includes(file);
       if (content === undefined) continue;
-      if (!known || !sameGenerated(content, asset(`legacy-${file.replace(/^\./, "")}`))) {
+      const generated = known && sameGenerated(content, asset(`legacy-${file.replace(/^\./, "")}`));
+      if (!generated && /^(eslint\.config\..+|\.eslintrc(?:\..+)?)$/.test(file)) {
+        const findings = output.manual.length;
+        if (portEslintRules(context, output, file, content, hadOxlint))
+          pkg.devDependencies["oxlint-tsgolint"] = "7.0.2004";
+        // Keep the source only when there is still something a person must translate.
+        if (output.manual.length === findings) context.text.remove(file, change);
+        continue;
+      }
+      if (!generated) {
         review(
           output,
           file,
-          "Customized legacy config retained. Port its rules, plugins, formatting or ignore patterns to .oxlintrc.json / .oxfmtrc.json / .oxfmtignore, then remove this file. Legacy support is removed in 5.34.0.",
+          "Port customized formatting or ignore options to .oxfmtrc.json / .oxfmtignore, then remove this file. Legacy support is gone in 5.34.0.",
         );
         continue;
       }
@@ -195,6 +265,7 @@ export const oxcToolchain: Codemod = {
       const file = `.vscode/${name}`;
       const content = context.text.read(file);
       if (content === undefined) continue;
+      if (name === "settings.json" && sameGenerated(content, asset(`oxc-vscode-${name}`))) continue;
       if (name === "settings.json" && sameGenerated(content, asset(`legacy-vscode-${name}`)))
         context.text.write(file, asset(`oxc-vscode-${name}`), change);
       else
@@ -205,6 +276,15 @@ export const oxcToolchain: Codemod = {
         );
     }
     migrateHealthSwitches(context, output);
+    context.text.write("package.json", `${JSON.stringify(pkg, null, 2)}\n`, change);
     return output;
   },
+};
+
+/** Run again for apps that skipped or partially completed the 5.33 migration. */
+export const oxcToolchainRemoval: Codemod = {
+  ...oxcToolchain,
+  id: "oxc-toolchain-removal",
+  version: "5.34.0",
+  title: "ESLint/Prettier support is gone in 5.34.0; migrate to the Oxlint/Oxfmt default",
 };

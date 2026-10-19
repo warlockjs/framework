@@ -1,0 +1,42 @@
+{
+  "name": "upgrade-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "warlock dev",
+    "build": "warlock generate.typings && tsc && warlock build",
+    "start": "warlock start",
+    "seed": "warlock seed",
+    "migrate": "warlock migrate",
+    "migrate.fresh": "warlock migrate --fresh",
+    "migrate.list": "warlock migrate --list",
+    "jwt": "warlock jwt.generate",
+    "gen": "warlock generate.module",
+    "gen.s": "warlock generate.service",
+    "gen.m": "warlock generate.model",
+    "gen.c": "warlock generate.controller",
+    "gen.mig": "warlock generate.migration",
+    "gen.r": "warlock generate.repository",
+    "gen.rs": "warlock generate.resource",
+    "lint": "oxlint --fix ./src --max-warnings=0",
+    "format": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --write ./src",
+    "tsc": "warlock generate.typings && tsc --noEmit",
+    "postinstall": "agent-kit init && agent-kit sync || echo \"warning: AI agent skills were NOT synced, so coding agents will not see the @warlock.js skills. Run the skills:sync script.\"",
+    "skills:sync": "agent-kit sync",
+    "skills:watch": "agent-kit watch",
+    "lint:check": "oxlint ./src --max-warnings=0",
+    "format:check": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --check ./src"
+  },
+  "dependencies": {
+    "@warlock.js/core": "5.33.0"
+  },
+  "devDependencies": {
+    "@mongez/agent-kit": "^1.3.1",
+    "@types/node": "^25.0.3",
+    "vitest": "4.0.5",
+    "oxlint": "1.88.0",
+    "oxfmt": "0.73.0",
+    "typescript": "7.0.2"
+  }
+}

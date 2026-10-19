@@ -7,7 +7,7 @@
  * board`), the sandboxed generator diffs, and the shared problem shape every
  * one of them reports.
  *
- * A separate entry because it pulls in the TypeScript compiler and ESLint,
+ * A separate entry because it pulls in the TypeScript compiler,
  * which must not reach an app's production module graph through the root
  * barrel. Error codes are on `@warlock.js/core/errors` (and the root).
  */

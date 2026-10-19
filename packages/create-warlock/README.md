@@ -34,22 +34,22 @@ answered that choice. The stack is the only choice that changes the generated
 app's shape. Everything else below is a flag with a default; a summary of what
 was decided prints after scaffolding, along with how to change each one.
 
-| Flag                           | Description                                                                     | Default                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `--name=<name>`                | Project name (or the first positional arg)                                      | required — prompted with a TTY, otherwise fails naming this flag         |
-| `--stack=<api\|web>`           | API-only or full-stack web; the structural choice                               | `api`                                                                    |
-| `--db=<driver>` / `--no-db`    | Database driver (`postgres`, `mongodb`, …), or skip one entirely                | `mongodb`                                                                |
-| `--features=<list>`            | Comma-separated feature keys (e.g. `test,herald`)                               | none (or `["web"]` when `--stack=web` and `--features` is not given)     |
-| `--lint=<oxc\|eslint>`         | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier (deprecated) | `oxc`                                                                    |
-| `--ai=<list>`                  | Comma-separated AI provider keys (e.g. `openai,anthropic`)                      | none                                                                     |
-| `--pm=<manager>`               | Package manager (`npm`, `yarn`, `pnpm`, `bun`)                                  | inferred from the invoking agent (`npm_config_user_agent`) or the system |
-| `--agents=<list>`              | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets            | `claude`                                                                 |
-| `--git` / `--no-git`           | Force-enable or force-disable git initialization                                | `false`                                                                  |
-| `--jwt` / `--no-jwt`           | Force-enable or force-disable JWT secret generation                             | `false`                                                                  |
-| `-y`, `--yes`                  | Skip every prompt and take defaults for anything unset                          | `false`                                                                  |
-| `--interactive`, `--customize` | Restore the full long-form interactive wizard                                   | `false`                                                                  |
-| `-h`, `--help`                 | Print usage (every flag + its default) and exit                                 | —                                                                        |
-| `-v`, `--version`              | Print the installed version and exit                                            | —                                                                        |
+| Flag                           | Description                                                          | Default                                                                  |
+| ------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `--name=<name>`                | Project name (or the first positional arg)                           | required — prompted with a TTY, otherwise fails naming this flag         |
+| `--stack=<api\|web>`           | API-only or full-stack web; the structural choice                    | `api`                                                                    |
+| `--db=<driver>` / `--no-db`    | Database driver (`postgres`, `mongodb`, …), or skip one entirely     | `mongodb`                                                                |
+| `--features=<list>`            | Comma-separated feature keys (e.g. `test,herald`)                    | none (or `["web"]` when `--stack=web` and `--features` is not given)     |
+| `--lint=<oxc>`                 | Oxlint/Oxfmt (only supported toolchain)                              | `oxc`                                                                    |
+| `--ai=<list>`                  | Comma-separated AI provider keys (e.g. `openai,anthropic`)           | none                                                                     |
+| `--pm=<manager>`               | Package manager (`npm`, `yarn`, `pnpm`, `bun`)                       | inferred from the invoking agent (`npm_config_user_agent`) or the system |
+| `--agents=<list>`              | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets | `claude`                                                                 |
+| `--git` / `--no-git`           | Force-enable or force-disable git initialization                     | `false`                                                                  |
+| `--jwt` / `--no-jwt`           | Force-enable or force-disable JWT secret generation                  | `false`                                                                  |
+| `-y`, `--yes`                  | Skip every prompt and take defaults for anything unset               | `false`                                                                  |
+| `--interactive`, `--customize` | Restore the full long-form interactive wizard                        | `false`                                                                  |
+| `-h`, `--help`                 | Print usage (every flag + its default) and exit                      | —                                                                        |
+| `-v`, `--version`              | Print the installed version and exit                                 | —                                                                        |
 
 ```bash
 create-warlock my-app --db=postgres --features=test,herald --yes
@@ -174,43 +174,28 @@ The decisions overview shows the total selected feature/AI count and up to six
 keys, followed by `+N more` for longer selections. The final success screen lists
 all selected feature keys.
 
-### Default Oxc tooling
+### Oxlint and Oxfmt
 
-New projects default to `--lint=oxc` (also `--lint oxc`), with Oxlint **1.88.0**
-and Oxfmt **0.73.0**. The full `--customize` wizard offers the same choice and
-preselects any supplied flag. Pass `--lint=eslint` to opt in to ESLint/Prettier.
-Unknown or missing `--lint` values fail before copying the project.
+Oxlint **1.88.0** and Oxfmt **0.73.0** are the only supported tools. New apps
+pin TypeScript **7.0.2** and include `.oxlintrc.json`, `.oxfmtrc.json`,
+`.oxfmtignore`, and VS Code settings for `oxc.oxc-vscode`.
+`--lint=oxc` is optional; `--lint=eslint` fails with the 5.34.0 removal message.
+The wizard has no toolchain choice.
 
 ```bash
-# Default: Oxlint + Oxfmt, TypeScript 7.0.2
 npm create warlock@latest my-app -- --yes
-
-# Explicit opt-in: ESLint + Prettier, TypeScript 6.0.3
-npm create warlock@latest my-eslint-app -- --lint=eslint --yes
+cd my-app
+npm run lint:check
+npm run format:check
 ```
 
-Oxc projects receive `.oxlintrc.json` and `.oxfmtrc.json`, replace the template's
-ESLint/Prettier dependencies and configs, and enable the Oxlint development health
-checker while retaining TypeScript checks. Both choices provide `lint`, `format`,
-`lint:check` and `format:check` scripts. The check variants do not modify files.
-Oxc projects also receive VS Code format-on-save settings and an extension
-recommendation for [Oxc](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode).
-Its formatter is `oxc.oxc-vscode` and lint fixes use `source.fixAll.oxc`;
-ESLint projects retain their Prettier/ESLint editor settings.
-
-The Oxlint config preserves the template's unused-variable/import checks,
-explicit class accessibility and type-import style. Oxfmt uses the same 100-column,
-double-quote, semicolon and trailing-comma settings, and sorts imports with
-`"sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] }` — built-ins, packages, internal aliases, then relative
-paths, in one block like `@ianvs/prettier-plugin-sort-imports` in the Prettier
-toolchain. The Prettier config also groups internal aliases before relatives and
-keeps type imports separate. Its Babel parser works with TypeScript 7 without
-using the compiler API. Neither formatter deletes unused imports; ESLint’s
-`unused-imports/no-unused-imports` or Oxlint’s `no-unused-vars` reports them. Every generated script calls the local binary
-(`eslint`, `oxlint`, `prettier`, `oxfmt`, `tsc`) rather than `npx`. See the
-[Oxlint config reference](https://oxc.rs/docs/guide/usage/linter/config-file-reference)
-and [Oxfmt config reference](https://oxc.rs/docs/guide/usage/formatter/config-file-reference)
-when adding project rules.
+Oxlint enables `"categories": { "correctness": "error" }`, unused-variable/import
+checks, explicit class accessibility and type-import style. Oxfmt sorts imports
+with `"sortImports": { "newlinesBetween": false, "internalPattern": ["app/", "web/", "@shared/"] }`.
+It keeps built-ins, packages, internal aliases and relative imports in one block.
+Formatting retains unused imports; lint reports them. Local package scripts use
+`oxlint`, `oxfmt` and `tsc` directly. The non-mutating scripts are `lint:check`
+and `format:check`. Background checks run TypeScript and configured Oxlint.
 
 ## TypeScript 7 in 5.32
 
@@ -220,40 +205,49 @@ Node types, and `paths` relative to its tsconfig, without `baseUrl`.
 Existing apps must remove `baseUrl`, rebase alias targets, and replace
 `moduleResolution: "node"` / `"node10"` before typechecking.
 
-Explicit `--lint=eslint` projects pin `typescript` to **6.0.3**, the newest version
-supported by typescript-eslint. Its parser requires the JavaScript compiler API
-removed in TypeScript 7, and its declared peer range is `>=4.8.4 <6.1.0`
-([parser package metadata](https://registry.npmjs.org/@typescript-eslint/parser/8.71.2)).
-Both modes use the same tsconfig settings above, which are valid in TypeScript 6.
-ESLint mode prints a deprecation warning naming removal in 5.34.0 and the Oxc migration command. Both modes install with npm, pnpm and yarn.
+## Migrate existing apps
 
-## Migrate to Oxlint and Oxfmt in 5.33
-
-ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
-New apps should use `--lint=oxc`. To migrate an existing app, install the new
-core release and `ts-morph`, then run:
+ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
 
 ```bash
-npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
-npx warlock upgrade --from 5.32 --to 5.33.0
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Review every reported `file:line`: customized configs are preserved and need
-manual translation before removal. The codemod installs the template's Oxlint
-and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
-scripts, removes legacy dependencies, and deletes only recognized generated
-configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
-configs are preserved. `--dry-run --json` reports the same planned changes
-without writing files.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
-Explicit deprecated ESLint scaffolds set `devServer.healthCheckers.eslint: true`;
-existing apps must set this themselves to retain background ESLint checking.
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
 
-Oxc formatting scripts explicitly read `.gitignore` and `.oxfmtignore`. Oxfmt
-0.73 otherwise defaults to `.prettierignore` (`oxfmt --help`); the explicit
-paths make migrated ignore rules effective. The package template format gate
-also defaults to Oxfmt; `--lint=eslint` is its deprecated compatibility mode.
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.

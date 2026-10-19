@@ -27,9 +27,7 @@
     "typecheck:template": "node scripts/typecheck-template.mjs",
     "llms": "node scripts/generate-llms.mjs",
     "update": "node node_modules/tsx/dist/cli.mjs version-checker.ts",
-    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
-    "format:prettier": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; use format or format:check (Oxfmt).')\" && node node_modules/prettier/bin/prettier.cjs --write \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json",
-    "format:prettier:check": "node -e \"console.warn('Deprecated: Prettier support is removed in 5.34.0; use format or format:check (Oxfmt).')\" && node node_modules/prettier/bin/prettier.cjs --check \"./src/**/*.{js,jsx,ts,tsx,css,md,json}\" --config ./.prettierrc.json"
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^0.8.2",
@@ -41,19 +39,12 @@
     "which-pm-runs": "^1.1.0"
   },
   "devDependencies": {
-    "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
     "@types/node": "^20.12.7",
-    "@typescript-eslint/eslint-plugin": "^7.7.0",
-    "@typescript-eslint/parser": "^7.7.0",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.1.3",
-    "eslint-plugin-unused-imports": "^3.1.0",
-    "prettier": "^3.2.5",
     "tsx": "^4.21.0",
     "typescript": "7.0.2",
     "vitest": "4.1.10",
-    "oxfmt": "0.73.0"
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0"
   },
   "module": "./src/index.ts",
   "typings": "./src/index.ts",

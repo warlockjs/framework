@@ -441,48 +441,40 @@ The CLI preserves incremental state and changed-file filtering. Development
 health checks keep one native compiler session and update its snapshots. Syntax
 analysis uses OXC. `warlock upgrade` still parses/transforms with ts-morph's own
 bundled TypeScript, without using it as the app's compiler. New scaffolds default
-to Oxlint/Oxfmt (`--lint=oxc`). Explicit `--lint=eslint` pins the app's compiler to
-TypeScript **6.0.3** because typescript-eslint requires the old JavaScript API
-and supports `>=4.8.4 <6.1.0`. Keep ESLint apps on 6.0.3 until switching tools:
-
-```bash
-npm install --save-dev --save-exact typescript@6.0.3
-npx tsc --noEmit
-```
-
-The same tsconfig cleanups work with TS6. Starting in 5.33, ESLint mode prints
-a deprecation warning naming removal in 5.34.0 and the Oxc migration command.
+to Oxlint/Oxfmt (`--lint=oxc`) with TypeScript 7.0.2. ESLint support was
+removed in 5.34.0; migrate legacy apps using the steps below.
 
 ## 5.32 to 5.33
 
-**BREAKING:** ESLint background health checking and automatic ESLint selection
-in `warlock check` are disabled by default. Oxlint/Oxfmt replace ESLint/Prettier
-as the default toolchain. Legacy support is deprecated now and removed in
-5.34.0. Temporary opt-ins are `devServer.healthCheckers: { eslint: true }`,
-`warlock check --lint eslint`, and `create-warlock --lint=eslint`; each warns
-about removal and migration. The legacy scaffold stays on TypeScript 6.0.3;
-Oxc apps use TypeScript 7.0.2.
-
-ESLint + Prettier are deprecated in 5.33.0 and will be removed in **5.34.0**.
-New apps should use `--lint=oxc`. To migrate an existing app, install the new
-core release and `ts-morph`, then run:
+The original `oxc-toolchain` codemod remains available:
 
 ```bash
 npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run
 npx warlock upgrade --from 5.32 --to 5.33.0
+```
+
+## 5.33 to 5.34 toolchain removal
+
+**BREAKING:** ESLint and Prettier support was removed in **5.34.0**. Oxlint/Oxfmt is the only
+supported toolchain. `--lint eslint` and `healthCheckers.eslint` are removed.
+Install the new core release and `ts-morph`, then migrate an existing app:
+
+```bash
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.33 --to 5.34.0 --dry-run
+npx warlock upgrade --from 5.33 --to 5.34.0
 npm install
 npm run format
 npm run lint:check
 npx warlock check
 ```
 
-Review every reported `file:line`: customized configs are preserved and need
-manual translation before removal. The codemod installs the template's Oxlint
-and Oxfmt versions and pins TypeScript to 7.0.2. It replaces standard lint/format
-scripts, removes legacy dependencies, and deletes only recognized generated
-configs. A generated `.prettierignore` becomes `.oxfmtignore`. Existing Oxc
-configs are preserved. `--dry-run --json` reports the same planned changes
-without writing files.
+The `oxc-toolchain-removal` step reapplies the preserved 5.33 `oxc-toolchain`
+migration when legacy configs, scripts or dependencies remain. Apps upgrading
+from 5.32 can still use `npx warlock upgrade --from 5.32 --to 5.33.0` first.
+It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates generated
+editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
+`.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
 The `oxc-toolchain` codemod also updates generated VS Code settings and literal
 ESLint/Oxlint health-check switches. Custom editor settings, checker arrays,
@@ -515,3 +507,26 @@ await v.validate(names, ["Ada"]);
 `v.record(keyValidator, valueValidator)`; malformed arguments now fail while
 defining the schema. Literal-key records infer partial dictionaries because
 only present keys are checked.
+Literal custom rules are translated without executing the config. Per-folder
+`no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
+file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
+`typescript/*` rules (or native base rules). Options are checked against the
+pinned Oxlint 1.88.0 schema. Type-aware equivalents enable `options.typeAware`
+and add `oxlint-tsgolint@7.0.2004` to the app's dev dependencies.
+`unused-imports/no-unused-imports` uses `no-unused-vars` with safe import fixes;
+Oxlint shares the severity for imports and variables, so differing active
+severities are reported for review.
+
+Only unsupported rules/options, computed or imported settings, selectors such
+as `no-restricted-syntax`, and conflicting existing Oxc rules need manual review.
+Each finding names its source `file:line`, rule and affected file patterns.
+Fully ported lint configs are removed; configs with findings remain for reference
+until those findings are addressed. Existing Oxc rules are kept on conflict.
+`--dry-run --json` reports the same plan without writes. Customized formatting,
+editor settings and nonstandard scripts can also require review.
+
+**Upgrading:** new and migrated template configs enable
+`"categories": { "correctness": "error" }`. Address the additional diagnostics;
+existing Oxc configs retain their categories. A real lockfile beside a workspace
+marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
+without `pnpm-lock.yaml` now produces `npm install`.

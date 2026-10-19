@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import {
   cpSync,
   existsSync,
@@ -11,7 +13,14 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { oxcToolchain, OXC_VERSIONS, OXC_SCRIPTS } from "./codemods/oxc-toolchain";
+import {
+  oxcToolchain,
+  oxcToolchainRemoval,
+  OXC_VERSIONS,
+  OXC_SCRIPTS,
+} from "./codemods/oxc-toolchain";
+import { OXLINT_RULE_SCHEMAS } from "./codemods/oxlint-rule-schemas";
+import { matchesSchema } from "./codemods/validate-oxlint-rule";
 import { TOOLCHAIN_TEMPLATES } from "./codemods/toolchain-templates";
 import { runUpgrade } from "./run-upgrade";
 import { runUpgradeCommand } from "./upgrade-command.action";
@@ -60,21 +69,17 @@ describe("Oxlint/Oxfmt upgrade", () => {
     expect((await upgrade(root)).changedFiles).toEqual([]);
   });
 
-  it("retains customized configs with actionable file:line findings, removing legacy dependencies", async () => {
+  it("ports custom native rules and retains only unsupported formatting for review", async () => {
     const root = materialize("oxc-toolchain-custom");
-    const before = snapshot(root).filter(([file]) => file !== "package.json");
     const result = await upgrade(root);
-    expect(result.manual.map(({ file, line }) => ({ file, line }))).toEqual(
-      JSON.parse(readFileSync(path.join(fixtures, "oxc-toolchain-custom/manual.json"), "utf8")),
-    );
-    for (const [file, content] of before)
-      expect(readFileSync(path.join(root, file ?? ""), "utf8")).toBe(content);
+    expect(result.manual.map(({ file }) => file)).toEqual([".prettierignore", ".prettierrc.yaml"]);
+    expect(existsSync(path.join(root, "eslint.config.mjs"))).toBe(false);
+    expect(existsSync(path.join(root, ".eslintrc.json"))).toBe(false);
+    const config = JSON.parse(readFileSync(path.join(root, ".oxlintrc.json"), "utf8"));
+    expect(config.rules).toMatchObject({ eqeqeq: "error", "no-debugger": "error" });
     const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
     expect(pkg.devDependencies).toEqual(OXC_VERSIONS);
     expect(pkg.scripts).toEqual(OXC_SCRIPTS);
-    expect(
-      result.manual.every(({ hint }) => hint.includes("Port") && hint.includes("5.34.0")),
-    ).toBe(true);
   });
 
   it("leaves an existing Oxc app untouched", async () => {
@@ -151,11 +156,332 @@ describe("Oxlint/Oxfmt upgrade", () => {
         ? "legacy-vscode-settings.json"
         : `legacy-${file.replace(/^\./, "")}`;
       expect(TOOLCHAIN_TEMPLATES[name]).toBe(
-        readFileSync(path.join(create, "templates/warlock", file), "utf8"),
+        readFileSync(path.join(fixtures, "oxc-toolchain/input", `${file}.txt`), "utf8"),
       );
     }
     const helper = readFileSync(path.join(create, "src/helpers/app.ts"), "utf8");
     for (const [name, version] of Object.entries(OXC_VERSIONS))
       expect(helper).toContain(name === "typescript" ? `"${version}"` : `${name}: "${version}"`);
   });
+});
+
+const customConfig = `import tsPlugin from "@typescript-eslint/eslint-plugin";
+const boundaries = [{ group: ["app/*/controllers/**", "app/*/repositories/**"], message: "Use public services" }];
+export default [
+  { ignores: ["dist/", "generated/**"] },
+  { files: ["src/**/*.ts"], plugins: { "@typescript-eslint": tsPlugin }, rules: {
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports" }],
+    "@typescript-eslint/no-unused-vars": "off",
+    "unused-imports/no-unused-imports": "error",
+    "no-restricted-exports": ["error", { restrictedNamedExports: ["default", "internal"] }]
+  } },
+  { files: ["src/app/billing/**/*.ts"], ignores: ["**/*.spec.ts"], rules: {
+    "no-restricted-imports": ["error", { paths: [{ name: "node:fs", importNames: ["readFileSync"] }], patterns: boundaries }],
+    "no-restricted-syntax": ["error", { selector: "CallExpression[callee.name='eval']", message: "Avoid evaluation" }]
+  } }
+];
+`;
+
+describe("5.34 removal and custom lint rules", () => {
+  it.each([false, true])(
+    "ports supported scoped rules and reports only selectors (dryRun=%s)",
+    async (dryRun) => {
+      const root = materialize("oxc-toolchain");
+      writeFileSync(path.join(root, "eslint.config.js"), customConfig);
+      writeFileSync(path.join(root, "package-lock.json"), "{}");
+      writeFileSync(path.join(root, "pnpm-workspace.yaml"), "allowBuilds: {}\n");
+      const before = snapshot(root);
+      const result = await runUpgrade({ root, from: "5.33", to: "5.34.0", dryRun });
+      expect(result.codemods.map(({ id }) => id)).toContain("oxc-toolchain-removal");
+      expect(result.notes.some(({ text }) => /ESLint.*gone.*5\.34\.0/.test(text))).toBe(true);
+      expect(result.installHint).toBe("npm install");
+      expect(result.manual).toHaveLength(1);
+      expect(result.manual[0]).toMatchObject({
+        file: "eslint.config.js",
+        line: 14,
+        codemod: "oxc-toolchain-removal",
+      });
+      expect(result.manual[0]?.hint).toContain("no-restricted-syntax");
+      expect(result.manual[0]?.hint).toContain("src/app/billing/**/*.ts");
+      if (dryRun) {
+        expect(snapshot(root)).toEqual(before);
+        expect(result.diff).toContain('"no-restricted-imports"');
+      } else {
+        const config = JSON.parse(readFileSync(path.join(root, ".oxlintrc.json"), "utf8"));
+        expect(config.categories.correctness).toBe("error");
+        expect(config.ignorePatterns).toContain("generated/**");
+        expect(config.overrides[0]).toMatchObject({
+          files: ["src/**/*.ts"],
+          rules: {
+            "typescript/no-explicit-any": "error",
+            "typescript/consistent-type-imports": ["error", { prefer: "type-imports" }],
+            "no-unused-vars": ["error", { fix: { imports: "safe-fix", variables: "off" } }],
+            "no-restricted-exports": ["error", { restrictedNamedExports: ["default", "internal"] }],
+          },
+        });
+        expect(config.overrides[1]).toMatchObject({
+          files: ["src/app/billing/**/*.ts"],
+          excludeFiles: ["**/*.spec.ts"],
+          rules: {
+            "no-restricted-imports": [
+              "error",
+              {
+                paths: [{ name: "node:fs", importNames: ["readFileSync"] }],
+                patterns: [
+                  {
+                    group: ["app/*/controllers/**", "app/*/repositories/**"],
+                    message: "Use public services",
+                  },
+                ],
+              },
+            ],
+          },
+        });
+        expect((await runUpgrade({ root, from: "5.33", to: "5.34.0" })).changedFiles).toEqual([]);
+      }
+    },
+  );
+
+  it("removes a fully ported custom config and its plugin dependencies", async () => {
+    const root = materialize("oxc-toolchain-custom");
+    await runUpgrade({ root, from: "5.33", to: "5.34.0", codemods: [oxcToolchainRemoval] });
+    expect(existsSync(path.join(root, "eslint.config.mjs"))).toBe(false);
+    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+    expect(Object.keys(pkg.devDependencies).some((name) => /eslint|prettier/.test(name))).toBe(
+      false,
+    );
+  });
+
+  it("reports unsupported options and imported/computed rules without executing config", async () => {
+    const root = materialize("oxc-toolchain");
+    writeFileSync(
+      path.join(root, "eslint.config.js"),
+      `throw new Error("must never execute");
+export default [{ files: ["src/app/**/*.ts"], rules: {
+  "no-restricted-imports": ["error", { unknownOption: true }],
+  "@typescript-eslint/no-explicit-any": ["error", { unknownOption: true }],
+  "custom/private-rule": "error",
+  "no-console": chooseSeverity()
+} }];`,
+    );
+    const result = await upgrade(root);
+    expect(result.manual).toHaveLength(4);
+    for (const name of [
+      "no-restricted-imports",
+      "@typescript-eslint/no-explicit-any",
+      "custom/private-rule",
+      "no-console",
+    ])
+      expect(
+        result.manual.some(({ hint }) => hint.includes(name) && hint.includes("src/app/**/*.ts")),
+      ).toBe(true);
+    expect(existsSync(path.join(root, "eslint.config.js"))).toBe(true);
+  });
+
+  it("enables type-aware native equivalents and declares the required optional engine", async () => {
+    const root = materialize("oxc-toolchain");
+    writeFileSync(
+      path.join(root, "eslint.config.js"),
+      'export default [{ rules: { "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: true }] } }];\n',
+    );
+    const result = await upgrade(root);
+    expect(result.manual).toEqual([]);
+    const config = JSON.parse(readFileSync(path.join(root, ".oxlintrc.json"), "utf8"));
+    expect(config.options.typeAware).toBe(true);
+    expect(config.rules["typescript/no-floating-promises"]).toEqual([
+      "error",
+      { ignoreVoid: true },
+    ]);
+    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+    expect(pkg.devDependencies["oxlint-tsgolint"]).toBe("7.0.2004");
+  });
+
+  it("removes stale health switches even when an app already has only Oxc dependencies", async () => {
+    const root = materialize("oxc-toolchain-already");
+    writeFileSync(
+      path.join(root, "warlock.config.ts"),
+      "export default defineConfig({ devServer: { healthCheckers: { eslint: false, oxlint: true } } });\n",
+    );
+    const result = await runUpgrade({ root, from: "5.33", to: "5.34.0" });
+    expect(result.changedFiles).toContain("warlock.config.ts");
+    expect(readFileSync(path.join(root, "warlock.config.ts"), "utf8")).not.toContain("eslint");
+  });
+});
+
+describe("pinned Oxlint rule compatibility", () => {
+  it("uses the installed rule option assertions", () => {
+    const oxlintRoot = path.dirname(createRequire(import.meta.url).resolve("oxlint/package.json"));
+    const schema = JSON.parse(
+      readFileSync(path.join(oxlintRoot, "configuration_schema.json"), "utf8"),
+    );
+    const strip = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(strip);
+      if (typeof value === "object" && value !== null)
+        return Object.fromEntries(
+          Object.entries(value)
+            .filter(
+              ([key]) =>
+                ![
+                  "description",
+                  "markdownDescription",
+                  "default",
+                  "examples",
+                  "title",
+                  "deprecated",
+                ].includes(key),
+            )
+            .map(([key, entry]) => [key, strip(entry)]),
+        );
+      return value;
+    };
+    for (const [name, assertion] of Object.entries(OXLINT_RULE_SCHEMAS.rules))
+      expect(assertion, name).toEqual(strip(schema.definitions.DummyRuleMap.properties[name]));
+    for (const [name, assertion] of Object.entries(OXLINT_RULE_SCHEMAS.definitions))
+      expect(assertion, name).toEqual(strip(schema.definitions[name]));
+    const restriction = OXLINT_RULE_SCHEMAS.rules["no-restricted-imports"];
+    if (restriction === undefined) throw new Error("Missing pinned restriction schema");
+    expect(
+      matchesSchema(
+        ["error", { unknownOption: true }],
+        restriction,
+        OXLINT_RULE_SCHEMAS.definitions,
+      ),
+    ).toBe(false);
+  });
+
+  it("enforces ported folder restrictions with the real Oxlint CLI", async () => {
+    const root = materialize("oxc-toolchain");
+    writeFileSync(path.join(root, "eslint.config.js"), customConfig);
+    await runUpgrade({ root, from: "5.33", to: "5.34.0" });
+    const source = 'import { readFileSync } from "node:fs";\nexport const read = readFileSync;\n';
+    for (const folder of ["billing", "catalog"]) {
+      mkdirSync(path.join(root, "src/app", folder), { recursive: true });
+      writeFileSync(path.join(root, "src/app", folder, "reader.ts"), source);
+    }
+    const oxlintRoot = path.dirname(createRequire(import.meta.url).resolve("oxlint/package.json"));
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(oxlintRoot, "bin/oxlint"),
+        "--threads",
+        "1",
+        "--config",
+        ".oxlintrc.json",
+        "--format",
+        "json",
+        "src/app/billing/reader.ts",
+        "src/app/catalog/reader.ts",
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(result.pid).toBeGreaterThan(0);
+    expect(result.status, result.stderr).toBe(1);
+    const report = JSON.parse(result.stdout) as {
+      diagnostics: { filename: string; code: string }[];
+    };
+    expect(
+      report.diagnostics.some(
+        ({ filename, code }) =>
+          filename.endsWith("billing/reader.ts") && code.includes("no-restricted-imports"),
+      ),
+    ).toBe(true);
+    expect(report.diagnostics.some(({ filename }) => filename.endsWith("catalog/reader.ts"))).toBe(
+      false,
+    );
+  });
+});
+
+describe("literal config variants", () => {
+  it("ports inline legacy rules, environments, globals and ignore files", async () => {
+    const root = materialize("oxc-toolchain-already");
+    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+    pkg.eslintConfig = {
+      env: { node: true },
+      globals: { appClock: false },
+      rules: { "no-restricted-exports": ["error", { restrictedNamedExports: ["internal"] }] },
+    };
+    writeFileSync(path.join(root, "package.json"), JSON.stringify(pkg));
+    writeFileSync(path.join(root, ".eslintignore"), "# generated files\ngenerated/**\n");
+    const result = await runUpgrade({ root, from: "5.33", to: "5.34.0" });
+    expect(result.manual).toEqual([]);
+    const config = JSON.parse(readFileSync(path.join(root, ".oxlintrc.json"), "utf8"));
+    expect(config.env.node).toBe(true);
+    expect(config.globals.appClock).toBe("readonly");
+    expect(config.ignorePatterns).toContain("generated/**");
+    expect(config.rules["no-restricted-exports"]).toEqual([
+      "error",
+      { restrictedNamedExports: ["internal"] },
+    ]);
+    expect(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"))).not.toHaveProperty(
+      "eslintConfig",
+    );
+    expect(existsSync(path.join(root, ".eslintignore"))).toBe(false);
+  });
+
+  it("resolves local shorthand and spreads without losing the independent import check", async () => {
+    const root = materialize("oxc-toolchain");
+    writeFileSync(
+      path.join(root, "eslint.config.js"),
+      `const imported = { "unused-imports/no-unused-imports": "error" };
+const rules = { ...imported, "@typescript-eslint/no-unused-vars": "off", "no-restricted-syntax": "off" };
+export default [{ rules }];`,
+    );
+    const result = await upgrade(root);
+    expect(result.manual).toEqual([]);
+    const config = JSON.parse(readFileSync(path.join(root, ".oxlintrc.json"), "utf8"));
+    expect(config.rules["no-unused-vars"]).toEqual([
+      "error",
+      { fix: { imports: "safe-fix", variables: "off" } },
+    ]);
+    expect(existsSync(path.join(root, "eslint.config.js"))).toBe(false);
+  });
+
+  it("keeps conflicting existing native rules and reports the source rule", async () => {
+    const root = materialize("oxc-toolchain");
+    writeFileSync(path.join(root, ".oxlintrc.json"), '{"rules":{"no-restricted-exports":"off"}}');
+    writeFileSync(
+      path.join(root, "eslint.config.js"),
+      'export default [{ rules: { "no-restricted-exports": ["error", { restrictedNamedExports: ["internal"] }] } }];',
+    );
+    const result = await upgrade(root);
+    expect(result.manual).toHaveLength(1);
+    expect(result.manual[0]?.hint).toContain("no-restricted-exports");
+    expect(result.manual[0]?.hint).toContain("conflicts");
+    expect(readFileSync(path.join(root, ".oxlintrc.json"), "utf8")).toBe(
+      '{"rules":{"no-restricted-exports":"off"}}',
+    );
+  });
+});
+
+describe("config combiners and extension rules", () => {
+  it.each([
+    ['import { defineConfig } from "eslint/config";', "defineConfig"],
+    ['import tseslint from "typescript-eslint";', "tseslint.config"],
+  ])("ports literal arguments to %s without loading it", async (declaration, combiner) => {
+    const root = materialize("oxc-toolchain");
+    writeFileSync(
+      path.join(root, "eslint.config.js"),
+      `${declaration}\nexport default ${combiner}([{ files: ["src/**/*.ts"], rules: { "@typescript-eslint/no-explicit-any": "error" } }]);\n`,
+    );
+    expect((await upgrade(root)).manual).toEqual([]);
+    const config = JSON.parse(readFileSync(path.join(root, ".oxlintrc.json"), "utf8"));
+    expect(config.overrides[0].rules["typescript/no-explicit-any"]).toBe("error");
+  });
+
+  it.each([true, false])(
+    "preserves an active TypeScript extension when its base is off (extensionFirst=%s)",
+    async (extensionFirst) => {
+      const root = materialize("oxc-toolchain");
+      const extension = '"@typescript-eslint/no-unused-vars": ["error", { args: "none" }]';
+      const base = '"no-unused-vars": "off"';
+      writeFileSync(
+        path.join(root, "eslint.config.js"),
+        `export default [{ rules: { ${extensionFirst ? `${extension}, ${base}` : `${base}, ${extension}`} } }];\n`,
+      );
+      expect((await upgrade(root)).manual).toEqual([]);
+      const config = JSON.parse(readFileSync(path.join(root, ".oxlintrc.json"), "utf8"));
+      expect(config.rules["no-unused-vars"]).toEqual(["error", { args: "none" }]);
+    },
+  );
 });

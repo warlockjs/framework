@@ -28,7 +28,7 @@ export type WizardSeeds = {
 export function seedFromFlags(cli: CliFlags): WizardSeeds {
   return {
     packageManager: cli.pm ?? getPreferredPackageManager(),
-    lint: cli.lint === "eslint" ? "eslint" : "oxc",
+    lint: "oxc",
     databaseDriver: cli.db,
     features: cli.features ?? defaultFeatures(cli),
     aiProviders: cli.ai ?? [],

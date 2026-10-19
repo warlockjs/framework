@@ -150,7 +150,7 @@ export default defineConfig({
 
 - **`watch.include` / `watch.exclude`** — globs piped into the file watcher. Override when you have non-`.ts(x)` files driving reloads (e.g. SQL fixtures), or to exclude a generated folder.
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
-- **`healthCheckers`** — built-in switches (`{ typescript?, eslint?, oxlint? }`), custom file health checker contracts, or `false` to disable. The `--skip-health` flag disables all checkers for that run. TypeScript runs by default. ESLint uses core's dependency and requires only an app-root flat config; Oxlint requires its package installed in the app plus a config. ESLint is disabled by default; explicitly set `eslint: true` to retain it until removal in 5.34.0. Enabling it prints one deprecation warning and the Oxc migration command.
+- **`healthCheckers`** — built-in switches (`{ typescript?, oxlint? }`), custom checker arrays, or `false`. TypeScript and installed/configured Oxlint run by default. `--skip-health` disables checks for one run. ESLint support was removed in 5.34.0; use `npx warlock upgrade --from 5.33 --to 5.34.0` to remove stale options.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
 - **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See the `update-packages` topic.
 - **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
@@ -173,12 +173,12 @@ import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   devServer: {
-    healthCheckers: { typescript: true, eslint: false, oxlint: true },
+    healthCheckers: { typescript: true, oxlint: true },
   },
 });
 ```
 
-Omit the switches to run TypeScript and installed/configured Oxlint; ESLint is off by default and requires `eslint: true`; `true` still requires the linter's config, and Oxlint also requires its app-installed package. Set `oxlint: false` to disable only Oxlint while leaving other defaults intact. A custom checker array replaces the built-in list. Config discovery also accepts `.oxlintrc.jsonc`, `oxlint.config.ts` and `oxlint.config.mts`; use JSON/JSONC on Node 22.15 because current Oxlint TypeScript configs need Node 22.18 or newer.
+Omit switches to run TypeScript and installed/configured Oxlint. Set `oxlint: false` to disable only Oxlint. A custom checker array replaces the built-in list. JSON/JSONC configs work on Node 22.15; current Oxlint TypeScript configs require Node 22.18 or newer.
 
 ## `warlock build` — production bundle
 

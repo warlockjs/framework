@@ -15,17 +15,17 @@ Every command is a `CLICommand` instance produced by the `command()` factory. Bu
 In a Warlock project, `warlock` is wired into `package.json` via `yarn`:
 
 ```bash
-pnpm warlock dev
-pnpm warlock migrate --fresh
-pnpm warlock generate.module products
+npx warlock dev
+npx warlock migrate --fresh
+npx warlock generate.module products
 ```
 
 Equivalent shortcuts your project may have configured:
 
 ```bash
-pnpm start         # → pnpm warlock dev
-pnpm migrate       # → pnpm warlock migrate
-pnpm build         # → pnpm warlock build
+npm start         # → npx warlock dev
+npm run migrate       # → npx warlock migrate
+npm run build         # → npx warlock build
 ```
 
 Look at the project's `package.json > scripts` to see the local shortcuts. Under the hood everything routes through the same CLI runner.
@@ -42,7 +42,7 @@ Look at the project's `package.json > scripts` to see the local shortcuts. Under
 
 ### `dev`
 
-Start the development server with hot module reload, type generation, and health checkers. [Background file health checks](./file-health-checks) run TypeScript and auto-detect configured ESLint and Oxlint installations.
+Start the development server with hot module reload, type generation, and health checkers. [Background file health checks](./file-health-checks) run TypeScript and auto-detect configured Oxlint installations.
 
 ```bash
 warlock dev
@@ -733,7 +733,7 @@ export default command({
 });
 ```
 
-Run it: `pnpm warlock users.promote --email=hasan@example.com` (or `pnpm warlock up -e hasan@example.com`).
+Run it: `npx warlock users.promote --email=hasan@example.com` (or `npx warlock up -e hasan@example.com`).
 
 Two rules for project-local commands:
 
