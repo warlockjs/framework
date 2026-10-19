@@ -6500,7 +6500,7 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 
 ---
 name: store-secrets
-description: "Store app credentials with secrets.get/set/remove/has and environmentName; lazy optional OS keychain, read-only scoped environment variables, encrypted file fallback, typed SecretStoreError and memory-backed secretsFake. Use for provider keys and OAuth credentials the app must read back. Skip user passwords (hash-password) and encrypted database columns (encrypt-data)."
+description: "Store app credentials with secrets.get/set/remove/has, backend() and environmentName; lazy optional OS keychain, read-only scoped environment variables, encrypted file fallback, typed SecretStoreError and memory-backed secretsFake. Use for provider keys and OAuth credentials the app must read back. Skip user passwords (hash-password) and encrypted database columns (encrypt-data)."
 ---
 
 # Application secret store
@@ -6516,6 +6516,7 @@ const token = await secrets.get("vendor-token"); // string | undefined
 const exists = await secrets.has("vendor-token"); // boolean; true for ""
 const removed = await secrets.remove("vendor-token"); // boolean
 const variable = secrets.environmentName("vendor-token"); // variable name, not value
+const backend = await secrets.backend(); // "keychain" | "file" | "memory"; no credentials
 
 try {
   await secrets.remove("vendor-token");
@@ -6531,6 +6532,23 @@ try {
 Names are case-sensitive, nonempty strings of at most 256 UTF-16 code units. Values are strings, including empty strings. Every operation is async, except `environmentName()`.
 
 ## Configuration and backend decisions
+
+Use `await secrets.backend()` or `await store.backend()` to inspect active storage.
+The exported `SecretBackendType` is `"keychain" | "file" | "memory"`. Inspection
+triggers core's own lazy selection and shares the memoized keychain probe with
+credential operations, including concurrent calls; never run an independent probe.
+It returns the selected backend, not the source of an individual secret. Scoped
+environment reads do not change it. File selection does not create files or verify
+the encryption key/filesystem. A later locked keychain remains `"keychain"` and
+credential operations fail safely instead of silently changing selection.
+
+Resolved `secrets.driver` overrides `SECRETS_DRIVER`: memory reports `"memory"`;
+auto reports `"keychain"` after a successful initial probe or `"file"` after failure.
+`secretsFake` and explicit `MemorySecretBackend` report `"memory"` without probing.
+Explicit backends bypass driver configuration. Custom `SecretBackend` implementations
+may declare readonly `type: SecretBackendType`; omitted metadata reports `"memory"`
+for compatibility with isolated injected test backends. Core file/keychain instances
+declare their own type.
 
 - Default namespace: app name plus the SHA-256 hash of the absolute project root. For changing release directories, configure a stable unique namespace including the deployment environment.
 - Reads: OS keychain → exact scoped environment variable → encrypted file.
@@ -6584,6 +6602,7 @@ import type { SecretBackend, SecretStoreOptions } from "@warlock.js/core/secrets
 const backend: SecretBackend = new MemorySecretBackend();
 const options: SecretStoreOptions = { namespace: "test-app", backend };
 const store = new SecretStore(options);
+await store.backend(); // "memory"
 await store.set("vendor-token", "test-credential");
 await store.get("vendor-token");
 await store.has("vendor-token");
@@ -31691,7 +31710,7 @@ Declare the loader so TypeScript infers its return type, then pass `typeof loade
 to the matching props type (`PageProps<typeof loader>`). Two spellings do that, and
 this skill uses both:
 
-```ts title="src/web/example.setup.ts"
+```ts
 // Either: a named function, with the context typed on the parameter.
 export async function loader({
   request,
@@ -31970,6 +31989,9 @@ export async function loader({
 A page's `config.validation` declares a [Seal](https://www.npmjs.com/package/@warlock.js/seal) schema per source, `params` and `query` kept as separate keys. Declare either or both:
 
 ```ts title="src/web/example.setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig } from "@warlock.js/web";
+
 export const config = {
   validation: {
     params: v.object({ id: v.int().coerce() }),
@@ -36186,6 +36208,8 @@ fields override `child.metadata`, while omitted child fields are not retained. P
 descendant metadata deliberately by spreading `child.metadata`:
 
 ```ts title="src/web/root.setup.ts"
+import type { RootConfig } from "@warlock.js/web";
+
 export async function loader() {
   return { applicationName: "Acme" };
 }
@@ -46223,7 +46247,7 @@ The MCP client does not use `@modelcontextprotocol/sdk`: it speaks MCP's JSON-RP
 
 ---
 name: expose-as-mcp-server
-description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `listFilter`, `validateCallParams`, `McpError`, `routes`, `McpHttpRouteContext`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[], or named tool groups) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)` — over stdio or authenticated Streamable HTTP. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `McpHttpServeTransport`, `McpHttpAuth`, `onAuthRefusal`, `McpHttpAuthRefusal`, `McpServeError`, `server.start()`, `server.stop()`, `{ url, close }`, `{ type: "http", host, port, path, auth }`, `bearer`, `authorize`, `authenticate`, `beforeCall`, `listFilter`, `validateCallParams`, `McpError`, `routes`, `McpHttpRouteContext`, `requestId`, `principal`, `notifications/cancelled`, `allowedOrigins`, `maxBodyBytes`, `prefixToolNames`, `groups`, `resources`, `prompts`, `ctx.request.headers`, `schemaTarget`, `tools/list`, `tools/call`, `{ type: "stdio" }`; ''expose my agent as an MCP server'', ''serve my tools over HTTP'', ''give each agent session its own MCP endpoint'', ''protect my MCP server with a token'', ''publish my tools to Cursor/Claude Desktop'', ''serve MCP resources or prompts'', ''tool name collision''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Expose tools AS an MCP server (Direction B)
@@ -46287,11 +46311,59 @@ transport: {
 }
 ```
 
-- Checks run in order: `bearer`, `authorize`, `authenticate`; every configured check must pass. A failed check skips later hooks. `authenticate` alone satisfies the non-loopback auth requirement. Host/Origin checks run first. A throwing authentication hook denies. Failures → `401`; bearer or authenticate failures include a Bearer `WWW-Authenticate` challenge.
+- Checks run in order: `bearer`, `authorize`, `authenticate`; every configured check must pass. A failed check skips later hooks. `authenticate` alone satisfies the non-loopback auth requirement. Host/Origin checks run first. A throwing authentication hook denies. By default, failures → `401`; bearer or authenticate failures include a Bearer `WWW-Authenticate` challenge.
 - A foreign or `null` `Origin` → `403` (DNS-rebinding guard from the MCP spec). Requests without `Origin` pass.
 - On loopback, a `Host` other than `localhost` / `127.0.0.1` / `[::1]` (or `allowedHosts`) → `403`.
 - Stateless: no session id; `GET` / `DELETE` → `405`; batches → `400`; unsupported `MCP-Protocol-Version` → `400`.
 - Plain HTTP: put TLS in front before exposing beyond the machine.
+
+## Customize HTTP authentication refusals
+
+Use `transport.onAuthRefusal` for a JSON error contract shared by the MCP endpoint
+and `transport.routes`. It runs only after a failed bearer/authorize/authenticate
+check. Host/Origin refusals always take precedence and never call it.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import type { McpHttpAuthRefusal } from "@warlock.js/ai-tools";
+import "@warlock.js/ai-tools";
+
+const onAuthRefusal: McpHttpAuthRefusal = async ({ check, target }) => ({
+  status: 401,
+  headers: { "cache-control": "no-store" },
+  body: { error: "MEMBER_UNAUTHORIZED", check, target },
+});
+
+const server = ai.mcp.serve([], {
+  name: "member-tools",
+  transport: {
+    type: "http",
+    auth: { authorize: () => false },
+    onAuthRefusal,
+    routes: [{ method: "GET", path: "/policy", handler: () => ({ body: {} }) }],
+  },
+});
+const { url, close } = await server.start();
+// url and `${url}/policy` share the custom refusal; no handler runs.
+await close();
+```
+
+- Context has only `check: "bearer" | "authorize" | "authenticate"`, uppercase
+  `method`, query-free `path`, and `target: "mcp" | "route"`. No error, credentials,
+  headers, principal or request body is passed. Thrown auth details stay private.
+- Return `{ status?, headers?, body }` or a promise. Status defaults to 401 and
+  must be an integer 400–599. Required body is plain JSON, including primitives,
+  arrays and null; no cycles, class instances, non-finite numbers or undefined entries.
+- Header allowlist: `www-authenticate`, `cache-control`, `retry-after`,
+  `content-language`, `x-request-id`. Public types use lowercase keys; runtime
+  matches names case-insensitively and validates HTTP string values. Headers merge
+  over the default challenge. Framing, cookies, CORS and redirects cannot be set.
+- Void, throws/rejections and any invalid result fall back to the original 401
+  JSON-RPC `Unauthorized.` response and default headers. A custom denial cannot
+  grant authority: it ends the request without later auth, route, policy or tool
+  handlers. Successful auth skips the refusal hook.
+- Exported types: `McpHttpAuthRefusal`, `McpHttpAuthRefusalContext`,
+  `McpHttpAuthRefusalResponse`, `McpHttpAuthRefusalBody`, `McpHttpAuthRefusalHeader`.
 
 ## Tools read request headers from `ctx.request`
 

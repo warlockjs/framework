@@ -6491,7 +6491,7 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 
 ---
 name: store-secrets
-description: "Store app credentials with secrets.get/set/remove/has and environmentName; lazy optional OS keychain, read-only scoped environment variables, encrypted file fallback, typed SecretStoreError and memory-backed secretsFake. Use for provider keys and OAuth credentials the app must read back. Skip user passwords (hash-password) and encrypted database columns (encrypt-data)."
+description: "Store app credentials with secrets.get/set/remove/has, backend() and environmentName; lazy optional OS keychain, read-only scoped environment variables, encrypted file fallback, typed SecretStoreError and memory-backed secretsFake. Use for provider keys and OAuth credentials the app must read back. Skip user passwords (hash-password) and encrypted database columns (encrypt-data)."
 ---
 
 # Application secret store
@@ -6507,6 +6507,7 @@ const token = await secrets.get("vendor-token"); // string | undefined
 const exists = await secrets.has("vendor-token"); // boolean; true for ""
 const removed = await secrets.remove("vendor-token"); // boolean
 const variable = secrets.environmentName("vendor-token"); // variable name, not value
+const backend = await secrets.backend(); // "keychain" | "file" | "memory"; no credentials
 
 try {
   await secrets.remove("vendor-token");
@@ -6522,6 +6523,23 @@ try {
 Names are case-sensitive, nonempty strings of at most 256 UTF-16 code units. Values are strings, including empty strings. Every operation is async, except `environmentName()`.
 
 ## Configuration and backend decisions
+
+Use `await secrets.backend()` or `await store.backend()` to inspect active storage.
+The exported `SecretBackendType` is `"keychain" | "file" | "memory"`. Inspection
+triggers core's own lazy selection and shares the memoized keychain probe with
+credential operations, including concurrent calls; never run an independent probe.
+It returns the selected backend, not the source of an individual secret. Scoped
+environment reads do not change it. File selection does not create files or verify
+the encryption key/filesystem. A later locked keychain remains `"keychain"` and
+credential operations fail safely instead of silently changing selection.
+
+Resolved `secrets.driver` overrides `SECRETS_DRIVER`: memory reports `"memory"`;
+auto reports `"keychain"` after a successful initial probe or `"file"` after failure.
+`secretsFake` and explicit `MemorySecretBackend` report `"memory"` without probing.
+Explicit backends bypass driver configuration. Custom `SecretBackend` implementations
+may declare readonly `type: SecretBackendType`; omitted metadata reports `"memory"`
+for compatibility with isolated injected test backends. Core file/keychain instances
+declare their own type.
 
 - Default namespace: app name plus the SHA-256 hash of the absolute project root. For changing release directories, configure a stable unique namespace including the deployment environment.
 - Reads: OS keychain → exact scoped environment variable → encrypted file.
@@ -6575,6 +6593,7 @@ import type { SecretBackend, SecretStoreOptions } from "@warlock.js/core/secrets
 const backend: SecretBackend = new MemorySecretBackend();
 const options: SecretStoreOptions = { namespace: "test-app", backend };
 const store = new SecretStore(options);
+await store.backend(); // "memory"
 await store.set("vendor-token", "test-credential");
 await store.get("vendor-token");
 await store.has("vendor-token");
