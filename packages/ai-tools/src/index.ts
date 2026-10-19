@@ -35,7 +35,7 @@ export type {
 } from "./mcp";
 
 // ---------------------------------------------------------------------------
-// The `ai.tools.*` namespace shape (declared once in `./register`).
+// The shared core `ai.tools.*` namespace shape, extended in `./register`.
 // ---------------------------------------------------------------------------
 export type { AiToolsNamespace } from "./register";
 

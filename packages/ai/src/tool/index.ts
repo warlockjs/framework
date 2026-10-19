@@ -13,3 +13,14 @@ export type {
   ProviderToolTarget,
   SelectedProviderTools,
 } from "./provider-tool";
+
+export { catalogue } from "./catalogue";
+export type {
+  CatalogueTool,
+  LazyCatalogueTool,
+  ToolCatalogueOptions,
+  ToolCatalogue,
+  CatalogueSearchInput,
+  CatalogueSearchResult,
+  CatalogueCallInput,
+} from "./catalogue";

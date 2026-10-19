@@ -49,6 +49,7 @@ import { runPipeline } from "../middleware";
 import { notifyObservers } from "../observe/resolve-observers";
 import { skills } from "../skills";
 import type { SkillsContract } from "../skills/contracts/skills.contract";
+import { resolveCatalogueCall } from "../tool/catalogue";
 import { normalizeAgentTools } from "../tool/executable-as-tool";
 import { isProviderTool } from "../tool/provider-tool";
 import type { ToolContract, ToolInvokeResult } from "../tool/tool";
@@ -563,6 +564,7 @@ class Execution<TOutput> {
   private readonly trips: LLMTrip[] = [];
   private readonly compactions: AgentCompactionRecord[] = [];
   private readonly toolCalls: ToolCall[] = [];
+  private readonly silentToolCalls = new Set<string>();
   private readonly usage: Usage = { input: 0, output: 0, total: 0 };
   private readonly messages: Message[] = [];
   private inputMessageIndex: number | undefined;
@@ -1152,10 +1154,7 @@ class Execution<TOutput> {
     // 2026-05-07-silent-tools.md (Q4). They behave as feedback.
     const allSilent =
       serverToolCalls.length === 0 &&
-      (response.toolCalls ?? []).every((request) => {
-        const registered = this.effectiveTools.find((tool) => tool.name === request.name);
-        return registered?.mode === "silent";
-      });
+      (response.toolCalls ?? []).every((request) => this.silentToolCalls.has(request.id));
 
     return allSilent ? "stop" : "continue";
   }
@@ -1577,7 +1576,33 @@ class Execution<TOutput> {
     toolCallRequest: ModelToolCallRequest,
     tripIndex: number,
   ): Promise<DispatchedToolCall> {
-    const registeredTool = this.effectiveTools.find((tool) => tool.name === toolCallRequest.name);
+    this.silentToolCalls.delete(toolCallRequest.id);
+    let registeredTool = this.effectiveTools.find((tool) => tool.name === toolCallRequest.name);
+
+    if (registeredTool) {
+      try {
+        const resolved = await resolveCatalogueCall(
+          registeredTool,
+          toolCallRequest,
+          this.options?.signal,
+        );
+        if (resolved) {
+          // Resolve identity before hooks: policy, HITL, budgets and tracing
+          // receive the actual target and its raw input, just as for a direct call.
+          registeredTool = resolved.tool;
+          toolCallRequest = resolved.request;
+        }
+      } catch (error) {
+        // Resolution failed before execution. Use the ordinary failure path;
+        // a loader failure or malformed meta-call must never execute a target.
+        registeredTool = {
+          ...registeredTool,
+          invoke: async () => {
+            throw error;
+          },
+        };
+      }
+    }
 
     if (!registeredTool) {
       const error = new AgentExecutionError(`Tool not registered: ${toolCallRequest.name}`, {
@@ -1627,6 +1652,8 @@ class Execution<TOutput> {
       return { record, message };
     }
 
+    if (registeredTool.mode === "silent") this.silentToolCalls.add(toolCallRequest.id);
+
     // Build the lightweight event meta once. Resolves `action` to a
     // string here so consumers receive plain data rather than having
     // to re-evaluate a callback on every event.
@@ -1672,13 +1699,14 @@ class Execution<TOutput> {
       : this.options?.toolCtx;
 
     let invokeResult: ToolInvokeResult<unknown>;
+    const dispatchTool = registeredTool;
 
     try {
       invokeResult = (await runPipeline(
         this.middleware,
         "tool",
         toolContext,
-        () => registeredTool.invoke(toolCallRequest.input, dispatchToolCtx),
+        () => dispatchTool.invoke(toolCallRequest.input, dispatchToolCtx),
         this.logger,
       )) as ToolInvokeResult<unknown>;
     } catch (thrown) {

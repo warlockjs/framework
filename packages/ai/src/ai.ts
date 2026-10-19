@@ -67,8 +67,16 @@ import { persona } from "./system-prompt/persona";
 import { systemPrompt } from "./system-prompt/system-prompt";
 import { providerTool } from "./tool/provider-tool";
 import { tool } from "./tool/tool";
+import { catalogue } from "./tool/catalogue";
+import { measureTools } from "./tool/tool-schemas";
 import { step } from "./workflow/step";
 import { workflow } from "./workflow/workflow";
+
+/** Built-in tool utilities; satellite packages augment this interface. */
+export interface AiToolsNamespace {
+  catalogue: typeof catalogue;
+  measure: typeof measureTools;
+}
 
 /**
  * The shape of the top-level `ai` namespace. Declared as an `interface` (not an
@@ -80,6 +88,7 @@ import { workflow } from "./workflow/workflow";
 export interface Ai {
   config: typeof setAIConfig;
   tool: typeof tool;
+  tools: AiToolsNamespace;
   providerTool: typeof providerTool;
   agent: typeof agent;
   systemPrompt: typeof systemPrompt;
@@ -251,6 +260,7 @@ export const ai = {
   measure,
   config: setAIConfig,
   tool,
+  tools: { catalogue, measure: measureTools },
   providerTool,
   agent,
   systemPrompt,

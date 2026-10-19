@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - `beforeCall` and envelope policy preserve a thrown `McpError`'s integer code, message and optional data, including official SDK errors, without a runtime SDK dependency. Other throws retain the existing invalid-params mapping.
+- Extend the core `ai.tools` namespace on registration, preserving `catalogue` and `measure` while adding the ready-made factories. `AiToolsNamespace` remains re-exported for consumers.
 
 ## 5.33.0 - 2026-10-19
 

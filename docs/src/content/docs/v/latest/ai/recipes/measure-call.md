@@ -67,3 +67,7 @@ warlock ai measure --model "$MODEL_ID" --tools ./tools.ts --system ./system.md -
 ```
 
 The CLI measures the supplied fixed input with the explicit `.` probe. See [AI measure CLI](/v/latest/core/cli/ai/) for provider IDs, configured model modules, exports and pricing configuration.
+
+## Measure a tool catalogue
+
+Pass `ai.tools.catalogue({ core, searchable }).tools` as `tools` to measure only the stable advertised core and the two discovery meta-tools. This does not load searchable schemas. Compare against the full eager tool list with `ai.measure.diff(full, discovered).parts.tools`: a negative token delta is the saved fixed tool-definition cost per trip. Include search-result messages in a later-call measurement when assessing discovery's conversation cost. See [Define tools](/v/latest/ai/tools/define-tools/#discover-tools-from-a-stable-catalogue) for lazy loading, ranking and governed calls.
