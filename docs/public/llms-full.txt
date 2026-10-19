@@ -12560,7 +12560,7 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 
 ---
 name: write-cli-command
-description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.register.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `warlock add bull-board`, `index.register.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — the `run-app` topic; warlock.config.ts wiring — the `configure-app` topic; competing libs `commander`, `yargs`, `oclif`.'
+description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.setup.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `warlock add bull-board`, `index.setup.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — the `run-app` topic; warlock.config.ts wiring — the `configure-app` topic; competing libs `commander`, `yargs`, `oclif`.'
 ---
 
 # Warlock — write a CLI command
@@ -12790,7 +12790,11 @@ Run `warlock add --list` to see what's currently registered. Pass `--packageMana
 is loaded automatically by `warlock dev` when installed, and is omitted from a
 production install with dev dependencies excluded.
 
-The Web starter keeps the page's universal non-component setup in `src/web/index.register.ts`, while `src/web/index.page.tsx` re-exports `register`. Warlock still discovers and runs the hook from the page namespace in both SSR and the browser, but editing the page component remains inside React's Fast Refresh boundary. Do not move the `register()` declaration inline beside the component: React Refresh treats that non-component export as incompatible and reloads the page, losing component state.
+`warlock add web` creates `root.tsx` + `root.setup.ts` and `index.page.tsx` +
+`index.setup.ts`. Setup files own configuration and universal `register()`
+logic; UI files own components. Warlock composes the pairs on the server and
+projects browser-safe registration to the client, preserving the component
+Fast Refresh boundary.
 
 ### AI input measurement
 
@@ -30428,11 +30432,13 @@ On the ordinary path it leaves this application-owned shape:
 src/
   web/
     root.tsx
+    root.setup.ts
     index.page.tsx
+    index.setup.ts
 warlock.config.ts
 ```
 
-The generated index page declares `export const config: PageConfig = { route: { path: "/", name: "index" }, ... }`, so the server payload and client registry consume one explicit identity. Universal localization setup is inside its synchronous `register()` hook. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#vessel`, and renders `<Scripts />`. `warlock dev` turns literal `groupedTranslations` registrations into typed `useTrans()` keys; it accepts `string` until the first generated typing file exists.
+The generated `index.setup.ts` declares `export const config: PageConfig = { route: { path: "/", name: "index" }, ... }`, so the server payload and client registry consume one explicit identity. Universal localization setup is inside its synchronous `register()` hook. `index.page.tsx` contains components, and `root.setup.ts` contains root policy. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#vessel`, and renders `<Scripts />`. `warlock dev` turns literal `groupedTranslations` registrations into typed `useTrans()` keys; it accepts `string` until the first generated typing file exists.
 
 Every added `@warlock.js/*` package is saved at the exact version of the Core CLI executing the command. Third-party dependency ranges stay as declared by the feature.
 
@@ -30483,7 +30489,7 @@ Indented `router.get("/", ...)` declarations inside a prefixed group are not roo
 - Exactly one recognized top-level `GET "/"` and no top-level `GET "/welcome"`: move it to `/welcome`, then create the home page.
 - More than one top-level `GET "/"`, an existing top-level `GET "/welcome"`, an unreadable/unwritable routes file, or an unrecognized rewrite: create `root.tsx`, do not create `index.page.tsx`, set a failing exit code, and still register the connector.
 
-On the refusal path, free `/` yourself and create a page with either `export const config = { route: { path: "/", name: "index" } } as const satisfies PageConfig` or another literal `config.route`.
+On the refusal path, free `/` yourself and create a page and matching setup file with either `export const config = { route: { path: "/", name: "index" } } as const satisfies PageConfig` or another literal `config.route`.
 
 ## Re-running the command
 
@@ -30521,7 +30527,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ---
 name: create-a-page
-description: "Create an SSR React page under `src/web/**`. Put route, cache, validation, middleware, metadata, and sitemap policy in `config`; keep `loader`, `register`, `ErrorBoundary`, and the default component as exports. Triggers: `*.page.tsx`, `PageConfig`, `config.route`, `config.cache`, `config.validation`, `config.middleware`, `config.metadata`, `config.sitemap`, `PageLoader`, `PageProps`, `error.page.tsx`, `register`, `[...slug]`."
+description: "Create an SSR React page under `src/web/**`. Put route, cache, validation, middleware, metadata, and sitemap policy in `config`; put `config`, `loader`, `register`, and actions in `.setup.ts`; keep default and named components in `.page.tsx`. Triggers: `*.page.tsx`, `PageConfig`, `config.route`, `config.cache`, `config.validation`, `config.middleware`, `config.metadata`, `config.sitemap`, `PageLoader`, `PageProps`, `error.page.tsx`, `register`, `[...slug]`."
 ---
 
 # Warlock — create a page
@@ -30545,11 +30551,11 @@ export function ErrorBoundary({ error, status }: { error: unknown; status: numbe
 
 The closest authored boundary handles the failure. Keep the boundary itself defensive: if it throws, Warlock escalates to the next boundary or framework fallback.
 
-## Optional server setup module
+## Page setup file
 
-Pair `product-details.page.tsx` with `product-details.setup.ts` when the React
-component should stay UI-only. The setup file may own `config`, `loader`, and
-universal `register()`. Do not value-import it from the component; type-only
+Pair `product-details.page.tsx` with `product-details.setup.ts`. The UI file
+owns components; the setup file owns `config` (including `config.metadata`), `loader`, actions,
+and universal `register()`. See `use-page-setup-files` for the complete contract. Do not value-import it from the component; type-only
 imports preserve loader inference:
 
 ```ts title="src/web/products/paired-product.setup.ts"
@@ -30569,13 +30575,13 @@ export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
 }
 ```
 
-Every export has one owner. Duplicate `config`, `loader`, or `register` exports
+Every export has one owner. Duplicate logic exports
 fail; `register()` remains browser-safe and runs on server and client. A
 type-only loader import is sufficient in development and production: it retains
 the framework-projected `register()` hook without a UI runtime import of setup.
 
-```tsx title="src/web/products/product-details.page.tsx"
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+```ts title="src/web/products/product-details.setup.ts"
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -30593,6 +30599,11 @@ export const loader = (async ({ request }) => {
     },
   };
 }) satisfies PageLoader<undefined, typeof config.route>;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return (
@@ -30610,9 +30621,11 @@ Declare `config` with `as const satisfies PageConfig`. `route.name` is typed `st
 
 ## The minimum page
 
-```tsx title="src/web/contact.page.tsx"
+```ts title="src/web/contact.setup.ts"
 export const config = { route: "/contact" };
+```
 
+```tsx title="src/web/contact.page.tsx"
 export default function ContactPage() {
   return (
     <main>
@@ -30646,11 +30659,11 @@ A file that cannot be parsed reports separately — `Cannot inspect the default 
 
 Use either a bare path or a literal object:
 
-```ts
+```ts title="src/web/products.setup.ts"
 export const config = { route: "/products" };
 ```
 
-```ts
+```ts title="src/web/example.setup.ts"
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
   cache: { public: true, maxAge: 60 },
@@ -30669,9 +30682,9 @@ Put validation in `config.validation`: a [Seal](https://www.npmjs.com/package/@w
 
 `route.validate` and a named `validation` export are invalid. Use the config shape below.
 
-```tsx title="src/web/products/product-details.page.tsx"
+```ts title="src/web/products/product-details.setup.ts"
 import { v } from "@warlock.js/seal";
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -30686,6 +30699,11 @@ export const loader = (async ({ request }) => {
 
   return { id: params.id, tab: query.tab };
 }) satisfies PageLoader<typeof config.validation, typeof config.route>;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return <h1>Product {data.id}</h1>;
@@ -30704,7 +30722,7 @@ Declare `config.middleware` as an array of `(ctx) => unknown | Promise<unknown>`
 
 `route.middleware` and a named `middleware` export are invalid.
 
-```tsx
+```ts title="src/web/account.setup.ts"
 export const config = {
   route: "/account",
   middleware: [
@@ -30731,7 +30749,7 @@ Prefer calling a `response` method (`.forbidden()`, `.redirect()`, `.unauthorize
 Page documents and their `x-warlock-data` representations are `no-store` by
 default. Opt a public page into shared caching with sibling `config.cache`:
 
-```tsx
+```ts title="src/web/products.setup.ts"
 export const config = {
   route: { path: "/products", name: "products.index" },
   cache: { public: true, maxAge: 60 },
@@ -30760,7 +30778,7 @@ CDN/proxy should honour. `serverCache` is a second, independent opt-in on the
 SAME object: the framework itself holds the resolved bytes and serves a HIT
 without re-running the pipeline at all.
 
-```tsx
+```ts title="src/web/products.setup.ts"
 export const config = {
   route: { path: "/products", name: "products.index" },
   cache: {
@@ -30882,7 +30900,7 @@ the rejected segment.
 
 Until a catch-all exists, use the terminal wildcard with an explicit `config.route`:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 export const config = {
   route: { path: "/docs/*", name: "docs.catchAll" },
 } as const satisfies PageConfig;
@@ -30906,7 +30924,7 @@ Examples that fail include `/users/:id?`, `/users/:id(\\d+)`,
 
 `config.metadata` is a static object or a function of the resolved loader data:
 
-```tsx
+```ts title="src/web/products.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -30925,13 +30943,15 @@ Every field (title templates, `openGraph`, `twitter`, `meta`, `links`, `canonica
 
 `404.page.tsx` anywhere beneath `src/web` is the application's one not-found page. It is the second of the two special page filenames, next to `error.page.tsx`. Without one, Warlock answers with a built-in "404 | Page not found" document.
 
-```tsx title="src/web/404.page.tsx"
+```ts title="src/web/404.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   metadata: { title: "Page not found" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/404.page.tsx"
 export default function NotFoundPage() {
   return (
     <main>
@@ -30945,14 +30965,14 @@ export default function NotFoundPage() {
 
 - **No `config.route`.** It has no URL of its own and answers every URL nothing else matched. Declaring a route on it is a build error, and a second `404.page.tsx` is a build error naming both files.
 - **Props.** The default component receives the usual `{ data, shared, params }`: `shared` is the sealed payload, `params` is empty, and there is no page data because its own `loader` never runs. Its `register()` and `config.middleware` still run and `config.metadata` still applies. Keep the metadata static, since there is no `data` to read.
-- **No loader.** A `loader` export on it is ignored. The `root.tsx` app loader still runs on a 404, so keep it cheap.
+- **No loader.** A `loader` export on it is ignored. The `root.setup.ts` app loader still runs on a 404, so keep it cheap.
 - **No layouts.** It renders inside `root.tsx` only, even when a `layout.tsx` sits above it, so it cannot depend on app chrome that might itself fail.
 - **Status and indexing.** The response status is 404 and `robots` is forced to `noindex`.
 - **Only for document requests.** It renders for `GET`/`HEAD` requests that explicitly list `text/html` in `Accept`. Any other unmatched request (a `fetch()` to a mistyped `/api/...` URL) keeps the JSON 404.
 
 A loader sends the visitor to it with `response.notFound()`, from an app, layout or page loader. Return the result:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageLoader } from "@warlock.js/web";
 import { findProduct } from "app/products/services/find-product.service";
 
@@ -30996,9 +31016,9 @@ If the failure happens before any page module could even load — a module-load 
 
 ## The `register()` hook
 
-`root.tsx`, `layout.tsx`, and `*.page.tsx` may each export `register`: a synchronous, no-argument, side-effect hook that runs once per raw module namespace instance. It is separate from `config` and runs before middleware or loader work.
+`root.setup.ts`, `layout.setup.ts`, and page setup files export `register`: a synchronous, no-argument, side-effect hook that runs once per raw module namespace instance. It is separate from `config` and runs before middleware or loader work.
 
-```tsx
+```ts title="src/web/example.setup.ts"
 export function register() {
   // one-time setup for this module namespace; must not return a Promise
 }
@@ -31008,12 +31028,9 @@ Returning a Promise (or anything thenable) throws — `register()` must finish b
 
 ## The client boundary
 
-The browser boundary is decided by the import graph, not by the file's location. A `*.page.tsx` is universal:
-
-- `config` and `loader` are server/build policy; the default component and `register` retain their defined module roles.
-- The default component and any other surviving exports form the client graph.
-- An import used only by a stripped server export is removed with it.
-- An import also used by the component survives and therefore must be browser-safe.
+The browser boundary is decided by the import graph, not by the file's location. UI components are universal. Setup files own server/build policy; only their
+browser-safe `register()` code is projected into the client graph. Component
+imports must be browser-safe. Use type-only imports from setup.
 
 Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
 
@@ -31039,13 +31056,13 @@ are the exception and remain supported.
 
 ## Editing a page in development
 
-`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's _skeleton_ — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports, module-level declarations, `config`, `loader`, and other exports.
+`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's _skeleton_ — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports and module-level component helpers. Setup changes are tracked separately.
 
 - **A JSX-only edit hot-updates.** The skeleton is unchanged, so Vite's Fast Refresh applies the projected client code with no reload and no lost component state.
 - **A `config.metadata` edit reloads the document.** It changes the server-rendered head policy.
-- **Any module-level change reloads.** An edited import, declaration, `config`, or `loader` changes the skeleton.
+- **Any module-level change reloads.** An edited UI import or declaration changes the skeleton; setup edits refresh server logic.
 - **A helper function used only by the JSX still reloads if it is declared at module level.** The rule does not try to prove which half of a shared declaration the edit was "really" for — it over-approximates deliberately, because a false reload only costs component state, while a missed one ships a stale `<head>` and calls it a hot update.
-- Creating, deleting, or renaming a page file, or editing its `route` export, is page-GRAPH churn, not a skeleton edit — see below, not Fast Refresh.
+- Creating, deleting, or renaming a page file, or editing `config.route` in its setup file, is page-GRAPH churn, not a skeleton edit — see below, not Fast Refresh.
 
 ## Route-table changes in development
 
@@ -31136,7 +31153,7 @@ supplier returning its concrete URLs. Warlock does not crawl links or infer a
 model query. Without a supplier the dynamic route contributes zero URLs and
 appears with a zero count in generation diagnostics.
 
-```ts
+```ts title="src/web/example.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 import { Product } from "web/product.server";
 import { listPublishedProductSitemapRows } from "web/product-sitemap-data.server";
@@ -31296,8 +31313,8 @@ description: "Handle a form POST on a page with an `action` (or named `actions`)
 
 Use a page action when a form belongs to a page and the result should re-render it or redirect. To post to an API route from the browser, use the `submit-a-form` topic instead.
 
-```tsx
-import { Form, FieldError, useActionData, useIsSubmitting, href } from "@warlock.js/web";
+```ts title="src/web/contact.setup.ts"
+import { href } from "@warlock.js/web";
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { v } from "@warlock.js/seal";
 
@@ -31315,6 +31332,11 @@ export async function action({ request, response }: PageActionContext<typeof con
 
   return response.redirect(href("contact"));
 }
+```
+
+```tsx title="src/web/contact.page.tsx"
+import { Form, FieldError, useActionData, useIsSubmitting } from "@warlock.js/web";
+import type { action } from "./contact.setup";
 
 export default function Contact() {
   const result = useActionData<typeof action>();
@@ -31354,8 +31376,7 @@ The action's `response` is the same buffered response a loader gets, plus the fa
 
 This example shows the cookie mechanics with an app-owned `signIn` service. For the framework's own session and a guarded page, see the `protect-a-page` topic.
 
-```tsx title="src/web/login.page.tsx"
-import { Form, FieldError, useActionData, useIsSubmitting } from "@warlock.js/web";
+```ts title="src/web/login.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { v } from "@warlock.js/seal";
 import { signIn } from "app/accounts/services/sign-in.service";
@@ -31382,6 +31403,11 @@ export async function action({ request, response }: PageActionContext<typeof log
 
   return response.redirect("/account");
 }
+```
+
+```tsx title="src/web/login.page.tsx"
+import { Form, FieldError, useActionData, useIsSubmitting } from "@warlock.js/web";
+import type { action } from "./login.setup";
 
 export default function LoginPage() {
   const result = useActionData<typeof action>();
@@ -31404,8 +31430,7 @@ export default function LoginPage() {
 
 Sign out is a second, named action on the page that owns the button. `clearCookie` must use the same `path` (and `domain`) the cookie was set with:
 
-```tsx title="src/web/account.page.tsx"
-import { Form } from "@warlock.js/web";
+```ts title="src/web/account.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -31419,6 +31444,10 @@ export const actions = {
     return response.redirect("/login");
   },
 };
+```
+
+```tsx title="src/web/account.page.tsx"
+import { Form } from "@warlock.js/web";
 
 export default function AccountPage() {
   return (
@@ -31458,10 +31487,7 @@ export const contactSchema = v.object({
 });
 ```
 
-```tsx
-// src/web/contact/contact.page.tsx
-import { Form as ReactForm } from "@mongez/react-form";
-import { useSubmitAction } from "@warlock.js/web/form";
+```ts title="src/web/contact/contact.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { contactSchema } from "web/contact/contact.schema";
 
@@ -31475,6 +31501,12 @@ export async function action({ request, response }: PageActionContext<typeof con
   // Handle values, then redirect or return data.
   return response.redirect("/contact");
 }
+```
+
+```tsx title="src/web/contact/contact.page.tsx"
+import { Form as ReactForm } from "@mongez/react-form";
+import { useSubmitAction } from "@warlock.js/web/form";
+import { contactSchema } from "web/contact/contact.schema";
 
 export default function ContactPage() {
   const submit = useSubmitAction<typeof contactSchema>();
@@ -31536,15 +31568,19 @@ export async function signIn(email: string, password: string) {
 
 ## Independent submission with query parameters
 
-```tsx title="src/web/cancel.page.tsx"
-import { useState } from "react";
-import { Form, type PageConfig } from "@warlock.js/web";
+```ts title="src/web/cancel.setup.ts"
+import { type PageConfig } from "@warlock.js/web";
 
 export const config = { route: "/cancel" } satisfies PageConfig;
 
 export async function action() {
   return { cancelled: true };
 }
+```
+
+```tsx title="src/web/cancel.page.tsx"
+import { useState } from "react";
+import { Form } from "@warlock.js/web";
 
 export default function CancelPage() {
   const [message, setMessage] = useState("");
@@ -31595,7 +31631,7 @@ description: "Load App, Layout, and Page data with named loaders; page validatio
 
 Opt a page into automatic loader re-runs using page-owned `config.live`:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -31655,7 +31691,7 @@ Declare the loader so TypeScript infers its return type, then pass `typeof loade
 to the matching props type (`PageProps<typeof loader>`). Two spellings do that, and
 this skill uses both:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 // Either: a named function, with the context typed on the parameter.
 export async function loader({
   request,
@@ -31680,13 +31716,18 @@ no `PUBLIC_` exception to it — static or computed.** `env("PUBLIC_X")` does no
 work client-side either. **The supported pattern is: read the value in a loader,
 which is server code, and return it as page data.**
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import { env } from "@warlock.js/core";
-import type { PageLoaderContext, PageProps } from "@warlock.js/web";
+import type { PageLoaderContext } from "@warlock.js/web";
 
 export async function loader(_context: PageLoaderContext<undefined, undefined>) {
   return { siteName: env("PUBLIC_SITE_NAME") };
 }
+```
+
+```tsx title="src/web/example.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./example.setup";
 
 export default function HomePage({ data }: PageProps<typeof loader>) {
   return <h1>{data.siteName}</h1>;
@@ -31760,9 +31801,9 @@ one for anything request-scoped.
 
 ## The shape
 
-```tsx title="src/web/products/product-details.page.tsx"
+```ts title="src/web/products/product-details.setup.ts"
 import { v } from "@warlock.js/seal";
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -31791,6 +31832,11 @@ export async function loader({
     locale: (shared as { locale?: string }).locale ?? "en",
   };
 }
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return (
@@ -31850,8 +31896,7 @@ regardless) — see Declare the shared payload below.
 
 `data` in `PageProps`, `LayoutProps`, `AppProps` and in `config.metadata` callbacks is typed as what actually reaches the page, not the loader's raw return: `Serialized<Return, "devalue">` from `@warlock.js/core` (a `Response` the loader may return is excluded first). The loader's own declared return type is untouched.
 
-```tsx title="src/web/products/product.page.tsx"
-import type { PageProps } from "@warlock.js/web";
+```ts title="src/web/products/product.setup.ts"
 import { getProduct } from "app/products/services/get-product.service";
 
 export async function loader() {
@@ -31859,6 +31904,11 @@ export async function loader() {
 
   return { product, publishedAt: new Date() };
 }
+```
+
+```tsx title="src/web/products/product.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product.setup";
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   // data.product      -> the browser-safe projection returned by the service
@@ -31888,13 +31938,13 @@ See the `define-resource` topic of the `warlock-js-core` skill for `Serialized<T
 
 ## Three loader levels
 
-| Module                  | Contract       | Component props              |
-| ----------------------- | -------------- | ---------------------------- |
-| `src/web/root.tsx`      | `AppLoader`    | `AppProps<typeof loader>`    |
-| positional `layout.tsx` | `LayoutLoader` | `LayoutProps<typeof loader>` |
-| `*.page.tsx`            | `PageLoader`   | `PageProps<typeof loader>`   |
+| Module                       | Contract       | Component props              |
+| ---------------------------- | -------------- | ---------------------------- |
+| `src/web/root.setup.ts`      | `AppLoader`    | `AppProps<typeof loader>`    |
+| positional `layout.setup.ts` | `LayoutLoader` | `LayoutProps<typeof loader>` |
+| page `*.setup.ts`            | `PageLoader`   | `PageProps<typeof loader>`   |
 
-All receive one context object with `request`, `response`, `shared`, and `route`; page loaders also get `site` and `session` when those are configured. Page loaders add generics that connect their sibling `validation` and `route` exports to `request.validated()` and `request.input()`.
+All receive one context object with `request`, `response`, `shared`, and `route`; page loaders also get `site` and `session` when those are configured. Page loaders add generics that connect their `config.validation` and `config.route` declarations to `request.validated()` and `request.input()`.
 
 Page loaders, layout loaders, metadata callbacks, and page actions also receive `route: { name, path, params }` — the MATCHED page's route. Read it instead of `request.route`: under `sites`, core registers one `/*` catch-all per method, so `request.route` is that catch-all there. `name` is the page's `config.route.name`, or its generated name (never a `<site>.` prefixed or internal key); it is `undefined` only if the page has none.
 
@@ -31902,7 +31952,7 @@ Page loaders, layout loaders, metadata callbacks, and page actions also receive 
 
 The runtime passes every loader a `signal`, an `AbortSignal` that fires when the client disconnects before the response finishes. The exported `PageLoaderContext` type does not declare it, so add it to the parameter type. Hand it to anything cancelable:
 
-```ts
+```ts title="src/web/example.setup.ts"
 import type { PageLoaderContext } from "@warlock.js/web";
 
 export async function loader({
@@ -31919,7 +31969,7 @@ export async function loader({
 
 A page's `config.validation` declares a [Seal](https://www.npmjs.com/package/@warlock.js/seal) schema per source, `params` and `query` kept as separate keys. Declare either or both:
 
-```ts
+```ts title="src/web/example.setup.ts"
 export const config = {
   validation: {
     params: v.object({ id: v.int().coerce() }),
@@ -31965,7 +32015,7 @@ A client navigation to the same URL still receives that same 400 status, with no
 
 ## Execution order
 
-Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.tsx`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
+Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.setup.ts`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
 
 **The first core `Response` a loader returns is terminal.** Returning a `Response` object stops the pipeline immediately: no lower loader starts, `metadata` is not resolved, and that response is sent as-is. It is more terminal than a short-circuit — because the response is returned whole, the buffered header/cookie writes made at that same level are discarded along with everything below it. Use `response.redirect()` / `response.notFound()` (which produce a `LoaderShortCircuit`, committing that level's buffer inclusively) when you want your buffered writes to survive; return a raw `Response` only when you mean "this exact response, nothing else."
 
@@ -32009,8 +32059,8 @@ Do not continue after a redirect or `notFound`; return the result. Surviving buf
 
 A theme preference, set from a query string and cleared on request:
 
-```tsx title="src/web/settings.page.tsx"
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+```ts title="src/web/settings.setup.ts"
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -32038,6 +32088,11 @@ export async function loader({
 
   return { theme: request.cookie("theme", "light") as string };
 }
+```
+
+```tsx title="src/web/settings.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./settings.setup";
 
 export default function SettingsPage({ data }: PageProps<typeof loader>) {
   return <p>Current theme: {data.theme}</p>;
@@ -32065,16 +32120,21 @@ export {};
 
 Required keys need an unconditional middleware writer. Optional keys may be written conditionally:
 
-```tsx title="src/web/root.tsx"
-import { Head, Scripts, shared as writableShared } from "@warlock.js/web";
-import type { AppProps, RootConfig } from "@warlock.js/web";
-import "./types";
+```ts title="src/web/root.setup.ts"
+import { shared as writableShared } from "@warlock.js/web";
+import type { RootConfig } from "@warlock.js/web";
 
 const publishLocale = async () => {
   writableShared.locale = "en";
 };
 
 export const config = { middleware: [publishLocale] } satisfies RootConfig;
+```
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import "./types";
 
 export default function App({ children, shared }: AppProps) {
   return (
@@ -32130,7 +32190,7 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - **Write `shared` in middleware only.** Loaders run after the seal.
 - **Required shared keys need unconditional writers.** The type is a promise for every request.
 - **Do not use loader return values as cross-level communication.** Levels run in order but are not wired to each other; use `shared`, written in middleware.
-- **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.tsx` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
+- **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.setup.ts` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
 - **`process.env` is refused in the client/universal graph, with no `PUBLIC_` exception.** Read it in a loader and return it as page data.
 - **In `warlock dev`, app modules can load twice.** Loaders import through Vite SSR while HTTP handlers load natively, so a module-level singleton (`AsyncLocalStorage`, cache, registry) may exist in two copies. Until the single module graph (planned 5.26), store it on `globalThis[Symbol.for("your-app.name")]`; `warlock start` has one graph and is unaffected.
 - **There are no RSC-style server actions.** Mutate through the page's own `action` export (the `handle-a-form-action` topic) or POST to an ordinary Warlock API route, then call `refresh()` after success.
@@ -32286,12 +32346,16 @@ With `app.localeCodes: ["en", "ar"]` and `strategy: "prefix-except-default"` as 
 
 The directory (`about`) is the namespace, so the keys are `about.title` and `about.intro`.
 
-```tsx title="src/web/about/about.page.tsx"
-import { useTrans, type PageConfig } from "@warlock.js/web";
+```ts title="src/web/about/about.setup.ts"
+import { type PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/about", name: "about" },
 } as const satisfies PageConfig;
+```
+
+```tsx title="src/web/about/about.page.tsx"
+import { useTrans } from "@warlock.js/web";
 
 export default function AboutPage() {
   const t = useTrans();
@@ -32752,7 +32816,7 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 ## 4. Read the result in a page handler
 
-```ts
+```ts title="src/web/example.setup.ts"
 import { loadTenant } from "app/tenants/services/tenant.service";
 import type { PageLoaderContext } from "@warlock.js/web";
 
@@ -32859,9 +32923,9 @@ export default function BetaTheme() {
 }
 ```
 
-```tsx title="src/web/root.tsx"
-import { Head, Scripts, linkStylesheetsFor, shared } from "@warlock.js/web";
-import type { AppProps, HttpContext, RootConfig } from "@warlock.js/web";
+```ts title="src/web/root.setup.ts"
+import { linkStylesheetsFor, shared } from "@warlock.js/web";
+import type { HttpContext, RootConfig } from "@warlock.js/web";
 import { themeSources, type ThemeId } from "./themes";
 
 const selectTheme = async ({ request }: HttpContext) => {
@@ -32907,7 +32971,7 @@ The server cannot see which lazy module rendered, and it never follows `dynamicI
 
 ## 4. Page cache
 
-```ts
+```ts title="src/web/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -32929,7 +32993,7 @@ export const config = {
 
 - **Middleware runs after the cache lookup.** Anything the key needs must come from the request (host, `varyBy`), not from `shared`.
 - **Keep `themeSources` next to the map.** A path typo fails the request loudly in both dev and prod.
-- **`import type {} from "./types"` in `root.tsx` is refused by projection.** Put the `SharedContext` augmentation in a module the root already imports.
+- **`import type {} from "./types"` in `root.setup.ts` is refused by projection.** Put the `SharedContext` augmentation in a module the root already imports.
 
 ## navigate-on-the-client  `@warlock.js/web/navigate-on-the-client/SKILL.md`
 
@@ -33095,13 +33159,18 @@ export function NavLink({ activeName, section = false, className, ...link }: Nav
 }
 ```
 
-```tsx title="src/web/layout.tsx"
-import type { LayoutLoader, LayoutProps } from "@warlock.js/web";
-import { NavLink } from "./components/nav-link";
+```ts title="src/web/layout.setup.ts"
+import type { LayoutLoader } from "@warlock.js/web";
 
 export const loader = (async ({ route }) => {
   return { activeName: route.name };
 }) satisfies LayoutLoader;
+```
+
+```tsx title="src/web/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
+import { NavLink } from "./components/nav-link";
+import type { loader } from "./layout.setup";
 
 export default function SiteLayout({ data, children }: LayoutProps<typeof loader>) {
   return (
@@ -33506,18 +33575,19 @@ export default {
 
 `project` is required; only its result reaches the browser as the payload's optional `session` key. Type it by augmenting `SessionRegistry { user; model }` in module `"@warlock.js/web"`.
 
-```tsx
-import { useUser } from "@warlock.js/web";
-import { requireGuest, requireUser } from "@warlock.js/web/session";
+```ts title="src/web/account.setup.ts"
+import { requireUser } from "@warlock.js/web/session";
 
-// account page
-export const accountConfig = {
+export const config = {
   route: "/account",
   middleware: [requireUser({ loginPath: "/login" })],
 };
+```
 
-// login page
-export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
+```ts title="src/web/login.setup.ts"
+import { requireGuest } from "@warlock.js/web/session";
+
+export const config = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
 ```
 
 - `useUser()` returns the projection or `null`.
@@ -33533,9 +33603,8 @@ export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/
 
 A page guarded by `requireUser()` can never be reached by a guest, so its types say so. The route-types generator reads the guard statically and writes `guard: "user"` on that page's `PageRouteRegistry` entry; `GuardedPageRouteName` (exported from `@warlock.js/web`) is the union of those names.
 
-```tsx title="src/web/account/account.page.tsx"
-import { useUser } from "@warlock.js/web";
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+```ts title="src/web/account/account.setup.ts"
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 import { requireUser } from "@warlock.js/web/session";
 
 export const config = {
@@ -33547,6 +33616,12 @@ export async function loader({ session }: PageLoaderContext<undefined, undefined
   // session is { user, model } here, neither null, and request.locals.user is non-null
   return { user: session.user };
 }
+```
+
+```tsx title="src/web/account/account.page.tsx"
+import { useUser } from "@warlock.js/web";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./account.setup";
 
 export default function AccountPage({ data }: PageProps<typeof loader>) {
   const user = useUser("account.show"); // SessionUser, never null
@@ -33841,8 +33916,16 @@ description: 'Render responsive, CLS-safe images with the `<Image>` component fr
 
 `<Image>` turns a plain JSON description of an image and its renditions into a responsive `<img>` (or `<picture>`). It is a pure render with no effects and no state, so the server and the browser produce identical markup and hydration always matches. It never runs Sharp or reads a file; every URL either comes straight from the descriptor or from a small `loader` function.
 
+```ts title="src/web/blog/post.setup.ts"
+import { type PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/blog/post", name: "blog.post" },
+} as const satisfies PageConfig;
+```
+
 ```tsx title="src/web/blog/post.page.tsx"
-import { Image, type ImageDescriptor, type PageConfig } from "@warlock.js/web";
+import { Image, type ImageDescriptor } from "@warlock.js/web";
 
 const cover: ImageDescriptor = {
   src: "/uploads/posts/cover.jpg",
@@ -33854,10 +33937,6 @@ const cover: ImageDescriptor = {
   },
   formats: ["webp"],
 };
-
-export const config = {
-  route: { path: "/blog/post", name: "blog.post" },
-} as const satisfies PageConfig;
 
 export default function PostPage() {
   return (
@@ -33986,8 +34065,7 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
 2. **The form page.** `<Form>` posts `multipart/form-data` by default, `config.action.validation` runs against the body with files included, and `v.file()` makes `request.validated()` hand back an `UploadedFile`:
 
-   ```tsx title="src/web/posts/new-post.page.tsx"
-   import { FieldError, Form } from "@warlock.js/web";
+   ```ts title="src/web/posts/new-post.setup.ts"
    import type { PageActionContext, PageConfig } from "@warlock.js/web";
    import { generateImageVariants } from "@warlock.js/core";
    import { v } from "@warlock.js/seal";
@@ -34020,6 +34098,10 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
      return response.redirect(`/posts/${post.id}`);
    }
+   ```
+
+   ```tsx title="src/web/posts/new-post.page.tsx"
+   import { FieldError, Form } from "@warlock.js/web";
 
    export default function NewPostPage() {
      return (
@@ -34038,9 +34120,8 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
 3. **Render it.** The loader returns the stored descriptor and the page passes it straight to `<Image>`:
 
-   ```tsx title="src/web/posts/post.page.tsx"
-   import { Image } from "@warlock.js/web";
-   import type { ImageDescriptor, PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+   ```ts title="src/web/posts/post.setup.ts"
+   import type { ImageDescriptor, PageConfig, PageLoader } from "@warlock.js/web";
    import { Post } from "app/posts/models/post";
 
    export const config = {
@@ -34054,6 +34135,12 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
      return { title: post.get("title") as string, cover: post.get("cover") as ImageDescriptor };
    }) satisfies PageLoader<undefined, typeof config.route>;
+   ```
+
+   ```tsx title="src/web/posts/post.page.tsx"
+   import { Image } from "@warlock.js/web";
+   import type { PageProps } from "@warlock.js/web";
+   import type { loader } from "./post.setup";
 
    export default function PostPage({ data }: PageProps<typeof loader>) {
      return (
@@ -34193,13 +34280,16 @@ Root imports ending in `.css`, `.scss`, `.sass`, `.less`, or `.styl` are recogni
 
 A page may import CSS directly:
 
-```tsx title="src/web/products/products.page.tsx"
-import "./products.css";
+```ts title="src/web/products/products.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products", name: "products.index" },
 } as const satisfies PageConfig;
+```
+
+```tsx title="src/web/products/products.page.tsx"
+import "./products.css";
 
 export default function ProductsPage() {
   return (
@@ -34336,9 +34426,9 @@ description: 'Set a page''s `<head>` with `config.metadata`: title (string, `{ d
 
 A page describes its `<head>` in `config.metadata`. The server resolves it after the loader, injects it into the document before the first byte, and rewrites the same tags after a client navigation. `<Head />` in `root.tsx` only decides where the tags are placed (see the `write-the-root` topic).
 
-`metadata` is a field of `config` on three modules: a page (`PageConfig`), a positional `layout.tsx` (`LayoutConfig`) and `root.tsx` (`RootConfig`). All three take the same shape.
+`metadata` is a field of `config` on three modules: a page (`PageConfig`), `layout.setup.ts` (`LayoutConfig`) and `root.setup.ts` (`RootConfig`). All three take the same shape.
 
-```tsx title="src/web/products/index.page.tsx"
+```ts title="src/web/products/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -34348,7 +34438,9 @@ export const config = {
     description: "Browse the product catalogue",
   },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/products/index.page.tsx"
 export default function ProductsPage() {
   return <h1>Products</h1>;
 }
@@ -34367,8 +34459,8 @@ export default function ProductsPage() {
 
 Give the config the loader's type so `data` is typed. `PageConfig<typeof loader>` reads the loader's type, so the loader may be declared after the config:
 
-```tsx title="src/web/products/product-details.page.tsx"
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+```ts title="src/web/products/product-details.setup.ts"
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -34395,6 +34487,11 @@ export const loader = (async ({ request }) => {
     },
   };
 }) satisfies PageLoader;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return <h1>{data.product.name}</h1>;
@@ -34436,7 +34533,7 @@ title: { default: "Acme Store", template: "%s | Acme Store" }; // template wraps
 title: { absolute: "Acme Store - Home" }; // ignores any ancestor template
 ```
 
-A `template` is applied by an ancestor to the title of the level below it, replacing `%s`. Put the template on `root.tsx` or a layout, then each page sets a plain `title: "Products"` and renders as `Products | Acme Store`. With a `template` and no descendant title, the `default` is used as is. `{ absolute }` opts one page out of every ancestor template. The title is always a plain string by the time it is rendered.
+A `template` is applied by an ancestor to the title of the level below it, replacing `%s`. Put the template in `config.metadata` in `root.setup.ts` or `layout.setup.ts`, then each page sets a plain `title: "Products"` and renders as `Products | Acme Store`. With a `template` and no descendant title, the `default` is used as is. `{ absolute }` opts one page out of every ancestor template. The title is always a plain string by the time it is rendered.
 
 ### `openGraph`
 
@@ -34514,7 +34611,7 @@ Metadata is resolved page first, then each layout, then the root, and an ancesto
 4. **A `title.template` on an ancestor wraps the title below it** (see Title above).
 5. **A layout or root callback returns its complete level.** Its returned fields override `child.metadata`, and fields it omits are not carried over from the child. Spread `child.metadata` when you want to keep them:
 
-```tsx title="src/web/products/layout.tsx"
+```ts title="src/web/products/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config = {
@@ -34527,7 +34624,7 @@ export const config = {
 
 Typical split: the root carries sitewide defaults and the title template, a layout carries section defaults, and each page carries its own `title`, `description` and share image.
 
-```tsx title="src/web/root.tsx"
+```ts title="src/web/root.setup.ts"
 import type { RootConfig } from "@warlock.js/web";
 
 export const config = {
@@ -34543,7 +34640,7 @@ export const config = {
 
 Metadata functions run inside the request, so translate with `t()` from `@warlock.js/core`. It resolves through the active locale (and the page's route-locales snapshot). See the `localize-pages` topic for the locale setup. Call `t()` inside the function, never in a module-level object, which would translate once at import time:
 
-```tsx title="src/web/pricing.page.tsx"
+```ts title="src/web/pricing.setup.ts"
 import { t } from "@warlock.js/core";
 import type { PageConfig } from "@warlock.js/web";
 
@@ -34554,7 +34651,9 @@ export const config = {
     description: t("pricing.description"),
   }),
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/pricing.page.tsx"
 export default function PricingPage() {
   return <h1>Pricing</h1>;
 }
@@ -34569,7 +34668,7 @@ What the framework does per locale without being asked:
 
 The generated hreflang set swaps only the locale prefix. If the slug also differs per locale (`/en/apartments-for-rent-in-zamalek` against `/ar/شقق-للإيجار-في-الزمالك`), declare the real URLs with `alternates`:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export async function loader() {
@@ -34626,11 +34725,10 @@ loader value, but a slow key no longer holds up everything else.
 
 ## The shape
 
-```tsx title="src/web/products/product-details.page.tsx"
-import { use, Suspense } from "react";
+```ts title="src/web/products/product-details.setup.ts"
 import { v } from "@warlock.js/seal";
 import { defer } from "@warlock.js/web";
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 type Review = { id: string; text: string };
 
@@ -34658,6 +34756,14 @@ export const loader = (async ({ request }) => {
 export const config = {
   validation,
 } as const satisfies PageConfig<typeof loader>;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import { use, Suspense } from "react";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
+
+type Review = { id: string; text: string };
 
 function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
   const list = use(reviews);
@@ -34808,7 +34914,7 @@ flushes; a deferred key resolves only after. Reading one throws
 `DeferredKeyInMetadataError` — naming the key and the page — in dev AND in
 production, unconditionally:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageConfig, PageLoader } from "@warlock.js/web";
 import { defer } from "@warlock.js/web";
 
@@ -35152,10 +35258,9 @@ Two consequences for page specs:
 
 ## The page under test
 
-```tsx title="src/web/products/product.page.tsx"
+```ts title="src/web/products/product.setup.ts"
 import { v } from "@warlock.js/seal";
-import { Link, useTrans } from "@warlock.js/web";
-import type { PageActionContext, PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+import type { PageActionContext, PageConfig, PageLoader } from "@warlock.js/web";
 import { findProduct, subscribe } from "./products.service";
 
 const subscribeSchema = v.object({ email: v.string().email() });
@@ -35186,6 +35291,12 @@ export async function action({ request, response }: PageActionContext<typeof sub
 
   return response.redirect("/products/42?subscribed=1");
 }
+```
+
+```tsx title="src/web/products/product.page.tsx"
+import { Link, useTrans } from "@warlock.js/web";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product.setup";
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   const t = useTrans();
@@ -35209,7 +35320,8 @@ A loader or action receives one context object (`request`, `response`, `shared`,
 import { LocaleProvider } from "@warlock.js/web";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import ProductPage, { action, loader } from "./product.page";
+import ProductPage from "./product.page";
+import { action, loader } from "./product.setup";
 import * as service from "./products.service";
 
 vi.mock("./products.service", () => ({
@@ -35406,16 +35518,16 @@ description: 'Wrap pages with positional `layout.tsx` modules, compose literal `
 
 # Warlock — use layouts
 
-A positional `layout.tsx` applies to pages in its directory and descendant directories. Its default export wraps the page; its optional `config.prefix` contributes to every descendant page's effective URL.
+A positional `layout.tsx` applies to pages in its directory and descendant directories. Its default export wraps the page; `config.prefix` in `layout.setup.ts` contributes to every descendant page's effective URL.
 
-`layout.setup.ts` is an optional companion for its server configuration, loader,
+Use `layout.setup.ts` for server configuration, loaders,
 or universal `register()`. The component must not value-import the setup file.
 Development detects setup add/edit/delete changes and rederives affected routes.
 
 ## The shape
 
-```tsx title="src/web/products/layout.tsx"
-import type { LayoutConfig, LayoutLoader, LayoutProps } from "@warlock.js/web";
+```ts title="src/web/products/layout.setup.ts"
+import type { LayoutConfig, LayoutLoader } from "@warlock.js/web";
 
 export const config: LayoutConfig = { prefix: "/products" };
 
@@ -35427,6 +35539,11 @@ export const loader = (async () => {
     ],
   };
 }) satisfies LayoutLoader;
+```
+
+```tsx title="src/web/products/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
+import type { loader } from "./layout.setup";
 
 export default function ProductsLayout({ data, children }: LayoutProps<typeof loader>) {
   return (
@@ -35446,13 +35563,15 @@ export default function ProductsLayout({ data, children }: LayoutProps<typeof lo
 
 A page beside it can declare its path relative to the prefix:
 
-```tsx title="src/web/products/index.page.tsx"
+```ts title="src/web/products/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/", name: "products.index" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/products/index.page.tsx"
 export default function ProductsPage() {
   return <h1>Products</h1>;
 }
@@ -35464,25 +35583,27 @@ The effective URL is `/products`. A page with `config.route.path = "/:id"` under
 
 Every positional layout on the page's directory ancestry may declare a literal `config.prefix`. Prefixes compose outermost first, then the page's own route path — never appended to the directory's own name, so a layout prefix replaces its directory's segment rather than adding to it.
 
-```tsx title="src/web/users/layout.tsx"
+```ts title="src/web/users/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = { prefix: "/users" };
 ```
 
-```tsx title="src/web/users/account/layout.tsx"
+```ts title="src/web/users/account/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = { prefix: "/account" };
 ```
 
-```tsx title="src/web/users/account/settings.page.tsx"
+```ts title="src/web/users/account/settings.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/settings", name: "users.account.settings" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/users/account/settings.page.tsx"
 export default function SettingsPage() {
   return <h1>Account settings</h1>;
 }
@@ -35506,14 +35627,18 @@ One layout guards every page under `/admin`. The `prefix` puts the subtree at `/
 
 Prerequisite: `requireUser()` needs the page session. Wire `web.session` once in `src/config/web.ts` with `pageSession(...)` from `@warlock.js/auth`, as the `protect-a-page` topic shows. Without it nobody resolves as signed in, so every request is treated as a guest.
 
-```tsx title="src/web/admin/layout.tsx"
-import type { LayoutConfig, LayoutProps } from "@warlock.js/web";
+```ts title="src/web/admin/layout.setup.ts"
+import type { LayoutConfig } from "@warlock.js/web";
 import { requireUser } from "@warlock.js/web/session";
 
 export const config: LayoutConfig = {
   prefix: "/admin",
   middleware: [requireUser({ loginPath: "/login", userType: "admin" })],
 };
+```
+
+```tsx title="src/web/admin/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
 
 export default function AdminLayout({ children }: LayoutProps) {
   return (
@@ -35525,13 +35650,15 @@ export default function AdminLayout({ children }: LayoutProps) {
 }
 ```
 
-```tsx title="src/web/admin/dashboard.page.tsx"
+```ts title="src/web/admin/dashboard.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/dashboard", name: "admin.dashboard" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/admin/dashboard.page.tsx"
 export default function DashboardPage() {
   return <h1>Dashboard</h1>;
 }
@@ -35565,7 +35692,7 @@ Use `shared` when multiple levels need one request-derived value, and write it i
 
 ## The client boundary
 
-A layout is projected for the browser the same way a page is: `config` and `loader` are stripped, including imports used only by them. The default component and `register()` form the client graph; `register()` runs once per module namespace on both the server and the browser. A named `ErrorBoundary` remains a separate server-rendered boundary export. See the `create-a-page` topic.
+The layout component and its imports form the UI client graph. Keep `config` and `loader` in `layout.setup.ts`; the framework projects its browser-safe `register()` code to the client. `register()` runs once per module namespace on both the server and the browser. A named `ErrorBoundary` stays in the UI file. See the `create-a-page` topic.
 
 ## Inherited policy
 
@@ -35578,13 +35705,17 @@ or `{ absolute }`. A callback returns that layout's complete metadata: explicit
 fields override `child.metadata`, and fields omitted from its result are not retained.
 Spread `child.metadata` when retaining descendant fields:
 
-```tsx
-export const config: LayoutConfig = {
+```ts title="src/web/layout.setup.ts"
+export async function loader() {
+  return { workspaceName: "Acme workspace" };
+}
+
+export const config = {
   metadata: ({ data, child }) => ({
     ...child?.metadata,
     title: `${data.workspaceName} | ${child?.metadata.title ?? "Workspace"}`,
   }),
-};
+} satisfies LayoutConfig<typeof loader>;
 ```
 
 The callback may override a child title; an absolute child title remains
@@ -35608,6 +35739,101 @@ cache policy, validation, or a sitemap supplier.
 - The `write-the-root` topic: the document and `#vessel` outside the layout.
 - The `load-page-data` topic: `LayoutLoader`, sequential execution, and `shared`.
 - The `navigate-on-the-client` topic: client swaps and `refresh()`.
+
+## use-page-setup-files  `@warlock.js/web/use-page-setup-files/SKILL.md`
+
+---
+name: use-page-setup-files
+description: "Separate page, layout, root, and error setup from UI. Use for .setup.ts pairs, config, loaders, actions, metadata, universal register(), type-only loader imports, duplicate exports, and setup-file development changes."
+---
+
+# Warlock — page setup files
+
+Page logic belongs in `.setup.ts`; React components belong in the UI file.
+A setup file is needed when a page has logic. A component-only page needs no
+setup file.
+
+| UI file                  | Setup file               |
+| ------------------------ | ------------------------ |
+| `about.page.tsx`         | `about.setup.ts`         |
+| `products/[id].page.tsx` | `products/[id].setup.ts` |
+| `layout.tsx`             | `layout.setup.ts`        |
+| `root.tsx`               | `root.setup.ts`          |
+| `error.page.tsx`         | `error.setup.ts`         |
+| `404.page.tsx`           | `404.setup.ts`           |
+
+The UI file owns the default component and any named component such as
+`ErrorBoundary`. Setup files own `config`, `loader`, `register`, and page
+`action` or `actions`. Metadata always belongs in `config.metadata`. Each role keeps its own config type:
+`PageConfig`, `LayoutConfig`, or `RootConfig`. Actions belong to ordinary pages;
+error and not-found pages retain their special rendering contracts.
+
+## A complete pair
+
+```ts title="src/web/about.setup.ts"
+import { groupedTranslations } from "@mongez/localization";
+import type { PageConfig } from "@warlock.js/web";
+
+export async function loader() {
+  return { teamName: "Acme" };
+}
+
+export const config = {
+  route: { path: "/about", name: "about" },
+  metadata: ({ data }) => ({
+    title: `About ${data.teamName}`,
+    description: "Meet our team.",
+  }),
+} as const satisfies PageConfig<typeof loader>;
+
+export function register() {
+  groupedTranslations({ team: { en: "Our team", ar: "فريقنا" } });
+}
+```
+
+```tsx title="src/web/about.page.tsx"
+import { useTrans, type PageProps } from "@warlock.js/web";
+import type { loader } from "./about.setup";
+
+export default function AboutPage({ data }: PageProps<typeof loader>) {
+  const trans = useTrans();
+  return (
+    <h1>
+      {trans("team")}: {data.teamName}
+    </h1>
+  );
+}
+```
+
+`import type { loader } from "./about.setup"` retains
+`PageProps<typeof loader>` inference without adding setup to the UI runtime
+graph. Use type-only imports for action inference too. Do not value-import or
+dynamically import setup from UI code.
+
+## Server and browser work
+
+Loaders, actions, metadata callbacks, and config policy run on the server.
+Metadata may be a static object or a function of loader data. Resolved metadata
+reaches the server-rendered head, hydration payload, and client navigation.
+Layout and root metadata compose with page metadata. Use `config.metadata`
+for both the static object and function forms; `PageConfig<typeof loader>`
+checks the callback and infers its data.
+
+`register()` still runs in both realms, once per module namespace before
+middleware and loaders. It is synchronous and must not return a Promise. The
+framework projects browser-safe registration code and its dependencies to the
+client. Keep registration safe for both realms; server-only services belong
+in loaders or actions.
+
+## Duplicate declarations and development
+
+Every logic export has one owner. Duplicates fail with the export name and
+source files; the framework never silently chooses a winner. Default
+components and named component exports belong in the UI file.
+
+`warlock dev` picks up setup-file additions, edits, and deletions. Route changes
+update the route graph; setup edits refresh server logic and its client
+registration projection. Component-only edits remain eligible for Fast Refresh.
 
 ## use-web-fonts  `@warlock.js/web/use-web-fonts/SKILL.md`
 
@@ -35683,13 +35909,15 @@ export default function App({ children }: AppProps) {
 }
 ```
 
-```tsx title="src/web/index.page.tsx"
+```ts title="src/web/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/", name: "home" },
 } satisfies PageConfig;
+```
 
+```tsx title="src/web/index.page.tsx"
 export default function HomePage() {
   return (
     <section className="hero">
@@ -35705,11 +35933,13 @@ An optional page/layout/root `config.fontPreload: false` suppresses all font
 preloads for its document; any ancestor's opt-out wins. CSS remains linked for
 client navigation. For example, a route without the hero:
 
-```tsx title="src/web/about.page.tsx"
+```ts title="src/web/about.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = { fontPreload: false } satisfies PageConfig;
+```
 
+```tsx title="src/web/about.page.tsx"
 export default function AboutPage() {
   return <main>About this site</main>;
 }
@@ -35746,16 +35976,15 @@ description: 'Author `src/web/root.tsx`, the full-document application root that
 
 `src/web/root.tsx` is the application document. Its default export renders the complete `<html>` tree and contains the one DOM node the browser hydrates: `#vessel`.
 
-Use optional `root.setup.ts` for root `config`, loader, or universal
+Use `root.setup.ts` for root `config` (including `config.metadata`), loader, or universal
 `register()` while `root.tsx` remains the document component. `strictMode` is
 statically projected from the setup file. Do not value-import setup from the UI;
 type-only imports are allowed, and duplicate exports fail.
 
-The root may export `config`, `loader`, `register`, `ErrorBoundary`, and its
-default component. `RootConfig` owns `middleware`, `strictMode`, and metadata.
-Route/prefix, cache, validation, sitemap, and robots-file policy are not root
-exports. Keep sitewide sitemap and robots serving in `web.sitemap` and
-`web.robots`; page and layout policy belongs in their own `config` exports.
+`root.tsx` owns the default document component and any named `ErrorBoundary`.
+`root.setup.ts` owns `config`, `loader`, and `register`. Metadata belongs in `config.metadata`. `RootConfig`
+owns `middleware`, `strictMode`, and metadata policy. Keep sitewide sitemap
+and robots serving in `web.sitemap` and `web.robots`.
 
 ## The shape
 
@@ -35834,7 +36063,7 @@ The browser hydrates `#vessel`, not the whole document. The client tree delibera
 
 Because App is outside the hydrated subtree, put client state that must survive navigation in a layout or component beneath `#vessel`, not in the document root.
 
-If `root.tsx` (or any module it needs) fails to load or its `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See the `create-a-page` topic for the app's own `error.page.tsx` boundary, which is tried first.
+If `root.tsx` or `root.setup.ts` (or any module they need) fails to load or the setup `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See the `create-a-page` topic for the app's own `error.page.tsx` boundary, which is tried first.
 
 ## `<Head />`
 
@@ -35893,13 +36122,18 @@ imported by application code.
 
 ## Add an application loader
 
-```tsx title="src/web/root.tsx"
-import { Head, Scripts } from "@warlock.js/web";
-import type { AppLoader, AppProps } from "@warlock.js/web";
+```ts title="src/web/root.setup.ts"
+import type { AppLoader } from "@warlock.js/web";
 
 export const loader = (async () => {
   return { applicationName: "Warlock Store" };
 }) satisfies AppLoader;
+```
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import type { loader } from "./root.setup";
 
 export default function App({ data, children }: AppProps<typeof loader>) {
   return (
@@ -35924,7 +36158,7 @@ The App loader runs first and is awaited before the outermost layout loader star
 Use the optional root config for guards that must run before layout and page
 middleware:
 
-```tsx
+```ts title="src/web/root.setup.ts"
 import type { RootConfig } from "@warlock.js/web";
 import type { Middleware } from "@warlock.js/core";
 
@@ -35944,20 +36178,24 @@ export const config: RootConfig = {
 };
 ```
 
-`loader`, `register`, and `ErrorBoundary` remain separate exports. Named
+`loader` and `register` are setup exports; `ErrorBoundary` is a UI component. Named
 `sitemap` or route-policy exports are invalid. Root metadata may be static or a
 server-only callback; it participates in title and field composition with
 layouts and the page. A callback returns the root's complete level: explicit
 fields override `child.metadata`, while omitted child fields are not retained. Preserve
 descendant metadata deliberately by spreading `child.metadata`:
 
-```tsx
-export const config: RootConfig = {
+```ts title="src/web/root.setup.ts"
+export async function loader() {
+  return { applicationName: "Acme" };
+}
+
+export const config = {
   metadata: ({ data, child }) => ({
     ...child?.metadata,
     title: `${data.applicationName} | ${child?.metadata.title ?? "Home"}`,
   }),
-};
+} satisfies RootConfig<typeof loader>;
 ```
 
 The callback may override a child title; an absolute child title remains
@@ -35992,14 +36230,16 @@ in production.
 
 ## Override the default viewport
 
-```tsx title="src/web/viewport.page.tsx"
+```ts title="src/web/viewport.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: "/viewport",
   metadata: { viewport: "width=device-width, initial-scale=1, viewport-fit=cover" },
 } satisfies PageConfig;
+```
 
+```tsx title="src/web/viewport.page.tsx"
 export default function ViewportPage() {
   return <main>Viewport settings come from metadata.</main>;
 }
@@ -45927,7 +46167,7 @@ export async function triage(model: ModelContract): Promise<void> {
 
 For each remote tool:
 
-1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (Ajv-backed — `ajv` is an optional peer needed only for the client);
+1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (Ajv-backed — `ajv` is an optional peer needed only for the client), which also exposes that schema (`~standard.jsonSchema`) so the model sees the server's real argument names;
 2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
 3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
 
