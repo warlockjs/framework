@@ -26,6 +26,10 @@ export async function mountQueueDashboard(
     return;
   }
 
+  if ((config.driver ?? "bullmq") !== "bullmq") {
+    throw new Error("The bull-board dashboard requires the bullmq queue driver.");
+  }
+
   const middlewareList = dashboard.middleware ?? [];
 
   if (middlewareList.length === 0) {

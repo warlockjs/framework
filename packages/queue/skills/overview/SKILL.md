@@ -5,12 +5,12 @@ description: "@warlock.js/queue overview for orientation and choosing the focuse
 
 # `@warlock.js/queue` — overview
 
-Durable background jobs. Jobs are stored in **Redis** (required), retried on failure, and processed by workers — inside the app process by default.
+Durable background jobs. Jobs are stored in **Redis** (default), local SQLite without Redis, or memory for tests, retried on failure, and processed by workers — inside the app process by default.
 
 ## Mental model
 
 - **Job definition** — `defineJob({ name, handle })` registers a handler by name and returns a typed job.
-- **Dispatch** — `job.dispatch(payload, options)` stores the job in Redis. Any process with the same definition and a worker can run it.
+- **Dispatch** — `job.dispatch(payload, options)` stores the job in the configured backend. Any process with the same definition and a worker can run it.
 - **Worker** — one per queue name, started by `queueConnector()` (or `startWorkers()`); routes each job to the handler with its name.
 - **Shutdown** — workers stop taking jobs, active jobs finish (up to `workers.shutdownTimeout`), then connections close.
 
@@ -20,6 +20,7 @@ Durable background jobs. Jobs are stored in **Redis** (required), retried on fai
 
 ## Skills index
 
+- `local-queues` — SQLite/memory configuration, leases, crash recovery, cancellation.
 - `configure-queue` — `src/config/queue.ts`, `queueConnector()`, workers on/off, shutdown.
 - `define-jobs` — `defineJob`, `dispatch` options, retries, progress, `find`.
 - `manage-failed-jobs` — `failedJobs`, `retryFailedJob`, the bull-board dashboard.

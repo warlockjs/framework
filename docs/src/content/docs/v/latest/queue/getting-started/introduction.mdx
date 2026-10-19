@@ -5,8 +5,9 @@ sidebar:
 ---
 
 `@warlock.js/queue` gives Warlock apps durable background jobs backed by
-[BullMQ](https://docs.bullmq.io) and Redis. Jobs are stored, not held in
-memory, so they survive a process restart and can retry on failure.
+[BullMQ](https://docs.bullmq.io) and Redis, or local SQLite without Redis.
+Durable backends survive process restarts; a memory backend executes jobs
+in tests. All use the same `defineJob` API.
 
 ## Installation
 
@@ -14,9 +15,9 @@ memory, so they survive a process restart and can retry on failure.
 npm install @warlock.js/queue
 ```
 
-Redis (5.0+, or any Redis-compatible server BullMQ supports — Valkey,
+For the default BullMQ backend, Redis (5.0+, or any Redis-compatible server BullMQ supports — Valkey,
 Dragonfly) must already be running; this package does not start or
-bundle it.
+bundle it. For SQLite or memory, see [Local and memory queues](../../guides/local-queues/).
 
 ## Configure and connect
 

@@ -4,7 +4,17 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "v
 
 const add = vi.fn(async (_name: string, _data: unknown, _opts: unknown) => ({ id: "1" }));
 
-vi.mock("../src/queue-manager", () => ({ getQueue: () => ({ add }) }));
+vi.mock("bullmq", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("bullmq")>();
+  return {
+    ...actual,
+    Queue: class {
+      add = add;
+      on(): void {}
+      async close(): Promise<void> {}
+    },
+  };
+});
 
 import {
   defineJob,

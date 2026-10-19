@@ -1,8 +1,5 @@
-import { unwrapPayload } from "./queue-context";
-import type { Job } from "bullmq";
 import { defaultQueueName } from "./config";
-import { FailedJobNotFoundError } from "./errors";
-import { getQueue } from "./queue-manager";
+import { getQueueDriver } from "./queue-driver";
 import type { FailedJob } from "./types";
 
 export type FailedJobsOptions = {
@@ -14,42 +11,16 @@ export type FailedJobsOptions = {
   end?: number;
 };
 
-/**
- * List failed jobs, newest first — jobs that used up every attempt, or
- * failed unrecoverably. Each entry can be retried.
- */
+/** List failed jobs, newest first, using the selected driver. */
 export async function failedJobs(options: FailedJobsOptions = {}): Promise<FailedJob[]> {
-  const queueName = options.queue ?? defaultQueueName();
-  const jobs = await getQueue(queueName).getFailed(options.start ?? 0, options.end ?? 99);
-
-  return jobs.map((job) => toFailedJob(job));
+  return getQueueDriver().failed(
+    options.queue ?? defaultQueueName(),
+    options.start ?? 0,
+    options.end ?? 99,
+  );
 }
 
-/**
- * Retry one failed job by id: it goes back to waiting with its attempts reset.
- * Throws {@link FailedJobNotFoundError} when no FAILED job has that id.
- */
+/** Move a failed job back to waiting, resetting its attempts. */
 export async function retryFailedJob(id: string, options: { queue?: string } = {}): Promise<void> {
-  const queueName = options.queue ?? defaultQueueName();
-  const job = await getQueue(queueName).getJob(id);
-
-  if (!job || !(await job.isFailed())) {
-    throw new FailedJobNotFoundError(id, queueName);
-  }
-
-  await job.retry("failed");
-}
-
-function toFailedJob(job: Job): FailedJob {
-  return {
-    id: String(job.id),
-    name: job.name,
-    queue: job.queueName,
-    payload: unwrapPayload(job.data).payload,
-    attemptsMade: job.attemptsMade,
-    failedReason: job.failedReason,
-    stacktrace: job.stacktrace ?? [],
-    failedAt: job.finishedOn ? new Date(job.finishedOn) : undefined,
-    retry: () => job.retry("failed"),
-  };
+  await getQueueDriver().retry(options.queue ?? defaultQueueName(), id);
 }
