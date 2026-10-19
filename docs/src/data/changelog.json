@@ -136,6 +136,106 @@
   ],
   "releases": [
     {
+      "version": "5.34.1",
+      "id": "v5-34-1",
+      "date": "October 19, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Page setup files become the documented way to add page logic, plus MCP and secrets fixes.</strong> A page's <code>config</code>, <code>loader</code>, <code>register</code> and <code>action</code>/<code>actions</code> live in its <code>*.setup.ts</code> file and its UI file holds only components; metadata always lives in <code>config.metadata</code>. A new Page setup files guide, and every web docs example, skill, the starter template and the page/layout/root generators follow it; the setup-file error lists every allowed export. ai-tools: tools from a remote MCP server now show the model their real input schema (Standard JSON Schema), and <code>ai.mcp.serve</code> HTTP transports accept <code>onAuthRefusal</code> to keep an app's own auth-error response, with Host/Origin checks unchanged. Core: <code>secrets.backend()</code> reports whether the keychain, encrypted-file or memory backend is active, reusing core's own selection. Docs: tables in MDX pages render again. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "HTTP <code>transport.onAuthRefusal</code> customizes denied authentication responses for the MCP endpoint and side routes using typed safe context, 4xx/5xx statuses, allowlisted headers and JSON bodies. Host/Origin guards retain precedence, invalid or throwing hooks retain the default refusal, and handlers never run after a denial."
+            },
+            {
+              "type": "Fixed",
+              "html": "Tools adapted from a remote MCP server now show the model their real input schema. <code>jsonSchemaToStandard</code> implements Standard JSON Schema (<code>~standard.jsonSchema</code>), so <code>extractJsonSchema</code> and every provider adapter read the server's <code>inputSchema</code> instead of falling back to a parameterless <code>{ type: \"object\" }</code>, which made models guess argument names and retry. Adapters receive copies of the schema; a tool without one advertises <code>{ type: \"object\", properties: {} }</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Async <code>secrets.backend()</code> and <code>SecretStore.backend()</code> report <code>\"keychain\"</code>, <code>\"file\"</code> or <code>\"memory\"</code> without credentials, sharing lazy selection and its memoized keychain probe. Resolved driver configuration, environment lookups and injected backend metadata have documented reporting semantics; memory fakes report <code>\"memory\"</code> without probing."
+            },
+            {
+              "type": "Changed",
+              "html": "Generate <code>root.setup.ts</code> and <code>index.setup.ts</code> with Web starter policy and universal registration, keeping the UI files focused on components."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "List all five allowed setup exports (<code>config</code>, <code>loader</code>, <code>register</code>, <code>action</code>, <code>actions</code>) in composition errors."
+            },
+            {
+              "type": "Fixed",
+              "html": "Correct Web documentation and skills to keep page, layout, root, and error logic in setup files, with metadata in <code>config.metadata</code>; add a complete page setup guide."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Document setup-file ownership in the Web starter and its code standards; retain metadata in <code>config.metadata</code> and cover UI/setup pairs in template integrity specs."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.34.0",
       "id": "v5-34-0",
       "date": "October 19, 2026",

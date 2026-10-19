@@ -1,4 +1,9 @@
 {
+  "5.34.1": {
+    "publishedAt": "2026-10-19T15:00:27.494Z",
+    "matrix": "none",
+    "summary": "**Page setup files become the documented way to add page logic, plus MCP and secrets fixes.** A page's `config`, `loader`, `register` and `action`/`actions` live in its `*.setup.ts` file and its UI file holds only components; metadata always lives in `config.metadata`. A new Page setup files guide, and every web docs example, skill, the starter template and the page/layout/root generators follow it; the setup-file error lists every allowed export. ai-tools: tools from a remote MCP server now show the model their real input schema (Standard JSON Schema), and `ai.mcp.serve` HTTP transports accept `onAuthRefusal` to keep an app's own auth-error response, with Host/Origin checks unchanged. Core: `secrets.backend()` reports whether the keychain, encrypted-file or memory backend is active, reusing core's own selection. Docs: tables in MDX pages render again. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.34.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm."
+  },
   "5.34.0": {
     "publishedAt": "2026-10-19T13:02:48.363Z",
     "matrix": "none",
