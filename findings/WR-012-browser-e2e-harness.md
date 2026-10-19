@@ -1,4 +1,4 @@
-# WR-012: browser end-to-end harness — warlock e2e (target 5.35)
+# WR-012: browser end-to-end harness — warlock e2e (target 5.34)
 
 Date: 2026-10-19 · Packages: @warlock.js/core (CLI), @warlock.js/web · From: Bureau
 

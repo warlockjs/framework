@@ -1,4 +1,4 @@
-# WR-013: AI tool discovery — searchable tool catalogue with lazy schemas (later)
+# WR-013: AI tool discovery — searchable tool catalogue with lazy schemas (target 5.34)
 
 Date: 2026-10-19 · Package: @warlock.js/ai · From: Bureau B9
 

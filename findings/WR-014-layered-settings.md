@@ -1,4 +1,4 @@
-# WR-014: layered settings with read-time defaults (later)
+# WR-014: layered settings with read-time defaults (target 5.34)
 
 Date: 2026-10-19 · Package: @warlock.js/core (or a small new package) · From: Bureau B15
 

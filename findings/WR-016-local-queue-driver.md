@@ -1,4 +1,4 @@
-# WR-016: local queue driver — file, SQLite or in-memory (later)
+# WR-016: local queue driver — file, SQLite or in-memory (target 5.34)
 
 Date: 2026-10-19 · Package: @warlock.js/queue · From: Bureau
 

@@ -1,4 +1,4 @@
-# WR-011: multi-file transactions on @warlock.js/fs (target 5.35)
+# WR-011: multi-file transactions on @warlock.js/fs (target 5.34)
 
 Date: 2026-10-19 · Package: @warlock.js/fs (or a new @warlock.js/state) · From: Bureau
 
