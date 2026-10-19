@@ -406,261 +406,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-cli",
-          "slug": "ai-cli",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/auth",
-          "slug": "auth",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/cascade",
           "slug": "cascade",
           "total": 1,
@@ -674,40 +419,6 @@
             {
               "type": "Changed",
               "html": "Use root Oxlint/Oxfmt binaries and configuration for package lint/fix and format scripts. Legacy ESLint/Prettier dependencies and configs remain until the 5.34.0 removal."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -746,57 +457,6 @@
           ]
         },
         {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/seal",
           "slug": "seal",
           "total": 1,
@@ -810,23 +470,6 @@
             {
               "type": "Changed",
               "html": "Use root Oxlint/Oxfmt binaries and configuration for package lint/fix and format scripts. Legacy ESLint/Prettier dependencies and configs remain until the 5.34.0 removal."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         }
@@ -3355,23 +2998,6 @@
           ]
         },
         {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/cascade",
           "slug": "cascade",
           "total": 1,
@@ -3385,23 +3011,6 @@
             {
               "type": "Fixed",
               "html": "The model-events skill uses <code>Model.globalEvents().on()</code> for global listeners; the abstract base model's per-model <code>on()</code> shortcut requires a concrete subclass."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -3423,23 +3032,6 @@
           ]
         },
         {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/notifications",
           "slug": "notifications",
           "total": 1,
@@ -3453,40 +3045,6 @@
             {
               "type": "Fixed",
               "html": "Local Redis integration tests skip with a clear service message when Redis is unavailable; CI and explicitly requested integration runs fail instead. Unit cases remain runnable without Redis."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         }
@@ -4206,278 +3764,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cascade",
-          "slug": "cascade",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/devtools",
-          "slug": "devtools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/notifications",
           "slug": "notifications",
           "total": 1,
@@ -4491,57 +3777,6 @@
             {
               "type": "Changed",
               "html": "Docs and skills point at the model path <code>warlock add notifications</code> writes since 5.30.0: <code>app/notifications/models/notification/notification.model</code>."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         }
@@ -4644,7 +3879,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4661,7 +3896,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4678,7 +3913,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4695,7 +3930,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4712,7 +3947,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4729,7 +3964,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4746,7 +3981,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4763,7 +3998,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4780,7 +4015,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4797,7 +4032,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4814,7 +4049,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4831,7 +4066,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4848,7 +4083,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4865,7 +4100,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4882,7 +4117,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4899,7 +4134,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4916,7 +4151,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4933,7 +4168,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4950,24 +4185,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/devtools",
-          "slug": "devtools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -4984,7 +4202,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -5001,7 +4219,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -5018,7 +4236,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -5035,7 +4253,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -5052,7 +4270,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -5069,7 +4287,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -5086,24 +4304,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         },
@@ -5120,7 +4321,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+              "html": "Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
             }
           ]
         }
@@ -5262,58 +4463,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5330,24 +4480,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5364,7 +4497,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5381,7 +4514,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5398,41 +4531,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5449,7 +4548,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5466,7 +4565,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5483,7 +4582,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5500,7 +4599,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5517,7 +4616,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5534,7 +4633,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5551,7 +4650,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5568,7 +4667,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5585,7 +4684,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5602,7 +4701,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5619,7 +4718,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5636,7 +4735,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5653,7 +4752,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         },
@@ -5687,7 +4786,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+              "html": "<code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
             }
           ]
         }
@@ -5848,244 +4947,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/auth",
           "slug": "auth",
           "total": 1,
@@ -6099,23 +4960,6 @@
             {
               "type": "Added",
               "html": "<code>authMiddleware()</code> now tags the middleware it returns with a non-enumerable, frozen, JSON-safe descriptor under <code>Symbol.for(\"warlock.auth\")</code> (<code>{ sources, userTypes }</code>), exported as <code>AUTH_MIDDLEWARE_DESCRIPTOR</code> / <code>AuthMiddlewareDescriptor</code>, so other tooling can read a route's resolved credential sources and allowed user types without changing runtime behavior."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -6137,125 +4981,6 @@
           ]
         },
         {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/seal",
           "slug": "seal",
           "total": 1,
@@ -6273,23 +4998,6 @@
           ]
         },
         {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "create-warlock",
           "slug": "create-warlock",
           "total": 1,
@@ -6302,7 +5010,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Generated apps depend on <code>@mongez/supportive-is</code> ^3.0.0 (type-predicate checkers). Lockstep release; package APIs are otherwise unchanged."
+              "html": "Generated apps depend on <code>@mongez/supportive-is</code> ^3.0.0 (type-predicate checkers)."
             }
           ]
         }
@@ -6581,23 +5289,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/ai-bedrock",
           "slug": "ai-bedrock",
           "total": 1,
@@ -6611,23 +5302,6 @@
             {
               "type": "Changed",
               "html": "Map all neutral reasoning effort levels to valid Bedrock extended-thinking budgets."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -6649,57 +5323,6 @@
           ]
         },
         {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/ai-ollama",
           "slug": "ai-ollama",
           "total": 1,
@@ -6713,74 +5336,6 @@
             {
               "type": "Changed",
               "html": "Clamp neutral reasoning effort levels to Ollama's supported <code>think</code> literals."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -6802,40 +5357,6 @@
           ]
         },
         {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/devtools",
           "slug": "devtools",
           "total": 1,
@@ -6853,74 +5374,6 @@
           ]
         },
         {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/queue",
           "slug": "queue",
           "total": 1,
@@ -6934,57 +5387,6 @@
             {
               "type": "Changed",
               "html": "Dependencies: <code>fastify</code> ^5.12.5 (security fixes). <code>@bull-board/*</code> ^9.10.2."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -7305,261 +5707,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/cache",
           "slug": "cache",
           "total": 1,
@@ -7573,91 +5720,6 @@
             {
               "type": "Added",
               "html": "<code>invalidated</code> cache event: <code>tags([...]).invalidate()</code> now emits it once, with the tags, the keys it removed and <code>durationMs</code>. The per-key <code>removed</code> events still fire."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -7694,23 +5756,6 @@
               "html": "<code>scheduler.start()</code> is now a no-op, logging <code>scheduler: not started (role: ...)</code>, on a process that doesn't serve the <code>worker</code> role (<code>WARLOCK_ROLES</code>) — so an app calling it in <code>main.ts</code> doesn't run its jobs on every <code>web</code>/<code>api</code> node. The \"jobs registered but <code>start()</code> never called\" development warning no longer fires on such a process. With no <code>--role</code> passed, every role is on and nothing changes."
             }
           ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
         }
       ]
     },
@@ -7727,22 +5772,14 @@
         {
           "name": "@warlock.js/ai",
           "slug": "ai",
-          "total": 2,
+          "total": 1,
           "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            },
             {
               "type": "Security",
               "n": 1
             }
           ],
           "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            },
             {
               "type": "Security",
               "html": "Durable HITL approvals are now bound to the exact agent session, tool, and arguments they approved, preventing cross-run or cross-action replay. A decision that doesn't match the call being gated is never applied; the call asks for approval again. <code>resume()</code> re-runs in the interrupted session unless <code>executeOptions.sessionId</code> says otherwise. Approvals left pending by an earlier version must be approved again after upgrading."
@@ -7810,22 +5847,14 @@
         {
           "name": "@warlock.js/ai-anthropic",
           "slug": "ai-anthropic",
-          "total": 2,
+          "total": 1,
           "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            },
             {
               "type": "Fixed",
               "n": 1
             }
           ],
           "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            },
             {
               "type": "Fixed",
               "html": "Preserve signed and redacted extended-thinking blocks across Anthropic tool-use follow-ups, and ensure <code>max_tokens</code> exceeds the thinking budget."
@@ -7835,280 +5864,17 @@
         {
           "name": "@warlock.js/ai-bedrock",
           "slug": "ai-bedrock",
-          "total": 2,
+          "total": 1,
           "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            },
             {
               "type": "Fixed",
               "n": 1
             }
           ],
           "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            },
             {
               "type": "Fixed",
               "html": "Preserve Claude extended-thinking reasoning blocks across Bedrock Converse tool-use follow-ups, and enforce valid thinking budgets and output-token ceilings."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/auth",
-          "slug": "auth",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         },
@@ -8126,159 +5892,6 @@
             {
               "type": "Fixed",
               "html": "<code>request.input(key)</code> now sees a route param set with <code>Request.setParam()</code>. Before, it updated only <code>request.params</code>, so in a multi-site app (where the site dispatcher sets each page param) every dynamic segment read as <code>undefined</code> through <code>input()</code>, <code>only()</code> and <code>all()</code>. Params keep their precedence over query and body."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "create-warlock",
-          "slug": "create-warlock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release; package APIs are unchanged."
             }
           ]
         }
@@ -8320,499 +5933,6 @@
             {
               "type": "Fixed",
               "html": "A page's declared <code>route.name</code> wins in the generated route types when its loader lives in a companion <code>.setup.ts</code> and <code>config</code> stays in the page file (for example, typed <code>satisfies PageConfig&lt;typeof loader&gt;</code>). Discovery now reads <code>config</code> from whichever of the two files declares it, and rejects it in both, as the runtime already did."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/auth",
-          "slug": "auth",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cascade",
-          "slug": "cascade",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/core",
-          "slug": "core",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "create-warlock",
-          "slug": "create-warlock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
             }
           ]
         }
@@ -8858,499 +5978,6 @@
             {
               "type": "Fixed",
               "html": "<code>$sites/&lt;key&gt;</code> never reaches a page's URL or route name in any installer, including production."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/auth",
-          "slug": "auth",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cascade",
-          "slug": "cascade",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/core",
-          "slug": "core",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "create-warlock",
-          "slug": "create-warlock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
             }
           ]
         }
@@ -9589,31 +6216,6 @@
           ]
         },
         {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 2,
-          "counts": [
-            {
-              "type": "Added",
-              "n": 1
-            },
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Added",
-              "html": "<code>notificationColumns()</code> now supports <code>idType</code> for UUID, bigint, integer, and string recipient and tenant IDs."
-            },
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/seal",
           "slug": "seal",
           "total": 2,
@@ -9639,261 +6241,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/auth",
           "slug": "auth",
           "total": 1,
@@ -9911,104 +6258,19 @@
           ]
         },
         {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
           "total": 1,
           "counts": [
             {
-              "type": "Changed",
+              "type": "Added",
               "n": 1
             }
           ],
           "items": [
             {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
+              "type": "Added",
+              "html": "<code>notificationColumns()</code> now supports <code>idType</code> for UUID, bigint, integer, and string recipient and tenant IDs."
             }
           ]
         }
@@ -10038,499 +6300,6 @@
             {
               "type": "Fixed",
               "html": "Page session resolution reads Core's shared config instance, so authenticated loaders, actions, and <code>useUser()</code> receive the signed-in user in installed apps."
-            }
-          ]
-        },
-        {
-          "name": "create-warlock",
-          "slug": "create-warlock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/core",
-          "slug": "core",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/auth",
-          "slug": "auth",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cascade",
-          "slug": "cascade",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release; package APIs are unchanged."
             }
           ]
         }
@@ -10647,193 +6416,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/ai-tools",
           "slug": "ai-tools",
           "total": 1,
@@ -10847,74 +6429,6 @@
             {
               "type": "Security",
               "html": "Stdio MCP children receive only a minimal execution environment plus explicitly supplied variables."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
             }
           ]
         },
@@ -10936,91 +6450,6 @@
           ]
         },
         {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/scheduler",
           "slug": "scheduler",
           "total": 1,
@@ -11034,57 +6463,6 @@
             {
               "type": "Fixed",
               "html": "Cron and time parsing handle absent fields explicitly under strict TypeScript checks."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "create-warlock",
-          "slug": "create-warlock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
             }
           ]
         }
@@ -11168,7 +6546,7 @@
         {
           "name": "@warlock.js/auth",
           "slug": "auth",
-          "total": 7,
+          "total": 6,
           "counts": [
             {
               "type": "Added",
@@ -11176,7 +6554,7 @@
             },
             {
               "type": "Changed",
-              "n": 4
+              "n": 3
             }
           ],
           "items": [
@@ -11203,17 +6581,13 @@
             {
               "type": "Changed",
               "html": "JWTs carry a random <code>jti</code>, so tokens issued in the same second differ."
-            },
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
             }
           ]
         },
         {
           "name": "@warlock.js/core",
           "slug": "core",
-          "total": 21,
+          "total": 20,
           "counts": [
             {
               "type": "Added",
@@ -11221,7 +6595,7 @@
             },
             {
               "type": "Changed",
-              "n": 17
+              "n": 16
             },
             {
               "type": "Fixed",
@@ -11302,10 +6676,6 @@
               "html": "<code>flushPendingCookies</code> throws instead of silently dropping cookies when the parked-cookie symbol is missing. Later <code>bootstrap()</code> calls no longer re-register the unhandled-rejection listener."
             },
             {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            },
-            {
               "type": "Fixed",
               "html": "The dev health checker now lints projects using <code>eslint.config.ts</code>/<code>.mts</code>/<code>.cts</code>."
             },
@@ -11318,7 +6688,7 @@
         {
           "name": "@warlock.js/cascade",
           "slug": "cascade",
-          "total": 15,
+          "total": 14,
           "counts": [
             {
               "type": "Added",
@@ -11326,7 +6696,7 @@
             },
             {
               "type": "Changed",
-              "n": 11
+              "n": 10
             },
             {
               "type": "Fixed",
@@ -11379,10 +6749,6 @@
               "html": "<code>defineModel</code> no longer overrides base-class <code>strictMode</code>/<code>autoGenerateId</code> unless supplied. Validation no longer calls <code>console.trace</code>."
             },
             {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            },
-            {
               "type": "Fixed",
               "html": "Postgres driver: <code>whereLike</code> with a RegExp (<code>~*</code>/<code>!~*</code>), <code>count()</code>/<code>exists()</code> honour <code>has</code>/<code>whereHas</code>, joins and <code>groupBy</code>/<code>distinct</code>, and <code>whereJsonContains</code> binds a parameter."
             },
@@ -11393,448 +6759,6 @@
             {
               "type": "Fixed",
               "html": "Mongo: replica-set detection runs <code>hello</code> once per driver."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/queue",
-          "slug": "queue",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/sitemap",
-          "slug": "sitemap",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
-            }
-          ]
-        },
-        {
-          "name": "create-warlock",
-          "slug": "create-warlock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep release maintenance and dependency refresh."
             }
           ]
         }
@@ -12595,23 +7519,6 @@
             {
               "type": "Changed",
               "html": "The default interactive scaffold flow now asks for a database after the API-only/full-stack choice unless <code>--db</code> or <code>--no-db</code> already answered it; the same selector includes <strong>None</strong> for a database-free app. Customize's AI multiselect now offers <strong>None</strong> last, treats it alone like an empty selection, and asks again when it is combined with an AI provider or capability."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/core",
-          "slug": "core",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "Lockstep patch release aligning <code>@warlock.js/core</code> with the 5.19.1 family; no Core runtime API change."
             }
           ]
         },
@@ -16600,431 +11507,6 @@
           ]
         },
         {
-          "name": "@warlock.js/access",
-          "slug": "access",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/auth",
-          "slug": "auth",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cascade",
-          "slug": "cascade",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Fixed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Fixed",
-              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
-            }
-          ]
-        },
-        {
           "name": "create-warlock",
           "slug": "create-warlock",
           "total": 1,
@@ -17735,244 +12217,6 @@
           ]
         },
         {
-          "name": "@warlock.js/ai",
-          "slug": "ai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-bedrock",
-          "slug": "ai-bedrock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-deepseek",
-          "slug": "ai-deepseek",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-groq",
-          "slug": "ai-groq",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-live",
-          "slug": "ai-live",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-mistral",
-          "slug": "ai-mistral",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-ollama",
-          "slug": "ai-ollama",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-panoptic",
-          "slug": "ai-panoptic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-tools",
-          "slug": "ai-tools",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-workspace",
-          "slug": "ai-workspace",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-xai",
-          "slug": "ai-xai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/auth",
           "slug": "auth",
           "total": 1,
@@ -17990,57 +12234,6 @@
           ]
         },
         {
-          "name": "@warlock.js/cache",
-          "slug": "cache",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/cascade",
-          "slug": "cascade",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/context",
-          "slug": "context",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
           "name": "@warlock.js/core",
           "slug": "core",
           "total": 1,
@@ -18054,91 +12247,6 @@
             {
               "type": "Added",
               "html": "<strong><code>request.requireUser()</code></strong> — returns the authenticated user non-optionally, or throws <code>UnAuthorizedError</code> when no user is attached. For handlers behind an auth guard, where an absent user is a misconfigured route rather than a normal state; replaces <code>request.user!</code> assertions"
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/fs",
-          "slug": "fs",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/herald",
-          "slug": "herald",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/logger",
-          "slug": "logger",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/notifications",
-          "slug": "notifications",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/scheduler",
-          "slug": "scheduler",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Changed",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Changed",
-              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
             }
           ]
         },

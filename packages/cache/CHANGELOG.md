@@ -4,12 +4,6 @@ All notable changes to `@warlock.js/cache` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.33.0 - 2026-10-19
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.32.0 - 2026-10-18
 
 ### Changed
@@ -42,73 +36,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
+- Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
 
 ## 5.28.0 - 2026-10-01
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
-
-## 5.27.0 - 2026-10-01
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.26.0 - 2026-09-30
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
+- `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
 
 ## 5.25.0 - 2026-09-28
 
 ### Added
 
 - `invalidated` cache event: `tags([...]).invalidate()` now emits it once, with the tags, the keys it removed and `durationMs`. The per-key `removed` events still fire.
-
-## 5.24.0 - 2026-09-27
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.23.2 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.1 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.0 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.22.1 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.22.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
-
-## 5.21.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
 
 ## 5.20.0 - 2026-09-24
 
@@ -196,18 +136,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Portable `typecheck` script: runs against this package's own `typescript` devDependency instead of relying on a hoisted binary from elsewhere in the workspace.
 
-## 5.11.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.11.0._
-
-## 5.10.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._
-
-## 5.9.0 - 2026-09-13
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
-
 ## 5.7.0 - 2026-09-11
 
 ### Fixed
@@ -224,38 +152,9 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
 
 - Documentation shipped in this package's `skills/` told users to run `pnpm`-specific commands. `pnpm <binary>` has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral.
 
-## 5.2.3 - 2026-09-02
-
-### Fixed
-
-- Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3.
-
 ## 5.2.2
 
 - `package.json` now declares `"warlock": { "environment": "server" }` — build-boundary metadata `@warlock.js/web` uses to refuse value-imports of this package from app client code (type-only imports are still allowed; server loaders/controllers/modules are unaffected).
-
-## 5.1.0
-
-No changes to `@warlock.js/cache`. Released in lockstep with the `@warlock.js/web`
-React-execution fix and the `@warlock.js/core` CLI additions — see those packages'
-changelogs.
-
-## 5.0.2 - 2026-08-25
-
-No changes to `@warlock.js/cache`. Released in lockstep with the `@warlock.js/web` SSR
-fix (`ssr.noExternal`) — see that package's changelog.
-
-## 5.0.1 - 2026-08-25
-
-No changes to `@warlock.js/cache`. Released in lockstep with the `create-warlock` vite
-resolution pin and the `@warlock.js/web` peer narrowing — see those packages'
-changelogs.
-
-## 5.0.0 - 2026-08-25
-
-### Changed
-
-- This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep.
 
 ## 4.16.0 - 2026-08-18
 

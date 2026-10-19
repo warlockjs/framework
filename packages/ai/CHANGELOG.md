@@ -131,19 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
-
-## 5.28.0 - 2026-10-01
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.27.0 - 2026-10-01
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
+- Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
 
 ## 5.26.0 - 2026-09-30
 
@@ -151,45 +139,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `ReasoningEffort` now accepts `"none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"`. Adapters clamp unsupported values to their nearest supported provider level rather than rejecting a request.
 
-## 5.25.0 - 2026-09-28
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.24.0 - 2026-09-27
 
 ### Security
 
 - Durable HITL approvals are now bound to the exact agent session, tool, and arguments they approved, preventing cross-run or cross-action replay. A decision that doesn't match the call being gated is never applied; the call asks for approval again. `resume()` re-runs in the interrupted session unless `executeOptions.sessionId` says otherwise. Approvals left pending by an earlier version must be approved again after upgrading.
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.23.2 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.1 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.0 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.22.1 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
 
 ## 5.22.0 - 2026-09-25
 
@@ -198,12 +152,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - USD budgets reject unpriced models by default; `onUnpriced: "allow"` explicitly opts out. Model pricing reaches middleware.
 - `ai.serve` owns session IDs and history, limits request bodies, checks bearer tokens in constant time and aborts on disconnect.
 - SSRF address classification reuses the core classifier, including IPv4-mapped IPv6.
-
-## 5.21.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
 
 ## 5.20.0 - 2026-09-24
 
@@ -235,18 +183,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `@warlock.js/cache` marked `optional` in `peerDependenciesMeta` — every runtime import of it in `src` is `import type` (structural typing only, e.g. `config.ts`, `memory/*.ts`, `rag/**`); `@warlock.js/cache` is never required to resolve at runtime for a consumer that doesn't opt into cache-backed features. `@warlock.js/logger` stays a required (non-optional) peer: several modules (`config.ts`, `agent/agent.ts`, `eval/eval-runner.ts`, `workflow/engine.ts`, `planner/planner.ts`, `planner/planner-run.ts`, `supervisor/execution.ts`) import its `log` value statically at the top level, so the package must be resolvable at load time.
 
-## 5.11.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.11.0._
-
-## 5.10.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._
-
-## 5.9.0 - 2026-09-13
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
-
 ## 5.7.0 - 2026-09-11
 
 ### Changed
@@ -254,38 +190,9 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
 - **Breaking:** indexing (`rag` and the skills catalogue) now throws `EmbeddingVectorCountMismatchError` when an embedding provider returns fewer vectors than records, instead of silently storing/scoring a record with no vector. Previously the run reported success while a document was left out of the index entirely.
 - Internal type-safety hardening; no other behaviour change.
 
-## 5.2.3 - 2026-09-02
-
-### Fixed
-
-- Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3.
-
 ## 5.2.2
 
 - `package.json` now declares `"warlock": { "environment": "server" }` — build-boundary metadata `@warlock.js/web` uses to refuse value-imports of this package from app client code (type-only imports are still allowed; server loaders/controllers/modules are unaffected).
-
-## 5.1.0
-
-No changes to `@warlock.js/ai`. Released in lockstep with the `@warlock.js/web`
-React-execution fix and the `@warlock.js/core` CLI additions — see those packages'
-changelogs.
-
-## 5.0.2 - 2026-08-25
-
-No changes to `@warlock.js/ai`. Released in lockstep with the `@warlock.js/web` SSR
-fix (`ssr.noExternal`) — see that package's changelog.
-
-## 5.0.1 - 2026-08-25
-
-No changes to `@warlock.js/ai`. Released in lockstep with the `create-warlock` vite
-resolution pin and the `@warlock.js/web` peer narrowing — see those packages'
-changelogs.
-
-## 5.0.0 - 2026-08-25
-
-### Changed
-
-- This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep.
 
 ## 4.16.0 - 2026-08-18
 

@@ -4,53 +4,23 @@ All notable changes to `@warlock.js/scheduler` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.33.0 - 2026-10-19
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.32.0 - 2026-10-18
 
 ### Changed
 
 - Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
 
-## 5.31.0 - 2026-10-18
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.30.0 - 2026-10-16
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.29.0 - 2026-10-01
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
+- Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
 
 ## 5.28.0 - 2026-10-01
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
-
-## 5.27.0 - 2026-10-01
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.26.0 - 2026-09-30
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
+- `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
 
 ## 5.25.0 - 2026-09-28
 
@@ -58,47 +28,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `scheduler.start()` is now a no-op, logging `scheduler: not started (role: ...)`, on a process that doesn't serve the `worker` role (`WARLOCK_ROLES`) — so an app calling it in `main.ts` doesn't run its jobs on every `web`/`api` node. The "jobs registered but `start()` never called" development warning no longer fires on such a process. With no `--role` passed, every role is on and nothing changes.
 
-## 5.24.0 - 2026-09-27
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.23.2 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.1 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
 ## 5.23.0 - 2026-09-25
 
 ### Added
 
 - `scheduler.around((job, run) => …)` wraps every job callback execution, each retry attempt included, so jobs can run inside a context such as `AsyncLocalStorage`. Multiple hooks compose with the first registered outermost; the call returns an unsubscribe function. A hook that never calls `run` skips the execution and emits `job:skip` (`JobResult.skipped` / `skipReason`); a hook that throws follows the normal retry/error path.
 
-## 5.22.1 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
 ## 5.22.0 - 2026-09-25
 
 ### Fixed
 
 - Cron and time parsing handle absent fields explicitly under strict TypeScript checks.
-
-## 5.21.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
 
 ## 5.20.0 - 2026-09-24
 
@@ -112,29 +52,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Refined package skill-discovery descriptions and regenerated the llms projections.
 
-## 5.11.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.11.0._
-
-## 5.10.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._
-
-## 5.9.0 - 2026-09-13
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
-
 ## 5.5.0 - 2026-09-07
 
 ### Fixed
 
 - Documentation shipped in this package's `skills/` told users to run `pnpm`-specific commands. `pnpm <binary>` has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral.
-
-## 5.2.3 - 2026-09-02
-
-### Fixed
-
-- Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3.
 
 ## 5.2.2
 
@@ -145,29 +67,6 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
   (import resolution) and Gate C (emitted-bundle verification); app client
   code must not value-import this package, type-only imports are allowed, and
   server loaders/controllers/modules may import it freely. No source change.
-
-## 5.1.0
-
-No changes to `@warlock.js/scheduler`. Released in lockstep with the `@warlock.js/web`
-React-execution fix and the `@warlock.js/core` CLI additions — see those packages'
-changelogs.
-
-## 5.0.2 - 2026-08-25
-
-No changes to `@warlock.js/scheduler`. Released in lockstep with the `@warlock.js/web` SSR
-fix (`ssr.noExternal`) — see that package's changelog.
-
-## 5.0.1 - 2026-08-25
-
-No changes to `@warlock.js/scheduler`. Released in lockstep with the `create-warlock` vite
-resolution pin and the `@warlock.js/web` peer narrowing — see those packages'
-changelogs.
-
-## 5.0.0 - 2026-08-25
-
-### Changed
-
-- This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep.
 
 ## 4.12.0
 

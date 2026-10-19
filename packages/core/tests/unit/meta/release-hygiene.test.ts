@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { Name } from "../../../src/cli/commands/generate/utils/name-parser";
@@ -137,6 +137,35 @@ describe("release hygiene: version ↔ changelog invariant", () => {
       ).toBeUndefined();
     }
   });
+});
+
+describe("release hygiene: no filler changelog entries", () => {
+  // A package with no changes in a release gets no section; a placeholder
+  // entry only bloats the unified changelog page.
+  const FILLER = [
+    /lockstep (patch )?release[;,]? (maintenance|package APIs are (otherwise )?unchanged)/i,
+    /no package-specific changes/i,
+    /this package is unchanged in/i,
+    /^\s*(- )?No changes to `[^`]+`\./m,
+  ];
+  const packagesRoot = path.resolve(packageRoot, "..");
+  const changelogs = readdirSync(packagesRoot)
+    .map((name) => path.join(packagesRoot, name, "CHANGELOG.md"))
+    .filter((file) => existsSync(file));
+
+  it("finds the family changelogs", () => {
+    expect(changelogs.length).toBeGreaterThan(1);
+  });
+
+  it.each(changelogs.map((file) => [path.basename(path.dirname(file)), file]))(
+    "%s has no placeholder entries for releases without changes",
+    (_name, file) => {
+      const text = readFileSync(file, "utf8");
+      for (const pattern of FILLER) {
+        expect(text, `filler entry matching ${pattern}`).not.toMatch(pattern);
+      }
+    },
+  );
 });
 
 describe("release hygiene: generator-stub import sources (audit F2)", () => {

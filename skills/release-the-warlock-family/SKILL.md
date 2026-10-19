@@ -872,10 +872,13 @@ no task ids, no internal process, no tooling detail.
   never end with `; echo`.** The status recorded is the last command's. A
   crashed test suite and a failed build were both reported as exit 0 on
   2026-08-11.
-- **Before publishing, assert every package's top changelog heading is the
-  version being released.** One package once said `## Unreleased` while 25 said
-  `## 4.12.0` — findable only by comparing across packages, which nobody does
-  unprompted.
+- **Before publishing, assert every package that changed has a `## <version>`
+  section, and that no package's top heading is anything else** (one package
+  once said `## Unreleased` while 25 said `## 4.12.0` — findable only by
+  comparing across packages, which nobody does unprompted). A package with no
+  changes in a release gets **no section at all**: never write a filler entry
+  such as "Lockstep release; package APIs are unchanged." — it only bloats the
+  changelog page. `core`'s release-hygiene test rejects those phrases.
 - **A step that cannot be verified is reported as unverified, not omitted.**
   Distinguish "I checked and it is wrong" from "I could not check".
 

@@ -4,101 +4,17 @@ All notable changes to `@warlock.js/sitemap` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.33.0 - 2026-10-19
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.32.0 - 2026-10-18
 
 ### Changed
 
 - Pin the package development compiler to TypeScript 7.0.2 and use explicit Node types and source roots with supported module resolution.
 
-## 5.31.0 - 2026-10-18
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.30.0 - 2026-10-16
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.29.0 - 2026-10-01
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.28.0 - 2026-10-01
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
-
-## 5.27.0 - 2026-10-01
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.26.0 - 2026-09-30
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.25.0 - 2026-09-28
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.24.0 - 2026-09-27
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.23.2 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.1 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.0 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.22.1 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.22.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
-
-## 5.21.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
+- `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
 
 ## 5.20.0 - 2026-09-24
 

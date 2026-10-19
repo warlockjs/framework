@@ -70,7 +70,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
+- Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
 
 ## 5.28.0 - 2026-10-01
 
@@ -83,7 +83,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Generated apps depend on `@mongez/supportive-is` ^3.0.0 (type-predicate checkers). Lockstep release; package APIs are otherwise unchanged.
+- Generated apps depend on `@mongez/supportive-is` ^3.0.0 (type-predicate checkers).
 
 ## 5.26.0 - 2026-09-30
 
@@ -103,24 +103,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `docs/new-module.md` in the generated app named `warlock create.module`; it is `warlock generate.module`.
 
-## 5.24.0 - 2026-09-27
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.23.2 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.1 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
 ## 5.23.0 - 2026-09-25
 
 ### Fixed
@@ -133,24 +115,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Template schemas and models drop redundant `.required()` and non-load-bearing `satisfies`, matching the framework skills.
-
-## 5.22.1 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.22.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
-
-## 5.21.0 - 2026-09-25
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
 
 ## 5.20.0 - 2026-09-24
 
@@ -293,10 +257,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A postgres scaffold shipped `src/config/database.postgres.ts` unformatted, so a new project's first dev run flagged it. The template is formatted, and the template-format check now runs as part of `create-warlock`'s own test suite.
 
-## 5.9.0 - 2026-09-13
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
-
 ## 5.7.0 - 2026-09-11
 
 ### Fixed
@@ -394,11 +354,6 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
   commented, so there is one obvious place to declare per-request typed data.
 - Replaced stale scaffold values that had been carried forward: the `wow2` project name
   and the `4.15.0` dependency version no longer appear in generated projects.
-
-## 5.0.2 - 2026-08-25
-
-No changes to `create-warlock`. Released in lockstep with the `@warlock.js/web` SSR fix
-(`ssr.noExternal`) — see that package's changelog.
 
 ## 5.0.1 - 2026-08-25
 

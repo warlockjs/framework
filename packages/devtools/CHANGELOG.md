@@ -25,18 +25,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The `devtools-overview` skill shows how to read a request's devtools timeline from the terminal with `warlock trace`, and how coding agents read recent requests through the `requests_recent` tool of `warlock mcp`. The JSON API they use (`GET <path>/api/requests`, `GET <path>/api/requests/:id`) is unchanged.
 
-## 5.30.0 - 2026-10-16
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.29.0 - 2026-10-01
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.28.0 - 2026-10-01
 
 ### Added

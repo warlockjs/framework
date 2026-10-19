@@ -4,12 +4,6 @@ All notable changes to `@warlock.js/auth` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.33.0 - 2026-10-19
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
 ## 5.32.0 - 2026-10-18
 
 ### Changed
@@ -43,13 +37,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
+- Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
 
 ## 5.28.0 - 2026-10-01
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged. `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
+- `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
 
 ## 5.27.0 - 2026-10-01
 
@@ -74,24 +68,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `authMiddleware` now returns its normal `401` missing-credential response for an unsafe dual-source request that presents neither access nor refresh cookies, instead of treating the configured refresh descriptor as a presented credential and rejecting its Origin with `403`.
 - Token-pair issuance now ensures its durable token family once, and repeated ensures return the existing family without another upsert.
 
-## 5.24.0 - 2026-09-27
-
-### Changed
-
-- Lockstep release; package APIs are unchanged.
-
-## 5.23.2 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.1 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
 ## 5.23.0 - 2026-09-25
 
 ### Upgrading
@@ -101,12 +77,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 
 - **BREAKING:** `CookieWriter` is removed. `setSessionCookies`, `clearSessionCookies`, `setAuthCookie`, `clearAuthCookie` and `loginWithSessionCookies` take core's `Response` (only its `cookie` and `clearCookie`), so a page action's `response` still works without a cast. An app helper that was typed as `CookieWriter` can take `{ cookie: (...args: Parameters<Response["cookie"]>) => unknown }` instead.
-
-## 5.22.1 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
 
 ## 5.22.0 - 2026-09-25
 
@@ -127,10 +97,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **BREAKING:** `loginWithSessionCookies()` requires a same-origin `Origin`/`Referer` even with no cookies, otherwise it throws `CsrfOriginMismatchError`. Send the header from non-browser clients.
 - **BREAKING:** `authMiddleware` takes an ordered header/cookie `sources` list; a present Authorization header always wins and never falls back to the cookie, so an invalid header now returns `401`.
 - JWTs carry a random `jti`, so tokens issued in the same second differ.
-
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
 
 ## 5.20.0 - 2026-09-24
 
@@ -242,18 +208,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
   A typed `currentUser<UserType extends Auth>()` helper is also exported, wrapping core's `useCurrentUser()` for callers that want `Auth`-derived typing without repeating the assertion at every call site.
 
-## 5.11.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.11.0._
-
-## 5.10.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._
-
-## 5.9.0 - 2026-09-13
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
-
 ## 5.8.0 - 2026-09-13
 
 ### Added
@@ -270,32 +224,9 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
 
 - Documentation shipped in this package's `skills/` told users to run `pnpm`-specific commands. `pnpm <binary>` has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral.
 
-## 5.2.3 - 2026-09-02
-
-### Fixed
-
-- Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3.
-
 ## 5.2.2
 
 - `package.json` now declares `"warlock": { "environment": "server" }` — build-boundary metadata `@warlock.js/web` uses to refuse value-imports of this package from app client code (type-only imports are still allowed; server loaders/controllers/modules are unaffected).
-
-## 5.1.0
-
-No changes to `@warlock.js/auth`. Released in lockstep with the `@warlock.js/web`
-React-execution fix and the `@warlock.js/core` CLI additions — see those packages'
-changelogs.
-
-## 5.0.2 - 2026-08-25
-
-No changes to `@warlock.js/auth`. Released in lockstep with the `@warlock.js/web` SSR
-fix (`ssr.noExternal`) — see that package's changelog.
-
-## 5.0.1 - 2026-08-25
-
-No changes to `@warlock.js/auth`. Released in lockstep with the `create-warlock` vite
-resolution pin and the `@warlock.js/web` peer narrowing — see those packages'
-changelogs.
 
 ## 5.0.0 - 2026-08-25
 

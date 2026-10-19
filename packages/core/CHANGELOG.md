@@ -344,18 +344,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `request.input(key)` now sees a route param set with `Request.setParam()`. Before, it updated only `request.params`, so in a multi-site app (where the site dispatcher sets each page param) every dynamic segment read as `undefined` through `input()`, `only()` and `all()`. Params keep their precedence over query and body.
 
-## 5.23.2 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
-## 5.23.1 - 2026-09-26
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
-
 ## 5.23.0 - 2026-09-25
 
 ### Added
@@ -369,12 +357,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `startHttpTestServer()` now loads `.env.test` itself before configuration is read, so a Vitest global setup cannot boot against the development database.
 - `warlock add` installs with the project's package manager: the nearest `packageManager` field, then a `pnpm-workspace.yaml`, then the nearest lockfile, searched upward so an app inside a workspace uses the workspace's manager.
 - `uniqueExceptCurrentUser` / `uniqueExceptCurrentId` / `existsExceptCurrentUser` / `existsExceptCurrentId` on `StringValidator` now return `this`, so `Infer<>` keeps the concrete output type.
-
-## 5.22.1 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
 
 ## 5.22.0 - 2026-09-25
 
@@ -415,10 +397,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   registration for a `GET` route at the same path. GET-only routes retain
   Fastify's implicit HEAD behavior.
 
-### Changed
-
-- Lockstep release maintenance and dependency refresh.
-
 ## 5.20.0 - 2026-09-24
 
 ### Added
@@ -443,12 +421,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The repository cache is also cleared after the DB transaction commits (cascade `afterCommit`), fixing stale reads when a concurrent read re-cached the old row between the model event and `COMMIT`.
-
-## 5.19.1 - 2026-09-23
-
-### Changed
-
-- Lockstep patch release aligning `@warlock.js/core` with the 5.19.1 family; no Core runtime API change.
 
 ## 5.19.0 - 2026-09-23
 
@@ -583,14 +555,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Backend file changes are picked up sooner in `warlock dev` (event debounce 150ms → 50ms).
-
-## 5.10.0 - 2026-09-14
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._
-
-## 5.9.0 - 2026-09-13
-
-_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
 
 ## 5.8.0 - 2026-09-13
 
@@ -910,16 +874,6 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
 - The `add` feature registry was split into one module per feature, replacing the single
   growing switch.
 - Fixed 7 mojibake checkmarks in CLI output.
-
-## 5.0.2 - 2026-08-25
-
-No changes to `@warlock.js/core`. Released in lockstep with the `@warlock.js/web` SSR
-fix (`ssr.noExternal`) — see that package's changelog.
-
-## 5.0.1 - 2026-08-25
-
-No changes to `@warlock.js/core`. Released in lockstep with the `create-warlock` vite
-resolution pin and the `@warlock.js/web` peer narrowing — see those packages' changelogs.
 
 ## 5.0.0 - 2026-08-25
 
