@@ -1,4 +1,9 @@
 {
+  "5.34.2": {
+    "publishedAt": "2026-10-19T20:47:10.981Z",
+    "matrix": "none",
+    "summary": "**One complete skill index per package.** Skills only; no runtime or API changes. The framework issue-reporting guide is now the `report-framework-issue` topic of `@warlock.js/core`, so `agent-kit` delivers it to apps (it was a loose file that never reached them). Every package index lists all of its topics, stale references are fixed, nine duplicate `overview` topics are merged into their indexes, and the hand-maintained `skills/README.md` catalogs are removed in favour of `skills/index.md`. The release gate and CI now fail when an index names a missing topic, leaves one out, or a package ships a loose skill file. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.34.2 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm."
+  },
   "5.34.1": {
     "publishedAt": "2026-10-19T15:00:27.494Z",
     "matrix": "none",

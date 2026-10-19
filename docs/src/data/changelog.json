@@ -136,6 +136,426 @@
   ],
   "releases": [
     {
+      "version": "5.34.2",
+      "id": "v5-34-2",
+      "date": "October 19, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>One complete skill index per package.</strong> Skills only; no runtime or API changes. The framework issue-reporting guide is now the <code>report-framework-issue</code> topic of <code>@warlock.js/core</code>, so <code>agent-kit</code> delivers it to apps (it was a loose file that never reached them). Every package index lists all of its topics, stale references are fixed, nine duplicate <code>overview</code> topics are merged into their indexes, and the hand-maintained <code>skills/README.md</code> catalogs are removed in favour of <code>skills/index.md</code>. The release gate and CI now fail when an index names a missing topic, leaves one out, or a package ships a loose skill file. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.2 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Qualify provider and companion package references in the grouped index, remove the redundant loose catalog, and include package orientation in LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Replace the loose skill catalog with a package index that points to the provider setup topic, and include orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Replace the loose skill catalog with a package index that points to the provider setup topic, and include orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-cli",
+          "slug": "ai-cli",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Keep the package skill description within the recommended size, remove the redundant loose catalog, and include package orientation in LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Replace the loose skill catalog with a package index that points to the provider setup topic, and include orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Replace the loose skill catalog with a package index that points to the provider setup topic, and include orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Replace the loose skill catalog with a package index that points to the provider setup topic, and include orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Remove the redundant loose skill catalog and include package orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Qualify custom-tool guidance as a topic of @warlock.js/ai, remove the redundant loose skill catalog, and include package orientation in LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Point the README at the package skill index, remove the redundant loose catalog, and include orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections. List the cache utility topic in the index and fix the orientation link."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Remove the redundant loose skill catalog and include package orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Export framework issue-reporting guidance as a proper skill topic; complete index coverage for browser testing and upgrade guidance, and include package orientation in LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Remove the redundant loose skill catalog and include package orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Point the README at the package skill index, remove the outdated loose catalog, and include orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Merge package orientation into the grouped skill index and remove the duplicate overview topic; preserve that orientation in generated LLM projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Keep the package skill description within the recommended size and include its orientation in generated LLM projections."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.34.1",
       "id": "v5-34-1",
       "date": "October 19, 2026",
