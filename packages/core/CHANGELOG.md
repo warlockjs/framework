@@ -13,22 +13,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Select an isolated in-memory secrets backend through `SECRETS_DRIVER=memory` or `secrets.driver`, including built-server test deployments and explicit `SecretStore` options. Configuration overrides the environment; unknown drivers fail closed.
 - Refuse the memory driver under `NODE_ENV=production` unless `allowMemoryInProduction: true` is explicitly configured; preserve log masking and namespace isolation without keychain/environment/file access.
 - Add `warlock e2e` and the isolated `@warlock.js/core/e2e` Node subpath: owned app/build fixtures and browser profiles, direct CDP with native WebSocket, stable hit-tested clicks, editable text and navigation waits, responsive screenshots and overflow assertions, console/network allowlists, per-run evidence and PID-verified process-group cleanup. Include fake-CDP coverage, real-browser integration specs and a complete browser-testing guide/skill.
-### Removed
-
-- **BREAKING** Remove the ESLint development checker, CLI selection, checker config option and production dependency. `warlock check --lint eslint` now fails with the 5.34.0 removal and Oxlint/Oxfmt migration guidance.
-
-### Added
-
 - `oxc-toolchain-removal` runs on `warlock upgrade --from 5.33 --to 5.34.0`, reusing the preserved 5.33 `oxc-toolchain` migration. It ports literal folder restrictions, native TypeScript rule equivalents, unused-import checks, globals and ignores; unsupported rules/options report their source and file scope without executing config. Native type-aware equivalents enable the optional app engine automatically.
+
+### Changed
+
+- **BREAKING** Migrated template configs enable Oxlint `correctness: error`; stale literal `healthCheckers.eslint` options are removed.
 
 ### Fixed
 
 - Detect a real lockfile beside `pnpm-workspace.yaml` before treating the directory as pnpm. npm apps with only `package-lock.json` now receive the correct install hint.
 - Validate Postman draft-04 schemas with an explicit development-only Ajv adapter instead of resolving ESLint's private dependency. Generated source formatting checks use Oxfmt.
 
-### Changed
+### Removed
 
-- **BREAKING** Migrated template configs enable Oxlint `correctness: error`; stale literal `healthCheckers.eslint` options are removed.
+- **BREAKING** Remove the ESLint development checker, CLI selection, checker config option and production dependency. `warlock check --lint eslint` now fails with the 5.34.0 removal and Oxlint/Oxfmt migration guidance.
 
 ### Upgrading
 
