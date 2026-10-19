@@ -19,6 +19,7 @@ type KeyringModule = {
 };
 
 export class KeyringSecretBackend implements SecretBackend {
+  public readonly type = "keychain";
   private constructor(private readonly keyring: KeyringModule) {}
 
   /** Read-only availability probe; never writes a setup credential. */

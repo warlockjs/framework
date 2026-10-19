@@ -4,7 +4,7 @@ import { config } from "../config/config-getter";
 import { rootPath, storagePath } from "../utils/paths";
 import { resolveSecretsDriver } from "./resolve-driver";
 import { SecretStore } from "./secret-store";
-import type { SecretBackend, SecretsConfigurations } from "./types";
+import type { SecretBackend, SecretBackendType, SecretsConfigurations } from "./types";
 
 let testBackend: SecretBackend | undefined;
 let stores = new Map<string, SecretStore>();
@@ -44,6 +44,9 @@ function current(): SecretStore {
 
 /** App identity and configuration are resolved on first use, after config has loaded. */
 export const secrets = {
+  async backend(): Promise<SecretBackendType> {
+    return current().backend();
+  },
   async get(name: string): Promise<string | undefined> {
     return current().get(name);
   },

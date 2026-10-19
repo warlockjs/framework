@@ -1,5 +1,10 @@
+/** Active storage selection, independent of the source of an individual secret. */
+export type SecretBackendType = "keychain" | "file" | "memory";
+
 /** Backend implementations must never log credentials or attach them to errors. */
 export interface SecretBackend {
+  /** Report injected storage; omitted metadata defaults to memory for test overrides. */
+  readonly type?: SecretBackendType;
   get(namespace: string, name: string): Promise<string | undefined>;
   set(namespace: string, name: string, value: string): Promise<void>;
   remove(namespace: string, name: string): Promise<boolean>;

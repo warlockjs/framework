@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.34.1
 
+### Added
+
+- HTTP `transport.onAuthRefusal` customizes denied authentication responses for the MCP endpoint and side routes using typed safe context, 4xx/5xx statuses, allowlisted headers and JSON bodies. Host/Origin guards retain precedence, invalid or throwing hooks retain the default refusal, and handlers never run after a denial.
+
 ### Fixed
 
 - Tools adapted from a remote MCP server now show the model their real input schema. `jsonSchemaToStandard` implements Standard JSON Schema (`~standard.jsonSchema`), so `extractJsonSchema` and every provider adapter read the server's `inputSchema` instead of falling back to a parameterless `{ type: "object" }`, which made models guess argument names and retry. Adapters receive copies of the schema; a tool without one advertises `{ type: "object", properties: {} }`.

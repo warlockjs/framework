@@ -3,6 +3,8 @@ import { request as httpRequest } from "node:http";
 import { tool, type ToolContext, type ToolContract } from "@warlock.js/ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
+  McpHttpAuthRefusal,
+  McpHttpAuthRefusalContext,
   McpHttpServeHandle,
   McpHttpServeTransport,
   McpHttpRouteContext,
@@ -154,6 +156,237 @@ function rpc(
 
 /** A `tools/list` request body. */
 const LIST = { jsonrpc: "2.0", id: 1, method: "tools/list" };
+
+/** Spies for both dispatch paths, including a valid tool for successful calls. */
+function refusalHandlers() {
+  const execute = vi.fn(async () => "executed");
+  const route = vi.fn(() => ({ body: "handled" }));
+  const contract = tool({ name: "guarded", description: "Guarded tool", execute });
+  return { execute, route, contract };
+}
+
+describe.each(["mcp", "route"] as const)("HTTP auth refusal hook — %s", (target) => {
+  const path = target === "mcp" ? "/mcp" : "/mcp/policy";
+  const method = target === "mcp" ? "POST" : "GET";
+  const request = (url: string, headers: Record<string, string> = {}) =>
+    raw(url, {
+      method,
+      path: `${path}?private-query=hidden`,
+      headers: { ...JSON_HEADERS, ...headers },
+      body:
+        target === "mcp"
+          ? JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "tools/call",
+              params: { name: "guarded" },
+            })
+          : undefined,
+    });
+
+  it.each([
+    { check: "bearer", failure: "missing" },
+    { check: "bearer", failure: "wrong" },
+    { check: "authorize", failure: "false" },
+    { check: "authorize", failure: "throw" },
+    { check: "authenticate", failure: "undefined" },
+    { check: "authenticate", failure: "throw" },
+  ] as const)(
+    "customizes $check ($failure) without running handlers",
+    async ({ check, failure }) => {
+      const { execute, route, contract } = refusalHandlers();
+      const authorize = vi.fn(async () => {
+        if (check === "authorize" && failure === "throw") throw new Error("private-auth-error");
+        return check !== "authorize";
+      });
+      const authenticate = vi.fn(async () => {
+        if (check === "authenticate" && failure === "throw") throw new Error("private-auth-error");
+        return check === "authenticate" ? undefined : { id: "member" };
+      });
+      const onAuthRefusal = vi.fn(async (context: McpHttpAuthRefusalContext) => ({
+        status: 403,
+        headers: {
+          "cache-control": "no-store",
+          "retry-after": "30",
+          "content-language": "en",
+          "x-request-id": "refused-request",
+        },
+        body: { error: "MEMBER_UNAUTHORIZED", check: context.check },
+      }));
+      const { url } = await start([contract], {
+        auth: { bearer: "valid-token", authorize, authenticate },
+        onAuthRefusal,
+        routes: [{ method: "GET", path: "/policy", handler: route }],
+      });
+      const headers: Record<string, string> =
+        check === "bearer"
+          ? failure === "missing"
+            ? {}
+            : { authorization: "Bearer wrong-token" }
+          : { authorization: "Bearer valid-token" };
+      const response = await request(url, headers);
+      expect(response.status).toBe(403);
+      expect(JSON.parse(response.body)).toEqual({ error: "MEMBER_UNAUTHORIZED", check });
+      expect(response.headers).toMatchObject({
+        "cache-control": "no-store",
+        "retry-after": "30",
+        "content-language": "en",
+        "x-request-id": "refused-request",
+        "www-authenticate": 'Bearer realm="mcp"',
+        "content-type": "application/json",
+        "content-length": String(Buffer.byteLength(response.body)),
+      });
+      expect(onAuthRefusal).toHaveBeenCalledOnce();
+      expect(onAuthRefusal).toHaveBeenCalledWith({ check, method, path, target });
+      expect(onAuthRefusal.mock.calls[0]).toHaveLength(1);
+      if (check === "bearer") expect(authorize).not.toHaveBeenCalled();
+      if (check !== "authenticate") expect(authenticate).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+      expect(route).not.toHaveBeenCalled();
+      expect(response.body).not.toContain("private-auth-error");
+    },
+  );
+
+  it.each(["host", "origin"])(
+    "keeps %s refusals ahead of auth and the refusal hook",
+    async (guard) => {
+      const { execute, route, contract } = refusalHandlers();
+      const authorize = vi.fn(() => false);
+      const authenticate = vi.fn(() => undefined);
+      const onAuthRefusal = vi.fn(() => ({ status: 503, body: { error: "custom" } }));
+      const { url } = await start([contract], {
+        auth: { authorize, authenticate },
+        onAuthRefusal,
+        routes: [{ method: "GET", path: "/policy", handler: route }],
+      });
+      const response = await request(
+        url,
+        guard === "host"
+          ? { host: "foreign.example", origin: "https://foreign.example" }
+          : { origin: "https://foreign.example" },
+      );
+      expect(response.status).toBe(403);
+      expect(JSON.parse(response.body)).toMatchObject({
+        error: {
+          message:
+            guard === "host"
+              ? "Forbidden: Host header not allowed."
+              : "Forbidden: Origin not allowed.",
+        },
+      });
+      expect(onAuthRefusal).not.toHaveBeenCalled();
+      expect(authorize).not.toHaveBeenCalled();
+      expect(authenticate).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+      expect(route).not.toHaveBeenCalled();
+    },
+  );
+
+  const invalidResults: [string, () => unknown][] = [
+    [
+      "throw",
+      () => {
+        throw new Error("private-refusal-error");
+      },
+    ],
+    ["void", () => undefined],
+    ["null", () => null],
+    ["boolean", () => true],
+    ["success status", () => ({ status: 200, body: {} })],
+    ["redirect status", () => ({ status: 302, body: {} })],
+    ["invalid status", () => ({ status: 600, body: {} })],
+    ["fractional status", () => ({ status: 401.5, body: {} })],
+    ["null status", () => ({ status: null, body: {} })],
+    ["string status", () => ({ status: "401", body: {} })],
+    ["missing body", () => ({ status: 403 })],
+    ["bigint body", () => ({ body: 1n })],
+    ["non-finite body", () => ({ body: { code: Number.NaN } })],
+    ["undefined body property", () => ({ body: { error: undefined } })],
+    ["class body", () => ({ body: new Date() })],
+    [
+      "cyclic body",
+      () => {
+        const body: Record<string, unknown> = {};
+        body.self = body;
+        return { body };
+      },
+    ],
+    ["invalid headers", () => ({ headers: [], body: {} })],
+    ["class headers", () => ({ headers: new Date(), body: {} })],
+    ["non-string header", () => ({ headers: { "retry-after": 10 }, body: {} })],
+    ["header injection", () => ({ headers: { "x-request-id": "id\r\nx-unsafe: yes" }, body: {} })],
+    ...[
+      "set-cookie",
+      "location",
+      "connection",
+      "content-type",
+      "content-length",
+      "transfer-encoding",
+      "access-control-allow-origin",
+    ].map((name): [string, () => unknown] => [
+      name,
+      () => ({ status: 403, headers: { [name]: "unsafe" }, body: {} }),
+    ]),
+  ];
+
+  it.each(invalidResults)("falls back to the original refusal on %s", async (_label, result) => {
+    const { execute, route, contract } = refusalHandlers();
+    // Deliberately model malformed JavaScript hook results at the HTTP boundary.
+    const onAuthRefusal = vi.fn(async () => result()) as unknown as McpHttpAuthRefusal;
+    const { url } = await start([contract], {
+      auth: {
+        authenticate: () => {
+          throw new Error("private-auth-error");
+        },
+      },
+      onAuthRefusal,
+      routes: [{ method: "GET", path: "/policy", handler: route }],
+    });
+    const response = await request(url);
+    expect(response.status).toBe(401);
+    expect(response.headers["www-authenticate"]).toBe('Bearer realm="mcp"');
+    expect(JSON.parse(response.body)).toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32000, message: "Unauthorized." },
+    });
+    expect(response.headers["x-request-id"]).toBeUndefined();
+    expect(onAuthRefusal).toHaveBeenCalledOnce();
+    expect(execute).not.toHaveBeenCalled();
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it("defaults status to 401 and allows a custom challenge and JSON body", async () => {
+    const { execute, route, contract } = refusalHandlers();
+    const { url } = await start([contract], {
+      auth: { bearer: "valid-token" },
+      onAuthRefusal: () => ({
+        headers: { "www-authenticate": 'Bearer realm="members"' },
+        body: null,
+      }),
+      routes: [{ method: "GET", path: "/policy", handler: route }],
+    });
+    const response = await request(url);
+    expect(response.status).toBe(401);
+    expect(response.body).toBe("null");
+    expect(response.headers["www-authenticate"]).toBe('Bearer realm="members"');
+    expect(execute).not.toHaveBeenCalled();
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it("skips the refusal hook for successful authentication", async () => {
+    const { execute, route, contract } = refusalHandlers();
+    const onAuthRefusal = vi.fn(() => ({ body: { error: "denied" } }));
+    const { url } = await start([contract], {
+      auth: { bearer: "valid-token" },
+      onAuthRefusal,
+      routes: [{ method: "GET", path: "/policy", handler: route }],
+    });
+    expect((await request(url, { authorization: "Bearer valid-token" })).status).toBe(200);
+    expect(onAuthRefusal).not.toHaveBeenCalled();
+    expect(target === "mcp" ? execute : route).toHaveBeenCalledOnce();
+  });
+});
 
 /** True when something can bind `port` on loopback again. */
 function portIsFree(port: number): Promise<boolean> {

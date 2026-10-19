@@ -16,6 +16,7 @@ function isMissing(error: unknown): boolean {
 
 /** One authenticated file per secret: concurrent writes to different keys cannot clobber each other. */
 export class FileSecretBackend implements SecretBackend {
+  public readonly type = "file";
   public constructor(
     private readonly directory: string,
     private readonly encryptionKey: () => string | undefined,
