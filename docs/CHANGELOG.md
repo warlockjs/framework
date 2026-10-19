@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.34.0
+
+### Added
+
+- Document browser end-to-end specs, owned fixtures, direct CDP interactions, responsive assertions, evidence and process cleanup, with complete runnable examples.
+
 ## 5.33.0
 
 ### Fixed

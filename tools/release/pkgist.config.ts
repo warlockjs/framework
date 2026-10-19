@@ -182,6 +182,8 @@ export default defineConfig({
             // out of every consumer's production module graph, so they need their own
             // build entries and `exports` entries to remain importable at all.
             "tests/index.ts",
+            // Node-only browser harness, kept outside the application barrel.
+            "e2e/index.ts",
             "vite/index.ts",
             // `@warlock.js/core/errors` (5.30): the HTTP error classes alone, so a
             // standalone helper can throw `BadRequestError` without bundling the

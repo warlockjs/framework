@@ -6,6 +6,7 @@ import { buildCommand } from "./commands/build.command";
 import { checkCommand } from "./commands/check.command";
 import { createDatabaseCommand } from "./commands/create-database.command";
 import { devServerCommand } from "./commands/dev-server.command";
+import { e2eCommand } from "./commands/e2e.command";
 import { doctorCommand } from "./commands/doctor.command";
 import { dropTablesCommand } from "./commands/drop-tables.command";
 import { explainCommand } from "./commands/explain.command";
@@ -49,6 +50,7 @@ export const frameworkCommands = [
 
   // testing commands
   testCommand,
+  e2eCommand,
 
   // diagnostics commands
   aiCommand,

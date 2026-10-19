@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.34.0
+
+### Added
+
+- Add `warlock e2e` and the isolated `@warlock.js/core/e2e` Node subpath: owned app/build fixtures and browser profiles, direct CDP with native WebSocket, stable hit-tested clicks, editable text and navigation waits, responsive screenshots and overflow assertions, console/network allowlists, per-run evidence and PID-verified process-group cleanup. Include fake-CDP coverage, real-browser integration specs and a complete browser-testing guide/skill.
+
 ## 5.33.0 - 2026-10-19
 
 ### Added

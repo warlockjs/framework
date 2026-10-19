@@ -1,0 +1,226 @@
+---
+title: Browser end-to-end tests
+description: Own an app fixture and Chrome or Edge, exercise real interactions over CDP, and retain screenshots and evidence for every run.
+sidebar:
+  order: 3
+---
+
+`npx warlock e2e` discovers `e2e/**/*.e2e.{ts,mts,js,mjs}` and runs each spec
+sequentially. Every spec owns a disposable copy of the app, an ephemeral HTTP
+port, a data root, an isolated environment, and a headless Chrome or Edge profile.
+There is no Playwright, Puppeteer, browser driver download, or shared server.
+
+Import the API from `@warlock.js/core/e2e`. This is a Node tooling subpath: it
+owns processes and files and also works with apps that do not install
+`@warlock.js/web`. Keeping it outside the root barrel and web's browser graph
+avoids pulling automation into production application code.
+
+## A complete spec
+
+This self-contained example creates a small app inside the disposable copy. Save
+it as `e2e/greeting.e2e.ts` in your project, then run `npx warlock e2e`.
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { defineE2E } from "@warlock.js/core/e2e";
+
+export default defineE2E({
+  app: {
+    start: [process.execPath, "greeting-fixture.mjs"],
+    portFromFile: true,
+    path: ["fake-bin"],
+    env: ({ dataRoot }) => ({ GREETING_DATA: dataRoot }),
+    prepare: async ({ directory, dataRoot }) => {
+      await mkdir(join(directory, "fake-bin"));
+      await writeFile(join(dataRoot, "greeting.txt"), "Hello");
+      await writeFile(
+        join(directory, "greeting-fixture.mjs"),
+        `
+        import { createServer } from 'node:http';
+        import { readFileSync, writeFileSync } from 'node:fs';
+        import { join } from 'node:path';
+        const greeting = readFileSync(join(process.env.GREETING_DATA, 'greeting.txt'), 'utf8');
+        const app = createServer((request, response) => {
+          if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
+          response.setHeader('Content-Type', 'text/html');
+          response.end('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">'
+            + '<label>Name <input id="name"></label><button id="save"><span>Save</span></button><h1 id="greeting">Ready</h1>'
+            + '<script>document.querySelector("#save").onclick=()=>{history.pushState({},"","/saved");document.querySelector("#greeting").textContent='
+            + JSON.stringify(greeting) + '+" "+document.querySelector("#name").value}</script>');
+        });
+        app.listen(0, '127.0.0.1', () => writeFileSync(process.env.WARLOCK_E2E_PORT_FILE, String(app.address().port)));
+      `,
+      );
+    },
+  },
+  run: async ({ page, step }) => {
+    await page.goto("/");
+    await step("save a greeting", async () => {
+      await page.fill("#name", "Ada");
+      await page.type("#name", " Lovelace");
+      await page.waitForNavigation(() => page.click("#save"), { url: "/saved" });
+      await page.waitFor({ selector: "#greeting", text: "Hello Ada Lovelace" });
+    });
+    await page.captureViewports("greeting");
+  },
+});
+```
+
+For a controlled root container that cannot use Chrome's sandbox, explicitly add
+`browser: { args: ["--no-sandbox"] }`. The harness does not add that flag for you.
+A missing browser fails the CLI with an installation/override instruction; the
+framework's real-browser integration specs skip with that reason instead.
+
+## Run your production app
+
+Replace the example's `app` with your app's foreground command. An optional build
+runs **inside the disposable copy**. Existing `dist` files are copied, so omitting
+`build` tests the existing production output.
+
+```ts
+import { defineE2E } from "@warlock.js/core/e2e";
+
+export default defineE2E({
+  app: {
+    build: [process.execPath, "node_modules/@warlock.js/core/bin/warlock.js", "build"],
+    start: [process.execPath, "dist/app.js"],
+    env: ({ dataRoot }) => ({ APP_DATA_ROOT: dataRoot }),
+    path: ["e2e/fake-bin"],
+    exclude: ["storage", "data"],
+    readyPath: "/health",
+    startupTimeoutMs: 60_000,
+  },
+  run: async ({ page }) => {
+    await page.goto("/");
+    await page.waitFor({ selector: "main" });
+    await page.captureViewports("home");
+  },
+});
+```
+
+Your app must map `APP_DATA_ROOT` (or your chosen variable) to its storage/database
+configuration. `WARLOCK_E2E_DATA_ROOT` always names the disposable root; it does
+not rewrite arbitrary app configuration or provision a database. Supply test
+service URLs explicitly if your app needs them. Do not pass production services.
+
+The fixture omits `.env`, `.env.*`, `.git`, `.warlock`, symlinks, `node_modules`,
+and configured exclusions. It links the nearest project `node_modules` for
+**dependency reads only**; commands must not install or mutate dependencies.
+Explicitly exclude large data directories. Keep `--out` outside source content
+that the app writes; the output directory itself is automatically omitted.
+Commands must run in the foreground and must not detach their descendants.
+
+Only basic OS execution variables are inherited. App secrets, `NODE_OPTIONS`,
+and ambient service endpoints are absent. HOME, temporary, config and cache
+directories are owned. `app.env` adds fixture variables; the harness then pins
+`HOST`/`HTTP_HOST` to loopback, `PORT`/`HTTP_PORT`, and the data/port-file variables.
+An owned `.env` mirrors this environment for framework `env()` consumers.
+`NODE_ENV` defaults to `production`; set it explicitly if your app needs another mode.
+
+By default, the OS assigns an ephemeral port which is reserved until immediately
+before spawning the app. A bind failure fails startup; there is no attach-to-server
+mode. For applications supporting port `0`, `portFromFile: true` removes the
+reservation handoff: bind port `0`, then write the actual numeric port to
+`WARLOCK_E2E_PORT_FILE`, as the complete example does. Readiness polls the owned
+origin until it returns 2xx/3xx, checking that the recorded foreground process is
+still running. Its output is retained when startup fails.
+
+`prepare(context)` can seed `dataRoot` and create fake executables under the copied
+app. `app.path` resolves relative to that copy; `--path` resolves relative to the
+CLI's working directory. Both prepend to PATH (CLI paths first). Provide genuine
+executable binaries/scripts for the host OS; commands use argument arrays without
+an implicit shell. On Windows, invoke JavaScript tools with `process.execPath`
+instead of passing `.cmd` wrappers as executables.
+
+## Page API
+
+| API                                                    | Behavior                                                                                                                                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page.goto(path, timeoutMs?)`                          | Navigate relative to the fixture URL and wait for document completion; reports navigation errors.                                                                                                                                     |
+| `page.click(selector, timeoutMs?)`                     | Scroll, wait two paints, compare successive boxes, hit-test the center, move the mouse, recheck after hover, then press/release. Retries missing, moving, hidden, disabled or covered targets until timeout; reports the last reason. |
+| `page.fill(selector, value)`                           | Clear an editable input/textarea/contenteditable with native input semantics, then insert Unicode text through CDP.                                                                                                                   |
+| `page.type(selector, text)`                            | Focus an editable target and append Unicode text through CDP. This is text insertion, not a physical-keyboard shortcut API.                                                                                                           |
+| `page.waitFor({ selector?, text?, url?, timeoutMs? })` | Wait for a visible selector, contained text and/or an exact resolved URL. At least one condition is required.                                                                                                                         |
+| `page.waitForNavigation(action, { url?, timeoutMs? })` | Arm before `action`, then wait for a changed document or URL; works with reloads, hashes and client-side routing.                                                                                                                     |
+| `page.setViewport({ name, width, height, mobile? })`   | Apply named CSS-pixel dimensions and wait two paints.                                                                                                                                                                                 |
+| `page.assertViewport()`                                | Require `innerWidth` to equal the requested width and document/body scrollWidth not to exceed it. Failures report the ten widest offending elements, including IDs, classes and boxes.                                                |
+| `page.screenshot(name)`                                | Save a numbered PNG at the current viewport; names accept letters, digits, `_` and `-`.                                                                                                                                               |
+| `page.captureViewports(name, viewports?)`              | Assert and screenshot each named viewport, including overflowing layouts, then restore the original viewport.                                                                                                                         |
+| `page.waitForNetworkIdle(timeoutMs?)`                  | Wait for no in-flight HTTP requests and 300 ms of network quiet.                                                                                                                                                                      |
+| `page.assertHealthy()`                                 | Assert zero unallowlisted console errors, uncaught exceptions, HTTP statuses >=400 and failed/canceled network loads.                                                                                                                 |
+| `page.evaluate<T>(expression, timeoutMs?)`             | Evaluate in the main page context with promise support; page exceptions fail the step.                                                                                                                                                |
+| `step(name, action)` / `page.step(name, action)`       | Record a named action's duration and outcome without recording fill/type values.                                                                                                                                                      |
+
+Selector helpers target the main document. Frames, closed shadow roots, downloads,
+keyboard shortcuts and pixel-diff assertions are outside this API's scope.
+The hit-test is repeated immediately before dispatch, but the DOM can still change
+between any two CDP messages. A missing event or unreachable target fails within
+the configured deadline instead of clicking through an overlay.
+
+The default viewports are `desktop` (1280×800) and `phone` (390×844, mobile mode).
+Every run captures and asserts both after the spec, even on failure. A phone page
+that expands to 448 pixels fails against **390**, even if its expanded `innerWidth`
+would otherwise hide the overflow. Use a viewport meta tag. Override defaults with
+`viewports: [{ name: "tablet", width: 768, height: 1024 }]`.
+
+## Expected failures and long-lived requests
+
+All errors remain in evidence, including allowed errors. Strings match substrings;
+regular expressions are supported and do not retain `/g` or `/y` state.
+
+```ts
+import { defineE2E } from "@warlock.js/core/e2e";
+
+export default defineE2E({
+  app: {}, // defaults to node dist/app.js in an owned app copy
+  allowConsoleErrors: [/^Expected preview warning$/],
+  allowNetworkFailures: [
+    { url: "/intentional-missing", status: 404 },
+    { url: "/canceled-search", errorText: "net::ERR_ABORTED" },
+  ],
+  allowPendingRequests: ["/events"], // exclude a known event stream from network idle
+  run: async ({ page }) => {
+    await page.goto("/");
+    await page.waitFor({ selector: "main" });
+  },
+});
+```
+
+The runner waits for network idle before final captures and again before checking
+health. Choose specific allowlists: `status` and `errorText` further restrict a URL
+rule. Long-lived request exemptions do not allow HTTP or console failures.
+
+## CLI, evidence and cleanup
+
+```bash
+npx warlock e2e
+npx warlock e2e 'e2e/account*.e2e.ts' --browser /path/to/chrome
+npx warlock e2e --out ./artifacts/browser --path ./test-bin,./engine-bin
+```
+
+Browser selection is `--browser`, `spec.browser.binary`, `WARLOCK_E2E_BROWSER`,
+then executable discovery on PATH and standard Chrome/Edge installation paths for
+Linux, macOS and Windows. A bad explicit override fails rather than falling back.
+Each launch uses headless mode, an OS-selected debugging port and a fresh profile.
+CDP uses [Node 22.15's built-in WebSocket](https://nodejs.org/download/release/v22.15.0/docs/api/globals.html#websocket).
+Protocol shapes are checked against the [official CDP definitions](https://chromedevtools.github.io/devtools-protocol/);
+source comments link every method/event.
+
+Each spec writes `.warlock/e2e/run-*/evidence.json` (`schemaVersion: 1`), numbered
+screenshots and app/build/browser logs. JSON contains timestamps, step timings,
+console entries, network failures and allowlist decisions, screenshot dimensions,
+recorded supervisor/child PIDs, commands and cleanup outcomes. Failed runs throw
+`E2ERunError`, whose `result` contains these paths and evidence. Programmatic users
+can call `runE2E(spec, { outputDirectory, browser, path, signal })`.
+
+A unique Node supervisor anchors every owned command's group, retaining the
+foreground PID and keeping its own command line verifiable after a child crashes.
+Teardown verifies that recorded supervisor's command line contains its unique
+fixture file before TERM and again before KILL. POSIX targets only that process
+group. Windows checks the recorded PID with CIM and uses `taskkill /PID ... /T` for
+its process tree. No cleanup searches by process name or port. Verification errors
+fail closed, retain fixture files and appear in evidence. Teardown attempts all
+owned resources and preserves the primary failure. SIGINT/SIGTERM and the default
+120-second run deadline request cleanup; individual CDP and startup operations
+also have deadlines. Forced OS termination cannot run JavaScript cleanup.
