@@ -392,7 +392,7 @@ const server = ai.mcp.serve([identity], {
 });
 ```
 
-`beforeCall(context, tool, input)` runs after successful input validation and before invocation. Return nothing to continue, or return a native `McpCallRefusal` (`isError: true` with valid MCP content) to refuse. Refusals, including `_meta` and `structuredContent`, are sent unchanged regardless of `results` mode. A thrown hook answers a JSON-RPC error (`-32602`); a malformed refusal answers `-32603`. Invalid input skips the hook and remains a tool error. With a policy hook, the serving boundary validates input before the hook and the contract's `invoke()` retains its own validation; schemas must be deterministic and hooks must treat input as read-only.
+`beforeCall(context, tool, input)` runs after successful input validation and before invocation. Return nothing to continue, or return a native `McpCallRefusal` (`isError: true` with valid MCP content) to refuse. Refusals, including `_meta` and `structuredContent`, are sent unchanged regardless of `results` mode. A thrown `McpError` preserves its integer code, message and optional data; other throws answer a JSON-RPC error (`-32602`); a malformed refusal answers `-32603`. Invalid input skips the hook and remains a tool error. With a policy hook, the serving boundary validates input before the hook and the contract's `invoke()` retains its own validation; schemas must be deterministic and hooks must treat input as read-only.
 
 Both tools and serve hooks receive `requestId`, `principal`, `signal` and, over HTTP, the request metadata. `ToolContext.requestId` and `.principal` are optional additions; in-process tool dispatch can omit them. `McpServeToolContext`, `McpBeforeCall`, `McpCallRefusal` and `McpStdioServeTransport` are exported from `@warlock.js/ai-tools`.
 
@@ -412,6 +412,110 @@ ai.mcp.serve([identity], {
   },
 });
 ```
+
+### Discovery independent of call policy
+
+`listFilter(context, tools)` optionally filters `tools/list` on every request over HTTP or stdio. It can be async and receives the same authenticated principal, JSON-RPC request id, request metadata and abort signal as other serve hooks. `tools` is a fresh array of wire `McpToolDescriptor`s, including `inputSchema`, `outputSchema` when configured, and the exposed names after `prefixToolNames`. Return the descriptors to advertise, in the desired order:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-tools";
+
+ai.mcp.serve([ai.tools.calculator(), ai.tools.dateTime()], {
+  name: "discovery",
+  transport: { type: "stdio", principal: "local" },
+  listFilter: async (context, tools) =>
+    context.principal === "local" ? tools.filter((tool) => tool.name === "calculator") : [],
+});
+```
+
+Omitted tools remain callable by their exposed names. `listFilter` never changes the construction-time call registry or invokes `beforeCall`; calls to hidden tools still run input validation and the same call policy. An empty list is valid. Without the hook, every tool is listed. A failing filter returns a JSON-RPC error for that list request and leaves the registry intact. Visibility is a discovery choice; enforce permissions in `beforeCall`.
+
+### Inspect call envelopes and choose protocol errors
+
+`validateCallParams(context, params)` inspects the complete `tools/call` params object, including `name`, `arguments`, `_meta`, `task` and arbitrary extension fields. It runs after the basic object/name check, before tool lookup, input schema validation, `beforeCall` or invocation. It may be async; treat params as read-only. Return nothing to continue or throw to refuse. This hook works over both HTTP and stdio.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { McpError } from "@warlock.js/ai-tools";
+
+ai.mcp.serve([ai.tools.calculator()], {
+  name: "interactive-tools",
+  validateCallParams: (_context, params) => {
+    const unsupported = Object.keys(params).filter(
+      (key) => !["name", "arguments", "_meta"].includes(key),
+    );
+    if (unsupported.length > 0) {
+      throw new McpError(-32600, "Unsupported call envelope", { fields: unsupported });
+    }
+  },
+  beforeCall: (context) => {
+    if (context.principal === "blocked") {
+      throw new McpError(-32600, "Caller denied");
+    }
+  },
+});
+```
+
+`McpError(code, message, data?)` is exported from `@warlock.js/ai-tools` and extends `Error`. In `beforeCall` and `validateCallParams`, it becomes a JSON-RPC error with exactly those fields. The official SDK's `McpError` is also recognized without adding a runtime SDK dependency: an `Error` named `McpError` with an integer `code` opts in. Its existing `.message` is preserved verbatim, including any SDK-added prefix. Other errors and thrown values retain the `-32602` mapping. This does not change tool execution failures, which remain `isError: true` results.
+
+The server negotiates `2025-11-25`, `2025-06-18` and `2025-03-26`. It does **not** advertise task capability. By default it continues to ignore extra call envelope fields, including `task`, and invokes the tool normally. The [MCP 2025-11-25 task support rules](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks#task-support-and-handling) require receivers without the corresponding task capability to ignore task augmentation metadata. Task support first appeared in that version. The validation example is an explicit application envelope restriction, not automatic task protocol enforcement; omit or adjust it for clients relying on that default. `_meta` is protocol metadata, not an unknown field, so the example allows it.
+
+### Extra authenticated HTTP routes
+
+Set `transport.routes` to serve small application endpoints on the same HTTP server. Routes share all configured bearer, authorize and authenticate checks, in the same order, plus the Host/Origin guards. As with the MCP endpoint, loopback can run without configured auth; non-loopback requires it. Authentication happens before reading the body or calling the handler.
+
+```ts
+import { randomBytes } from "node:crypto";
+import { ai } from "@warlock.js/ai";
+import { McpError } from "@warlock.js/ai-tools";
+
+const tools = [ai.tools.calculator(), ai.tools.dateTime()];
+const token = randomBytes(32).toString("hex");
+const allowed = (principal: unknown, name: string) =>
+  principal === "member" && tools.some((tool) => tool.name === name);
+
+const { url, close } = await ai.mcp
+  .serve(tools, {
+    name: "policy-tools",
+    listFilter: (_context, descriptors) => descriptors.filter((tool) => tool.name === "calculator"),
+    beforeCall: (context, tool) => {
+      if (!allowed(context.principal, tool.name)) throw new McpError(-32600, "Denied");
+    },
+    transport: {
+      type: "http",
+      path: "/mcp",
+      auth: {
+        bearer: token,
+        authenticate: () => "member", // identity associated with this bearer token
+      },
+      routes: [
+        {
+          method: "GET",
+          path: "/tool-policy",
+          handler: (context) => ({
+            body: {
+              allowed: allowed(context.principal, context.url.searchParams.get("name") ?? ""),
+            },
+          }),
+        },
+      ],
+    },
+  })
+  .start();
+
+// GET `${url}/tool-policy?name=date_time` with Authorization: Bearer <token>
+// returns { allowed: true }; date_time is callable even though hidden above.
+await close();
+```
+
+Paths are exact suffixes beneath the MCP URL: `/tool-policy` with `/mcp` or `/mcp/` mounts at `/mcp/tool-policy`; with MCP path `/`, it mounts at `/tool-policy`. Each segment must be nonempty and use letters, digits, `_`, `-`, `.` or `~`; `.` and `..` segments, percent escapes, queries, fragments, wildcards, repeated slashes and trailing slashes are rejected in configured route paths. Read incoming query parameters from `context.url.searchParams`; queries do not affect route matching. When routes are configured, the MCP path must be a canonical URL pathname without query/fragment or normalization. The MCP endpoint itself is reserved for **all methods**: empty and `/` route suffixes are invalid, so a route cannot replace MCP POST, GET or DELETE behavior. Duplicate method/path pairs fail `start()` with `McpServeError.type: "collision"`; invalid routes fail with `"config"`. Different methods may share one route path. There is no wildcard matching, implicit HEAD mapping or automatic OPTIONS/CORS handler.
+
+A known route path with an unregistered method answers `405` with `Allow`; unknown paths answer `404`. Supported methods are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`. MCP protocol-version, Accept and JSON Content-Type requirements apply to the MCP endpoint; side routes receive the UTF-8 body without JSON parsing, capped by the same `maxBodyBytes` (`413` on overflow).
+
+The handler receives `McpHttpRouteContext`: `request` (method/path/headers/remoteAddress), `principal`, `url`, `body` and `signal`; `requestId` is absent because it is not a JSON-RPC request. The signal aborts on disconnect or shutdown after the drain timeout. Return `McpHttpRouteResponse` with optional `status` (default `200`), `headers` and a JSON-serializable `body`; omitting body sends an empty response, and HEAD always suppresses the body. A thrown handler error returns a generic `500` without exposing the error. In-flight routes participate in `close()` draining. A route can reuse an application's policy function, as above; the transport does not invoke `beforeCall` for route requests. Routes are HTTP-only.
+
+Public types include `McpListFilter`, `McpValidateCallParams`, `McpHttpRoute`, `McpHttpRouteContext` and `McpHttpRouteResponse`.
 
 ### Cancellation
 

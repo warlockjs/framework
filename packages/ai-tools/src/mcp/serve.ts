@@ -4,6 +4,7 @@ import { extractJsonSchema, type ToolContext, type ToolContract } from "@warlock
 import type {
   JsonRpcRequest,
   JsonRpcResponse,
+  McpCallRefusal,
   McpGroupedToolSource,
   McpHttpServeHandle,
   McpHttpServeTransport,
@@ -22,6 +23,7 @@ import type {
   McpToolSource,
 } from "../contracts";
 import { McpServeError, McpTransportError } from "../errors";
+import { isMcpError } from "./error";
 import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
 import { startHttpServer } from "./serve-http";
 import { McpServeRequests } from "./serve-requests";
@@ -242,7 +244,7 @@ class McpServeHandler {
       case "ping":
         return {};
       case "tools/list":
-        return { tools: this.listTools() };
+        return { tools: await this.listTools({ ...context, requestId: request.id }) };
       case "tools/call":
         return this.callTool(request.params, { ...context, requestId: request.id });
       default:
@@ -317,10 +319,10 @@ class McpServeHandler {
    * the configured dialect (default `draft-2020-12` — overriding
    * `extractJsonSchema`'s own `openai-strict` default to a neutral MCP draft).
    */
-  private listTools(): McpToolDescriptor[] {
+  private async listTools(context: McpServeToolContext): Promise<readonly McpToolDescriptor[]> {
     const target = this.options.schemaTarget ?? DEFAULT_SCHEMA_TARGET;
 
-    return this.tools.map(({ name, contract }) => {
+    const tools = this.tools.map(({ name, contract }) => {
       const inputSchema = extractJsonSchema(contract.input, { target }) ?? {
         type: "object",
         properties: {},
@@ -335,6 +337,9 @@ class McpServeHandler {
           : {}),
       };
     });
+
+    context.signal?.throwIfAborted();
+    return this.options.listFilter ? this.options.listFilter(context, tools) : tools;
   }
 
   /**
@@ -352,6 +357,21 @@ class McpServeHandler {
     context: McpServeToolContext,
   ): Promise<McpToolCallResult> {
     const { name, args } = readCallParams(params);
+
+    if (this.options.validateCallParams) {
+      context.signal?.throwIfAborted();
+
+      try {
+        await this.options.validateCallParams(context, readRecord(params));
+      } catch (cause) {
+        if (isMcpError(cause)) {
+          throw new RpcFailure(cause.code, cause.message, cause.data);
+        }
+
+        throw cause;
+      }
+    }
+
     const contract = this.byName.get(name);
 
     if (!contract) {
@@ -415,7 +435,17 @@ class McpServeHandler {
       }
 
       context.signal?.throwIfAborted();
-      const refusal = await this.options.beforeCall(context, contract, input);
+      let refusal: void | McpCallRefusal;
+
+      try {
+        refusal = await this.options.beforeCall(context, contract, input);
+      } catch (cause) {
+        if (isMcpError(cause)) {
+          throw new RpcFailure(cause.code, cause.message, cause.data);
+        }
+
+        throw cause;
+      }
 
       if (refusal !== undefined) {
         try {

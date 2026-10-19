@@ -4,6 +4,18 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.34.0
+
+### Added
+
+- `ai.mcp.serve` supports async `listFilter(context, tools)` for per-request discovery independent of callability, and `validateCallParams(context, params)` for application envelope policy before lookup, schema validation and call policy, over HTTP and stdio. Default handling of unknown fields and unsupported task metadata is unchanged.
+- HTTP `transport.routes` adds exact method/path application routes beneath the MCP URL with shared authentication, principal/context, Host/Origin guards, body limits, disconnect signals and shutdown draining. Conflicting or invalid route configuration fails before binding.
+- Export `McpError(code, message, data?)` and the new discovery, envelope and HTTP route contracts.
+
+### Fixed
+
+- `beforeCall` and envelope policy preserve a thrown `McpError`'s integer code, message and optional data, including official SDK errors, without a runtime SDK dependency. Other throws retain the existing invalid-params mapping.
+
 ## 5.33.0 - 2026-10-19
 
 ### Fixed

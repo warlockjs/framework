@@ -1,5 +1,5 @@
 import type { JsonSchemaTarget, ToolContract, ToolRequestContext } from "@warlock.js/ai";
-import type { JsonRpcId, McpContentBlock, McpToolCallResult } from "./mcp.type";
+import type { JsonRpcId, McpContentBlock, McpToolCallResult, McpToolDescriptor } from "./mcp.type";
 
 /**
  * Type contracts for `ai.mcp.serve(source, options)` — exposing local
@@ -75,6 +75,37 @@ export type McpHttpAuth = {
   authenticate?: (request: McpHttpRequestInfo) => unknown | Promise<unknown>;
 };
 
+/** Authenticated context for an extra HTTP route; there is no JSON-RPC id. */
+export type McpHttpRouteContext = McpServeCallContext & {
+  request: McpHttpRequestInfo;
+  /** Parsed request URL; use searchParams to read query parameters. */
+  url: URL;
+  /** UTF-8 request body, subject to the transport's maxBodyBytes limit. */
+  body: string;
+  signal: AbortSignal;
+};
+
+/** JSON response from an extra HTTP route. Omit body for an empty response. */
+export type McpHttpRouteResponse = {
+  /** @default 200 */
+  status?: number;
+  headers?: Record<string, string>;
+  body?: unknown;
+};
+
+/** An exact method/path route beneath the MCP endpoint, sharing its auth. */
+export type McpHttpRoute = {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+  /**
+   * Suffix such as /tool-policy, appended to the MCP path without its trailing
+   * slash. Nonempty segments use letters, digits, _, -, . or ~; . and .. are
+   * forbidden. No query, fragment, escapes, wildcard or trailing slash.
+   * The MCP endpoint itself is reserved for every method. Duplicates fail start().
+   */
+  path: string;
+  handler(context: McpHttpRouteContext): McpHttpRouteResponse | Promise<McpHttpRouteResponse>;
+};
+
 /**
  * Serve over the MCP Streamable HTTP transport.
  *
@@ -99,13 +130,15 @@ export type McpHttpServeTransport = {
    */
   port?: number;
   /**
-   * The single MCP endpoint path. Other paths answer 404.
+   * The MCP endpoint path. Other paths answer 404 unless registered in routes.
    *
    * @default "/mcp"
    */
   path?: string;
   /** Bearer, authorize and/or authenticate checks. Required off loopback. */
   auth?: McpHttpAuth;
+  /** Extra HTTP routes with the same Host/Origin and authentication checks. */
+  routes?: readonly McpHttpRoute[];
   /**
    * Extra browser origins allowed to call the endpoint, as full origins
    * (`"https://app.example.com"`). Loopback origins (`http://localhost:*`,
@@ -181,6 +214,21 @@ export type McpBeforeCall = (
   tool: ToolContract,
   input: unknown,
 ) => void | McpCallRefusal | Promise<void | McpCallRefusal>;
+
+/** Filter fresh wire descriptors for discovery only; hidden tools stay callable. */
+export type McpListFilter = (
+  context: McpServeToolContext,
+  tools: readonly McpToolDescriptor[],
+) => readonly McpToolDescriptor[] | Promise<readonly McpToolDescriptor[]>;
+
+/**
+ * Inspect the complete tools/call params before lookup, schema validation or
+ * beforeCall. Treat params as read-only; throw McpError for an app-defined error.
+ */
+export type McpValidateCallParams = (
+  context: McpServeToolContext,
+  params: Readonly<Record<string, unknown>>,
+) => void | Promise<void>;
 
 /**
  * A static MCP resource served by `resources/list` + `resources/read`.
@@ -283,9 +331,17 @@ export interface McpServeOptions {
   /**
    * Runs after schema validation and before invocation. Input is the validated
    * value and should be treated as read-only. Return an isError:true native
-   * result to refuse; throw to answer with a JSON-RPC invalid-params error.
+   * result to refuse. McpError preserves its code/message/data; other throws
+   * answer with a JSON-RPC invalid-params error.
    */
   beforeCall?: McpBeforeCall;
+  /** Per-request discovery filter; never changes tools/call lookup or policy. */
+  listFilter?: McpListFilter;
+  /**
+   * Optional envelope policy. Receives all params, including unknown fields,
+   * task and _meta. By default extra fields are ignored (no task capability).
+   */
+  validateCallParams?: McpValidateCallParams;
   /**
    * Prefix each tool of a grouped source (`{ groups: { … } }`) with its
    * group name. `true` exposes `<group>_<tool>`; a function builds the

@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   McpHttpServeHandle,
   McpHttpServeTransport,
+  McpHttpRouteContext,
+  McpServeToolContext,
   McpServeOptions,
   McpServeSource,
   McpToolCallResult,
@@ -14,7 +16,7 @@ import { objectSchema, stringField } from "../schema";
 import { mcp } from "./client";
 import { isLoopbackHost } from "./serve-http";
 import { serve } from "./serve";
-import { mcpResult } from "../index";
+import { McpError, mcpResult } from "../index";
 
 /** A tool that uppercases its `value`. */
 function upperTool(name = "upper"): ToolContract {
@@ -1255,4 +1257,364 @@ it("honours cancellation sent by the official SDK without a JSON-RPC response", 
     controller.abort();
     await client.close();
   }
+});
+
+describe("serve() over http — discovery and envelope policy", () => {
+  it("filters discovery per authenticated caller while hidden tools keep the same call policy", async () => {
+    const beforeCall = vi.fn((context: McpServeToolContext) => {
+      if (context.principal === "denied")
+        throw new McpError(-32600, "Denied", { policy: "member" });
+    });
+    const { url } = await start(
+      [upperTool()],
+      { auth: { authenticate: (info) => info.headers["x-member"] } },
+      {
+        listFilter: async (context, tools) => {
+          expect(context.requestId).toBe(1);
+          expect(context.signal).toBeInstanceOf(AbortSignal);
+          expect(context.request?.path).toBe("/mcp");
+          return context.principal === "operator" ? tools : [];
+        },
+        beforeCall,
+        validateCallParams: (context, params) => {
+          expect(context.principal).toBe(context.request?.headers["x-member"]);
+          if ("task" in params) throw new McpError(-32012, "Unsupported task envelope");
+        },
+      },
+    );
+    expect(JSON.parse((await rpc(url, LIST, { "x-member": "reader" })).body).result.tools).toEqual(
+      [],
+    );
+    expect(
+      JSON.parse((await rpc(url, LIST, { "x-member": "operator" })).body).result.tools,
+    ).toHaveLength(1);
+    const message = {
+      jsonrpc: "2.0",
+      id: "hidden",
+      method: "tools/call",
+      params: { name: "upper", arguments: { value: "hi" } },
+    };
+    expect(
+      JSON.parse((await rpc(url, message, { "x-member": "reader" })).body).result,
+    ).toMatchObject({ content: [{ text: '{"upper":"HI"}' }] });
+    expect(JSON.parse((await rpc(url, message, { "x-member": "denied" })).body).error).toEqual({
+      code: -32600,
+      message: "Denied",
+      data: { policy: "member" },
+    });
+    expect(
+      JSON.parse(
+        (
+          await rpc(
+            url,
+            { ...message, params: { ...message.params, task: {}, extension: true } },
+            { "x-member": "reader" },
+          )
+        ).body,
+      ).error,
+    ).toEqual({ code: -32012, message: "Unsupported task envelope" });
+    expect(beforeCall).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves errors thrown by the official SDK without a serving runtime dependency", async () => {
+    const sdkTypes = "@modelcontextprotocol/sdk/types.js";
+    const { McpError: SdkMcpError } = (await import(sdkTypes)) as {
+      McpError: new (
+        code: number,
+        message: string,
+        data?: unknown,
+      ) => Error & { code: number; data?: unknown };
+    };
+    const denied = new SdkMcpError(-32600, "Denied by policy", { allowed: false });
+    const { url } = await start(
+      [upperTool()],
+      {},
+      {
+        beforeCall: () => {
+          throw denied;
+        },
+      },
+    );
+    const response = await rpc(url, {
+      jsonrpc: "2.0",
+      id: "sdk-error",
+      method: "tools/call",
+      params: { name: "upper", arguments: { value: "hi" } },
+    });
+    expect(JSON.parse(response.body)).toEqual({
+      jsonrpc: "2.0",
+      id: "sdk-error",
+      error: { code: denied.code, message: denied.message, data: denied.data },
+    });
+  });
+
+  it("keeps unknown envelopes ignored by default over HTTP", async () => {
+    const { url } = await start([upperTool()]);
+    const response = await rpc(url, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "upper", arguments: { value: "hi" }, task: {}, extension: "ignored" },
+    });
+    expect(JSON.parse(response.body).result).toMatchObject({
+      content: [{ text: '{"upper":"HI"}' }],
+    });
+  });
+});
+
+describe("serve() over http — authenticated extra routes", () => {
+  it("shares ordered auth and principal/context, query parameters and JSON responses", async () => {
+    const principal = { member: "reader" };
+    const authenticate = vi.fn(() => principal);
+    const authorize = vi.fn(() => true);
+    const handler = vi.fn((context: McpHttpRouteContext) => {
+      expect(context.principal).toBe(principal);
+      expect(context.request).toMatchObject({
+        method: "GET",
+        path: "/mcp/tool-policy",
+        headers: { authorization: "Bearer secret" },
+      });
+      expect(context.request.remoteAddress).toBeTruthy();
+      expect(context.requestId).toBeUndefined();
+      expect(context.signal).toBeInstanceOf(AbortSignal);
+      expect(context.body).toBe("");
+      return {
+        body: { allowed: context.url.searchParams.get("name") === "upper" },
+        headers: { "x-policy": "member" },
+      };
+    });
+    const { url } = await start([upperTool()], {
+      auth: { bearer: "secret", authorize, authenticate },
+      routes: [{ method: "GET", path: "/tool-policy", handler }],
+    });
+    const options = {
+      method: "GET",
+      path: "/mcp/tool-policy?name=upper",
+      headers: { authorization: "Bearer secret" },
+    };
+    expect((await raw(url, { ...options, headers: {} })).status).toBe(401);
+    expect(authorize).not.toHaveBeenCalled();
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+    const response = await raw(url, options);
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ allowed: true });
+    expect(response.headers["content-type"]).toBe("application/json");
+    expect(response.headers["x-policy"]).toBe("member");
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(authenticate).toHaveBeenCalledOnce();
+    expect((await rpc(url, LIST, options.headers)).status).toBe(200);
+  });
+
+  it("applies Host/Origin checks and every auth hook before invoking routes", async () => {
+    const handler = vi.fn(() => ({ body: { ok: true } }));
+    const authenticate = vi.fn(() => "member");
+    const { url } = await start([], {
+      auth: {
+        bearer: "secret",
+        authorize: (info) => info.headers["x-allow"] === "yes",
+        authenticate,
+      },
+      routes: [{ method: "GET", path: "/policy", handler }],
+    });
+    const base = {
+      method: "GET",
+      path: "/mcp/policy",
+      headers: { authorization: "Bearer secret", "x-allow": "yes" },
+    };
+    for (const headers of [
+      { ...base.headers, host: "untrusted.example" },
+      { ...base.headers, origin: "https://untrusted.example" },
+    ]) {
+      expect((await raw(url, { ...base, headers })).status).toBe(403);
+    }
+    expect((await raw(url, { ...base, headers: { authorization: "Bearer secret" } })).status).toBe(
+      401,
+    );
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+    expect((await raw(url, base)).status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it.each(["undefined", "throw"])("denies a route when authenticate returns %s", async (mode) => {
+    const handler = vi.fn(() => ({ body: "secret" }));
+    const { url } = await start([], {
+      auth: {
+        authenticate: () => {
+          if (mode === "throw") throw new Error("private auth error");
+          return undefined;
+        },
+      },
+      routes: [{ method: "GET", path: "/policy", handler }],
+    });
+    const response = await raw(url, { method: "GET", path: "/mcp/policy" });
+    expect(response.status).toBe(401);
+    expect(response.headers["www-authenticate"]).toBe('Bearer realm="mcp"');
+    expect(response.body).not.toContain("private auth error");
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("matches exact methods and paths beneath a trailing-slash MCP url", async () => {
+    const { url } = await start([], {
+      path: "/rpc/",
+      routes: [
+        {
+          method: "POST",
+          path: "/policy",
+          handler: (context) => ({ status: 201, body: { received: context.body } }),
+        },
+        { method: "GET", path: "/policy", handler: () => ({ status: 204 }) },
+        {
+          method: "HEAD",
+          path: "/policy",
+          handler: () => ({ body: { ignored: true }, headers: { "x-ok": "yes" } }),
+        },
+      ],
+    });
+    const created = await raw(url, {
+      path: "/rpc/policy?name=x",
+      body: "plain-text",
+      headers: { "content-type": "text/plain", "mcp-protocol-version": "not-mcp" },
+    });
+    expect(created.status).toBe(201);
+    expect(JSON.parse(created.body)).toEqual({ received: "plain-text" });
+    const empty = await raw(url, { method: "GET", path: "/rpc/policy" });
+    expect(empty.status).toBe(204);
+    expect(empty.body).toBe("");
+    const head = await raw(url, { method: "HEAD", path: "/rpc/policy" });
+    expect(head.body).toBe("");
+    expect(head.headers["x-ok"]).toBe("yes");
+    const wrongMethod = await raw(url, { method: "DELETE", path: "/rpc/policy" });
+    expect(wrongMethod.status).toBe(405);
+    expect(wrongMethod.headers.allow).toBe("GET, HEAD, POST");
+    for (const path of ["/rpc/policy/", "/rpc/policy/child", "/policy", "/rpc/unknown"]) {
+      expect((await raw(url, { method: "GET", path })).status).toBe(404);
+    }
+    expect((await raw(url, { method: "GET" })).status).toBe(405);
+    expect((await rpc(url, LIST)).status).toBe(200);
+  });
+
+  it("mounts routes below a root MCP path", async () => {
+    const { url } = await start([], {
+      path: "/",
+      routes: [{ method: "GET", path: "/policy", handler: () => ({ body: true }) }],
+    });
+    expect((await raw(url, { method: "GET", path: "/policy" })).body).toBe("true");
+    expect((await rpc(url, LIST)).status).toBe(200);
+  });
+
+  it.each([
+    "",
+    "/",
+    "policy",
+    "//policy",
+    "/a//b",
+    "/a/",
+    "/.",
+    "/..",
+    "/a/../b",
+    "/%2e%2e",
+    "/a?x=1",
+    "/a#b",
+    "/a*",
+    "/a\\b",
+  ])("rejects invalid or reserved route suffix %j before binding", async (path) => {
+    await expect(
+      start([], { routes: [{ method: "GET", path, handler: () => ({}) }] }),
+    ).rejects.toMatchObject({ type: "config" });
+  });
+
+  it("refuses duplicate method/path pairs and noncanonical endpoint paths before binding", async () => {
+    const route = { method: "GET", path: "/policy", handler: () => ({}) } as const;
+    await expect(start([], { routes: [route, route] })).rejects.toMatchObject({
+      type: "collision",
+    });
+    await expect(start([], { path: "/rpc?query", routes: [route] })).rejects.toMatchObject({
+      type: "config",
+    });
+  });
+
+  it("caps route bodies and conceals handler exceptions", async () => {
+    const handler = vi.fn(() => {
+      throw new Error("private route error");
+    });
+    const { url } = await start([], {
+      maxBodyBytes: 8,
+      routes: [{ method: "POST", path: "/policy", handler }],
+    });
+    expect(
+      (
+        await raw(url, {
+          path: "/mcp/policy",
+          body: "0123456789",
+          headers: { "content-length": "10" },
+        })
+      ).status,
+    ).toBe(413);
+    expect(handler).not.toHaveBeenCalled();
+    const failed = await raw(url, { path: "/mcp/policy", body: "ok" });
+    expect(failed.status).toBe(500);
+    expect(failed.body).not.toContain("private route error");
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("aborts a route when the client disconnects", async () => {
+    let routeSignal: AbortSignal | undefined;
+    const { url } = await start([], {
+      routes: [
+        {
+          method: "GET",
+          path: "/slow",
+          handler: async (context) => {
+            routeSignal = context.signal;
+            await new Promise<void>((resolve) =>
+              context.signal.addEventListener("abort", () => resolve(), { once: true }),
+            );
+            return { body: "done" };
+          },
+        },
+      ],
+    });
+    const outgoing = httpRequest(`${url}/slow`, { method: "GET" });
+    outgoing.on("error", () => {});
+    outgoing.end();
+    try {
+      await vi.waitFor(() => expect(routeSignal).toBeDefined());
+      outgoing.destroy();
+      await vi.waitFor(() => expect(routeSignal?.aborted).toBe(true));
+    } finally {
+      outgoing.destroy();
+    }
+  });
+
+  it("aborts route context after the shutdown drain timeout", async () => {
+    let routeSignal: AbortSignal | undefined;
+    let entered: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const { url, close } = await start([], {
+      drainTimeoutMs: 10,
+      routes: [
+        {
+          method: "GET",
+          path: "/slow",
+          handler: async (context) => {
+            routeSignal = context.signal;
+            entered();
+            await new Promise<void>((resolve) =>
+              context.signal.addEventListener("abort", () => resolve(), { once: true }),
+            );
+            return { body: "done" };
+          },
+        },
+      ],
+    });
+    const exchange = raw(url, { method: "GET", path: "/mcp/slow" }).catch(() => undefined);
+    await ready;
+    await close();
+    await exchange;
+    expect(routeSignal?.aborted).toBe(true);
+  });
 });
