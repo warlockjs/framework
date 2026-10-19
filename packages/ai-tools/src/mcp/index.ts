@@ -17,7 +17,7 @@ export { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
 export { McpError } from "./error";
 export { mcpResult } from "./result";
 export type { McpNativeResult } from "./result";
-export { jsonSchemaToStandard } from "./json-schema-to-standard";
+export { jsonSchemaToStandard, type JsonSchemaStandard } from "./json-schema-to-standard";
 export { createJsonRpcClient, createTransport } from "./transport";
 export type { JsonRpcClientHandle } from "./transport";
 export type { McpTransportClient } from "./transport.type";

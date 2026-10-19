@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.34.1
+
+### Fixed
+
+- Tools adapted from a remote MCP server now show the model their real input schema. `jsonSchemaToStandard` implements Standard JSON Schema (`~standard.jsonSchema`), so `extractJsonSchema` and every provider adapter read the server's `inputSchema` instead of falling back to a parameterless `{ type: "object" }`, which made models guess argument names and retry. Adapters receive copies of the schema; a tool without one advertises `{ type: "object", properties: {} }`.
+
 ## 5.34.0 - 2026-10-19
 
 ### Added

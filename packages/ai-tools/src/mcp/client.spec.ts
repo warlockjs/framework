@@ -152,6 +152,15 @@ describe("mcp() client — handshake + tools/list", () => {
     expect(typeof contract.invoke).toBe("function");
   });
 
+  it("advertises each remote tool's input schema to provider adapters", async () => {
+    const { extractJsonSchema } = await import("@warlock.js/ai");
+    const tools = await mcp(scriptedTransport([ECHO_TOOL])).tools();
+    const [contract] = tools;
+    if (!contract) throw new Error("Expected an adapted echo tool");
+
+    expect(extractJsonSchema(contract.input)).toEqual(ECHO_TOOL.inputSchema);
+  });
+
   it("supplies a fallback description when the remote omits one", async () => {
     const transport = scriptedTransport([{ name: "bare" }]);
 

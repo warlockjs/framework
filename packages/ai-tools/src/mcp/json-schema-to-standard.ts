@@ -1,4 +1,4 @@
-import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { StandardJSONSchemaV1, StandardSchemaV1 } from "@standard-schema/spec";
 
 /**
  * The inverse of `@warlock.js/ai`'s `extractJsonSchema` (which goes
@@ -148,7 +148,8 @@ function makeCompiler(schema: Record<string, unknown>): () => AjvValidateFunctio
  *
  * @param schema - The JSON Schema (an MCP tool's `inputSchema`), or
  *   `undefined` for a no-argument tool.
- * @returns A `StandardSchemaV1<TInput>` ready for `tool({ input })`.
+ * @returns A `StandardSchemaV1<TInput>` ready for `tool({ input })` that also implements
+ * Standard JSON Schema, so provider adapters advertise the wrapped schema.
  *
  * @example
  * const input = jsonSchemaToStandard<{ q: string }>({
@@ -157,9 +158,25 @@ function makeCompiler(schema: Record<string, unknown>): () => AjvValidateFunctio
  *   required: ["q"],
  * });
  */
+/** A validating wrapper that also exposes the JSON Schema it wraps. */
+export type JsonSchemaStandard<TInput = unknown> = StandardSchemaV1<TInput> &
+  StandardJSONSchemaV1<TInput>;
+
+/**
+ * Standard JSON Schema converter returning a copy of the wrapped schema, so
+ * provider adapters (which may compact or rewrite it) never mutate the source.
+ * The remote server owns its schema, so every target receives it unchanged.
+ */
+function exposeSchema(schema: Record<string, unknown>): StandardJSONSchemaV1.Converter {
+  return {
+    input: () => structuredClone(schema),
+    output: () => structuredClone(schema),
+  };
+}
+
 export function jsonSchemaToStandard<TInput = unknown>(
   schema: Record<string, unknown> | undefined,
-): StandardSchemaV1<TInput> {
+): JsonSchemaStandard<TInput> {
   // A tool with no schema (or an empty object schema) validates everything
   // — return an accept-all passthrough and never touch Ajv.
   if (!schema || Object.keys(schema).length === 0) {
@@ -168,6 +185,7 @@ export function jsonSchemaToStandard<TInput = unknown>(
         version: 1,
         vendor: VENDOR,
         validate: (value: unknown) => ({ value: value as TInput }),
+        jsonSchema: exposeSchema({ type: "object", properties: {} }),
       },
     };
   }
@@ -178,6 +196,7 @@ export function jsonSchemaToStandard<TInput = unknown>(
     "~standard": {
       version: 1,
       vendor: VENDOR,
+      jsonSchema: exposeSchema(schema),
       async validate(value: unknown): Promise<StandardSchemaV1.Result<TInput>> {
         await loadAjv();
 

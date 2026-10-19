@@ -620,7 +620,7 @@ Bad requests never throw: they get an HTTP status or a JSON-RPC error. Tool-leve
 
 MCP describes a tool's arguments with a **JSON Schema**, but Warlock's `ToolContract` validates input with a **Standard Schema**. `jsonSchemaToStandard` bridges the two and runs at both boundaries:
 
-- **Consuming (A)** — each remote tool's JSON-Schema `inputSchema` is wrapped into a Standard Schema so the adapted contract validates calls locally.
+- **Consuming (A)** — each remote tool's JSON-Schema `inputSchema` is wrapped into a Standard Schema so the adapted contract validates calls locally. The wrapper also exposes the original schema as Standard JSON Schema (`~standard.jsonSchema`), so provider adapters advertise the server's real argument names to the model; a tool without an `inputSchema` advertises `{ type: "object", properties: {} }`.
 - **Publishing (B)** — each contract's Standard Schema is projected to JSON Schema via `extractJsonSchema(contract.input, { target: schemaTarget })` for `tools/list`.
 
 ```ts

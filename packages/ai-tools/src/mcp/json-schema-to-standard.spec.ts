@@ -159,3 +159,32 @@ describe("jsonSchemaToStandard — ajv-backed validation", () => {
     expect(b).toEqual({ value: { message: "two" } });
   });
 });
+
+describe("jsonSchemaToStandard — advertised JSON Schema", () => {
+  const schema = {
+    type: "object",
+    properties: { text: { type: "string" }, final: { type: "boolean" } },
+    required: ["text"],
+    additionalProperties: false,
+  };
+
+  it("lets provider adapters read the wrapped schema", async () => {
+    const { extractJsonSchema } = await import("@warlock.js/ai");
+    expect(extractJsonSchema(jsonSchemaToStandard(schema))).toEqual(schema);
+  });
+
+  it("hands out copies so adapters cannot mutate the source schema", () => {
+    const converter = jsonSchemaToStandard(schema)["~standard"].jsonSchema;
+    const copy = converter.input({ target: "draft-2020-12" });
+    (copy.properties as Record<string, unknown>).extra = { type: "number" };
+    expect(converter.input({ target: "draft-2020-12" })).toEqual(schema);
+  });
+
+  it("advertises an empty object schema for a tool without one", async () => {
+    const { extractJsonSchema } = await import("@warlock.js/ai");
+    expect(extractJsonSchema(jsonSchemaToStandard(undefined))).toEqual({
+      type: "object",
+      properties: {},
+    });
+  });
+});
