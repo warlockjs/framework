@@ -5,6 +5,7 @@
 ### Added
 
 - Publish the Node-only `@warlock.js/core/e2e` entry independently from the application barrel.
+
 ### Removed
 
 - Drop the removed ESLint worker from core's published build entries; generated-source documentation and oracle comments refer to Oxfmt.

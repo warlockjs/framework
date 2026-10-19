@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Upgrading
 
 - Convert class instances to explicit plain DTOs before object validation; use array or instance validators for those inputs. No permissive object opt-in is provided because it would recreate accidental array acceptance.
+
 ### Removed
 
 - Remove the remaining ESLint, Prettier and typescript-eslint development dependencies; package linting and formatting use Oxlint/Oxfmt.

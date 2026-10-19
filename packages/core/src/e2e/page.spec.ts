@@ -200,7 +200,7 @@ describe("browser page over a fake CDP endpoint", () => {
     expect(evidence.networkFailures).toHaveLength(2);
     expect(evidence.networkFailures.every(({ allowed }) => allowed)).toBe(true);
     expect(evidence.console.every(({ allowed }) => allowed)).toBe(true);
-    endpoint.event("Log.entryAdded", { entry: { level: "error", text: "unexpected error" } });
+    endpoint.event("Log.entryAdded", { entry: { level: "error", text: "boom: not allowlisted" } });
     endpoint.event("Network.responseReceived", {
       requestId: "3",
       response: { url: "http://local/missing", status: 500 },

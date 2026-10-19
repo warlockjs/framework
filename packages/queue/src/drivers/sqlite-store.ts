@@ -1,9 +1,27 @@
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import type { DatabaseSync } from "node:sqlite";
 import type { JobState, QueueConfig } from "../types";
 import type { LocalJob, LocalStore } from "./local-store";
+
+/**
+ * The part of `node:sqlite` this store uses. Declared here so apps type-check the
+ * shipped source without depending on a particular `@types/node` release.
+ * https://nodejs.org/docs/latest-v22.x/api/sqlite.html
+ */
+type SqliteValue = null | number | bigint | string | Uint8Array;
+type SqliteRow = Record<string, unknown>;
+type SqliteStatement = {
+  all(...parameters: SqliteValue[]): SqliteRow[];
+  get(...parameters: SqliteValue[]): SqliteRow | undefined;
+  run(...parameters: SqliteValue[]): unknown;
+};
+type DatabaseSync = {
+  exec(sql: string): void;
+  prepare(sql: string): SqliteStatement;
+  close(): void;
+};
+type SqliteModule = { DatabaseSync: new (path: string) => DatabaseSync };
 
 /** node:sqlite is loaded only when the local backend is selected. */
 export class SqliteStore implements LocalStore {
@@ -14,9 +32,9 @@ export class SqliteStore implements LocalStore {
     const path = resolve(config.local?.path ?? ".warlock/queue.sqlite");
     if (config.local?.path === ":memory:")
       throw new Error("Use driver: 'memory' for non-durable queues.");
-    let sqlite: typeof import("node:sqlite");
+    let sqlite: SqliteModule;
     try {
-      sqlite = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
+      sqlite = createRequire(import.meta.url)("node:sqlite") as SqliteModule;
     } catch (cause) {
       throw new Error(
         "The local queue driver requires Node >= 22.15 with node:sqlite available without flags.",

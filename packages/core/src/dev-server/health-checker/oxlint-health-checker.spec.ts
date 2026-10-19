@@ -499,9 +499,9 @@ describe("Oxlint background file checks", () => {
         (checker) => checker.name,
       ),
     ).toEqual(["Oxlint"]);
-    expect(() => defaultHealthCheckers({ ...{ eslint: true } }, cwd)).toThrow(
-      /removed in 5\.34\.0/,
-    );
+    // The removed option still arrives from untyped 5.33 configs; it must fail loudly.
+    const legacyOptions: Record<string, boolean> = { eslint: true };
+    expect(() => defaultHealthCheckers(legacyOptions, cwd)).toThrow(/removed in 5\.34\.0/);
     expect(defaultHealthCheckers({ oxlint: false }, cwd).map((checker) => checker.name)).toEqual([
       "TypeScript",
     ]);

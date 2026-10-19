@@ -201,7 +201,7 @@ export function catalogue(options: ToolCatalogueOptions): ToolCatalogue {
           );
           return {
             ...item,
-            score: scores.reduce((sum, score) => sum + score, 0),
+            score: scores.reduce<number>((sum, score) => sum + score, 0),
             matches: scores.every((score) => score > 0),
           };
         })

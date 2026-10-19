@@ -92,7 +92,10 @@ describe("browser run evidence against a fake CDP endpoint", () => {
     ) as E2EEvidence;
     expect(persisted.errors).toContain("original spec failure");
     expect(persisted.steps[1]).toMatchObject({ name: "deliberate failure", status: "failed" });
-    expect(persisted.screenshots.map(({ viewport }) => viewport.width)).toEqual([1280, 390]);
+    expect(
+      persisted.screenshots.map(({ viewport }) => viewport.width),
+      JSON.stringify(persisted.errors),
+    ).toEqual([1280, 390]);
     expect(persisted.processes.every(({ stopped }) => stopped)).toBe(true);
     expect(holder.closed).toBe(true);
     await expect(access(dataRoot)).rejects.toThrow();

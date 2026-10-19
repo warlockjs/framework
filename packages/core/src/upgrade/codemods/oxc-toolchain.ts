@@ -244,7 +244,8 @@ export const oxcToolchain: Codemod = {
       }
       if (file === ".prettierignore") {
         const existing = context.text.read(".oxfmtignore");
-        if (existing === undefined) context.text.write(".oxfmtignore", content, change);
+        if (existing === undefined)
+          context.text.write(".oxfmtignore", `${content.trimEnd()}\n`, change);
         else if (existing.trim() !== content.trim()) {
           review(
             output,

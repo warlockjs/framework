@@ -38,7 +38,7 @@ async function stop(child: Child): Promise<void> {
 
 function spawnWorker(config: QueueConfig, mode: "race" | "crash"): Child {
   const process = fork(fixture, [JSON.stringify(config), mode], {
-    execArgv: [],
+    execArgv: ["--import", "tsx"],
     stdio: ["ignore", "ignore", "pipe", "ipc"],
   });
   const pid = process.pid;

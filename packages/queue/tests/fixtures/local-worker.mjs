@@ -1,39 +1,6 @@
-// Load the actual TypeScript driver in a separate Node process, without a build
-// or dependencies. Node 22.15 provides both synchronous hooks and transform mode:
-// https://nodejs.org/download/release/v22.15.0/docs/api/module.html
-import { existsSync, readFileSync } from "node:fs";
-import { registerHooks, stripTypeScriptTypes } from "node:module";
-import { fileURLToPath } from "node:url";
-
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (specifier === "@warlock.js/logger") {
-      return {
-        url: "data:text/javascript,export const log = { error: (...args) => console.error(...args) };",
-        shortCircuit: true,
-      };
-    }
-    if (specifier.startsWith(".") && context.parentURL?.startsWith("file:")) {
-      const url = new URL(`${specifier}.ts`, context.parentURL);
-      if (existsSync(url)) return { url: url.href, shortCircuit: true };
-    }
-    return nextResolve(specifier, context);
-  },
-  load(url, context, nextLoad) {
-    if (url.endsWith(".ts")) {
-      return {
-        format: "module",
-        shortCircuit: true,
-        source: stripTypeScriptTypes(readFileSync(fileURLToPath(url), "utf8"), {
-          mode: "transform",
-          sourceUrl: url,
-        }),
-      };
-    }
-    return nextLoad(url, context);
-  },
-});
-
+// Runs the real TypeScript driver in a separate Node process. The spec forks this file with
+// `--import tsx`, the same loader other packages use for TypeScript child processes; it
+// also loads built-in modules such as node:sqlite normally.
 const { LocalDriver } = await import("../../src/drivers/local");
 const { SqliteStore } = await import("../../src/drivers/sqlite-store");
 const { registerJob } = await import("../../src/job-registry");

@@ -17,10 +17,16 @@ export async function fakeCdp(
   const commands: FakeCommand[] = [];
   const send = (socket: Duplex, value: unknown) => {
     const payload = Buffer.from(JSON.stringify(value));
-    const header = Buffer.alloc(payload.length < 126 ? 2 : 4);
+    const header = Buffer.alloc(payload.length < 126 ? 2 : payload.length < 65536 ? 4 : 10);
     header[0] = 0x81;
-    header[1] = payload.length < 126 ? payload.length : 126;
-    if (payload.length >= 126) header.writeUInt16BE(payload.length, 2);
+    if (payload.length < 126) header[1] = payload.length;
+    else if (payload.length < 65536) {
+      header[1] = 126;
+      header.writeUInt16BE(payload.length, 2);
+    } else {
+      header[1] = 127;
+      header.writeBigUInt64BE(BigInt(payload.length), 2);
+    }
     socket.write(Buffer.concat([header, payload]));
   };
   const server = createServer((_request, response) => {
@@ -47,14 +53,16 @@ export async function fakeCdp(
       while (buffered.length >= 2) {
         const opcode = buffered[0] & 0x0f;
         const masked = Boolean(buffered[1] & 0x80);
-        let length = buffered[1] & 0x7f;
+        // Branch on the 7-bit marker, not the decoded length: a 16-bit length of
+        // exactly 127 must not be re-read as a 64-bit length.
+        const marker = buffered[1] & 0x7f;
+        let length = marker;
         let offset = 2;
-        if (length === 126) {
+        if (marker === 126) {
           if (buffered.length < 4) return;
           length = buffered.readUInt16BE(2);
           offset = 4;
-        }
-        if (length === 127) {
+        } else if (marker === 127) {
           if (buffered.length < 10) return;
           length = Number(buffered.readBigUInt64BE(2));
           offset = 10;
