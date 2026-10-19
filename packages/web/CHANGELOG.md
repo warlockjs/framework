@@ -2,7 +2,7 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
-## 5.34.1
+## 5.34.1 - 2026-10-19
 
 ### Fixed
 
