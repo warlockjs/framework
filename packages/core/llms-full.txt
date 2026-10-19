@@ -4,6 +4,47 @@
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/core/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
+## Package orientation
+
+---
+description: "The Warlock server framework: HTTP routes, controllers, responses, resources, repositories, CLI, mail, storage, security helpers. Exports `router`, `Request`, `Response`, `RequestHandler`, `useCase`, `RepositoryManager`, `defineResource`, `defineConfig`, `storage`, `sendMail`, `hashPassword`, `command`. Use for: add a route, write a controller, return a JSON response, hide a field from the response, upload a file, send an email, hash a password, add a CLI command, generate an OpenAPI document, type an API response, wire a socket, run or configure the app. Not this package: database models/queries → @warlock.js/cascade; input schemas → @warlock.js/seal; SSR pages → @warlock.js/web."
+---
+
+# @warlock.js/core
+
+Core is the application runtime: it boots the app, auto-loads each module's special files, serves HTTP, and provides the helpers every feature layer uses. Features live in `src/app/<module>/` and flow one way: `routes.ts → controllers → services → repositories → models`; resources map output at the edge. Start with `warlock-conventions.md`, which every other topic assumes.
+
+## The 80% path
+
+1. Scaffold a module (`create-module.md`), then declare routes in its `routes.ts` (`register-route.md`, `warlock-routes.md`).
+2. Write a thin controller (`create-controller.md`); validate input with a schema attached to the handler (`validate-input.md`).
+3. Put logic in a service or use case (`write-use-case.md`), and data access in a repository (`use-repository.md`).
+4. Return via `response.*` (`send-response.md`) and shape output with a resource (`define-resource.md`); declare `responseSchema` for typed clients and docs (`create-controller.md`, `generate-openapi.md`).
+5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md` (or serve it to an agent with `warlock-mcp.md`), verify a change with `warlock-check.md`, and a request's runtime behaviour with `warlock-trace.md`.
+
+When the framework is wrong or missing a capability, follow the `report-framework-issue` topic to prepare a public report and ask the user before filing.
+
+## Topics by area
+
+- **Foundations:** warlock-conventions, create-module, make-endpoint, configure-app, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators, upgrade-from-5-29
+- **HTTP & routing:** register-route, warlock-routes, create-controller, use-middleware, write-middleware, validate-input, use-request-locals, build-restful, wire-socket
+- **Responses & resources:** send-response, define-resource, use-model-transformers, use-localization
+- **Domain layers:** write-use-case, use-repository, write-seeder
+- **CLI & running the app:** run-app, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
+- **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
+- **Storage, files & mail:** store-file, upload-file, process-image, send-mail
+- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing
+- **Testing:** test-browser, test-http, test-service, test-fakes, model-factories
+
+## Conventions and pitfalls
+
+- Several files are auto-loaded (`routes.ts`, `main.ts`, `events/*`, `utils/locales.ts`, `src/config/*`); never import them by hand.
+- Core does NOT re-export `v`/`Infer` (import from `@warlock.js/seal`), or `Model`/`Migration` (from `@warlock.js/cascade`).
+- Controllers stay thin: no business logic, transactions, or external API calls. Resources are output-only.
+- No per-action `*.request.ts` files; schema files export the value and the inferred type together.
+- Prefer typed model getters over scattered `.get<T>("field")` casts.
+
+
 ## add-connector  `@warlock.js/core/add-connector/SKILL.md`
 
 ---
@@ -3743,6 +3784,169 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 - The `create-controller` topic — the handler shape, validation, request/response surface.
 - The `send-response` topic — picking the right `response.<helper>()`.
 - The `warlock-conventions` topic — module layout, the `guarded` convention, path aliases.
+
+
+## report-framework-issue  `@warlock.js/core/report-framework-issue/SKILL.md`
+
+---
+name: report-framework-issue
+description: "Report a confirmed Warlock.js framework bug or missing capability. Read when behavior contradicts the installed docs, a crash appears to originate in @warlock.js packages, or no documented API meets a requirement; covers minimal reproduction, duplicate searches, sanitized warlock issue output and user approval before filing."
+---
+
+# Report a Warlock.js framework issue
+
+Use this topic when behavior contradicts the installed version's docs or skills,
+a crash originates inside `@warlock.js/*`, or a needed framework capability is
+missing. Framework reports belong at <https://github.com/warlockjs/framework>.
+
+## Confirm and search first
+
+1. Reduce the problem to a minimal reproduction in a clean, generic app. Isolate
+   application logic, third-party packages and configuration mistakes; a stack
+   frame in the framework alone does not prove a framework bug.
+2. Read the **installed version's** package `CHANGELOG.md` and skills. Confirm
+   that the documented API exists in that version and check whether a later
+   release already addresses it. For a feature, describe the missing capability
+   and why the documented APIs or an app-level workaround are insufficient.
+3. Run `warlock doctor --json` (see `warlock-doctor.md`). Fix app/environment
+   findings first. If boot fails, retain only the sanitized failure; `warlock
+   issue` itself does not boot the app.
+4. Search existing reports, including closed issues, using distinctive public
+   terms. If a matching issue exists, show its link and help draft a useful
+   follow-up instead of opening a duplicate. Ask before posting that follow-up.
+
+```bash
+gh issue list -R warlockjs/framework --state all --search "public error or capability"
+```
+
+Without GitHub CLI, use
+<https://github.com/warlockjs/framework/issues?q=is%3Aissue> and enter those terms.
+
+## Collect and protect
+
+```bash
+warlock issue --type bug --title "Public description of the failure"
+warlock issue --type feature --title "Public description of the capability" --json
+```
+
+Collect affected package names and **installed versions**, Node and package
+manager versions, OS/architecture, TypeScript version, the reviewed `warlock
+issue` environment output, a minimal reproduction with exact steps, expected
+versus actual behavior, and relevant sanitized logs / `warlock doctor --json`
+output. If a tool cannot run or there are no relevant logs, explain why.
+
+**Never paste secrets, tokens, `.env` contents, customer data, proprietary code or
+private app names** into titles, bodies, logs, screenshots, repro repositories,
+search queries or URLs. Replace the original app with a minimal generic repro.
+Review even generated environment output and stack traces; remove local paths,
+hostnames and identifying details. The command reads installed package metadata
+and a static config summary; it never reads `.env` or executes the app/config.
+Do not attach the app's full config or diagnostic report without sanitizing it.
+
+## Draft and get consent
+
+Choose one template below, replace every prompt with concrete evidence, and
+write the sanitized body to a local UTF-8 file such as `framework-issue.md`.
+**Always show the complete drafted title and body to the user and explicitly ask
+before filing.** Generating a draft or URL is not consent to publish. If the user
+requests edits, show the revised draft and obtain approval for that version.
+
+### Bug body
+
+```markdown
+### Summary
+
+Public description of the framework failure and affected packages.
+
+### Environment / warlock issue output
+
+Reviewed environment output: installed @warlock.js package versions, Node,
+package manager + version, OS/arch, TypeScript, static config summary.
+
+### Minimal reproduction
+
+Public minimal code or repro link, setup commands and exact steps.
+
+### Expected behavior
+
+What should happen, with the installed version's docs/skills reference.
+
+### Actual / current behavior
+
+What happens instead, including the error and impact.
+
+### Sanitized logs / doctor output
+
+Relevant logs and warlock doctor --json, or why unavailable / not applicable.
+
+### Checks
+
+- [ ] Searched existing issues and checked installed-version CHANGELOG and skills.
+- [ ] Removed secrets, tokens, .env, customer data, proprietary code and private app names.
+- [ ] User reviewed this complete draft and approved filing.
+```
+
+### Feature request body
+
+```markdown
+### Problem / use case
+
+Public description of the missing framework capability and affected packages.
+
+### Environment / warlock issue output
+
+Reviewed environment output: installed @warlock.js package versions, Node,
+package manager + version, OS/arch, TypeScript, static config summary.
+
+### Minimal reproduction
+
+Minimal public example of the capability that cannot currently be expressed.
+
+### Proposed behavior
+
+Desired API/behavior, with an example and why it belongs in the framework.
+
+### Actual / current behavior
+
+Current limitation and relevant installed-version docs/skills.
+
+### Alternatives considered
+
+Existing APIs, app-level workarounds and their limitations.
+
+### Sanitized logs / doctor output
+
+Relevant logs and warlock doctor --json, or why unavailable / not applicable.
+
+### Checks
+
+- [ ] Searched existing issues and checked installed-version CHANGELOG and skills.
+- [ ] Removed secrets, tokens, .env, customer data, proprietary code and private app names.
+- [ ] User reviewed this complete draft and approved filing.
+```
+
+Only check a box after completing that step, including obtaining consent.
+
+## File the approved draft
+
+Check `gh --version` and `gh auth status --hostname github.com`. If GitHub CLI is
+available and authenticated, **after approval** run:
+
+```bash
+gh issue create -R warlockjs/framework --title "Approved public title" --body-file framework-issue.md
+```
+
+Return the created issue's link. If GitHub CLI is unavailable or unauthenticated,
+give the user the pre-filled new-issue URL printed by `warlock issue` together
+with the approved body. The URL selects `bug.yml` or `feature.yml` and prefills
+the environment field; the user must complete the remaining form fields. URLs
+are capped at 7,500 characters and may include a truncation note: restore the
+remaining reviewed output manually. Never claim the issue was filed from merely
+printing or opening a URL. `warlock issue` never sends anything itself.
+
+GitHub CLI flags: [list](https://cli.github.com/manual/gh_issue_list),
+[create](https://cli.github.com/manual/gh_issue_create),
+[authentication](https://cli.github.com/manual/gh_auth_status).
 
 
 ## request-memo  `@warlock.js/core/request-memo/SKILL.md`
@@ -11319,7 +11523,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 
 ## See also
 
-- `report-framework-issue.md` — confirm a framework bug or missing capability, collect `warlock issue` output, and get the user's approval before filing.
+- the `report-framework-issue` topic — confirm a framework bug or missing capability, collect `warlock issue` output, and get the user's approval before filing.
 - The `warlock-doctor` topic — boot-time diagnostics; `doctor --json` uses the same codes and fields.
 - The `warlock-inspect` topic — the app's routes, models and config as JSON.
 - The `warlock-conventions` topic — the rules behind `WL9001`–`WL9012`, with the fix for each.
