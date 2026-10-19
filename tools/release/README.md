@@ -50,6 +50,21 @@ node --import tsx scripts/release-family.ts gate --version <x.y.z> --matrix none
 The pkgist tool itself is `@mongez/pkgist` on npm, released separately; keep the
 pinned version in `package.json` in step with the @mongez runner.
 
+`npm run check:skill-path-refs` validates package skill references and grouped
+indexes. It also runs in the workspace CI workflow and the release workflow.
+Keep all agent guidance in `skills/<topic>/SKILL.md`; the only loose Markdown
+allowed under a package's `skills/` is `index.md`. Its body must name every
+topic folder and cannot name a missing local topic. Use topic filenames,
+backticked hyphenated slugs, explicit "the `slug` topic" references, or
+comma-separated slug lists. For another package, use "the `define-ai-tool`
+topic of the `@warlock.js/ai` package" (or its `warlock-js-ai` skill name).
+Frontmatter descriptions do not count as body coverage. Diagnostics include
+the package, file, line and offending topic. Topic assets remain allowed.
+
+Package LLM projections include the package index as orientation, followed by
+the topic folders discovered on disk. Regenerate them after skill edits at
+release time; removed topics need no separate release registry entry.
+
 `npm ci` also applies a checked compatibility patch to `rolldown-plugin-dts`:
 native TypeScript declaration emit and the plugin's output lookup must both
 honor each member's configured `rootDir` (`..` in this workspace). The upstream

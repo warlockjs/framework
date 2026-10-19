@@ -91,6 +91,9 @@ jobs:
       - name: Skill examples stay within their compile budget
         run: node --import tsx tools/release/scripts/skill-snippet-gate.ts
 
+      - name: Skill indexes cover exported topics and use valid references
+        run: node --import tsx tools/release/scripts/skill-path-refs.ts
+
       - name: Public text contains no private references
         run: pnpm run check:public-text
 

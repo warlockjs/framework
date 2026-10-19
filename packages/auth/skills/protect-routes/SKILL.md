@@ -178,7 +178,7 @@ The middleware uses the framework's `response.unauthorized({...})` shape. To ove
 
 That last one is the difference between a role check and an authorization model: without it, an account-creation endpoint gated on `authMiddleware("admin")` is a privilege-escalation path.
 
-Install `@warlock.js/access` (the `overview` topic of the `warlock-js-access` skill) for that. It layers RBAC plus per-permission ABAC policies over the same authenticated user:
+Install `@warlock.js/access` (the `warlock-js-access` skill index) for that. It layers RBAC plus per-permission ABAC policies over the same authenticated user:
 
 ```ts
 import { router, type RequestHandler } from "@warlock.js/core";
@@ -309,4 +309,4 @@ This is an Origin check, not a double-submit CSRF token — cheaper, and closes 
 - The `customize-user-type` topic — config and multi-user-type semantics
 - The `handle-login-and-logout` topic — where the access token gets issued in the first place
 - The `throttle-login-attempts` topic — brute-force throttle to stack in front of the login route
-- The `overview` topic of the `warlock-js-access` skill — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough
+- The `warlock-js-access` skill index — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough

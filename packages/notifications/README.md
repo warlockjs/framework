@@ -58,7 +58,7 @@ await inApp.markAsRead(user); // recipient-scoped — no IDOR
 
 ## Skills
 
-The package ships `skills/<task>/SKILL.md` files describing every public surface. Browse the index at [`skills/README.md`](./skills/README.md) or load them via `agent-kit`.
+The package ships `skills/<task>/SKILL.md` files describing every public surface. Browse the index at [`skills/index.md`](./skills/index.md) or load them via `agent-kit`.
 
 ## License
 

@@ -21,7 +21,7 @@ Planning, design, and reference content for the `@warlock.js/cache` package — 
 - [Decisions log](./design/decisions.md)
 - [v2 implementation plan](./plans/2026-04-23-v2-api.md)
 - [Testing plan (completed)](./plans/archive/2026-04-23-unit-testing-coverage.md)
-- **Assistant skills:** [`@warlock.js/cache/skills/overview/SKILL.md`](../../@warlock.js/cache/skills/overview/SKILL.md) — front-door orientation + 19 task skills (one folder per concept).
+- **Assistant skills:** [package skill index](../skills/index.md) — front-door orientation + 19 task topics (one folder per concept).
 
 ## Code & docs live elsewhere
 

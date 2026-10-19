@@ -75,10 +75,21 @@ function collectReferenceFiles(folderPath) {
 }
 
 const skills = collectSkills();
+const packageIndexPath = join(skillsDir, "index.md");
+const packageIndexText = existsSync(packageIndexPath)
+  ? readFileSync(packageIndexPath, "utf8")
+  : undefined;
 const indexLines = [`# ${projectName}`, "", `> Package: \`${packageName}\``, ""];
 if (tagline) indexLines.push(`> ${tagline}`, "");
 for (const note of packageNotes) indexLines.push(`> ${note}`, "");
 indexLines.push("## Skills", "");
+
+if (packageIndexText !== undefined) {
+  const { meta } = parseFrontmatter(packageIndexText);
+  indexLines.push(
+    `- [Package orientation](${packageName}/skills/index.md): ${meta.description ?? "Package orientation"}`,
+  );
+}
 
 for (const skill of skills) {
   const { meta } = parseFrontmatter(readFileSync(skill.path, "utf8"));
@@ -96,6 +107,10 @@ const fullLines = [
   `> Generated artifact. Concatenates every SKILL.md and reference file under \`${packageName}/skills/\`. Re-run \`node scripts/generate-llms.mjs\` after any change.`,
   "",
 ];
+
+if (packageIndexText !== undefined) {
+  fullLines.push(`## Package orientation`, ``, packageIndexText, ``);
+}
 
 for (const skill of skills) {
   fullLines.push(

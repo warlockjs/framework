@@ -160,8 +160,8 @@ jobs:
         working-directory: tools/release
         run: npm run test:scripts
 
-      - name: Skill cross-references name topics, not paths
-        # agent-kit flattens skills into an app on install, so `../x/SKILL.md` breaks there.
+      - name: Skill indexes cover exported topics and use valid references
+        # Grouped exports require complete indexes and topic folders, with no loose Markdown.
         working-directory: tools/release
         run: npm run check:skill-path-refs
 

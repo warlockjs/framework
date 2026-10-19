@@ -127,7 +127,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 
 ## See also
 
-- `report-framework-issue.md` — confirm a framework bug or missing capability, collect `warlock issue` output, and get the user's approval before filing.
+- the `report-framework-issue` topic — confirm a framework bug or missing capability, collect `warlock issue` output, and get the user's approval before filing.
 - The `warlock-doctor` topic — boot-time diagnostics; `doctor --json` uses the same codes and fields.
 - The `warlock-inspect` topic — the app's routes, models and config as JSON.
 - The `warlock-conventions` topic — the rules behind `WL9001`–`WL9012`, with the fix for each.

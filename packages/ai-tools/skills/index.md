@@ -18,4 +18,4 @@ A belt of prebuilt tools for `@warlock.js/ai` agents plus the Model Context Prot
 - `fetchUrlTool` and `httpRequestTool` are policy-gated: set host allowlists and byte caps rather than opening them fully.
 - `webSearchTool` needs a search provider choice and its API key (tavily, brave, or serpapi).
 - Every error class extends the `AIError` of `@warlock.js/ai`; catch by subclass.
-- Writing a custom tool with `ai.tool()` lives in `@warlock.js/ai` (`define-ai-tool.md`).
+- Writing a custom tool with `ai.tool()` is covered by the `define-ai-tool` topic of the `@warlock.js/ai` package.

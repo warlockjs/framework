@@ -163,7 +163,7 @@ describe("installed skills", () => {
       "node_modules/@warlock.js/core/skills/warlock-check/SKILL.md",
       "---\nname: warlock-check\ndescription: 'Verify a change. It''s one command.'\n---\n\n# Body\n",
     );
-    write("node_modules/@warlock.js/core/skills/README.md", "not a skill");
+    write("node_modules/@warlock.js/core/skills/index.md", "Package orientation, not a topic.");
     write("node_modules/@warlock.js/ai/skills/run-agent/SKILL.md", "# no front matter\n");
     mkdirSync(path.join(cwd, "node_modules/@warlock.js/fs/skills/empty"), { recursive: true });
 

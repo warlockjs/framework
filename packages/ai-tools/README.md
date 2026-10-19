@@ -162,7 +162,7 @@ if (error instanceof HttpPolicyError && error.type === "host-not-allowed") {
 
 ## Skills
 
-Progressive-disclosure, per-task docs live under [`skills/`](./skills/README.md):
+Progressive-disclosure, per-task docs live under [`skills/`](./skills/index.md):
 
 - [`use-web-and-http-tools/`](./skills/use-web-and-http-tools/SKILL.md) — wire `web_search`, `fetch_url`,
   `http_request`, `calculator`, and `date_time` into an agent under their guardrails.

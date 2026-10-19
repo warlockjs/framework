@@ -1,5 +1,15 @@
 ﻿# Changelog — release tooling
 
+## 5.34.2
+
+### Fixed
+
+- Reject missing or unlisted local topics in grouped skill indexes and loose Markdown that agent-kit cannot export, with package, file, line and topic diagnostics. Cover valid exports and each failure with fixtures, and run the guard in workspace CI as well as the release gate.
+
+### Changed
+
+- Document grouped skill authoring and add regression coverage for package orientation and topic assets in LLM projections.
+
 ## 5.34.1 - 2026-10-19
 
 ### Fixed

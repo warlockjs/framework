@@ -1,55 +1,60 @@
 ---
 title: Skills
-description: How AI agents work with Warlock.js via per-task SKILL.md files and agent-kit.
+description: How AI agents discover Warlock.js packages and load focused topics with agent-kit.
 template: splash
 ---
 
-Every Warlock.js package ships **per-task skill files** — small Markdown
-documents that teach an AI coding agent how to perform one specific job
-inside that package: write a migration, register a route, pick a cache
-driver, define an AI tool.
-
-When an agent works on Warlock code, it loads the relevant skill into
-its context and gets the same orientation a senior engineer would give
-in a code review: which identifiers matter, when to skip this skill for
-a sibling, common footguns, canonical imports.
+Warlock.js packages ship a package orientation and focused task topics: register
+a route, write a migration, choose a cache driver, or define an AI tool. The
+package index explains what belongs in that package, where to start, and when
+to use another package. Agents load detailed topics as needed.
 
 ## How they sync
 
-Skills live alongside each package's source at
-`@warlock.js/<pkg>/skills/<task>/SKILL.md`. The
-[`agent-kit`](https://github.com/hassanzohdy/agent-kit) CLI discovers
-them and syncs flat-named copies into `.claude/skills/`,
-`.cursor/skills/`, and any other AI-tool target.
+Install agent-kit in your application, then sync the installed packages:
 
 ```bash
-pnpm add -D @mongez/agent-kit
+npm install --save-dev @mongez/agent-kit
 npx agent-kit sync
 ```
 
-Skills appear in your AI tool as `warlock-js-<pkg>-<skill>` — for
-example, `warlock-js-core-build-url` or `warlock-js-cascade-define-model`.
+With agent-kit 1.3's default `auto` layout, a package with two or more topics
+and `skills/index.md` exports as **one skill per package**. For example:
 
-## Per-package skill counts
+```text
+.claude/skills/warlock-js-core/
+  SKILL.md                    # package index + generated Topics table
+  test-browser.md             # focused topic
+  report-framework-issue.md   # focused topic
+```
 
-Roughly 120 skills across the framework today:
+Other targets, including Cursor and Codex, receive the same package guidance.
+Each topic originates in `skills/<topic>/SKILL.md`; its assets are exported
+alongside it. A single-topic package stays flat. Applications can configure
+`agentKit.layout` as `grouped` or `flat` to override automatic grouping.
 
-| Package           | Skills |
-| ----------------- | -----: |
-| `core`            |     33 |
-| `cache`           |     16 |
-| `cascade`         |     15 |
-| `ai`              |     12 |
-| `logger`          |     10 |
-| `seal`            |      8 |
-| `auth`            |      7 |
-| `scheduler`       |      6 |
-| `herald`          |      4 |
-| `fs`              |      4 |
-| `context`         |      2 |
-| Provider adapters | 1 each |
+Read core's `test-browser` topic for browser flows, `upgrade-from-5-29` for
+application migrations, and `report-framework-issue` when a confirmed framework
+bug or missing capability needs a sanitized report and user approval before
+filing. Cache's `use-cache-utils` topic covers TTL constants, key parsing and
+vector helpers. Custom AI tool definitions belong to the `define-ai-tool`
+topic of `@warlock.js/ai`; `@warlock.js/ai-tools` supplies ready-made tools and MCP.
 
-Each skill's full text is browsable in the GitHub repo. Their
-descriptions follow an enriched format (Triggers / Skip / typical
-import / competing patterns) so your agent's skill matcher picks the
-right one fast.
+## Authoring package guidance
+
+Use `skills/index.md` as the package front door, with a 400–700 character
+frontmatter description and a body that names every local topic. Put detailed
+guidance in `skills/<topic>/SKILL.md`, with `name` and a `description` explaining
+when to read it. Agent-kit generates the Topics table from those descriptions;
+do not maintain a second table or a duplicate overview topic.
+
+Loose Markdown files other than `index.md` are not exported. In particular,
+putting a guide directly at `skills/report-framework-issue.md` would hide it
+from applications. Use a topic folder even though the grouped export becomes a
+sibling `.md` file.
+
+Name cross-package topics with their owner: "the `define-ai-tool` topic of the
+`@warlock.js/ai` package". The release tooling's `check:skill-path-refs` gate
+checks index coverage, missing local references, loose Markdown and path-style
+topic links in CI and before release. Generated package `llms.txt` and
+`llms-full.txt` project the index and topics from the same sources.

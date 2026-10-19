@@ -1,3 +1,8 @@
+---
+name: report-framework-issue
+description: "Report a confirmed Warlock.js framework bug or missing capability. Read when behavior contradicts the installed docs, a crash appears to originate in @warlock.js packages, or no documented API meets a requirement; covers minimal reproduction, duplicate searches, sanitized warlock issue output and user approval before filing."
+---
+
 # Report a Warlock.js framework issue
 
 Use this topic when behavior contradicts the installed version's docs or skills,
