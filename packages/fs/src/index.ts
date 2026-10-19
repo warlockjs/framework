@@ -9,21 +9,21 @@
  * operation; there are no aliases to remember.
  */
 
-export * from "./atomic.js";
+export * from "./atomic";
 export * from "./confined";
 export * from "./confined-errors";
 export { isPathInside } from "./confined-path";
-export * from "./copy.js";
-export * from "./dirs.js";
-export * from "./exists.js";
-export * from "./hash.js";
-export * from "./list.js";
+export * from "./copy";
+export * from "./dirs";
+export * from "./exists";
+export * from "./hash";
+export * from "./list";
 export * from "./move-directory";
-export * from "./read.js";
-export * from "./remove.js";
-export * from "./rename.js";
-export * from "./stats.js";
-export * from "./write.js";
+export * from "./read";
+export * from "./remove";
+export * from "./rename";
+export * from "./stats";
+export * from "./write";
 
 // ── Shorthand facade (async) — fs.files.* / fs.dirs.* + File/Directory handles ──
 export { fs } from "./facade/fs";
@@ -36,3 +36,5 @@ export {
   type StandardSchemaIssue,
   type StandardSchemaResult,
 } from "./facade/standard-schema";
+
+export * from "./transaction";

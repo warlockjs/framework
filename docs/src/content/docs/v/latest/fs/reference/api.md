@@ -430,3 +430,33 @@ hashBuffer(content: Buffer | Uint8Array, algorithm?: HashAlgorithm): string    /
 - [Read a folder confined](../guides/read-a-folder-confined) — `fs.confined` and its guarantees.
 
 Source: [`@warlock.js/fs/src/`](https://github.com/warlockjs/core/tree/main/%40warlock.js/fs/src)
+
+## Multi-file transactions
+
+See [Multi-file transactions](../guides/multi-file-transactions) for options,
+errors, replay, recovery and durability limits.
+
+```ts
+fs.transaction(root, async (tx) => { /* await tx.read/write/remove */ }, options?)
+fs.openTransactions(root, { durability?, lockTimeoutMs? }) // Promise<TransactionRoot>
+fs.inspectTransactions(root) // Promise<TransactionInspection>, read-only
+fs.read(path, { root, consistent: true, attempts?, retryDelayMs? }) // Promise<string>
+
+// TransactionRoot
+store.transaction(callback, options?)
+store.inspect()
+store.read(path, { consistent?, attempts?, retryDelayMs? })
+store.readMany(paths, { consistent?, attempts?, retryDelayMs? })
+
+// FileTransaction
+tx.operationId; tx.epoch;
+tx.read(path) // Promise<string | null>
+tx.readBuffer(path) // Promise<Buffer | null>
+tx.hash(path) // Promise<string | null>, SHA-256 of staged view
+tx.write(path, stringOrBuffer, { expectedHash?: string | null })
+tx.remove(path, { expectedHash?: string | null })
+```
+
+Flat async exports: `transactionAsync`, `openTransactionRootAsync`,
+`inspectTransactionsAsync`, `readTransactionFileAsync`. The optional third
+argument of `atomicWriteAsync` is `{ durability?: "file" | "full" }`.

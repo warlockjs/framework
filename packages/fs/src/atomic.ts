@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  assertDurability,
+  ensureDurableDirectory,
+  syncDirectory,
+  type WriteDurability,
+} from "./durability";
 import { renameWithRetry } from "./retry-rename";
 
 export { AtomicWriteError } from "./atomic-write-error";
@@ -20,14 +26,22 @@ export { AtomicWriteError } from "./atomic-write-error";
  * {@link AtomicWriteError} naming the target, the attempt count, and the
  * last OS error as `cause`.
  *
- * Parent directories are created if missing.
+ * Parent directories are created if missing. Optional durability flushes the
+ * temporary file before rename; `full` also flushes new parent entries and the
+ * destination directory afterward (POSIX only). Defaults remain unflushed.
  *
  * @example
  *   await atomicWriteAsync("manifest.json", JSON.stringify(data));
  */
-export async function atomicWriteAsync(filePath: string, content: string | Buffer): Promise<void> {
+export async function atomicWriteAsync(
+  filePath: string,
+  content: string | Buffer,
+  options: { durability?: WriteDurability } = {},
+): Promise<void> {
   const dir = path.dirname(filePath);
-  await mkdir(dir, { recursive: true });
+  if (options.durability) assertDurability(options.durability);
+  if (options.durability === "full") await ensureDurableDirectory(dir);
+  else await mkdir(dir, { recursive: true });
 
   // Random suffix so concurrent writers don't fight over the same temp file.
   const tempPath = path.join(
@@ -36,8 +50,19 @@ export async function atomicWriteAsync(filePath: string, content: string | Buffe
   );
 
   try {
-    await writeFile(tempPath, content);
+    if (options.durability) {
+      const handle = await open(tempPath, "wx", 0o600);
+      try {
+        await handle.writeFile(content);
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+    } else {
+      await writeFile(tempPath, content);
+    }
     await renameWithRetry(tempPath, filePath);
+    if (options.durability === "full") await syncDirectory(dir);
   } catch (error) {
     await unlink(tempPath).catch(() => undefined);
     throw error;

@@ -1,3 +1,9 @@
+import {
+  transactionAsync,
+  openTransactionRootAsync,
+  inspectTransactionsAsync,
+  readTransactionFileAsync,
+} from "../transaction";
 import { createConfinedReader, type ConfinedReader, type ConfinedReaderOptions } from "../confined";
 import { pathExistsAsync } from "../exists";
 import { hashBuffer, hashFileAsync, hashString, type HashAlgorithm } from "../hash";
@@ -29,6 +35,10 @@ import { files } from "./files";
  * if (await dir.isEmpty()) { ... }
  */
 export const fs = {
+  transaction: transactionAsync,
+  openTransactions: openTransactionRootAsync,
+  inspectTransactions: inspectTransactionsAsync,
+  read: readTransactionFileAsync,
   files,
   dirs,
 

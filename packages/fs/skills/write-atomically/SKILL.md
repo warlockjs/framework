@@ -50,7 +50,7 @@ The random 6-byte suffix prevents two concurrent writers from racing on the same
 
 Two `atomicWriteAsync` calls to the same target serialize at the rename. Whichever rename completes last wins. **No locking** — last-writer-wins is the contract.
 
-If you need read-modify-write atomicity (each writer sees the previous writer's result), wrap the calls in a distributed lock — e.g. the `use-cache-lock` topic of the `warlock-js-cache` skill.
+For local read-modify-write safety, use `fs.transaction`; see the `multi-file-transactions` topic. All writers must cooperate with that protocol.
 
 ## Common shapes
 
@@ -107,8 +107,8 @@ try {
 
 ## What it doesn't protect against
 
-- **Filesystem corruption.** Power-loss between `writeFile` and `rename` leaves the temp file behind — that's `fsync` territory, not handled here. For ironclad durability, you'd need a `writeFile + fsync + rename + fsync(parent)` sequence; this helper skips the fsyncs for write speed.
-- **Cross-filesystem renames.** If `dir` is a different mount from the target's actual storage (unusual), `rename` may fall back to copy + delete, which isn't atomic. Keep the temp on the same mount — the helper does this automatically.
+- **Default durability.** The default skips fsync. Select `{ durability: "full" }` for file-before-rename and directory-after-rename flushes on POSIX, subject to filesystem/hardware guarantees. Windows requires explicit `file` durability and offers no power-loss guarantee.
+- **Cross-filesystem renames.** The temp is a sibling on the same mount. Rename failures are propagated; there is no copy/delete fallback.
 - **Race conditions in your callers.** `atomicWriteAsync` makes the file write atomic; it doesn't serialize callers. Two callers stomping each other is your problem, not the helper's.
 
 ## See also
@@ -121,4 +121,19 @@ try {
 - Don't use `atomicWriteAsync` when you don't need atomicity — `putFileAsync` is slightly faster (no rename round-trip). For ephemeral files, plain write is fine.
 - Don't store the temp file outside the target directory. The helper picks the same dir on purpose so the rename is intra-mount; if you reach inside the source and change that, you lose the atomicity guarantee on cross-mount setups.
 - Don't pair atomic writes with locked reads expecting consistency. A reader between the rename and your next write sees the intermediate complete state — that's the point of the helper. If you want every read to see a particular write, serialize with a lock.
-- Don't sync after atomic write expecting "definitely persisted to disk" — the helper doesn't fsync. For durability guarantees, fsync the parent directory after the rename yourself.
+- For durable single-file replacement, select `{ durability: "full" }`; default writes remain unflushed. A post-rename directory flush alone does not establish file-byte durability.
+
+## Optional durability
+
+```ts
+import { atomicWriteAsync } from "@warlock.js/fs";
+
+await atomicWriteAsync("./state.json", JSON.stringify({ ready: true }), {
+  durability: "full", // POSIX: file fsync, rename, directory fsync
+});
+// Windows must choose file-only; no OS-crash/power-loss promise.
+await atomicWriteAsync("./state.json", "{}", { durability: "file" });
+```
+
+A directory-sync error may occur after the new target is visible. This helper
+has no journal; use the `multi-file-transactions` topic for automatic recovery.
