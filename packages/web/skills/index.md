@@ -4,12 +4,12 @@ description: "Server-rendered React pages for a Warlock app, with Vite. Exports 
 
 # @warlock.js/web
 
-Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**` as `*.page.tsx` files; each declares its route, middleware, validation, and metadata in a `config` export and fetches data in a named loader. The server renders the shell, the browser hydrates, and navigation verbs re-run loaders through the server. There is no client-side route matcher; the server decides what matched.
+Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**` as `*.page.tsx` files; their matching `.setup.ts` files declare configuration and fetch data in named loaders. The server renders the shell, the browser hydrates, and navigation verbs re-run loaders through the server. There is no client-side route matcher; the server decides what matched.
 
 ## The 80% path
 
 1. Install the layer with `warlock add web` (`add-web-to-an-app.md`), then edit the document in `src/web/root.tsx` (`write-the-root.md`).
-2. Create pages with `config` and a loader (`create-a-page.md`, `load-page-data.md`, which also covers how loader data is typed on the page); wrap them with `use-layouts.md`; set titles, descriptions, Open Graph and per-locale metadata (`set-page-metadata.md`).
+2. Separate UI and logic with `use-page-setup-files`, then create pages with `config` and a loader (`create-a-page.md`, `load-page-data.md`, which also covers how loader data is typed on the page); wrap them with `use-layouts.md`; set titles, descriptions, Open Graph and per-locale metadata (`set-page-metadata.md`).
 3. Link and navigate with `<Link>`, `href()`, `navigateTo` (`navigate-on-the-client.md`).
 4. Post forms to a Core API route (`submit-a-form.md`), then `refresh()` to revalidate (a route whose handler declares `responseSchema` types `data` and `onSuccess`); or handle a form on the page itself with an `action` export and `<Form>` (`handle-a-form-action.md`).
 5. Guard pages and read the user (`protect-a-page.md`); a `requireUser()`-guarded page is typed as signed-in (`useUser("route.name")` is non-null).
@@ -20,6 +20,7 @@ Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**`
 
 ## Conventions and pitfalls
 
+- Put components in UI files; put `config`, `loader`, `register`, and `action`/`actions` in the matching setup file.
 - Route, cache, validation, middleware, metadata and sitemap policy go in `config`; keep loaders for data only.
 - Anything the browser receives via `shared` must be declared by augmenting `SharedContext` in module `"@warlock.js/web"`.
 - Server-only helpers live on subpaths (`@warlock.js/web/build`, `/sitemap`, `/form`, `/connector`); importing them from the root barrel breaks page graphs.

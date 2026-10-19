@@ -10,7 +10,7 @@ The current 5.2 model is compact but specific:
 - Page files live under `src/web`. With no `route` export, directories contribute path segments, `index.page.tsx` claims its directory, `(group)` directories contribute nothing, and a whole `[id]` segment becomes dynamic; an explicit `route` always wins. Catch-all (`[...slug]`) and composite dynamic (`[lat]-[lng]`) filenames are unsupported and remain literal. See [filesystem routing](/v/latest/web/#filesystem-routing).
 - Layouts on the page's ancestry compose outer-to-inner. At most one may render, while non-rendering layouts may still contribute middleware, loaders, and prefixes; a layout prefix replaces its own directory segment. See [layouts and the prefix override](/v/latest/web/#layouts-and-the-prefix-override).
 - Adding, removing, renaming, or changing a page's route identity in development atomically re-registers the page routes without restarting the server. Component-body-only edits stay on React Fast Refresh. See [live dev re-registration](/v/latest/web/#live-dev-re-registration).
-- Keep universal `register()` setup in a sidecar and named-re-export it (`export { register } from "./index.register";`). Declaring the non-component hook inline breaks the page's Fast Refresh boundary. See [`register()`](/v/latest/web/#register).
+- Put page logic (`config`, `loader`, `register()`, `action`/`actions`) in the paired setup file (`index.setup.ts` beside `index.page.tsx`) and keep only components in the page file. See [Page setup files](/v/latest/web/essentials/page-setup-files/).
 
 For the upgrade itself, move the `@warlock.js/*` packages you use to v5 together, then make the edits below.
 

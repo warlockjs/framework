@@ -1,6 +1,6 @@
 ---
 name: create-a-page
-description: "Create an SSR React page under `src/web/**`. Put route, cache, validation, middleware, metadata, and sitemap policy in `config`; keep `loader`, `register`, `ErrorBoundary`, and the default component as exports. Triggers: `*.page.tsx`, `PageConfig`, `config.route`, `config.cache`, `config.validation`, `config.middleware`, `config.metadata`, `config.sitemap`, `PageLoader`, `PageProps`, `error.page.tsx`, `register`, `[...slug]`."
+description: "Create an SSR React page under `src/web/**`. Put route, cache, validation, middleware, metadata, and sitemap policy in `config`; put `config`, `loader`, `register`, and actions in `.setup.ts`; keep default and named components in `.page.tsx`. Triggers: `*.page.tsx`, `PageConfig`, `config.route`, `config.cache`, `config.validation`, `config.middleware`, `config.metadata`, `config.sitemap`, `PageLoader`, `PageProps`, `error.page.tsx`, `register`, `[...slug]`."
 ---
 
 # Warlock — create a page
@@ -24,11 +24,11 @@ export function ErrorBoundary({ error, status }: { error: unknown; status: numbe
 
 The closest authored boundary handles the failure. Keep the boundary itself defensive: if it throws, Warlock escalates to the next boundary or framework fallback.
 
-## Optional server setup module
+## Page setup file
 
-Pair `product-details.page.tsx` with `product-details.setup.ts` when the React
-component should stay UI-only. The setup file may own `config`, `loader`, and
-universal `register()`. Do not value-import it from the component; type-only
+Pair `product-details.page.tsx` with `product-details.setup.ts`. The UI file
+owns components; the setup file owns `config` (including `config.metadata`), `loader`, actions,
+and universal `register()`. See `use-page-setup-files` for the complete contract. Do not value-import it from the component; type-only
 imports preserve loader inference:
 
 ```ts title="src/web/products/paired-product.setup.ts"
@@ -48,13 +48,13 @@ export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
 }
 ```
 
-Every export has one owner. Duplicate `config`, `loader`, or `register` exports
+Every export has one owner. Duplicate logic exports
 fail; `register()` remains browser-safe and runs on server and client. A
 type-only loader import is sufficient in development and production: it retains
 the framework-projected `register()` hook without a UI runtime import of setup.
 
-```tsx title="src/web/products/product-details.page.tsx"
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+```ts title="src/web/products/product-details.setup.ts"
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -72,6 +72,11 @@ export const loader = (async ({ request }) => {
     },
   };
 }) satisfies PageLoader<undefined, typeof config.route>;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return (
@@ -89,9 +94,11 @@ Declare `config` with `as const satisfies PageConfig`. `route.name` is typed `st
 
 ## The minimum page
 
-```tsx title="src/web/contact.page.tsx"
+```ts title="src/web/contact.setup.ts"
 export const config = { route: "/contact" };
+```
 
+```tsx title="src/web/contact.page.tsx"
 export default function ContactPage() {
   return (
     <main>
@@ -125,11 +132,11 @@ A file that cannot be parsed reports separately — `Cannot inspect the default 
 
 Use either a bare path or a literal object:
 
-```ts
+```ts title="src/web/products.setup.ts"
 export const config = { route: "/products" };
 ```
 
-```ts
+```ts title="src/web/example.setup.ts"
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
   cache: { public: true, maxAge: 60 },
@@ -148,9 +155,9 @@ Put validation in `config.validation`: a [Seal](https://www.npmjs.com/package/@w
 
 `route.validate` and a named `validation` export are invalid. Use the config shape below.
 
-```tsx title="src/web/products/product-details.page.tsx"
+```ts title="src/web/products/product-details.setup.ts"
 import { v } from "@warlock.js/seal";
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -165,6 +172,11 @@ export const loader = (async ({ request }) => {
 
   return { id: params.id, tab: query.tab };
 }) satisfies PageLoader<typeof config.validation, typeof config.route>;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return <h1>Product {data.id}</h1>;
@@ -183,7 +195,7 @@ Declare `config.middleware` as an array of `(ctx) => unknown | Promise<unknown>`
 
 `route.middleware` and a named `middleware` export are invalid.
 
-```tsx
+```ts title="src/web/account.setup.ts"
 export const config = {
   route: "/account",
   middleware: [
@@ -210,7 +222,7 @@ Prefer calling a `response` method (`.forbidden()`, `.redirect()`, `.unauthorize
 Page documents and their `x-warlock-data` representations are `no-store` by
 default. Opt a public page into shared caching with sibling `config.cache`:
 
-```tsx
+```ts title="src/web/products.setup.ts"
 export const config = {
   route: { path: "/products", name: "products.index" },
   cache: { public: true, maxAge: 60 },
@@ -239,7 +251,7 @@ CDN/proxy should honour. `serverCache` is a second, independent opt-in on the
 SAME object: the framework itself holds the resolved bytes and serves a HIT
 without re-running the pipeline at all.
 
-```tsx
+```ts title="src/web/products.setup.ts"
 export const config = {
   route: { path: "/products", name: "products.index" },
   cache: {
@@ -361,7 +373,7 @@ the rejected segment.
 
 Until a catch-all exists, use the terminal wildcard with an explicit `config.route`:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 export const config = {
   route: { path: "/docs/*", name: "docs.catchAll" },
 } as const satisfies PageConfig;
@@ -385,7 +397,7 @@ Examples that fail include `/users/:id?`, `/users/:id(\\d+)`,
 
 `config.metadata` is a static object or a function of the resolved loader data:
 
-```tsx
+```ts title="src/web/products.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -404,13 +416,15 @@ Every field (title templates, `openGraph`, `twitter`, `meta`, `links`, `canonica
 
 `404.page.tsx` anywhere beneath `src/web` is the application's one not-found page. It is the second of the two special page filenames, next to `error.page.tsx`. Without one, Warlock answers with a built-in "404 | Page not found" document.
 
-```tsx title="src/web/404.page.tsx"
+```ts title="src/web/404.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   metadata: { title: "Page not found" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/404.page.tsx"
 export default function NotFoundPage() {
   return (
     <main>
@@ -424,14 +438,14 @@ export default function NotFoundPage() {
 
 - **No `config.route`.** It has no URL of its own and answers every URL nothing else matched. Declaring a route on it is a build error, and a second `404.page.tsx` is a build error naming both files.
 - **Props.** The default component receives the usual `{ data, shared, params }`: `shared` is the sealed payload, `params` is empty, and there is no page data because its own `loader` never runs. Its `register()` and `config.middleware` still run and `config.metadata` still applies. Keep the metadata static, since there is no `data` to read.
-- **No loader.** A `loader` export on it is ignored. The `root.tsx` app loader still runs on a 404, so keep it cheap.
+- **No loader.** A `loader` export on it is ignored. The `root.setup.ts` app loader still runs on a 404, so keep it cheap.
 - **No layouts.** It renders inside `root.tsx` only, even when a `layout.tsx` sits above it, so it cannot depend on app chrome that might itself fail.
 - **Status and indexing.** The response status is 404 and `robots` is forced to `noindex`.
 - **Only for document requests.** It renders for `GET`/`HEAD` requests that explicitly list `text/html` in `Accept`. Any other unmatched request (a `fetch()` to a mistyped `/api/...` URL) keeps the JSON 404.
 
 A loader sends the visitor to it with `response.notFound()`, from an app, layout or page loader. Return the result:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageLoader } from "@warlock.js/web";
 import { findProduct } from "app/products/services/find-product.service";
 
@@ -475,9 +489,9 @@ If the failure happens before any page module could even load — a module-load 
 
 ## The `register()` hook
 
-`root.tsx`, `layout.tsx`, and `*.page.tsx` may each export `register`: a synchronous, no-argument, side-effect hook that runs once per raw module namespace instance. It is separate from `config` and runs before middleware or loader work.
+`root.setup.ts`, `layout.setup.ts`, and page setup files export `register`: a synchronous, no-argument, side-effect hook that runs once per raw module namespace instance. It is separate from `config` and runs before middleware or loader work.
 
-```tsx
+```ts title="src/web/example.setup.ts"
 export function register() {
   // one-time setup for this module namespace; must not return a Promise
 }
@@ -487,12 +501,9 @@ Returning a Promise (or anything thenable) throws — `register()` must finish b
 
 ## The client boundary
 
-The browser boundary is decided by the import graph, not by the file's location. A `*.page.tsx` is universal:
-
-- `config` and `loader` are server/build policy; the default component and `register` retain their defined module roles.
-- The default component and any other surviving exports form the client graph.
-- An import used only by a stripped server export is removed with it.
-- An import also used by the component survives and therefore must be browser-safe.
+The browser boundary is decided by the import graph, not by the file's location. UI components are universal. Setup files own server/build policy; only their
+browser-safe `register()` code is projected into the client graph. Component
+imports must be browser-safe. Use type-only imports from setup.
 
 Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
 
@@ -518,13 +529,13 @@ are the exception and remain supported.
 
 ## Editing a page in development
 
-`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's _skeleton_ — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports, module-level declarations, `config`, `loader`, and other exports.
+`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's _skeleton_ — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports and module-level component helpers. Setup changes are tracked separately.
 
 - **A JSX-only edit hot-updates.** The skeleton is unchanged, so Vite's Fast Refresh applies the projected client code with no reload and no lost component state.
 - **A `config.metadata` edit reloads the document.** It changes the server-rendered head policy.
-- **Any module-level change reloads.** An edited import, declaration, `config`, or `loader` changes the skeleton.
+- **Any module-level change reloads.** An edited UI import or declaration changes the skeleton; setup edits refresh server logic.
 - **A helper function used only by the JSX still reloads if it is declared at module level.** The rule does not try to prove which half of a shared declaration the edit was "really" for — it over-approximates deliberately, because a false reload only costs component state, while a missed one ships a stale `<head>` and calls it a hot update.
-- Creating, deleting, or renaming a page file, or editing its `route` export, is page-GRAPH churn, not a skeleton edit — see below, not Fast Refresh.
+- Creating, deleting, or renaming a page file, or editing `config.route` in its setup file, is page-GRAPH churn, not a skeleton edit — see below, not Fast Refresh.
 
 ## Route-table changes in development
 

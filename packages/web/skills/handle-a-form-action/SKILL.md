@@ -7,8 +7,8 @@ description: "Handle a form POST on a page with an `action` (or named `actions`)
 
 Use a page action when a form belongs to a page and the result should re-render it or redirect. To post to an API route from the browser, use the `submit-a-form` topic instead.
 
-```tsx
-import { Form, FieldError, useActionData, useIsSubmitting, href } from "@warlock.js/web";
+```ts title="src/web/contact.setup.ts"
+import { href } from "@warlock.js/web";
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { v } from "@warlock.js/seal";
 
@@ -26,6 +26,11 @@ export async function action({ request, response }: PageActionContext<typeof con
 
   return response.redirect(href("contact"));
 }
+```
+
+```tsx title="src/web/contact.page.tsx"
+import { Form, FieldError, useActionData, useIsSubmitting } from "@warlock.js/web";
+import type { action } from "./contact.setup";
 
 export default function Contact() {
   const result = useActionData<typeof action>();
@@ -65,8 +70,7 @@ The action's `response` is the same buffered response a loader gets, plus the fa
 
 This example shows the cookie mechanics with an app-owned `signIn` service. For the framework's own session and a guarded page, see the `protect-a-page` topic.
 
-```tsx title="src/web/login.page.tsx"
-import { Form, FieldError, useActionData, useIsSubmitting } from "@warlock.js/web";
+```ts title="src/web/login.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { v } from "@warlock.js/seal";
 import { signIn } from "app/accounts/services/sign-in.service";
@@ -93,6 +97,11 @@ export async function action({ request, response }: PageActionContext<typeof log
 
   return response.redirect("/account");
 }
+```
+
+```tsx title="src/web/login.page.tsx"
+import { Form, FieldError, useActionData, useIsSubmitting } from "@warlock.js/web";
+import type { action } from "./login.setup";
 
 export default function LoginPage() {
   const result = useActionData<typeof action>();
@@ -115,8 +124,7 @@ export default function LoginPage() {
 
 Sign out is a second, named action on the page that owns the button. `clearCookie` must use the same `path` (and `domain`) the cookie was set with:
 
-```tsx title="src/web/account.page.tsx"
-import { Form } from "@warlock.js/web";
+```ts title="src/web/account.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -130,6 +138,10 @@ export const actions = {
     return response.redirect("/login");
   },
 };
+```
+
+```tsx title="src/web/account.page.tsx"
+import { Form } from "@warlock.js/web";
 
 export default function AccountPage() {
   return (
@@ -169,10 +181,7 @@ export const contactSchema = v.object({
 });
 ```
 
-```tsx
-// src/web/contact/contact.page.tsx
-import { Form as ReactForm } from "@mongez/react-form";
-import { useSubmitAction } from "@warlock.js/web/form";
+```ts title="src/web/contact/contact.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { contactSchema } from "web/contact/contact.schema";
 
@@ -186,6 +195,12 @@ export async function action({ request, response }: PageActionContext<typeof con
   // Handle values, then redirect or return data.
   return response.redirect("/contact");
 }
+```
+
+```tsx title="src/web/contact/contact.page.tsx"
+import { Form as ReactForm } from "@mongez/react-form";
+import { useSubmitAction } from "@warlock.js/web/form";
+import { contactSchema } from "web/contact/contact.schema";
 
 export default function ContactPage() {
   const submit = useSubmitAction<typeof contactSchema>();
@@ -247,15 +262,19 @@ export async function signIn(email: string, password: string) {
 
 ## Independent submission with query parameters
 
-```tsx title="src/web/cancel.page.tsx"
-import { useState } from "react";
-import { Form, type PageConfig } from "@warlock.js/web";
+```ts title="src/web/cancel.setup.ts"
+import { type PageConfig } from "@warlock.js/web";
 
 export const config = { route: "/cancel" } satisfies PageConfig;
 
 export async function action() {
   return { cancelled: true };
 }
+```
+
+```tsx title="src/web/cancel.page.tsx"
+import { useState } from "react";
+import { Form } from "@warlock.js/web";
 
 export default function CancelPage() {
   const [message, setMessage] = useState("");

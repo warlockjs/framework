@@ -65,13 +65,16 @@ Root imports ending in `.css`, `.scss`, `.sass`, `.less`, or `.styl` are recogni
 
 A page may import CSS directly:
 
-```tsx title="src/web/products/products.page.tsx"
-import "./products.css";
+```ts title="src/web/products/products.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products", name: "products.index" },
 } as const satisfies PageConfig;
+```
+
+```tsx title="src/web/products/products.page.tsx"
+import "./products.css";
 
 export default function ProductsPage() {
   return (

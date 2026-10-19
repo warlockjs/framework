@@ -14,8 +14,9 @@ import {
   webContactControllerStub,
   webContactRoutesStub,
   webHomePageStub,
-  webHomeRegisterStub,
+  webHomeSetupStub,
   webRootStub,
+  webRootSetupStub,
 } from "../stubs";
 import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
@@ -103,6 +104,10 @@ async function completeWebInstallation(_options: CommandActionData) {
   } else {
     await ensureDirectoryAsync(srcPath("web"));
     await putFileAsync(rootFile, webRootStub);
+    const rootSetupFile = srcPath("web/root.setup.ts");
+    if (!(await fileExistsAsync(rootSetupFile))) {
+      await putFileAsync(rootSetupFile, webRootSetupStub);
+    }
     console.log(`${colors.green("✓")} Created src/web/root.tsx`);
 
     const collision = await relocateConflictingHomeRoute();
@@ -124,10 +129,10 @@ async function completeWebInstallation(_options: CommandActionData) {
 
       console.log(
         `${verb} Did not create src/web/index.page.tsx: ${collision.reason}.\n` +
-          `  The page stub declares ${colors.yellowBright('route.path = "/"')}, and two handlers on one ` +
+          `  The page setup declares ${colors.yellowBright('route.path = "/"')}, and two handlers on one ` +
           "path is a 500 at request time, not a startup error.\n" +
           `  Free up ${colors.yellowBright('GET "/"')} under src/app — move it to a path of its own, ` +
-          "or remove it — then create src/web/index.page.tsx yourself. Giving the page a `route` other " +
+          "or remove it — then create src/web/index.page.tsx yourself. Giving the setup file a `config.route` other " +
           "than `/` works too.",
       );
 
@@ -142,7 +147,10 @@ async function completeWebInstallation(_options: CommandActionData) {
       process.exitCode = 1;
     } else {
       await putFileAsync(srcPath("web/index.page.tsx"), webHomePageStub);
-      await putFileAsync(srcPath("web/index.register.ts"), webHomeRegisterStub);
+      const homeSetupFile = srcPath("web/index.setup.ts");
+      if (!(await fileExistsAsync(homeSetupFile))) {
+        await putFileAsync(homeSetupFile, webHomeSetupStub);
+      }
 
       // Unlike root.tsx above, the contact controller and its routes file are
       // ordinary application files a project can already have — independently

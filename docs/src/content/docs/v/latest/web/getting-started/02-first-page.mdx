@@ -12,9 +12,9 @@ React component Warlock renders on the server and hydrates in the browser.
 
 ## Create a route from the filename
 
-Create `src/web/about.page.tsx`:
+Create `src/web/about.setup.ts` for metadata and `src/web/about.page.tsx` for the component:
 
-```tsx title="src/web/about.page.tsx"
+```ts title="src/web/about.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = {
@@ -23,7 +23,9 @@ export const config: PageConfig = {
     description: "Meet the team behind the product.",
   },
 };
+```
 
+```tsx title="src/web/about.page.tsx"
 export default function AboutPage() {
   return (
     <main>
@@ -43,13 +45,15 @@ directory, so `src/web/index.page.tsx` serves `/` and
 Put a literal `route` in the page's `config` when the public URL should differ
 from the file path, or when callers need a stable name:
 
-```tsx title="src/web/company/about.page.tsx"
+```ts title="src/web/company/about.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = {
   route: { path: "/about", name: "company.about" },
 };
+```
 
+```tsx title="src/web/company/about.page.tsx"
 export default function AboutPage() {
   return <main>About us</main>;
 }
@@ -88,26 +92,32 @@ a missing component.
 
 ## Keep registration outside the component file
 
-`root.tsx`, `layout.tsx`, and a page may export a synchronous, no-argument
-`register()` hook. It runs once per module namespace on both the server and the
-browser, before middleware or loaders.
+Declare a synchronous, no-argument `register()` in `root.setup.ts`,
+`layout.setup.ts`, or the page's matching `.setup.ts` file. It runs once per
+module namespace in both realms, before middleware or loaders. It must not
+return a Promise. The framework projects its browser-safe code to the client;
+keep its imports and dependencies safe for both server and browser.
 
-For page-level setup, use a sidecar:
+```ts title="src/web/index.setup.ts"
+import { groupedTranslations } from "@mongez/localization";
 
-```tsx title="src/web/index.page.tsx"
-export { register } from "./index.register";
-
-export default function HomePage() {
-  return <main>Home</main>;
+export function register() {
+  groupedTranslations({ welcome: { en: "Welcome", ar: "مرحبًا" } });
 }
 ```
 
-An inline non-component export can make React Fast Refresh treat the module as
-an incompatible component boundary. The generated sidecar keeps stateful
-component edits refreshable. `register()` must not return a Promise.
+```tsx title="src/web/index.page.tsx"
+import { useTrans } from "@warlock.js/web";
+
+export default function HomePage() {
+  const trans = useTrans();
+  return <main>{trans("welcome")}</main>;
+}
+```
 
 ## Next steps
 
+- [Learn page setup files →](/v/latest/web/essentials/page-setup-files/)
 - [Learn filesystem and explicit routing →](/v/latest/web/essentials/routing/)
 - [Load server data with a typed loader →](/v/latest/web/essentials/loaders-and-metadata/)
 - [Add Tailwind CSS or shadcn/ui →](/v/latest/web/getting-started/tailwind-and-shadcn/)

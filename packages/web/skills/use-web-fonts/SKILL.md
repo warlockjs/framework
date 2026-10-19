@@ -70,13 +70,15 @@ export default function App({ children }: AppProps) {
 }
 ```
 
-```tsx title="src/web/index.page.tsx"
+```ts title="src/web/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/", name: "home" },
 } satisfies PageConfig;
+```
 
+```tsx title="src/web/index.page.tsx"
 export default function HomePage() {
   return (
     <section className="hero">
@@ -92,11 +94,13 @@ An optional page/layout/root `config.fontPreload: false` suppresses all font
 preloads for its document; any ancestor's opt-out wins. CSS remains linked for
 client navigation. For example, a route without the hero:
 
-```tsx title="src/web/about.page.tsx"
+```ts title="src/web/about.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = { fontPreload: false } satisfies PageConfig;
+```
 
+```tsx title="src/web/about.page.tsx"
 export default function AboutPage() {
   return <main>About this site</main>;
 }

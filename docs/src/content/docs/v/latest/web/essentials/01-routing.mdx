@@ -37,13 +37,15 @@ The rules are:
 
 Put a literal path or object in the page's `config`:
 
-```tsx title="src/web/products/[id].page.tsx"
+```ts title="src/web/products/[id].setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = {
   route: { path: "/catalog/:id", name: "products.show" },
 };
+```
 
+```tsx title="src/web/products/[id].page.tsx"
 export default function ProductPage() {
   return <main>Product</main>;
 }
@@ -52,7 +54,7 @@ export default function ProductPage() {
 An explicit route wins over filesystem derivation for both path and name. A
 bare string inside `config` is also valid:
 
-```ts
+```ts title="src/web/products.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = { route: "/products" };
@@ -95,7 +97,7 @@ validates against the published route table at runtime.
 Page documents and their `x-warlock-data` representations are `no-store` by
 default. Opt a public page into shared caching with `config.cache`:
 
-```tsx title="src/web/products/index.page.tsx"
+```ts title="src/web/products/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = {
@@ -155,7 +157,7 @@ both the page and rejected segment:
 
 Use an explicit terminal wildcard instead:
 
-```tsx title="src/web/docs/catch-all.page.tsx"
+```ts title="src/web/docs/catch-all.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = {

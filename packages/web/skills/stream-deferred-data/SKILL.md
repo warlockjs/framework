@@ -13,11 +13,10 @@ loader value, but a slow key no longer holds up everything else.
 
 ## The shape
 
-```tsx title="src/web/products/product-details.page.tsx"
-import { use, Suspense } from "react";
+```ts title="src/web/products/product-details.setup.ts"
 import { v } from "@warlock.js/seal";
 import { defer } from "@warlock.js/web";
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 type Review = { id: string; text: string };
 
@@ -45,6 +44,14 @@ export const loader = (async ({ request }) => {
 export const config = {
   validation,
 } as const satisfies PageConfig<typeof loader>;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import { use, Suspense } from "react";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
+
+type Review = { id: string; text: string };
 
 function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
   const list = use(reviews);
@@ -195,7 +202,7 @@ flushes; a deferred key resolves only after. Reading one throws
 `DeferredKeyInMetadataError` — naming the key and the page — in dev AND in
 production, unconditionally:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageConfig, PageLoader } from "@warlock.js/web";
 import { defer } from "@warlock.js/web";
 

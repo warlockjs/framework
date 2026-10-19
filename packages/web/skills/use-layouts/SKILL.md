@@ -5,16 +5,16 @@ description: 'Wrap pages with positional `layout.tsx` modules, compose literal `
 
 # Warlock — use layouts
 
-A positional `layout.tsx` applies to pages in its directory and descendant directories. Its default export wraps the page; its optional `config.prefix` contributes to every descendant page's effective URL.
+A positional `layout.tsx` applies to pages in its directory and descendant directories. Its default export wraps the page; `config.prefix` in `layout.setup.ts` contributes to every descendant page's effective URL.
 
-`layout.setup.ts` is an optional companion for its server configuration, loader,
+Use `layout.setup.ts` for server configuration, loaders,
 or universal `register()`. The component must not value-import the setup file.
 Development detects setup add/edit/delete changes and rederives affected routes.
 
 ## The shape
 
-```tsx title="src/web/products/layout.tsx"
-import type { LayoutConfig, LayoutLoader, LayoutProps } from "@warlock.js/web";
+```ts title="src/web/products/layout.setup.ts"
+import type { LayoutConfig, LayoutLoader } from "@warlock.js/web";
 
 export const config: LayoutConfig = { prefix: "/products" };
 
@@ -26,6 +26,11 @@ export const loader = (async () => {
     ],
   };
 }) satisfies LayoutLoader;
+```
+
+```tsx title="src/web/products/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
+import type { loader } from "./layout.setup";
 
 export default function ProductsLayout({ data, children }: LayoutProps<typeof loader>) {
   return (
@@ -45,13 +50,15 @@ export default function ProductsLayout({ data, children }: LayoutProps<typeof lo
 
 A page beside it can declare its path relative to the prefix:
 
-```tsx title="src/web/products/index.page.tsx"
+```ts title="src/web/products/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/", name: "products.index" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/products/index.page.tsx"
 export default function ProductsPage() {
   return <h1>Products</h1>;
 }
@@ -63,25 +70,27 @@ The effective URL is `/products`. A page with `config.route.path = "/:id"` under
 
 Every positional layout on the page's directory ancestry may declare a literal `config.prefix`. Prefixes compose outermost first, then the page's own route path — never appended to the directory's own name, so a layout prefix replaces its directory's segment rather than adding to it.
 
-```tsx title="src/web/users/layout.tsx"
+```ts title="src/web/users/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = { prefix: "/users" };
 ```
 
-```tsx title="src/web/users/account/layout.tsx"
+```ts title="src/web/users/account/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = { prefix: "/account" };
 ```
 
-```tsx title="src/web/users/account/settings.page.tsx"
+```ts title="src/web/users/account/settings.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/settings", name: "users.account.settings" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/users/account/settings.page.tsx"
 export default function SettingsPage() {
   return <h1>Account settings</h1>;
 }
@@ -105,14 +114,18 @@ One layout guards every page under `/admin`. The `prefix` puts the subtree at `/
 
 Prerequisite: `requireUser()` needs the page session. Wire `web.session` once in `src/config/web.ts` with `pageSession(...)` from `@warlock.js/auth`, as the `protect-a-page` topic shows. Without it nobody resolves as signed in, so every request is treated as a guest.
 
-```tsx title="src/web/admin/layout.tsx"
-import type { LayoutConfig, LayoutProps } from "@warlock.js/web";
+```ts title="src/web/admin/layout.setup.ts"
+import type { LayoutConfig } from "@warlock.js/web";
 import { requireUser } from "@warlock.js/web/session";
 
 export const config: LayoutConfig = {
   prefix: "/admin",
   middleware: [requireUser({ loginPath: "/login", userType: "admin" })],
 };
+```
+
+```tsx title="src/web/admin/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
 
 export default function AdminLayout({ children }: LayoutProps) {
   return (
@@ -124,13 +137,15 @@ export default function AdminLayout({ children }: LayoutProps) {
 }
 ```
 
-```tsx title="src/web/admin/dashboard.page.tsx"
+```ts title="src/web/admin/dashboard.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/dashboard", name: "admin.dashboard" },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/admin/dashboard.page.tsx"
 export default function DashboardPage() {
   return <h1>Dashboard</h1>;
 }
@@ -164,7 +179,7 @@ Use `shared` when multiple levels need one request-derived value, and write it i
 
 ## The client boundary
 
-A layout is projected for the browser the same way a page is: `config` and `loader` are stripped, including imports used only by them. The default component and `register()` form the client graph; `register()` runs once per module namespace on both the server and the browser. A named `ErrorBoundary` remains a separate server-rendered boundary export. See the `create-a-page` topic.
+The layout component and its imports form the UI client graph. Keep `config` and `loader` in `layout.setup.ts`; the framework projects its browser-safe `register()` code to the client. `register()` runs once per module namespace on both the server and the browser. A named `ErrorBoundary` stays in the UI file. See the `create-a-page` topic.
 
 ## Inherited policy
 
@@ -177,13 +192,17 @@ or `{ absolute }`. A callback returns that layout's complete metadata: explicit
 fields override `child.metadata`, and fields omitted from its result are not retained.
 Spread `child.metadata` when retaining descendant fields:
 
-```tsx
-export const config: LayoutConfig = {
+```ts title="src/web/layout.setup.ts"
+export async function loader() {
+  return { workspaceName: "Acme workspace" };
+}
+
+export const config = {
   metadata: ({ data, child }) => ({
     ...child?.metadata,
     title: `${data.workspaceName} | ${child?.metadata.title ?? "Workspace"}`,
   }),
-};
+} satisfies LayoutConfig<typeof loader>;
 ```
 
 The callback may override a child title; an absolute child title remains

@@ -2,6 +2,13 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.34.1
+
+### Fixed
+
+- List all five allowed setup exports (`config`, `loader`, `register`, `action`, `actions`) in composition errors.
+- Correct Web documentation and skills to keep page, layout, root, and error logic in setup files, with metadata in `config.metadata`; add a complete page setup guide.
+
 ## 5.34.0 - 2026-10-19
 
 ### Added

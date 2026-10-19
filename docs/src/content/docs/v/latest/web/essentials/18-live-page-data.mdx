@@ -13,8 +13,8 @@ layout, and page loader pipeline through client navigation. The page URL and
 mounted layout stay in place. A navigation can overtake a live request even
 when that request ignores cancellation; the late response is discarded. No component hook is needed.
 
-```tsx title="src/web/products/index.page.tsx"
-import type { PageConfig, PageProps } from "@warlock.js/web";
+```ts title="src/web/products/index.setup.ts"
+import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   live: { tags: ["products"], pollInterval: 15_000 },
@@ -23,6 +23,11 @@ export const config = {
 export async function loader() {
   return { updatedAt: new Date() };
 }
+```
+
+```tsx title="src/web/products/index.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./index.setup";
 
 export default function Products({ data }: PageProps<typeof loader>) {
   return <p>Updated: {data.updatedAt.toISOString()}</p>;
@@ -47,7 +52,7 @@ Use core's existing socket connector and pass the application's client to
 dependency, installed only when the app wants push delivery. The web package
 does not create another connection or own disconnection/authentication.
 
-```tsx title="src/web/root.tsx — register alongside existing exports"
+```ts title="src/web/root.setup.ts"
 import { configureLivePageData } from "@warlock.js/web";
 import { io } from "socket.io-client";
 

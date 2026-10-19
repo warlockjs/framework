@@ -449,7 +449,11 @@ preserves app-owned files and adds no duplicate import. The output explains how
 to set per-instance ownership and use `processes.spawn()`; terminals require
 optional peer `node-pty`. See [process supervision](/v/latest/process/).
 
-`warlock add web` scaffolds the application-wide Web tree under `src/web/`. Its generated home page re-exports the universal `register()` hook from `src/web/index.register.ts`: Warlock still discovers the hook from the page namespace and runs it during SSR and hydration, while React Fast Refresh can update the page component without reloading it or resetting component state.
+`warlock add web` creates `root.tsx` + `root.setup.ts` and `index.page.tsx` +
+`index.setup.ts`. Setup files own configuration and universal `register()`
+logic; UI files own components. Warlock composes the pairs on the server and
+projects browser-safe registration to the client, preserving the component
+Fast Refresh boundary.
 
 #### AI features
 

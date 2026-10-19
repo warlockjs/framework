@@ -58,7 +58,7 @@ Use `requireUser` as page middleware:
 The guards live on the server-only subpath `@warlock.js/web/session`, so they never reach the client bundle. Client code reads the user with `useUser()` from `@warlock.js/web`.
 :::
 
-```tsx title="src/web/account/account.page.tsx"
+```ts title="src/web/account/account.setup.ts"
 import { requireUser } from "@warlock.js/web/session";
 
 export const config = {
@@ -80,7 +80,7 @@ requireUser({ userType: "admin", when: (model) => model.isActive });
 
 Pass the loader context to read the model and guard from a loader. A guest throws a redirect that stops lower loaders. `when` must be synchronous here.
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageLoaderContext } from "@warlock.js/web";
 import { requireUser } from "@warlock.js/web/session";
 
@@ -93,7 +93,7 @@ export async function loader(ctx: PageLoaderContext) {
 
 ### Guest-only pages
 
-```ts
+```ts title="src/web/login.setup.ts"
 import { requireGuest } from "@warlock.js/web/session";
 
 export const config = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
@@ -105,9 +105,8 @@ A signed-in user is sent to the `redirect` query when it is a same-origin relati
 
 A page guarded by `requireUser()` can never be reached by a guest, so since 5.27 its types say so. The route-types generator reads the guard statically and writes `guard: "user"` on that page's `PageRouteRegistry` entry; `GuardedPageRouteName`, exported from `@warlock.js/web`, is the union of those names.
 
-```tsx title="src/web/account/account.page.tsx"
-import { useUser } from "@warlock.js/web";
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+```ts title="src/web/account/account.setup.ts"
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 import { requireUser } from "@warlock.js/web/session";
 
 export const config = {
@@ -119,6 +118,12 @@ export async function loader({ session }: PageLoaderContext<undefined, undefined
   // session is { user, model } here, neither null, and request.locals.user is non-null
   return { user: session.user };
 }
+```
+
+```tsx title="src/web/account/account.page.tsx"
+import { useUser } from "@warlock.js/web";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./account.setup";
 
 export default function AccountPage({ data }: PageProps<typeof loader>) {
   const user = useUser("account.show"); // SessionUser, never null
@@ -132,7 +137,7 @@ export default function AccountPage({ data }: PageProps<typeof loader>) {
 
 #### What counts as a guard
 
-The generator types a page as guarded only when it can prove the guard from source. The page, any layout on its chain, or the root (`root.tsx`) must export a literal `config` whose `middleware` is an array literal with a **direct element** that is a call to `requireUser(...)`, where `requireUser` is a value import from `"@warlock.js/web/session"`. The arguments do not matter. An aliased import (`import { requireUser as ru }`) counts, and `as`, `satisfies` or parentheses around the array or the call are looked through. A page's `config` may live in its `.setup.ts` companion, in one of the two files.
+The generator types a page as guarded only when it can prove the guard from source. The page setup, any layout setup on its chain, or `root.setup.ts` must export a literal `config` whose `middleware` is an array literal with a **direct element** that is a call to `requireUser(...)`, where `requireUser` is a value import from `"@warlock.js/web/session"`. The arguments do not matter. An aliased import (`import { requireUser as ru }`) counts, and `as`, `satisfies` or parentheses around the array or the call are looked through. A page's `config` may live in its `.setup.ts` companion, in one of the two files.
 
 These do **not** count, and the page stays unguarded in the types (no `guard` is emitted):
 
