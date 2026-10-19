@@ -12,6 +12,7 @@ import type {
   JsonRpcResponse,
   McpHttpAuth,
   McpHttpRequestInfo,
+  McpHttpRoute,
   McpHttpServeTransport,
   McpServeCallContext,
 } from "../contracts";
@@ -26,7 +27,7 @@ import { McpServeRequests } from "./serve-requests";
  * specification (https://modelcontextprotocol.io/specification/2025-11-25/basic/transports,
  * checked 2026-10-17) on `node:http`, with no SDK dependency:
  *
- * - one endpoint path; each POST carries exactly one JSON-RPC message
+ * - one MCP endpoint path (plus optional authenticated app routes); each MCP POST carries exactly one JSON-RPC message
  *   (batches were removed from the protocol in 2025-06-18 and get 400);
  * - a request is answered with `Content-Type: application/json` (the spec
  *   lets a server pick JSON or SSE per request); a notification or a
@@ -132,7 +133,60 @@ type ResolvedSettings = {
   authRequired: boolean;
   allowedOrigins: Set<string>;
   allowedHosts: Set<string>;
+  routes: Map<string, Map<string, McpHttpRoute>>;
 };
+
+/** Resolve exact descendant routes; no route may replace the MCP endpoint. */
+function resolveRoutes(
+  path: string,
+  routes: readonly McpHttpRoute[],
+): Map<string, Map<string, McpHttpRoute>> {
+  const resolved = new Map<string, Map<string, McpHttpRoute>>();
+  const methods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
+
+  if (routes.length > 0) {
+    let canonical = false;
+
+    try {
+      canonical = !path.startsWith("//") && new URL(path, "http://localhost").pathname === path;
+    } catch {
+      // Invalid URLs are configuration errors too, before the server binds.
+    }
+
+    if (!canonical) {
+      throw new McpServeError("MCP http routes require a canonical endpoint pathname.", {
+        type: "config",
+      });
+    }
+  }
+
+  for (const route of routes) {
+    if (
+      !methods.has(route.method) ||
+      !/^\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/.test(route.path) ||
+      route.path.split("/").some((segment) => segment === "." || segment === "..") ||
+      typeof route.handler !== "function"
+    ) {
+      throw new McpServeError("Invalid MCP http route method, path or handler.", {
+        type: "config",
+      });
+    }
+
+    const fullPath = `${path.replace(/\/+$/, "")}${route.path}`;
+    const byMethod = resolved.get(fullPath) ?? new Map<string, McpHttpRoute>();
+
+    if (fullPath === path || byMethod.has(route.method)) {
+      throw new McpServeError(`MCP http route "${route.method} ${fullPath}" conflicts.`, {
+        type: "collision",
+      });
+    }
+
+    byMethod.set(route.method, { ...route });
+    resolved.set(fullPath, byMethod);
+  }
+
+  return resolved;
+}
 
 /** Normalise a configured origin to `scheme://host[:port]`, or throw a config error. */
 function normalizeOrigin(origin: string): string {
@@ -233,6 +287,7 @@ function resolveSettings(transport: McpHttpServeTransport): ResolvedSettings {
     authRequired,
     allowedOrigins: new Set((transport.allowedOrigins ?? []).map(normalizeOrigin)),
     allowedHosts: new Set((transport.allowedHosts ?? []).map((name) => hostnameOf(name))),
+    routes: resolveRoutes(path, transport.routes ?? []),
   };
 }
 
@@ -414,8 +469,8 @@ export async function startHttpServer(
 }
 
 /**
- * Validate and answer one HTTP request: path → Host / Origin → auth →
- * method → headers → body → JSON-RPC dispatch.
+ * Validate and answer one HTTP request: Host / Origin → path → auth →
+ * method → route handler or MCP headers/body/JSON-RPC dispatch.
  */
 async function handleRequest(
   request: IncomingMessage,
@@ -427,7 +482,9 @@ async function handleRequest(
 ): Promise<void> {
   const headers = flattenHeaders(request.headers);
   const method = (request.method ?? "GET").toUpperCase();
-  const path = new URL(request.url ?? "/", "http://localhost").pathname;
+  const url = new URL(request.url ?? "/", "http://localhost");
+  const path = url.pathname;
+  const routes = settings.routes.get(path);
 
   // DNS-rebinding guards apply to every request on every path.
   if (!hostAllowed(headers.host, settings)) {
@@ -442,7 +499,7 @@ async function handleRequest(
     return;
   }
 
-  if (path !== settings.path) {
+  if (path !== settings.path && !routes) {
     sendRefusal(response, 404, JSON_RPC_SERVER_ERROR, "Not found.");
 
     return;
@@ -463,6 +520,29 @@ async function handleRequest(
         : {};
 
     sendRefusal(response, 401, JSON_RPC_SERVER_ERROR, "Unauthorized.", challenge);
+
+    return;
+  }
+
+  if (routes) {
+    const route = routes.get(method);
+
+    if (!route) {
+      sendEmpty(response, 405, { allow: [...routes.keys()].sort().join(", ") });
+
+      return;
+    }
+
+    await handleRoute(
+      request,
+      response,
+      route,
+      info,
+      url,
+      authentication.principal,
+      signal,
+      settings,
+    );
 
     return;
   }
@@ -600,6 +680,52 @@ async function handleRequest(
   }
 
   sendRefusal(response, 400, JSON_RPC_INVALID_REQUEST, "Invalid request: not a JSON-RPC message.");
+}
+
+/** Run a side route after the shared guards, tracking disconnect and shutdown. */
+async function handleRoute(
+  request: IncomingMessage,
+  response: ServerResponse,
+  route: McpHttpRoute,
+  info: McpHttpRequestInfo,
+  url: URL,
+  principal: unknown,
+  shutdown: AbortSignal,
+  settings: ResolvedSettings,
+): Promise<void> {
+  const disconnected = new AbortController();
+  const onClose = () => disconnected.abort();
+  response.once("close", onClose);
+
+  try {
+    const body = await readBody(request, settings.maxBodyBytes);
+
+    if (body.type === "too-large") {
+      sendRefusal(
+        response,
+        413,
+        JSON_RPC_SERVER_ERROR,
+        `Request body exceeds ${settings.maxBodyBytes} bytes.`,
+        {
+          connection: "close",
+        },
+      );
+
+      return;
+    }
+
+    const signal = AbortSignal.any([shutdown, disconnected.signal]);
+    signal.throwIfAborted();
+    const result = await route.handler({ request: info, url, principal, body: body.text, signal });
+
+    if (result.body === undefined || info.method === "HEAD") {
+      sendEmpty(response, result.status ?? 200, result.headers);
+    } else {
+      sendJson(response, result.status ?? 200, result.body, result.headers);
+    }
+  } finally {
+    response.off("close", onClose);
+  }
 }
 
 /**

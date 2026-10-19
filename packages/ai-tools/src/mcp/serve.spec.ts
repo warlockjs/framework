@@ -14,7 +14,7 @@ import { objectSchema, stringField } from "../schema";
 import { McpServeError } from "../errors";
 import { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
 import { answerStdioLine, createServeHandler, serve } from "./serve";
-import { mcpResult } from "../index";
+import { McpError, mcpResult } from "../index";
 
 /** A tool that uppercases its `value`. */
 function makeUpperTool(): ToolContract {
@@ -1060,4 +1060,209 @@ describe("serve() over stdio — call context and policy", () => {
       });
     },
   );
+});
+
+describe("serve() — discovery and call envelope policy", () => {
+  it("filters fresh prefixed descriptors per request without changing call lookup", async () => {
+    const beforeCall = vi.fn();
+    const listFilter = vi.fn(
+      async (context: McpServeToolContext, tools: readonly McpToolDescriptor[]) =>
+        context.principal === "reader"
+          ? tools.filter((entry) => entry.name === "core_upper")
+          : tools,
+    );
+    const handler = createServeHandler(
+      { groups: { core: [makeUpperTool()], extra: [resultTool("hidden")] } },
+      { name: "discovery", prefixToolNames: true, listFilter, beforeCall },
+    );
+    const signal = new AbortController().signal;
+    const reader = await handler.handle(request("list", "tools/list"), {
+      principal: "reader",
+      signal,
+    });
+    expect(reader.result).toMatchObject({
+      tools: [{ name: "core_upper", inputSchema: { type: "object" } }],
+    });
+    expect((reader.result as { tools: McpToolDescriptor[] }).tools).toHaveLength(1);
+    expect(listFilter).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: "list", principal: "reader", signal }),
+      expect.arrayContaining([expect.objectContaining({ name: "extra_native-result" })]),
+    );
+    const full = await handler.handle(request(2, "tools/list"), { principal: "operator" });
+    expect((full.result as { tools: McpToolDescriptor[] }).tools).toHaveLength(2);
+    const called = await handler.handle(request(3, "tools/call", { name: "extra_native-result" }), {
+      principal: "reader",
+    });
+    expect(called.result).toMatchObject({ content: [{ text: "hidden" }] });
+    expect(beforeCall).toHaveBeenCalledOnce();
+    expect(listFilter).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the registry callable after an empty or throwing list filter", async () => {
+    const handler = createServeHandler([resultTool("ok")], {
+      name: "discovery",
+      listFilter: (context) => {
+        if (context.requestId === "fail") throw new Error("Discovery unavailable");
+        return [];
+      },
+    });
+    expect((await handler.handle(request(1, "tools/list"))).result).toEqual({ tools: [] });
+    expect((await handler.handle(request("fail", "tools/list"))).error).toMatchObject({
+      message: "Discovery unavailable",
+    });
+    expect(
+      (await handler.handle(request(3, "tools/call", { name: "native-result" }))).error,
+    ).toBeUndefined();
+  });
+
+  it("passes the complete envelope before lookup or input validation and preserves app errors", async () => {
+    const beforeCall = vi.fn();
+    const guarded = makeUpperTool();
+    const invoke = vi.spyOn(guarded, "invoke");
+    const validateCallParams = vi.fn(
+      async (context: McpServeToolContext, params: Readonly<Record<string, unknown>>) => {
+        expect(context.principal).toBe("member");
+        if ("task" in params)
+          throw new McpError(-32600, "Task requests denied", { policy: "interactive" });
+      },
+    );
+    const handler = createServeHandler([guarded], {
+      name: "envelopes",
+      validateCallParams,
+      beforeCall,
+    });
+    const params = {
+      name: "missing",
+      arguments: { value: 42 },
+      task: {},
+      _meta: { trace: "x" },
+      extension: true,
+    };
+    const response = await handler.handle(request("envelope", "tools/call", params), {
+      principal: "member",
+    });
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: "envelope",
+      error: { code: -32600, message: "Task requests denied", data: { policy: "interactive" } },
+    });
+    expect(validateCallParams).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: "envelope" }),
+      params,
+    );
+    expect(beforeCall).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+    const allowed = await handler.handle(
+      request(2, "tools/call", {
+        name: "upper",
+        arguments: { value: "ok" },
+        _meta: { trace: "x" },
+      }),
+      { principal: "member" },
+    );
+    expect(allowed.result).toMatchObject({ content: [{ text: '{"upper":"OK"}' }] });
+    expect(beforeCall).toHaveBeenCalledOnce();
+  });
+
+  it("ignores task and unknown fields by default without advertising task support", async () => {
+    const handler = createServeHandler([resultTool("ok")], { name: "defaults" });
+    expect((await handler.handle(request(0, "initialize"))).result).toMatchObject({
+      capabilities: { tools: {} },
+    });
+    expect((await handler.handle(request(0, "initialize"))).result).not.toHaveProperty(
+      "capabilities.tasks",
+    );
+    expect(
+      (
+        await handler.handle(
+          request(1, "tools/call", { name: "native-result", task: { ttl: 100 }, extension: true }),
+        )
+      ).result,
+    ).toMatchObject({ content: [{ text: "ok" }] });
+  });
+
+  it.each([new Error("Unavailable"), "Unavailable"])(
+    "keeps ordinary envelope throws mapped to invalid params: %s",
+    async (cause) => {
+      const handler = createServeHandler([resultTool("ok")], {
+        name: "errors",
+        validateCallParams: () => {
+          throw cause;
+        },
+      });
+      expect(
+        (await handler.handle(request(1, "tools/call", { name: "native-result" }))).error,
+      ).toEqual({ code: -32602, message: "Unavailable" });
+    },
+  );
+});
+
+describe("serve() over stdio — discovery and envelope policy", () => {
+  it("ignores unsupported task and extension fields without an envelope hook", async () => {
+    await withStdio([resultTool("ok")], {}, {}, async ({ send, replies }) => {
+      send(request(1, "tools/call", { name: "native-result", task: {}, extension: true }));
+      await vi.waitFor(() => expect(replies).toHaveLength(1));
+      expect(replies[0]?.result).toMatchObject({ content: [{ text: "ok" }] });
+    });
+  });
+
+  it("uses provider identity for discovery while hidden tools remain subject to call policy", async () => {
+    const beforeCall = vi.fn((context: McpServeToolContext) => {
+      if (context.requestId === "denied") throw new McpError(-32600, "Denied");
+    });
+    await withStdio(
+      [resultTool("hidden")],
+      {
+        listFilter: (context, tools) => {
+          expect(context.principal).toBe("local");
+          expect(context.request).toBeUndefined();
+          expect(context.signal).toBeInstanceOf(AbortSignal);
+          return context.requestId === "list" ? [] : tools;
+        },
+        beforeCall,
+        validateCallParams: (context, params) => {
+          expect(context.principal).toBe("local");
+          if ("task" in params)
+            throw new McpError(-32010, "Unsupported envelope", { field: "task" });
+        },
+      },
+      { principalProvider: () => "local" },
+      async ({ send, replies }) => {
+        send(request("list", "tools/list"));
+        await vi.waitFor(() => expect(replies).toHaveLength(1));
+        expect(replies[0]?.result).toEqual({ tools: [] });
+        send(request("call", "tools/call", { name: "native-result" }));
+        await vi.waitFor(() => expect(replies).toHaveLength(2));
+        expect(replies[1]?.result).toMatchObject({ content: [{ text: "hidden" }] });
+        send(request("denied", "tools/call", { name: "native-result" }));
+        await vi.waitFor(() => expect(replies).toHaveLength(3));
+        expect(replies[2]?.error).toEqual({ code: -32600, message: "Denied" });
+        send(request("task", "tools/call", { name: "native-result", task: {} }));
+        await vi.waitFor(() => expect(replies).toHaveLength(4));
+        expect(replies[3]?.error).toEqual({
+          code: -32010,
+          message: "Unsupported envelope",
+          data: { field: "task" },
+        });
+        expect(beforeCall).toHaveBeenCalledTimes(2);
+      },
+    );
+  });
+
+  it("keeps ordinary beforeCall throws at invalid params", async () => {
+    await withStdio(
+      [resultTool("ok")],
+      {
+        beforeCall: () => {
+          throw new Error("Policy unavailable");
+        },
+      },
+      {},
+      async ({ send, replies }) => {
+        send(request(1, "tools/call", { name: "native-result" }));
+        await vi.waitFor(() => expect(replies).toHaveLength(1));
+        expect(replies[0]?.error).toEqual({ code: -32602, message: "Policy unavailable" });
+      },
+    );
+  });
 });

@@ -14,6 +14,7 @@ import { serve } from "./serve";
 export { serve, createServeHandler } from "./serve";
 export type { McpServeRequestHandler } from "./serve";
 export { SUPPORTED_PROTOCOL_VERSIONS } from "./protocol";
+export { McpError } from "./error";
 export { mcpResult } from "./result";
 export type { McpNativeResult } from "./result";
 export { jsonSchemaToStandard } from "./json-schema-to-standard";
