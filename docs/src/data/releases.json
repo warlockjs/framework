@@ -1,4 +1,9 @@
 {
+  "5.33.0": {
+    "publishedAt": "2026-10-19T00:05:08.790Z",
+    "matrix": "none",
+    "summary": "**Oxlint + Oxfmt become the only default toolchain, plus MCP request context, live page data, app-scoped secrets, AI measurement, PM2 commands and a new process supervisor.** ESLint and Prettier are off by default and deprecated (removal in 5.34.0): an ESLint config alone no longer enables checks, and `warlock upgrade --from 5.32 --to 5.33.0` migrates an app to Oxlint/Oxfmt. AI: `ai.mcp.serve` passes `requestId`, an authenticated `principal` and cancellation signals to tools, with `beforeCall` policy after input validation; `ai.measure()` and `warlock ai measure` report per-part input tokens and cost, with `measure.diff`. Web: pages opt into `config.live` for loader refreshes pushed over sockets with polling fallback, driven by `invalidatePageCache(tags)`. Core: `secrets.get/set/remove/has` with OS keychain, scoped environment and encrypted-file backends and log masking; `warlock pm2 init`/`reload` with PM2 readiness after boot. Devtools: an AI panel on Panoptic traces and a Processes panel. New package `@warlock.js/process` (`warlock add process`) supervises app-owned workers on Linux, macOS and Windows with token and start-time identity, group stops and memory caps. **Breaking:** ESLint/Prettier no longer selected automatically, MCP cancellation and policy order, secret fakes in default test setup. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.33.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm."
+  },
   "5.32.0": {
     "publishedAt": "2026-10-18T17:12:16.261Z",
     "matrix": "none",
