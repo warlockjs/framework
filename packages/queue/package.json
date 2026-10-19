@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/queue",
-  "version": "5.33.0",
+  "version": "5.34.0",
   "type": "module",
   "description": "Background jobs for Warlock.js on BullMQ + Redis, local SQLite, or memory: defineJob, dispatch with delay/priority, retries with backoff, progress, failed-job access, in-process workers with graceful shutdown.",
   "main": "./src/index.ts",
@@ -28,8 +28,8 @@
   "peerDependencies": {
     "@bull-board/api": "^9.0.0",
     "@bull-board/fastify": "^9.0.0",
-    "@warlock.js/core": "5.33.0",
-    "@warlock.js/logger": "5.33.0"
+    "@warlock.js/core": "5.34.0",
+    "@warlock.js/logger": "5.34.0"
   },
   "peerDependenciesMeta": {
     "@bull-board/api": {

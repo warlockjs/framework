@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/context",
-  "version": "5.33.0",
+  "version": "5.34.0",
   "type": "module",
   "description": "A simple and unified way to share context using AsyncLocalStorage for the Warlock.js framework",
   "keywords": [
