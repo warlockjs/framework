@@ -1,3 +1,4 @@
+import { catalogueToolNames } from "../tool/catalogue";
 import type { AgentConfig } from "./agent-config.type";
 
 /**
@@ -10,8 +11,9 @@ import type { AgentConfig } from "./agent-config.type";
  *
  * - Model name + provider — a different model invalidates the prior
  *   conversation's continuation.
- * - The sorted tool names — adding / removing / renaming a tool changes
- *   which dispatches the persisted `toolCalls` could have come from.
+ * - The sorted tool names, including hidden catalogue targets — adding,
+ *   removing or renaming a tool changes which dispatches the persisted
+ *   `toolCalls` could have come from.
  * - `maxTrips` — the loop bound is a semantic shape change.
  * - Whether a default `output` schema is configured — flips the
  *   structured-output instruction baked into the system turn.
@@ -37,7 +39,7 @@ export function computeAgentSignature(config: {
   compaction?: AgentConfig["compaction"];
 }): string {
   const toolNames = (config.tools ?? [])
-    .map((tool) => tool.name)
+    .flatMap((tool) => [tool.name, ...catalogueToolNames(tool)])
     .sort((a, b) => a.localeCompare(b));
 
   const fingerprint = {

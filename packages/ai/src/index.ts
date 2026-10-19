@@ -1,6 +1,6 @@
 export * from "./agent";
 export { ai } from "./ai";
-export type { Ai } from "./ai";
+export type { Ai, AiToolsNamespace } from "./ai";
 export * from "./batch";
 export * from "./measure";
 export * from "./checkpoint";

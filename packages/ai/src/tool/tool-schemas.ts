@@ -74,8 +74,7 @@ export type ToolTokenMeasurement = {
 /**
  * Measure how many input tokens a tool list costs on every call — often
  * the largest fixed part of an agent turn. Available as
- * `ai.tools.measure(tools, options)` once `@warlock.js/ai-tools` is
- * loaded.
+ * `ai.tools.measure(tools, options)` in AI core.
  *
  * **Native** (the model has `countTokens`): counts a one-message probe
  * with no tools, with all tools, and with each tool left out, so

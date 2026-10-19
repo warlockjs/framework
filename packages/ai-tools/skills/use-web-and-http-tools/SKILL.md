@@ -161,3 +161,24 @@ if (error instanceof WebToolError && error.type === "denied-host") {
 - The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
 - The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every tool here is built on.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes these tools.
+
+## Add the belt to a discovery catalogue
+
+Registration extends the core namespace, preserving `ai.tools.catalogue` and `ai.tools.measure`:
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai, type ModelContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+const surface = ai.tools.catalogue({
+  core: [ai.tools.calculator()],
+  searchable: [ai.tools.dateTime()],
+  limit: 8,
+});
+const assistant = ai.agent({ model, tools: surface.tools });
+const measured = await ai.measure({ model, tools: surface.tools });
+console.log(measured.parts.tools.tokens);
+```
+
+The core plus `tool_search` / `tool_call` stays advertised. Hidden calls still traverse target policy, approval, validation, accounting and tracing. The `define-ai-tool` topic covers lazy descriptors, ranking and measurement comparisons. Native provider tools stay alongside the catalogue; eager ones included in its lists pass through unchanged and are excluded from discovery.

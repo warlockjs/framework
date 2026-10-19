@@ -33,7 +33,7 @@ The construction `options` are the **rails** — they bound what the model may d
 
 ## How they surface on `ai`
 
-The bare `import "@warlock.js/ai-tools"` runs the package's `register` side effect, which (a) assigns the five factories onto `ai.tools` and `ai.mcp`, and (b) widens the `Ai` interface through a single `declare module "@warlock.js/ai"` augmentation. So after the import, `ai.tools.webSearch(...)`, `ai.tools.http(...)`, and the rest are fully typed — no view or cast needed. The same import also lights up `ai.mcp(...)` / `ai.mcp.serve(...)` (see [Connect MCP](/v/latest/ai/tools/connect-mcp/)).
+The bare `import "@warlock.js/ai-tools"` runs the package's `register` side effect, which (a) extends the core `ai.tools` namespace with the five factories and attaches `ai.mcp`, and (b) widens the `Ai` interface through a single `declare module "@warlock.js/ai"` augmentation. So after the import, `ai.tools.webSearch(...)`, `ai.tools.http(...)`, and the rest are fully typed — no view or cast needed. The same import also lights up `ai.mcp(...)` / `ai.mcp.serve(...)` (see [Connect MCP](/v/latest/ai/tools/connect-mcp/)).
 
 The factories are also exported as named values if you prefer not to go through the namespace:
 
@@ -46,6 +46,8 @@ import {
   dateTimeTool,
 } from "@warlock.js/ai-tools";
 ```
+
+`ai.tools.catalogue` and `ai.tools.measure` are built into `@warlock.js/ai`; importing the belt preserves them. Put ready-made function tools in a catalogue's `core` or `searchable` lists to keep large tool sets small. See [Discover tools from a stable catalogue](/v/latest/ai/tools/define-tools/#discover-tools-from-a-stable-catalogue). Provider-hosted tools stay outside discovery and pass through unchanged.
 
 ## The five tools
 

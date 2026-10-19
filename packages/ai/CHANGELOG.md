@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.34.0
+
+### Added
+
+- `ai.tools.catalogue({ core, searchable, limit?, searchName?, callName? })` (also `catalogue`) keeps a stable advertised core plus bounded schema search and governed hidden calls. Supports deterministic name/description/tag ranking, lazy cached tool loading, provider-tool passthrough, durable inventory drift detection and measurement with `ai.measure` / `ai.tools.measure`. Hidden calls resolve before the normal agent tool pipeline so target validation, policy, HITL, accounting, context and tracing remain intact.
+
 ## 5.33.0 - 2026-10-19
 
 ### Changed

@@ -79,7 +79,7 @@ const report = await measureTools([weatherTool, searchTool], { model, mode: "ful
 - **Native** — when `model` has a count endpoint (`countTokens`: Anthropic, Google, Bedrock, OpenAI Responses), the counts are exact for that model. It makes `tools.length + 2` count calls (no tools, all tools, and each tool left out), so `perTool` is each tool's marginal cost and `overhead` is what the provider adds once whenever any tool is present.
 - **Estimate** — otherwise each tool's schema JSON at `charsPerToken` (default 4) characters per token; `source` is `"estimate"` and `overhead` is `0`.
 
-`ai.tools.measure(tools, options)` is the same function once `@warlock.js/ai-tools` is loaded.
+`ai.tools.measure(tools, options)` is the same function, available in AI core.
 
 To shrink the bill, send the schemas compact — per agent, or per call:
 
@@ -107,6 +107,85 @@ const fromJson = compactJsonSchema({
 });
 // { type: "string" }
 ```
+
+## Discover tools from a stable catalogue
+
+`ai.tools.catalogue({ core, searchable, limit? })` ships in `@warlock.js/ai` itself, alongside `ai.tools.measure`. The named `catalogue` export is the same factory. Give the agent `catalogue.tools`: it advertises the core and two fixed meta-tools, `tool_search` and `tool_call`. Search results carry schemas in tool messages; they never expand the advertised definitions on later trips.
+
+```ts
+import { ai, type ModelContract } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+declare const model: ModelContract;
+
+const status = ai.tool({
+  name: "status",
+  description: "Read service status",
+  execute: async () => ({ ready: true }),
+});
+const surface = ai.tools.catalogue({
+  core: [status],
+  limit: 8,
+  searchable: [
+    {
+      name: "archive_note",
+      description: "Archive a note by id",
+      tags: ["notes", "archive"],
+      load: async () =>
+        ai.tool({
+          name: "archive_note",
+          description: "Archive a note by id",
+          input: v.object({ id: v.string() }),
+          execute: async ({ id }) => ({ archived: id }),
+        }),
+    },
+  ],
+});
+const assistant = ai.agent({
+  model,
+  tools: surface.tools,
+  middleware: [
+    ai.human.approval({
+      policy: { type: "allowlist", tools: ["archive_note"] },
+      handler: async () => ({ type: "reject", reason: "Archiving requires operator review" }),
+    }),
+  ],
+});
+```
+
+The model searches with `{ query: "notes archive" }`, receives `{ tools: [{ name, description, inputSchema }] }`, then calls `tool_call` with `{ name: "archive_note", input: { id: "n-1" } }`. `surface.search` and `surface.call` expose the two contracts; `searchName` and `callName` customize their names to avoid collisions. All core, searchable and meta-tool names must be distinct. `core` defaults to `[]` and contains eager contracts; `searchable` accepts eager `ToolContract`s or lazy descriptors with `name`, `description`, optional `tags`, and `load()`.
+
+Search is case-insensitive. Every whitespace-separated term must match the name, description or tags. Each term scores 100 for an exact name, 20 for a name substring, 10 for a tag substring, or 1 for a description substring; scores add together, with ties sorted by case-sensitive name using code-unit order. Duplicate terms count once. `*` lists tools alphabetically and an empty query returns no results. Queries are limited to 500 characters. `limit` is a positive safe integer, defaults to 8, and cannot be overridden by the model. Eager tools use `meta: { tags: ["notes"] }` for tags.
+
+Only the selected matches load, after ranking and the result cap. A direct call can load a named hidden tool without a prior search. Successful loads and concurrent in-flight loads are shared for the catalogue's lifetime; failures can be retried. A loader must return an ordinary tool with the declared name. Search returns the resolved tool's actual description and full JSON input schema, extracted as `draft-2020-12`, even with `toolSchemas: "compact"`. A schema-less tool gets the usual empty-object schema; a schema that cannot expose JSON fails search rather than returning a guessed definition. Use a lazy import inside `load` to defer implementation modules as well as schemas.
+
+Hidden calls resolve to their target **before** the agent's normal tool pipeline. Target name, raw input and description reach policy middleware and approval/HITL; approval edits still pass through the target's own Standard Schema validation. Cancellation, artifacts and identity context, concurrency limits, silent mode, nested reports, usage and budgets use the same path as a directly advertised tool. Events and report nodes identify the target and keep the original provider call id; conversation history keeps the model's meta-call. Hidden inventory participates in durable drift detection without loading tools. Bump the agent's `version` when changing target behavior or schemas, as for other tools.
+
+The call meta-tool can invoke only this catalogue's searchable inventory: core tools are called directly, and other meta-tools are excluded. Calling `surface.call.invoke()` or `.execute()` outside an agent fails closed because standalone invocation has no agent policy pipeline. Search is discovery, not an access-control filter; execution always checks current middleware, so a discovered schema does not grant permission. Supply an inventory appropriate for the current user if tool names or descriptions are sensitive.
+
+Native provider tools stay outside discovery. Prefer `tools: [...surface.tools, hostedSearch]`. If a provider tool is included in `core` or `searchable`, it passes through unchanged in the advertised list, remains a provider tool on the wire, and cannot be found or invoked through the catalogue. Lazy loaders cannot return provider tools.
+
+### Measure the fixed tool cost
+
+Compare the full eager list against the advertised list using the same model and representative messages:
+
+```ts
+import { ai, type ModelContract, type ToolContract } from "@warlock.js/ai";
+
+declare const model: ModelContract;
+declare const core: ToolContract[];
+declare const searchable: ToolContract[];
+const surface = ai.tools.catalogue({ core, searchable });
+const messages = [{ role: "user" as const, content: "Find a note" }];
+const full = await ai.measure({ model, messages, tools: [...core, ...searchable] });
+const discovered = await ai.measure({ model, messages, tools: surface.tools });
+console.log(full.parts.tools.tokens, discovered.parts.tools.tokens);
+console.log(ai.measure.diff(full, discovered).parts.tools); // negative tokens = saving
+const schemas = await ai.tools.measure(surface.tools, { model });
+console.log(schemas.tokens, schemas.source);
+```
+
+Measurement of `surface.tools` does not load hidden schemas or execute tools. Native token counts or labelled estimates include the core and both meta-tools. Loading every hidden tool to measure a full baseline is an explicit application choice; keep an eager baseline when comparing. Search-result schemas and extra search/call turns cost tokens in conversation history, so also measure representative later messages to assess the total tradeoff. The catalogue targets the fixed tool-definition cost paid on every trip.
 
 ## What gets sent back to the model
 
