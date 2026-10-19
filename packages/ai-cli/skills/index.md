@@ -1,5 +1,5 @@
 ---
-description: "Drive vendor coding-agent CLIs headless as @warlock.js/ai agents — Claude Code, Codex, Antigravity, Qwen Code, Kimi Code, Cursor, Copilot, Grok Build, OpenCode, Amp, Factory Droid, Mistral Vibe, Aider, Reasonix. Exports `cli`, `createCliAgent`, `cliModel`, `CliError`, the per-vendor adapters and the adapter building blocks; registers `ai.cli`. Use for: run a coding CLI from code, stream its tool calls and text as one event model, resume or cancel a CLI session, read its token usage, give a CLI per-run MCP servers without leaking tokens, use a CLI as an ai.agent model, add an adapter for another CLI. Not this package: direct model calls → @warlock.js/ai with a provider adapter; a policy-jailed shell/file workspace → @warlock.js/ai-workspace; MCP clients and servers → @warlock.js/ai-tools."
+description: "Run vendor coding CLIs headless as Warlock AI agents. Exports `cli`, `createCliAgent`, `cliModel`, `CliError` and adapter building blocks; registers `ai.cli`. Use for: launch Claude Code, Codex, Qwen Code or another supported CLI from code, stream tool calls and text, resume or cancel a session, read usage, attach per-run MCP servers, use a CLI as an ai.agent model, or implement an adapter. Not this package: direct model calls → @warlock.js/ai plus a provider adapter; a policy-jailed file and shell workspace → @warlock.js/ai-workspace; MCP clients and servers → @warlock.js/ai-tools."
 ---
 
 # @warlock.js/ai-cli
@@ -18,5 +18,5 @@ Many teams run the vendors' own agent CLIs on the subscriptions they already pay
 - `permission` defaults to `"standard"` (the CLI's own non-interactive rules); `"bypass"` must be opted into. Kimi Code has no standard mode and requires `"bypass"`.
 - Secrets go in `apiKey`, `env`, or MCP `env`/`headers`, never in `args`.
 - The default home is private per run: authenticate with `apiKey`/`env`, or pass a home you logged in to.
-- `run()` rejects only for setup problems (`CliError`: `not-found`, `capability`, `unsupported-option`, …). `done()` never rejects; check `status`.
+- `run()` rejects only for setup problems (`CliError`: "not-found", `capability`, "unsupported-option", …). `done()` never rejects; check `status`.
 - The installed CLI's `--help` must list every flag the adapter uses, so a CLI release with renamed flags fails closed with the flag and version in the error.

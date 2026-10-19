@@ -84,7 +84,7 @@ gh issue create -R warlockjs/framework --title "Approved public title" --body-fi
 
 Otherwise give the user the URL printed by `warlock issue` and the reviewed body
 to complete the form themselves. Printing a URL does not file an issue. App
-agents can follow the `report-framework-issue.md` topic in core's skill index for
+agents can follow the `report-framework-issue` topic in core's skill index for
 separate bug/feature body templates and the full consent workflow.
 
 The issue chooser disables blank issues to encourage complete reports and links

@@ -1,5 +1,5 @@
 /**
- * Skill cross-reference gate.
+ * Skill cross-reference and grouped-layout gate.
  *
  * ## Why this exists
  *
@@ -17,6 +17,8 @@
  * This gate fails, naming file and line, on any `<something>/SKILL.md` path
  * inside a package's `skills/**\/*.md`. The bare word `SKILL.md` (as in "each
  * folder holds one `SKILL.md`") is not a path and is not flagged.
+ * Grouped indexes must also name every local topic, never name a missing local
+ * topic, and keep all agent guidance in topic folders rather than loose files.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
@@ -103,12 +105,154 @@ export function runSkillPathRefsGate(repoRoot: string): SkillPathRef[] {
   );
 }
 
+export type SkillLayoutIssue = {
+  package: string;
+  relPath: string;
+  line: number;
+  topic: string;
+  type: "loose-markdown" | "unknown-topic" | "unlisted-topic";
+  message: string;
+};
+
+/** Keep offsets intact while excluding metadata and explicitly owned foreign topics. */
+function localIndexBody(text: string, packageDir: string): string {
+  return text
+    .replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, (meta) => meta.replace(/[^\r\n]/g, " "))
+    .replace(
+      /(?:the\s+)?`[a-z][a-z0-9-]*(?:\.md)?`\s+topic\s+of\s+(?:the\s+)?`(@warlock\.js\/[a-z0-9-]+|warlock-js-[a-z0-9-]+)`\s+(?:package|skill)/g,
+      (ref, owner: string) =>
+        owner === `@warlock.js/${packageDir}` || owner === `warlock-js-${packageDir}`
+          ? ref
+          : ref.replace(/[^\r\n]/g, " "),
+    )
+    .replace(/`warlock-js-[a-z0-9-]+`/g, (owner) => " ".repeat(owner.length));
+}
+
+/**
+ * Index orientation uses topic filenames, backticked hyphenated slugs, explicit
+ * `slug` topic references, or comma-separated slug lists. Plain API identifiers
+ * and package specifiers are not topic references.
+ */
+export function findIndexTopicRefs(text: string): { topic: string; line: number }[] {
+  const refs: { topic: string; line: number }[] = [];
+
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    const topics = new Set<string>();
+    const patterns = [
+      /\b([a-z][a-z0-9-]*)\.md\b/g,
+      /`(overview|[a-z][a-z0-9]*(?:-[a-z0-9]+)+)`/g,
+      /`([a-z][a-z0-9-]*)` topic\b/g,
+      /\btopic `([a-z][a-z0-9-]*)`/g,
+    ];
+
+    for (const pattern of patterns) {
+      for (const match of line.matchAll(pattern)) {
+        if (match[1]) topics.add(match[1]);
+      }
+    }
+
+    // Support the compact, unquoted area lists used by the core index.
+    const list = line.match(
+      /^\s*[-*] (?:\*\*[^*]+:\*\* )?([a-z][a-z0-9-]*(?:, [a-z][a-z0-9-]*)*)\s*$/,
+    );
+    for (const topic of list?.[1]?.split(", ") ?? []) topics.add(topic);
+
+    for (const topic of topics) refs.push({ topic, line: index + 1 });
+  }
+
+  return refs;
+}
+
+/** `repoRoot` is the packages directory, also used by fixture-based specs. */
+export function runSkillLayoutGate(repoRoot: string): SkillLayoutIssue[] {
+  const issues: SkillLayoutIssue[] = [];
+
+  for (const packageDir of readdirSync(repoRoot).sort()) {
+    if (packageDir.startsWith(".") || packageDir === "node_modules") continue;
+    const skillsRoot = path.join(repoRoot, packageDir, "skills");
+    if (!isDirectory(skillsRoot)) continue;
+    const names = readdirSync(skillsRoot).sort();
+    const topics = new Set(
+      names.filter(
+        (name) =>
+          isDirectory(path.join(skillsRoot, name)) &&
+          statIsFile(path.join(skillsRoot, name, "SKILL.md")),
+      ),
+    );
+    const addIssue = (
+      file: string,
+      line: number,
+      topic: string,
+      type: SkillLayoutIssue["type"],
+      message: string,
+    ) => {
+      issues.push({
+        package: `@warlock.js/${packageDir}`,
+        relPath: toPosix(path.relative(repoRoot, path.join(skillsRoot, file))),
+        line,
+        topic,
+        type,
+        message,
+      });
+    };
+
+    for (const name of names) {
+      if (name !== "index.md" && name.endsWith(".md") && statIsFile(path.join(skillsRoot, name))) {
+        addIssue(
+          name,
+          1,
+          name.slice(0, -3),
+          "loose-markdown",
+          "loose Markdown is not exported; move agent guidance into <topic>/SKILL.md or merge orientation into index.md",
+        );
+      }
+    }
+
+    const indexFile = path.join(skillsRoot, "index.md");
+    if (!statIsFile(indexFile)) continue;
+    const refs = findIndexTopicRefs(localIndexBody(readFileSync(indexFile, "utf8"), packageDir));
+    const mentioned = new Set(refs.map((ref) => ref.topic));
+
+    for (const ref of refs) {
+      if (!topics.has(ref.topic)) {
+        addIssue(
+          "index.md",
+          ref.line,
+          ref.topic,
+          "unknown-topic",
+          "index names a local topic without a matching <topic>/SKILL.md; qualify topics owned by another package",
+        );
+      }
+    }
+    for (const topic of topics) {
+      if (!mentioned.has(topic)) {
+        addIssue(
+          "index.md",
+          1,
+          topic,
+          "unlisted-topic",
+          "topic is missing from the index body; add it to the orientation",
+        );
+      }
+    }
+  }
+
+  return issues;
+}
+
+function statIsFile(file: string): boolean {
+  try {
+    return statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
   const refs = runSkillPathRefsGate(PACKAGES_ROOT);
+  const layoutIssues = runSkillLayoutGate(PACKAGES_ROOT);
 
-  if (refs.length === 0) {
-    console.log("skill-path-refs: no path-style SKILL.md references in any package's skills");
-  } else {
+  if (refs.length > 0) {
     for (const ref of refs) {
       console.error(`${ref.relPath}:${ref.line}  ${ref.ref}`);
     }
@@ -118,5 +262,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
         'refer by topic name instead: "the `x` topic" or "the `x` topic of the `warlock-js-<pkg>` skill".',
     );
     process.exitCode = 1;
+  }
+
+  for (const issue of layoutIssues) {
+    console.error(
+      `${issue.package} ${issue.relPath}:${issue.line} [${issue.topic}] ${issue.message}`,
+    );
+  }
+  if (layoutIssues.length > 0) {
+    console.error(`skill-path-refs: ${layoutIssues.length} grouped-layout issue(s).`);
+    process.exitCode = 1;
+  }
+  if (refs.length === 0 && layoutIssues.length === 0) {
+    console.log("skill-path-refs: package skill paths and grouped indexes are consistent");
   }
 }

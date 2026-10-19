@@ -160,7 +160,7 @@ plus provisioning helpers.
 
 ## Skills
 
-Progressive-disclosure, per-task docs live under [`skills/`](./skills/README.md):
+Progressive-disclosure, per-task docs live under [`skills/`](./skills/index.md):
 
 - [`use-a-workspace/`](./skills/use-a-workspace/SKILL.md) — build a jailed workspace
   and operate it (policy, tools, direct methods, `readonly` / `scope`).

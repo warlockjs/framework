@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.34.2
+
+### Fixed
+
+- Keep the package skill description within the recommended size and include its orientation in generated LLM projections.
+
 ## 5.34.1 - 2026-10-19
 
 ### Fixed

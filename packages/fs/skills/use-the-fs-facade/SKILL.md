@@ -98,9 +98,9 @@ const moved = await fs.file("a.txt").moveTo(fs.dir("archive")); // new File hand
 - **Async-only facade.** There is no `fs.filesSync`; for sync use the bare primitives.
 - **`edit`/`mergeJson` are sugar, not a lock.** Concurrent edits race (last-write-wins); `atomic` only makes the _write_ atomic, not the read+write pair. No file locking.
 - **`get()` reads the whole file.** For large text use `readLines`; for large-file digests `hash` already streams.
-- **Still no glob / watch / chmod** — see the `overview` topic. Use `walk` + filter instead of glob.
+- **Still no glob / watch / chmod** — see the package skill index. Use `walk` + filter instead of glob.
 
 ## See also
 
-- The `overview` topic — the package front door + the `*Async`/bare convention.
+- The package skill index — the package front door + the `*Async`/bare convention.
 - The `write-atomically` topic — `put({ atomic })` delegates to this.

@@ -4,7 +4,7 @@ description: "Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RA
 
 # @warlock.js/ai
 
-The core AI package. Everything hangs off the `ai` facade (`ai.agent`, `ai.tool`, `ai.team`, `ai.rag`, ...) and the same factories are exported standalone. An agent is one model plus a system prompt plus tools; the other runners compose agents. Model access comes from a provider package (`ai-openai`, `ai-anthropic`, ...), never from this one. Sibling packages (`ai-tools`, `ai-workspace`, `ai-panoptic`) attach themselves onto `ai` on import.
+The core AI package. Everything hangs off the `ai` facade (`ai.agent`, `ai.tool`, `ai.team`, `ai.rag`, ...) and the same factories are exported standalone. An agent is one model plus a system prompt plus tools; the other runners compose agents. Model access comes from a provider package (`@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, ...), never from this one. Sibling packages (`@warlock.js/ai-tools`, `@warlock.js/ai-workspace`, `@warlock.js/ai-panoptic`) attach themselves onto `ai` on import.
 
 ## The 80% path
 
@@ -28,7 +28,7 @@ The core AI package. Everything hangs off the `ai` facade (`ai.agent`, `ai.tool`
 
 ## Conventions and pitfalls
 
-- `ai-tools`, `ai-workspace`, `ai-panoptic` extend `ai` by side-effect import; import the package once before using `ai.tools.*`, `ai.mcp`, `ai.workspace`.
+- `@warlock.js/ai-tools`, `@warlock.js/ai-workspace`, `@warlock.js/ai-panoptic` extend `ai` by side-effect import; import the package once before using `ai.tools.*`, `ai.mcp`, `ai.workspace`.
 - Errors all extend `AIError`; branch on the typed subclass, not the message.
 - Persistence goes through `@warlock.js/cache`; checkpoints and snapshots are different stores.
 - Human approval and durable resume need a persistent interrupt store when approval happens in another process.
