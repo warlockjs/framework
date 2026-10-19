@@ -21,10 +21,11 @@
     "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/check-tab-code-fences.mjs && node scripts/generate-changelog.mjs && node scripts/check-changelog-freshness.mjs",
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "astro build && node scripts/check-mdx-gfm.mjs",
     "preview": "astro preview",
     "astro": "astro",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:gfm-check": "node --test scripts/check-mdx-gfm.test.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.39.2",
