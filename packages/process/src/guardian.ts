@@ -30,7 +30,10 @@ const start = () => {
   gated = false;
   const [command, ...args] = JSON.parse(process.env.WARLOCK_PROCESS_LAUNCH);
   const env = { ...process.env };
-  delete env.WARLOCK_PROCESS_LAUNCH;
+  for (const key of Object.keys(env)) {
+    const name = process.platform === "win32" ? key.toUpperCase() : key;
+    if (name === "WARLOCK_PROCESS_TOKEN" || name === "WARLOCK_PROCESS_LAUNCH") delete env[key];
+  }
   const child = spawn(command, args, { env, stdio: "inherit", windowsHide: true });
   child.on("error", (error) => { console.error(error.message); finish(127); });
   child.on("exit", (code, signal) => {

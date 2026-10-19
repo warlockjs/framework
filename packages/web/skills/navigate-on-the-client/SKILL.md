@@ -476,3 +476,32 @@ export function knownDestination(name: string): string | undefined {
 `isRouteName()` checks the published runtime page table. It is false before the
 table exists and narrows a dynamic name for `href()`; it does not generate a
 route or validate that all required parameters were supplied.
+
+## Refresh triggers and shared shell data
+
+Refresh lifecycle events (`onNavigating`, `onNavigated`, `onNavigationError`)
+carry `reason`: `"refresh"` for an explicit `refresh()`, `"live"` for live-data
+invalidation, `"poll"` for polling/reconnect catch-up, and `"focus"` for window
+focus catch-up on live pages. Ordinary route navigations omit `reason`.
+
+```ts
+import { refresh, routerEvents } from "@warlock.js/web";
+
+const stop = routerEvents.onNavigated((event) => {
+  if (event.reason === "refresh") console.log("Refresh complete");
+});
+await refresh(); // explicit/user refresh
+await refresh({ reason: "poll" }); // app-owned background revalidation
+stop();
+```
+
+Background reasons bypass page caches. Built-in live updates still wait for
+navigation and unsent form edits; explicit refreshes remain user requests.
+`RefreshReason` and `RefreshOptions` are exported types. Filter background
+reasons explicitly instead of treating every history `replace` as background.
+
+Each successful client page/shell swap installs and recursively freezes that
+payload's `shared` snapshot before rendering. Retained components using
+`useShared()` subscribe to the new snapshot, including across consecutive shell
+switches. Write shared values in server middleware on each request; client
+writes remain refused.

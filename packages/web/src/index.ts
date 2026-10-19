@@ -189,6 +189,7 @@ export { navigateTo, navigateBack, getHash } from "./client/navigation/verbs";
 // `createRouterEvents` is ours, not MRR's, and exists so tests get isolation.
 export { routerEvents, createRouterEvents } from "./routing/router-events";
 export type {
+  RefreshReason,
   NavigationStartPayload,
   NavigationEndPayload,
   NavigationErrorPayload,
@@ -206,7 +207,7 @@ export type { MatchedRoute } from "./client/navigation/current-route";
 // A FAILED refresh deliberately does not degrade to a full page load the way a
 // failed navigation does: a navigation must reload because the user has to
 // arrive, a refresh must not because the user is already there.
-export { refresh } from "./client/navigation/refresh";
+export { refresh, type RefreshOptions } from "./client/navigation/refresh";
 // Drop every hover-prefetched page — call after a logout or mutation the runtime cannot see.
 export { clearPrefetchCache } from "./client/navigation/prefetch";
 

@@ -6,7 +6,7 @@ import type { Schema, SchemaContext, TypedValidationResult, ValidatedOutput } fr
 import type { Infer } from "../types/inference-types";
 import { AnyValidator } from "../validators/any-validator";
 import { ArrayValidator } from "../validators/array-validator";
-import type { BaseValidator } from "../validators/base-validator";
+import { BaseValidator } from "../validators/base-validator";
 import { BooleanValidator } from "../validators/boolean-validator";
 import { ComputedValidator } from "../validators/computed-validator";
 import { DateValidator } from "../validators/date-validator";
@@ -36,6 +36,37 @@ import "../validators/methods/present-methods";
 import "../validators/methods/required-methods";
 import { validate as validateFunction } from "./validate";
 
+type RecordShape<K extends string, V> = string extends K
+  ? Record<string, V>
+  : Partial<Record<K, V>>;
+type TypedRecord<T extends BaseValidator, K extends string = string> = StandardSchemaV1<
+  RecordShape<K, Infer.Input<T>>,
+  RecordShape<K, Infer.Output<T>>
+> &
+  RecordValidator & { valueValidator: T };
+
+function record<T extends BaseValidator = AnyValidator>(
+  validator?: T,
+  errorMessage?: string,
+): TypedRecord<T>;
+function record<K extends BaseValidator, T extends BaseValidator>(
+  keyValidator: K,
+  valueValidator: T,
+  errorMessage?: string,
+): TypedRecord<T, Extract<Infer.Input<K>, string>> & { keyValidator: K };
+function record(
+  first?: BaseValidator,
+  second?: BaseValidator | string,
+  errorMessage?: string,
+): RecordValidator {
+  if (second instanceof BaseValidator) {
+    if (first === undefined)
+      throw new TypeError("v.record(): a key validator is required before the value validator");
+    return new RecordValidator(first, second, errorMessage);
+  }
+  return new RecordValidator(first === undefined ? new AnyValidator() : first, second);
+}
+
 /**
  * Seal factory object - creates instances of validators
  *
@@ -55,12 +86,7 @@ export const v: ValidatorV = {
     } & StandardSchemaV1<Array<Infer.Input<T>>, Array<Infer.Output<T>>>,
 
   /** Create a record validator - object with dynamic keys and consistent value types */
-  record: <T extends BaseValidator>(validator?: T, errorMessage?: string) =>
-    new RecordValidator(validator || v.any(), errorMessage) as StandardSchemaV1<
-      Record<string, Infer.Input<T>>,
-      Record<string, Infer.Output<T>>
-    > &
-      RecordValidator & { valueValidator: T },
+  record,
 
   /**
    * Create a tuple validator - fixed-length array with position-specific types.
@@ -241,11 +267,7 @@ export interface ValidatorV {
   ) => ArrayValidator & {
     validator: T;
   } & StandardSchemaV1<Array<Infer.Input<T>>, Array<Infer.Output<T>>>;
-  record: <T extends BaseValidator>(
-    validator?: T,
-    errorMessage?: string,
-  ) => StandardSchemaV1<Record<string, Infer.Input<T>>, Record<string, Infer.Output<T>>> &
-    RecordValidator & { valueValidator: T };
+  record: typeof record;
   tuple: <T extends BaseValidator[] | []>(
     validators: T,
     errorMessage?: string,

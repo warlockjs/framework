@@ -4,6 +4,24 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.34.0
+
+### Changed
+
+- **BREAKING** `v.object()` requires a plain or null-prototype object; arrays, built-ins, class instances and custom prototypes fail even with unknown-key options enabled.
+
+### Added
+
+- `v.record(keyValidator, valueValidator, errorMessage?)` validates original property names and values, infers partial literal-key dictionaries, and emits key JSON Schema. Existing value-only and error-message forms remain supported.
+
+### Fixed
+
+- Reject malformed record validator arguments at schema definition with a clear `TypeError`.
+
+### Upgrading
+
+- Convert class instances to explicit plain DTOs before object validation; use array or instance validators for those inputs. No permissive object opt-in is provided because it would recreate accidental array acceptance.
+
 ## 5.33.0 - 2026-10-19
 
 ### Changed

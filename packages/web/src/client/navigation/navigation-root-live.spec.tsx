@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { stringify } from "devalue";
-import { act, createElement } from "react";
+import { act, createElement, memo } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Form } from "../../components/form";
 import type { HydrationDocumentPayloadSource } from "../../hydration-payload";
+import { hydrateShared, useShared } from "../../shared";
 import { currentNavigator } from "../../routing/navigator";
 import { configureLivePageData, type LivePageSocket } from "./live-page-data";
 import { NavigationRoot } from "./navigation-root";
@@ -200,4 +201,42 @@ describe("live page loader refresh", () => {
     expect(window.location.pathname).toBe("/orders");
     expect(host.querySelector("p")?.textContent).toBe("orders data");
   });
+});
+
+it("re-seals shared on consecutive shell navigations and updates a retained consumer", async () => {
+  const snapshots: Readonly<object>[] = [];
+  const SharedProbe = memo(function SharedProbe() {
+    const value = useShared();
+    snapshots.push(value);
+    return createElement("output", null, JSON.stringify(value));
+  });
+  const initial = { ...payload(), shared: { shell: { name: "first" } } };
+  hydrateShared(initial.shared);
+  const shellTree = () => createElement(SharedProbe);
+  await act(async () =>
+    root.render(
+      createElement(NavigationRoot, {
+        pages: [],
+        initialPayload: initial,
+        initialTree: shellTree(),
+        buildTree: async () => shellTree(),
+      }),
+    ),
+  );
+  for (const name of ["second", "third"]) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        response({ ...payload(name), shared: { shell: { name } } }, url),
+      ),
+    );
+    await act(async () => {
+      currentNavigator()?.(`/${name}`, {});
+    });
+    expect(host.querySelector("output")?.textContent).toBe(JSON.stringify({ shell: { name } }));
+    const latest = snapshots.at(-1);
+    expect(Object.isFrozen(latest)).toBe(true);
+    expect(Object.isFrozen((latest as { shell: object }).shell)).toBe(true);
+  }
+  expect(initial.shared.shell.name).toBe("first");
 });

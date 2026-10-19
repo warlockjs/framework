@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Refresher } from "./refresh";
 import type { LivePageOptions } from "../../live-page-data";
 import { configureLivePageData, startLivePageData, type LivePageSocket } from "./live-page-data";
 import { beginNavigationPending } from "./navigation-pending-store";
@@ -31,7 +32,7 @@ let stop: (() => void) | undefined;
 let completeNavigation: (() => void) | undefined;
 let options: LivePageOptions | undefined;
 let socket: Socket;
-let refresh: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
+let refresh: ReturnType<typeof vi.fn<Refresher>>;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -48,6 +49,7 @@ afterEach(() => {
   setFormDirty(form, false);
   configureLivePageData({});
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 function start() {
@@ -63,6 +65,7 @@ describe("live page scheduling", () => {
     socket.invalidate();
     await Promise.resolve();
     expect(refresh).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenLastCalledWith({ reason: "live" });
   });
 
   it("coalesces notifications during navigation and rechecks the committed page", () => {
@@ -118,6 +121,7 @@ describe("live page scheduling", () => {
     socket.emit("disconnect");
     await vi.advanceTimersByTimeAsync(1000);
     expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenLastCalledWith({ reason: "poll" });
     socket.connected = true;
     socket.emit("connect");
     expect(refresh).toHaveBeenCalledTimes(2);
@@ -154,4 +158,17 @@ describe("live page scheduling", () => {
       true,
     );
   });
+});
+
+it("marks focus catch-up and removes the listener on disposal", async () => {
+  const browser = new EventTarget();
+  vi.stubGlobal("window", browser);
+  start();
+  browser.dispatchEvent(new Event("focus"));
+  await Promise.resolve();
+  expect(refresh).toHaveBeenLastCalledWith({ reason: "focus" });
+  stop?.();
+  refresh.mockClear();
+  browser.dispatchEvent(new Event("focus"));
+  expect(refresh).not.toHaveBeenCalled();
 });

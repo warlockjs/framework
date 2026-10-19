@@ -1,4 +1,6 @@
 export type SecretStoreErrorCode =
+  | "INVALID_DRIVER"
+  | "MEMORY_IN_PRODUCTION"
   | "INVALID_NAME"
   | "INVALID_VALUE"
   | "INVALID_NAMESPACE"
@@ -13,6 +15,9 @@ export class SecretStoreError extends Error {
   public constructor(public readonly code: SecretStoreErrorCode) {
     super(
       {
+        INVALID_DRIVER: "secrets.driver / SECRETS_DRIVER must be auto or memory.",
+        MEMORY_IN_PRODUCTION:
+          "The memory secrets driver requires secrets.allowMemoryInProduction: true when NODE_ENV=production.",
         INVALID_NAME: "Secret names must be valid Unicode strings of 1 to 256 UTF-16 code units.",
         INVALID_VALUE: "Secret values must be strings.",
         INVALID_NAMESPACE: "A nonempty secret store namespace is required.",

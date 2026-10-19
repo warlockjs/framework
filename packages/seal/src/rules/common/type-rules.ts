@@ -1,4 +1,5 @@
-import { isObject, isPlainObject } from "@mongez/supportive-is";
+import { isObject } from "@mongez/supportive-is";
+import { isPlainObjectValue as isPlainObject } from "../../helpers/plain-object";
 import { invalidRule, VALID_RULE } from "../../helpers";
 import type { SchemaRule } from "../../types";
 

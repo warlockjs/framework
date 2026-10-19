@@ -2,6 +2,16 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.34.0
+
+### Added
+
+- Refresh lifecycle events carry a `reason` distinguishing explicit refreshes from live-data, polling/reconnect and focus revalidation. Export `RefreshReason` and `RefreshOptions`; allow app-owned background `refresh({ reason })` calls.
+
+### Fixed
+
+- Seal and publish each successful page/shell swap's shared snapshot at the central swap boundary, updating retained `useShared()` consumers.
+
 ## 5.33.0 - 2026-10-19
 
 ### Fixed

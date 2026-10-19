@@ -6,6 +6,10 @@ export interface SecretBackend {
 }
 
 export type SecretsConfigurations = {
+  /** auto selects keychain/environment/files; memory is isolated to this process. */
+  driver?: "auto" | "memory";
+  /** Explicitly permit the volatile memory driver under NODE_ENV=production. */
+  allowMemoryInProduction?: boolean;
   /** Stable identity shared only by processes belonging to this app installation. */
   namespace?: string;
   /** Trusted parent location; defaults to storage/secrets. */

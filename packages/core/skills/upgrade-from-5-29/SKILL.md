@@ -489,3 +489,29 @@ ESLint/Oxlint health-check switches. Custom editor settings, checker arrays,
 computed options and nonstandard scripts require review. Oxc diagnostics keep
 framework conventions in `warlock check`. Re-run the migration after addressing
 manual findings if needed; an app with only Oxc tooling is a no-op for this codemod.
+
+## 5.33 to 5.34 plain object validation
+
+**BREAKING:** Seal `v.object()` rejects arrays, dates, maps, sets, class instances
+and objects with custom prototypes, including under `.allowUnknown()` and
+`.stripUnknown()`. Plain and null-prototype dictionaries remain accepted. There
+is no permissive opt-in: choose an array/instance validator or construct a plain
+DTO explicitly before validation.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+class User {
+  name = "Ada";
+}
+const instance = new User();
+const user = v.object({ name: v.string() });
+await v.validate(user, { name: instance.name });
+const names = v.array(v.string());
+await v.validate(names, ["Ada"]);
+```
+
+`v.record(valueValidator)` remains supported. To validate dictionary keys, use
+`v.record(keyValidator, valueValidator)`; malformed arguments now fail while
+defining the schema. Literal-key records infer partial dictionaries because
+only present keys are checked.

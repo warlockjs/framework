@@ -202,3 +202,19 @@ it.each(["darwin", "win32"])(
     if (platform === "win32") expect(plan.env.warlock_process_token).toBeUndefined();
   },
 );
+
+it("retains the ownership token in the Linux workload launch environment", () => {
+  const plan = launchCommand(
+    "linux",
+    "node",
+    "worker",
+    ["literal"],
+    {},
+    { APP_MODE: "test" },
+    token,
+  );
+  expect(plan.env.WARLOCK_PROCESS_TOKEN).toBe(token);
+  expect(plan.env.WARLOCK_PROCESS_LAUNCH).toBeUndefined();
+  expect(plan.env.APP_MODE).toBe("test");
+  expect(plan.args).toContain("worker");
+});

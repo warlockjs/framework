@@ -20,6 +20,10 @@ it.each(["darwin", "win32"])(
     const exit = vi.fn();
     const kill = vi.fn();
     const env = {
+      APP_MODE: "test",
+      ...(platform === "win32"
+        ? { warlock_process_token: "untrusted", warlock_process_launch: "untrusted" }
+        : {}),
       WARLOCK_PROCESS_TOKEN: token,
       WARLOCK_PROCESS_LAUNCH: JSON.stringify(["worker", "argument with spaces", "$(literal)"]),
     };
@@ -61,10 +65,18 @@ it.each(["darwin", "win32"])(
     request({ resume: sign(nonce + ":resume") });
     expect(spawn).toHaveBeenCalledTimes(1);
     expect(spawn).toHaveBeenCalledWith("worker", ["argument with spaces", "$(literal)"], {
-      env: { WARLOCK_PROCESS_TOKEN: token },
+      env: { APP_MODE: "test" },
       stdio: "inherit",
       windowsHide: true,
     });
+    // Removing workload credentials must not affect the guardian's later proof.
+    const after = request({});
+    expect(JSON.parse(String(after.end.mock.calls[0]?.[0]))).toEqual({
+      pid: 42,
+      digest: sign(nonce + ":42:false"),
+      gated: false,
+    });
+    expect(env.WARLOCK_PROCESS_TOKEN).toBe(token);
     child.emit("exit", 7, null);
     expect(exit).toHaveBeenCalledWith(7);
     expect(kill).not.toHaveBeenCalled();

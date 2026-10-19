@@ -64,11 +64,16 @@
  */
 export type NavigationMode = "push" | "replace";
 
+/** Refresh trigger; absent on ordinary route navigation. */
+export type RefreshReason = "refresh" | "live" | "poll" | "focus";
+
 /** Emitted when a navigation begins — before anything has been fetched. */
 export type NavigationStartPayload = {
   /** The URL the navigation was requested for, verbatim and unparsed. */
   url: string;
   mode: NavigationMode;
+  /** Explicit refresh() uses refresh; background revalidation names its trigger. */
+  reason?: RefreshReason;
 };
 
 /** Emitted when a navigation has completed and the new page is on screen. */
@@ -83,6 +88,8 @@ export type NavigationEndPayload = {
    */
   resolvedUrl: string;
   mode: NavigationMode;
+  /** Explicit refresh() uses refresh; background revalidation names its trigger. */
+  reason?: RefreshReason;
 };
 
 /**
@@ -96,6 +103,8 @@ export type NavigationErrorPayload = {
   /** The URL the navigation was requested for. */
   url: string;
   mode: NavigationMode;
+  /** Explicit refresh() uses refresh; background revalidation names its trigger. */
+  reason?: RefreshReason;
   /**
    * What went wrong. `unknown` rather than `Error` because a caught value has
    * no such guarantee — narrow it before reading `.message`.

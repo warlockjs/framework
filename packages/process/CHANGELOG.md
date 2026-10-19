@@ -1,5 +1,15 @@
 # Changelog — @warlock.js/process
 
+## 5.34.0
+
+### Fixed
+
+- Validate supervisor configuration before accessing options; errors name the missing or invalid `owner` or `registry` option.
+
+### Security
+
+- Strip guardian ownership and launch variables from macOS/Windows workload environments, including Windows casing aliases. Guardian proof remains intact; Linux retains its `/proc` ownership token.
+
 ## 5.33.0 - 2026-10-19
 
 ### Added

@@ -1,8 +1,8 @@
 import { except } from "@mongez/reinforcements";
-import { isPlainObject } from "@mongez/supportive-is";
+import { isPlainObjectValue as isPlainObject } from "../helpers/plain-object";
 import { setKeyPath } from "../helpers/path-helpers";
 import { objectTrimMutator, stripUnknownMutator } from "../mutators/object-mutators";
-import { objectRule } from "../rules/common/type-rules";
+import { plainObjectRule } from "../rules/common/type-rules";
 import { unknownKeyRule } from "../rules/common/unknown-key";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
@@ -40,7 +40,7 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     errorMessage?: string,
   ) {
     super();
-    this.addMutableRule(objectRule, errorMessage);
+    this.addMutableRule({ ...plainObjectRule, name: "object" }, errorMessage);
   }
 
   /**
