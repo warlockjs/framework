@@ -6,8 +6,9 @@ import {
   webContactControllerStub,
   webContactRoutesStub,
   webHomePageStub,
-  webHomeRegisterStub,
+  webHomeSetupStub,
   webRootStub,
+  webRootSetupStub,
 } from "../../../src/generations/stubs";
 
 const options = JSON.parse(
@@ -31,11 +32,12 @@ type StubCase = {
  */
 const generatedWebStubs: readonly StubCase[] = [
   { writtenAs: "src/web/root.tsx", content: webRootStub, filepath: "root.tsx" },
+  { writtenAs: "src/web/root.setup.ts", content: webRootSetupStub, filepath: "root.setup.ts" },
   { writtenAs: "src/web/index.page.tsx", content: webHomePageStub, filepath: "index.page.tsx" },
   {
-    writtenAs: "src/web/index.register.ts",
-    content: webHomeRegisterStub,
-    filepath: "index.register.ts",
+    writtenAs: "src/web/index.setup.ts",
+    content: webHomeSetupStub,
+    filepath: "index.setup.ts",
   },
   {
     writtenAs: "src/app/contact/controllers/contact.controller.ts",

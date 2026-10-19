@@ -43,7 +43,7 @@ export function composePageModule(
         exportName,
         uiFile,
         source,
-        `setup files may export only config, loader, or register; found "${exportName}".`,
+        `setup files may export only config, loader, register, action, actions; found "${exportName}".`,
       );
     }
 

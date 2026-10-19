@@ -38,9 +38,9 @@ declare module "@warlock.js/web" {
 }
 ```
 
-```tsx title="src/web/root.tsx"
-import { Head, Scripts, linkStylesheetsFor, shared } from "@warlock.js/web";
-import type { AppProps, HttpContext, RootConfig } from "@warlock.js/web";
+```ts title="src/web/root.setup.ts"
+import { linkStylesheetsFor, shared } from "@warlock.js/web";
+import type { HttpContext, RootConfig } from "@warlock.js/web";
 import { themeSources, type ThemeId } from "./themes";
 
 const selectTheme = async ({ request }: HttpContext) => {
@@ -102,7 +102,7 @@ called from middleware or a loader:
 
 ## 4. Page cache: keyed by host, plus `varyBy`
 
-```ts title="src/web/home.page.tsx"
+```ts title="src/web/home.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = {
@@ -139,9 +139,9 @@ rest of the `serverCache` contract.
 - **Keep `themeSources` next to the map.** A path typo fails the request
   loudly, in both development and production, rather than serving unstyled
   HTML.
-- **`import type {} from "./types"` in `root.tsx` is refused by projection**
+- **`import type {} from "./types"` in `root.setup.ts` is refused by projection**
   as an ambiguous side-effect import. Put the `SharedContext` augmentation in
-  a module `root.tsx` already imports (`themes/index.ts` above).
+  a module `root.setup.ts` already imports (`themes/index.ts` above).
 
 ## See also
 

@@ -126,12 +126,16 @@ With `app.localeCodes: ["en", "ar"]` and `strategy: "prefix-except-default"` as 
 
 The directory (`about`) is the namespace, so the keys are `about.title` and `about.intro`.
 
-```tsx title="src/web/about/about.page.tsx"
-import { useTrans, type PageConfig } from "@warlock.js/web";
+```ts title="src/web/about/about.setup.ts"
+import { type PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/about", name: "about" },
 } as const satisfies PageConfig;
+```
+
+```tsx title="src/web/about/about.page.tsx"
+import { useTrans } from "@warlock.js/web";
 
 export default function AboutPage() {
   const t = useTrans();

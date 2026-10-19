@@ -50,9 +50,9 @@ export default function BetaTheme() {
 }
 ```
 
-```tsx title="src/web/root.tsx"
-import { Head, Scripts, linkStylesheetsFor, shared } from "@warlock.js/web";
-import type { AppProps, HttpContext, RootConfig } from "@warlock.js/web";
+```ts title="src/web/root.setup.ts"
+import { linkStylesheetsFor, shared } from "@warlock.js/web";
+import type { HttpContext, RootConfig } from "@warlock.js/web";
 import { themeSources, type ThemeId } from "./themes";
 
 const selectTheme = async ({ request }: HttpContext) => {
@@ -98,7 +98,7 @@ The server cannot see which lazy module rendered, and it never follows `dynamicI
 
 ## 4. Page cache
 
-```ts
+```ts title="src/web/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -120,4 +120,4 @@ export const config = {
 
 - **Middleware runs after the cache lookup.** Anything the key needs must come from the request (host, `varyBy`), not from `shared`.
 - **Keep `themeSources` next to the map.** A path typo fails the request loudly in both dev and prod.
-- **`import type {} from "./types"` in `root.tsx` is refused by projection.** Put the `SharedContext` augmentation in a module the root already imports.
+- **`import type {} from "./types"` in `root.setup.ts` is refused by projection.** Put the `SharedContext` augmentation in a module the root already imports.

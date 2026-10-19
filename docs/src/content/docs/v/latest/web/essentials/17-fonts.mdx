@@ -98,7 +98,7 @@ entry. Select fallbacks available on your audience's operating systems.
 
 ## Disable preloads for a route
 
-```tsx title="src/web/articles/layout.tsx"
+```ts title="src/web/articles/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config = { fontPreload: false } satisfies LayoutConfig;

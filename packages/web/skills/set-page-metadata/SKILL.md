@@ -7,9 +7,9 @@ description: 'Set a page''s `<head>` with `config.metadata`: title (string, `{ d
 
 A page describes its `<head>` in `config.metadata`. The server resolves it after the loader, injects it into the document before the first byte, and rewrites the same tags after a client navigation. `<Head />` in `root.tsx` only decides where the tags are placed (see the `write-the-root` topic).
 
-`metadata` is a field of `config` on three modules: a page (`PageConfig`), a positional `layout.tsx` (`LayoutConfig`) and `root.tsx` (`RootConfig`). All three take the same shape.
+`metadata` is a field of `config` on three modules: a page (`PageConfig`), `layout.setup.ts` (`LayoutConfig`) and `root.setup.ts` (`RootConfig`). All three take the same shape.
 
-```tsx title="src/web/products/index.page.tsx"
+```ts title="src/web/products/index.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -19,7 +19,9 @@ export const config = {
     description: "Browse the product catalogue",
   },
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/products/index.page.tsx"
 export default function ProductsPage() {
   return <h1>Products</h1>;
 }
@@ -38,8 +40,8 @@ export default function ProductsPage() {
 
 Give the config the loader's type so `data` is typed. `PageConfig<typeof loader>` reads the loader's type, so the loader may be declared after the config:
 
-```tsx title="src/web/products/product-details.page.tsx"
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+```ts title="src/web/products/product-details.setup.ts"
+import type { PageConfig, PageLoader } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -66,6 +68,11 @@ export const loader = (async ({ request }) => {
     },
   };
 }) satisfies PageLoader;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return <h1>{data.product.name}</h1>;
@@ -107,7 +114,7 @@ title: { default: "Acme Store", template: "%s | Acme Store" }; // template wraps
 title: { absolute: "Acme Store - Home" }; // ignores any ancestor template
 ```
 
-A `template` is applied by an ancestor to the title of the level below it, replacing `%s`. Put the template on `root.tsx` or a layout, then each page sets a plain `title: "Products"` and renders as `Products | Acme Store`. With a `template` and no descendant title, the `default` is used as is. `{ absolute }` opts one page out of every ancestor template. The title is always a plain string by the time it is rendered.
+A `template` is applied by an ancestor to the title of the level below it, replacing `%s`. Put the template in `config.metadata` in `root.setup.ts` or `layout.setup.ts`, then each page sets a plain `title: "Products"` and renders as `Products | Acme Store`. With a `template` and no descendant title, the `default` is used as is. `{ absolute }` opts one page out of every ancestor template. The title is always a plain string by the time it is rendered.
 
 ### `openGraph`
 
@@ -185,7 +192,7 @@ Metadata is resolved page first, then each layout, then the root, and an ancesto
 4. **A `title.template` on an ancestor wraps the title below it** (see Title above).
 5. **A layout or root callback returns its complete level.** Its returned fields override `child.metadata`, and fields it omits are not carried over from the child. Spread `child.metadata` when you want to keep them:
 
-```tsx title="src/web/products/layout.tsx"
+```ts title="src/web/products/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config = {
@@ -198,7 +205,7 @@ export const config = {
 
 Typical split: the root carries sitewide defaults and the title template, a layout carries section defaults, and each page carries its own `title`, `description` and share image.
 
-```tsx title="src/web/root.tsx"
+```ts title="src/web/root.setup.ts"
 import type { RootConfig } from "@warlock.js/web";
 
 export const config = {
@@ -214,7 +221,7 @@ export const config = {
 
 Metadata functions run inside the request, so translate with `t()` from `@warlock.js/core`. It resolves through the active locale (and the page's route-locales snapshot). See the `localize-pages` topic for the locale setup. Call `t()` inside the function, never in a module-level object, which would translate once at import time:
 
-```tsx title="src/web/pricing.page.tsx"
+```ts title="src/web/pricing.setup.ts"
 import { t } from "@warlock.js/core";
 import type { PageConfig } from "@warlock.js/web";
 
@@ -225,7 +232,9 @@ export const config = {
     description: t("pricing.description"),
   }),
 } as const satisfies PageConfig;
+```
 
+```tsx title="src/web/pricing.page.tsx"
 export default function PricingPage() {
   return <h1>Pricing</h1>;
 }
@@ -240,7 +249,7 @@ What the framework does per locale without being asked:
 
 The generated hreflang set swaps only the locale prefix. If the slug also differs per locale (`/en/apartments-for-rent-in-zamalek` against `/ar/شقق-للإيجار-في-الزمالك`), declare the real URLs with `alternates`:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export async function loader() {

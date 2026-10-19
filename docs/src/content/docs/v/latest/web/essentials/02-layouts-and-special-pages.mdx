@@ -7,8 +7,9 @@ sidebar:
   label: Layouts and special pages
 ---
 
-A `layout.tsx` can contribute a React wrapper, a route prefix, middleware, and a
-loader to pages below its directory.
+A `layout.tsx` holds the React wrapper. Its `layout.setup.ts` supplies a route
+prefix, middleware, metadata, and a loader to pages below its directory. See
+[Page setup files](/v/latest/web/essentials/page-setup-files/) for all pairs.
 
 ## Layout composition
 
@@ -22,16 +23,20 @@ first:
   default export. Prefix/middleware-only layouts may nest freely; two rendering
   layouts on one page path fail the build and name every offender.
 - **A prefix replaces its directory segment for derived routes.** If
-  `src/web/products/layout.tsx` declares `prefix: "/store"`, then
+  `src/web/products/layout.setup.ts` declares `prefix: "/store"`, then
   `src/web/products/index.page.tsx` resolves to `/store`, not
   `/store/products`.
 - **A prefix prepends an explicit page path.** The composed prefix joins the
   literal `config.route.path`; root values do not create doubled slashes.
 
-```tsx title="src/web/products/layout.tsx"
-import type { LayoutConfig, LayoutProps } from "@warlock.js/web";
+```ts title="src/web/products/layout.setup.ts"
+import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = { prefix: "/store" };
+```
+
+```tsx title="src/web/products/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
 
 export default function StoreLayout({ children }: LayoutProps) {
   return <section className="store-shell">{children}</section>;
@@ -40,7 +45,7 @@ export default function StoreLayout({ children }: LayoutProps) {
 
 Layouts can also provide inherited metadata (including `robots`) and
 `sitemap: false` inside this same `LayoutConfig`. They cannot set a page route,
-cache policy, validation, or a sitemap URL supplier. A root module may export
+cache policy, validation, or a sitemap URL supplier. `root.setup.ts` exports
 `config: RootConfig` for application middleware, `strictMode`, and metadata;
 it owns the flag even though only the tree beneath `#vessel` hydrates in the
 browser.
@@ -69,7 +74,7 @@ decides what happens next:
   object). A page middleware returning 2xx content **replaces the page**; no
   loader or render runs.
 
-```tsx title="src/web/account/layout.tsx"
+```ts title="src/web/account/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = {
@@ -96,6 +101,16 @@ change.
 route of its own and must not declare `config.route`. When no application file exists,
 Warlock still answers unmatched URLs with its built-in `404` response.
 
+Keep its metadata in the matching setup file:
+
+```ts title="src/web/404.setup.ts"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  metadata: { title: "Page not found", robots: "noindex" },
+};
+```
+
 ```tsx title="src/web/404.page.tsx"
 export default function NotFoundPage() {
   return <main>We could not find that page.</main>;
@@ -113,6 +128,16 @@ of an unmatched request.
 `error.page.tsx` is the one application-wide error boundary. A second copy
 beneath `src/web/` fails the build. It does not declare `config.route` and does
 not handle ordinary 404s.
+
+Use `error.setup.ts` for error-page metadata and registration:
+
+```ts title="src/web/error.setup.ts"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  metadata: { title: "Something went wrong", robots: "noindex" },
+};
+```
 
 ```tsx title="src/web/error.page.tsx"
 import type { ErrorPageProps } from "@warlock.js/web";
@@ -210,19 +235,30 @@ flight get a brief, bounded window to finish before the process exits.
 
 ### Client: `onClientError`
 
-Register a callback from your own client code — typically `src/web/root.tsx`
+Register a callback from your own client code — typically a client helper called by `src/web/root.setup.ts`’s `register()`
 or wherever your app initializes — with `onClientError`. It receives every
 uncaught `window` error, unhandled promise rejection, and React hydration
 error the framework observes, plus whatever the framework's own error
 boundary catches after hydration.
 
-```tsx title="src/web/root.tsx"
+```ts title="src/web/client-errors.ts"
 import * as Sentry from "@sentry/react";
 import { onClientError } from "@warlock.js/web";
 
-onClientError(({ error, kind, routeName, pathname }) => {
-  Sentry.captureException(error, { tags: { kind, routeName }, extra: { pathname } });
-});
+export function registerClientErrors() {
+  if (typeof window === "undefined") return;
+  onClientError(({ error, kind, routeName, pathname }) => {
+    Sentry.captureException(error, { tags: { kind, routeName }, extra: { pathname } });
+  });
+}
+```
+
+```ts title="src/web/root.setup.ts"
+import { registerClientErrors } from "./client-errors";
+
+export function register() {
+  registerClientErrors();
+}
 ```
 
 Like the server hook, `onClientError` sits alongside `console.error`, never
@@ -234,17 +270,25 @@ SDK, or `fetch()` your own endpoint, from inside the callback.
 
 ## The universal `register()` hook
 
-`root.tsx`, `layout.tsx`, and pages may export a synchronous, no-argument
-`register()` hook. It runs once per real module namespace in both realms,
-before that module's middleware or loader. It must not return a Promise.
+Declare a synchronous, no-argument `register()` in `root.setup.ts`,
+`layout.setup.ts`, or the page's matching `.setup.ts` file. It runs once per
+module namespace in both realms, before middleware or loaders. It must not
+return a Promise. The framework projects its browser-safe code to the client;
+keep its imports and dependencies safe for both server and browser.
 
-Prefer a sidecar and named re-export for page registration so React Fast
-Refresh sees a clean component boundary:
+```ts title="src/web/index.setup.ts"
+import { groupedTranslations } from "@mongez/localization";
+
+export function register() {
+  groupedTranslations({ welcome: { en: "Welcome", ar: "مرحبًا" } });
+}
+```
 
 ```tsx title="src/web/index.page.tsx"
-export { register } from "./index.register";
+import { useTrans } from "@warlock.js/web";
 
 export default function HomePage() {
-  return <main>Home</main>;
+  const trans = useTrans();
+  return <main>{trans("welcome")}</main>;
 }
 ```

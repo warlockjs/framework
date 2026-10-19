@@ -70,7 +70,7 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 ## 4. Read the result in a page handler
 
-```ts
+```ts title="src/web/example.setup.ts"
 import { loadTenant } from "app/tenants/services/tenant.service";
 import type { PageLoaderContext } from "@warlock.js/web";
 

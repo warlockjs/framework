@@ -16,10 +16,9 @@ so one slow value no longer holds up everything else.
 
 ## Mark a key as deferred
 
-```tsx title="src/web/products/product-details.page.tsx"
-import { use, Suspense } from "react";
+```ts title="src/web/products/product-details.setup.ts"
 import { defer } from "@warlock.js/web";
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+import type { PageLoader } from "@warlock.js/web";
 
 export const loader = (async ({ request }) => {
   const { id } = request.validated();
@@ -29,6 +28,12 @@ export const loader = (async ({ request }) => {
     reviews: getReviews(id), // a Promise — streamed in after the shell
   });
 }) satisfies PageLoader;
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import { use, Suspense } from "react";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
   const list = use(reviews);
@@ -160,7 +165,7 @@ keys on one page each get their own timer.
 after. Reading one throws `DeferredKeyInMetadataError`, naming the key and
 the page, in dev **and** in production:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 export const loader = (async () =>
   defer({ product: await getProduct(id), reviews: getReviews(id) })) satisfies PageLoader;
 

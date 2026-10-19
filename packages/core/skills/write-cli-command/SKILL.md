@@ -1,6 +1,6 @@
 ---
 name: write-cli-command
-description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.register.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `warlock add bull-board`, `index.register.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — the `run-app` topic; warlock.config.ts wiring — the `configure-app` topic; competing libs `commander`, `yargs`, `oclif`.'
+description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.setup.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `warlock add bull-board`, `index.setup.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — the `run-app` topic; warlock.config.ts wiring — the `configure-app` topic; competing libs `commander`, `yargs`, `oclif`.'
 ---
 
 # Warlock — write a CLI command
@@ -230,7 +230,11 @@ Run `warlock add --list` to see what's currently registered. Pass `--packageMana
 is loaded automatically by `warlock dev` when installed, and is omitted from a
 production install with dev dependencies excluded.
 
-The Web starter keeps the page's universal non-component setup in `src/web/index.register.ts`, while `src/web/index.page.tsx` re-exports `register`. Warlock still discovers and runs the hook from the page namespace in both SSR and the browser, but editing the page component remains inside React's Fast Refresh boundary. Do not move the `register()` declaration inline beside the component: React Refresh treats that non-component export as incompatible and reloads the page, losing component state.
+`warlock add web` creates `root.tsx` + `root.setup.ts` and `index.page.tsx` +
+`index.setup.ts`. Setup files own configuration and universal `register()`
+logic; UI files own components. Warlock composes the pairs on the server and
+projects browser-safe registration to the client, preserving the component
+Fast Refresh boundary.
 
 ### AI input measurement
 

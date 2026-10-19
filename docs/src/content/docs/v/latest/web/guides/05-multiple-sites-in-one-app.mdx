@@ -95,7 +95,7 @@ These hosts belong in application environment/configuration. Web does not add a 
 
 In multi-site mode loaders and actions receive `ctx.site` (`PageSite`). It contains the configured site key, normalized host, selected `basePath`, and `tenantKey` for a resolver-selected site.
 
-```ts title="src/web/$sites/tenant/listings/[id].page.tsx"
+```ts title="src/web/$sites/tenant/listings/[id].setup.ts"
 import type { PageActionContext, PageLoaderContext } from "@warlock.js/web";
 
 export async function loader({ site }: PageLoaderContext<undefined, undefined>) {

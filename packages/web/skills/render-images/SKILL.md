@@ -7,8 +7,16 @@ description: 'Render responsive, CLS-safe images with the `<Image>` component fr
 
 `<Image>` turns a plain JSON description of an image and its renditions into a responsive `<img>` (or `<picture>`). It is a pure render with no effects and no state, so the server and the browser produce identical markup and hydration always matches. It never runs Sharp or reads a file; every URL either comes straight from the descriptor or from a small `loader` function.
 
+```ts title="src/web/blog/post.setup.ts"
+import { type PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/blog/post", name: "blog.post" },
+} as const satisfies PageConfig;
+```
+
 ```tsx title="src/web/blog/post.page.tsx"
-import { Image, type ImageDescriptor, type PageConfig } from "@warlock.js/web";
+import { Image, type ImageDescriptor } from "@warlock.js/web";
 
 const cover: ImageDescriptor = {
   src: "/uploads/posts/cover.jpg",
@@ -20,10 +28,6 @@ const cover: ImageDescriptor = {
   },
   formats: ["webp"],
 };
-
-export const config = {
-  route: { path: "/blog/post", name: "blog.post" },
-} as const satisfies PageConfig;
 
 export default function PostPage() {
   return (
@@ -152,8 +156,7 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
 2. **The form page.** `<Form>` posts `multipart/form-data` by default, `config.action.validation` runs against the body with files included, and `v.file()` makes `request.validated()` hand back an `UploadedFile`:
 
-   ```tsx title="src/web/posts/new-post.page.tsx"
-   import { FieldError, Form } from "@warlock.js/web";
+   ```ts title="src/web/posts/new-post.setup.ts"
    import type { PageActionContext, PageConfig } from "@warlock.js/web";
    import { generateImageVariants } from "@warlock.js/core";
    import { v } from "@warlock.js/seal";
@@ -186,6 +189,10 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
      return response.redirect(`/posts/${post.id}`);
    }
+   ```
+
+   ```tsx title="src/web/posts/new-post.page.tsx"
+   import { FieldError, Form } from "@warlock.js/web";
 
    export default function NewPostPage() {
      return (
@@ -204,9 +211,8 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
 3. **Render it.** The loader returns the stored descriptor and the page passes it straight to `<Image>`:
 
-   ```tsx title="src/web/posts/post.page.tsx"
-   import { Image } from "@warlock.js/web";
-   import type { ImageDescriptor, PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+   ```ts title="src/web/posts/post.setup.ts"
+   import type { ImageDescriptor, PageConfig, PageLoader } from "@warlock.js/web";
    import { Post } from "app/posts/models/post";
 
    export const config = {
@@ -220,6 +226,12 @@ One flow from a file input to a responsive `<Image>`. It assumes the `/uploads/*
 
      return { title: post.get("title") as string, cover: post.get("cover") as ImageDescriptor };
    }) satisfies PageLoader<undefined, typeof config.route>;
+   ```
+
+   ```tsx title="src/web/posts/post.page.tsx"
+   import { Image } from "@warlock.js/web";
+   import type { PageProps } from "@warlock.js/web";
+   import type { loader } from "./post.setup";
 
    export default function PostPage({ data }: PageProps<typeof loader>) {
      return (

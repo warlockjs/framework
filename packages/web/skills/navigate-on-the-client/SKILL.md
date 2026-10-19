@@ -160,13 +160,18 @@ export function NavLink({ activeName, section = false, className, ...link }: Nav
 }
 ```
 
-```tsx title="src/web/layout.tsx"
-import type { LayoutLoader, LayoutProps } from "@warlock.js/web";
-import { NavLink } from "./components/nav-link";
+```ts title="src/web/layout.setup.ts"
+import type { LayoutLoader } from "@warlock.js/web";
 
 export const loader = (async ({ route }) => {
   return { activeName: route.name };
 }) satisfies LayoutLoader;
+```
+
+```tsx title="src/web/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
+import { NavLink } from "./components/nav-link";
+import type { loader } from "./layout.setup";
 
 export default function SiteLayout({ data, children }: LayoutProps<typeof loader>) {
   return (

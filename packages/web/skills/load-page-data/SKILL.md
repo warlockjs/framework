@@ -9,7 +9,7 @@ description: "Load App, Layout, and Page data with named loaders; page validatio
 
 Opt a page into automatic loader re-runs using page-owned `config.live`:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
@@ -69,7 +69,7 @@ Declare the loader so TypeScript infers its return type, then pass `typeof loade
 to the matching props type (`PageProps<typeof loader>`). Two spellings do that, and
 this skill uses both:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 // Either: a named function, with the context typed on the parameter.
 export async function loader({
   request,
@@ -94,13 +94,18 @@ no `PUBLIC_` exception to it — static or computed.** `env("PUBLIC_X")` does no
 work client-side either. **The supported pattern is: read the value in a loader,
 which is server code, and return it as page data.**
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import { env } from "@warlock.js/core";
-import type { PageLoaderContext, PageProps } from "@warlock.js/web";
+import type { PageLoaderContext } from "@warlock.js/web";
 
 export async function loader(_context: PageLoaderContext<undefined, undefined>) {
   return { siteName: env("PUBLIC_SITE_NAME") };
 }
+```
+
+```tsx title="src/web/example.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./example.setup";
 
 export default function HomePage({ data }: PageProps<typeof loader>) {
   return <h1>{data.siteName}</h1>;
@@ -174,9 +179,9 @@ one for anything request-scoped.
 
 ## The shape
 
-```tsx title="src/web/products/product-details.page.tsx"
+```ts title="src/web/products/product-details.setup.ts"
 import { v } from "@warlock.js/seal";
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 
 export const config = {
   route: { path: "/products/:id", name: "products.details" },
@@ -205,6 +210,11 @@ export async function loader({
     locale: (shared as { locale?: string }).locale ?? "en",
   };
 }
+```
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product-details.setup";
 
 export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
   return (
@@ -264,8 +274,7 @@ regardless) — see Declare the shared payload below.
 
 `data` in `PageProps`, `LayoutProps`, `AppProps` and in `config.metadata` callbacks is typed as what actually reaches the page, not the loader's raw return: `Serialized<Return, "devalue">` from `@warlock.js/core` (a `Response` the loader may return is excluded first). The loader's own declared return type is untouched.
 
-```tsx title="src/web/products/product.page.tsx"
-import type { PageProps } from "@warlock.js/web";
+```ts title="src/web/products/product.setup.ts"
 import { getProduct } from "app/products/services/get-product.service";
 
 export async function loader() {
@@ -273,6 +282,11 @@ export async function loader() {
 
   return { product, publishedAt: new Date() };
 }
+```
+
+```tsx title="src/web/products/product.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product.setup";
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   // data.product      -> the browser-safe projection returned by the service
@@ -302,13 +316,13 @@ See the `define-resource` topic of the `warlock-js-core` skill for `Serialized<T
 
 ## Three loader levels
 
-| Module                  | Contract       | Component props              |
-| ----------------------- | -------------- | ---------------------------- |
-| `src/web/root.tsx`      | `AppLoader`    | `AppProps<typeof loader>`    |
-| positional `layout.tsx` | `LayoutLoader` | `LayoutProps<typeof loader>` |
-| `*.page.tsx`            | `PageLoader`   | `PageProps<typeof loader>`   |
+| Module                       | Contract       | Component props              |
+| ---------------------------- | -------------- | ---------------------------- |
+| `src/web/root.setup.ts`      | `AppLoader`    | `AppProps<typeof loader>`    |
+| positional `layout.setup.ts` | `LayoutLoader` | `LayoutProps<typeof loader>` |
+| page `*.setup.ts`            | `PageLoader`   | `PageProps<typeof loader>`   |
 
-All receive one context object with `request`, `response`, `shared`, and `route`; page loaders also get `site` and `session` when those are configured. Page loaders add generics that connect their sibling `validation` and `route` exports to `request.validated()` and `request.input()`.
+All receive one context object with `request`, `response`, `shared`, and `route`; page loaders also get `site` and `session` when those are configured. Page loaders add generics that connect their `config.validation` and `config.route` declarations to `request.validated()` and `request.input()`.
 
 Page loaders, layout loaders, metadata callbacks, and page actions also receive `route: { name, path, params }` — the MATCHED page's route. Read it instead of `request.route`: under `sites`, core registers one `/*` catch-all per method, so `request.route` is that catch-all there. `name` is the page's `config.route.name`, or its generated name (never a `<site>.` prefixed or internal key); it is `undefined` only if the page has none.
 
@@ -316,7 +330,7 @@ Page loaders, layout loaders, metadata callbacks, and page actions also receive 
 
 The runtime passes every loader a `signal`, an `AbortSignal` that fires when the client disconnects before the response finishes. The exported `PageLoaderContext` type does not declare it, so add it to the parameter type. Hand it to anything cancelable:
 
-```ts
+```ts title="src/web/example.setup.ts"
 import type { PageLoaderContext } from "@warlock.js/web";
 
 export async function loader({
@@ -333,7 +347,7 @@ export async function loader({
 
 A page's `config.validation` declares a [Seal](https://www.npmjs.com/package/@warlock.js/seal) schema per source, `params` and `query` kept as separate keys. Declare either or both:
 
-```ts
+```ts title="src/web/example.setup.ts"
 export const config = {
   validation: {
     params: v.object({ id: v.int().coerce() }),
@@ -379,7 +393,7 @@ A client navigation to the same URL still receives that same 400 status, with no
 
 ## Execution order
 
-Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.tsx`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
+Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.setup.ts`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
 
 **The first core `Response` a loader returns is terminal.** Returning a `Response` object stops the pipeline immediately: no lower loader starts, `metadata` is not resolved, and that response is sent as-is. It is more terminal than a short-circuit — because the response is returned whole, the buffered header/cookie writes made at that same level are discarded along with everything below it. Use `response.redirect()` / `response.notFound()` (which produce a `LoaderShortCircuit`, committing that level's buffer inclusively) when you want your buffered writes to survive; return a raw `Response` only when you mean "this exact response, nothing else."
 
@@ -423,8 +437,8 @@ Do not continue after a redirect or `notFound`; return the result. Surviving buf
 
 A theme preference, set from a query string and cleared on request:
 
-```tsx title="src/web/settings.page.tsx"
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+```ts title="src/web/settings.setup.ts"
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -452,6 +466,11 @@ export async function loader({
 
   return { theme: request.cookie("theme", "light") as string };
 }
+```
+
+```tsx title="src/web/settings.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./settings.setup";
 
 export default function SettingsPage({ data }: PageProps<typeof loader>) {
   return <p>Current theme: {data.theme}</p>;
@@ -479,16 +498,21 @@ export {};
 
 Required keys need an unconditional middleware writer. Optional keys may be written conditionally:
 
-```tsx title="src/web/root.tsx"
-import { Head, Scripts, shared as writableShared } from "@warlock.js/web";
-import type { AppProps, RootConfig } from "@warlock.js/web";
-import "./types";
+```ts title="src/web/root.setup.ts"
+import { shared as writableShared } from "@warlock.js/web";
+import type { RootConfig } from "@warlock.js/web";
 
 const publishLocale = async () => {
   writableShared.locale = "en";
 };
 
 export const config = { middleware: [publishLocale] } satisfies RootConfig;
+```
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import "./types";
 
 export default function App({ children, shared }: AppProps) {
   return (
@@ -544,7 +568,7 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - **Write `shared` in middleware only.** Loaders run after the seal.
 - **Required shared keys need unconditional writers.** The type is a promise for every request.
 - **Do not use loader return values as cross-level communication.** Levels run in order but are not wired to each other; use `shared`, written in middleware.
-- **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.tsx` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
+- **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.setup.ts` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
 - **`process.env` is refused in the client/universal graph, with no `PUBLIC_` exception.** Read it in a loader and return it as page data.
 - **In `warlock dev`, app modules can load twice.** Loaders import through Vite SSR while HTTP handlers load natively, so a module-level singleton (`AsyncLocalStorage`, cache, registry) may exist in two copies. Until the single module graph (planned 5.26), store it on `globalThis[Symbol.for("your-app.name")]`; `warlock start` has one graph and is unaffected.
 - **There are no RSC-style server actions.** Mutate through the page's own `action` export (the `handle-a-form-action` topic) or POST to an ordinary Warlock API route, then call `refresh()` after success.

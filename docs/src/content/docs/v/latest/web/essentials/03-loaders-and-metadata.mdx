@@ -11,7 +11,7 @@ A page loader is its server-side controller. It can use the Warlock request
 context, DI, guards, and response controls, then return serializable data to the
 React component.
 
-## Optional setup modules
+## Page setup modules
 
 Pair `products.page.tsx` with `products.setup.ts` to keep server policy and
 loaders beside, but outside, the UI component. `layout.setup.ts`,
@@ -35,38 +35,34 @@ That type-only loader import is sufficient in development and production. It
 retains the framework-projected `register()` hook without adding a runtime UI
 import of setup.
 
-An export belongs to exactly one member of the pair. Duplicate `config`,
-`loader`, or `register` exports fail rather than receiving precedence. Setup
-files are optional and `warlock dev` detects their add/edit/delete changes.
+An export belongs to exactly one member of the pair. Duplicate logic exports fail rather than receiving precedence. Create a setup file when the page needs logic; `warlock dev` detects their add/edit/delete changes.
 
 ## Type loader data into the page
 
-```tsx title="src/web/products/[id].setup.ts"
+```ts title="src/web/products/[id].setup.ts"
 import { v } from "@warlock.js/seal";
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 
 const productParams = v.object({ id: v.string() });
+const productValidation = { params: productParams };
 
 export const config = {
   route: { path: "/products/:id", name: "products.show" },
-  validation: { params: productParams },
+  validation: productValidation,
   cache: { public: true, maxAge: 60 },
-} satisfies PageConfig;
+  metadata: ({ data }) => ({
+    title: data.product.name,
+    description: `Details for ${data.product.name}`,
+  }),
+} satisfies PageConfig<typeof loader>;
 
-export async function loader({
-  request,
-}: PageLoaderContext<typeof config.validation, typeof config.route>) {
+export async function loader({ request }: PageLoaderContext<typeof productValidation>) {
   const id = request.input("id");
 
   return {
     product: { id, name: `Product ${id}` },
   };
 }
-
-export const metadata = ({ data }: PageProps<typeof loader>) => ({
-  title: data.product.name,
-  description: `Details for ${data.product.name}`,
-});
 ```
 
 Use the context type for the file role: `PageLoaderContext` for a page,
@@ -102,7 +98,7 @@ A page's `config.validation` declares a Seal schema per source. `params` and
 page with no dynamic segment can skip `params`, and one that reads no query
 keys can skip `query`:
 
-```tsx title="src/web/products/[id].page.tsx"
+```ts title="src/web/products/[id].setup.ts"
 import { v } from "@warlock.js/seal";
 import type { PageConfig } from "@warlock.js/web";
 
@@ -164,7 +160,7 @@ body, so the browser showed a blank page.
 
 Loaders run sequentially and are awaited root to leaf:
 
-1. the `root.tsx` application loader;
+1. the `root.setup.ts` application loader;
 2. the one rendering layout's loader;
 3. the page loader.
 
@@ -181,7 +177,7 @@ Every loader context includes `signal`, an `AbortSignal` that fires when the
 client disconnects before the response is finished. Pass it to anything that
 can be cancelled:
 
-```tsx title="src/web/products/index.page.tsx"
+```ts title="src/web/products/index.setup.ts"
 import type { PageLoader } from "@warlock.js/web";
 
 export const loader = (async ({ signal }) => {
@@ -223,7 +219,7 @@ export default {
 ## Metadata behavior
 
 `config.metadata` can be a static object or a function of resolved loader data.
-Pages, layouts, and `root.tsx` all use that same shape. It supports `title`,
+Page, layout, and root setup files all use that same shape. It supports `title`,
 `description`, `keywords`, `canonical`, `robots`, `viewport`, `openGraph`, and
 `twitter`.
 
@@ -236,7 +232,7 @@ it, so a per-page value applies on a full page load.
 Use an explicit config type annotation. A title can be a string, a default and
 template pair, or an absolute title that no ancestor may format:
 
-```tsx title="src/web/root.tsx"
+```ts title="src/web/root.setup.ts"
 import type { RootConfig } from "@warlock.js/web";
 
 export const config: RootConfig = {
@@ -245,7 +241,7 @@ export const config: RootConfig = {
 };
 ```
 
-```tsx title="src/web/account/layout.tsx"
+```ts title="src/web/account/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = {
@@ -253,7 +249,7 @@ export const config: LayoutConfig = {
 };
 ```
 
-```tsx title="src/web/account/profile.page.tsx"
+```ts title="src/web/account/profile.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config: PageConfig = {
@@ -270,15 +266,19 @@ each callback sees its own loader data. A callback returns that level's complete
 metadata: its explicit fields override `child.metadata`, and fields it omits do not carry
 forward. Spread `child.metadata` when the callback should retain descendant fields:
 
-```tsx title="src/web/account/layout.tsx"
+```ts title="src/web/account/layout.setup.ts"
 import type { LayoutConfig } from "@warlock.js/web";
 
-export const config: LayoutConfig = {
+export async function loader() {
+  return { accountName: "Acme account" };
+}
+
+export const config = {
   metadata: ({ data, child }) => ({
     ...child?.metadata,
     title: `${data.accountName} | ${child?.metadata.title ?? "Account"}`,
   }),
-};
+} satisfies LayoutConfig<typeof loader>;
 ```
 
 The callback may override a child title. An absolute child title remains
@@ -334,8 +334,7 @@ Since 5.27, `data` in `PageProps`, `LayoutProps`, `AppProps` and in
 raw return. The loader's own declared return type is untouched, and plain
 JSON-like data reads exactly as before.
 
-```tsx title="src/web/products/product.page.tsx"
-import type { PageProps } from "@warlock.js/web";
+```ts title="src/web/products/product.setup.ts"
 import { getProduct } from "app/products/services/get-product.service";
 
 export async function loader() {
@@ -343,6 +342,11 @@ export async function loader() {
 
   return { product, publishedAt: new Date() };
 }
+```
+
+```tsx title="src/web/products/product.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product.setup";
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   // data.product      is the output of the model's resource
@@ -387,13 +391,18 @@ web side beyond enabling `http.tracing` in `warlock.config.ts`.
 Read deployment or request-scoped values in the loader and return only what is
 safe for the browser:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import { env } from "@warlock.js/core";
-import type { PageLoader, PageProps } from "@warlock.js/web";
+import type { PageLoader } from "@warlock.js/web";
 
 export const loader = (async () => ({
   siteName: env("PUBLIC_SITE_NAME"),
 })) satisfies PageLoader;
+```
+
+```tsx title="src/web/example.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./example.setup";
 
 export default function HomePage({ data }: PageProps<typeof loader>) {
   return <h1>{data.siteName}</h1>;

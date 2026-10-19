@@ -44,7 +44,7 @@ supplier returning its concrete URLs. Warlock does not crawl links or infer a
 model query. Without a supplier the dynamic route contributes zero URLs and
 appears with a zero count in generation diagnostics.
 
-```ts
+```ts title="src/web/example.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 import { Product } from "web/product.server";
 import { listPublishedProductSitemapRows } from "web/product-sitemap-data.server";

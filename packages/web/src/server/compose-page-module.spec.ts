@@ -17,6 +17,21 @@ describe("composePageModule", () => {
     ).toEqual({ default: Page, config: { route: "/products" }, loader, register });
   });
 
+  it("composes unnamed and named actions from setup", () => {
+    const ui = { default: () => null };
+    const setup = { action: () => ({ saved: true }) };
+    const namedSetup = { actions: { save: setup.action } };
+
+    expect(composePageModule(ui, setup, "contact.page.tsx", "contact.setup.ts")).toEqual({
+      ...ui,
+      ...setup,
+    });
+    expect(composePageModule(ui, namedSetup, "cart.page.tsx", "cart.setup.ts")).toEqual({
+      ...ui,
+      ...namedSetup,
+    });
+  });
+
   it("returns the original UI namespace when no setup exists", () => {
     const module = { default: () => null };
 
@@ -42,16 +57,27 @@ describe("composePageModule", () => {
     ).toThrow('both files export "config"');
   });
 
-  it("refuses a component export from setup", () => {
+  it.each(["default", "ErrorBoundary", "metadata"])("refuses the %s export from setup", (name) => {
     expect(() =>
       composePageModule(
         { default: () => null },
-        { default: () => null },
+        { [name]: () => null },
         "src/web/index.page.tsx",
         "src/web/index.setup.ts",
       ),
-    ).toThrow("setup files may export only config, loader, or register");
+    ).toThrow(
+      `Cannot compose "src/web/index.page.tsx" with "src/web/index.setup.ts": setup files may export only config, loader, register, action, actions; found "${name}".`,
+    );
   });
+
+  it.each(["config", "loader", "register", "action", "actions"])(
+    "rejects duplicate %s declarations",
+    (name) => {
+      expect(() =>
+        composePageModule({ [name]: {} }, { [name]: {} }, "a.page.tsx", "a.setup.ts"),
+      ).toThrow(`both files export "${name}"`);
+    },
+  );
 
   it("returns the same namespace for the same ui/setup pair so register() runs once", () => {
     const ui = { default: () => null };

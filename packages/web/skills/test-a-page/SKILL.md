@@ -47,10 +47,9 @@ Two consequences for page specs:
 
 ## The page under test
 
-```tsx title="src/web/products/product.page.tsx"
+```ts title="src/web/products/product.setup.ts"
 import { v } from "@warlock.js/seal";
-import { Link, useTrans } from "@warlock.js/web";
-import type { PageActionContext, PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+import type { PageActionContext, PageConfig, PageLoader } from "@warlock.js/web";
 import { findProduct, subscribe } from "./products.service";
 
 const subscribeSchema = v.object({ email: v.string().email() });
@@ -81,6 +80,12 @@ export async function action({ request, response }: PageActionContext<typeof sub
 
   return response.redirect("/products/42?subscribed=1");
 }
+```
+
+```tsx title="src/web/products/product.page.tsx"
+import { Link, useTrans } from "@warlock.js/web";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./product.setup";
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   const t = useTrans();
@@ -104,7 +109,8 @@ A loader or action receives one context object (`request`, `response`, `shared`,
 import { LocaleProvider } from "@warlock.js/web";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import ProductPage, { action, loader } from "./product.page";
+import ProductPage from "./product.page";
+import { action, loader } from "./product.setup";
 import * as service from "./products.service";
 
 vi.mock("./products.service", () => ({

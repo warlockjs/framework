@@ -11,10 +11,11 @@ A `*.page.tsx` file is universal: its default component renders on the server
 and in the browser. The client graph is determined by imports, not by a file
 living under `src/web/`.
 
-Warlock removes the server exports `route`, `middleware`, `validation`,
-`loader`, `metadata`, and `prefix` before the browser graph forms. An import
-used only by one of those exports disappears with it. An import also used by
-the component survives and must be browser-safe.
+Put `config` (including `config.metadata`), `loader`, and `action`/`actions` in the matching
+`.setup.ts` file. These stay on the server. The framework projects only
+browser-safe `register()` code and its dependencies to the client. UI files
+contain components and browser-safe imports. Use type-only imports from setup
+to retain loader and action inference.
 
 ## What the build refuses
 
@@ -53,20 +54,25 @@ covered. Importing `env()` into a client-bound component does not work either;
 
 Read the value from a loader and return the smallest safe payload:
 
-```tsx
+```ts title="src/web/example.setup.ts"
 import { env } from "@warlock.js/core";
-import type { PageLoader, PageProps } from "@warlock.js/web";
+import type { PageLoader } from "@warlock.js/web";
 
 export const loader = (async () => ({
   publicApiOrigin: env("PUBLIC_API_ORIGIN"),
 })) satisfies PageLoader;
+```
+
+```tsx title="src/web/example.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./example.setup";
 
 export default function HomePage({ data }: PageProps<typeof loader>) {
   return <a href={data.publicApiOrigin}>API</a>;
 }
 ```
 
-The loader is stripped from the client module, but its returned data crosses
+The setup loader stays on the server, but its returned data crosses
 the hydration boundary. Never return a secret just because the read itself ran
 on the server.
 

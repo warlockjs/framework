@@ -29,7 +29,7 @@ the connector loads when needed. It also:
 - registers the Web connector in `warlock.config.ts`;
 - creates the application-wide page root at `src/web/`;
 - creates `root.tsx`, the document shell shared by every page;
-- creates an index page and a separate `index.register.ts` setup hook.
+- creates a UI-only index page with `index.setup.ts` for policy and registration.
 
 `src/web/` is the only page root. A tree such as `src/app/blog/web/` is not
 scanned; organize every page, layout, and page middleware beneath the one
@@ -40,14 +40,14 @@ project-level `src/web/` directory.
 ```text
 src/web/
 ├── index.page.tsx
-├── index.register.ts
-└── root.tsx
+├── index.setup.ts
+├── root.tsx
+└── root.setup.ts
 ```
 
-The generated page re-exports `register` from `index.register.ts`. Keep
-non-component universal setup in that sidecar: Warlock runs it on the server
-and in the browser while edits to the component remain compatible with React
-Fast Refresh.
+The generated `index.setup.ts` owns page configuration and universal `register()`
+setup. `root.setup.ts` owns root configuration. The UI files contain components;
+Warlock composes each pair and projects browser-safe registration to the client.
 
 ## Requirements
 

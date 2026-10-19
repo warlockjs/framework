@@ -5,16 +5,16 @@ sidebar:
   order: 15
 ---
 
-A page action is the server half of a form on a page. The page module exports `action` (or a named `actions` record); a `<Form>` posts to the same URL; the result comes back as `actionData` that the page reads with `useActionData`. It works with and without JavaScript.
+A page action is the server half of a form on a page. The page’s setup file exports `action` (or a named `actions` record); a `<Form>` posts to the same URL; the result comes back as `actionData` that the page reads with `useActionData`. It works with and without JavaScript.
 
 For a form that posts to an API route and handles the response in the browser, use [`useSubmitForm`](./14-form-submission) instead. Use a page action when the form belongs to a page and the outcome should re-render that page or redirect.
 
 ## Export an action
 
-Policy goes in `config`, the handler is an export, like `loader`:
+In the page’s `.setup.ts`, policy goes in `config` and the handler is an export, like `loader`:
 
-```tsx
-import { Form, FieldError, useActionData, useIsSubmitting, href } from "@warlock.js/web";
+```ts title="src/web/contact.setup.ts"
+import { href } from "@warlock.js/web";
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { v } from "@warlock.js/seal";
 
@@ -37,6 +37,11 @@ export async function action({ request, response }: PageActionContext<typeof con
 
   return response.redirect(href("contact"));
 }
+```
+
+```tsx title="src/web/contact.page.tsx"
+import { Form, FieldError, useActionData, useIsSubmitting } from "@warlock.js/web";
+import type { action } from "./contact.setup";
 
 export default function ContactPage() {
   const result = useActionData<typeof action>();
@@ -63,10 +68,9 @@ export default function ContactPage() {
 
 ### Several forms on one page
 
-Export `actions`, a plain object of functions, and configure each by key under `config.actions`. Names match `/^[a-z][a-zA-Z0-9]*$/`; `default` is reserved for the unnamed `action`.
+In the setup file, export `actions`, a plain object of functions, and configure each by key under `config.actions`. Names match `/^[a-z][a-zA-Z0-9]*$/`; `default` is reserved for the unnamed `action`.
 
-```tsx
-import { Form, useActionData } from "@warlock.js/web";
+```ts title="src/web/cart.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { v } from "@warlock.js/seal";
 
@@ -85,6 +89,11 @@ export const actions = {
     return response.redirect(`/cart?removed=${itemId}`);
   },
 };
+```
+
+```tsx title="src/web/cart.page.tsx"
+import { Form, useActionData } from "@warlock.js/web";
+import type { actions } from "./cart.setup";
 
 export default function CartPage() {
   const result = useActionData<typeof actions>("remove");
@@ -121,10 +130,7 @@ export const contactSchema = v.object({
 });
 ```
 
-```tsx
-// src/web/contact/contact.page.tsx
-import { Form as ReactForm } from "@mongez/react-form";
-import { useSubmitAction } from "@warlock.js/web/form";
+```ts title="src/web/contact/contact.setup.ts"
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { contactSchema } from "./contact.schema";
 
@@ -138,6 +144,12 @@ export async function action({ request, response }: PageActionContext<typeof con
   // Handle values, then redirect or return data.
   return response.redirect("/contact");
 }
+```
+
+```tsx title="src/web/contact/contact.page.tsx"
+import { Form as ReactForm } from "@mongez/react-form";
+import { useSubmitAction } from "@warlock.js/web/form";
+import { contactSchema } from "./contact.schema";
 
 export default function ContactPage() {
   const submit = useSubmitAction<typeof contactSchema>();
@@ -243,7 +255,7 @@ A no-JS action that returns data (rather than redirecting) renders at the POST U
 
 Add core's `rateLimit` to the action's middleware and key it on the signed-in user:
 
-```tsx
+```ts title="src/web/contact.setup.ts"
 import { middleware } from "@warlock.js/core";
 
 export const config: PageConfig = {

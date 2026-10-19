@@ -53,19 +53,19 @@ make the feature harder to read.
 
 ## 1. Keep the page contract, make the implementation thin
 
-Warlock's file-routed modules have one policy export: `config`. A page's
-`route`, `cache`, `middleware`, `validation`, `metadata`, and `sitemap` all
-belong in that object; do not use legacy top-level policy exports. `loader`,
-`register`, `ErrorBoundary`, and the default component remain top-level
-exports. Layouts, registration files, `root.tsx`, `404.page.tsx`, and
-`error.page.tsx` also have framework-defined roles. These are intentional
-exceptions to the generic "one primary export per file" rule; do not split
-them merely to satisfy it.
+Page logic lives in the matching `.setup.ts` file: `config`, `loader`,
+`register`, and `action`/`actions`. UI files contain the default
+component and named components such as `ErrorBoundary`. Pair `layout.tsx` with
+`layout.setup.ts`, `root.tsx` with `root.setup.ts`, and `error.page.tsx` with
+`error.setup.ts`. Use type-only imports from setup for loader/action inference.
+The framework projects browser-safe `register()` code to the client. Put route,
+cache, validation, middleware, metadata, and sitemap policy inside `config`;
+metadata always belongs in `config.metadata`.
 
 Use the config type that matches the module. A page can preserve loader data
 inference for metadata by satisfying `PageConfig<typeof loader>`:
 
-```tsx
+```ts title="src/web/posts.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export async function loader() {
@@ -79,7 +79,9 @@ export const config = {
   metadata: ({ data }) => ({ title: data.title }),
   sitemap: { changefreq: "daily" },
 } satisfies PageConfig<typeof loader>;
+```
 
+```tsx title="src/web/posts.page.tsx"
 export default function PostsPage() {
   return <main>Posts</main>;
 }
@@ -93,21 +95,22 @@ route-name and parameter types are not available in 5.17.
 Layouts use one `config satisfies LayoutConfig` object for `prefix`,
 `middleware`, `metadata`, and a sitemap default. Roots use one
 `config satisfies RootConfig` object for `middleware` and the static `strictMode`
-flag: root modules do
-not declare routes, prefixes, metadata, validation, cache, or sitemap policy.
+flag, plus metadata defaults. Root modules do not declare routes, prefixes,
+validation, cache, or sitemap policy.
 
-```tsx
-import type { LayoutConfig, RootConfig } from "@warlock.js/web";
-
-// src/web/account/layout.tsx
+```ts title="src/web/account/layout.setup.ts"
+import type { LayoutConfig } from "@warlock.js/web";
 export const config = {
   prefix: "/account",
   middleware: [requireUser],
   metadata: { robots: "noindex" },
   sitemap: false,
 } satisfies LayoutConfig;
+```
 
-// src/web/root.tsx
+```ts title="src/web/root.setup.ts"
+import type { RootConfig } from "@warlock.js/web";
+
 export const config = {
   middleware: [loadRequestContext],
 } satisfies RootConfig;
@@ -119,8 +122,8 @@ let TypeScript infer its return. Use
 `LayoutLoaderContext` for a layout, and `AppLoaderContext` for the root. Do not
 annotate the whole function as `PageLoader`, use `satisfies` on a loader,
 duplicate its payload shape, or cast an unknown return.
-A page file declares its route contract, coordinates a controller-like loader,
-and composes presentational components. The loader validates input, calls
+A setup file declares the route contract and coordinates a controller-like
+loader; its UI file composes presentational components. The loader validates input, calls
 named services under `src/app/<domain>/services/`, converts results through
 their resources, and returns the page data. **Every model/repository read and
 every business rule belongs in an app service, even when the loader would need
@@ -134,7 +137,7 @@ Extract substantive view sections into cohesive components. A component
 that needs any behavior gets a separate feature-named custom-hook file; a
 component with no behavior stays presentational and needs no hook. Split by
 responsibility, not by a mechanical line-count limit. Framework exports
-remain in the page file even when their work is delegated elsewhere.
+for logic remain in the setup file even when their work is delegated elsewhere.
 
 Preserve the framework's rendering boundary: `root.tsx` owns the document,
 `#vessel` and `<Scripts />`; the loader runs on the server, while the rendered

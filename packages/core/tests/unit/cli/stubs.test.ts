@@ -13,8 +13,9 @@ import {
   webContactControllerStub,
   webContactRoutesStub,
   webHomePageStub,
-  webHomeRegisterStub,
+  webHomeSetupStub,
   webRootStub,
+  webRootSetupStub,
 } from "../../../src/generations/stubs";
 
 /**
@@ -176,17 +177,20 @@ describe("web starter stubs", () => {
   });
 
   it("keeps universal registration behind a stable Fast Refresh boundary", () => {
-    expect(webHomePageStub).toContain(
+    expect(webHomeSetupStub).toContain(
       'export const config: PageConfig = {\n  route: { path: "/", name: "index" },\n  metadata: { title: "Home" },\n};',
     );
     expect(webHomePageStub).not.toContain("export const route =");
-    expect(webHomePageStub).toContain('export { register } from "./index.register";');
+    expect(webHomePageStub).not.toContain("export { register }");
+    expect(webHomePageStub).not.toContain("export const config");
+    expect(webRootStub).not.toContain("export const config");
+    expect(webRootSetupStub).toContain("export const config: RootConfig = { strictMode: true };");
     expect(webHomePageStub).not.toContain("export function register() {");
     expect(webHomePageStub).not.toContain('extend("en", {');
 
-    expect(webHomeRegisterStub).toContain("export function register() {");
-    expect(webHomeRegisterStub).toContain('extend("en", {');
-    expect(webHomeRegisterStub).toContain('extend("ar", {');
+    expect(webHomeSetupStub).toContain("export function register() {");
+    expect(webHomeSetupStub).toContain('extend("en", {');
+    expect(webHomeSetupStub).toContain('extend("ar", {');
   });
 
   it("keeps the generated browser console clean with deterministic root markup", () => {

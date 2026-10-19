@@ -21,18 +21,19 @@ export default {
 
 `project` is required; only its result reaches the browser as the payload's optional `session` key. Type it by augmenting `SessionRegistry { user; model }` in module `"@warlock.js/web"`.
 
-```tsx
-import { useUser } from "@warlock.js/web";
-import { requireGuest, requireUser } from "@warlock.js/web/session";
+```ts title="src/web/account.setup.ts"
+import { requireUser } from "@warlock.js/web/session";
 
-// account page
-export const accountConfig = {
+export const config = {
   route: "/account",
   middleware: [requireUser({ loginPath: "/login" })],
 };
+```
 
-// login page
-export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
+```ts title="src/web/login.setup.ts"
+import { requireGuest } from "@warlock.js/web/session";
+
+export const config = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
 ```
 
 - `useUser()` returns the projection or `null`.
@@ -48,9 +49,8 @@ export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/
 
 A page guarded by `requireUser()` can never be reached by a guest, so its types say so. The route-types generator reads the guard statically and writes `guard: "user"` on that page's `PageRouteRegistry` entry; `GuardedPageRouteName` (exported from `@warlock.js/web`) is the union of those names.
 
-```tsx title="src/web/account/account.page.tsx"
-import { useUser } from "@warlock.js/web";
-import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+```ts title="src/web/account/account.setup.ts"
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 import { requireUser } from "@warlock.js/web/session";
 
 export const config = {
@@ -62,6 +62,12 @@ export async function loader({ session }: PageLoaderContext<undefined, undefined
   // session is { user, model } here, neither null, and request.locals.user is non-null
   return { user: session.user };
 }
+```
+
+```tsx title="src/web/account/account.page.tsx"
+import { useUser } from "@warlock.js/web";
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./account.setup";
 
 export default function AccountPage({ data }: PageProps<typeof loader>) {
   const user = useUser("account.show"); // SessionUser, never null

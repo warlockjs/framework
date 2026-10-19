@@ -484,3 +484,36 @@ describe("framework conventions are verified by warlock check", () => {
     expect(read("skills/security-baseline/SKILL.md")).toContain("WL9007");
   });
 });
+
+describe("web template UI and setup contracts", () => {
+  it.each([
+    ["src/web/home/index.page.tsx", "src/web/home/index.setup.ts"],
+    ["src/web/root.tsx", "src/web/root.setup.ts"],
+    ["src/web/404.page.tsx", "src/web/404.setup.ts"],
+  ])("keeps %s as UI with policy in %s", (uiFile, setupFile) => {
+    const ui = stripComments(read(uiFile));
+    const setup = stripComments(read(setupFile));
+
+    expect(ui).toMatch(/export default function/);
+    expect(ui).not.toMatch(
+      /export\s+(?:const|(?:async\s+)?function)\s+(?:config|loader|register|action|actions|metadata)\b/,
+    );
+    expect(ui).not.toMatch(/export\s*\{[^}]*\bregister\b/);
+    expect(setup).toMatch(/export const config/);
+    expect(setup).not.toMatch(/export default/);
+    expect(setup).not.toMatch(/export\s+(?:const|(?:async\s+)?function)\s+metadata\b/);
+  });
+
+  it("types home data through a type-only setup loader import", () => {
+    const page = read("src/web/home/index.page.tsx");
+    const setup = read("src/web/home/index.setup.ts");
+
+    expect(page).toContain('import type { loader } from "./index.setup"');
+    expect(page).toContain("PageProps<typeof loader>");
+    expect(setup).toContain("export async function loader");
+    expect(setup).toContain("export function register");
+    expect(setup).toContain("satisfies PageConfig<typeof loader>");
+    expect(setup).toContain("metadata: {");
+    expect(read("src/web/404.setup.ts")).toContain('title: "Page not found"');
+  });
+});

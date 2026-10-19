@@ -859,13 +859,19 @@ ${signedInCases.replaceAll("fixture.", "fixture!.")}
 `;
 }
 
+/** `src/web/root.setup.ts` — document policy. */
+export const webRootSetupStub = `import type { RootConfig } from "@warlock.js/web";
+
+export const config: RootConfig = { strictMode: true };
+`;
+
 /**
  * `src/web/root.tsx` — the application root for the SSR page layer.
  *
  * Deliberately minimal. The framework ships a default root, so this exists to
  * give you a place to start rather than because anything requires it. The
- * reference app (`v5/app/src/web/root.tsx`) is where to look for the fuller
- * shape: middleware, an app-level loader, locales, an ErrorBoundary.
+ * document component stays here; request policy and an app-level loader
+ * belong in `root.setup.ts`. Named ErrorBoundary components stay in the UI.
  */
 export const webRootStub = `import type { AppProps } from "@warlock.js/web";
 import { Head, Scripts } from "@warlock.js/web";
@@ -962,14 +968,14 @@ import { contactController } from "./controllers/contact.controller";
 router.post("/api/contact", contactController, { public: true });
 `;
 
-/**
- * `src/web/index.register.ts` — universal static setup for the starter page.
- *
- * The page re-exports this stable binding so Warlock's `register()` lifecycle
- * still sees it in both realms without making React Fast Refresh treat every
- * JSX edit as an incompatible function-export replacement.
- */
-export const webHomeRegisterStub = `import { extend } from "@mongez/localization";
+/** `src/web/index.setup.ts` — page policy and universal registration. */
+export const webHomeSetupStub = `import { extend } from "@mongez/localization";
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  route: { path: "/", name: "index" },
+  metadata: { title: "Home" },
+};
 
 export function register() {
   extend("en", {
@@ -1010,24 +1016,8 @@ import { setCurrentLocaleCode } from "@mongez/localization";
 import { Form, useFormControl, type FormControlProps } from "@mongez/react-form";
 import { transX } from "@mongez/react-localization";
 import { v } from "@warlock.js/seal";
-import { Link, type PageConfig, type PageProps } from "@warlock.js/web";
+import { Link, type PageProps } from "@warlock.js/web";
 import { useState } from "react";
-
-export { register } from "./index.register";
-
-/**
- * A page route is an ordinary Warlock route whose handler renders React
- * instead of returning JSON.
- *
- * The URL and stable hydration name are the ones this file DECLARES below.
- * This page answers \`GET "/"\` because \`config.route.path = "/"\`, not because of
- * where the file lives. A page file with
- * no \`config.route\` declaration derives its URL from the filesystem.
- */
-export const config: PageConfig = {
-  route: { path: "/", name: "index" },
-  metadata: { title: "Home" },
-};
 
 const contactSchema = v.object({
   name: v.string().min(2),
@@ -1047,13 +1037,7 @@ function TextInput({ label, ...controlProps }: FormControlProps & { label: strin
   );
 }
 
-/**
- * Add a \`loader\` export to fetch data on the server, and it arrives here as
- * \`data\`, typed:
- *
- *   export const loader = (async () => ({ items: await itemsRepository.all() }));
- *   export default function HomePage({ data }: PageProps<typeof loader>) { ... }
- */
+/** Fetch data in index.setup.ts; use a type-only loader import for PageProps. */
 export default function HomePage(_props: PageProps) {
   // Live state. If the button below does nothing, the page rendered on the
   // server but never hydrated — the runtime never mounted at \`#vessel\`. This is

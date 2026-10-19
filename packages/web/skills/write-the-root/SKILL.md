@@ -7,16 +7,15 @@ description: 'Author `src/web/root.tsx`, the full-document application root that
 
 `src/web/root.tsx` is the application document. Its default export renders the complete `<html>` tree and contains the one DOM node the browser hydrates: `#vessel`.
 
-Use optional `root.setup.ts` for root `config`, loader, or universal
+Use `root.setup.ts` for root `config` (including `config.metadata`), loader, or universal
 `register()` while `root.tsx` remains the document component. `strictMode` is
 statically projected from the setup file. Do not value-import setup from the UI;
 type-only imports are allowed, and duplicate exports fail.
 
-The root may export `config`, `loader`, `register`, `ErrorBoundary`, and its
-default component. `RootConfig` owns `middleware`, `strictMode`, and metadata.
-Route/prefix, cache, validation, sitemap, and robots-file policy are not root
-exports. Keep sitewide sitemap and robots serving in `web.sitemap` and
-`web.robots`; page and layout policy belongs in their own `config` exports.
+`root.tsx` owns the default document component and any named `ErrorBoundary`.
+`root.setup.ts` owns `config`, `loader`, and `register`. Metadata belongs in `config.metadata`. `RootConfig`
+owns `middleware`, `strictMode`, and metadata policy. Keep sitewide sitemap
+and robots serving in `web.sitemap` and `web.robots`.
 
 ## The shape
 
@@ -95,7 +94,7 @@ The browser hydrates `#vessel`, not the whole document. The client tree delibera
 
 Because App is outside the hydrated subtree, put client state that must survive navigation in a layout or component beneath `#vessel`, not in the document root.
 
-If `root.tsx` (or any module it needs) fails to load or its `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See the `create-a-page` topic for the app's own `error.page.tsx` boundary, which is tried first.
+If `root.tsx` or `root.setup.ts` (or any module they need) fails to load or the setup `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See the `create-a-page` topic for the app's own `error.page.tsx` boundary, which is tried first.
 
 ## `<Head />`
 
@@ -154,13 +153,18 @@ imported by application code.
 
 ## Add an application loader
 
-```tsx title="src/web/root.tsx"
-import { Head, Scripts } from "@warlock.js/web";
-import type { AppLoader, AppProps } from "@warlock.js/web";
+```ts title="src/web/root.setup.ts"
+import type { AppLoader } from "@warlock.js/web";
 
 export const loader = (async () => {
   return { applicationName: "Warlock Store" };
 }) satisfies AppLoader;
+```
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import type { loader } from "./root.setup";
 
 export default function App({ data, children }: AppProps<typeof loader>) {
   return (
@@ -185,7 +189,7 @@ The App loader runs first and is awaited before the outermost layout loader star
 Use the optional root config for guards that must run before layout and page
 middleware:
 
-```tsx
+```ts title="src/web/root.setup.ts"
 import type { RootConfig } from "@warlock.js/web";
 import type { Middleware } from "@warlock.js/core";
 
@@ -205,20 +209,24 @@ export const config: RootConfig = {
 };
 ```
 
-`loader`, `register`, and `ErrorBoundary` remain separate exports. Named
+`loader` and `register` are setup exports; `ErrorBoundary` is a UI component. Named
 `sitemap` or route-policy exports are invalid. Root metadata may be static or a
 server-only callback; it participates in title and field composition with
 layouts and the page. A callback returns the root's complete level: explicit
 fields override `child.metadata`, while omitted child fields are not retained. Preserve
 descendant metadata deliberately by spreading `child.metadata`:
 
-```tsx
-export const config: RootConfig = {
+```ts title="src/web/root.setup.ts"
+export async function loader() {
+  return { applicationName: "Acme" };
+}
+
+export const config = {
   metadata: ({ data, child }) => ({
     ...child?.metadata,
     title: `${data.applicationName} | ${child?.metadata.title ?? "Home"}`,
   }),
-};
+} satisfies RootConfig<typeof loader>;
 ```
 
 The callback may override a child title; an absolute child title remains
@@ -253,14 +261,16 @@ in production.
 
 ## Override the default viewport
 
-```tsx title="src/web/viewport.page.tsx"
+```ts title="src/web/viewport.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
 export const config = {
   route: "/viewport",
   metadata: { viewport: "width=device-width, initial-scale=1, viewport-fit=cover" },
 } satisfies PageConfig;
+```
 
+```tsx title="src/web/viewport.page.tsx"
 export default function ViewportPage() {
   return <main>Viewport settings come from metadata.</main>;
 }
