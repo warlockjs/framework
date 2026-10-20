@@ -1,5 +1,5 @@
 ---
-description: "Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RAG, memory, guardrails. Exports `ai`, `agent`, `tool`, `team`, `workflow`, `planner`, `supervisor`, `orchestrator`, `rag`, `memory`, `systemPrompt`, `humanApproval`, `guard`. Use for: call an LLM, build an AI agent, give it tools, run a multi-agent team, chain steps, RAG over documents, embed text, generate images or speech, transcribe audio, approve tool calls, redact PII, replay model calls, run evals. Not this package: web/HTTP/MCP tools → @warlock.js/ai-tools; file+shell agents → @warlock.js/ai-workspace; tracing → @warlock.js/ai-panoptic; model adapters → ai-openai, ai-anthropic, other ai-<provider> packages."
+description: 'Provider-neutral AI agents, tools, workflows, memory, RAG and multimodal calls. Exports `ai`, `humanApproval`, `guardrail`, `team`, `MockModel` and `countInputTokens`. Use for "run an agent", "define a tool", "stream a response", "add approval" or "track token cost". Not this package → @warlock.js/ai-tools for MCP and web tools; @warlock.js/ai-workspace for file/shell tools; @warlock.js/ai-openai for provider setup.'
 ---
 
 # @warlock.js/ai

@@ -108,7 +108,7 @@ Resolution at `model()` time: per-model `pricing` > SDK-level `pricing[name]` > 
 
 ## Setup skill
 
-For agent wiring, capability inference, reasoning, and pricing detail, see the bundled setup skill: [`skills/setup-groq/SKILL.md`](./skills/setup-groq/SKILL.md).
+For agent wiring, capability inference, reasoning, and pricing detail, see the bundled setup skill: [`skills/SKILL.md`](./skills/SKILL.md).
 
 ## Tests
 

@@ -27,7 +27,7 @@ Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working 
 ## Foundations
 
 1. **Public API is functional factories.** Use `ai.agent({...})`, `ai.tool({...})`, `ai.workflow({...})`, `ai.step({...})`, `ai.supervisor({...})`, `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()`. Never `new Agent()`.
-2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `warlock-js-ai-openai` skill.
 3. **Schemas everywhere are `StandardSchemaV1<T>`.** Recommended: `@warlock.js/seal` (the `seal-basics` topic of the `warlock-js-seal` skill) — `v.object({...})`. Zod, Valibot, hand-rolled all interop.
 4. **`execute()` never throws.** Errors funnel into `result.error` as a typed `AIError` subclass. Same for `stream.result`, `workflow.execute()` / `resume()`, `supervisor.execute()` / `resume()`. See the `handle-ai-errors` topic.
 5. **Each `execute()` call is isolated.** Fresh internal execution instance per call.

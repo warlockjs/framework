@@ -112,7 +112,7 @@ Mistral has no OpenAI-compatible image endpoint, so `MistralSDK` intentionally d
 
 ## Setup skill
 
-For agent wiring, capability inference, and pricing detail, see the bundled setup skill: [`skills/setup-mistral/SKILL.md`](./skills/setup-mistral/SKILL.md).
+For agent wiring, capability inference, and pricing detail, see the bundled setup skill: [`skills/SKILL.md`](./skills/SKILL.md).
 
 ## Tests
 

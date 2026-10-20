@@ -4,7 +4,7 @@
  *
  * Self-contained, package-agnostic projector. Derives the package name and
  * tagline from the sibling `package.json`, then reads every
- * `skills/<skill>/SKILL.md` to produce two artifacts:
+ * root `skills/SKILL.md` and grouped topics to produce two artifacts:
  *
  * - `llms.txt`      — header + a one-line index of every skill (its
  *                     `description` frontmatter). The llmstxt.org-style entry
@@ -20,7 +20,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -83,13 +83,18 @@ function parseFrontmatter(text) {
 }
 
 /**
- * Collect every `skills/<folder>/SKILL.md`. Returns entries sorted by folder
- * name for deterministic output. Files at the skills root (README.md) are
- * ignored — only direct subdirectories holding a SKILL.md count.
+ * Collect root and topic SKILL.md files. Returns entries sorted by folder
+ * name for deterministic output. A root skill owns the whole skills directory;
+ * otherwise direct subdirectories holding a SKILL.md are grouped topics.
  */
 function collectSkills() {
   if (!existsSync(skillsDir)) {
     return [];
+  }
+
+  const rootSkillPath = join(skillsDir, "SKILL.md");
+  if (existsSync(rootSkillPath)) {
+    return [{ folder: shortName, path: rootSkillPath, folderPath: skillsDir }];
   }
 
   const skills = [];
@@ -121,7 +126,7 @@ function collectReferenceFiles(folderPath) {
   const refs = [];
 
   for (const entry of readdirSync(folderPath).sort()) {
-    if (entry === "SKILL.md" || !entry.endsWith(".md")) {
+    if (entry === "SKILL.md" || entry === "index.md" || !entry.endsWith(".md")) {
       continue;
     }
 
@@ -146,7 +151,9 @@ for (const skill of skills) {
   const { meta } = parseFrontmatter(readFileSync(skill.path, "utf8"));
   const description = meta.description ?? "(no description)";
 
-  indexLines.push(`- [${skill.folder}](${packageName}/${skill.folder}/SKILL.md): ${description}`);
+  indexLines.push(
+    `- [${skill.folder}](${packageName}/${relative(pkgRoot, skill.path).split("\\").join("/")}): ${description}`,
+  );
 }
 
 writeFileSync(llmsTxtPath, indexLines.join("\n") + "\n", "utf8");
@@ -163,7 +170,7 @@ const fullLines = [
 
 for (const skill of skills) {
   fullLines.push(
-    `## ${skill.folder}  \`${packageName}/${skill.folder}/SKILL.md\``,
+    `## ${skill.folder}  \`${packageName}/${relative(pkgRoot, skill.path).split("\\").join("/")}\``,
     ``,
     readFileSync(skill.path, "utf8"),
     ``,
@@ -171,7 +178,7 @@ for (const skill of skills) {
 
   for (const ref of collectReferenceFiles(skill.folderPath)) {
     fullLines.push(
-      `### ${skill.folder}/${ref.name}  \`${packageName}/${skill.folder}/${ref.name}\``,
+      `### ${skill.folder}/${ref.name}  \`${packageName}/${relative(pkgRoot, ref.path).split("\\").join("/")}\``,
       ``,
       readFileSync(ref.path, "utf8"),
       ``,

@@ -22,19 +22,25 @@ default pricing.
 
 <Tabs syncKey="pm">
   <TabItem label="npm">
+
     ```bash
     npm install @warlock.js/ai @warlock.js/ai-groq
     ```
+
   </TabItem>
   <TabItem label="yarn">
+
     ```bash
     yarn add @warlock.js/ai @warlock.js/ai-groq
     ```
+
   </TabItem>
   <TabItem label="pnpm">
+
     ```bash
     pnpm add @warlock.js/ai @warlock.js/ai-groq
     ```
+
   </TabItem>
 </Tabs>
 
@@ -67,9 +73,9 @@ OpenAI id. Any current Groq model id works — the list below is curated, not
 an allow-list:
 
 ```ts
-groq.model({ name: "llama-3.3-70b-versatile" });       // flagship general-purpose text
-groq.model({ name: "llama-3.1-8b-instant" });          // fastest / cheapest small text
-groq.model({ name: "openai/gpt-oss-120b" });           // vision + reasoning auto-true
+groq.model({ name: "llama-3.3-70b-versatile" }); // flagship general-purpose text
+groq.model({ name: "llama-3.1-8b-instant" }); // fastest / cheapest small text
+groq.model({ name: "openai/gpt-oss-120b" }); // vision + reasoning auto-true
 groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
 ```
 
@@ -92,7 +98,7 @@ OpenAI adapter's prefix inference would never fire. `GroqSDK` carries its
 An explicit flag always wins over inference:
 
 ```ts
-groq.model({ name: "some-custom-llama", vision: true });      // force on for an unlisted multimodal id
+groq.model({ name: "some-custom-llama", vision: true }); // force on for an unlisted multimodal id
 groq.model({ name: "openai/gpt-oss-120b", reasoning: false }); // pin off
 ```
 
@@ -103,7 +109,7 @@ adapter as OpenAI's `reasoning_effort`:
 
 ```ts
 const model = groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
-await model.complete(messages, { reasoning: { effort: "high" } });   // → reasoning_effort: "high"
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
 ```
 
 - `reasoning.effort` (`"low" | "medium" | "high" | "none"`) maps verbatim.
@@ -170,7 +176,7 @@ Groq has documented OpenAI-compat gaps: `n` must be `1`, and `logprobs` /
 :::
 
 For the full wire-level surface — it is identical here — see the
-[OpenAI provider](/v/v4/ai/providers/openai/) page and the `setup-groq`
+[OpenAI provider](/v/v4/ai/providers/openai/) page and the `warlock-js-ai-groq`
 skill.
 
 ## See also

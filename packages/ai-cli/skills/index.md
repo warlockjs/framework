@@ -1,5 +1,5 @@
 ---
-description: "Run vendor coding CLIs headless as Warlock AI agents. Exports `cli`, `createCliAgent`, `cliModel`, `CliError` and adapter building blocks; registers `ai.cli`. Use for: launch Claude Code, Codex, Qwen Code or another supported CLI from code, stream tool calls and text, resume or cancel a session, read usage, attach per-run MCP servers, use a CLI as an ai.agent model, or implement an adapter. Not this package: direct model calls → @warlock.js/ai plus a provider adapter; a policy-jailed file and shell workspace → @warlock.js/ai-workspace; MCP clients and servers → @warlock.js/ai-tools."
+description: 'Run installed coding-agent CLIs with `cli`, `createCliAgent`, `cliModel`, `CliAdapter` and `jsonLinesParser`. Use for "run Claude Code or Codex", "resume a CLI session", stream tool/usage events, configure permissions or write an adapter. Not this package → @warlock.js/ai for provider-neutral agents; @warlock.js/ai-workspace for embedded file/shell tools; @warlock.js/process for general child processes.'
 ---
 
 # @warlock.js/ai-cli

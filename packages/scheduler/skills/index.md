@@ -1,5 +1,5 @@
 ---
-description: 'In-process job scheduler for Warlock.js with fluent and cron scheduling, retries, overlap prevention and timezones. Exports `Scheduler`, `scheduler`, `Job`, `job`, `CronParser`, `parseCron`, plus types `RetryConfig`, `JobResult`, `SchedulerEvents`. Use for: "run this every day at 3am", "run a cron expression on weekdays", "retry a failing job 3 times", "stop a job overlapping itself", "run in New York time", "log job failures". Not this package: durable queues and background workers are not scheduling; per-run locking across instances uses @warlock.js/cache.'
+description: 'In-process cron and fluent scheduling: `Scheduler`, `scheduler`, `Job`, `job`, `CronParser` and `parseCron`. Use for "run every day at 3am", "schedule weekdays", "retry a failing job", "prevent overlap", choose a timezone or observe job failures. Not this package → @warlock.js/queue for durable background workers; @warlock.js/cache for locks across instances; @warlock.js/herald for broker messaging.'
 ---
 
 # @warlock.js/scheduler

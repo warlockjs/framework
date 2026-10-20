@@ -21,19 +21,25 @@ OpenRouter, local LLM gateways — by passing a custom `baseURL`.
 
 <Tabs syncKey="pm">
   <TabItem label="npm">
+
     ```bash
     npm install @warlock.js/ai @warlock.js/ai-openai
     ```
+
   </TabItem>
   <TabItem label="yarn">
+
     ```bash
     yarn add @warlock.js/ai @warlock.js/ai-openai
     ```
+
   </TabItem>
   <TabItem label="pnpm">
+
     ```bash
     pnpm add @warlock.js/ai @warlock.js/ai-openai
     ```
+
   </TabItem>
 </Tabs>
 
@@ -71,7 +77,7 @@ const { vector } = await embedder.embed("Hello world");
 ## Capabilities
 
 - **Structured output** — on by default (`response_format: json_schema,
-  strict: true`); pass `responseFormat: "json_object"` or `"text"` on the
+strict: true`); pass `responseFormat: "json_object"` or `"text"` on the
   model call to downgrade to the soft "respond in JSON only" system-prompt
   hint instead.
 - **Vision** — auto-detected for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`,
@@ -109,17 +115,17 @@ By default the adapter emits strict `response_format: { type: "json_schema", str
 const model = openai.model({ name: "some-legacy-model", responseFormat: "json_object" });
 ```
 
-| `responseFormat` | Wire `response_format` | Shape enforcement |
-| --- | --- | --- |
-| `"json_schema"` | `{ type: "json_schema", strict: true }` | Token-level — the model can only emit JSON matching the schema. The default when omitted. |
-| `"json_object"` | `{ type: "json_object" }` | Valid JSON, but **not** the shape — re-communicated via the agent's soft system-prompt hint. |
-| `"text"` | _(none emitted)_ | No `response_format` on the wire — relies entirely on the soft prompt hint. |
+| `responseFormat` | Wire `response_format`                  | Shape enforcement                                                                            |
+| ---------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `"json_schema"`  | `{ type: "json_schema", strict: true }` | Token-level — the model can only emit JSON matching the schema. The default when omitted.    |
+| `"json_object"`  | `{ type: "json_object" }`               | Valid JSON, but **not** the shape — re-communicated via the agent's soft system-prompt hint. |
+| `"text"`         | _(none emitted)_                        | No `response_format` on the wire — relies entirely on the soft prompt hint.                  |
 
 Picking `"json_object"` or `"text"` also flips the model's inferred `capabilities.structuredOutput` to `false`, so the agent runtime re-injects a soft "respond in JSON only" hint. Client-side validation against your output schema still runs, so `result.data` is shape-checked either way.
 
 For the full surface (pricing config, streaming caveats, embedding
 dimension truncation, token counting), see the
-`setup-openai` skill.
+`warlock-js-ai-openai` skill.
 
 ## Image generation
 
@@ -182,7 +188,11 @@ accounting path. See [`ai.image`](/v/v4/ai/) for the full verb surface
 
 ```ts
 // tts-1 / tts-1-hd — billed per INPUT CHARACTER.
-const classic = openai.speech({ name: "tts-1", voice: "alloy", pricing: { perMillionCharacters: 15 } });
+const classic = openai.speech({
+  name: "tts-1",
+  voice: "alloy",
+  pricing: { perMillionCharacters: 15 },
+});
 
 // gpt-4o-mini-tts — billed per TOKEN; supports `instructions` tone steering.
 const steered = openai.speech({ name: "gpt-4o-mini-tts", pricing: { input: 0.6, output: 12 } });
@@ -190,9 +200,9 @@ const steered = openai.speech({ name: "gpt-4o-mini-tts", pricing: { input: 0.6, 
 const { data, error } = await ai.speech({
   model: steered,
   text: "Welcome aboard. Let's get you set up.",
-  voice: "verse",             // overrides the model default
-  format: "wav",              // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
-  speed: 1.25,                // OpenAI 0.25–4.0
+  voice: "verse", // overrides the model default
+  format: "wav", // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
+  speed: 1.25, // OpenAI 0.25–4.0
   instructions: "calm, warm", // gpt-4o-mini-tts only
 });
 
@@ -229,13 +239,13 @@ const audio = await ai.audioFromFile("./voice-note.ogg");
 const { data, error } = await ai.transcribe({
   model: whisper,
   audio,
-  language: "en",             // BCP-47 hint — improves accuracy + latency
+  language: "en", // BCP-47 hint — improves accuracy + latency
 });
 
 if (error) {
   console.warn(error.code);
 } else {
-  console.log(data.text);     // full transcript
+  console.log(data.text); // full transcript
   for (const seg of data.segments ?? []) {
     console.log(seg.start, seg.end, seg.text); // whisper verbose_json segments
   }
@@ -256,13 +266,13 @@ OpenAI accepts them only on specific model families, so the capability is
 honest-off until you opt in:
 
 ```ts
-const doc = openai.model({ name: "gpt-4o", pdf: true });    // PDF file parts
+const doc = openai.model({ name: "gpt-4o", pdf: true }); // PDF file parts
 const listen = openai.model({ name: "gpt-4o-audio-preview", audio: true }); // input_audio
 ```
 
-| Content part | OpenAI wire mapping | Requires |
-| --- | --- | --- |
-| `{ type: "pdf", source: { base64, mediaType } }` | `{ type: "file", file: { filename, file_data } }` | `.model({ pdf: true })` |
+| Content part                                       | OpenAI wire mapping                                      | Requires                  |
+| -------------------------------------------------- | -------------------------------------------------------- | ------------------------- |
+| `{ type: "pdf", source: { base64, mediaType } }`   | `{ type: "file", file: { filename, file_data } }`        | `.model({ pdf: true })`   |
 | `{ type: "audio", source: { base64, mediaType } }` | `{ type: "input_audio", input_audio: { data, format } }` | `.model({ audio: true })` |
 
 PDF and audio reach the wire only when the model declares the matching

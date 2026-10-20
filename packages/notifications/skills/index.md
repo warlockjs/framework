@@ -1,5 +1,5 @@
 ---
-description: 'Multi-channel notifications for Warlock: define once, send by mail, in-app database, or custom channels. Exports `defineNotification`, `notify`, `defineChannel`, `mailChannel`, `inApp`, `notificationColumns`, `notifications`, `bullmqQueue`, `heraldQueue`, `NotificationConfig`. Use for: "notify a user", "send order shipped by email and in-app", "unread notifications", "add a Slack or webhook channel", "queue notification delivery". Not this package: sending a plain email or mail templates → @warlock.js/core sendMail; background jobs → @warlock.js/queue.'
+description: 'Define once and notify through mail, in-app or custom channels: `defineNotification`, `notify`, `defineChannel`, `mailChannel`, `inApp`, `bullmqQueue` and `heraldQueue`. Use for "notify a user", "show unread notifications", "add a webhook channel" or "queue notification delivery". Not this package → @warlock.js/core for plain email and templates; @warlock.js/queue for jobs; @warlock.js/herald for broker messaging.'
 ---
 
 # @warlock.js/notifications

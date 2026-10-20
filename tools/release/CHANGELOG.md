@@ -1,5 +1,12 @@
 ﻿# Changelog — release tooling
 
+## 5.34.3
+
+### Changed
+
+- Require exactly one exported agent skill per package: root `skills/SKILL.md`, or an index with at least two topics. Reject mixed and nested layouts, missing descriptions and descriptions over 450 characters, with fixture coverage.
+- Discover root skills in snippet diagnostics and LLM projections, preserve sibling assets, and refresh skill path references and the documentation catalog.
+
 ## 5.34.2 - 2026-10-19
 
 ### Fixed

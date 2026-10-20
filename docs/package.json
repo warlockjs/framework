@@ -16,16 +16,18 @@
     "test:changelog-freshness": "node --test scripts/check-changelog-freshness.test.mjs",
     "check:mdx-guard": "node scripts/check-mdx-in-md.mjs && node scripts/check-tab-code-fences.mjs",
     "test:mdx-guard": "node --test scripts/check-tab-code-fences.test.mjs",
-    "predev": "node scripts/generate-changelog.mjs",
-    "prestart": "node scripts/generate-changelog.mjs",
-    "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/check-tab-code-fences.mjs && node scripts/generate-changelog.mjs && node scripts/check-changelog-freshness.mjs",
+    "predev": "node scripts/generate-changelog.mjs && node scripts/generate-skills.mjs",
+    "prestart": "node scripts/generate-changelog.mjs && node scripts/generate-skills.mjs",
+    "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/check-tab-code-fences.mjs && node scripts/generate-changelog.mjs && node scripts/check-changelog-freshness.mjs && node scripts/generate-skills.mjs",
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build && node scripts/check-mdx-gfm.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:gfm-check": "node --test scripts/check-mdx-gfm.test.mjs"
+    "test:gfm-check": "node --test scripts/check-mdx-gfm.test.mjs",
+    "sync:skills": "node scripts/generate-skills.mjs",
+    "test:skills": "node --test scripts/generate-skills.test.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.39.2",

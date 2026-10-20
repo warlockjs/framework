@@ -18,7 +18,9 @@
  * inside a package's `skills/**\/*.md`. The bare word `SKILL.md` (as in "each
  * folder holds one `SKILL.md`") is not a path and is not flagged.
  * Grouped indexes must also name every local topic, never name a missing local
- * topic, and keep all agent guidance in topic folders rather than loose files.
+ * topic, and keep grouped guidance in topic folders rather than loose files.
+ * Single-topic packages use a root SKILL.md; every package exports one skill
+ * with a nonempty package description of at most 450 characters.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
@@ -110,7 +112,13 @@ export type SkillLayoutIssue = {
   relPath: string;
   line: number;
   topic: string;
-  type: "loose-markdown" | "unknown-topic" | "unlisted-topic";
+  type:
+    | "loose-markdown"
+    | "unknown-topic"
+    | "unlisted-topic"
+    | "invalid-layout"
+    | "missing-description"
+    | "description-too-long";
   message: string;
 };
 
@@ -187,7 +195,7 @@ export function runSkillLayoutGate(repoRoot: string): SkillLayoutIssue[] {
       message: string,
     ) => {
       issues.push({
-        package: `@warlock.js/${packageDir}`,
+        package: packageDir === "create-warlock" ? packageDir : `@warlock.js/${packageDir}`,
         relPath: toPosix(path.relative(repoRoot, path.join(skillsRoot, file))),
         line,
         topic,
@@ -196,7 +204,21 @@ export function runSkillLayoutGate(repoRoot: string): SkillLayoutIssue[] {
       });
     };
 
+    const rootSkill = statIsFile(path.join(skillsRoot, "SKILL.md"));
+    const indexFile = path.join(skillsRoot, "index.md");
+    if (rootSkill && (topics.size > 0 || statIsFile(indexFile))) {
+      addIssue(
+        "SKILL.md",
+        1,
+        "",
+        "invalid-layout",
+        "root SKILL.md cannot be mixed with topic skills or index.md",
+      );
+    }
+
     for (const name of names) {
+      // Root-layout skills export their sibling reference assets too.
+      if (rootSkill) continue;
       if (name !== "index.md" && name.endsWith(".md") && statIsFile(path.join(skillsRoot, name))) {
         addIssue(
           name,
@@ -208,7 +230,6 @@ export function runSkillLayoutGate(repoRoot: string): SkillLayoutIssue[] {
       }
     }
 
-    const indexFile = path.join(skillsRoot, "index.md");
     if (!statIsFile(indexFile)) continue;
     const refs = findIndexTopicRefs(localIndexBody(readFileSync(indexFile, "utf8"), packageDir));
     const mentioned = new Set(refs.map((ref) => ref.topic));
@@ -240,6 +261,90 @@ export function runSkillLayoutGate(repoRoot: string): SkillLayoutIssue[] {
   return issues;
 }
 
+/** Decode the simple YAML scalars used in package skill frontmatter. */
+export function readSkillDescription(text: string): string | undefined {
+  const frontmatter = text.replace(/^\uFEFF/, "").match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  const field = frontmatter?.[1]?.match(/^description:[ \t]*(.*)$/m);
+  if (!field) return undefined;
+  const value = (field[1] ?? "").trim();
+  if (value.startsWith('"')) {
+    try {
+      const decoded: unknown = JSON.parse(value);
+      return typeof decoded === "string" ? decoded.trim() : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  if (value.startsWith("'")) {
+    return value.endsWith("'") ? value.slice(1, -1).replace(/''/g, "'").trim() : undefined;
+  }
+  // Fail closed on YAML block scalars/collections instead of counting only a marker.
+  // Authors use a quoted, single-line description so every consumer sees the same text.
+  if (/^(?:[>|{}&*!]|\[|\])/.test(value) || /^(?:null|~|true|false|\d+)$/i.test(value))
+    return undefined;
+  return value.replace(/\s+#.*$/, "").trim();
+}
+
+/** One package skill under agent-kit's default auto layout, with a bounded description. */
+export function runSkillPackageGate(repoRoot: string): SkillLayoutIssue[] {
+  const issues: SkillLayoutIssue[] = [];
+  for (const packageDir of readdirSync(repoRoot).sort()) {
+    if (packageDir.startsWith(".") || packageDir === "node_modules") continue;
+    const skillsRoot = path.join(repoRoot, packageDir, "skills");
+    const manifestFile = path.join(repoRoot, packageDir, "package.json");
+    if (!isDirectory(skillsRoot) && !statIsFile(manifestFile)) continue;
+    if (statIsFile(manifestFile)) {
+      const manifest: { private?: boolean } = JSON.parse(readFileSync(manifestFile, "utf8"));
+      if (manifest.private) continue;
+    }
+    const files: string[] = [];
+    if (isDirectory(skillsRoot)) walkMarkdown(skillsRoot, repoRoot, files);
+    const skills = files.filter((file) => path.basename(file) === "SKILL.md");
+    const rootFile = path.join(skillsRoot, "SKILL.md");
+    const indexFile = path.join(skillsRoot, "index.md");
+    const rootSkill = statIsFile(rootFile);
+    const hasIndex = statIsFile(indexFile);
+    const validRoot = rootSkill && skills.length === 1 && !hasIndex;
+    const validGrouped =
+      !rootSkill &&
+      hasIndex &&
+      skills.length >= 2 &&
+      skills.every((file) => path.dirname(path.dirname(file)) === skillsRoot);
+    const frontDoor = rootSkill ? rootFile : hasIndex ? indexFile : (skills[0] ?? rootFile);
+    const addIssue = (type: SkillLayoutIssue["type"], message: string) => {
+      issues.push({
+        package: packageDir === "create-warlock" ? packageDir : `@warlock.js/${packageDir}`,
+        relPath: toPosix(path.relative(repoRoot, frontDoor)),
+        line: 1,
+        topic: "",
+        type,
+        message,
+      });
+    };
+    if (!validRoot && !validGrouped) {
+      addIssue(
+        "invalid-layout",
+        "ship exactly one package skill: skills/SKILL.md alone, or skills/index.md with at least two direct topic folders; nested or unindexed topic skills are not allowed",
+      );
+    }
+    const description = statIsFile(frontDoor)
+      ? readSkillDescription(readFileSync(frontDoor, "utf8"))
+      : undefined;
+    if (!description) {
+      addIssue(
+        "missing-description",
+        "package skill requires a nonempty single-line frontmatter description",
+      );
+    } else if (description.length > 450) {
+      addIssue(
+        "description-too-long",
+        `package skill description has ${description.length} characters; maximum is 450`,
+      );
+    }
+  }
+  return issues;
+}
+
 function statIsFile(file: string): boolean {
   try {
     return statSync(file).isFile();
@@ -250,7 +355,10 @@ function statIsFile(file: string): boolean {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
   const refs = runSkillPathRefsGate(PACKAGES_ROOT);
-  const layoutIssues = runSkillLayoutGate(PACKAGES_ROOT);
+  const layoutIssues = [
+    ...runSkillLayoutGate(PACKAGES_ROOT),
+    ...runSkillPackageGate(PACKAGES_ROOT),
+  ];
 
   if (refs.length > 0) {
     for (const ref of refs) {
@@ -270,10 +378,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
     );
   }
   if (layoutIssues.length > 0) {
-    console.error(`skill-path-refs: ${layoutIssues.length} grouped-layout issue(s).`);
+    console.error(`skill-path-refs: ${layoutIssues.length} package skill issue(s).`);
     process.exitCode = 1;
   }
   if (refs.length === 0 && layoutIssues.length === 0) {
-    console.log("skill-path-refs: package skill paths and grouped indexes are consistent");
+    console.log(
+      "skill-path-refs: one skill per package, descriptions and topic references are consistent",
+    );
   }
 }

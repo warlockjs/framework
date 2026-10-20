@@ -1,6 +1,6 @@
 ---
-name: create-a-warlock-project
-description: "Create a Warlock project with the canonical scaffold, package selection, and project conventions."
+name: create-warlock
+description: 'Scaffold Warlock apps with `npm create warlock@latest` or `npx create-warlock`; the CLI entry exports `parseFlags`, `packageVersion` and default `createApp`. Use for "create a project", "start a backend or SSR app", choose a database, AI adapters, features or linting, and automate setup with `--yes` and `--pm=npm`. Not this package → @warlock.js/core for extending an existing app; @warlock.js/web for page APIs.'
 ---
 
 # create-warlock — scaffold a new project
@@ -45,7 +45,7 @@ that is just the project name, the one required answer with no default:
 
 ```
 A project name is required and no terminal is available to ask for one. Pass it as
-the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
+the first argument or --name=<name>. Non-interactive flags: --yes, --pm=npm,
 --db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc>, --git|--no-git, --jwt|--no-jwt.
 ```
 
@@ -64,30 +64,23 @@ Features: none
 
 ## Flags
 
-| Flag                           | Takes value | Default                                                             | Purpose                                                                                                                |
-| ------------------------------ | ----------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory.                                                                                       |
-| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default.                                      |
-| `--db`                         | yes         | `mongodb`                                                           | Database driver key (`mongodb`, `postgres`, or `none`).                                                                |
-| `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                                     |
-| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
-| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default.                |
-| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                                    |
-| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                                        |
-| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                                       |
-| `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                                   |
-| `--jwt` / `--no-jwt`           | no          | off                                                                 | Generate JWT secrets via the project's `jwt` script.                                                                   |
-| `--yes` / `-y`                 | no          | off                                                                 | Fully headless mode.                                                                                                   |
-| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form wizard.                                                                                     |
+| Flag                           | Takes value | Default                                                             | Purpose                                                                                                 |
+| ------------------------------ | ----------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory.                                                                        |
+| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default.                       |
+| `--db`                         | yes         | `mongodb`                                                           | Database driver key (`mongodb`, `postgres`, or `none`).                                                 |
+| `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                      |
+| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — use `npm` for the commands in this guide.                                             |
+| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
+| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                     |
+| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                         |
+| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                        |
+| `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                    |
+| `--jwt` / `--no-jwt`           | no          | off                                                                 | Generate JWT secrets via the project's `jwt` script.                                                    |
+| `--yes` / `-y`                 | no          | off                                                                 | Fully headless mode.                                                                                    |
+| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form wizard.                                                                      |
 
-With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script
-approvals (esbuild, and Sharp when the `image` feature is selected) where that
-version reads them: `allowBuilds` in `pnpm-workspace.yaml` on pnpm 10.26+, 11
-and 12; that file plus `onlyBuiltDependencies` on 10.5–10.25; and, before 10.5,
-no workspace file (those versions reject one without `packages:`) but
-`pnpm.onlyBuiltDependencies` in `package.json`. An explicit existing denial is
-retained. If selected feature dependencies do
-not install, JWT generation is skipped and reported rather than retried through
+If selected feature dependencies do not install, JWT generation is skipped and reported rather than retried through
 the package manager.
 
 Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--pm` / `--db` / `--features` / `--ai` / `--agents` / `--lint` values fail fast before any write or install.

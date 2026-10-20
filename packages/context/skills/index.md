@@ -1,5 +1,5 @@
 ---
-description: 'Typed request-scoped context on Node AsyncLocalStorage, so data (user, tenant, trace id, transaction) flows through awaits without parameter threading. Exports `Context`, `contextManager`, `ContextManager`. Use for: "share the current user or tenant across async calls", "request-scoped storage", "AsyncLocalStorage wrapper", "run several contexts together", "avoid passing data through every function". Not this package: cross-request state → @warlock.js/cache or a database; HTTP request/response objects → @warlock.js/core.'
+description: 'Typed async context propagation with `Context` and `ContextManager`, built on AsyncLocalStorage. Use for "avoid passing the tenant everywhere", request-scoped users, trace IDs, `run`, `enter`, `get`, `set` or coordinating several contexts. Not this package → @warlock.js/core for the framework request context; @warlock.js/cache for state shared across requests; @warlock.js/cascade for database transactions.'
 ---
 
 # @warlock.js/context

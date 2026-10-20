@@ -1,5 +1,11 @@
 # Changelog — @warlock.js/process
 
+## 5.34.3
+
+### Changed
+
+- The agent skill now exports as `warlock-js-process`; package discovery descriptions stay within 450 characters.
+
 ## 5.34.0 - 2026-10-19
 
 ### Fixed

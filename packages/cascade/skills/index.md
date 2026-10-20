@@ -1,5 +1,5 @@
 ---
-description: "Model-first ORM for MongoDB and Postgres. Exports `Model`, `RegisterModel`, `Migration`, `defineModel`, `BelongsTo`, `HasMany`, `transaction`, `DataSource`, `dataSourceRegistry`, `connectToDatabase`, `runMigrations`. Use for: define a model, add a column or collection, write or alter a migration, query or filter records, paginate, aggregate or group, add a relation, run a transaction, soft delete, track changes, react to save or delete events, vector search. Not this package: request validation and schemas → @warlock.js/seal; routes, controllers, repositories → @warlock.js/core."
+description: 'Database models and query builders for MongoDB and SQL: `Model`, `DataSource`, `defineModel`, `registerModel`, `afterCommit` and `modelSync`. Use for "query a table", "define a relation", "write a migration", "run a transaction", eager loading or model events. Not this package → @warlock.js/seal for structural validation; @warlock.js/core for HTTP handlers and repositories; @warlock.js/cache for transient data.'
 ---
 
 # @warlock.js/cascade

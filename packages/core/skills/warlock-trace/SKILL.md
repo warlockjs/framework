@@ -1,6 +1,6 @@
 ---
 name: warlock-trace
-description: 'Verify runtime behaviour without a browser: `warlock trace <method> <url> [--body json|@file] [--header k:v] [--json]` sends one request to the running `warlock dev` server and prints what devtools recorded for it — middleware chain with timings, validation result and errors, handler time, queries with N+1 flags, logs, cache operations, captured mails, the response and timings — as a versioned report (`schemaVersion: 1`); `traceRequest()` returns the same object. Triggers: `warlock trace`, `traceRequest`, `TraceReport`, `buildTraceReport`, `x-request-id`, `.warlock/dev-server.json`, `WL8008`, `WL8009`, `WL5004`, `--id-header`; "did validation pass for this request", "which queries does this endpoint run", "is there an N+1 on this route", "what middleware runs on this route", "check the endpoint after my change", "request timeline as JSON". Skip: the devtools dashboard in a browser — the `devtools-overview` skill of @warlock.js/devtools; static route facts (guard, rate limit, schemas) — the `warlock-inspect` topic; typecheck/lint/tests — the `warlock-check` topic.'
+description: 'Verify runtime behaviour without a browser: `warlock trace <method> <url> [--body json|@file] [--header k:v] [--json]` sends one request to the running `warlock dev` server and prints what devtools recorded for it — middleware chain with timings, validation result and errors, handler time, queries with N+1 flags, logs, cache operations, captured mails, the response and timings — as a versioned report (`schemaVersion: 1`); `traceRequest()` returns the same object. Triggers: `warlock trace`, `traceRequest`, `TraceReport`, `buildTraceReport`, `x-request-id`, `.warlock/dev-server.json`, `WL8008`, `WL8009`, `WL5004`, `--id-header`; "did validation pass for this request", "which queries does this endpoint run", "is there an N+1 on this route", "what middleware runs on this route", "check the endpoint after my change", "request timeline as JSON". Skip: the devtools dashboard in a browser — the `warlock-js-devtools` skill; static route facts (guard, rate limit, schemas) — the `warlock-inspect` topic; typecheck/lint/tests — the `warlock-check` topic.'
 ---
 
 # Warlock — `warlock trace`
@@ -78,4 +78,4 @@ Devtools is checked before anything is sent. With `--json` a failure prints `{ "
 
 - The `warlock-inspect` topic — the static facts of a route (guard, rate limit, schemas).
 - The `warlock-check` topic — typecheck, lint, tests and conventions in one run.
-- The `devtools-overview` skill of `@warlock.js/devtools` — the dashboard behind the timeline.
+- The `warlock-js-devtools` skill — the dashboard behind the timeline.

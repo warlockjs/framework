@@ -51,9 +51,13 @@ The pkgist tool itself is `@mongez/pkgist` on npm, released separately; keep the
 pinned version in `package.json` in step with the @mongez runner.
 
 `npm run check:skill-path-refs` validates package skill references and grouped
-indexes. It also runs in the workspace CI workflow and the release workflow.
-Keep all agent guidance in `skills/<topic>/SKILL.md`; the only loose Markdown
-allowed under a package's `skills/` is `index.md`. Its body must name every
+indexes, exactly one exported skill per package, and nonempty package descriptions
+of at most 450 characters. It also runs in the workspace CI workflow and the release workflow.
+Single-topic packages use `skills/SKILL.md`, with reference assets beside it.
+Do not mix a root skill with topics or an index. Multi-topic packages use
+`skills/<topic>/SKILL.md` plus `skills/index.md` and at least two topics;
+unindexed or nested topic skills are rejected. Only `index.md` may be loose
+Markdown in a grouped package. Its body must name every
 topic folder and cannot name a missing local topic. Use topic filenames,
 backticked hyphenated slugs, explicit "the `slug` topic" references, or
 comma-separated slug lists. For another package, use "the `define-ai-tool`

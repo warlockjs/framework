@@ -66,6 +66,19 @@ function skillFor(pkg: WorkspacePackage, slug: string, filePath: string): Discov
 }
 
 describe("discoverPackages / discoverSkillFiles", () => {
+  it("discovers a root skill with a stable slug and ignores reference assets", async () => {
+    const root = await fixtureRoot();
+    const pkg = await writeFixturePackage(
+      root,
+      "widgets",
+      "@fixture/widgets",
+      "export const widget = 1;\n",
+    );
+    const filePath = path.join(pkg.absPath, "skills", "SKILL.md");
+    await writeFile(filePath, "# Root package skill\n");
+    await writeFile(path.join(pkg.absPath, "skills", "reference.md"), "# Supporting asset\n");
+    assert.deepEqual(discoverSkillFiles(pkg), [{ package: pkg, filePath, slug: "." }]);
+  });
   it("derives packages from the filesystem, not a hardcoded list", async () => {
     const root = await fixtureRoot();
     await writeFixturePackage(root, "widgets", "@fixture/widgets", "export const widget = 1;\n");

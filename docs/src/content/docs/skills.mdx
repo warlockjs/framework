@@ -4,6 +4,8 @@ description: How AI agents discover Warlock.js packages and load focused topics 
 template: splash
 ---
 
+import catalog from "../../data/skills.json";
+
 Warlock.js packages ship a package orientation and focused task topics: register
 a route, write a migration, choose a cache driver, or define an AI tool. The
 package index explains what belongs in that package, where to start, and when
@@ -29,8 +31,10 @@ and `skills/index.md` exports as **one skill per package**. For example:
 ```
 
 Other targets, including Cursor and Codex, receive the same package guidance.
-Each topic originates in `skills/<topic>/SKILL.md`; its assets are exported
-alongside it. A single-topic package stays flat. Applications can configure
+Each grouped topic originates in `skills/<topic>/SKILL.md`; its assets are exported
+alongside it. A single-topic package uses `skills/SKILL.md`, with assets beside
+that file, and exports directly as `warlock-js-<package>`. The unscoped
+`create-warlock` package exports as `create-warlock`. Applications can configure
 `agentKit.layout` as `grouped` or `flat` to override automatic grouping.
 
 Read core's `test-browser` topic for browser flows, `upgrade-from-5-29` for
@@ -42,19 +46,62 @@ topic of `@warlock.js/ai`; `@warlock.js/ai-tools` supplies ready-made tools and 
 
 ## Authoring package guidance
 
-Use `skills/index.md` as the package front door, with a 400–700 character
-frontmatter description and a body that names every local topic. Put detailed
+Every package ships exactly one exported skill under the default `auto` layout.
+For one topic, put its guidance at `skills/SKILL.md`; do not add an index or
+topic folders. Its frontmatter `name` is the package slug used by agent-kit.
+
+For two or more topics, use `skills/index.md` as the package front door,
+with a body that names every local topic. Put detailed
 guidance in `skills/<topic>/SKILL.md`, with `name` and a `description` explaining
 when to read it. Agent-kit generates the Topics table from those descriptions;
 do not maintain a second table or a duplicate overview topic.
 
-Loose Markdown files other than `index.md` are not exported. In particular,
+The package front door's description must be nonempty and at most **450
+characters**; aim for 350–420. Describe the package, key exported APIs, common
+user requests and "Not this package →" pointers. Topic descriptions are loaded
+through the grouped skill and have their own task scope. Keep the total across
+packages under 14,000 characters.
+
+Loose Markdown files other than `index.md` in grouped packages are not exported. In particular,
 putting a guide directly at `skills/report-framework-issue.md` would hide it
 from applications. Use a topic folder even though the grouped export becomes a
 sibling `.md` file.
 
 Name cross-package topics with their owner: "the `define-ai-tool` topic of the
 `@warlock.js/ai` package". The release tooling's `check:skill-path-refs` gate
-checks index coverage, missing local references, loose Markdown and path-style
+checks one exported skill per package, description limits, index coverage,
+missing local references, loose Markdown and path-style
 topic links in CI and before release. Generated package `llms.txt` and
 `llms-full.txt` project the index and topics from the same sources.
+
+## Package skill catalog
+
+This catalog comes from package frontmatter, including root skills and grouped
+indexes. Refresh it with `node docs/scripts/generate-skills.mjs` from the
+repository root. There are {catalog.skills.length} package skills using
+{catalog.totalCharacters.toLocaleString("en-US")} description characters.
+
+<table>
+  <thead>
+    <tr>
+      <th>Package</th>
+      <th>Exported skill</th>
+      <th>Description characters</th>
+    </tr>
+  </thead>
+  <tbody>
+    {catalog.skills.map((skill) => (
+      <tr>
+        <td>
+          <a href={`https://github.com/warlockjs/framework/blob/main/${skill.source}`}>
+            {skill.package}
+          </a>
+        </td>
+        <td>
+          <code>{skill.slug}</code>
+        </td>
+        <td>{skill.characters}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>

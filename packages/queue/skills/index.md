@@ -1,5 +1,5 @@
 ---
-description: 'Background jobs on BullMQ + Redis, local SQLite, or memory: retries, delays, priorities, workers, failed-job recovery. Exports `defineJob`, `queueConnector`, `startWorkers`, `closeQueue`, `getQueue`, `failedJobs`, `retryFailedJob`, `mountQueueDashboard`, `QueueConfig`, `QueueJob`. Use for: "run this in the background", "retry a failed job", "delay a job", "survive restarts", "job dashboard". Not this package: cron or recurring schedules → @warlock.js/scheduler; broker pub/sub messaging → @warlock.js/herald; core `Queue` is an in-memory batcher.'
+description: 'Background jobs with BullMQ/Redis, local SQLite or memory: `defineJob`, `queueConnector`, `startWorkers`, `closeQueue`, `failedJobs` and `mountQueueDashboard`. Use for "run in the background", "retry a job", "delay work", "survive restarts" or "view the job dashboard". Not this package → @warlock.js/scheduler for recurring schedules; @warlock.js/herald for pub/sub; @warlock.js/core for the in-memory `Queue` batcher.'
 ---
 
 # @warlock.js/queue

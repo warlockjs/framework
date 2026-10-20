@@ -222,7 +222,7 @@ export function discoverPackages(repoRoot: string): WorkspacePackage[] {
   return packages.sort((a, b) => a.dir.localeCompare(b.dir));
 }
 
-/** Every `skills/**\/SKILL.md` under one package, filesystem derived. */
+/** Root `skills/SKILL.md` and all grouped topic SKILL.md files, filesystem derived. */
 export function discoverSkillFiles(pkg: WorkspacePackage): DiscoveredSkill[] {
   const skillsRoot = path.join(pkg.absPath, "skills");
   const found: DiscoveredSkill[] = [];
@@ -799,7 +799,7 @@ function formatReport(report: GateReport): { text: string; failed: boolean } {
   lines.push("");
 
   for (const result of report.results) {
-    const skillLabel = `${result.skill.package.dir}/skills/${result.skill.slug}`;
+    const skillLabel = toPosix(path.relative(PACKAGES_ROOT, result.skill.filePath));
     totalSkipped += result.skipped.length;
     for (const file of result.files) {
       totalBlocks += 1;

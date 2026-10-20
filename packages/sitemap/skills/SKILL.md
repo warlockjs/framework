@@ -1,6 +1,6 @@
 ---
-name: sitemap-overview
-description: "Front-door orientation for `@warlock.js/sitemap`: framework-blind `Sitemap` and streaming `SitemapIndex` builders, URL metadata, hreflang, Google image entries, sharding, diagnostics, and atomic publication. Use when adding or debugging sitemap output; Warlock page discovery and `/sitemap.xml` routing belong to `@warlock.js/web`."
+name: warlock-js-sitemap
+description: 'Framework-independent XML sitemap builders: `Sitemap`, `SitemapIndex`, `buildSitemapXml`, `joinOrigin` and `SitemapEntry`. Use for "generate sitemap XML", URL metadata, hreflang, image entries, sharding, duplicate diagnostics or atomic publication from scripts and servers. Not this package → @warlock.js/web for Warlock page discovery, `/sitemap.xml` and robots routing; @warlock.js/core for app configuration.'
 ---
 
 # `@warlock.js/sitemap` — overview

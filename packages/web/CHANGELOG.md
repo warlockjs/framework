@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.34.3
+
+### Changed
+
+- Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance.
+
 ## 5.34.2 - 2026-10-19
 
 ### Fixed

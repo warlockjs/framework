@@ -1,5 +1,5 @@
 ---
-description: "The Warlock server framework: HTTP routes, controllers, responses, resources, repositories, CLI, mail, storage, security helpers. Exports `router`, `Request`, `Response`, `RequestHandler`, `useCase`, `RepositoryManager`, `defineResource`, `defineConfig`, `storage`, `sendMail`, `hashPassword`, `command`. Use for: add a route, write a controller, return a JSON response, hide a field from the response, upload a file, send an email, hash a password, add a CLI command, generate an OpenAPI document, type an API response, wire a socket, run or configure the app. Not this package: database models/queries → @warlock.js/cascade; input schemas → @warlock.js/seal; SSR pages → @warlock.js/web."
+description: 'Warlock application runtime: `router`, `Request`, `Response`, `config`, `env`, `sendMail` and `defineConfig`. Use for "add an API route", controllers, middleware, CLI commands, config, uploads, mail, sockets, OpenAPI, testing or upgrades. Not this package → @warlock.js/web for React SSR pages; @warlock.js/cascade for database queries; @warlock.js/seal for standalone schemas; @warlock.js/auth for login.'
 ---
 
 # @warlock.js/core
