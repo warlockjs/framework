@@ -563,7 +563,7 @@ sessions. On models that bind thinking to the exact prior history (Claude Fable
 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5) the Anthropic adapter replays retained
 turns without their thinking; older models keep it. Prefer
 `providerOptions.anthropic.serverCompaction` on those models when the
-reasoning matters (see `setup-anthropic`).
+reasoning matters (see the `warlock-js-ai-anthropic` skill).
 
 ```ts
 const result = await worker.execute("Refactor the module", { captureMessages: true });

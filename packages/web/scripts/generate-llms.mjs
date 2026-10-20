@@ -2,7 +2,7 @@
 /** Generate llms.txt and llms-full.txt from this package's skills. */
 
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +55,11 @@ function parseFrontmatter(contents) {
 function collectSkills() {
   if (!existsSync(skillsDir)) return [];
 
+  const rootSkillPath = join(skillsDir, "SKILL.md");
+  if (existsSync(rootSkillPath)) {
+    return [{ folder: shortName, path: rootSkillPath, folderPath: skillsDir }];
+  }
+
   const skills = [];
   for (const entry of readdirSync(skillsDir).sort()) {
     const folderPath = join(skillsDir, entry);
@@ -94,7 +99,7 @@ if (packageIndexText !== undefined) {
 for (const skill of skills) {
   const { meta } = parseFrontmatter(readFileSync(skill.path, "utf8"));
   indexLines.push(
-    `- [${skill.folder}](${packageName}/${skill.folder}/SKILL.md): ${meta.description ?? "(no description)"}`,
+    `- [${skill.folder}](${packageName}/${relative(pkgRoot, skill.path).split("\\").join("/")}): ${meta.description ?? "(no description)"}`,
   );
 }
 writeFileSync(llmsTxtPath, `${indexLines.join("\n")}\n`, "utf8");
@@ -114,7 +119,7 @@ if (packageIndexText !== undefined) {
 
 for (const skill of skills) {
   fullLines.push(
-    `## ${skill.folder}  \`${packageName}/${skill.folder}/SKILL.md\``,
+    `## ${skill.folder}  \`${packageName}/${relative(pkgRoot, skill.path).split("\\").join("/")}\``,
     "",
     readFileSync(skill.path, "utf8").trimEnd(),
     "",

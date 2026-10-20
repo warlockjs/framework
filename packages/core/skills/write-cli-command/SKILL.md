@@ -337,5 +337,5 @@ Set a unique owner and registry per app instance, then import `processes` from
 the generated module and await `processes.spawn({ kind: "worker", command,
 args, labels })`. Consume output and await `handle.exited`. Use handle stops or
 label filters; never stop processes by command or name. `spawnPty()` lazily
-loads separately installed optional peer `node-pty`. The `supervise-processes`
-skill in `@warlock.js/process` contains complete working examples.
+loads separately installed optional peer `node-pty`. The `warlock-js-process`
+skill contains complete working examples.

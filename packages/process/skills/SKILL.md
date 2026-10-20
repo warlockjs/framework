@@ -1,6 +1,6 @@
 ---
-name: supervise-processes
-description: Start, limit, list, stop and recover app-owned workers or terminals using @warlock.js/process. Covers supervisor, ProcessNotOwnedError, spawnPty and warlock add process. Use for child process ownership and resource caps.
+name: warlock-js-process
+description: 'Supervise owned child processes with `supervisor`, `ProcessNotOwnedError` and `UnsupportedProcessPlatformError`. Use for "start and stop a process", readiness checks, restart backoff, line-buffered output, IPC, graceful shutdown, pipelines or optional PTY sessions. Not this package → @warlock.js/queue for background jobs; @warlock.js/scheduler for cron; @warlock.js/ai-cli for coding-agent CLI adapters.'
 ---
 
 # Supervise app-owned processes

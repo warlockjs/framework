@@ -1,5 +1,5 @@
 ---
-description: 'Message bus over RabbitMQ (Kafka planned): publish, subscribe, and request-response between services. Exports `connectToBroker`, `herald`, `heraldChannel`, `Broker`, `defineEvent`, `defineConsumer`, `EventMessage`, `EventConsumer`, `Consumable`, `brokerRegistry`. Use for: "publish an event to RabbitMQ", "subscribe to a channel", "ack or nack a message", "request and reply over the bus", "cross-service messaging". Not this package: durable retried background jobs on Redis → @warlock.js/queue; cron/recurring work → @warlock.js/scheduler.'
+description: 'Broker messaging over RabbitMQ: `connectToBroker`, `herald`, `heraldChannel`, `defineEvent`, `defineConsumer`, `EventMessage` and `EventConsumer`. Use for "publish an event", "subscribe to a channel", "ack or nack", "request and reply" or cross-service pub/sub. Not this package → @warlock.js/queue for durable retried background jobs; @warlock.js/scheduler for cron; @warlock.js/notifications for user notifications.'
 ---
 
 # @warlock.js/herald

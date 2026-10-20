@@ -25,19 +25,25 @@ workflow, and supervisor already speaks.
 
 <Tabs syncKey="pm">
   <TabItem label="npm">
+
     ```bash
     npm install @warlock.js/ai @warlock.js/ai-deepseek
     ```
+
   </TabItem>
   <TabItem label="yarn">
+
     ```bash
     yarn add @warlock.js/ai @warlock.js/ai-deepseek
     ```
+
   </TabItem>
   <TabItem label="pnpm">
+
     ```bash
     pnpm add @warlock.js/ai @warlock.js/ai-deepseek
     ```
+
   </TabItem>
 </Tabs>
 
@@ -105,12 +111,12 @@ supervisor.
 
 ## Models
 
-| Model | Notes |
-| --- | --- |
-| `deepseek-chat` | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
-| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default. |
-| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default. |
+| Model               | Notes                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
+| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**.        |
+| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                                    |
+| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                                   |
 
 DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names
 retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are
@@ -122,12 +128,12 @@ id the upstream serves.
 The wrapper injects DeepSeek's own inference so the right flags are set even
 though the model names aren't OpenAI names:
 
-| Flag | Default |
-| --- | --- |
-| `reasoning` | Inferred from the model name — `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
-| `vision` | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026). |
-| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode. |
-| `promptCaching` | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI. |
+| Flag               | Default                                                                                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reasoning`        | Inferred from the model name — `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
+| `vision`           | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026).                                                                                         |
+| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode.                                                                                   |
+| `promptCaching`    | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI.                                                                                 |
 
 An explicit value always wins over the injected inference:
 
@@ -205,4 +211,4 @@ fail against the stock DeepSeek endpoint. Use a dedicated provider —
 
 - [OpenAI provider](/v/v4/ai/providers/openai/) — the wrapped adapter; all wire-level behavior applies here.
 - [`@warlock.js/ai`](/v/v4/ai/) — the agent, tool, and system-prompt surface these models plug into.
-- For provider-specific notes and the latest model ids, see the `setup-deepseek` skill.
+- For provider-specific notes and the latest model ids, see the `warlock-js-ai-deepseek` skill.

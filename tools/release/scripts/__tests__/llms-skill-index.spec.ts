@@ -18,6 +18,9 @@ const packagesRoot = fileURLToPath(new URL("../../../../packages/", import.meta.
 const indexedPackages = readdirSync(packagesRoot).filter((name) =>
   existsSync(path.join(packagesRoot, name, "skills/index.md")),
 );
+const rootPackages = readdirSync(packagesRoot).filter((name) =>
+  existsSync(path.join(packagesRoot, name, "skills/SKILL.md")),
+);
 
 async function generate(root: string): Promise<void> {
   const child = spawn(process.execPath, ["scripts/generate-llms.mjs"], {
@@ -43,6 +46,47 @@ async function generate(root: string): Promise<void> {
 }
 
 describe("package LLM skill projections", () => {
+  for (const packageDir of rootPackages) {
+    it(`${packageDir} projects the root skill and sibling assets at published paths`, async () => {
+      const root = mkdtempSync(path.join(os.tmpdir(), "llms-root-skill-"));
+      try {
+        mkdirSync(path.join(root, "scripts"));
+        mkdirSync(path.join(root, "skills"));
+        writeFileSync(
+          path.join(root, "scripts", "generate-llms.mjs"),
+          readFileSync(path.join(packagesRoot, packageDir, "scripts", "generate-llms.mjs")),
+        );
+        writeFileSync(
+          path.join(root, "package.json"),
+          JSON.stringify({
+            name: "@warlock.js/sample",
+            description: "Sample package.",
+            type: "module",
+          }),
+        );
+        writeFileSync(
+          path.join(root, "skills", "SKILL.md"),
+          '---\nname: warlock-js-sample\ndescription: "Root package description"\n---\n\nComplete root instructions.\n',
+        );
+        writeFileSync(path.join(root, "skills", "reference.md"), "Root reference content.\n");
+
+        await generate(root);
+        const index = readFileSync(path.join(root, "llms.txt"), "utf8");
+        const full = readFileSync(path.join(root, "llms-full.txt"), "utf8");
+        assert.match(
+          index,
+          /\[sample\]\(@warlock\.js\/sample\/skills\/SKILL\.md\): Root package description/,
+        );
+        assert.match(full, /Complete root instructions/);
+        assert.match(full, /@warlock\.js\/sample\/skills\/reference\.md/);
+        assert.match(full, /Root reference content/);
+        assert.doesNotMatch(index, /skills\/sample\/SKILL\.md|skills\/index\.md/);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+  }
+
   for (const packageDir of indexedPackages) {
     it(`${packageDir} projects index orientation and topic assets without an overview folder`, async () => {
       const root = mkdtempSync(path.join(os.tmpdir(), "llms-skill-index-"));

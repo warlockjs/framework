@@ -199,7 +199,7 @@ If you switch providers mid-project (e.g. OpenAI → Anthropic):
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — full OpenAI adapter docs
+- The `warlock-js-ai-openai` skill — full OpenAI adapter docs
 - The `run-ai-agent` topic — model passed into `ai.agent({...})`
 - The `embed-text` topic — embedder primitive on the SDK
 - The `handle-ai-errors` topic — adapter error categorization

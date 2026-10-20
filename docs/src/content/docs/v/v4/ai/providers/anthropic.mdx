@@ -20,19 +20,25 @@ your orchestration code.
 
 <Tabs syncKey="pm">
   <TabItem label="npm">
+
     ```bash
     npm install @warlock.js/ai @warlock.js/ai-anthropic
     ```
+
   </TabItem>
   <TabItem label="yarn">
+
     ```bash
     yarn add @warlock.js/ai @warlock.js/ai-anthropic
     ```
+
   </TabItem>
   <TabItem label="pnpm">
+
     ```bash
     pnpm add @warlock.js/ai @warlock.js/ai-anthropic
     ```
+
   </TabItem>
 </Tabs>
 
@@ -132,10 +138,10 @@ bytes (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
 
 Claude bills the most-repeated tokens — tool schemas, the system prompt — at a fraction of the input rate when reused across trips. The adapter exposes **two independent breakpoints**:
 
-| Where | How you opt in | What it caches |
-| --- | --- | --- |
-| **Tool schemas** | `model({ promptCaching: true })` (per-model) | Marks the tools block `cache_control: { type: "ephemeral" }` so multi-trip agents reuse tool definitions at the cache-read rate. |
-| **System prompt** | `modelOptions: { cacheControl: { breakpoints: 1 } }` (per-call) | Emits the system prompt as a cached `text` block. |
+| Where             | How you opt in                                                  | What it caches                                                                                                                   |
+| ----------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Tool schemas**  | `model({ promptCaching: true })` (per-model)                    | Marks the tools block `cache_control: { type: "ephemeral" }` so multi-trip agents reuse tool definitions at the cache-read rate. |
+| **System prompt** | `modelOptions: { cacheControl: { breakpoints: 1 } }` (per-call) | Emits the system prompt as a cached `text` block.                                                                                |
 
 ```ts
 const model = anthropic.model({
@@ -144,10 +150,10 @@ const model = anthropic.model({
 });
 ```
 
-`promptCaching` is **off by default**: a cache *write* costs ~1.25×, so a breakpoint only pays off when the cached prefix is read at least twice (multi-trip / multi-turn agents). The split is deliberate — tool schemas are static (a per-model decision), while the system prompt often carries per-turn placeholders (a per-call decision). Reads and writes flow back as `Usage.cachedTokens` / `Usage.cacheWriteTokens`.
+`promptCaching` is **off by default**: a cache _write_ costs ~1.25×, so a breakpoint only pays off when the cached prefix is read at least twice (multi-trip / multi-turn agents). The split is deliberate — tool schemas are static (a per-model decision), while the system prompt often carries per-turn placeholders (a per-call decision). Reads and writes flow back as `Usage.cachedTokens` / `Usage.cacheWriteTokens`.
 
 :::note[Bedrock differs]
-On the [Bedrock adapter](/v/v4/ai/providers/bedrock/), `promptCaching` is a *capability override* rather than an opt-in — auto-inferred `true` for Claude 3.5+/3.7/4 and Nova, mapping per-call `cacheControl` breakpoints to Converse `cachePoint` blocks. Set `promptCaching: false` to force it off.
+On the [Bedrock adapter](/v/v4/ai/providers/bedrock/), `promptCaching` is a _capability override_ rather than an opt-in — auto-inferred `true` for Claude 3.5+/3.7/4 and Nova, mapping per-call `cacheControl` breakpoints to Converse `cachePoint` blocks. Set `promptCaching: false` to force it off.
 :::
 
 ## Vision
@@ -198,4 +204,4 @@ and quota guards, not for billing.
 
 For the agent/workflow surface these models plug into, see
 [`@warlock.js/ai`](/v/v4/ai/). For provider-specific notes and the
-latest model ids, see the `setup-anthropic` skill.
+latest model ids, see the `warlock-js-ai-anthropic` skill.

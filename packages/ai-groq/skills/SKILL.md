@@ -1,6 +1,6 @@
 ---
-name: setup-groq
-description: 'Wire @warlock.js/ai-groq — new GroqSDK({apiKey, baseURL?, provider?, pricing?}) for Groq-hosted open models on LPU hardware (llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b/20b, deepseek-r1-distill-llama-70b). Thin wrapper over @warlock.js/ai-openai — uses the OpenAI-compatible endpoint https://api.groq.com/openai/v1, delegating transport/streaming/structured-output/errors to OpenAISDK while injecting Groqs OWN vision/reasoning inference + default pricing. .model({name, vision?, reasoning?, structuredOutput?}) for ModelContract. Triggers: `GroqSDK`, `GROQ_DEFAULT_PRICING`, `groq.model`, `groq.count`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss`, `deepseek-r1-distill`, `groq vision`, `groq reasoning`, `reasoning_effort`, `https://api.groq.com/openai/v1`, OpenAI-compatible Groq, LPU, fast inference; "wire groq into a warlock agent", "use llama 3.3 on groq", "run gpt-oss / deepseek reasoning on groq", "point warlock at the groq endpoint"; import `import { GroqSDK } from "@warlock.js/ai-groq"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; the wrapped adapter `@warlock.js/ai-openai` (`setup-openai`); embeddings (Groq has none — use openai/google); siblings `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `groq-sdk` / `openai` SDK.'
+name: warlock-js-ai-groq
+description: 'Groq adapter for Warlock AI: `GroqSDK`, `GROQ_KNOWN_MODELS`, `GROQ_DEFAULT_PRICING`, `inferVisionCapability` and `inferReasoningCapability`. Use for "connect Groq", fast chat, streaming, tools, model capabilities or pricing overrides through `sdk.model()`. Not this package → @warlock.js/ai for agents and custom tools; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.'
 ---
 
 # `@warlock.js/ai-groq`
@@ -64,7 +64,7 @@ await model.complete(messages, { reasoning: { effort: "high" } }); // → reason
 
 ## Structured output & streaming
 
-Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `response_format: json_schema` (strict) when the schema is a proper root object, else loose `json_object`; `model.stream()` drains the streaming Chat Completions response and yields `delta` / `tool-call` / `done` chunks with `include_usage` on. See the `setup-openai` topic of the `warlock-js-ai-openai` skill for the full wire behavior.
+Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `response_format: json_schema` (strict) when the schema is a proper root object, else loose `json_object`; `model.stream()` drains the streaming Chat Completions response and yields `delta` / `tool-call` / `done` chunks with `include_usage` on. See the `warlock-js-ai-openai` skill for the full wire behavior.
 
 ## Embeddings — not available on Groq
 
@@ -116,12 +116,12 @@ Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by th
 ## When NOT to use this skill
 
 - Embeddings or image generation — Groq has neither; use `@warlock.js/ai-openai` / `@warlock.js/ai-google`.
-- OpenAI / Azure / OpenRouter — use `@warlock.js/ai-openai` (`setup-openai`); this wraps it but for Groq specifically.
+- OpenAI / Azure / OpenRouter — use the `warlock-js-ai-openai` skill; this wraps it but for Groq specifically.
 - Anthropic — `@warlock.js/ai-anthropic`. Bedrock — `@warlock.js/ai-bedrock`. Gemini — `@warlock.js/ai-google`. Local Ollama — `@warlock.js/ai-ollama`.
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output detail
+- The `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output detail
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
 

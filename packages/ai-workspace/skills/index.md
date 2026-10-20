@@ -1,5 +1,5 @@
 ---
-description: "Policy-jailed filesystem and shell access for @warlock.js/ai agents, for coding and build-loop agents. Exports `workspace`, `makeEditFileTool`, `makeRunShellTool`, `makeRunTestsTool`, `createLocalBackend`, `createMockBackend`, `WorkspacePolicyError`. Use for: let an agent read, edit or write files, run shell commands or tests safely, sandbox an agent to a directory, build a coding agent that loops until tests pass, test file tools with a fake backend. Not this package: web, HTTP or MCP tools → @warlock.js/ai-tools; agents and custom tools → @warlock.js/ai; tracing runs → @warlock.js/ai-panoptic."
+description: 'Policy-confined file and shell tools for coding agents: `workspace`, `createLocalBackend`, `createMockBackend`, `makeEditFileTool`, `makeRunShellTool` and `WorkspacePolicyError`. Use for "let an agent edit files", "sandbox shell commands" or "loop until tests pass". Not this package → @warlock.js/ai-tools for MCP/web tools; @warlock.js/ai for agents; @warlock.js/ai-cli for installed coding CLIs.'
 ---
 
 # @warlock.js/ai-workspace

@@ -23,19 +23,25 @@ default pricing.
 
 <Tabs syncKey="pm">
   <TabItem label="npm">
+
     ```bash
     npm install @warlock.js/ai @warlock.js/ai-mistral
     ```
+
   </TabItem>
   <TabItem label="yarn">
+
     ```bash
     yarn add @warlock.js/ai @warlock.js/ai-mistral
     ```
+
   </TabItem>
   <TabItem label="pnpm">
+
     ```bash
     pnpm add @warlock.js/ai @warlock.js/ai-mistral
     ```
+
   </TabItem>
 </Tabs>
 
@@ -69,9 +75,9 @@ The headline `-latest` aliases are exported as `MISTRAL_MODELS`
 also accepts any version-pinned id (`mistral-large-2512`, `magistral-medium-2509`):
 
 ```ts
-mistral.model({ name: "mistral-large-latest" });    // multimodal flagship
+mistral.model({ name: "mistral-large-latest" }); // multimodal flagship
 mistral.model({ name: "magistral-medium-latest" }); // reasoning
-mistral.model({ name: "pixtral-large-latest" });    // vision
+mistral.model({ name: "pixtral-large-latest" }); // vision
 ```
 
 ## Use as an embedder
@@ -161,7 +167,7 @@ Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by
 the wrapped adapter (dispatch keys on `APIError.status + code`).
 
 For the full wire-level surface — it is identical here — see the
-[OpenAI provider](/v/v4/ai/providers/openai/) page and the `setup-mistral`
+[OpenAI provider](/v/v4/ai/providers/openai/) page and the `warlock-js-ai-mistral`
 skill.
 
 ## See also

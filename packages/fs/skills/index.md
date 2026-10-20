@@ -1,5 +1,5 @@
 ---
-description: 'Filesystem primitives for Warlock.js: sync and async file/dir operations with one canonical name each (`*Async` is async, bare name is sync). Exports `fs`, `File`, `Directory`, `getJsonFileAsync`, `putFileAsync`, `atomicWriteAsync`, `atomicWriteJsonAsync`, `ensureDirectoryAsync`, `copyDirectoryAsync`, `listFilesAsync`, `hashFileAsync`, `createConfinedReader`. Use for: "read a JSON file", "write a file without corrupting it on crash", "create a directory recursively", "hash a file", "list files in a folder", "read a user-chosen folder without following symlinks or escaping it". Not this package: uploads and storage drivers live in @warlock.js/core; config loading is a core concern.'
+description: 'Filesystem helpers with sync names and `Async` variants: `fs`, `File`, `Directory`, `getJsonFileAsync`, `atomicWriteAsync`, `hashFileAsync` and `createConfinedReader`. Use for "read JSON", "write atomically", "copy a directory", "hash a file" or "read a folder without escaping it". Not this package → @warlock.js/core for uploads/storage; @warlock.js/ai-workspace for agent file tools with policy enforcement.'
 ---
 
 # @warlock.js/fs

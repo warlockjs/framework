@@ -1,0 +1,236 @@
+{
+  "totalCharacters": 13325,
+  "skills": [
+    {
+      "package": "@warlock.js/access",
+      "slug": "warlock-js-access",
+      "source": "packages/access/skills/index.md",
+      "description": "Authorization with RBAC and ABAC: `can`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access` and `AccessResolver`. Use for \"check a permission\", \"only the owner can edit\", route policies, tenant roles or custom permission storage. Not this package → @warlock.js/auth for login, tokens and user-type guards; @warlock.js/seal for request validation.",
+      "characters": 363
+    },
+    {
+      "package": "@warlock.js/ai",
+      "slug": "warlock-js-ai",
+      "source": "packages/ai/skills/index.md",
+      "description": "Provider-neutral AI agents, tools, workflows, memory, RAG and multimodal calls. Exports `ai`, `humanApproval`, `guardrail`, `team`, `MockModel` and `countInputTokens`. Use for \"run an agent\", \"define a tool\", \"stream a response\", \"add approval\" or \"track token cost\". Not this package → @warlock.js/ai-tools for MCP and web tools; @warlock.js/ai-workspace for file/shell tools; @warlock.js/ai-openai for provider setup.",
+      "characters": 419
+    },
+    {
+      "package": "@warlock.js/ai-anthropic",
+      "slug": "warlock-js-ai-anthropic",
+      "source": "packages/ai-anthropic/skills/SKILL.md",
+      "description": "Anthropic Claude adapter for Warlock AI: `AnthropicSDK`, `AnthropicModel`, `AnthropicCallOptions` and `ANTHROPIC_MODEL_PRICING`. Use for \"connect Claude\", streaming, tools, thinking, caching, native search or context management through `sdk.model()`. Not this package → @warlock.js/ai for agents and custom tools; @warlock.js/ai-bedrock for Claude on AWS; @warlock.js/ai-cli for terminal agents.",
+      "characters": 395
+    },
+    {
+      "package": "@warlock.js/ai-bedrock",
+      "slug": "warlock-js-ai-bedrock",
+      "source": "packages/ai-bedrock/skills/SKILL.md",
+      "description": "Amazon Bedrock adapter for Warlock AI: `BedrockSDK`, `BedrockCallOptions`, `bedrockPricingFor` and regional pricing registries. Use for \"run Claude on AWS\", \"configure Bedrock credentials\", Converse streaming, tools, caching or Titan embeddings through `model()` and `embedder()`. Not this package → @warlock.js/ai-anthropic for direct Anthropic access; @warlock.js/ai for orchestration.",
+      "characters": 387
+    },
+    {
+      "package": "@warlock.js/ai-cli",
+      "slug": "warlock-js-ai-cli",
+      "source": "packages/ai-cli/skills/index.md",
+      "description": "Run installed coding-agent CLIs with `cli`, `createCliAgent`, `cliModel`, `CliAdapter` and `jsonLinesParser`. Use for \"run Claude Code or Codex\", \"resume a CLI session\", stream tool/usage events, configure permissions or write an adapter. Not this package → @warlock.js/ai for provider-neutral agents; @warlock.js/ai-workspace for embedded file/shell tools; @warlock.js/process for general child processes.",
+      "characters": 406
+    },
+    {
+      "package": "@warlock.js/ai-deepseek",
+      "slug": "warlock-js-ai-deepseek",
+      "source": "packages/ai-deepseek/skills/SKILL.md",
+      "description": "DeepSeek adapter for Warlock AI: `DeepSeekSDK`, `DEEPSEEK_CHAT_MODELS`, `DEEPSEEK_DEFAULT_PRICING` and `DEEPSEEK_OFF_PEAK_PRICING`. Use for \"connect DeepSeek\", reasoning, streaming, tools, capability inference or per-model pricing through `sdk.model()`. Not this package → @warlock.js/ai for agents, tools and workflows; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.",
+      "characters": 383
+    },
+    {
+      "package": "@warlock.js/ai-google",
+      "slug": "warlock-js-ai-google",
+      "source": "packages/ai-google/skills/SKILL.md",
+      "description": "Google Gemini and Imagen adapter for Warlock AI: `GoogleSDK`, `GeminiImageModel`, `GoogleImageModel`, `GoogleCallOptions` and `GOOGLE_MODEL_PRICING`. Use for \"connect Gemini\", thinking, streaming, tools, embeddings, images or grounded search through `model()`, `embedder()` and `image()`. Not this package → @warlock.js/ai for orchestration; @warlock.js/ai-live for video and realtime sessions.",
+      "characters": 394
+    },
+    {
+      "package": "@warlock.js/ai-groq",
+      "slug": "warlock-js-ai-groq",
+      "source": "packages/ai-groq/skills/SKILL.md",
+      "description": "Groq adapter for Warlock AI: `GroqSDK`, `GROQ_KNOWN_MODELS`, `GROQ_DEFAULT_PRICING`, `inferVisionCapability` and `inferReasoningCapability`. Use for \"connect Groq\", fast chat, streaming, tools, model capabilities or pricing overrides through `sdk.model()`. Not this package → @warlock.js/ai for agents and custom tools; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.",
+      "characters": 382
+    },
+    {
+      "package": "@warlock.js/ai-live",
+      "slug": "warlock-js-ai-live",
+      "source": "packages/ai-live/skills/SKILL.md",
+      "description": "Video generation and realtime voice sessions for Warlock AI. Importing this package mounts `ai.video` and `ai.realtime`; exports `video`, `realtime`, `VideoModelContract`, `RealtimeTransport`, `MockVideoModel` and `MockRealtimeTransport`. Use for \"generate a video\", \"duplex voice\", audio events or per-second costs. Not this package → @warlock.js/ai for chat, still images, speech and one-shot transcription.",
+      "characters": 409
+    },
+    {
+      "package": "@warlock.js/ai-mistral",
+      "slug": "warlock-js-ai-mistral",
+      "source": "packages/ai-mistral/skills/SKILL.md",
+      "description": "Mistral adapter for Warlock AI: `MistralSDK`, `MISTRAL_MODELS`, `MISTRAL_DEFAULT_PRICING`, `inferVisionCapability` and `inferReasoningCapability`. Use for \"connect Mistral\", streaming, tools, vision, reasoning, capability inference or pricing overrides through `sdk.model()`. Not this package → @warlock.js/ai for agents and workflows; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.",
+      "characters": 398
+    },
+    {
+      "package": "@warlock.js/ai-ollama",
+      "slug": "warlock-js-ai-ollama",
+      "source": "packages/ai-ollama/skills/SKILL.md",
+      "description": "Local Ollama models for Warlock AI: `OllamaSDK`, `OllamaCallOptions`, `OllamaModelConfig` and `OllamaEmbedderConfig`. Use for \"run a local LLM\", \"connect Ollama\", pull model tags, stream chat, use tools, configure thinking or generate embeddings through `model()` and `embedder()`. Not this package → @warlock.js/ai for agents and RAG; @warlock.js/ai-openai for hosted OpenAI-compatible servers.",
+      "characters": 395
+    },
+    {
+      "package": "@warlock.js/ai-openai",
+      "slug": "warlock-js-ai-openai",
+      "source": "packages/ai-openai/skills/SKILL.md",
+      "description": "OpenAI and compatible endpoints for Warlock AI: `OpenAISDK`, `OpenAIEmbedder`, `OpenAIImageModel`, `kimiSearchTool`, `kimiFetchTool` and pricing registries. Use for \"connect OpenAI\", Responses or Chat Completions, reasoning, caching, embeddings, images, speech, transcription or Kimi search. Not this package → @warlock.js/ai for agents; @warlock.js/ai-anthropic for Claude; @warlock.js/ai-ollama for local Ollama.",
+      "characters": 414
+    },
+    {
+      "package": "@warlock.js/ai-panoptic",
+      "slug": "warlock-js-ai-panoptic",
+      "source": "packages/ai-panoptic/skills/index.md",
+      "description": "AI tracing, usage, cost analysis and dashboards: `panoptic`, `createCollector`, `createInMemoryTraceStore`, `consoleExporter`, `otelExporter`, `langfuseExporter` and `dashboard`. Use for \"trace an agent run\", \"compare prompt costs\", \"export spans\" or \"inspect the AI dashboard\". Not this package → @warlock.js/ai for running agents and evals; @warlock.js/logger for logs; @warlock.js/devtools for HTTP debugging.",
+      "characters": 412
+    },
+    {
+      "package": "@warlock.js/ai-tools",
+      "slug": "warlock-js-ai-tools",
+      "source": "packages/ai-tools/skills/index.md",
+      "description": "Ready-made AI tools and MCP client/server support: `mcp`, `serve`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool` and `dateTimeTool`; also mounts `ai.mcp` and `ai.tools`. Use for \"connect an MCP server\", \"serve tools over MCP\", \"search the web\" or \"fetch a URL\". Not this package → @warlock.js/ai for custom tools and agents; @warlock.js/ai-workspace for filesystem and shell tools.",
+      "characters": 404
+    },
+    {
+      "package": "@warlock.js/ai-workspace",
+      "slug": "warlock-js-ai-workspace",
+      "source": "packages/ai-workspace/skills/index.md",
+      "description": "Policy-confined file and shell tools for coding agents: `workspace`, `createLocalBackend`, `createMockBackend`, `makeEditFileTool`, `makeRunShellTool` and `WorkspacePolicyError`. Use for \"let an agent edit files\", \"sandbox shell commands\" or \"loop until tests pass\". Not this package → @warlock.js/ai-tools for MCP/web tools; @warlock.js/ai for agents; @warlock.js/ai-cli for installed coding CLIs.",
+      "characters": 398
+    },
+    {
+      "package": "@warlock.js/ai-xai",
+      "slug": "warlock-js-ai-xai",
+      "source": "packages/ai-xai/skills/SKILL.md",
+      "description": "xAI Grok adapter for Warlock AI: `XaiSDK`, `XAI_CHAT_MODELS`, `inferVisionCapability`, `inferReasoningCapability` and `XaiModelConfig`. Use for \"connect Grok\", streaming, tools, vision, reasoning, model capabilities or pricing overrides through `sdk.model()`. Not this package → @warlock.js/ai for agents, tools and workflows; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.",
+      "characters": 389
+    },
+    {
+      "package": "@warlock.js/auth",
+      "slug": "warlock-js-auth",
+      "source": "packages/auth/skills/index.md",
+      "description": "JWT authentication, refresh rotation, sessions, OTP and passkeys for Warlock apps. Exports `Auth`, `authService`, `authMiddleware`, `currentUser` and `GoogleProvider`. Use for \"log in\", \"protect a route\", \"reset a password\", \"sign in with Google\" or multiple user types. Not this package → @warlock.js/access for roles and permission policies; @warlock.js/core for general middleware; @warlock.js/seal for input rules.",
+      "characters": 418
+    },
+    {
+      "package": "@warlock.js/cache",
+      "slug": "warlock-js-cache",
+      "source": "packages/cache/skills/index.md",
+      "description": "Pluggable memory, LRU, file, Redis and Postgres caching: `cache`, `cached`, `CacheManager`, `TaggedCache`, `ScopedCache` and `MockCacheDriver`. Use for \"cache this query\", \"invalidate a tenant\", \"stale-while-revalidate\", \"take a lock\", tag invalidation or counters. Not this package → @warlock.js/core for HTTP response caching; @warlock.js/web for page caching; @warlock.js/cascade for persistent models.",
+      "characters": 405
+    },
+    {
+      "package": "@warlock.js/cascade",
+      "slug": "warlock-js-cascade",
+      "source": "packages/cascade/skills/index.md",
+      "description": "Database models and query builders for MongoDB and SQL: `Model`, `DataSource`, `defineModel`, `registerModel`, `afterCommit` and `modelSync`. Use for \"query a table\", \"define a relation\", \"write a migration\", \"run a transaction\", eager loading or model events. Not this package → @warlock.js/seal for structural validation; @warlock.js/core for HTTP handlers and repositories; @warlock.js/cache for transient data.",
+      "characters": 414
+    },
+    {
+      "package": "@warlock.js/context",
+      "slug": "warlock-js-context",
+      "source": "packages/context/skills/index.md",
+      "description": "Typed async context propagation with `Context` and `ContextManager`, built on AsyncLocalStorage. Use for \"avoid passing the tenant everywhere\", request-scoped users, trace IDs, `run`, `enter`, `get`, `set` or coordinating several contexts. Not this package → @warlock.js/core for the framework request context; @warlock.js/cache for state shared across requests; @warlock.js/cascade for database transactions.",
+      "characters": 409
+    },
+    {
+      "package": "@warlock.js/core",
+      "slug": "warlock-js-core",
+      "source": "packages/core/skills/index.md",
+      "description": "Warlock application runtime: `router`, `Request`, `Response`, `config`, `env`, `sendMail` and `defineConfig`. Use for \"add an API route\", controllers, middleware, CLI commands, config, uploads, mail, sockets, OpenAPI, testing or upgrades. Not this package → @warlock.js/web for React SSR pages; @warlock.js/cascade for database queries; @warlock.js/seal for standalone schemas; @warlock.js/auth for login.",
+      "characters": 405
+    },
+    {
+      "package": "create-warlock",
+      "slug": "create-warlock",
+      "source": "packages/create-warlock/skills/SKILL.md",
+      "description": "Scaffold Warlock apps with `npm create warlock@latest` or `npx create-warlock`; the CLI entry exports `parseFlags`, `packageVersion` and default `createApp`. Use for \"create a project\", \"start a backend or SSR app\", choose a database, AI adapters, features or linting, and automate setup with `--yes` and `--pm=npm`. Not this package → @warlock.js/core for extending an existing app; @warlock.js/web for page APIs.",
+      "characters": 414
+    },
+    {
+      "package": "@warlock.js/devtools",
+      "slug": "warlock-js-devtools",
+      "source": "packages/devtools/skills/SKILL.md",
+      "description": "Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for \"debug a slow endpoint\", \"inspect this request\", \"view captured mail\" or \"open devtools\". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.",
+      "characters": 420
+    },
+    {
+      "package": "@warlock.js/fs",
+      "slug": "warlock-js-fs",
+      "source": "packages/fs/skills/index.md",
+      "description": "Filesystem helpers with sync names and `Async` variants: `fs`, `File`, `Directory`, `getJsonFileAsync`, `atomicWriteAsync`, `hashFileAsync` and `createConfinedReader`. Use for \"read JSON\", \"write atomically\", \"copy a directory\", \"hash a file\" or \"read a folder without escaping it\". Not this package → @warlock.js/core for uploads/storage; @warlock.js/ai-workspace for agent file tools with policy enforcement.",
+      "characters": 410
+    },
+    {
+      "package": "@warlock.js/herald",
+      "slug": "warlock-js-herald",
+      "source": "packages/herald/skills/index.md",
+      "description": "Broker messaging over RabbitMQ: `connectToBroker`, `herald`, `heraldChannel`, `defineEvent`, `defineConsumer`, `EventMessage` and `EventConsumer`. Use for \"publish an event\", \"subscribe to a channel\", \"ack or nack\", \"request and reply\" or cross-service pub/sub. Not this package → @warlock.js/queue for durable retried background jobs; @warlock.js/scheduler for cron; @warlock.js/notifications for user notifications.",
+      "characters": 417
+    },
+    {
+      "package": "@warlock.js/logger",
+      "slug": "warlock-js-logger",
+      "source": "packages/logger/skills/index.md",
+      "description": "Structured logging with channels, filtering, redaction and shutdown flushing: `log`, `Logger`, `LogChannel`, `ConsoleLog`, `JSONFileLog`, `SentryLog` and `applyRedact`. Use for \"log an error with context\", \"hide tokens\", \"write JSON logs\", \"send errors to Sentry\" or \"flush before exit\". Not this package → @warlock.js/core for HTTP error responses; @warlock.js/ai-panoptic for agent traces and AI cost dashboards.",
+      "characters": 414
+    },
+    {
+      "package": "@warlock.js/notifications",
+      "slug": "warlock-js-notifications",
+      "source": "packages/notifications/skills/index.md",
+      "description": "Define once and notify through mail, in-app or custom channels: `defineNotification`, `notify`, `defineChannel`, `mailChannel`, `inApp`, `bullmqQueue` and `heraldQueue`. Use for \"notify a user\", \"show unread notifications\", \"add a webhook channel\" or \"queue notification delivery\". Not this package → @warlock.js/core for plain email and templates; @warlock.js/queue for jobs; @warlock.js/herald for broker messaging.",
+      "characters": 417
+    },
+    {
+      "package": "@warlock.js/process",
+      "slug": "warlock-js-process",
+      "source": "packages/process/skills/SKILL.md",
+      "description": "Supervise owned child processes with `supervisor`, `ProcessNotOwnedError` and `UnsupportedProcessPlatformError`. Use for \"start and stop a process\", readiness checks, restart backoff, line-buffered output, IPC, graceful shutdown, pipelines or optional PTY sessions. Not this package → @warlock.js/queue for background jobs; @warlock.js/scheduler for cron; @warlock.js/ai-cli for coding-agent CLI adapters.",
+      "characters": 405
+    },
+    {
+      "package": "@warlock.js/queue",
+      "slug": "warlock-js-queue",
+      "source": "packages/queue/skills/index.md",
+      "description": "Background jobs with BullMQ/Redis, local SQLite or memory: `defineJob`, `queueConnector`, `startWorkers`, `closeQueue`, `failedJobs` and `mountQueueDashboard`. Use for \"run in the background\", \"retry a job\", \"delay work\", \"survive restarts\" or \"view the job dashboard\". Not this package → @warlock.js/scheduler for recurring schedules; @warlock.js/herald for pub/sub; @warlock.js/core for the in-memory `Queue` batcher.",
+      "characters": 419
+    },
+    {
+      "package": "@warlock.js/scheduler",
+      "slug": "warlock-js-scheduler",
+      "source": "packages/scheduler/skills/index.md",
+      "description": "In-process cron and fluent scheduling: `Scheduler`, `scheduler`, `Job`, `job`, `CronParser` and `parseCron`. Use for \"run every day at 3am\", \"schedule weekdays\", \"retry a failing job\", \"prevent overlap\", choose a timezone or observe job failures. Not this package → @warlock.js/queue for durable background workers; @warlock.js/cache for locks across instances; @warlock.js/herald for broker messaging.",
+      "characters": 402
+    },
+    {
+      "package": "@warlock.js/seal",
+      "slug": "warlock-js-seal",
+      "source": "packages/seal/skills/index.md",
+      "description": "Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator` and `Infer`. Use for \"validate a request body\", \"require an email\", optional fields and defaults, schema type inference, custom rules, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.",
+      "characters": 393
+    },
+    {
+      "package": "@warlock.js/sitemap",
+      "slug": "warlock-js-sitemap",
+      "source": "packages/sitemap/skills/SKILL.md",
+      "description": "Framework-independent XML sitemap builders: `Sitemap`, `SitemapIndex`, `buildSitemapXml`, `joinOrigin` and `SitemapEntry`. Use for \"generate sitemap XML\", URL metadata, hreflang, image entries, sharding, duplicate diagnostics or atomic publication from scripts and servers. Not this package → @warlock.js/web for Warlock page discovery, `/sitemap.xml` and robots routing; @warlock.js/core for app configuration.",
+      "characters": 411
+    },
+    {
+      "package": "@warlock.js/web",
+      "slug": "warlock-js-web",
+      "source": "packages/web/skills/index.md",
+      "description": "React SSR pages with Vite: `Link`, `href`, `defer`, `shared`, `useShared`, `Form`, `Head`, `Image`, `useTrans` and `navigateTo`. Use for \"add a page\", \"load page data\", stream loaders, layouts, forms/actions, sessions, themes, localization, metadata or sitemaps. Not this package → @warlock.js/core for API routes, mail and storage; @warlock.js/cascade for queries; @warlock.js/seal for input validation.",
+      "characters": 404
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 ---
-description: 'JWT authentication for Warlock apps: login/logout, refresh-token rotation, protected routes, multiple user types. Exports `Auth`, `authService`, `authMiddleware`, `authEvents`, `currentUser`, `loginThrottleMiddleware`, `requireVerifiedEmail`, `GoogleProvider`, `AuthErrorCodes`. Use for: "log a user in and issue tokens", "protect this route", "add an admin user type", "rate-limit login attempts", "verify email / reset password", "sign in with Google". Not this package: general route middleware lives in @warlock.js/core; request-body validation is @warlock.js/seal.'
+description: 'JWT authentication, refresh rotation, sessions, OTP and passkeys for Warlock apps. Exports `Auth`, `authService`, `authMiddleware`, `currentUser` and `GoogleProvider`. Use for "log in", "protect a route", "reset a password", "sign in with Google" or multiple user types. Not this package → @warlock.js/access for roles and permission policies; @warlock.js/core for general middleware; @warlock.js/seal for input rules.'
 ---
 
 # @warlock.js/auth

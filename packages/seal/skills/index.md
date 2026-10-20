@@ -1,5 +1,5 @@
 ---
-description: 'Type-safe, framework-agnostic validation for Warlock.js: schemas, coercion, modifiers, JSON Schema, Standard Schema. Exports `v`, `validate`, `ObjectValidator`, `StringValidator`, `Infer`, reached as `v.object`, `v.string`, `v.array`, `v.enum`, `v.union`. Use for: "validate this request body", "require an email and a min-length password", "infer the TypeScript type from a schema", "make a field optional or give it a default", "generate JSON Schema", "write a custom rule". Not this package: database rules and file validators live in @warlock.js/core; model schemas and persistence are @warlock.js/cascade.'
+description: 'Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator` and `Infer`. Use for "validate a request body", "require an email", optional fields and defaults, schema type inference, custom rules, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.'
 ---
 
 # @warlock.js/seal

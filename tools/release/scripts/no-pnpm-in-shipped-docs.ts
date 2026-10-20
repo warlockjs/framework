@@ -114,12 +114,6 @@ export const ALLOWLIST: ReadonlyArray<{ relPath: string; text: string; reason: s
       "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation.",
   },
   {
-    relPath: "create-warlock/skills/create-a-warlock-project/SKILL.md",
-    text: "With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script",
-    reason:
-      "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation.",
-  },
-  {
     relPath: "seal/skills/bridge-standard-schema/SKILL.md",
     text: "From `packages/seal`, run `pnpm bench:types --check` after changes to inference or",
     reason:

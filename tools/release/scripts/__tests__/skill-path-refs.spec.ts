@@ -4,7 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
-import { findSkillPathRefs, runSkillLayoutGate, runSkillPathRefsGate } from "../skill-path-refs.ts";
+import {
+  findSkillPathRefs,
+  readSkillDescription,
+  runSkillLayoutGate,
+  runSkillPackageGate,
+  runSkillPathRefsGate,
+} from "../skill-path-refs.ts";
 
 describe("findSkillPathRefs", () => {
   it("flags a relative sibling link", () => {
@@ -37,6 +43,122 @@ describe("findSkillPathRefs", () => {
   it("reports 1-based lines with CRLF input", () => {
     const refs = findSkillPathRefs("seal/skills/a/SKILL.md", "one\r\ntwo\r\nsee x/SKILL.md\r\n");
     assert.equal(refs[0]?.line, 3);
+  });
+});
+
+describe("one exported package skill and description budget", () => {
+  const skill = (description = "Package purpose, APIs and routing guidance") =>
+    `---\nname: warlock-js-sample\ndescription: ${JSON.stringify(description)}\n---\n\nInstructions.\n`;
+
+  it("accepts root skills with sibling assets and complete grouped packages", () => {
+    withSkills(
+      {
+        "single/skills/SKILL.md": skill("x".repeat(450)),
+        "single/skills/reference.md": "A root skill asset.",
+        "single/skills/assets/example.txt": "Nested asset.",
+        "grouped/skills/index.md": `${skill()}\nRead first-task.md and second-task.md.\n`,
+        "grouped/skills/first-task/SKILL.md": skill(),
+        "grouped/skills/second-task/SKILL.md": skill(),
+        "grouped/skills/first-task/reference.md": "A topic asset.",
+      },
+      (root) => {
+        assert.deepEqual(runSkillPackageGate(root), []);
+        assert.deepEqual(runSkillLayoutGate(root), []);
+        assert.deepEqual(runSkillPathRefsGate(root), []);
+      },
+    );
+  });
+
+  for (const body of [
+    "No metadata",
+    "---\nname: example\n---\n",
+    skill(""),
+    skill("   "),
+    "---\ndescription: null\n---\n",
+  ]) {
+    it(`rejects missing or empty package descriptions: ${JSON.stringify(body)}`, () => {
+      withSkills({ "sample/skills/SKILL.md": body }, (root) => {
+        assert.equal(runSkillPackageGate(root)[0]?.type, "missing-description");
+      });
+    });
+  }
+
+  it("rejects descriptions over 450 decoded characters on root and grouped skills", () => {
+    withSkills(
+      {
+        "single/skills/SKILL.md": skill("x".repeat(451)),
+        "grouped/skills/index.md": skill("x".repeat(451)),
+        "grouped/skills/a/SKILL.md": skill(),
+        "grouped/skills/b/SKILL.md": skill(),
+      },
+      (root) => {
+        const issues = runSkillPackageGate(root);
+        assert.deepEqual(
+          issues.map(({ type }) => type),
+          ["description-too-long", "description-too-long"],
+        );
+        assert.match(issues[0]?.message ?? "", /451 characters/);
+        assert.equal(issues[0]?.relPath, "grouped/skills/index.md");
+      },
+    );
+  });
+
+  it("rejects a published package with no skill, but skips private packages", () => {
+    withSkills(
+      {
+        "sample/package.json": '{"name":"@warlock.js/sample"}',
+        "private/package.json": '{"name":"internal-tool","private":true}',
+      },
+      (root) => {
+        assert.deepEqual(
+          runSkillPackageGate(root).map(({ type }) => type),
+          ["invalid-layout", "missing-description"],
+        );
+      },
+    );
+  });
+
+  for (const files of [
+    { "a/SKILL.md": skill() },
+    { "a/SKILL.md": skill(), "b/SKILL.md": skill() },
+    { "SKILL.md": skill(), "a/SKILL.md": skill() },
+    { "SKILL.md": skill(), "index.md": skill() },
+    { "index.md": skill(), "a/SKILL.md": skill() },
+    { "index.md": skill() },
+    { "SKILL.md": skill(), "assets/nested/SKILL.md": skill() },
+    { "index.md": skill(), "a/SKILL.md": skill(), "nested/b/SKILL.md": skill() },
+  ]) {
+    it(`rejects invalid export layout: ${Object.keys(files).join(", ")}`, () => {
+      withSkills(
+        Object.fromEntries(
+          Object.entries(files).map(([file, text]) => [`sample/skills/${file}`, text]),
+        ),
+        (root) => {
+          assert.equal(runSkillPackageGate(root)[0]?.type, "invalid-layout");
+        },
+      );
+    });
+  }
+
+  it("the layout guard rejects a root skill mixed with topics or an index", () => {
+    for (const file of ["a/SKILL.md", "index.md"]) {
+      withSkills(
+        { "sample/skills/SKILL.md": skill(), [`sample/skills/${file}`]: skill() },
+        (root) => {
+          assert.equal(runSkillLayoutGate(root)[0]?.type, "invalid-layout");
+        },
+      );
+    }
+  });
+
+  it("measures decoded quotes and handles CRLF, single quotes and unsupported YAML", () => {
+    assert.equal(readSkillDescription(skill('Say "hello"').replace(/\n/g, "\r\n")), 'Say "hello"');
+    assert.equal(
+      readSkillDescription("---\ndescription: 'It''s a package'\n---\n"),
+      "It's a package",
+    );
+    assert.equal(readSkillDescription("---\ndescription: >\n  Long text\n---\n"), undefined);
+    assert.equal(readSkillDescription('---\ndescription: "broken\n---\n'), undefined);
   });
 });
 

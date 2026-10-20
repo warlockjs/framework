@@ -118,10 +118,7 @@ test("wire-response and locale snippets are parseable JSON", async () => {
 });
 
 test("provider options remain prose and repaired documents have no empty trailing code blocks", async () => {
-  const xai = await readFile(
-    join(workspaceRoot, "packages/ai-xai/skills/setup-xai/SKILL.md"),
-    "utf8",
-  );
+  const xai = await readFile(join(workspaceRoot, "packages/ai-xai/skills/SKILL.md"), "utf8");
   const prose = xai.replace(/^```[^\n]*\n[\s\S]*?^```[ \t]*$/gm, "");
   assert.match(prose, /^## Provider body options and token estimates$/m);
   assert.match(prose, /Models from this adapter have no native/);

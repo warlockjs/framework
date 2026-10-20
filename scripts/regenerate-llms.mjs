@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+/** Project root skills and grouped indexes/topics through each package generator. */
 export function regenerateLlms(packagesRoot, run = spawnSync) {
   const generated = [];
   for (const entry of readdirSync(packagesRoot, { withFileTypes: true }).sort((a, b) =>

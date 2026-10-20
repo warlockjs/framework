@@ -28,7 +28,7 @@ have it.
   `X-Forwarded-For` can't unlock it.
 - Everything lives in memory, and nothing is written to disk.
 
-Full guide: [`skills/devtools-overview/SKILL.md`](skills/devtools-overview/SKILL.md).
+Full guide: [`skills/SKILL.md`](skills/SKILL.md).
 
 ## License
 

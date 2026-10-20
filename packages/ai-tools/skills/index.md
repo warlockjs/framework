@@ -1,5 +1,5 @@
 ---
-description: "Ready-made tools for @warlock.js/ai agents: web search, URL fetch, HTTP requests, calculator, date-time, and MCP client and server support. Exports `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `mcp`, `serve`, `createServeHandler`, `McpTransportError`, `McpServeError`. Use for: let an agent search the web, fetch a page, call an HTTP API, do math, get the current date, connect to an MCP server, expose my tools as an MCP server over stdio or authenticated HTTP. Not this package: defining your own tool or the agent itself → @warlock.js/ai; file and shell tools → @warlock.js/ai-workspace."
+description: 'Ready-made AI tools and MCP client/server support: `mcp`, `serve`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool` and `dateTimeTool`; also mounts `ai.mcp` and `ai.tools`. Use for "connect an MCP server", "serve tools over MCP", "search the web" or "fetch a URL". Not this package → @warlock.js/ai for custom tools and agents; @warlock.js/ai-workspace for filesystem and shell tools.'
 ---
 
 # @warlock.js/ai-tools

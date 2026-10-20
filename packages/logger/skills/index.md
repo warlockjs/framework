@@ -1,5 +1,5 @@
 ---
-description: 'Structured logging for Warlock.js with pluggable channels, redaction and shutdown flushing. Exports `log`, `Logger`, `LogChannel`, `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `applyRedact`, `DEFAULT_REDACT_KEYS`, `captureAnyUnhandledRejection`. Use for: "log an error with context", "write logs to a file as JSON", "send errors to Sentry", "hide passwords and tokens in logs", "flush logs before exit", "catch unhandled rejections", "write my own log channel". Not this package: HTTP request handling and error responses live in @warlock.js/core; scheduled jobs are @warlock.js/scheduler.'
+description: 'Structured logging with channels, filtering, redaction and shutdown flushing: `log`, `Logger`, `LogChannel`, `ConsoleLog`, `JSONFileLog`, `SentryLog` and `applyRedact`. Use for "log an error with context", "hide tokens", "write JSON logs", "send errors to Sentry" or "flush before exit". Not this package → @warlock.js/core for HTTP error responses; @warlock.js/ai-panoptic for agent traces and AI cost dashboards.'
 ---
 
 # @warlock.js/logger

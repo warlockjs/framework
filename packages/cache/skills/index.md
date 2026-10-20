@@ -1,5 +1,5 @@
 ---
-description: 'Cache layer for Warlock apps with pluggable drivers (memory, LRU, file, Redis, Postgres). Exports `cache`, `CacheManager`, `cached`, `TaggedCache`, `ScopedCache`, `RedisCacheDriver`, `MemoryCacheDriver`, `MockCacheDriver`, `PgCacheDriver`. Use for: "cache this query for 5 minutes", "invalidate every key for tenant 42", "stale-while-revalidate", "take a lock so only one worker runs this", "tag keys and flush the tag", "increment a counter in cache". Not this package: HTTP response/page caching belongs to @warlock.js/core or web; persistent data is a @warlock.js/cascade model.'
+description: 'Pluggable memory, LRU, file, Redis and Postgres caching: `cache`, `cached`, `CacheManager`, `TaggedCache`, `ScopedCache` and `MockCacheDriver`. Use for "cache this query", "invalidate a tenant", "stale-while-revalidate", "take a lock", tag invalidation or counters. Not this package → @warlock.js/core for HTTP response caching; @warlock.js/web for page caching; @warlock.js/cascade for persistent models.'
 ---
 
 # @warlock.js/cache

@@ -1,5 +1,5 @@
 ---
-description: "Observability for @warlock.js/ai: turns agent, workflow and team run reports into traces and ships them to OpenTelemetry, Langfuse, file, console or a local dashboard. Exports `panoptic`, `createCollector`, `createInMemoryTraceStore`, `otelExporter`, `langfuseExporter`, `consoleExporter`, `fileExporter`, `dashboard`. Use for: trace an agent run, see token cost and latency per span, send traces to Langfuse or OTel, query past traces, open a local trace viewer, evaluate a system prompt. Not this package: plain logging → @warlock.js/logger; building agents → @warlock.js/ai; provider adapters → ai-<provider> packages."
+description: 'AI tracing, usage, cost analysis and dashboards: `panoptic`, `createCollector`, `createInMemoryTraceStore`, `consoleExporter`, `otelExporter`, `langfuseExporter` and `dashboard`. Use for "trace an agent run", "compare prompt costs", "export spans" or "inspect the AI dashboard". Not this package → @warlock.js/ai for running agents and evals; @warlock.js/logger for logs; @warlock.js/devtools for HTTP debugging.'
 ---
 
 # @warlock.js/ai-panoptic
