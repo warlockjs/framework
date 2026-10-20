@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Strengthen the web code standards skill with single-responsibility components, Mongez React Form validation, accessible custom controls, and explicit UI kit selection; consolidate setup-file guidance and correct typed-route advice.
 - The agent skill now exports as `create-warlock`; package discovery descriptions stay within 450 characters.
 
 ## 5.34.1 - 2026-10-19
