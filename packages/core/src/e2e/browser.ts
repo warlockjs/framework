@@ -7,6 +7,9 @@ import { isolatedEnvironment } from "./fixture";
 import { OwnedProcess } from "./owned-process";
 import type { BrowserOptions, E2EEvidence } from "./types";
 
+/** Default wait for the browser's DevTools endpoint; first launches can be slow. */
+const DEFAULT_STARTUP_TIMEOUT_MS = 30_000;
+
 export function browserCandidates(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string[] {
   const names =
     platform === "win32"
@@ -105,7 +108,7 @@ export class OwnedBrowser {
         this.process = owned;
       },
     );
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + (options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS);
     let reason = "DevToolsActivePort is not ready";
     while (Date.now() < deadline) {
       signal?.throwIfAborted();

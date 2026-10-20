@@ -7025,6 +7025,7 @@ port-file handshake above when the app supports binding `0` itself.
   document. Selector helpers do not enter frames or closed shadow roots.
 
 Use `--browser /path/to/chrome` or `WARLOCK_E2E_BROWSER` if discovery fails.
+Set `browser.startupTimeoutMs` (default 30 seconds) when the browser is slow to start, for example on shared CI runners.
 `browser: { args: ["--no-sandbox"] }` is an explicit option for controlled root
 containers; it is not a default. On Windows, command arrays should invoke JS tools
 through `process.execPath`, avoiding `.cmd` executables that require a shell.

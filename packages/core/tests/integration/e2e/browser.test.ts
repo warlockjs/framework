@@ -37,7 +37,12 @@ app.listen(0,'127.0.0.1',()=>writeFileSync(process.env.WARLOCK_E2E_PORT_FILE,Str
 }
 // Chromium's root-container override is explicit, never a harness default.
 // https://chromium.googlesource.com/chromium/src/+/main/sandbox/policy/switches.cc
-const browser = { binary, args: process.getuid?.() === 0 ? ["--no-sandbox"] : [] };
+const browser = {
+  binary,
+  args: process.getuid?.() === 0 ? ["--no-sandbox"] : [],
+  // Shared CI runners can be slow to bring up a fresh profile.
+  startupTimeoutMs: 60_000,
+};
 
 test(
   "runs a real owned browser flow, captures both widths and verifies cleanup" + missing,

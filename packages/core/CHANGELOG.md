@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `warlock e2e` waits up to `browser.startupTimeoutMs` (new option, default 30 seconds instead of a fixed 15) for the browser's DevTools endpoint, so a slow first launch on a busy machine no longer fails the run.
 - `ResponseStatus` includes 413 (`CONTENT_TOO_LARGE`) and 422 (`UNPROCESSABLE_ENTITY`), the statuses `response.contentTooLarge()` and `response.unprocessableEntity()` send, so `responseSchema` can declare them.
 - Type Fastify error-response hook and test handler parameters explicitly, and align upgrade fixture expectations with the enabled explicit-any, brace and console rules.
 

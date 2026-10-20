@@ -41,6 +41,12 @@ export type BrowserOptions = {
   binary?: string;
   /** Additional Chrome flags, e.g. --no-sandbox in a controlled root container. */
   args?: string[];
+  /**
+   * How long to wait for the browser to report its DevTools endpoint.
+   * A first launch with a fresh profile on a busy machine can be slow.
+   * @default 30_000
+   */
+  startupTimeoutMs?: number;
 };
 export type NetworkFailure = {
   at: string;

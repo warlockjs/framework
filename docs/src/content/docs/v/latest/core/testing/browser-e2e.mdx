@@ -202,7 +202,7 @@ npx warlock e2e --out ./artifacts/browser --path ./test-bin,./engine-bin
 Browser selection is `--browser`, `spec.browser.binary`, `WARLOCK_E2E_BROWSER`,
 then executable discovery on PATH and standard Chrome/Edge installation paths for
 Linux, macOS and Windows. A bad explicit override fails rather than falling back.
-Each launch uses headless mode, an OS-selected debugging port and a fresh profile.
+Each launch uses headless mode, an OS-selected debugging port and a fresh profile. The harness waits up to `spec.browser.startupTimeoutMs` (default 30 seconds) for the browser to report its DevTools endpoint; raise it on slow shared CI runners.
 CDP uses [Node 22.15's built-in WebSocket](https://nodejs.org/download/release/v22.15.0/docs/api/globals.html#websocket).
 Protocol shapes are checked against the [official CDP definitions](https://chromedevtools.github.io/devtools-protocol/);
 source comments link every method/event.
