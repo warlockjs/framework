@@ -1,6 +1,6 @@
 ﻿# Changelog — release tooling
 
-## 5.34.3
+## 5.34.3 - 2026-10-20
 
 ### Changed
 
