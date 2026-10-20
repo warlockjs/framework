@@ -1,5 +1,5 @@
 ---
-description: 'Database models and query builders for MongoDB and SQL: `Model`, `DataSource`, `defineModel`, `registerModel`, `afterCommit` and `modelSync`. Use for "query a table", "define a relation", "write a migration", "run a transaction", eager loading or model events. Not this package → @warlock.js/seal for structural validation; @warlock.js/core for HTTP handlers and repositories; @warlock.js/cache for transient data.'
+description: 'Database models and query builders for MongoDB and SQL: `Model`, `DataSource`, `defineModel`, `RegisterModel`, `afterCommit` and `modelSync`. Use for "query a table", "define a relation", "write a migration", "run a transaction", eager loading or model events. Not this package → @warlock.js/seal for structural validation; @warlock.js/core for HTTP handlers and repositories; @warlock.js/cache for transient data.'
 ---
 
 # @warlock.js/cascade
