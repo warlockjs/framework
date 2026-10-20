@@ -4,24 +4,11 @@
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-bedrock/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## Package orientation
+## ai-bedrock  `@warlock.js/ai-bedrock/skills/SKILL.md`
 
 ---
-description: "Provider adapter for AWS Bedrock Converse API and Titan embeddings in Warlock AI applications. Exports `BedrockSDK` with model and provider configuration for the shared AI contracts. Use when connecting this provider, configuring region, the AWS credential chain, model capabilities and embeddings, or diagnosing provider requests and usage. Read `setup-bedrock` for construction and examples using AWS credentials. Not this package: agent loops, tools and workflows → @warlock.js/ai; HTTP and MCP tools → @warlock.js/ai-tools."
----
-
-# @warlock.js/ai-bedrock
-
-This adapter supplies provider-backed models for `@warlock.js/ai`. Read `setup-bedrock.md` to construct `BedrockSDK`, configure region, the AWS credential chain, model capabilities and embeddings, and understand provider-specific behavior.
-
-For agent composition, read the `run-ai-agent` topic of the `@warlock.js/ai` package. Keep provider configuration here and application orchestration in that package.
-
-
-## setup-bedrock  `@warlock.js/ai-bedrock/setup-bedrock/SKILL.md`
-
----
-name: setup-bedrock
-description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, apiKey?, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain or an Amazon Bedrock API key (bearer). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint on tools (Claude), system and the last message, 1h TTL via promptCacheTtl, usage inputIncludesCache: false + cachedTokens/cacheWriteTokens/cacheWrite1hTokens, built-in Claude prices for global./us. profiles (BEDROCK_GLOBAL_PRICING, BEDROCK_US_PRICING, bedrockPricingFor), ServiceUnavailableException → ProviderOverloadedError. Triggers: `apiKey`, `AWS_BEARER_TOKEN_BEDROCK`, `providerOptions`, `BedrockCallOptions`, `countTokens`, `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `ai.providerTool`, `systemTool`, `nova_grounding`, `server_tool_use`, `streamChunks`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
+name: warlock-js-ai-bedrock
+description: 'Amazon Bedrock adapter for Warlock AI: `BedrockSDK`, `BedrockCallOptions`, `bedrockPricingFor` and regional pricing registries. Use for "run Claude on AWS", "configure Bedrock credentials", Converse streaming, tools, caching or Titan embeddings through `model()` and `embedder()`. Not this package → @warlock.js/ai-anthropic for direct Anthropic access; @warlock.js/ai for orchestration.'
 ---
 
 # `@warlock.js/ai-bedrock`

@@ -16,7 +16,7 @@
 ## Package orientation
 
 ---
-description: "The Warlock server framework: HTTP routes, controllers, responses, resources, repositories, CLI, mail, storage, security helpers. Exports `router`, `Request`, `Response`, `RequestHandler`, `useCase`, `RepositoryManager`, `defineResource`, `defineConfig`, `storage`, `sendMail`, `hashPassword`, `command`. Use for: add a route, write a controller, return a JSON response, hide a field from the response, upload a file, send an email, hash a password, add a CLI command, generate an OpenAPI document, type an API response, wire a socket, run or configure the app. Not this package: database models/queries → @warlock.js/cascade; input schemas → @warlock.js/seal; SSR pages → @warlock.js/web."
+description: 'Warlock application runtime: `router`, `Request`, `Response`, `config`, `env`, `sendMail` and `defineConfig`. Use for "add an API route", controllers, middleware, CLI commands, config, uploads, mail, sockets, OpenAPI, testing or upgrades. Not this package → @warlock.js/web for React SSR pages; @warlock.js/cascade for database queries; @warlock.js/seal for standalone schemas; @warlock.js/auth for login.'
 ---
 
 # @warlock.js/core
@@ -54,7 +54,7 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 - Prefer typed model getters over scattered `.get<T>("field")` casts.
 
 
-## add-connector  `@warlock.js/core/add-connector/SKILL.md`
+## add-connector  `@warlock.js/core/skills/add-connector/SKILL.md`
 
 ---
 name: add-connector
@@ -286,7 +286,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 - The `warlock-conventions` topic — module layout, canonical imports.
 
 
-## benchmark-code  `@warlock.js/core/benchmark-code/SKILL.md`
+## benchmark-code  `@warlock.js/core/skills/benchmark-code/SKILL.md`
 
 ---
 name: benchmark-code
@@ -552,7 +552,7 @@ The `latency` is the _total_ time including retries — useful for the SLO you a
 - The `configure-app` topic — wiring `src/config/benchmark.ts`.
 
 
-## build-restful  `@warlock.js/core/build-restful/SKILL.md`
+## build-restful  `@warlock.js/core/skills/build-restful/SKILL.md`
 
 ---
 name: build-restful
@@ -824,7 +824,7 @@ router.restfulResource("/orders", new OrdersRestful());
 - The `warlock-conventions` topic — controller/service/repository layering rules.
 
 
-## build-url  `@warlock.js/core/build-url/SKILL.md`
+## build-url  `@warlock.js/core/skills/build-url/SKILL.md`
 
 ---
 name: build-url
@@ -1008,7 +1008,7 @@ Don't call `setBaseUrl` per request — it's process-global and races every othe
 - The `configure-app` topic — `src/config/app.ts` and the `baseUrl` env wiring.
 
 
-## configure-app  `@warlock.js/core/configure-app/SKILL.md`
+## configure-app  `@warlock.js/core/skills/configure-app/SKILL.md`
 
 ---
 name: configure-app
@@ -1435,7 +1435,7 @@ this config. Return `undefined` for errors you do not recognize; a mapped 5xx
 is opaque unless the mapper explicitly chooses a public message.
 
 
-## create-controller  `@warlock.js/core/create-controller/SKILL.md`
+## create-controller  `@warlock.js/core/skills/create-controller/SKILL.md`
 
 ---
 name: create-controller
@@ -1734,7 +1734,7 @@ export const remoteCatalogController: RequestHandler = async ({ request, respons
 ```
 
 
-## create-module  `@warlock.js/core/create-module/SKILL.md`
+## create-module  `@warlock.js/core/skills/create-module/SKILL.md`
 
 ---
 name: create-module
@@ -1935,7 +1935,7 @@ After editing generated code, run `npm run format` and `npm run lint:check`.
 Formatting retains unused imports; the linter reports them.
 
 
-## define-resource  `@warlock.js/core/define-resource/SKILL.md`
+## define-resource  `@warlock.js/core/skills/define-resource/SKILL.md`
 
 ---
 name: define-resource
@@ -2342,7 +2342,7 @@ export const CommentResource = defineResource({
 - The `create-controller` topic — calling `new XResource(record).toJSON()` from a controller.
 
 
-## encrypt-data  `@warlock.js/core/encrypt-data/SKILL.md`
+## encrypt-data  `@warlock.js/core/skills/encrypt-data/SKILL.md`
 
 ---
 name: encrypt-data
@@ -2556,11 +2556,11 @@ Password hashing (`hashPassword`) needs `bcryptjs`, which is its own install —
 - The `warlock-conventions` topic — service layering, where the encryption boundary should sit.
 
 
-## generate-openapi  `@warlock.js/core/generate-openapi/SKILL.md`
+## generate-openapi  `@warlock.js/core/skills/generate-openapi/SKILL.md`
 
 ---
 name: generate-openapi
-description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`), write a Postman collection from it with `warlock generate.postman` (default `storage/postman/collection.json`), and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `generate.postman`, `openApiToPostmanCollection`, `getDevelopmentPostmanCollection`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — the `create-controller` topic; the devtools dashboard — the `devtools-overview` topic of the `warlock-js-devtools` skill; listing routes — the `warlock-routes` topic.'
+description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`), write a Postman collection from it with `warlock generate.postman` (default `storage/postman/collection.json`), and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `generate.postman`, `openApiToPostmanCollection`, `getDevelopmentPostmanCollection`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — the `create-controller` topic; the devtools dashboard — the `warlock-js-devtools` skill; listing routes — the `warlock-routes` topic.'
 ---
 
 # Warlock — generate an OpenAPI document
@@ -2734,7 +2734,7 @@ const { document, warnings } = buildOpenApiDocument(router.list(), {
 - The `warlock-routes` topic — list the routes the document is built from.
 
 
-## hash-password  `@warlock.js/core/hash-password/SKILL.md`
+## hash-password  `@warlock.js/core/skills/hash-password/SKILL.md`
 
 ---
 name: hash-password
@@ -2921,7 +2921,7 @@ There is no `warlock add` feature for password hashing — `bcryptjs` is a plain
 - The `warlock-conventions` topic — service layering, where the password boundary should sit.
 
 
-## health-checks  `@warlock.js/core/health-checks/SKILL.md`
+## health-checks  `@warlock.js/core/skills/health-checks/SKILL.md`
 
 ---
 name: health-checks
@@ -3063,7 +3063,7 @@ For an even smoother handoff, give the load balancer time to observe the 503 bef
 - The `use-middleware` topic — maintenance mode and other built-in middleware.
 
 
-## lower-stage3-decorators  `@warlock.js/core/lower-stage3-decorators/SKILL.md`
+## lower-stage3-decorators  `@warlock.js/core/skills/lower-stage3-decorators/SKILL.md`
 
 ---
 name: lower-stage3-decorators
@@ -3123,7 +3123,7 @@ It's the **same esbuild transform the production `tsx`/build path uses**, so a f
 - The `write-migration` topic of the `warlock-js-cascade` skill — the decorated models this plugin lets you load.
 
 
-## make-endpoint  `@warlock.js/core/make-endpoint/SKILL.md`
+## make-endpoint  `@warlock.js/core/skills/make-endpoint/SKILL.md`
 
 ---
 name: make-endpoint
@@ -3237,7 +3237,7 @@ Every `generate.*` command, `make`, and `add` take both. `--dry-run` writes (and
 - The `generate-openapi` topic — what `responseSchema` documents.
 
 
-## model-factories  `@warlock.js/core/model-factories/SKILL.md`
+## model-factories  `@warlock.js/core/skills/model-factories/SKILL.md`
 
 ---
 name: model-factories
@@ -3333,7 +3333,7 @@ it("lists users", async () => {
 - The `write-seeder` topic — seeding a development database.
 
 
-## process-image  `@warlock.js/core/process-image/SKILL.md`
+## process-image  `@warlock.js/core/skills/process-image/SKILL.md`
 
 ---
 name: process-image
@@ -3510,7 +3510,7 @@ See the `upload-file` topic for the multipart entry point and the `store-file` t
 - The `warlock-conventions` topic — where image-processing services live.
 
 
-## register-route  `@warlock.js/core/register-route/SKILL.md`
+## register-route  `@warlock.js/core/skills/register-route/SKILL.md`
 
 ---
 name: register-route
@@ -3795,7 +3795,7 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 - The `warlock-conventions` topic — module layout, the `guarded` convention, path aliases.
 
 
-## report-framework-issue  `@warlock.js/core/report-framework-issue/SKILL.md`
+## report-framework-issue  `@warlock.js/core/skills/report-framework-issue/SKILL.md`
 
 ---
 name: report-framework-issue
@@ -3958,7 +3958,7 @@ GitHub CLI flags: [list](https://cli.github.com/manual/gh_issue_list),
 [authentication](https://cli.github.com/manual/gh_auth_status).
 
 
-## request-memo  `@warlock.js/core/request-memo/SKILL.md`
+## request-memo  `@warlock.js/core/skills/request-memo/SKILL.md`
 
 ---
 name: request-memo
@@ -4104,7 +4104,7 @@ Reusing one key for different result types is a caller bug: TypeScript cannot co
 - The `create-controller` topic — consuming request-scoped values from controllers.
 
 
-## request-tracing  `@warlock.js/core/request-tracing/SKILL.md`
+## request-tracing  `@warlock.js/core/skills/request-tracing/SKILL.md`
 
 ---
 name: request-tracing
@@ -4342,7 +4342,7 @@ export default httpConfig;
 - The `logger-basics` topic of the `warlock-js-logger` skill — structured logging; tracing hooks are the place to bridge phase timing into your log channel.
 
 
-## resolve-path  `@warlock.js/core/resolve-path/SKILL.md`
+## resolve-path  `@warlock.js/core/skills/resolve-path/SKILL.md`
 
 ---
 name: resolve-path
@@ -4517,7 +4517,7 @@ If you find yourself reaching for `path.join(process.cwd(), ...)` — that's a s
 - The `upload-file` topic — the `UploadedFile` shape that pairs with `uploadsPath`.
 
 
-## retry-operation  `@warlock.js/core/retry-operation/SKILL.md`
+## retry-operation  `@warlock.js/core/skills/retry-operation/SKILL.md`
 
 ---
 name: retry-operation
@@ -4639,7 +4639,7 @@ const result = await measure("publish-event", () =>
 - The `write-use-case` topic — the use-case `retry` option.
 
 
-## run-app  `@warlock.js/core/run-app/SKILL.md`
+## run-app  `@warlock.js/core/skills/run-app/SKILL.md`
 
 ---
 name: run-app
@@ -5359,7 +5359,7 @@ directly. Regression tests cover both paths without inherited loader hooks,
 including configured declaration roots, source updates and deleted declarations.
 
 
-## send-mail  `@warlock.js/core/send-mail/SKILL.md`
+## send-mail  `@warlock.js/core/skills/send-mail/SKILL.md`
 
 ---
 name: send-mail
@@ -5765,7 +5765,7 @@ await Mail.to(user.email)
 - The `warlock-conventions` topic — where mail-sending services live.
 
 
-## send-response  `@warlock.js/core/send-response/SKILL.md`
+## send-response  `@warlock.js/core/skills/send-response/SKILL.md`
 
 ---
 name: send-response
@@ -6252,7 +6252,7 @@ export function requireProduct<T>(product: T | null | undefined): T {
 ```
 
 
-## store-file  `@warlock.js/core/store-file/SKILL.md`
+## store-file  `@warlock.js/core/skills/store-file/SKILL.md`
 
 ---
 name: store-file
@@ -6700,7 +6700,7 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 - The `send-response` topic — `response.sendFile(absPath)` for serving local files.
 
 
-## store-secrets  `@warlock.js/core/store-secrets/SKILL.md`
+## store-secrets  `@warlock.js/core/skills/store-secrets/SKILL.md`
 
 ---
 name: store-secrets
@@ -6864,7 +6864,7 @@ The normal test harness still installs `secretsFake`; explicit `backend`
 instances and that fake continue to bypass configured backend selection.
 
 
-## test-browser  `@warlock.js/core/test-browser/SKILL.md`
+## test-browser  `@warlock.js/core/skills/test-browser/SKILL.md`
 
 ---
 name: test-browser
@@ -6987,7 +6987,7 @@ if ownership verification fails and reports the failure in evidence. Do not add
 process-name or port-based kills to a spec.
 
 
-## test-fakes  `@warlock.js/core/test-fakes/SKILL.md`
+## test-fakes  `@warlock.js/core/skills/test-fakes/SKILL.md`
 
 ---
 name: test-fakes
@@ -7116,7 +7116,7 @@ An unknown fake name or a non-boolean value fails setup with the list of known f
 - The `model-factories` topic — deterministic fixtures.
 
 
-## test-http  `@warlock.js/core/test-http/SKILL.md`
+## test-http  `@warlock.js/core/skills/test-http/SKILL.md`
 
 ---
 name: test-http
@@ -7580,7 +7580,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 - The `write-cli-command` topic — `warlock add test` scaffolds both global + worker setup files.
 
 
-## test-service  `@warlock.js/core/test-service/SKILL.md`
+## test-service  `@warlock.js/core/skills/test-service/SKILL.md`
 
 ---
 name: test-service
@@ -8030,7 +8030,7 @@ setupTest({ importModule: (file) => import(file) });
 The generated `src/test-setup.ts` already does this. Without it, `setupTest()` under Vitest warns once.
 
 
-## update-packages  `@warlock.js/core/update-packages/SKILL.md`
+## update-packages  `@warlock.js/core/skills/update-packages/SKILL.md`
 
 ---
 name: update-packages
@@ -8178,7 +8178,7 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 - The `configure-app` topic — `warlock.config.ts` shape and `defineConfig`.
 
 
-## upgrade-from-5-29  `@warlock.js/core/upgrade-from-5-29/SKILL.md`
+## upgrade-from-5-29  `@warlock.js/core/skills/upgrade-from-5-29/SKILL.md`
 
 ---
 name: upgrade-from-5-29
@@ -8714,7 +8714,7 @@ marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
 
 
-## upload-file  `@warlock.js/core/upload-file/SKILL.md`
+## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
 
 ---
 name: upload-file
@@ -9027,7 +9027,7 @@ The reverse direction — sending a stored file back via `response.sendFile(...)
 - The `warlock-conventions` topic — storage configuration and driver selection.
 
 
-## use-app-context  `@warlock.js/core/use-app-context/SKILL.md`
+## use-app-context  `@warlock.js/core/skills/use-app-context/SKILL.md`
 
 ---
 name: use-app-context
@@ -9338,7 +9338,7 @@ cors: {
 - The `warlock-conventions` topic — module layout, where paths point to.
 
 
-## use-localization  `@warlock.js/core/use-localization/SKILL.md`
+## use-localization  `@warlock.js/core/skills/use-localization/SKILL.md`
 
 ---
 name: use-localization
@@ -9680,7 +9680,7 @@ This produces `account.title` and `account.actions.save`. Keep every leaf comple
 When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
 
 
-## use-middleware  `@warlock.js/core/use-middleware/SKILL.md`
+## use-middleware  `@warlock.js/core/skills/use-middleware/SKILL.md`
 
 ---
 name: use-middleware
@@ -9978,7 +9978,7 @@ router.post("/private/preview", ({ response }) => response.success({ ready: true
 ```
 
 
-## use-model-transformers  `@warlock.js/core/use-model-transformers/SKILL.md`
+## use-model-transformers  `@warlock.js/core/skills/use-model-transformers/SKILL.md`
 
 ---
 name: use-model-transformers
@@ -10211,7 +10211,7 @@ Rule of thumb: transformers are for **pure, deterministic** transforms of the ro
 - The `warlock-conventions` topic — schema files live in `src/app/<module>/models/<entity>/<entity>.model.ts`.
 
 
-## use-repository  `@warlock.js/core/use-repository/SKILL.md`
+## use-repository  `@warlock.js/core/skills/use-repository/SKILL.md`
 
 ---
 name: use-repository
@@ -10645,7 +10645,7 @@ The third arg is a context object — `{ allValues, dateFormat, ... }` — for f
 - The `warlock-conventions` topic — controller → service → repository → model layering.
 
 
-## use-request-locals  `@warlock.js/core/use-request-locals/SKILL.md`
+## use-request-locals  `@warlock.js/core/skills/use-request-locals/SKILL.md`
 
 ---
 name: use-request-locals
@@ -10816,7 +10816,7 @@ Writing `request.locals.organization` does not affect `request.all()`, `request.
 - The `create-controller` topic — reading locals in downstream controllers.
 
 
-## validate-input  `@warlock.js/core/validate-input/SKILL.md`
+## validate-input  `@warlock.js/core/skills/validate-input/SKILL.md`
 
 ---
 name: validate-input
@@ -11174,7 +11174,7 @@ updateProductController.validation = {
 - The `warlock-conventions` topic — `Request<Schema>` type-alias convention.
 
 
-## warlock-agents-md  `@warlock.js/core/warlock-agents-md/SKILL.md`
+## warlock-agents-md  `@warlock.js/core/skills/warlock-agents-md/SKILL.md`
 
 ---
 name: warlock-agents-md
@@ -11274,7 +11274,7 @@ refresher.dispose();
 - The `warlock-conventions` topic — the conventions listed in the section.
 
 
-## warlock-board  `@warlock.js/core/warlock-board/SKILL.md`
+## warlock-board  `@warlock.js/core/skills/warlock-board/SKILL.md`
 
 ---
 name: warlock-board
@@ -11401,7 +11401,7 @@ const { messages } = await watchBoard({ agent: "implementer", timeoutMs: 30 * 60
 - The `warlock-inspect` topic — the app's facts as JSON before you change it.
 
 
-## warlock-check  `@warlock.js/core/warlock-check/SKILL.md`
+## warlock-check  `@warlock.js/core/skills/warlock-check/SKILL.md`
 
 ---
 name: warlock-check
@@ -11542,7 +11542,7 @@ Migrate lint and format tooling with
 and work through the manual-review list. Use `--lint=oxc` for new apps.
 
 
-## warlock-conventions  `@warlock.js/core/warlock-conventions/SKILL.md`
+## warlock-conventions  `@warlock.js/core/skills/warlock-conventions/SKILL.md`
 
 ---
 name: warlock-conventions
@@ -11798,7 +11798,7 @@ The comment covers the codes it names on its own line and the next; with no code
 - The `send-response` topic — the full Response helper surface.
 
 
-## warlock-doctor  `@warlock.js/core/warlock-doctor/SKILL.md`
+## warlock-doctor  `@warlock.js/core/skills/warlock-doctor/SKILL.md`
 
 ---
 name: warlock-doctor
@@ -11981,7 +11981,7 @@ formatting. Oxlint/Oxfmt are the only supported tools in 5.34.0. Use the
 Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`).
 
 
-## warlock-inspect  `@warlock.js/core/warlock-inspect/SKILL.md`
+## warlock-inspect  `@warlock.js/core/skills/warlock-inspect/SKILL.md`
 
 ---
 name: warlock-inspect
@@ -12119,7 +12119,7 @@ const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA
 - The `generate-openapi` topic — the same route schemas as an OpenAPI document.
 
 
-## warlock-mcp  `@warlock.js/core/warlock-mcp/SKILL.md`
+## warlock-mcp  `@warlock.js/core/skills/warlock-mcp/SKILL.md`
 
 ---
 name: warlock-mcp
@@ -12243,7 +12243,7 @@ await server.close();
 - The `expose-as-mcp-server` topic of @warlock.js/ai-tools — the transport underneath.
 
 
-## warlock-routes  `@warlock.js/core/warlock-routes/SKILL.md`
+## warlock-routes  `@warlock.js/core/skills/warlock-routes/SKILL.md`
 
 ---
 name: warlock-routes
@@ -12383,11 +12383,11 @@ and exits non-zero.
 - The `write-cli-command` topic — the command + `preload` shape `routesCommand` is built from.
 
 
-## warlock-trace  `@warlock.js/core/warlock-trace/SKILL.md`
+## warlock-trace  `@warlock.js/core/skills/warlock-trace/SKILL.md`
 
 ---
 name: warlock-trace
-description: 'Verify runtime behaviour without a browser: `warlock trace <method> <url> [--body json|@file] [--header k:v] [--json]` sends one request to the running `warlock dev` server and prints what devtools recorded for it — middleware chain with timings, validation result and errors, handler time, queries with N+1 flags, logs, cache operations, captured mails, the response and timings — as a versioned report (`schemaVersion: 1`); `traceRequest()` returns the same object. Triggers: `warlock trace`, `traceRequest`, `TraceReport`, `buildTraceReport`, `x-request-id`, `.warlock/dev-server.json`, `WL8008`, `WL8009`, `WL5004`, `--id-header`; "did validation pass for this request", "which queries does this endpoint run", "is there an N+1 on this route", "what middleware runs on this route", "check the endpoint after my change", "request timeline as JSON". Skip: the devtools dashboard in a browser — the `devtools-overview` skill of @warlock.js/devtools; static route facts (guard, rate limit, schemas) — the `warlock-inspect` topic; typecheck/lint/tests — the `warlock-check` topic.'
+description: 'Verify runtime behaviour without a browser: `warlock trace <method> <url> [--body json|@file] [--header k:v] [--json]` sends one request to the running `warlock dev` server and prints what devtools recorded for it — middleware chain with timings, validation result and errors, handler time, queries with N+1 flags, logs, cache operations, captured mails, the response and timings — as a versioned report (`schemaVersion: 1`); `traceRequest()` returns the same object. Triggers: `warlock trace`, `traceRequest`, `TraceReport`, `buildTraceReport`, `x-request-id`, `.warlock/dev-server.json`, `WL8008`, `WL8009`, `WL5004`, `--id-header`; "did validation pass for this request", "which queries does this endpoint run", "is there an N+1 on this route", "what middleware runs on this route", "check the endpoint after my change", "request timeline as JSON". Skip: the devtools dashboard in a browser — the `warlock-js-devtools` skill; static route facts (guard, rate limit, schemas) — the `warlock-inspect` topic; typecheck/lint/tests — the `warlock-check` topic.'
 ---
 
 # Warlock — `warlock trace`
@@ -12465,10 +12465,10 @@ Devtools is checked before anything is sent. With `--json` a failure prints `{ "
 
 - The `warlock-inspect` topic — the static facts of a route (guard, rate limit, schemas).
 - The `warlock-check` topic — typecheck, lint, tests and conventions in one run.
-- The `devtools-overview` skill of `@warlock.js/devtools` — the dashboard behind the timeline.
+- The `warlock-js-devtools` skill — the dashboard behind the timeline.
 
 
-## wire-socket  `@warlock.js/core/wire-socket/SKILL.md`
+## wire-socket  `@warlock.js/core/skills/wire-socket/SKILL.md`
 
 ---
 name: wire-socket
@@ -12779,7 +12779,7 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 - The `warlock-conventions` topic — where socket-related code lives (a setup function for handler registration, `services/` for emit sites).
 
 
-## write-cli-command  `@warlock.js/core/write-cli-command/SKILL.md`
+## write-cli-command  `@warlock.js/core/skills/write-cli-command/SKILL.md`
 
 ---
 name: write-cli-command
@@ -13120,11 +13120,11 @@ Set a unique owner and registry per app instance, then import `processes` from
 the generated module and await `processes.spawn({ kind: "worker", command,
 args, labels })`. Consume output and await `handle.exited`. Use handle stops or
 label filters; never stop processes by command or name. `spawnPty()` lazily
-loads separately installed optional peer `node-pty`. The `supervise-processes`
-skill in `@warlock.js/process` contains complete working examples.
+loads separately installed optional peer `node-pty`. The `warlock-js-process`
+skill contains complete working examples.
 
 
-## write-middleware  `@warlock.js/core/write-middleware/SKILL.md`
+## write-middleware  `@warlock.js/core/skills/write-middleware/SKILL.md`
 
 ---
 name: write-middleware
@@ -13352,7 +13352,7 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 - The `warlock-conventions` topic — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.
 
 
-## write-seeder  `@warlock.js/core/write-seeder/SKILL.md`
+## write-seeder  `@warlock.js/core/skills/write-seeder/SKILL.md`
 
 ---
 name: write-seeder
@@ -13747,7 +13747,7 @@ warlock seed --transaction    # (default true) — pass --transaction=false to s
 - The `warlock-conventions` topic — `seeds/` is the canonical folder name (singular `seed/` is incorrect).
 
 
-## write-use-case  `@warlock.js/core/write-use-case/SKILL.md`
+## write-use-case  `@warlock.js/core/skills/write-use-case/SKILL.md`
 
 ---
 name: write-use-case
@@ -14072,7 +14072,7 @@ For the plain-function flavour (`warlock generate.use-case <module>/<verb-noun>`
 ## Package orientation
 
 ---
-description: "Model-first ORM for MongoDB and Postgres. Exports `Model`, `RegisterModel`, `Migration`, `defineModel`, `BelongsTo`, `HasMany`, `transaction`, `DataSource`, `dataSourceRegistry`, `connectToDatabase`, `runMigrations`. Use for: define a model, add a column or collection, write or alter a migration, query or filter records, paginate, aggregate or group, add a relation, run a transaction, soft delete, track changes, react to save or delete events, vector search. Not this package: request validation and schemas → @warlock.js/seal; routes, controllers, repositories → @warlock.js/core."
+description: 'Database models and query builders for MongoDB and SQL: `Model`, `DataSource`, `defineModel`, `RegisterModel`, `afterCommit` and `modelSync`. Use for "query a table", "define a relation", "write a migration", "run a transaction", eager loading or model events. Not this package → @warlock.js/seal for structural validation; @warlock.js/core for HTTP handlers and repositories; @warlock.js/cache for transient data.'
 ---
 
 # @warlock.js/cascade
@@ -14099,7 +14099,7 @@ Cascade is the data layer. The model is the query entry point (`User.find(id)`, 
 - Undefined `where` values and unsafe filters throw on purpose; sanitize user-supplied filters.
 
 
-## aggregate-data  `@warlock.js/cascade/aggregate-data/SKILL.md`
+## aggregate-data  `@warlock.js/cascade/skills/aggregate-data/SKILL.md`
 
 ---
 name: aggregate-data
@@ -14279,7 +14279,7 @@ Raw stages: `joinRaw({ $lookup: { from, let, pipeline, as } })` (or an array of 
 - The `use-cached-hof` topic of the `warlock-js-cache` skill — caching expensive aggregate results
 
 
-## alter-migration  `@warlock.js/cascade/alter-migration/SKILL.md`
+## alter-migration  `@warlock.js/cascade/skills/alter-migration/SKILL.md`
 
 ---
 name: alter-migration
@@ -14906,7 +14906,7 @@ export default Migration.alter(
 - The `manage-data-sources` topic — multi-DB migrations
 
 
-## cascade-basics  `@warlock.js/cascade/cascade-basics/SKILL.md`
+## cascade-basics  `@warlock.js/cascade/skills/cascade-basics/SKILL.md`
 
 ---
 name: cascade-basics
@@ -15007,7 +15007,7 @@ const page = await User.paginate({ page: 1, limit: 20 });
 - Don't auto-run migrations from app code. They're a deploy step; run via `cascade migrate` or the Operations API.
 
 
-## configure-delete-strategy  `@warlock.js/cascade/configure-delete-strategy/SKILL.md`
+## configure-delete-strategy  `@warlock.js/cascade/skills/configure-delete-strategy/SKILL.md`
 
 ---
 name: configure-delete-strategy
@@ -15141,7 +15141,7 @@ See the `subscribe-to-model-events` topic.
 - The `query-data` topic — global scopes and `withoutGlobalScope` for surfacing deleted rows
 
 
-## define-model  `@warlock.js/cascade/define-model/SKILL.md`
+## define-model  `@warlock.js/cascade/skills/define-model/SKILL.md`
 
 ---
 name: define-model
@@ -15352,7 +15352,7 @@ export class User extends Model<UserSchema> {
 - The `subscribe-to-model-events` topic — lifecycle hooks
 
 
-## define-relations  `@warlock.js/cascade/define-relations/SKILL.md`
+## define-relations  `@warlock.js/cascade/skills/define-relations/SKILL.md`
 
 ---
 name: define-relations
@@ -15522,7 +15522,7 @@ For embedded/denormalized relations (cached `author_name` on posts, etc.), Casca
 - The `define-model` topic — `@RegisterModel`, the registry that makes name-based lookup work
 
 
-## manage-data-sources  `@warlock.js/cascade/manage-data-sources/SKILL.md`
+## manage-data-sources  `@warlock.js/cascade/skills/manage-data-sources/SKILL.md`
 
 ---
 name: manage-data-sources
@@ -15703,7 +15703,7 @@ unless `clientOptions.monitorCommands` is explicitly set.
 - The `manage-transactions` topic — transactions run on the default source
 
 
-## manage-transactions  `@warlock.js/cascade/manage-transactions/SKILL.md`
+## manage-transactions  `@warlock.js/cascade/skills/manage-transactions/SKILL.md`
 
 ---
 name: manage-transactions
@@ -15946,7 +15946,7 @@ Use the outbox pattern above instead when the side effect must survive a crash b
 - The `manage-data-sources` topic — transactions run on the default source
 
 
-## paginate-results  `@warlock.js/cascade/paginate-results/SKILL.md`
+## paginate-results  `@warlock.js/cascade/skills/paginate-results/SKILL.md`
 
 ---
 name: paginate-results
@@ -16070,7 +16070,7 @@ The total count requires an extra query. On very large filtered tables, this can
 - The `define-relations` topic — eager loading on a paginated page
 
 
-## perform-atomic-ops  `@warlock.js/cascade/perform-atomic-ops/SKILL.md`
+## perform-atomic-ops  `@warlock.js/cascade/skills/perform-atomic-ops/SKILL.md`
 
 ---
 name: perform-atomic-ops
@@ -16235,7 +16235,7 @@ for (const user of targets) {
 - The `paginate-results` topic — `.chunk` for bulk-processing iteration
 
 
-## query-data  `@warlock.js/cascade/query-data/SKILL.md`
+## query-data  `@warlock.js/cascade/skills/query-data/SKILL.md`
 
 ---
 name: query-data
@@ -16446,7 +16446,7 @@ const activeUsers = await User.query().scope("active").get();
 - The `aggregate-data` topic — `.sum`, `.avg`, `.groupBy`, `.having`
 
 
-## run-cascade-cli  `@warlock.js/cascade/run-cascade-cli/SKILL.md`
+## run-cascade-cli  `@warlock.js/cascade/skills/run-cascade-cli/SKILL.md`
 
 ---
 name: run-cascade-cli
@@ -16576,7 +16576,7 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 - The `manage-data-sources` topic — multi-database routing
 
 
-## search-by-vector  `@warlock.js/cascade/search-by-vector/SKILL.md`
+## search-by-vector  `@warlock.js/cascade/skills/search-by-vector/SKILL.md`
 
 ---
 name: search-by-vector
@@ -16710,7 +16710,7 @@ For local dev with MongoDB, develop the vector path against Postgres + pgvector.
 - The `use-cache-similarity` topic of the `warlock-js-cache` skill — semantic cache of LLM output
 
 
-## subscribe-to-model-events  `@warlock.js/cascade/subscribe-to-model-events/SKILL.md`
+## subscribe-to-model-events  `@warlock.js/cascade/skills/subscribe-to-model-events/SKILL.md`
 
 ---
 name: subscribe-to-model-events
@@ -16862,7 +16862,7 @@ For external side effects (queues, emails) that must only fire if a surrounding 
 - The `configure-delete-strategy` topic — `deleting` / `deleted` / `restored` around delete strategies
 
 
-## track-changes  `@warlock.js/cascade/track-changes/SKILL.md`
+## track-changes  `@warlock.js/cascade/skills/track-changes/SKILL.md`
 
 ---
 name: track-changes
@@ -16993,7 +16993,7 @@ Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was si
 - The `define-model` topic — the `.set` / `.merge` / `.save` idioms that stage changes
 
 
-## write-migration  `@warlock.js/cascade/write-migration/SKILL.md`
+## write-migration  `@warlock.js/cascade/skills/write-migration/SKILL.md`
 
 ---
 name: write-migration
@@ -17216,7 +17216,7 @@ For a class-form migration not bound to a model, set `public readonly dataSource
 ## Package orientation
 
 ---
-description: 'Type-safe, framework-agnostic validation for Warlock.js: schemas, coercion, modifiers, JSON Schema, Standard Schema. Exports `v`, `validate`, `ObjectValidator`, `StringValidator`, `Infer`, reached as `v.object`, `v.string`, `v.array`, `v.enum`, `v.union`. Use for: "validate this request body", "require an email and a min-length password", "infer the TypeScript type from a schema", "make a field optional or give it a default", "generate JSON Schema", "write a custom rule". Not this package: database rules and file validators live in @warlock.js/core; model schemas and persistence are @warlock.js/cascade.'
+description: 'Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator` and `Infer`. Use for "validate a request body", "require an email", optional fields and defaults, schema type inference, custom rules, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.'
 ---
 
 # @warlock.js/seal
@@ -17270,7 +17270,7 @@ Skip if you only need framework-bound validators (file uploads, DB rules) — th
 - `@warlock.js/core` (the `validate-input` topic of the `warlock-js-core` skill) — adds framework validators through `core/v`; import the base `v` from seal.
 
 
-## bridge-standard-schema  `@warlock.js/seal/bridge-standard-schema/SKILL.md`
+## bridge-standard-schema  `@warlock.js/seal/skills/bridge-standard-schema/SKILL.md`
 
 ---
 name: bridge-standard-schema
@@ -17436,7 +17436,7 @@ Seal forks the types locally. Reasons:
 If V2 lands, re-fork. Until then the local copy is the right call.
 
 
-## compose-seal-modifiers  `@warlock.js/seal/compose-seal-modifiers/SKILL.md`
+## compose-seal-modifiers  `@warlock.js/seal/skills/compose-seal-modifiers/SKILL.md`
 
 ---
 name: compose-seal-modifiers
@@ -17745,7 +17745,7 @@ Switch back with `.immutable`. Default is fine 99% of the time. Reach for `.muta
 - Don't mutate a schema you handed to a Model. Default immutability protects you; opting into `.mutable` on shared schemas is asking for confusion.
 
 
-## define-structural-shape  `@warlock.js/seal/define-structural-shape/SKILL.md`
+## define-structural-shape  `@warlock.js/seal/skills/define-structural-shape/SKILL.md`
 
 ---
 name: define-structural-shape
@@ -17920,7 +17920,7 @@ rename entries; present keys are validated as strings. Literal keys are optional
 in the inferred dictionary; use `v.object` for required named fields.
 
 
-### define-structural-shape/array-methods.md  `@warlock.js/seal/define-structural-shape/array-methods.md`
+### define-structural-shape/array-methods.md  `@warlock.js/seal/skills/define-structural-shape/array-methods.md`
 
 # `v.array(itemValidator)` — method reference
 
@@ -18002,7 +18002,7 @@ v.array(v.string()).default([]).optional();
 ```
 
 
-### define-structural-shape/object-methods.md  `@warlock.js/seal/define-structural-shape/object-methods.md`
+### define-structural-shape/object-methods.md  `@warlock.js/seal/skills/define-structural-shape/object-methods.md`
 
 # `v.object({...})` — method reference
 
@@ -18200,7 +18200,7 @@ const signupSchema = v.object({
 ```
 
 
-## extend-seal-with-plugins  `@warlock.js/seal/extend-seal-with-plugins/SKILL.md`
+## extend-seal-with-plugins  `@warlock.js/seal/skills/extend-seal-with-plugins/SKILL.md`
 
 ---
 name: extend-seal-with-plugins
@@ -18416,7 +18416,7 @@ const bothDates: SchemaRule = {
 ```
 
 
-## generate-json-schema  `@warlock.js/seal/generate-json-schema/SKILL.md`
+## generate-json-schema  `@warlock.js/seal/skills/generate-json-schema/SKILL.md`
 
 ---
 name: generate-json-schema
@@ -18563,7 +18563,7 @@ If the schema validator itself accepts data but the _generated_ JSON Schema reje
 Generating JSON Schema is cheap (pure-function tree walk), so don't worry about caching the result for schemas that change at startup. For dynamic schemas built per-request, generate per-request — there's no shared mutable state.
 
 
-## handle-seal-errors  `@warlock.js/seal/handle-seal-errors/SKILL.md`
+## handle-seal-errors  `@warlock.js/seal/skills/handle-seal-errors/SKILL.md`
 
 ---
 name: handle-seal-errors
@@ -18713,7 +18713,7 @@ Avoid leaking `result.data` back to the client when rejecting — it might conta
 For server-side logs, log `errors[]` with the field paths and rule types; redact values unless you're certain the field isn't sensitive. The `@warlock.js/logger` redaction layer is the right place to enforce that.
 
 
-## pick-seal-primitive  `@warlock.js/seal/pick-seal-primitive/SKILL.md`
+## pick-seal-primitive  `@warlock.js/seal/skills/pick-seal-primitive/SKILL.md`
 
 ---
 name: pick-seal-primitive
@@ -18870,7 +18870,7 @@ For cross-cutting modifiers (`.optional`/`.nullable`/`.default`/`.catch`/`.in`/`
 - Don't expect `v.computed` / `v.managed` to validate input — they ignore input shape entirely. Reach for them only when _producing_ a value.
 
 
-### pick-seal-primitive/boolean-methods.md  `@warlock.js/seal/pick-seal-primitive/boolean-methods.md`
+### pick-seal-primitive/boolean-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/boolean-methods.md`
 
 # `v.boolean()` — method reference
 
@@ -18978,7 +18978,7 @@ v.object({
 ```
 
 
-### pick-seal-primitive/date-methods.md  `@warlock.js/seal/pick-seal-primitive/date-methods.md`
+### pick-seal-primitive/date-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/date-methods.md`
 
 # `v.date()` — method reference
 
@@ -19157,7 +19157,7 @@ v.date().toEndOfDay().toDateOnly();
 ```
 
 
-### pick-seal-primitive/number-methods.md  `@warlock.js/seal/pick-seal-primitive/number-methods.md`
+### pick-seal-primitive/number-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/number-methods.md`
 
 # `v.number()` / `v.int()` / `v.float()` / `v.numeric()` — method reference
 
@@ -19299,7 +19299,7 @@ v.int().min(0).default(0).optional();
 ```
 
 
-### pick-seal-primitive/string-methods.md  `@warlock.js/seal/pick-seal-primitive/string-methods.md`
+### pick-seal-primitive/string-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/string-methods.md`
 
 # `v.string()` — method reference
 
@@ -19477,7 +19477,7 @@ The standalone `replaceMutator` and `replaceAllMutator` preserve the stringified
 value when called without a context or replacement options.
 
 
-## seal-basics  `@warlock.js/seal/seal-basics/SKILL.md`
+## seal-basics  `@warlock.js/seal/skills/seal-basics/SKILL.md`
 
 ---
 name: seal-basics
@@ -19622,7 +19622,7 @@ Both flavours widen with `| null` when `.nullable()` is set.
 ## Package orientation
 
 ---
-description: 'Cache layer for Warlock apps with pluggable drivers (memory, LRU, file, Redis, Postgres). Exports `cache`, `CacheManager`, `cached`, `TaggedCache`, `ScopedCache`, `RedisCacheDriver`, `MemoryCacheDriver`, `MockCacheDriver`, `PgCacheDriver`. Use for: "cache this query for 5 minutes", "invalidate every key for tenant 42", "stale-while-revalidate", "take a lock so only one worker runs this", "tag keys and flush the tag", "increment a counter in cache". Not this package: HTTP response/page caching belongs to @warlock.js/core or web; persistent data is a @warlock.js/cascade model.'
+description: 'Pluggable memory, LRU, file, Redis and Postgres caching: `cache`, `cached`, `CacheManager`, `TaggedCache`, `ScopedCache` and `MockCacheDriver`. Use for "cache this query", "invalidate a tenant", "stale-while-revalidate", "take a lock", tag invalidation or counters. Not this package → @warlock.js/core for HTTP response caching; @warlock.js/web for page caching; @warlock.js/cascade for persistent models.'
 ---
 
 # @warlock.js/cache
@@ -19669,7 +19669,7 @@ A single `cache` singleton fronts a configured driver. `cache.set(key, value, op
 - The `configure-app` topic of the `warlock-js-core` skill — wires the cache driver from `src/config/cache.ts` and exposes the singleton.
 
 
-## apply-cache-patterns  `@warlock.js/cache/apply-cache-patterns/SKILL.md`
+## apply-cache-patterns  `@warlock.js/cache/skills/apply-cache-patterns/SKILL.md`
 
 ---
 name: apply-cache-patterns
@@ -19772,7 +19772,7 @@ await cache.tags([`tenant-${tenantId}`]).invalidate();
 - The `use-cached-hof` topic — `cached()` HOF for declarative memoization
 
 
-## cache-basics  `@warlock.js/cache/cache-basics/SKILL.md`
+## cache-basics  `@warlock.js/cache/skills/cache-basics/SKILL.md`
 
 ---
 name: cache-basics
@@ -19903,7 +19903,7 @@ const user = await cache.remember("user.1", "1h", async () => db.users.find(1));
 - Don't switch embedders without re-embedding the entire vector index.
 
 
-## configure-pg-cache  `@warlock.js/cache/configure-pg-cache/SKILL.md`
+## configure-pg-cache  `@warlock.js/cache/skills/configure-pg-cache/SKILL.md`
 
 ---
 name: configure-pg-cache
@@ -20023,7 +20023,7 @@ See the `handle-cache-errors` topic for the full error class hierarchy.
 - The `pick-cache-driver` topic — comparing pg with memory / redis / file
 
 
-## configure-set-options  `@warlock.js/cache/configure-set-options/SKILL.md`
+## configure-set-options  `@warlock.js/cache/skills/configure-set-options/SKILL.md`
 
 ---
 name: configure-set-options
@@ -20129,7 +20129,7 @@ await cache.set("k", v, undefined); // same as no TTL
 ```
 
 
-## handle-cache-errors  `@warlock.js/cache/handle-cache-errors/SKILL.md`
+## handle-cache-errors  `@warlock.js/cache/skills/handle-cache-errors/SKILL.md`
 
 ---
 name: handle-cache-errors
@@ -20225,7 +20225,7 @@ try {
 - **Concurrent writes clobbering each other** — last-write-wins by default. Use `update()` or `onConflict: "create"` if you need protection.
 
 
-## observe-cache  `@warlock.js/cache/observe-cache/SKILL.md`
+## observe-cache  `@warlock.js/cache/skills/observe-cache/SKILL.md`
 
 ---
 name: observe-cache
@@ -20333,7 +20333,7 @@ Drivers that never fire events stay absent from `byDriver` — guard with `?.` a
 - Don't forget to attach early. If startup metrics matter, call `cache.metrics()` right after `cache.init()`.
 
 
-## pick-cache-driver  `@warlock.js/cache/pick-cache-driver/SKILL.md`
+## pick-cache-driver  `@warlock.js/cache/skills/pick-cache-driver/SKILL.md`
 
 ---
 name: pick-cache-driver
@@ -20467,7 +20467,7 @@ The manager loads (and connects) the override driver lazily on first use, then r
 - The `test-cache-code` topic — `MockCacheDriver` and `NullCacheDriver` for tests
 
 
-## test-cache-code  `@warlock.js/cache/test-cache-code/SKILL.md`
+## test-cache-code  `@warlock.js/cache/skills/test-cache-code/SKILL.md`
 
 ---
 name: test-cache-code
@@ -20695,7 +20695,7 @@ it("returns the most similar doc above threshold", async () => {
 The `pg` driver accepts any object satisfying `PgClientLike` (`{ query(text, values) }`). For unit tests, hand-roll a minimal Map-backed fake — see `src/drivers/pg-cache-driver.spec.ts` for a 60-line `FakePool` that recognizes the exact SQL shapes the driver issues. For integration coverage, gate a real-PG suite on a `POSTGRES_URL` env var and skip cleanly when unset.
 
 
-## use-cache-atomic  `@warlock.js/cache/use-cache-atomic/SKILL.md`
+## use-cache-atomic  `@warlock.js/cache/skills/use-cache-atomic/SKILL.md`
 
 ---
 name: use-cache-atomic
@@ -20764,7 +20764,7 @@ if (remaining < 0) {
 - The `pick-cache-driver` topic — when you need cross-node atomicity
 
 
-## use-cache-bulk  `@warlock.js/cache/use-cache-bulk/SKILL.md`
+## use-cache-bulk  `@warlock.js/cache/skills/use-cache-bulk/SKILL.md`
 
 ---
 name: use-cache-bulk
@@ -20828,7 +20828,7 @@ returned promise rejects.
 - The `use-cache-tags` topic — invalidate a batch by tag
 
 
-## use-cache-list  `@warlock.js/cache/use-cache-list/SKILL.md`
+## use-cache-list  `@warlock.js/cache/skills/use-cache-list/SKILL.md`
 
 ---
 name: use-cache-list
@@ -20917,7 +20917,7 @@ const top = await stack.pop(); // LIFO
 These are tracked as candidates for v3.
 
 
-## use-cache-lock  `@warlock.js/cache/use-cache-lock/SKILL.md`
+## use-cache-lock  `@warlock.js/cache/skills/use-cache-lock/SKILL.md`
 
 ---
 name: use-cache-lock
@@ -21028,7 +21028,7 @@ await cache.lock(
 - **Cross-server requires `redis` or `pg`.** Memory / LRU / file drivers don't coordinate across servers.
 
 
-## use-cache-namespace  `@warlock.js/cache/use-cache-namespace/SKILL.md`
+## use-cache-namespace  `@warlock.js/cache/skills/use-cache-namespace/SKILL.md`
 
 ---
 name: use-cache-namespace
@@ -21118,7 +21118,7 @@ Note: scope `ttl` defaults are NOT applied to SWR — `freshTtl` / `staleTtl` al
 - Don't mix prefix separators. The convention is `.` (dot) — pick one and stick with it across scopes so nested prefixes compose predictably.
 
 
-## use-cache-similarity  `@warlock.js/cache/use-cache-similarity/SKILL.md`
+## use-cache-similarity  `@warlock.js/cache/skills/use-cache-similarity/SKILL.md`
 
 ---
 name: use-cache-similarity
@@ -21216,7 +21216,7 @@ See the `configure-pg-cache` topic.
 - Don't use `topK: 0` or negative — `pg` rejects with `CacheConfigurationError`; memory drivers return `[]` but it's a code smell.
 
 
-## use-cache-tags  `@warlock.js/cache/use-cache-tags/SKILL.md`
+## use-cache-tags  `@warlock.js/cache/skills/use-cache-tags/SKILL.md`
 
 ---
 name: use-cache-tags
@@ -21308,7 +21308,7 @@ See the `use-cached-hof` topic.
 - Don't use tags as a query mechanism. Tags drop keys; they don't list them. If you need "give me every user", store an index list separately.
 
 
-## use-cache-update-merge  `@warlock.js/cache/use-cache-update-merge/SKILL.md`
+## use-cache-update-merge  `@warlock.js/cache/skills/use-cache-update-merge/SKILL.md`
 
 ---
 name: use-cache-update-merge
@@ -21396,7 +21396,7 @@ The per-key lock map lives on the driver instance and is cleared after each chai
 | "Read-then-delete atomically"              | `pull()`                                                        |
 
 
-## use-cache-utils  `@warlock.js/cache/use-cache-utils/SKILL.md`
+## use-cache-utils  `@warlock.js/cache/skills/use-cache-utils/SKILL.md`
 
 ---
 name: use-cache-utils
@@ -21489,7 +21489,7 @@ For most call sites the duration string (`"1h"`, `"7d"`) reads better.
 - The `pick-cache-driver` topic — building a custom driver where these help
 
 
-## use-cached-hof  `@warlock.js/cache/use-cached-hof/SKILL.md`
+## use-cached-hof  `@warlock.js/cache/skills/use-cached-hof/SKILL.md`
 
 ---
 name: use-cached-hof
@@ -21597,7 +21597,7 @@ const getCategoryMeta = cached(
 - Don't include secrets in args — they'd land in cache keys. Project only the identifying fields into the key.
 
 
-## use-swr  `@warlock.js/cache/use-swr/SKILL.md`
+## use-swr  `@warlock.js/cache/skills/use-swr/SKILL.md`
 
 ---
 name: use-swr
@@ -21714,7 +21714,7 @@ await feed.swr("home", { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
 ## Package orientation
 
 ---
-description: 'Filesystem primitives for Warlock.js: sync and async file/dir operations with one canonical name each (`*Async` is async, bare name is sync). Exports `fs`, `File`, `Directory`, `getJsonFileAsync`, `putFileAsync`, `atomicWriteAsync`, `atomicWriteJsonAsync`, `ensureDirectoryAsync`, `copyDirectoryAsync`, `listFilesAsync`, `hashFileAsync`, `createConfinedReader`. Use for: "read a JSON file", "write a file without corrupting it on crash", "create a directory recursively", "hash a file", "list files in a folder", "read a user-chosen folder without following symlinks or escaping it". Not this package: uploads and storage drivers live in @warlock.js/core; config loading is a core concern.'
+description: 'Filesystem helpers with sync names and `Async` variants: `fs`, `File`, `Directory`, `getJsonFileAsync`, `atomicWriteAsync`, `hashFileAsync` and `createConfinedReader`. Use for "read JSON", "write atomically", "copy a directory", "hash a file" or "read a folder without escaping it". Not this package → @warlock.js/core for uploads/storage; @warlock.js/ai-workspace for agent file tools with policy enforcement.'
 ---
 
 # @warlock.js/fs
@@ -21772,7 +21772,7 @@ Skip if your code path is one-off and bare `node:fs/promises` is already importe
 - The `warlock-conventions` topic of the `warlock-js-core` skill — the parent framework's conventions; `fs` is one of its foundation packages.
 
 
-## hash-files  `@warlock.js/fs/hash-files/SKILL.md`
+## hash-files  `@warlock.js/fs/skills/hash-files/SKILL.md`
 
 ---
 name: hash-files
@@ -21906,7 +21906,7 @@ Cheaper than `cmp`-byte-comparing two large files when the result is "yes/no dif
 - Don't expect digests to compare lexically meaningfully — they're random hex. For ordering, hash and then `bigint`-convert if you really need sort.
 
 
-## manage-directories  `@warlock.js/fs/manage-directories/SKILL.md`
+## manage-directories  `@warlock.js/fs/skills/manage-directories/SKILL.md`
 
 ---
 name: manage-directories
@@ -22070,7 +22070,7 @@ const tsFiles = await walk("./src");
 - Don't list a directory you're concurrently modifying — readdir snapshots aren't atomic across concurrent writes.
 
 
-## multi-file-transactions  `@warlock.js/fs/multi-file-transactions/SKILL.md`
+## multi-file-transactions  `@warlock.js/fs/skills/multi-file-transactions/SKILL.md`
 
 ---
 name: multi-file-transactions
@@ -22162,7 +22162,7 @@ Flat APIs: `transactionAsync`, `openTransactionRootAsync`,
 For one file without CAS or locking, use the `write-atomically` topic.
 
 
-## read-a-folder-confined  `@warlock.js/fs/read-a-folder-confined/SKILL.md`
+## read-a-folder-confined  `@warlock.js/fs/skills/read-a-folder-confined/SKILL.md`
 
 ---
 name: read-a-folder-confined
@@ -22259,7 +22259,7 @@ Each link is resolved with `realpath` and must land inside the root. `walk` desc
 - The reader only reads. For an agent that also writes and runs commands, use `@warlock.js/ai-workspace`; its jail follows links that stay inside and accepts absolute paths inside the jail by design.
 
 
-## read-and-write-files  `@warlock.js/fs/read-and-write-files/SKILL.md`
+## read-and-write-files  `@warlock.js/fs/skills/read-and-write-files/SKILL.md`
 
 ---
 name: read-and-write-files
@@ -22372,7 +22372,7 @@ const all = await statsAsync("./bundle.js"); // fs.Stats
 - Don't pass binary content to `putFile` / `putFileAsync` as a `Buffer` directly — these are text-only (UTF-8). For binaries, use `node:fs/promises`'s `writeFile` directly, or use `atomicWriteAsync` (which accepts `string | Buffer`).
 
 
-## use-the-fs-facade  `@warlock.js/fs/use-the-fs-facade/SKILL.md`
+## use-the-fs-facade  `@warlock.js/fs/skills/use-the-fs-facade/SKILL.md`
 
 ---
 name: use-the-fs-facade
@@ -22482,7 +22482,7 @@ const moved = await fs.file("a.txt").moveTo(fs.dir("archive")); // new File hand
 - The `write-atomically` topic — `put({ atomic })` delegates to this.
 
 
-## write-atomically  `@warlock.js/fs/write-atomically/SKILL.md`
+## write-atomically  `@warlock.js/fs/skills/write-atomically/SKILL.md`
 
 ---
 name: write-atomically
@@ -22638,7 +22638,7 @@ has no journal; use the `multi-file-transactions` topic for automatic recovery.
 ## Package orientation
 
 ---
-description: 'Structured logging for Warlock.js with pluggable channels, redaction and shutdown flushing. Exports `log`, `Logger`, `LogChannel`, `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `applyRedact`, `DEFAULT_REDACT_KEYS`, `captureAnyUnhandledRejection`. Use for: "log an error with context", "write logs to a file as JSON", "send errors to Sentry", "hide passwords and tokens in logs", "flush logs before exit", "catch unhandled rejections", "write my own log channel". Not this package: HTTP request handling and error responses live in @warlock.js/core; scheduled jobs are @warlock.js/scheduler.'
+description: 'Structured logging with channels, filtering, redaction and shutdown flushing: `log`, `Logger`, `LogChannel`, `ConsoleLog`, `JSONFileLog`, `SentryLog` and `applyRedact`. Use for "log an error with context", "hide tokens", "write JSON logs", "send errors to Sentry" or "flush before exit". Not this package → @warlock.js/core for HTTP error responses; @warlock.js/ai-panoptic for agent traces and AI cost dashboards.'
 ---
 
 # @warlock.js/logger
@@ -22702,7 +22702,7 @@ You write `log.info("auth", "login", "user signed in", { userId })`. The logger 
 - The `warlock-conventions` topic of the `warlock-js-core` skill — the parent framework's conventions; logger is one of its foundation packages and ships transitively when you install core.
 
 
-## capture-unhandled-errors  `@warlock.js/logger/capture-unhandled-errors/SKILL.md`
+## capture-unhandled-errors  `@warlock.js/logger/skills/capture-unhandled-errors/SKILL.md`
 
 ---
 name: capture-unhandled-errors
@@ -22816,7 +22816,7 @@ Both listeners log with:
 If you want these routed to a specific file, filter on `data.module === "app"`. See the `filter-log-entries` topic.
 
 
-## configure-logger  `@warlock.js/logger/configure-logger/SKILL.md`
+## configure-logger  `@warlock.js/logger/skills/configure-logger/SKILL.md`
 
 ---
 name: configure-logger
@@ -22922,7 +22922,7 @@ See the `redact-sensitive-log-fields` topic for the redact contract and the `fil
 - The `flush-logs-on-shutdown` topic — `autoFlushOn` event behavior
 
 
-## filter-log-entries  `@warlock.js/logger/filter-log-entries/SKILL.md`
+## filter-log-entries  `@warlock.js/logger/skills/filter-log-entries/SKILL.md`
 
 ---
 name: filter-log-entries
@@ -23046,7 +23046,7 @@ Filters run on **every** entry per channel. A synchronous, cheap predicate is fi
 The `minLevel` check is the fastest of the three (single comparison before fan-out), so prefer it when "drop everything below X uniformly" matches your need.
 
 
-## flush-logs-on-shutdown  `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`
+## flush-logs-on-shutdown  `@warlock.js/logger/skills/flush-logs-on-shutdown/SKILL.md`
 
 ---
 name: flush-logs-on-shutdown
@@ -23186,7 +23186,7 @@ resolves so shutdown can continue. Timeout does not cancel a channel's network
 operation; its driver owns cancellation.
 
 
-## logger-basics  `@warlock.js/logger/logger-basics/SKILL.md`
+## logger-basics  `@warlock.js/logger/skills/logger-basics/SKILL.md`
 
 ---
 name: logger-basics
@@ -23275,7 +23275,7 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 - Don't shadow the import in local code: `for (const log of logEntries) { ... }` will hide the singleton inside that block. Rename loop variables (`entry`, `record`) when working with logger imports.
 
 
-## pick-log-channel  `@warlock.js/logger/pick-log-channel/SKILL.md`
+## pick-log-channel  `@warlock.js/logger/skills/pick-log-channel/SKILL.md`
 
 ---
 name: pick-log-channel
@@ -23446,7 +23446,7 @@ If two channels share a `name`, only one is reachable this way — the search re
 - The `write-custom-log-channel` topic — extending `LogChannel` for custom sinks
 
 
-## redact-sensitive-log-fields  `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`
+## redact-sensitive-log-fields  `@warlock.js/logger/skills/redact-sensitive-log-fields/SKILL.md`
 
 ---
 name: redact-sensitive-log-fields
@@ -23651,7 +23651,7 @@ Keys are normalized; values are exact literal substrings (punctuation is literal
 Registration retains keys/values in memory for the process lifetime. Removed/rotated values stay protected. It does not protect prior logs, transformed/encoded credentials, direct console calls, third-party loggers or credentials never registered. Core's `secrets` store registers its encountered keys/values automatically. Keep credentials out of logs even with this protection enabled.
 
 
-## ship-logs-to-sentry  `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`
+## ship-logs-to-sentry  `@warlock.js/logger/skills/ship-logs-to-sentry/SKILL.md`
 
 ---
 name: ship-logs-to-sentry
@@ -23773,7 +23773,7 @@ The channel never crashes your app: the dynamic import failure is swallowed, the
 - The `write-custom-log-channel` topic — build your own sink
 
 
-## test-logging-code  `@warlock.js/logger/test-logging-code/SKILL.md`
+## test-logging-code  `@warlock.js/logger/skills/test-logging-code/SKILL.md`
 
 ---
 name: test-logging-code
@@ -23956,7 +23956,7 @@ process.emit("uncaughtException", new Error("test"), "uncaughtException");
 See the `capture-unhandled-errors` topic for a full example.
 
 
-## use-log-helpers  `@warlock.js/logger/use-log-helpers/SKILL.md`
+## use-log-helpers  `@warlock.js/logger/skills/use-log-helpers/SKILL.md`
 
 ---
 name: use-log-helpers
@@ -24026,7 +24026,7 @@ end({ rowsProcessed: report.rowCount });
 - `log.timer` shorthand binds to the singleton — see the `test-logging-code` topic for how to swap channels per test.
 
 
-## write-custom-log-channel  `@warlock.js/logger/write-custom-log-channel/SKILL.md`
+## write-custom-log-channel  `@warlock.js/logger/skills/write-custom-log-channel/SKILL.md`
 
 ---
 name: write-custom-log-channel
@@ -24266,7 +24266,7 @@ Prefer extending `LogChannel` unless you have a concrete reason not to — the l
 ## Package orientation
 
 ---
-description: 'In-process job scheduler for Warlock.js with fluent and cron scheduling, retries, overlap prevention and timezones. Exports `Scheduler`, `scheduler`, `Job`, `job`, `CronParser`, `parseCron`, plus types `RetryConfig`, `JobResult`, `SchedulerEvents`. Use for: "run this every day at 3am", "run a cron expression on weekdays", "retry a failing job 3 times", "stop a job overlapping itself", "run in New York time", "log job failures". Not this package: durable queues and background workers are not scheduling; per-run locking across instances uses @warlock.js/cache.'
+description: 'In-process cron and fluent scheduling: `Scheduler`, `scheduler`, `Job`, `job`, `CronParser` and `parseCron`. Use for "run every day at 3am", "schedule weekdays", "retry a failing job", "prevent overlap", choose a timezone or observe job failures. Not this package → @warlock.js/queue for durable background workers; @warlock.js/cache for locks across instances; @warlock.js/herald for broker messaging.'
 ---
 
 # @warlock.js/scheduler
@@ -24317,7 +24317,7 @@ Define a job with `job("name", async () => { ... })`. Attach a schedule via the 
 - The `warlock-js-core` skill index — the parent framework that scheduled jobs typically run alongside.
 
 
-## configure-retry-and-overlap  `@warlock.js/scheduler/configure-retry-and-overlap/SKILL.md`
+## configure-retry-and-overlap  `@warlock.js/scheduler/skills/configure-retry-and-overlap/SKILL.md`
 
 ---
 name: configure-retry-and-overlap
@@ -24463,7 +24463,7 @@ job("sync", sync).everyMinutes(5).onOneServer({ lockTtl: "10m", key: "sync-v2" }
 - Throws at call time if the job has no name/key.
 
 
-## observe-scheduler  `@warlock.js/scheduler/observe-scheduler/SKILL.md`
+## observe-scheduler  `@warlock.js/scheduler/skills/observe-scheduler/SKILL.md`
 
 ---
 name: observe-scheduler
@@ -24621,7 +24621,7 @@ job.cronExpression; // string | null
 - The `schedule-fluently` topic — the methods that mutate the state these getters expose
 
 
-## pin-schedule-timezone  `@warlock.js/scheduler/pin-schedule-timezone/SKILL.md`
+## pin-schedule-timezone  `@warlock.js/scheduler/skills/pin-schedule-timezone/SKILL.md`
 
 ---
 name: pin-schedule-timezone
@@ -24730,7 +24730,7 @@ Node ships full ICU on most platforms, so all IANA zones work out of the box. If
 - The `observe-scheduler` topic — `job.nextRun.toISOString()` always renders in UTC; format with `.tz(zone)` to see local time
 
 
-## schedule-fluently  `@warlock.js/scheduler/schedule-fluently/SKILL.md`
+## schedule-fluently  `@warlock.js/scheduler/skills/schedule-fluently/SKILL.md`
 
 ---
 name: schedule-fluently
@@ -24872,7 +24872,7 @@ j?.cronExpression; // null if using fluent API
 - The `pin-schedule-timezone` topic — `.inTimezone()`
 
 
-## schedule-with-cron  `@warlock.js/scheduler/schedule-with-cron/SKILL.md`
+## schedule-with-cron  `@warlock.js/scheduler/skills/schedule-with-cron/SKILL.md`
 
 ---
 name: schedule-with-cron
@@ -24999,7 +24999,7 @@ If the job has `.inTimezone(tz)`, the cron parser receives a timezone-aware `day
 - The `pin-schedule-timezone` topic — pinning a cron schedule to a wall-clock timezone
 
 
-## scheduler-basics  `@warlock.js/scheduler/scheduler-basics/SKILL.md`
+## scheduler-basics  `@warlock.js/scheduler/skills/scheduler-basics/SKILL.md`
 
 ---
 name: scheduler-basics
@@ -25123,7 +25123,7 @@ scheduler.around((job, run) => storage.run({ job: job.name }, run));
 ## Package orientation
 
 ---
-description: 'Background jobs on BullMQ + Redis, local SQLite, or memory: retries, delays, priorities, workers, failed-job recovery. Exports `defineJob`, `queueConnector`, `startWorkers`, `closeQueue`, `getQueue`, `failedJobs`, `retryFailedJob`, `mountQueueDashboard`, `QueueConfig`, `QueueJob`. Use for: "run this in the background", "retry a failed job", "delay a job", "survive restarts", "job dashboard". Not this package: cron or recurring schedules → @warlock.js/scheduler; broker pub/sub messaging → @warlock.js/herald; core `Queue` is an in-memory batcher.'
+description: 'Background jobs with BullMQ/Redis, local SQLite or memory: `defineJob`, `queueConnector`, `startWorkers`, `closeQueue`, `failedJobs` and `mountQueueDashboard`. Use for "run in the background", "retry a job", "delay work", "survive restarts" or "view the job dashboard". Not this package → @warlock.js/scheduler for recurring schedules; @warlock.js/herald for pub/sub; @warlock.js/core for the in-memory `Queue` batcher.'
 ---
 
 # @warlock.js/queue
@@ -25161,7 +25161,7 @@ Use the `local-queues` topic for `driver: "local"` / `"memory"`, Node requiremen
 `@warlock.js/core` exports `Queue` — an in-memory batcher that flushes items by size or interval inside one process. No storage, no retries, lost on exit. Use `@warlock.js/queue` when work must survive a restart or be retried.
 
 
-## configure-queue  `@warlock.js/queue/configure-queue/SKILL.md`
+## configure-queue  `@warlock.js/queue/skills/configure-queue/SKILL.md`
 
 ---
 name: configure-queue
@@ -25224,7 +25224,7 @@ Every process must use the same `prefix`, or they will not see each other's jobs
 `QueueConfig` also takes a `dashboard: { enabled, path, middleware }` block — see the "Dashboard (optional)" section of the `manage-failed-jobs` topic for the `warlock add bull-board` setup and the production guard (`QueueDashboardUnguardedError`).
 
 
-## define-jobs  `@warlock.js/queue/define-jobs/SKILL.md`
+## define-jobs  `@warlock.js/queue/skills/define-jobs/SKILL.md`
 
 ---
 name: define-jobs
@@ -25325,7 +25325,7 @@ Jobs are not run — call the handler to test it. Opt out with `tests.fakes: { q
 - Defining the same name again replaces the handler (this is what keeps dev reloads working), so keep names unique.
 
 
-## local-queues  `@warlock.js/queue/local-queues/SKILL.md`
+## local-queues  `@warlock.js/queue/skills/local-queues/SKILL.md`
 
 ---
 name: local-queues
@@ -25450,7 +25450,7 @@ and process-role gating work for every backend.
   with local/memory queues. Prefer BullMQ for multi-host/high-volume workloads.
 
 
-## manage-failed-jobs  `@warlock.js/queue/manage-failed-jobs/SKILL.md`
+## manage-failed-jobs  `@warlock.js/queue/skills/manage-failed-jobs/SKILL.md`
 
 ---
 name: manage-failed-jobs
@@ -25522,7 +25522,7 @@ await queueDashboard(getHttpServer(), {
 - It has no authentication of its own — pass `middleware` yourself; this path does not enforce the production guard that the `dashboard` config does.
 
 
-## queue-notifications  `@warlock.js/queue/queue-notifications/SKILL.md`
+## queue-notifications  `@warlock.js/queue/skills/queue-notifications/SKILL.md`
 
 ---
 name: queue-notifications
@@ -25573,7 +25573,7 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
 ## Package orientation
 
 ---
-description: 'JWT authentication for Warlock apps: login/logout, refresh-token rotation, protected routes, multiple user types. Exports `Auth`, `authService`, `authMiddleware`, `authEvents`, `currentUser`, `loginThrottleMiddleware`, `requireVerifiedEmail`, `GoogleProvider`, `AuthErrorCodes`. Use for: "log a user in and issue tokens", "protect this route", "add an admin user type", "rate-limit login attempts", "verify email / reset password", "sign in with Google". Not this package: general route middleware lives in @warlock.js/core; request-body validation is @warlock.js/seal.'
+description: 'JWT authentication, refresh rotation, sessions, OTP and passkeys for Warlock apps. Exports `Auth`, `authService`, `authMiddleware`, `currentUser` and `GoogleProvider`. Use for "log in", "protect a route", "reset a password", "sign in with Google" or multiple user types. Not this package → @warlock.js/access for roles and permission policies; @warlock.js/core for general middleware; @warlock.js/seal for input rules.'
 ---
 
 # @warlock.js/auth
@@ -25623,7 +25623,7 @@ Your user model extends the `Auth` base model and declares its `userType`. A log
 - The `cascade-basics` topic of the `warlock-js-cascade` skill — the ORM behind the `Auth`, `AccessToken`, and `RefreshToken` models.
 
 
-## auth-basics  `@warlock.js/auth/auth-basics/SKILL.md`
+## auth-basics  `@warlock.js/auth/skills/auth-basics/SKILL.md`
 
 ---
 name: auth-basics
@@ -25744,7 +25744,7 @@ Two values that look right and are not:
 - Don't run `auth.cleanup` from app boot. Schedule it (cron, scheduler) as a periodic task — see the `scheduler-basics` topic of the `warlock-js-scheduler` skill.
 
 
-## customize-token-storage  `@warlock.js/auth/customize-token-storage/SKILL.md`
+## customize-token-storage  `@warlock.js/auth/skills/customize-token-storage/SKILL.md`
 
 ---
 name: customize-token-storage
@@ -25913,7 +25913,7 @@ If you rename a column, override the statics **and these getters** so they map t
 - The `define-model` topic of the `warlock-js-cascade` skill — extending models and schemas.
 
 
-## customize-user-type  `@warlock.js/auth/customize-user-type/SKILL.md`
+## customize-user-type  `@warlock.js/auth/skills/customize-user-type/SKILL.md`
 
 ---
 name: customize-user-type
@@ -26087,7 +26087,7 @@ abstract class Auth<TSchema> extends Model<TSchema> implements Authenticable {
 - The `define-model` topic of the `warlock-js-cascade` skill — `@RegisterModel`, models in general
 
 
-## handle-login-and-logout  `@warlock.js/auth/handle-login-and-logout/SKILL.md`
+## handle-login-and-logout  `@warlock.js/auth/skills/handle-login-and-logout/SKILL.md`
 
 ---
 name: handle-login-and-logout
@@ -26289,7 +26289,7 @@ Full event list: `login.attempt`, `login.success`, `login.failed`, `logout`, `lo
 For cookie sessions read by `@warlock.js/web` pages, log in with `authService.loginWithSessionCookies(request, response, Model, credentials)`. It requires a same-origin `Origin`/`Referer` even without cookies (login CSRF) and sets the access and refresh cookies (`auth.cookie.name`, `auth.cookie.refreshName`, `Path=/`). To share a session across subdomains, configure `auth.cookie.cookieDomain(request)` to return (for example) `".example.com"`; return `undefined` for host-only cookies. With `cookieDomain` configured, always pass the request to cookie helpers so they select the same Domain: `authService.setSessionCookies(response, tokens, request)`, `authService.clearSessionCookies(response, request)`, and `authService.clearAuthCookie(response, options, request)`. Omitting it throws `CookieDomainRequestRequiredError`. Domain clears also remove the legacy host-only names. Resolve pages with `pageSession({ project })` (`web.session`); header beats cookie; `auth.session.maxAge` defaults to `"30d"`. A page session with multiple `userTypes` cannot renew its cookie: the resolver only supplies a renewal user type when exactly one type is allowed, so it reads the session but skips automatic renewal. Multi-instance: share the JWT secret and the cache store, keep clocks in sync.
 
 
-## login-with-providers  `@warlock.js/auth/login-with-providers/SKILL.md`
+## login-with-providers  `@warlock.js/auth/skills/login-with-providers/SKILL.md`
 
 ---
 name: login-with-providers
@@ -26601,7 +26601,7 @@ router.post(
 - The `define-channel` topic of the `warlock-js-notifications` skill: an SMS/WhatsApp channel
 
 
-## manage-tokens  `@warlock.js/auth/manage-tokens/SKILL.md`
+## manage-tokens  `@warlock.js/auth/skills/manage-tokens/SKILL.md`
 
 ---
 name: manage-tokens
@@ -26801,7 +26801,7 @@ The package signs access and refresh tokens with independent secrets — `config
 - The `scheduler-basics` topic of the `warlock-js-scheduler` skill — scheduling cleanup
 
 
-## protect-routes  `@warlock.js/auth/protect-routes/SKILL.md`
+## protect-routes  `@warlock.js/auth/skills/protect-routes/SKILL.md`
 
 ---
 name: protect-routes
@@ -27117,7 +27117,7 @@ This is an Origin check, not a double-submit CSRF token — cheaper, and closes 
 - The `warlock-js-access` skill index — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough
 
 
-## register-user  `@warlock.js/auth/register-user/SKILL.md`
+## register-user  `@warlock.js/auth/skills/register-user/SKILL.md`
 
 ---
 name: register-user
@@ -27268,7 +27268,7 @@ Cleaner alternative: emit your own `user.registered` event from the controller a
 - The `define-model` topic of the `warlock-js-cascade` skill — `toJsonColumns` / `resource` for public output
 
 
-## run-auth-commands  `@warlock.js/auth/run-auth-commands/SKILL.md`
+## run-auth-commands  `@warlock.js/auth/skills/run-auth-commands/SKILL.md`
 
 ---
 name: run-auth-commands
@@ -27431,7 +27431,7 @@ Register it the same way as the bundled commands — call the factory inside `de
 - The `scheduler-basics` topic of the `warlock-js-scheduler` skill — in-process scheduling
 
 
-## throttle-login-attempts  `@warlock.js/auth/throttle-login-attempts/SKILL.md`
+## throttle-login-attempts  `@warlock.js/auth/skills/throttle-login-attempts/SKILL.md`
 
 ---
 name: throttle-login-attempts
@@ -27583,7 +27583,7 @@ They compose. For a hard ceiling on request volume _and_ failure-aware account l
 - The `use-middleware` topic of the `warlock-js-core` skill — `middleware.rateLimit` and the built-in middleware suite.
 
 
-## verify-email-and-reset-password  `@warlock.js/auth/verify-email-and-reset-password/SKILL.md`
+## verify-email-and-reset-password  `@warlock.js/auth/skills/verify-email-and-reset-password/SKILL.md`
 
 ---
 name: verify-email-and-reset-password
@@ -27739,7 +27739,7 @@ The default notifications are `defineNotification` objects (`type: "auth.email-v
 ## Package orientation
 
 ---
-description: 'Authorization (RBAC + ABAC) for Warlock apps: what a signed-in user is allowed to do. Exports `can`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access`, `DefaultAccessResolver`, `AccessResolver`, `AccessErrorCodes`. Use for: "check a permission", "restrict this route to users who can update orders", "only the owner can edit", "roles and permissions", "per-tenant roles", "custom role storage". Not this package: login, tokens, user-type gating → @warlock.js/auth; request validation → @warlock.js/seal.'
+description: 'Authorization with RBAC and ABAC: `can`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access` and `AccessResolver`. Use for "check a permission", "only the owner can edit", route policies, tenant roles or custom permission storage. Not this package → @warlock.js/auth for login, tokens and user-type guards; @warlock.js/seal for request validation.'
 ---
 
 # @warlock.js/access
@@ -27792,7 +27792,7 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 - The `protect-routes` topic of the `warlock-js-auth` skill — `authMiddleware`; stack `gate` after it.
 
 
-## check-permissions  `@warlock.js/access/check-permissions/SKILL.md`
+## check-permissions  `@warlock.js/access/skills/check-permissions/SKILL.md`
 
 ---
 name: check-permissions
@@ -27869,7 +27869,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 - The `protect-routes` topic of the `warlock-js-auth` skill — `authMiddleware`, which runs first.
 
 
-## configure-access  `@warlock.js/access/configure-access/SKILL.md`
+## configure-access  `@warlock.js/access/skills/configure-access/SKILL.md`
 
 ---
 name: configure-access
@@ -27961,7 +27961,7 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 - The `manage-roles` topic — assign / revoke with the ejected table.
 
 
-## define-policies  `@warlock.js/access/define-policies/SKILL.md`
+## define-policies  `@warlock.js/access/skills/define-policies/SKILL.md`
 
 ---
 name: define-policies
@@ -28036,7 +28036,7 @@ definePolicy(
 - The `check-permissions` topic — `authorize(…, { resource })`.
 
 
-## implement-resolver  `@warlock.js/access/implement-resolver/SKILL.md`
+## implement-resolver  `@warlock.js/access/skills/implement-resolver/SKILL.md`
 
 ---
 name: implement-resolver
@@ -28145,7 +28145,7 @@ class DirectResolver implements AccessResolver {
 - The `configure-access` topic — the quickstart `DefaultAccessResolver`.
 
 
-## manage-roles  `@warlock.js/access/manage-roles/SKILL.md`
+## manage-roles  `@warlock.js/access/skills/manage-roles/SKILL.md`
 
 ---
 name: manage-roles
@@ -28232,7 +28232,7 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 ## Package orientation
 
 ---
-description: 'Typed request-scoped context on Node AsyncLocalStorage, so data (user, tenant, trace id, transaction) flows through awaits without parameter threading. Exports `Context`, `contextManager`, `ContextManager`. Use for: "share the current user or tenant across async calls", "request-scoped storage", "AsyncLocalStorage wrapper", "run several contexts together", "avoid passing data through every function". Not this package: cross-request state → @warlock.js/cache or a database; HTTP request/response objects → @warlock.js/core.'
+description: 'Typed async context propagation with `Context` and `ContextManager`, built on AsyncLocalStorage. Use for "avoid passing the tenant everywhere", request-scoped users, trace IDs, `run`, `enter`, `get`, `set` or coordinating several contexts. Not this package → @warlock.js/core for the framework request context; @warlock.js/cache for state shared across requests; @warlock.js/cascade for database transactions.'
 ---
 
 # @warlock.js/context
@@ -28288,7 +28288,7 @@ Each `Context<TStore>` subclass declares a typed store shape and what payload bu
 - The `warlock-js-core` skill index — the parent framework; `context` is one of its foundation packages.
 
 
-## define-context  `@warlock.js/context/define-context/SKILL.md`
+## define-context  `@warlock.js/context/skills/define-context/SKILL.md`
 
 ---
 name: define-context
@@ -28449,7 +28449,7 @@ Now `tenantContext.tenantId` reads better than `tenantContext.get("tenantId")` a
 - Don't share one context instance across unrelated concerns. One typed context per domain concept reads better than one fat `globalContext`.
 
 
-## orchestrate-contexts  `@warlock.js/context/orchestrate-contexts/SKILL.md`
+## orchestrate-contexts  `@warlock.js/context/skills/orchestrate-contexts/SKILL.md`
 
 ---
 name: orchestrate-contexts
@@ -28622,11 +28622,11 @@ async function handleRequest(req: any, res: any) {
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/process/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## supervise-processes  `@warlock.js/process/supervise-processes/SKILL.md`
+## process  `@warlock.js/process/skills/SKILL.md`
 
 ---
-name: supervise-processes
-description: Start, limit, list, stop and recover app-owned workers or terminals using @warlock.js/process. Covers supervisor, ProcessNotOwnedError, spawnPty and warlock add process. Use for child process ownership and resource caps.
+name: warlock-js-process
+description: 'Supervise owned child processes with `supervisor`, `ProcessNotOwnedError` and `UnsupportedProcessPlatformError`. Use for "start and stop a process", readiness checks, restart backoff, line-buffered output, IPC, graceful shutdown, pipelines or optional PTY sessions. Not this package → @warlock.js/queue for background jobs; @warlock.js/scheduler for cron; @warlock.js/ai-cli for coding-agent CLI adapters.'
 ---
 
 # Supervise app-owned processes
@@ -28786,7 +28786,7 @@ to forward the token because ownership is checked through `/proc/<pid>/environ`.
 ## Package orientation
 
 ---
-description: 'Message bus over RabbitMQ (Kafka planned): publish, subscribe, and request-response between services. Exports `connectToBroker`, `herald`, `heraldChannel`, `Broker`, `defineEvent`, `defineConsumer`, `EventMessage`, `EventConsumer`, `Consumable`, `brokerRegistry`. Use for: "publish an event to RabbitMQ", "subscribe to a channel", "ack or nack a message", "request and reply over the bus", "cross-service messaging". Not this package: durable retried background jobs on Redis → @warlock.js/queue; cron/recurring work → @warlock.js/scheduler.'
+description: 'Broker messaging over RabbitMQ: `connectToBroker`, `herald`, `heraldChannel`, `defineEvent`, `defineConsumer`, `EventMessage` and `EventConsumer`. Use for "publish an event", "subscribe to a channel", "ack or nack", "request and reply" or cross-service pub/sub. Not this package → @warlock.js/queue for durable retried background jobs; @warlock.js/scheduler for cron; @warlock.js/notifications for user notifications.'
 ---
 
 # @warlock.js/herald
@@ -28810,7 +28810,7 @@ Herald is the broker-agnostic message bus. `connectToBroker(config)` boots a bro
 - Do not value-import from client code.
 
 
-## consume-message  `@warlock.js/herald/consume-message/SKILL.md`
+## consume-message  `@warlock.js/herald/skills/consume-message/SKILL.md`
 
 ---
 name: consume-message
@@ -29035,7 +29035,7 @@ await channel.delete(); // remove the queue entirely
 - The `request-and-respond` topic — when you need to reply to a message
 
 
-## herald-basics  `@warlock.js/herald/herald-basics/SKILL.md`
+## herald-basics  `@warlock.js/herald/skills/herald-basics/SKILL.md`
 
 ---
 name: herald-basics
@@ -29140,7 +29140,7 @@ herald("analytics").channel("events").publish({/* ... */}); // → analytics
 - The `seal-basics` topic of the `warlock-js-seal` skill — schema validation
 
 
-## publish-message  `@warlock.js/herald/publish-message/SKILL.md`
+## publish-message  `@warlock.js/herald/skills/publish-message/SKILL.md`
 
 ---
 name: publish-message
@@ -29319,7 +29319,7 @@ Set an optional `version` on the event (instance field) to drive the consumer's 
 - The `request-and-respond` topic — when you need a reply
 
 
-## request-and-respond  `@warlock.js/herald/request-and-respond/SKILL.md`
+## request-and-respond  `@warlock.js/herald/skills/request-and-respond/SKILL.md`
 
 ---
 name: request-and-respond
@@ -29410,7 +29410,7 @@ Each `request()` generates its own correlation ID and an exclusive reply queue u
 ## Package orientation
 
 ---
-description: 'Multi-channel notifications for Warlock: define once, send by mail, in-app database, or custom channels. Exports `defineNotification`, `notify`, `defineChannel`, `mailChannel`, `inApp`, `notificationColumns`, `notifications`, `bullmqQueue`, `heraldQueue`, `NotificationConfig`. Use for: "notify a user", "send order shipped by email and in-app", "unread notifications", "add a Slack or webhook channel", "queue notification delivery". Not this package: sending a plain email or mail templates → @warlock.js/core sendMail; background jobs → @warlock.js/queue.'
+description: 'Define once and notify through mail, in-app or custom channels: `defineNotification`, `notify`, `defineChannel`, `mailChannel`, `inApp`, `bullmqQueue` and `heraldQueue`. Use for "notify a user", "show unread notifications", "add a webhook channel" or "queue notification delivery". Not this package → @warlock.js/core for plain email and templates; @warlock.js/queue for jobs; @warlock.js/herald for broker messaging.'
 ---
 
 # @warlock.js/notifications
@@ -29435,7 +29435,7 @@ An orchestrator over transports that already exist: one event, many recipients, 
 - Do not value-import from client code.
 
 
-## configure-notifications  `@warlock.js/notifications/configure-notifications/SKILL.md`
+## configure-notifications  `@warlock.js/notifications/skills/configure-notifications/SKILL.md`
 
 ---
 name: configure-notifications
@@ -29577,7 +29577,7 @@ afterEach(() => resetNotificationConfig());
 - The `define-channel` topic — custom channels.
 
 
-## define-channel  `@warlock.js/notifications/define-channel/SKILL.md`
+## define-channel  `@warlock.js/notifications/skills/define-channel/SKILL.md`
 
 ---
 name: define-channel
@@ -29690,7 +29690,7 @@ export const slackChannel = (config: { token: string }) =>
 - The `develop-warlock.js-feature` workspace skill — lazy-import pattern for SDK-backed channels.
 
 
-## define-notification  `@warlock.js/notifications/define-notification/SKILL.md`
+## define-notification  `@warlock.js/notifications/skills/define-notification/SKILL.md`
 
 ---
 name: define-notification
@@ -29824,7 +29824,7 @@ Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-chan
 - The `observe-notifications` topic — `notifications.on("sending" | "sent" | "failed" | "skipped", …)`.
 
 
-## notifications-basics  `@warlock.js/notifications/notifications-basics/SKILL.md`
+## notifications-basics  `@warlock.js/notifications/skills/notifications-basics/SKILL.md`
 
 ---
 name: notifications-basics
@@ -29926,7 +29926,7 @@ await inApp.markAsRead(user, "ntf_123");
 - The `observe-notifications` topic — events + metrics.
 
 
-## observe-notifications  `@warlock.js/notifications/observe-notifications/SKILL.md`
+## observe-notifications  `@warlock.js/notifications/skills/observe-notifications/SKILL.md`
 
 ---
 name: observe-notifications
@@ -30000,7 +30000,7 @@ A handler that throws is logged and swallowed — the other handlers for the sam
 - The `send-ad-hoc` topic — when `notifiable` is undefined in events.
 
 
-## queue-notifications  `@warlock.js/notifications/queue-notifications/SKILL.md`
+## queue-notifications  `@warlock.js/notifications/skills/queue-notifications/SKILL.md`
 
 ---
 name: queue-notifications
@@ -30114,7 +30114,7 @@ await orderShipped.queue(user, { order }, { idempotencyKey: `ship:${order.id}` }
 - The `herald-basics` topic of the `warlock-js-herald` skill - connecting the broker.
 
 
-## send-ad-hoc  `@warlock.js/notifications/send-ad-hoc/SKILL.md`
+## send-ad-hoc  `@warlock.js/notifications/skills/send-ad-hoc/SKILL.md`
 
 ---
 name: send-ad-hoc
@@ -30213,7 +30213,7 @@ await notify.slack(staff, { text: "Deploy starting" });
 - The `observe-notifications` topic — `sending` / `sent` / `failed` / `skipped` events.
 
 
-## use-in-app  `@warlock.js/notifications/use-in-app/SKILL.md`
+## use-in-app  `@warlock.js/notifications/skills/use-in-app/SKILL.md`
 
 ---
 name: use-in-app
@@ -30391,7 +30391,7 @@ database: inApp.configure({ repository: notificationsRepository }),
 - The `define-notification` topic — create rows via the database channel.
 
 
-## write-notification-migration  `@warlock.js/notifications/write-notification-migration/SKILL.md`
+## write-notification-migration  `@warlock.js/notifications/skills/write-notification-migration/SKILL.md`
 
 ---
 name: write-notification-migration
@@ -30491,7 +30491,7 @@ Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See th
 ## Package orientation
 
 ---
-description: "React SSR pages for Warlock apps, with Vite. Exports `defer`, `useTrans`, `LocaleProvider`, `Link`, `href`, `navigateTo`, `refresh`, `shared`, `useShared`, `PublicPageError`, plus `Head` and `ClientOnly`. Use for: add a page, add SSR to an app, load data for a page, stream slow data, add a layout, change the HTML document, translate a page, link or navigate between pages, submit a form, handle a form action, protect a page, read the signed-in user, serve a sitemap, add a theme, ship CSS, set page metadata, render an image, test a page. Not this package: API routes, controllers, mail, storage → @warlock.js/core; database queries → @warlock.js/cascade; form input rules → @warlock.js/seal."
+description: 'React SSR pages with Vite: `Link`, `href`, `defer`, `shared`, `useShared`, `Form`, `Head`, `Image`, `useTrans` and `navigateTo`. Use for "add a page", "load page data", stream loaders, layouts, forms/actions, sessions, themes, localization, metadata or sitemaps. Not this package → @warlock.js/core for API routes, mail and storage; @warlock.js/cascade for queries; @warlock.js/seal for input validation.'
 ---
 
 # @warlock.js/web
@@ -30521,7 +30521,7 @@ Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**`
 - Do not add a client router or matcher; two matchers diverge silently.
 
 
-## add-web-to-an-app  `@warlock.js/web/add-web-to-an-app/SKILL.md`
+## add-web-to-an-app  `@warlock.js/web/skills/add-web-to-an-app/SKILL.md`
 
 ---
 name: add-web-to-an-app
@@ -30646,7 +30646,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 - The `serve-styles` topic: add global CSS from the root.
 - The `run-app` topic of the `warlock-js-core` skill: run dev, build, and production.
 
-## create-a-page  `@warlock.js/web/create-a-page/SKILL.md`
+## create-a-page  `@warlock.js/web/skills/create-a-page/SKILL.md`
 
 ---
 name: create-a-page
@@ -31228,11 +31228,11 @@ export async function findProduct(id: string | number) {
 }
 ```
 
-## generate-sitemap  `@warlock.js/web/generate-sitemap/SKILL.md`
+## generate-sitemap  `@warlock.js/web/skills/generate-sitemap/SKILL.md`
 
 ---
 name: generate-sitemap
-description: 'Serve `/sitemap.xml` and `/robots.txt` from a Warlock web app with the `@warlock.js/web/sitemap` subpath — the `web.sitemap` and `web.robots` keys in `src/config/web.ts`, page `config.sitemap` (opt out, static options, or a supplier for dynamic routes), locale/hreflang expansion, the automatic switch to a sharded `SitemapIndex`, when generation runs (intervals, committed model changes, runtime boot or `regenerateSitemap()` — never `warlock build`), the 503-before-first-generation rule, and `MissingPublicUrlError`. Triggers: `web.sitemap`, `web.robots`, `WebSitemapConfig`, `RobotsConfig`, `SitemapPageExport`, `export const sitemap`, `regenerateSitemap`, `generateSitemap`, `MissingPublicUrlError`, `splitByLocale`, `localeUrl`, `referenceSitemap`, `warlock add sitemap`; "add a sitemap to my Warlock site", "dynamic route missing from sitemap.xml", "regenerate the sitemap after publishing a post", "robots.txt", "sitemap returns 503", "hreflang in the sitemap". Skip: the framework-blind builder classes themselves (`Sitemap`, `SitemapIndex`, Express/cron usage) — the `sitemap-overview` topic of the `warlock-js-sitemap` skill; `app.publicUrl` — the `configure-app` topic of the `warlock-js-core` skill; page metadata `robots: noindex` — the `create-a-page` topic; competing tools `next-sitemap`, `sitemap` npm package direct.'
+description: 'Serve `/sitemap.xml` and `/robots.txt` from a Warlock web app with the `@warlock.js/web/sitemap` subpath — the `web.sitemap` and `web.robots` keys in `src/config/web.ts`, page `config.sitemap` (opt out, static options, or a supplier for dynamic routes), locale/hreflang expansion, the automatic switch to a sharded `SitemapIndex`, when generation runs (intervals, committed model changes, runtime boot or `regenerateSitemap()` — never `warlock build`), the 503-before-first-generation rule, and `MissingPublicUrlError`. Triggers: `web.sitemap`, `web.robots`, `WebSitemapConfig`, `RobotsConfig`, `SitemapPageExport`, `export const sitemap`, `regenerateSitemap`, `generateSitemap`, `MissingPublicUrlError`, `splitByLocale`, `localeUrl`, `referenceSitemap`, `warlock add sitemap`; "add a sitemap to my Warlock site", "dynamic route missing from sitemap.xml", "regenerate the sitemap after publishing a post", "robots.txt", "sitemap returns 503", "hreflang in the sitemap". Skip: the framework-blind builder classes themselves (`Sitemap`, `SitemapIndex`, Express/cron usage) — the `warlock-js-sitemap` skill; `app.publicUrl` — the `configure-app` topic of the `warlock-js-core` skill; page metadata `robots: noindex` — the `create-a-page` topic; competing tools `next-sitemap`, `sitemap` npm package direct.'
 ---
 
 # Generate a sitemap and robots.txt
@@ -31425,7 +31425,7 @@ export async function listPublishedProductSitemapRows() {
 }
 ```
 
-## handle-a-form-action  `@warlock.js/web/handle-a-form-action/SKILL.md`
+## handle-a-form-action  `@warlock.js/web/skills/handle-a-form-action/SKILL.md`
 
 ---
 name: handle-a-form-action
@@ -31741,7 +31741,7 @@ export default function CancelPage() {
 An independent form can run beside another pending form; duplicate submissions
 of the same form still share their active request.
 
-## load-page-data  `@warlock.js/web/load-page-data/SKILL.md`
+## load-page-data  `@warlock.js/web/skills/load-page-data/SKILL.md`
 
 ---
 name: load-page-data
@@ -32342,7 +32342,7 @@ export async function getProduct() {
 }
 ```
 
-## localize-pages  `@warlock.js/web/localize-pages/SKILL.md`
+## localize-pages  `@warlock.js/web/skills/localize-pages/SKILL.md`
 
 ---
 name: localize-pages
@@ -32584,7 +32584,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 - The `use-localization` topic of the `warlock-js-core` skill: global/module dictionaries and localized data columns.
 - The `multi-site` topic: per-site `localeRouting`.
 
-## measure-web-vitals  `@warlock.js/web/measure-web-vitals/SKILL.md`
+## measure-web-vitals  `@warlock.js/web/skills/measure-web-vitals/SKILL.md`
 
 ---
 name: measure-web-vitals
@@ -32868,7 +32868,7 @@ all.
 - The `stream-deferred-data` topic:
   `defer()` and `<Suspense>`, relevant to the CLS guidance above.
 
-## multi-site  `@warlock.js/web/multi-site/SKILL.md`
+## multi-site  `@warlock.js/web/skills/multi-site/SKILL.md`
 
 ---
 name: multi-site
@@ -32995,7 +32995,7 @@ export async function loadTenant(id: string) {
 }
 ```
 
-## multi-theme  `@warlock.js/web/multi-theme/SKILL.md`
+## multi-theme  `@warlock.js/web/skills/multi-theme/SKILL.md`
 
 ---
 name: multi-theme
@@ -33121,7 +33121,7 @@ export const config = {
 - **Keep `themeSources` next to the map.** A path typo fails the request loudly in both dev and prod.
 - **`import type {} from "./types"` in `root.setup.ts` is refused by projection.** Put the `SharedContext` augmentation in a module the root already imports.
 
-## navigate-on-the-client  `@warlock.js/web/navigate-on-the-client/SKILL.md`
+## navigate-on-the-client  `@warlock.js/web/skills/navigate-on-the-client/SKILL.md`
 
 ---
 name: navigate-on-the-client
@@ -33636,7 +33636,7 @@ payload's `shared` snapshot before rendering. Retained components using
 switches. Write shared values in server middleware on each request; client
 writes remain refused.
 
-## observe-page-requests  `@warlock.js/web/observe-page-requests/SKILL.md`
+## observe-page-requests  `@warlock.js/web/skills/observe-page-requests/SKILL.md`
 
 ---
 name: observe-page-requests
@@ -33676,7 +33676,7 @@ Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
 Use `key` only to identify a deferred value; do not put sensitive loader data
 in tracing attributes.
 
-## protect-a-page  `@warlock.js/web/protect-a-page/SKILL.md`
+## protect-a-page  `@warlock.js/web/skills/protect-a-page/SKILL.md`
 
 ---
 name: protect-a-page
@@ -33805,7 +33805,7 @@ declare module "@warlock.js/web" {
 }
 ```
 
-## render-client-only  `@warlock.js/web/render-client-only/SKILL.md`
+## render-client-only  `@warlock.js/web/skills/render-client-only/SKILL.md`
 
 ---
 name: render-client-only
@@ -34031,7 +34031,7 @@ Rules that follow from the source:
 - The `create-a-page` topic: the page component this typically renders inside.
 - The `write-the-root` topic: the hydration boundary `<ClientOnly>`'s mount detection relies on.
 
-## render-images  `@warlock.js/web/render-images/SKILL.md`
+## render-images  `@warlock.js/web/skills/render-images/SKILL.md`
 
 ---
 name: render-images
@@ -34337,7 +34337,7 @@ export class Post extends Model<Infer<typeof postSchema>> {
 }
 ```
 
-## serve-styles  `@warlock.js/web/serve-styles/SKILL.md`
+## serve-styles  `@warlock.js/web/skills/serve-styles/SKILL.md`
 
 ---
 name: serve-styles
@@ -34541,7 +34541,7 @@ Notes:
 - The `create-a-page` topic: page-local asset imports and projection.
 - The `navigate-on-the-client` topic: client swaps after the initial styled document.
 
-## set-page-metadata  `@warlock.js/web/set-page-metadata/SKILL.md`
+## set-page-metadata  `@warlock.js/web/skills/set-page-metadata/SKILL.md`
 
 ---
 name: set-page-metadata
@@ -34834,7 +34834,7 @@ export const config = {
 - `localize-pages` topic: locale setup, `useTrans` and `t()`.
 - `generate-sitemap` topic: hreflang alternates in `sitemap.xml`.
 
-## stream-deferred-data  `@warlock.js/web/stream-deferred-data/SKILL.md`
+## stream-deferred-data  `@warlock.js/web/skills/stream-deferred-data/SKILL.md`
 
 ---
 name: stream-deferred-data
@@ -35177,7 +35177,7 @@ cache never serves one representation to a client that asked for the other.
 - The `load-page-data` topic: the rest of the loader contract `defer()` builds on.
 - The `navigate-on-the-client` topic: the NDJSON data request this streams over.
 
-## submit-a-form  `@warlock.js/web/submit-a-form/SKILL.md`
+## submit-a-form  `@warlock.js/web/skills/submit-a-form/SKILL.md`
 
 ---
 name: submit-a-form
@@ -35333,7 +35333,7 @@ declare module "@warlock.js/web" {
 }
 ```
 
-## test-a-page  `@warlock.js/web/test-a-page/SKILL.md`
+## test-a-page  `@warlock.js/web/skills/test-a-page/SKILL.md`
 
 ---
 name: test-a-page
@@ -35635,7 +35635,7 @@ export async function subscribe(email: string) {
 }
 ```
 
-## use-layouts  `@warlock.js/web/use-layouts/SKILL.md`
+## use-layouts  `@warlock.js/web/skills/use-layouts/SKILL.md`
 
 ---
 name: use-layouts
@@ -35866,7 +35866,7 @@ cache policy, validation, or a sitemap supplier.
 - The `load-page-data` topic: `LayoutLoader`, sequential execution, and `shared`.
 - The `navigate-on-the-client` topic: client swaps and `refresh()`.
 
-## use-page-setup-files  `@warlock.js/web/use-page-setup-files/SKILL.md`
+## use-page-setup-files  `@warlock.js/web/skills/use-page-setup-files/SKILL.md`
 
 ---
 name: use-page-setup-files
@@ -35961,7 +35961,7 @@ components and named component exports belong in the UI file.
 update the route graph; setup edits refresh server logic and its client
 registration projection. Component-only edits remain eligible for Fast Refresh.
 
-## use-web-fonts  `@warlock.js/web/use-web-fonts/SKILL.md`
+## use-web-fonts  `@warlock.js/web/skills/use-web-fonts/SKILL.md`
 
 ---
 name: use-web-fonts
@@ -36091,7 +36091,7 @@ export default function AboutPage() {
   actual hero at its breakpoints with an empty browser cache. Variable fonts
   use default-instance metrics; non-Latin sampling is not implemented.
 
-## write-the-root  `@warlock.js/web/write-the-root/SKILL.md`
+## write-the-root  `@warlock.js/web/skills/write-the-root/SKILL.md`
 
 ---
 name: write-the-root
@@ -36391,7 +36391,7 @@ suppressing it.
 ## Package orientation
 
 ---
-description: "Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RAG, memory, guardrails. Exports `ai`, `agent`, `tool`, `team`, `workflow`, `planner`, `supervisor`, `orchestrator`, `rag`, `memory`, `systemPrompt`, `humanApproval`, `guard`. Use for: call an LLM, build an AI agent, give it tools, run a multi-agent team, chain steps, RAG over documents, embed text, generate images or speech, transcribe audio, approve tool calls, redact PII, replay model calls, run evals. Not this package: web/HTTP/MCP tools → @warlock.js/ai-tools; file+shell agents → @warlock.js/ai-workspace; tracing → @warlock.js/ai-panoptic; model adapters → ai-openai, ai-anthropic, other ai-<provider> packages."
+description: 'Provider-neutral AI agents, tools, workflows, memory, RAG and multimodal calls. Exports `ai`, `humanApproval`, `guardrail`, `team`, `MockModel` and `countInputTokens`. Use for "run an agent", "define a tool", "stream a response", "add approval" or "track token cost". Not this package → @warlock.js/ai-tools for MCP and web tools; @warlock.js/ai-workspace for file/shell tools; @warlock.js/ai-openai for provider setup.'
 ---
 
 # @warlock.js/ai
@@ -36427,7 +36427,7 @@ The core AI package. Everything hangs off the `ai` facade (`ai.agent`, `ai.tool`
 - `registerAiMatchers` lazy-loads `vitest`; only call it from tests.
 
 
-## ai-basics  `@warlock.js/ai/ai-basics/SKILL.md`
+## ai-basics  `@warlock.js/ai/skills/ai-basics/SKILL.md`
 
 ---
 name: ai-basics
@@ -36458,7 +36458,7 @@ Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working 
 ## Foundations
 
 1. **Public API is functional factories.** Use `ai.agent({...})`, `ai.tool({...})`, `ai.workflow({...})`, `ai.step({...})`, `ai.supervisor({...})`, `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()`. Never `new Agent()`.
-2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `warlock-js-ai-openai` skill.
 3. **Schemas everywhere are `StandardSchemaV1<T>`.** Recommended: `@warlock.js/seal` (the `seal-basics` topic of the `warlock-js-seal` skill) — `v.object({...})`. Zod, Valibot, hand-rolled all interop.
 4. **`execute()` never throws.** Errors funnel into `result.error` as a typed `AIError` subclass. Same for `stream.result`, `workflow.execute()` / `resume()`, `supervisor.execute()` / `resume()`. See the `handle-ai-errors` topic.
 5. **Each `execute()` call is isolated.** Fresh internal execution instance per call.
@@ -36539,7 +36539,7 @@ Runtime deps: `@warlock.js/cache` (persistence), `@warlock.js/logger` (logging),
 - `domains/ai/conventions/errors.md` — framework-vs-consumer-app error split
 
 
-## ai-dx-helpers  `@warlock.js/ai/ai-dx-helpers/SKILL.md`
+## ai-dx-helpers  `@warlock.js/ai/skills/ai-dx-helpers/SKILL.md`
 
 ---
 name: ai-dx-helpers
@@ -36824,7 +36824,7 @@ const concierge = ai.agent({
 - The `pick-ai-provider` topic — `fallbackModel` wraps these adapters; cost-truth tokens
 
 
-## approve-tool-calls  `@warlock.js/ai/approve-tool-calls/SKILL.md`
+## approve-tool-calls  `@warlock.js/ai/skills/approve-tool-calls/SKILL.md`
 
 ---
 name: approve-tool-calls
@@ -36967,7 +36967,7 @@ Only a _handler bug_ — a non-sentinel throw from your handler — propagates, 
 - `@warlock.js/ai` — the `ai.agent(...)`, `AgentMiddleware`, `tool.before`, and `ToolInvokeResult` primitives this gate wraps.
 
 
-## attach-ai-middleware  `@warlock.js/ai/attach-ai-middleware/SKILL.md`
+## attach-ai-middleware  `@warlock.js/ai/skills/attach-ai-middleware/SKILL.md`
 
 ---
 name: attach-ai-middleware
@@ -37319,7 +37319,7 @@ prompt. Official verified rates and sources:
 https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees
 
 
-## define-ai-tool  `@warlock.js/ai/define-ai-tool/SKILL.md`
+## define-ai-tool  `@warlock.js/ai/skills/define-ai-tool/SKILL.md`
 
 ---
 name: define-ai-tool
@@ -37722,7 +37722,7 @@ Keep provider-hosted tools alongside `...surface.tools`. Eager provider tools ac
 For savings, compare `ai.measure({ model, tools: fullEagerList })` with `ai.measure({ model, tools: surface.tools })` and inspect `ai.measure.diff(full, discovered).parts.tools`; negative tokens mean a reduction. Measurement does not load hidden tools. Search-result schemas and extra trips still cost context tokens; include representative discovery messages when measuring the whole run.
 
 
-## detect-and-redact-pii  `@warlock.js/ai/detect-and-redact-pii/SKILL.md`
+## detect-and-redact-pii  `@warlock.js/ai/skills/detect-and-redact-pii/SKILL.md`
 
 ---
 name: detect-and-redact-pii
@@ -37827,7 +37827,7 @@ npm install openai
 - The `escalate-block-to-human` topic — escalating a hard `block` to a human-review surface.
 
 
-## durable-agent-runs  `@warlock.js/ai/durable-agent-runs/SKILL.md`
+## durable-agent-runs  `@warlock.js/ai/skills/durable-agent-runs/SKILL.md`
 
 ---
 name: durable-agent-runs
@@ -37978,7 +37978,7 @@ Pair `deleteOnComplete: true` with this loop when you don't need the completed-r
 - [[durable-resume]] — the OTHER resume: `ai.human.resume` of a gated tool call (human-in-the-loop), not a crash.
 
 
-## durable-resume  `@warlock.js/ai/durable-resume/SKILL.md`
+## durable-resume  `@warlock.js/ai/skills/durable-resume/SKILL.md`
 
 ---
 name: durable-resume
@@ -38129,7 +38129,7 @@ const redisStore = ai.human.interrupt.redis({ url: process.env.REDIS_URL });
 - `@warlock.js/ai` — the `CheckpointStore` / `SnapshotStore` the `InterruptStore` mirrors, and the `ai.agent(...)` re-run target.
 
 
-## embed-text  `@warlock.js/ai/embed-text/SKILL.md`
+## embed-text  `@warlock.js/ai/skills/embed-text/SKILL.md`
 
 ---
 name: embed-text
@@ -38244,7 +38244,7 @@ No built-in vector store. Bring your own (pgvector / Qdrant / Pinecone / Chroma 
 - The `search-by-vector` topic of the `warlock-js-cascade` skill — cascade `similarTo` query method
 
 
-## escalate-block-to-human  `@warlock.js/ai/escalate-block-to-human/SKILL.md`
+## escalate-block-to-human  `@warlock.js/ai/skills/escalate-block-to-human/SKILL.md`
 
 ---
 name: escalate-block-to-human
@@ -38345,7 +38345,7 @@ A `check()` may be sync or async (async = call an external service); the guard a
 - The `detect-and-redact-pii` topic — the `pii` detector and the optional `moderation` peer that commonly drives an escalation.
 
 
-## eval-datasets-and-ci  `@warlock.js/ai/eval-datasets-and-ci/SKILL.md`
+## eval-datasets-and-ci  `@warlock.js/ai/skills/eval-datasets-and-ci/SKILL.md`
 
 ---
 name: eval-datasets-and-ci
@@ -38472,7 +38472,7 @@ if (report.regression && !report.regression.passed) process.exit(1);
 - The `record-replay-llm` topic — `ai.vcr` for deterministic, offline eval runs
 
 
-## generate-images  `@warlock.js/ai/generate-images/SKILL.md`
+## generate-images  `@warlock.js/ai/skills/generate-images/SKILL.md`
 
 ---
 name: generate-images
@@ -38632,7 +38632,7 @@ const { data, usage } = await ai.image({ model: mock.image!({ name: "mock-image"
 ```
 
 
-## generate-speech  `@warlock.js/ai/generate-speech/SKILL.md`
+## generate-speech  `@warlock.js/ai/skills/generate-speech/SKILL.md`
 
 ---
 name: generate-speech
@@ -38783,7 +38783,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 - [[handle-ai-errors]] — the typed `AIError` taxonomy on `result.error`
 
 
-## guard-input-output  `@warlock.js/ai/guard-input-output/SKILL.md`
+## guard-input-output  `@warlock.js/ai/skills/guard-input-output/SKILL.md`
 
 ---
 name: guard-input-output
@@ -38906,7 +38906,7 @@ A detector's `check()` **rejecting** is an infrastructure fault, not a content v
 - The `run-ai-agent` topic — running the agent, the middleware pipeline, and the `GuardrailViolationError` on `result.error`.
 
 
-## handle-ai-errors  `@warlock.js/ai/handle-ai-errors/SKILL.md`
+## handle-ai-errors  `@warlock.js/ai/skills/handle-ai-errors/SKILL.md`
 
 ---
 name: handle-ai-errors
@@ -39209,7 +39209,7 @@ async function runWithFallbacks(input: string) {
 - `domains/ai/conventions/errors.md` — framework vs app error convention
 
 
-## keep-agent-conversations  `@warlock.js/ai/keep-agent-conversations/SKILL.md`
+## keep-agent-conversations  `@warlock.js/ai/skills/keep-agent-conversations/SKILL.md`
 
 ---
 name: keep-agent-conversations
@@ -39315,7 +39315,7 @@ On Claude, `providerOptions.anthropic.serverCompaction` is the server-side alter
 - Without `durable` on the agent, `resume()` throws; the next `send` replaces the pending mark.
 
 
-## log-ai-calls  `@warlock.js/ai/log-ai-calls/SKILL.md`
+## log-ai-calls  `@warlock.js/ai/skills/log-ai-calls/SKILL.md`
 
 ---
 name: log-ai-calls
@@ -39459,7 +39459,7 @@ See the `test-logging-code` topic of the `warlock-js-logger` skill for the test 
 - The `handle-ai-errors` topic — what lands on the `error` channel
 
 
-## manage-ai-stores  `@warlock.js/ai/manage-ai-stores/SKILL.md`
+## manage-ai-stores  `@warlock.js/ai/skills/manage-ai-stores/SKILL.md`
 
 ---
 name: manage-ai-stores
@@ -39618,7 +39618,7 @@ A bare `ai.supervisor()` / `ai.workflow()` uses a `snapshotStore` for `resume(ru
 - The `handle-ai-errors` topic — `OrchestratorDriftError` / `OrchestratorConfigError`
 
 
-## manage-prompts  `@warlock.js/ai/manage-prompts/SKILL.md`
+## manage-prompts  `@warlock.js/ai/skills/manage-prompts/SKILL.md`
 
 ---
 name: manage-prompts
@@ -39817,7 +39817,7 @@ If you only ever called `ai.prompt({ ... })` and used the returned registry, **n
 - The `run-ai-agent` topic — wiring a resolved prompt into an agent, plus the judge-safe agent preset (`ai.agent.judge`)
 
 
-## observe-ai-flows  `@warlock.js/ai/observe-ai-flows/SKILL.md`
+## observe-ai-flows  `@warlock.js/ai/skills/observe-ai-flows/SKILL.md`
 
 ---
 name: observe-ai-flows
@@ -39919,7 +39919,7 @@ A misbehaving listener's throw is swallowed (same swallow-on-throw discipline as
 - The `run-ai-team` topic — a team inherits `observe` through the supervisor it forwards to
 
 
-## persist-ai-data  `@warlock.js/ai/persist-ai-data/SKILL.md`
+## persist-ai-data  `@warlock.js/ai/skills/persist-ai-data/SKILL.md`
 
 ---
 name: persist-ai-data
@@ -40150,7 +40150,7 @@ The driver must support `similar()`. Without similarity → `CacheUnsupportedErr
 - The `cache-basics` topic of the `warlock-js-cache` skill — driver catalog
 
 
-## pick-ai-provider  `@warlock.js/ai/pick-ai-provider/SKILL.md`
+## pick-ai-provider  `@warlock.js/ai/skills/pick-ai-provider/SKILL.md`
 
 ---
 name: pick-ai-provider
@@ -40353,7 +40353,7 @@ If you switch providers mid-project (e.g. OpenAI → Anthropic):
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — full OpenAI adapter docs
+- The `warlock-js-ai-openai` skill — full OpenAI adapter docs
 - The `run-ai-agent` topic — model passed into `ai.agent({...})`
 - The `embed-text` topic — embedder primitive on the SDK
 - The `handle-ai-errors` topic — adapter error categorization
@@ -40417,7 +40417,7 @@ the transport lacks it. Pass only options appropriate to your selected adapter;
 provider-only fields do not replace framework-owned messages, tools or model.
 
 
-## rag-loaders-and-stores  `@warlock.js/ai/rag-loaders-and-stores/SKILL.md`
+## rag-loaders-and-stores  `@warlock.js/ai/skills/rag-loaders-and-stores/SKILL.md`
 
 ---
 name: rag-loaders-and-stores
@@ -40616,7 +40616,7 @@ The `embedder`'s `dimensions` MUST equal the store's `dimensions` — a mismatch
 - The `use-cache-similarity` topic of the `warlock-js-cache` skill — the cache driver `cacheVectorStore` adapts.
 
 
-## record-replay-llm  `@warlock.js/ai/record-replay-llm/SKILL.md`
+## record-replay-llm  `@warlock.js/ai/skills/record-replay-llm/SKILL.md`
 
 ---
 name: record-replay-llm
@@ -40720,7 +40720,7 @@ VCR composes **below** `ai.fallbackModel` and works with any adapter. Wrap the l
 - The `pick-ai-provider` topic — the adapters whose models VCR wraps
 
 
-## refine-prompts  `@warlock.js/ai/refine-prompts/SKILL.md`
+## refine-prompts  `@warlock.js/ai/skills/refine-prompts/SKILL.md`
 
 ---
 name: refine-prompts
@@ -40821,7 +40821,7 @@ Factory-time resolution reads whatever is pinned **at that moment** — so warm 
 - The `eval-datasets-and-ci` topic — measure original vs refined behaviour on a dataset
 
 
-## run-ai-agent  `@warlock.js/ai/run-ai-agent/SKILL.md`
+## run-ai-agent  `@warlock.js/ai/skills/run-ai-agent/SKILL.md`
 
 ---
 name: run-ai-agent
@@ -41388,7 +41388,7 @@ sessions. On models that bind thinking to the exact prior history (Claude Fable
 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5) the Anthropic adapter replays retained
 turns without their thinking; older models keep it. Prefer
 `providerOptions.anthropic.serverCompaction` on those models when the
-reasoning matters (see `setup-anthropic`).
+reasoning matters (see the `warlock-js-ai-anthropic` skill).
 
 ```ts
 const result = await worker.execute("Refactor the module", { captureMessages: true });
@@ -41438,7 +41438,7 @@ A concurrency cap limits calls within one model trip; it is not a process-wide
 limit across many agent runs. Results still reach the model in request order.
 
 
-## run-ai-rag  `@warlock.js/ai/run-ai-rag/SKILL.md`
+## run-ai-rag  `@warlock.js/ai/skills/run-ai-rag/SKILL.md`
 
 ---
 name: run-ai-rag
@@ -41581,7 +41581,7 @@ await kb.clear(); // drops every entry written under this rag's namespace
 - The `run-ai-agent` topic — wiring the retrieval tool into an agent
 
 
-## run-ai-team  `@warlock.js/ai/run-ai-team/SKILL.md`
+## run-ai-team  `@warlock.js/ai/skills/run-ai-team/SKILL.md`
 
 ---
 name: run-ai-team
@@ -41700,7 +41700,7 @@ A member callback that calls `agent.execute()` **directly** still nests `member 
 - The `observe-ai-flows` topic — the `observe` seam a team inherits
 
 
-## run-ai-workflow  `@warlock.js/ai/run-ai-workflow/SKILL.md`
+## run-ai-workflow  `@warlock.js/ai/skills/run-ai-workflow/SKILL.md`
 
 ---
 name: run-ai-workflow
@@ -41985,7 +41985,7 @@ Every payload carries `runId` and `rootRunId`.
 - The `handle-ai-errors` topic — `WorkflowError` subclasses
 
 
-## run-orchestrator  `@warlock.js/ai/run-orchestrator/SKILL.md`
+## run-orchestrator  `@warlock.js/ai/skills/run-orchestrator/SKILL.md`
 
 ---
 name: run-orchestrator
@@ -42204,7 +42204,7 @@ await orch.execute(input, { sessionId, history, on: { "orchestrator.drift.checke
 - The `handle-ai-errors` topic — `OrchestratorDriftError` / `OrchestratorConfigError`
 
 
-## run-planner  `@warlock.js/ai/run-planner/SKILL.md`
+## run-planner  `@warlock.js/ai/skills/run-planner/SKILL.md`
 
 ---
 name: run-planner
@@ -42351,7 +42351,7 @@ A plan step can hand a bounded subtask to a fresh single-use agent with a hard s
 Use `MockSDK` for the planning model — script the plan as a JSON string matching `{ steps, summary? }`. Capabilities can be `mockAgent({ name, responses })`. See `src/planner/planner.spec.ts`.
 
 
-## run-supervisor  `@warlock.js/ai/run-supervisor/SKILL.md`
+## run-supervisor  `@warlock.js/ai/skills/run-supervisor/SKILL.md`
 
 ---
 name: run-supervisor
@@ -42743,7 +42743,7 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 - The `define-ai-tool` topic — tool artifacts side-channel
 
 
-## secure-outbound-requests  `@warlock.js/ai/secure-outbound-requests/SKILL.md`
+## secure-outbound-requests  `@warlock.js/ai/skills/secure-outbound-requests/SKILL.md`
 
 ---
 name: secure-outbound-requests
@@ -42850,7 +42850,7 @@ Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting t
 - The `handle-ai-errors` topic — `OutboundPolicyError`
 
 
-## transcribe-audio  `@warlock.js/ai/transcribe-audio/SKILL.md`
+## transcribe-audio  `@warlock.js/ai/skills/transcribe-audio/SKILL.md`
 
 ---
 name: transcribe-audio
@@ -43013,7 +43013,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 - [[handle-ai-errors]] — the typed `AIError` taxonomy on `result.error`
 
 
-## use-ai-memory  `@warlock.js/ai/use-ai-memory/SKILL.md`
+## use-ai-memory  `@warlock.js/ai/skills/use-ai-memory/SKILL.md`
 
 ---
 name: use-ai-memory
@@ -43194,7 +43194,7 @@ Drivers without similarity support throw `CacheUnsupportedError` from `set({ vec
 - The `cache-basics` topic of the `warlock-js-cache` skill — vector driver catalog
 
 
-## use-runtime-skills  `@warlock.js/ai/use-runtime-skills/SKILL.md`
+## use-runtime-skills  `@warlock.js/ai/skills/use-runtime-skills/SKILL.md`
 
 ---
 name: use-runtime-skills
@@ -43309,7 +43309,7 @@ The optional `analytics` sink fires `catalogued` / `loaded` / `used` / `saved` /
 - The `secure-outbound-requests` topic — the `guardedFetch` / `OutboundPolicy` guard the `url` source's manifest fetch runs through
 
 
-## write-system-prompt  `@warlock.js/ai/write-system-prompt/SKILL.md`
+## write-system-prompt  `@warlock.js/ai/skills/write-system-prompt/SKILL.md`
 
 ---
 name: write-system-prompt
@@ -43503,24 +43503,11 @@ Three distinct prompts, one common foundation. Base is immutable — safe to sha
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-openai/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## Package orientation
+## ai-openai  `@warlock.js/ai-openai/skills/SKILL.md`
 
 ---
-description: "Provider adapter for OpenAI and compatible gateways including Azure and OpenRouter in Warlock AI applications. Exports `OpenAISDK` with model and provider configuration for the shared AI contracts. Use when connecting this provider, configuring baseURL, reasoning, prompt caching, embeddings and image models, or diagnosing provider requests and usage. Read `setup-openai` for construction and examples using OPENAI_API_KEY. Not this package: agent loops, tools and workflows → @warlock.js/ai; HTTP and MCP tools → @warlock.js/ai-tools."
----
-
-# @warlock.js/ai-openai
-
-This adapter supplies provider-backed models for `@warlock.js/ai`. Read `setup-openai.md` to construct `OpenAISDK`, configure baseURL, reasoning, prompt caching, embeddings and image models, and understand provider-specific behavior.
-
-For agent composition, read the `run-ai-agent` topic of the `@warlock.js/ai` package. Keep provider configuration here and application orchestration in that package.
-
-
-## setup-openai  `@warlock.js/ai-openai/setup-openai/SKILL.md`
-
----
-name: setup-openai
-description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `kimiSearchTool`, `kimiFetchTool`, `KIMI_SERVER_TOOL_PRICING`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `cacheWriteTokens`, `inputIncludesCache`, `OPENAI_MODEL_PRICING`, `openAIPricingFor`, `ProviderOverloadedError`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, `ai.providerTool`, hosted `web_search`, `streamChunks`, `reasoning_content`, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
+name: warlock-js-ai-openai
+description: 'OpenAI and compatible endpoints for Warlock AI: `OpenAISDK`, `OpenAIEmbedder`, `OpenAIImageModel`, `kimiSearchTool`, `kimiFetchTool` and pricing registries. Use for "connect OpenAI", Responses or Chat Completions, reasoning, caching, embeddings, images, speech, transcription or Kimi search. Not this package → @warlock.js/ai for agents; @warlock.js/ai-anthropic for Claude; @warlock.js/ai-ollama for local Ollama.'
 ---
 
 # `@warlock.js/ai-openai`
@@ -43976,24 +43963,11 @@ and throws mapped errors. Never infer fees from function calls or prose.
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-anthropic/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## Package orientation
+## ai-anthropic  `@warlock.js/ai-anthropic/skills/SKILL.md`
 
 ---
-description: "Provider adapter for Anthropic Messages API for Claude in Warlock AI applications. Exports `AnthropicSDK` with model and provider configuration for the shared AI contracts. Use when connecting this provider, configuring extended thinking, prompt caching, token counting and usage costs, or diagnosing provider requests and usage. Read `setup-anthropic` for construction and examples using ANTHROPIC_API_KEY. Not this package: agent loops, tools and workflows → @warlock.js/ai; HTTP and MCP tools → @warlock.js/ai-tools."
----
-
-# @warlock.js/ai-anthropic
-
-This adapter supplies provider-backed models for `@warlock.js/ai`. Read `setup-anthropic.md` to construct `AnthropicSDK`, configure extended thinking, prompt caching, token counting and usage costs, and understand provider-specific behavior.
-
-For agent composition, read the `run-ai-agent` topic of the `@warlock.js/ai` package. Keep provider configuration here and application orchestration in that package.
-
-
-## setup-anthropic  `@warlock.js/ai-anthropic/setup-anthropic/SKILL.md`
-
----
-name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?, maxOutputTokens?}). System-prompt hoisting, max_tokens required (default: model max output when streaming, 16384 non-streaming; maxOutputTokens for gateway ids), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), built-in Claude list prices (ANTHROPIC_MODEL_PRICING, anthropicPricingFor, withAnthropicCacheWriteRates), cost-truth usage (inputIncludesCache: false, cachedTokens/cacheWriteTokens/cacheWrite1hTokens, usage.cost on complete()), ProviderOverloadedError for 529, no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `maxOutputTokens`, `max_tokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `contextManagement`, `serverCompaction`, `clear_tool_uses`, `clear_thinking`, `thinkingBlockBinding`, `block_binding`, `preservedThinking`, `ai.providerTool`, `web_search_20250305`, `bash_20250124`, `text_editor_20250728`, `streamChunks`, `thinking_delta`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `cacheWrite1hTokens`, `inputIncludesCache`, `ANTHROPIC_MODEL_PRICING`, `ProviderOverloadedError`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+name: warlock-js-ai-anthropic
+description: 'Anthropic Claude adapter for Warlock AI: `AnthropicSDK`, `AnthropicModel`, `AnthropicCallOptions` and `ANTHROPIC_MODEL_PRICING`. Use for "connect Claude", streaming, tools, thinking, caching, native search or context management through `sdk.model()`. Not this package → @warlock.js/ai for agents and custom tools; @warlock.js/ai-bedrock for Claude on AWS; @warlock.js/ai-cli for terminal agents.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -44453,7 +44427,7 @@ errors propagate. See the cost/budget guide for reserve mode.
 
 ## No embeddings
 
-Anthropic ships no first-party embeddings API, so `AnthropicSDK` intentionally does **not** implement `embedder()` (the `SDKAdapterContract.embedder` slot is optional). Use `@warlock.js/ai-openai` (or another embeddings-capable adapter; see the `setup-openai` topic of the `warlock-js-ai-openai` skill) for vectors.
+Anthropic ships no first-party embeddings API, so `AnthropicSDK` intentionally does **not** implement `embedder()` (the `SDKAdapterContract.embedder` slot is optional). Use `@warlock.js/ai-openai` (or another embeddings-capable adapter; see the `warlock-js-ai-openai` skill) for vectors.
 
 ## When NOT to use this skill
 
@@ -44504,24 +44478,11 @@ and [fee reservations](https://warlock.js.org/v/latest/ai/recipes/cost-budgets-a
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-google/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## Package orientation
+## ai-google  `@warlock.js/ai-google/skills/SKILL.md`
 
 ---
-description: "Provider adapter for Google Gemini API and Vertex AI in Warlock AI applications. Exports `GoogleSDK` with model and provider configuration for the shared AI contracts. Use when connecting this provider, configuring API keys or Vertex project settings, reasoning and embeddings, or diagnosing provider requests and usage. Read `setup-google` for construction and examples using GOOGLE_API_KEY or Vertex credentials. Not this package: agent loops, tools and workflows → @warlock.js/ai; HTTP and MCP tools → @warlock.js/ai-tools."
----
-
-# @warlock.js/ai-google
-
-This adapter supplies provider-backed models for `@warlock.js/ai`. Read `setup-google.md` to construct `GoogleSDK`, configure API keys or Vertex project settings, reasoning and embeddings, and understand provider-specific behavior.
-
-For agent composition, read the `run-ai-agent` topic of the `@warlock.js/ai` package. Keep provider configuration here and application orchestration in that package.
-
-
-## setup-google  `@warlock.js/ai-google/setup-google/SKILL.md`
-
----
-name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `providerOptions`, `GoogleCallOptions`, `countTokens`, `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `ai.providerTool`, `googleSearch`, `includeThoughts`, `streamChunks`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `inputIncludesCache`, `GOOGLE_MODEL_PRICING`, `googlePricingFor`, `ProviderOverloadedError`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent loop the `run-ai-agent` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+name: warlock-js-ai-google
+description: 'Google Gemini and Imagen adapter for Warlock AI: `GoogleSDK`, `GeminiImageModel`, `GoogleImageModel`, `GoogleCallOptions` and `GOOGLE_MODEL_PRICING`. Use for "connect Gemini", thinking, streaming, tools, embeddings, images or grounded search through `model()`, `embedder()` and `image()`. Not this package → @warlock.js/ai for orchestration; @warlock.js/ai-live for video and realtime sessions.'
 ---
 
 # `@warlock.js/ai-google`
@@ -44894,24 +44855,11 @@ console.log(response.providerMetadata);
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-bedrock/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## Package orientation
+## ai-bedrock  `@warlock.js/ai-bedrock/skills/SKILL.md`
 
 ---
-description: "Provider adapter for AWS Bedrock Converse API and Titan embeddings in Warlock AI applications. Exports `BedrockSDK` with model and provider configuration for the shared AI contracts. Use when connecting this provider, configuring region, the AWS credential chain, model capabilities and embeddings, or diagnosing provider requests and usage. Read `setup-bedrock` for construction and examples using AWS credentials. Not this package: agent loops, tools and workflows → @warlock.js/ai; HTTP and MCP tools → @warlock.js/ai-tools."
----
-
-# @warlock.js/ai-bedrock
-
-This adapter supplies provider-backed models for `@warlock.js/ai`. Read `setup-bedrock.md` to construct `BedrockSDK`, configure region, the AWS credential chain, model capabilities and embeddings, and understand provider-specific behavior.
-
-For agent composition, read the `run-ai-agent` topic of the `@warlock.js/ai` package. Keep provider configuration here and application orchestration in that package.
-
-
-## setup-bedrock  `@warlock.js/ai-bedrock/setup-bedrock/SKILL.md`
-
----
-name: setup-bedrock
-description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, apiKey?, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain or an Amazon Bedrock API key (bearer). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint on tools (Claude), system and the last message, 1h TTL via promptCacheTtl, usage inputIncludesCache: false + cachedTokens/cacheWriteTokens/cacheWrite1hTokens, built-in Claude prices for global./us. profiles (BEDROCK_GLOBAL_PRICING, BEDROCK_US_PRICING, bedrockPricingFor), ServiceUnavailableException → ProviderOverloadedError. Triggers: `apiKey`, `AWS_BEARER_TOKEN_BEDROCK`, `providerOptions`, `BedrockCallOptions`, `countTokens`, `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `ai.providerTool`, `systemTool`, `nova_grounding`, `server_tool_use`, `streamChunks`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
+name: warlock-js-ai-bedrock
+description: 'Amazon Bedrock adapter for Warlock AI: `BedrockSDK`, `BedrockCallOptions`, `bedrockPricingFor` and regional pricing registries. Use for "run Claude on AWS", "configure Bedrock credentials", Converse streaming, tools, caching or Titan embeddings through `model()` and `embedder()`. Not this package → @warlock.js/ai-anthropic for direct Anthropic access; @warlock.js/ai for orchestration.'
 ---
 
 # `@warlock.js/ai-bedrock`
@@ -45240,16 +45188,16 @@ your own verified metering establishes the billing unit.
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-deepseek/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## setup-deepseek  `@warlock.js/ai-deepseek/setup-deepseek/SKILL.md`
+## ai-deepseek  `@warlock.js/ai-deepseek/skills/SKILL.md`
 
 ---
-name: setup-deepseek
-description: 'Wire @warlock.js/ai-deepseek — new DeepSeekSDK({apiKey, baseURL?, provider?, pricing?}) for DeepSeek''s OpenAI-compatible API, .model({name, reasoning?, vision?, structuredOutput?, responseFormat?}) for ModelContract. Thin wrapper over @warlock.js/ai-openai''s OpenAISDK pinned to https://api.deepseek.com with provider "deepseek"; injects DeepSeek-specific reasoning/vision inference + built-in pricing. Models: deepseek-flash / deepseek-v4-flash, deepseek-v4-pro, legacy deepseek-chat / deepseek-reasoner. Built-in peak-rate pricing (DEEPSEEK_DEFAULT_PRICING) and an opt-in off-peak table (DEEPSEEK_OFF_PEAK_PRICING). Triggers: `DeepSeekSDK`, `DEEPSEEK_DEFAULT_PRICING`, `DEEPSEEK_OFF_PEAK_PRICING`, `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4`, `api.deepseek.com`, `DEEPSEEK_API_KEY`, reasoning effort on deepseek; "wire deepseek into a warlock agent", "use deepseek-reasoner", "configure deepseek-chat", "route a warlock agent through deepseek". Skip: OpenAI/Azure/OpenRouter — `@warlock.js/ai-openai`; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; raw deepseek HTTP / the `openai` SDK directly. Typical import `import { DeepSeekSDK } from "@warlock.js/ai-deepseek"`.'
+name: warlock-js-ai-deepseek
+description: 'DeepSeek adapter for Warlock AI: `DeepSeekSDK`, `DEEPSEEK_CHAT_MODELS`, `DEEPSEEK_DEFAULT_PRICING` and `DEEPSEEK_OFF_PEAK_PRICING`. Use for "connect DeepSeek", reasoning, streaming, tools, capability inference or per-model pricing through `sdk.model()`. Not this package → @warlock.js/ai for agents, tools and workflows; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.'
 ---
 
 # `@warlock.js/ai-deepseek`
 
-Provider adapter for DeepSeek. DeepSeek's API is **OpenAI-compatible**, so this package is a **thin wrapper** over `@warlock.js/ai-openai`'s `OpenAISDK` (the `setup-openai` topic of the `warlock-js-ai-openai` skill): it constructs an internal `OpenAISDK` pinned to `https://api.deepseek.com` with `provider: "deepseek"` and delegates `model()` / `embedder()` / `image()` / `count()` to it — while injecting DeepSeek's own capability inference and pricing so the right flags are set even though the model names aren't OpenAI names. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+Provider adapter for DeepSeek. DeepSeek's API is **OpenAI-compatible**, so this package is a **thin wrapper** over `@warlock.js/ai-openai`'s `OpenAISDK` (the `warlock-js-ai-openai` skill): it constructs an internal `OpenAISDK` pinned to `https://api.deepseek.com` with `provider: "deepseek"` and delegates `model()` / `embedder()` / `image()` / `count()` to it — while injecting DeepSeek's own capability inference and pricing so the right flags are set even though the model names aren't OpenAI names. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
 
 ## Construction
 
@@ -45306,7 +45254,7 @@ deepseek.model({ name: "deepseek-reasoner", reasoning: false }); // suppress it
 
 ## Uses the OpenAI-compatible endpoint
 
-Everything on the wire — Chat Completions request/response shape, streaming loop, tool-call accumulation, structured-output `response_format`, multipart message mapping, and error wrapping — is inherited **unchanged** from `OpenAIModel`. See the `setup-openai` topic of the `warlock-js-ai-openai` skill for the wire-level detail; it all applies here against `https://api.deepseek.com`.
+Everything on the wire — Chat Completions request/response shape, streaming loop, tool-call accumulation, structured-output `response_format`, multipart message mapping, and error wrapping — is inherited **unchanged** from `OpenAIModel`. See the `warlock-js-ai-openai` skill for the wire-level detail; it all applies here against `https://api.deepseek.com`.
 
 Structured output, reasoning effort, and streaming therefore behave exactly as documented for the OpenAI adapter:
 
@@ -45365,7 +45313,7 @@ Raw errors surface through the wrapped OpenAI adapter's wrapper into the typed `
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; all wire-level behavior.
+- The `warlock-js-ai-openai` skill — the wrapped adapter; all wire-level behavior.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`.
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison.
 
@@ -45394,11 +45342,11 @@ Models from this adapter have no native `countTokens` method. Check
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-groq/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## setup-groq  `@warlock.js/ai-groq/setup-groq/SKILL.md`
+## ai-groq  `@warlock.js/ai-groq/skills/SKILL.md`
 
 ---
-name: setup-groq
-description: 'Wire @warlock.js/ai-groq — new GroqSDK({apiKey, baseURL?, provider?, pricing?}) for Groq-hosted open models on LPU hardware (llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b/20b, deepseek-r1-distill-llama-70b). Thin wrapper over @warlock.js/ai-openai — uses the OpenAI-compatible endpoint https://api.groq.com/openai/v1, delegating transport/streaming/structured-output/errors to OpenAISDK while injecting Groqs OWN vision/reasoning inference + default pricing. .model({name, vision?, reasoning?, structuredOutput?}) for ModelContract. Triggers: `GroqSDK`, `GROQ_DEFAULT_PRICING`, `groq.model`, `groq.count`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss`, `deepseek-r1-distill`, `groq vision`, `groq reasoning`, `reasoning_effort`, `https://api.groq.com/openai/v1`, OpenAI-compatible Groq, LPU, fast inference; "wire groq into a warlock agent", "use llama 3.3 on groq", "run gpt-oss / deepseek reasoning on groq", "point warlock at the groq endpoint"; import `import { GroqSDK } from "@warlock.js/ai-groq"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; the wrapped adapter `@warlock.js/ai-openai` (`setup-openai`); embeddings (Groq has none — use openai/google); siblings `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `groq-sdk` / `openai` SDK.'
+name: warlock-js-ai-groq
+description: 'Groq adapter for Warlock AI: `GroqSDK`, `GROQ_KNOWN_MODELS`, `GROQ_DEFAULT_PRICING`, `inferVisionCapability` and `inferReasoningCapability`. Use for "connect Groq", fast chat, streaming, tools, model capabilities or pricing overrides through `sdk.model()`. Not this package → @warlock.js/ai for agents and custom tools; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.'
 ---
 
 # `@warlock.js/ai-groq`
@@ -45462,7 +45410,7 @@ await model.complete(messages, { reasoning: { effort: "high" } }); // → reason
 
 ## Structured output & streaming
 
-Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `response_format: json_schema` (strict) when the schema is a proper root object, else loose `json_object`; `model.stream()` drains the streaming Chat Completions response and yields `delta` / `tool-call` / `done` chunks with `include_usage` on. See the `setup-openai` topic of the `warlock-js-ai-openai` skill for the full wire behavior.
+Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `response_format: json_schema` (strict) when the schema is a proper root object, else loose `json_object`; `model.stream()` drains the streaming Chat Completions response and yields `delta` / `tool-call` / `done` chunks with `include_usage` on. See the `warlock-js-ai-openai` skill for the full wire behavior.
 
 ## Embeddings — not available on Groq
 
@@ -45514,12 +45462,12 @@ Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by th
 ## When NOT to use this skill
 
 - Embeddings or image generation — Groq has neither; use `@warlock.js/ai-openai` / `@warlock.js/ai-google`.
-- OpenAI / Azure / OpenRouter — use `@warlock.js/ai-openai` (`setup-openai`); this wraps it but for Groq specifically.
+- OpenAI / Azure / OpenRouter — use the `warlock-js-ai-openai` skill; this wraps it but for Groq specifically.
 - Anthropic — `@warlock.js/ai-anthropic`. Bedrock — `@warlock.js/ai-bedrock`. Gemini — `@warlock.js/ai-google`. Local Ollama — `@warlock.js/ai-ollama`.
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output detail
+- The `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output detail
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
 
@@ -45548,16 +45496,16 @@ Models from this adapter have no native `countTokens` method. Check
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-mistral/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## setup-mistral  `@warlock.js/ai-mistral/setup-mistral/SKILL.md`
+## ai-mistral  `@warlock.js/ai-mistral/skills/SKILL.md`
 
 ---
-name: setup-mistral
-description: 'Wire @warlock.js/ai-mistral — new MistralSDK({apiKey, baseURL?, provider?, pricing?}) for Mistral AI, a thin wrapper over the OpenAI adapter that uses Mistral''s OpenAI-compatible endpoint (https://api.mistral.ai/v1). .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for a ModelContract with Mistral-aware capabilities (vision auto-inferred for the pixtral family, reasoning for the magistral family + hybrid mistral-small), .embedder({name, dimensions?}) for mistral-embed via /v1/embeddings. Triggers: `MistralSDK`, `mistral.model`, `mistral.embedder`, `pixtral`, `magistral`, `mistral-large`, `mistral-small`, `mistral-medium`, `ministral`, `mistral-embed`, `api.mistral.ai`, `MISTRAL_DEFAULT_PRICING`, `promptCacheKey`, OpenAI-compatible Mistral, `reasoning_effort`, `responseFormat`, `pricing`; "use mistral", "wire mistral into a warlock agent", "configure mistral-large", "use magistral reasoning", "pixtral vision", "mistral embeddings with warlock". Skip: image generation (Mistral has no OpenAI-compatible image endpoint — `mistral.image()` does not exist); the wrapped adapter internals `@warlock.js/ai-openai`; agent wiring the `run-ai-agent` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-google`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@mistralai/mistralai`, Vercel `@ai-sdk/mistral`.'
+name: warlock-js-ai-mistral
+description: 'Mistral adapter for Warlock AI: `MistralSDK`, `MISTRAL_MODELS`, `MISTRAL_DEFAULT_PRICING`, `inferVisionCapability` and `inferReasoningCapability`. Use for "connect Mistral", streaming, tools, vision, reasoning, capability inference or pricing overrides through `sdk.model()`. Not this package → @warlock.js/ai for agents and workflows; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.'
 ---
 
 # `@warlock.js/ai-mistral`
 
-Provider adapter for Mistral AI. Mistral exposes an **OpenAI-compatible** API, so `MistralSDK` is a **thin wrapper** over `@warlock.js/ai-openai` (the `setup-openai` topic of the `warlock-js-ai-openai` skill) — it does not re-implement the wire protocol, streaming, tool calls, structured output, error wrapping, or token accounting. It builds one internal `OpenAISDK` pointed at Mistral's `baseURL` with `provider: "mistral"`, then layers on this provider's own capability inference + default pricing. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+Provider adapter for Mistral AI. Mistral exposes an **OpenAI-compatible** API, so `MistralSDK` is a **thin wrapper** over `@warlock.js/ai-openai` (the `warlock-js-ai-openai` skill) — it does not re-implement the wire protocol, streaming, tool calls, structured output, error wrapping, or token accounting. It builds one internal `OpenAISDK` pointed at Mistral's `baseURL` with `provider: "mistral"`, then layers on this provider's own capability inference + default pricing. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
 
 ## Construction
 
@@ -45598,7 +45546,7 @@ The headline `-latest` aliases are exported as `MISTRAL_MODELS` ({ chat, vision,
 
 ## Uses the OpenAI-compatible endpoint
 
-Because Mistral speaks the OpenAI Chat Completions + Embeddings protocol, everything the OpenAI adapter does applies unchanged: streaming deltas + consolidated tool calls, `response_format: json_schema` structured output (override per model with `responseFormat`), `reasoning_effort` for reasoning models, multipart image input, and the neutral `Usage` breakdown (`input` / `output` / `cachedTokens` / `reasoningTokens`). See `@warlock.js/ai-openai` (the `setup-openai` topic of the `warlock-js-ai-openai` skill) for the wire-level detail — it is identical here.
+Because Mistral speaks the OpenAI Chat Completions + Embeddings protocol, everything the OpenAI adapter does applies unchanged: streaming deltas + consolidated tool calls, `response_format: json_schema` structured output (override per model with `responseFormat`), `reasoning_effort` for reasoning models, multipart image input, and the neutral `Usage` breakdown (`input` / `output` / `cachedTokens` / `reasoningTokens`). See `@warlock.js/ai-openai` (the `warlock-js-ai-openai` skill) for the wire-level detail — it is identical here.
 
 **No image generation.** Mistral has no OpenAI-compatible image endpoint, so `MistralSDK` intentionally does **not** expose `image()` — the structural absence is the capability guard (`ai.mistral.image(...)` is a compile-time error).
 
@@ -45665,7 +45613,7 @@ Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by th
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; identical wire behavior.
+- The `warlock-js-ai-openai` skill — the wrapped adapter; identical wire behavior.
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`.
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison.
 
@@ -45694,16 +45642,16 @@ Models from this adapter have no native `countTokens` method. Check
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-xai/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## setup-xai  `@warlock.js/ai-xai/setup-xai/SKILL.md`
+## ai-xai  `@warlock.js/ai-xai/skills/SKILL.md`
 
 ---
-name: setup-xai
-description: 'Wire @warlock.js/ai-xai — new XaiSDK({apiKey, baseURL?, provider?, pricing?}) for xAI Grok, .model({name, vision?, reasoning?, structuredOutput?}) for a ModelContract, .embedder({name, dimensions?}) and .image({name, pricing?}) delegated to the OpenAI-compatible adapter. Thin wrapper over OpenAISDK: uses the xAI OpenAI-compatible endpoint (https://api.x.ai/v1) and injects xAI''s own vision/reasoning inference so Grok names resolve to the right capabilities. Triggers: `XaiSDK`, `grok`, `grok-4`, `grok-3`, `grok-3-mini`, `grok-2-vision`, `.model`, `x.ai`, `api.x.ai`, `XAI_API_KEY`, `reasoning_effort` on Grok, `promptCacheKey`, `prompt_cache_key`, xai pricing, "wire xai/grok into a warlock agent", "configure grok-4", "use grok reasoning effort", "send an image to grok-4 / grok-2-vision"; typical import `import { XaiSDK } from "@warlock.js/ai-xai"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; the underlying OpenAI-compatible adapter and its full capability/streaming/error surface — the `setup-openai` topic of the `warlock-js-ai-openai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK pointed at x.ai by hand.'
+name: warlock-js-ai-xai
+description: 'xAI Grok adapter for Warlock AI: `XaiSDK`, `XAI_CHAT_MODELS`, `inferVisionCapability`, `inferReasoningCapability` and `XaiModelConfig`. Use for "connect Grok", streaming, tools, vision, reasoning, model capabilities or pricing overrides through `sdk.model()`. Not this package → @warlock.js/ai for agents, tools and workflows; @warlock.js/ai-openai for generic OpenAI-compatible endpoints.'
 ---
 
 # `@warlock.js/ai-xai`
 
-Provider adapter for xAI's **Grok** models. xAI speaks the OpenAI Chat Completions protocol, so `XaiSDK` is a **thin wrapper** over `OpenAISDK` (the `setup-openai` topic of the `warlock-js-ai-openai` skill) — it does not reimplement the wire layer. It constructs one internal `OpenAISDK` pointed at xAI's `baseURL` and labeled `provider: "xai"`, then delegates `model()` / `embedder()` / `image()` / `count()`, injecting xAI's own capability inference so Grok model names resolve correctly. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+Provider adapter for xAI's **Grok** models. xAI speaks the OpenAI Chat Completions protocol, so `XaiSDK` is a **thin wrapper** over `OpenAISDK` (the `warlock-js-ai-openai` skill) — it does not reimplement the wire layer. It constructs one internal `OpenAISDK` pointed at xAI's `baseURL` and labeled `provider: "xai"`, then delegates `model()` / `embedder()` / `image()` / `count()`, injecting xAI's own capability inference so Grok model names resolve correctly. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
 
 ## Construction
 
@@ -45745,7 +45693,7 @@ This adapter ships xAI's OWN name lists (Grok ids don't match OpenAI's `gpt-*` /
 
 - `vision` — inferred `true` for the `grok-4` and `grok-2-vision` prefixes; `false` otherwise.
 - `reasoning` — inferred `true` for `grok-4` and `grok-3-mini`; drives whether `reasoning.effort` is forwarded as `reasoning_effort` on the wire.
-- `structuredOutput` / `promptCaching` and the image/PDF/audio wire mapping all come from the wrapped OpenAI adapter unchanged — see the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+- `structuredOutput` / `promptCaching` and the image/PDF/audio wire mapping all come from the wrapped OpenAI adapter unchanged — see the `warlock-js-ai-openai` skill.
 
 **Override `vision`, `reasoning`, or `structuredOutput` explicitly** via `.model({ name, vision?, reasoning?, structuredOutput? })`.
 
@@ -45762,11 +45710,11 @@ await model.complete(messages, { reasoning: { effort: "high" } }); // → reason
 
 ## Multipart messages (image input)
 
-Image attachments reach the wire only on a vision-capable model (`grok-4`, `grok-2-vision`); the agent's modality gate throws otherwise. Mapping to OpenAI `image_url` parts is identical to the OpenAI adapter — see the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+Image attachments reach the wire only on a vision-capable model (`grok-4`, `grok-2-vision`); the agent's modality gate throws otherwise. Mapping to OpenAI `image_url` parts is identical to the OpenAI adapter — see the `warlock-js-ai-openai` skill.
 
 ## Uses the OpenAI-compatible endpoint
 
-All wire work — request/response mapping, streaming, tool-call accumulation, structured output, usage extraction — is the wrapped `OpenAISDK`'s, unchanged. The wrapper only: (1) sets the xAI `baseURL` + `provider` defaults, and (2) injects xAI's vision/reasoning inference per model. For streaming, structured output, and the full multipart surface, read the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+All wire work — request/response mapping, streaming, tool-call accumulation, structured output, usage extraction — is the wrapped `OpenAISDK`'s, unchanged. The wrapper only: (1) sets the xAI `baseURL` + `provider` defaults, and (2) injects xAI's vision/reasoning inference per model. For streaming, structured output, and the full multipart surface, read the `warlock-js-ai-openai` skill.
 
 ## Embeddings — not available on xAI
 
@@ -45826,7 +45774,7 @@ Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output / multipart surface
+- The `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output / multipart surface
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
 
@@ -45867,24 +45815,11 @@ is guessed. See [compatible native search](https://warlock.js.org/v/latest/ai/pr
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-ollama/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## Package orientation
+## ai-ollama  `@warlock.js/ai-ollama/skills/SKILL.md`
 
 ---
-description: "Provider adapter for local and self-hosted Ollama servers in Warlock AI applications. Exports `OllamaSDK` with model and provider configuration for the shared AI contracts. Use when connecting this provider, configuring host and headers, reasoning, embeddings and daemon errors, or diagnosing provider requests and usage. Read `setup-ollama` for construction and examples using an Ollama host. Not this package: agent loops, tools and workflows → @warlock.js/ai; HTTP and MCP tools → @warlock.js/ai-tools."
----
-
-# @warlock.js/ai-ollama
-
-This adapter supplies provider-backed models for `@warlock.js/ai`. Read `setup-ollama.md` to construct `OllamaSDK`, configure host and headers, reasoning, embeddings and daemon errors, and understand provider-specific behavior.
-
-For agent composition, read the `run-ai-agent` topic of the `@warlock.js/ai` package. Keep provider configuration here and application orchestration in that package.
-
-
-## setup-ollama  `@warlock.js/ai-ollama/setup-ollama/SKILL.md`
-
----
-name: setup-ollama
-description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `providerOptions`, `OllamaCallOptions`, `countTokens`, `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `streamChunks`, `message.thinking`, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings core — the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
+name: warlock-js-ai-ollama
+description: 'Local Ollama models for Warlock AI: `OllamaSDK`, `OllamaCallOptions`, `OllamaModelConfig` and `OllamaEmbedderConfig`. Use for "run a local LLM", "connect Ollama", pull model tags, stream chat, use tools, configure thinking or generate embeddings through `model()` and `embedder()`. Not this package → @warlock.js/ai for agents and RAG; @warlock.js/ai-openai for hosted OpenAI-compatible servers.'
 ---
 
 # `@warlock.js/ai-ollama`
@@ -46080,11 +46015,11 @@ model has no `countTokens` method. `sdk.count(text)` remains an offline estimate
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-live/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## use-ai-live  `@warlock.js/ai-live/use-ai-live/SKILL.md`
+## ai-live  `@warlock.js/ai-live/skills/SKILL.md`
 
 ---
-name: use-ai-live
-description: 'Live & generative rich-media add-on for @warlock.js/ai. A side-effect import `import "@warlock.js/ai-live"` mounts two heavy modalities onto the shared `ai.*` facade: `ai.video({ model, prompt })` — text-to-video (Sora / Veo / Kling-class), the async submit→poll job hidden behind the same uniform never-throws `{ data, error, usage, report }` envelope as `ai.image`, with per-second cost-truth folded into `Usage.cost`; and `ai.realtime({ transport, model })` — a stateful duplex VOICE SESSION over a pluggable `RealtimeTransport` (sendAudio / sendText / events() / close()→RealtimeReport). Videos are a discriminated `GeneratedVideo = { type: "url" } | { type: "base64" }`; session output is a `RealtimeEvent` union (audio | transcript | tool-call | error | done). Ships `MockVideoModel` + `MockRealtimeTransport` for HTTP-free tests. Triggers: `ai.video`, `ai.realtime`, `VideoModelContract`, `GeneratedVideo`, `VideoModelPricing`, `RealtimeSession`, `RealtimeTransport`, `RealtimeEvent`, `RealtimeReport`, `MockVideoModel`, `MockRealtimeTransport`; ''generate a video'', ''text to video'', ''sora'', ''veo'', ''realtime voice'', ''duplex voice session'', ''live voice agent'', ''barge-in'', ''per-second video cost''; typical import `import "@warlock.js/ai-live"` + `import { ai } from "@warlock.js/ai"`. Skip: still-image OUTPUT — [[generate-images]]; text-to-speech / transcription (one-shot audio, not a session) — [[generate-speech]]; chat agents / tools / workflows — the `run-ai-agent` topic of the `warlock-js-ai` skill.'
+name: warlock-js-ai-live
+description: 'Video generation and realtime voice sessions for Warlock AI. Importing this package mounts `ai.video` and `ai.realtime`; exports `video`, `realtime`, `VideoModelContract`, `RealtimeTransport`, `MockVideoModel` and `MockRealtimeTransport`. Use for "generate a video", "duplex voice", audio events or per-second costs. Not this package → @warlock.js/ai for chat, still images, speech and one-shot transcription.'
 ---
 
 # Live rich-media — `ai.video` + `ai.realtime` (`@warlock.js/ai-live`)
@@ -46315,7 +46250,7 @@ Feed `MockVideoModel` an `{ error }` response and `ai.video` lands it on `result
 ## Package orientation
 
 ---
-description: "Ready-made tools for @warlock.js/ai agents: web search, URL fetch, HTTP requests, calculator, date-time, and MCP client and server support. Exports `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `mcp`, `serve`, `createServeHandler`, `McpTransportError`, `McpServeError`. Use for: let an agent search the web, fetch a page, call an HTTP API, do math, get the current date, connect to an MCP server, expose my tools as an MCP server over stdio or authenticated HTTP. Not this package: defining your own tool or the agent itself → @warlock.js/ai; file and shell tools → @warlock.js/ai-workspace."
+description: 'Ready-made AI tools and MCP client/server support: `mcp`, `serve`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool` and `dateTimeTool`; also mounts `ai.mcp` and `ai.tools`. Use for "connect an MCP server", "serve tools over MCP", "search the web" or "fetch a URL". Not this package → @warlock.js/ai for custom tools and agents; @warlock.js/ai-workspace for filesystem and shell tools.'
 ---
 
 # @warlock.js/ai-tools
@@ -46337,7 +46272,7 @@ A belt of prebuilt tools for `@warlock.js/ai` agents plus the Model Context Prot
 - Writing a custom tool with `ai.tool()` is covered by the `define-ai-tool` topic of the `@warlock.js/ai` package.
 
 
-## connect-mcp-server  `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`
+## connect-mcp-server  `@warlock.js/ai-tools/skills/connect-mcp-server/SKILL.md`
 
 ---
 name: connect-mcp-server
@@ -46476,7 +46411,7 @@ The MCP client does not use `@modelcontextprotocol/sdk`: it speaks MCP's JSON-RP
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes the adapted tools.
 
 
-## expose-as-mcp-server  `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`
+## expose-as-mcp-server  `@warlock.js/ai-tools/skills/expose-as-mcp-server/SKILL.md`
 
 ---
 name: expose-as-mcp-server
@@ -46898,7 +46833,7 @@ Mounting it in your own server means you own Origin validation, auth and body li
 - The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — a workspace whose `tools.all()` is a natural `serve` source.
 
 
-## use-web-and-http-tools  `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`
+## use-web-and-http-tools  `@warlock.js/ai-tools/skills/use-web-and-http-tools/SKILL.md`
 
 ---
 name: use-web-and-http-tools
@@ -47099,7 +47034,7 @@ The core plus `tool_search` / `tool_call` stays advertised. Hidden calls still t
 ## Package orientation
 
 ---
-description: "Policy-jailed filesystem and shell access for @warlock.js/ai agents, for coding and build-loop agents. Exports `workspace`, `makeEditFileTool`, `makeRunShellTool`, `makeRunTestsTool`, `createLocalBackend`, `createMockBackend`, `WorkspacePolicyError`. Use for: let an agent read, edit or write files, run shell commands or tests safely, sandbox an agent to a directory, build a coding agent that loops until tests pass, test file tools with a fake backend. Not this package: web, HTTP or MCP tools → @warlock.js/ai-tools; agents and custom tools → @warlock.js/ai; tracing runs → @warlock.js/ai-panoptic."
+description: 'Policy-confined file and shell tools for coding agents: `workspace`, `createLocalBackend`, `createMockBackend`, `makeEditFileTool`, `makeRunShellTool` and `WorkspacePolicyError`. Use for "let an agent edit files", "sandbox shell commands" or "loop until tests pass". Not this package → @warlock.js/ai-tools for MCP/web tools; @warlock.js/ai for agents; @warlock.js/ai-cli for installed coding CLIs.'
 ---
 
 # @warlock.js/ai-workspace
@@ -47122,7 +47057,7 @@ A workspace is a policy jail around a directory: it decides which paths an agent
 - Edits fail loudly (`WorkspaceEditError`) when the target text is not found; re-read the file rather than retrying blindly.
 
 
-## build-loop-agent  `@warlock.js/ai-workspace/build-loop-agent/SKILL.md`
+## build-loop-agent  `@warlock.js/ai-workspace/skills/build-loop-agent/SKILL.md`
 
 ---
 name: build-loop-agent
@@ -47226,7 +47161,7 @@ ai.supervisor({
 - The `run-supervisor` topic of the `warlock-js-ai` skill — coordinating the members that share one workspace.
 
 
-## use-a-workspace  `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`
+## use-a-workspace  `@warlock.js/ai-workspace/skills/use-a-workspace/SKILL.md`
 
 ---
 name: use-a-workspace
@@ -47536,7 +47471,7 @@ hash still describes the whole file.
 ## Package orientation
 
 ---
-description: "Run vendor coding CLIs headless as Warlock AI agents. Exports `cli`, `createCliAgent`, `cliModel`, `CliError` and adapter building blocks; registers `ai.cli`. Use for: launch Claude Code, Codex, Qwen Code or another supported CLI from code, stream tool calls and text, resume or cancel a session, read usage, attach per-run MCP servers, use a CLI as an ai.agent model, or implement an adapter. Not this package: direct model calls → @warlock.js/ai plus a provider adapter; a policy-jailed file and shell workspace → @warlock.js/ai-workspace; MCP clients and servers → @warlock.js/ai-tools."
+description: 'Run installed coding-agent CLIs with `cli`, `createCliAgent`, `cliModel`, `CliAdapter` and `jsonLinesParser`. Use for "run Claude Code or Codex", "resume a CLI session", stream tool/usage events, configure permissions or write an adapter. Not this package → @warlock.js/ai for provider-neutral agents; @warlock.js/ai-workspace for embedded file/shell tools; @warlock.js/process for general child processes.'
 ---
 
 # @warlock.js/ai-cli
@@ -47559,7 +47494,7 @@ Many teams run the vendors' own agent CLIs on the subscriptions they already pay
 - The installed CLI's `--help` must list every flag the adapter uses, so a CLI release with renamed flags fails closed with the flag and version in the error.
 
 
-## run-cli-agents  `@warlock.js/ai-cli/run-cli-agents/SKILL.md`
+## run-cli-agents  `@warlock.js/ai-cli/skills/run-cli-agents/SKILL.md`
 
 ---
 name: run-cli-agents
@@ -47749,7 +47684,7 @@ How the model behaves:
 - The vendor table in the docs ("Vendor adapters") lists each CLI's flags, stream format, and the version it was verified against.
 
 
-## write-a-cli-adapter  `@warlock.js/ai-cli/write-a-cli-adapter/SKILL.md`
+## write-a-cli-adapter  `@warlock.js/ai-cli/skills/write-a-cli-adapter/SKILL.md`
 
 ---
 name: write-a-cli-adapter
@@ -47939,7 +47874,7 @@ it("normalizes a recorded stream and needs only listed flags", () => {
 ## Package orientation
 
 ---
-description: "Observability for @warlock.js/ai: turns agent, workflow and team run reports into traces and ships them to OpenTelemetry, Langfuse, file, console or a local dashboard. Exports `panoptic`, `createCollector`, `createInMemoryTraceStore`, `otelExporter`, `langfuseExporter`, `consoleExporter`, `fileExporter`, `dashboard`. Use for: trace an agent run, see token cost and latency per span, send traces to Langfuse or OTel, query past traces, open a local trace viewer, evaluate a system prompt. Not this package: plain logging → @warlock.js/logger; building agents → @warlock.js/ai; provider adapters → ai-<provider> packages."
+description: 'AI tracing, usage, cost analysis and dashboards: `panoptic`, `createCollector`, `createInMemoryTraceStore`, `consoleExporter`, `otelExporter`, `langfuseExporter` and `dashboard`. Use for "trace an agent run", "compare prompt costs", "export spans" or "inspect the AI dashboard". Not this package → @warlock.js/ai for running agents and evals; @warlock.js/logger for logs; @warlock.js/devtools for HTTP debugging.'
 ---
 
 # @warlock.js/ai-panoptic
@@ -47962,7 +47897,7 @@ Panoptic subscribes to the execution reports every `@warlock.js/ai` primitive al
 - `@opentelemetry/*` and `langfuse` are optional; install only the one you export to.
 
 
-## evaluate-system-prompt  `@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md`
+## evaluate-system-prompt  `@warlock.js/ai-panoptic/skills/evaluate-system-prompt/SKILL.md`
 
 ---
 name: evaluate-system-prompt
@@ -48056,7 +47991,7 @@ curl -X POST 'http://127.0.0.1:4319/api/traces/tr_1/spans/sp_1/evaluate' \
 - `ai.prompts().validate({ criteria })` in `@warlock.js/ai` — the sibling capability this reuses: grading raw prompt TEXT you already have in code, no trace or dashboard involved.
 
 
-## export-traces  `@warlock.js/ai-panoptic/export-traces/SKILL.md`
+## export-traces  `@warlock.js/ai-panoptic/skills/export-traces/SKILL.md`
 
 ---
 name: export-traces
@@ -48252,7 +48187,7 @@ Reach for `reportToTrace` when you already hold a finished `result.report` and w
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent and the `BaseReport` shape Panoptic projects into a `Trace`.
 
 
-## observe-with-panoptic  `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`
+## observe-with-panoptic  `@warlock.js/ai-panoptic/skills/observe-with-panoptic/SKILL.md`
 
 ---
 name: observe-with-panoptic
@@ -48466,7 +48401,7 @@ remain absent; do not infer semantic-cache hits from zero tokens. An incomplete
 run is identified by its status or normalized `AGENT_INCOMPLETE` error code.
 
 
-## query-traces  `@warlock.js/ai-panoptic/query-traces/SKILL.md`
+## query-traces  `@warlock.js/ai-panoptic/skills/query-traces/SKILL.md`
 
 ---
 name: query-traces
@@ -48720,7 +48655,7 @@ panel does not clear application trace history. Enable flow observation first;
 installing the viewer alone does not collect runs.
 
 
-## use-local-dashboard  `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`
+## use-local-dashboard  `@warlock.js/ai-panoptic/skills/use-local-dashboard/SKILL.md`
 
 ---
 name: use-local-dashboard
@@ -48983,11 +48918,11 @@ production and retains its socket-loopback guard.
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `create-warlock/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## create-a-warlock-project  `create-warlock/create-a-warlock-project/SKILL.md`
+## create-warlock  `create-warlock/skills/SKILL.md`
 
 ---
-name: create-a-warlock-project
-description: "Create a Warlock project with the canonical scaffold, package selection, and project conventions."
+name: create-warlock
+description: 'Scaffold Warlock apps with `npm create warlock@latest` or `npx create-warlock`; the CLI entry exports `parseFlags`, `packageVersion` and default `createApp`. Use for "create a project", "start a backend or SSR app", choose a database, AI adapters, features or linting, and automate setup with `--yes` and `--pm=npm`. Not this package → @warlock.js/core for extending an existing app; @warlock.js/web for page APIs.'
 ---
 
 # create-warlock — scaffold a new project
@@ -49032,7 +48967,7 @@ that is just the project name, the one required answer with no default:
 
 ```
 A project name is required and no terminal is available to ask for one. Pass it as
-the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
+the first argument or --name=<name>. Non-interactive flags: --yes, --pm=npm,
 --db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc>, --git|--no-git, --jwt|--no-jwt.
 ```
 
@@ -49051,30 +48986,23 @@ Features: none
 
 ## Flags
 
-| Flag                           | Takes value | Default                                                             | Purpose                                                                                                                |
-| ------------------------------ | ----------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory.                                                                                       |
-| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default.                                      |
-| `--db`                         | yes         | `mongodb`                                                           | Database driver key (`mongodb`, `postgres`, or `none`).                                                                |
-| `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                                     |
-| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
-| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default.                |
-| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                                    |
-| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                                        |
-| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                                       |
-| `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                                   |
-| `--jwt` / `--no-jwt`           | no          | off                                                                 | Generate JWT secrets via the project's `jwt` script.                                                                   |
-| `--yes` / `-y`                 | no          | off                                                                 | Fully headless mode.                                                                                                   |
-| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form wizard.                                                                                     |
+| Flag                           | Takes value | Default                                                             | Purpose                                                                                                 |
+| ------------------------------ | ----------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory.                                                                        |
+| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default.                       |
+| `--db`                         | yes         | `mongodb`                                                           | Database driver key (`mongodb`, `postgres`, or `none`).                                                 |
+| `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                      |
+| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — use `npm` for the commands in this guide.                                             |
+| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
+| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                     |
+| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                         |
+| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                        |
+| `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                    |
+| `--jwt` / `--no-jwt`           | no          | off                                                                 | Generate JWT secrets via the project's `jwt` script.                                                    |
+| `--yes` / `-y`                 | no          | off                                                                 | Fully headless mode.                                                                                    |
+| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form wizard.                                                                      |
 
-With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script
-approvals (esbuild, and Sharp when the `image` feature is selected) where that
-version reads them: `allowBuilds` in `pnpm-workspace.yaml` on pnpm 10.26+, 11
-and 12; that file plus `onlyBuiltDependencies` on 10.5–10.25; and, before 10.5,
-no workspace file (those versions reject one without `packages:`) but
-`pnpm.onlyBuiltDependencies` in `package.json`. An explicit existing denial is
-retained. If selected feature dependencies do
-not install, JWT generation is skipped and reported rather than retried through
+If selected feature dependencies do not install, JWT generation is skipped and reported rather than retried through
 the package manager.
 
 Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--pm` / `--db` / `--features` / `--ai` / `--agents` / `--lint` values fail fast before any write or install.
@@ -49267,11 +49195,11 @@ without `pnpm-lock.yaml` now produces `npm install`.
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/devtools/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## devtools-overview  `@warlock.js/devtools/devtools-overview/SKILL.md`
+## devtools  `@warlock.js/devtools/skills/SKILL.md`
 
 ---
-name: devtools-overview
-description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations, AI traces per HTTP request (model, tokens, cost, cache hits, tools, retries, truncation, compaction), the route map and an API docs page (`/__warlock/docs`, the OpenAPI 3.1 document of the app rendered with Scalar or Swagger UI at `/__warlock/docs/swagger`, with OpenAPI and Postman downloads). Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard", "browse my API docs in dev", "see the OpenAPI for my routes", "open Swagger UI for my API", "export my routes to Postman". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
+name: warlock-js-devtools
+description: 'Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail" or "open devtools". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
 ---
 
 # `@warlock.js/devtools` — overview
@@ -49443,7 +49371,7 @@ The **Processes** tab refreshes `GET /__warlock/api/processes`: PIDs, workload
 categories, labels, display commands, limits, enforcement, and peak memory.
 It excludes ownership tokens. Without registration the list is empty. The
 endpoint retains development/loopback guards and provides no stop action.
-Use the `supervise-processes` skill of `@warlock.js/process` for launch,
+Use the `warlock-js-process` skill for launch,
 recovery and stop APIs; configure one owner/registry per application instance.
 
 
@@ -49457,11 +49385,11 @@ recovery and stop APIs; configure one owner/registry per application instance.
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/sitemap/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## sitemap-overview  `@warlock.js/sitemap/sitemap-overview/SKILL.md`
+## sitemap  `@warlock.js/sitemap/skills/SKILL.md`
 
 ---
-name: sitemap-overview
-description: "Front-door orientation for `@warlock.js/sitemap`: framework-blind `Sitemap` and streaming `SitemapIndex` builders, URL metadata, hreflang, Google image entries, sharding, diagnostics, and atomic publication. Use when adding or debugging sitemap output; Warlock page discovery and `/sitemap.xml` routing belong to `@warlock.js/web`."
+name: warlock-js-sitemap
+description: 'Framework-independent XML sitemap builders: `Sitemap`, `SitemapIndex`, `buildSitemapXml`, `joinOrigin` and `SitemapEntry`. Use for "generate sitemap XML", URL metadata, hreflang, image entries, sharding, duplicate diagnostics or atomic publication from scripts and servers. Not this package → @warlock.js/web for Warlock page discovery, `/sitemap.xml` and robots routing; @warlock.js/core for app configuration.'
 ---
 
 # `@warlock.js/sitemap` — overview

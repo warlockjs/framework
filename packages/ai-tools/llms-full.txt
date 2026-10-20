@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: "Ready-made tools for @warlock.js/ai agents: web search, URL fetch, HTTP requests, calculator, date-time, and MCP client and server support. Exports `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `mcp`, `serve`, `createServeHandler`, `McpTransportError`, `McpServeError`. Use for: let an agent search the web, fetch a page, call an HTTP API, do math, get the current date, connect to an MCP server, expose my tools as an MCP server over stdio or authenticated HTTP. Not this package: defining your own tool or the agent itself → @warlock.js/ai; file and shell tools → @warlock.js/ai-workspace."
+description: 'Ready-made AI tools and MCP client/server support: `mcp`, `serve`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool` and `dateTimeTool`; also mounts `ai.mcp` and `ai.tools`. Use for "connect an MCP server", "serve tools over MCP", "search the web" or "fetch a URL". Not this package → @warlock.js/ai for custom tools and agents; @warlock.js/ai-workspace for filesystem and shell tools.'
 ---
 
 # @warlock.js/ai-tools
@@ -29,7 +29,7 @@ A belt of prebuilt tools for `@warlock.js/ai` agents plus the Model Context Prot
 - Writing a custom tool with `ai.tool()` is covered by the `define-ai-tool` topic of the `@warlock.js/ai` package.
 
 
-## connect-mcp-server  `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`
+## connect-mcp-server  `@warlock.js/ai-tools/skills/connect-mcp-server/SKILL.md`
 
 ---
 name: connect-mcp-server
@@ -168,7 +168,7 @@ The MCP client does not use `@modelcontextprotocol/sdk`: it speaks MCP's JSON-RP
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes the adapted tools.
 
 
-## expose-as-mcp-server  `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`
+## expose-as-mcp-server  `@warlock.js/ai-tools/skills/expose-as-mcp-server/SKILL.md`
 
 ---
 name: expose-as-mcp-server
@@ -590,7 +590,7 @@ Mounting it in your own server means you own Origin validation, auth and body li
 - The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — a workspace whose `tools.all()` is a natural `serve` source.
 
 
-## use-web-and-http-tools  `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`
+## use-web-and-http-tools  `@warlock.js/ai-tools/skills/use-web-and-http-tools/SKILL.md`
 
 ---
 name: use-web-and-http-tools

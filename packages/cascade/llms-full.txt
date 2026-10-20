@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: "Model-first ORM for MongoDB and Postgres. Exports `Model`, `RegisterModel`, `Migration`, `defineModel`, `BelongsTo`, `HasMany`, `transaction`, `DataSource`, `dataSourceRegistry`, `connectToDatabase`, `runMigrations`. Use for: define a model, add a column or collection, write or alter a migration, query or filter records, paginate, aggregate or group, add a relation, run a transaction, soft delete, track changes, react to save or delete events, vector search. Not this package: request validation and schemas → @warlock.js/seal; routes, controllers, repositories → @warlock.js/core."
+description: 'Database models and query builders for MongoDB and SQL: `Model`, `DataSource`, `defineModel`, `RegisterModel`, `afterCommit` and `modelSync`. Use for "query a table", "define a relation", "write a migration", "run a transaction", eager loading or model events. Not this package → @warlock.js/seal for structural validation; @warlock.js/core for HTTP handlers and repositories; @warlock.js/cache for transient data.'
 ---
 
 # @warlock.js/cascade
@@ -34,7 +34,7 @@ Cascade is the data layer. The model is the query entry point (`User.find(id)`, 
 - Undefined `where` values and unsafe filters throw on purpose; sanitize user-supplied filters.
 
 
-## aggregate-data  `@warlock.js/cascade/aggregate-data/SKILL.md`
+## aggregate-data  `@warlock.js/cascade/skills/aggregate-data/SKILL.md`
 
 ---
 name: aggregate-data
@@ -214,7 +214,7 @@ Raw stages: `joinRaw({ $lookup: { from, let, pipeline, as } })` (or an array of 
 - The `use-cached-hof` topic of the `warlock-js-cache` skill — caching expensive aggregate results
 
 
-## alter-migration  `@warlock.js/cascade/alter-migration/SKILL.md`
+## alter-migration  `@warlock.js/cascade/skills/alter-migration/SKILL.md`
 
 ---
 name: alter-migration
@@ -841,7 +841,7 @@ export default Migration.alter(
 - The `manage-data-sources` topic — multi-DB migrations
 
 
-## cascade-basics  `@warlock.js/cascade/cascade-basics/SKILL.md`
+## cascade-basics  `@warlock.js/cascade/skills/cascade-basics/SKILL.md`
 
 ---
 name: cascade-basics
@@ -942,7 +942,7 @@ const page = await User.paginate({ page: 1, limit: 20 });
 - Don't auto-run migrations from app code. They're a deploy step; run via `cascade migrate` or the Operations API.
 
 
-## configure-delete-strategy  `@warlock.js/cascade/configure-delete-strategy/SKILL.md`
+## configure-delete-strategy  `@warlock.js/cascade/skills/configure-delete-strategy/SKILL.md`
 
 ---
 name: configure-delete-strategy
@@ -1076,7 +1076,7 @@ See the `subscribe-to-model-events` topic.
 - The `query-data` topic — global scopes and `withoutGlobalScope` for surfacing deleted rows
 
 
-## define-model  `@warlock.js/cascade/define-model/SKILL.md`
+## define-model  `@warlock.js/cascade/skills/define-model/SKILL.md`
 
 ---
 name: define-model
@@ -1287,7 +1287,7 @@ export class User extends Model<UserSchema> {
 - The `subscribe-to-model-events` topic — lifecycle hooks
 
 
-## define-relations  `@warlock.js/cascade/define-relations/SKILL.md`
+## define-relations  `@warlock.js/cascade/skills/define-relations/SKILL.md`
 
 ---
 name: define-relations
@@ -1457,7 +1457,7 @@ For embedded/denormalized relations (cached `author_name` on posts, etc.), Casca
 - The `define-model` topic — `@RegisterModel`, the registry that makes name-based lookup work
 
 
-## manage-data-sources  `@warlock.js/cascade/manage-data-sources/SKILL.md`
+## manage-data-sources  `@warlock.js/cascade/skills/manage-data-sources/SKILL.md`
 
 ---
 name: manage-data-sources
@@ -1638,7 +1638,7 @@ unless `clientOptions.monitorCommands` is explicitly set.
 - The `manage-transactions` topic — transactions run on the default source
 
 
-## manage-transactions  `@warlock.js/cascade/manage-transactions/SKILL.md`
+## manage-transactions  `@warlock.js/cascade/skills/manage-transactions/SKILL.md`
 
 ---
 name: manage-transactions
@@ -1881,7 +1881,7 @@ Use the outbox pattern above instead when the side effect must survive a crash b
 - The `manage-data-sources` topic — transactions run on the default source
 
 
-## paginate-results  `@warlock.js/cascade/paginate-results/SKILL.md`
+## paginate-results  `@warlock.js/cascade/skills/paginate-results/SKILL.md`
 
 ---
 name: paginate-results
@@ -2005,7 +2005,7 @@ The total count requires an extra query. On very large filtered tables, this can
 - The `define-relations` topic — eager loading on a paginated page
 
 
-## perform-atomic-ops  `@warlock.js/cascade/perform-atomic-ops/SKILL.md`
+## perform-atomic-ops  `@warlock.js/cascade/skills/perform-atomic-ops/SKILL.md`
 
 ---
 name: perform-atomic-ops
@@ -2170,7 +2170,7 @@ for (const user of targets) {
 - The `paginate-results` topic — `.chunk` for bulk-processing iteration
 
 
-## query-data  `@warlock.js/cascade/query-data/SKILL.md`
+## query-data  `@warlock.js/cascade/skills/query-data/SKILL.md`
 
 ---
 name: query-data
@@ -2381,7 +2381,7 @@ const activeUsers = await User.query().scope("active").get();
 - The `aggregate-data` topic — `.sum`, `.avg`, `.groupBy`, `.having`
 
 
-## run-cascade-cli  `@warlock.js/cascade/run-cascade-cli/SKILL.md`
+## run-cascade-cli  `@warlock.js/cascade/skills/run-cascade-cli/SKILL.md`
 
 ---
 name: run-cascade-cli
@@ -2511,7 +2511,7 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 - The `manage-data-sources` topic — multi-database routing
 
 
-## search-by-vector  `@warlock.js/cascade/search-by-vector/SKILL.md`
+## search-by-vector  `@warlock.js/cascade/skills/search-by-vector/SKILL.md`
 
 ---
 name: search-by-vector
@@ -2645,7 +2645,7 @@ For local dev with MongoDB, develop the vector path against Postgres + pgvector.
 - The `use-cache-similarity` topic of the `warlock-js-cache` skill — semantic cache of LLM output
 
 
-## subscribe-to-model-events  `@warlock.js/cascade/subscribe-to-model-events/SKILL.md`
+## subscribe-to-model-events  `@warlock.js/cascade/skills/subscribe-to-model-events/SKILL.md`
 
 ---
 name: subscribe-to-model-events
@@ -2797,7 +2797,7 @@ For external side effects (queues, emails) that must only fire if a surrounding 
 - The `configure-delete-strategy` topic — `deleting` / `deleted` / `restored` around delete strategies
 
 
-## track-changes  `@warlock.js/cascade/track-changes/SKILL.md`
+## track-changes  `@warlock.js/cascade/skills/track-changes/SKILL.md`
 
 ---
 name: track-changes
@@ -2928,7 +2928,7 @@ Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was si
 - The `define-model` topic — the `.set` / `.merge` / `.save` idioms that stage changes
 
 
-## write-migration  `@warlock.js/cascade/write-migration/SKILL.md`
+## write-migration  `@warlock.js/cascade/skills/write-migration/SKILL.md`
 
 ---
 name: write-migration

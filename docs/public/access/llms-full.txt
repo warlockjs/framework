@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'Authorization (RBAC + ABAC) for Warlock apps: what a signed-in user is allowed to do. Exports `can`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access`, `DefaultAccessResolver`, `AccessResolver`, `AccessErrorCodes`. Use for: "check a permission", "restrict this route to users who can update orders", "only the owner can edit", "roles and permissions", "per-tenant roles", "custom role storage". Not this package: login, tokens, user-type gating → @warlock.js/auth; request validation → @warlock.js/seal.'
+description: 'Authorization with RBAC and ABAC: `can`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access` and `AccessResolver`. Use for "check a permission", "only the owner can edit", route policies, tenant roles or custom permission storage. Not this package → @warlock.js/auth for login, tokens and user-type guards; @warlock.js/seal for request validation.'
 ---
 
 # @warlock.js/access
@@ -60,7 +60,7 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 - The `protect-routes` topic of the `warlock-js-auth` skill — `authMiddleware`; stack `gate` after it.
 
 
-## check-permissions  `@warlock.js/access/check-permissions/SKILL.md`
+## check-permissions  `@warlock.js/access/skills/check-permissions/SKILL.md`
 
 ---
 name: check-permissions
@@ -137,7 +137,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 - The `protect-routes` topic of the `warlock-js-auth` skill — `authMiddleware`, which runs first.
 
 
-## configure-access  `@warlock.js/access/configure-access/SKILL.md`
+## configure-access  `@warlock.js/access/skills/configure-access/SKILL.md`
 
 ---
 name: configure-access
@@ -229,7 +229,7 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 - The `manage-roles` topic — assign / revoke with the ejected table.
 
 
-## define-policies  `@warlock.js/access/define-policies/SKILL.md`
+## define-policies  `@warlock.js/access/skills/define-policies/SKILL.md`
 
 ---
 name: define-policies
@@ -304,7 +304,7 @@ definePolicy(
 - The `check-permissions` topic — `authorize(…, { resource })`.
 
 
-## implement-resolver  `@warlock.js/access/implement-resolver/SKILL.md`
+## implement-resolver  `@warlock.js/access/skills/implement-resolver/SKILL.md`
 
 ---
 name: implement-resolver
@@ -413,7 +413,7 @@ class DirectResolver implements AccessResolver {
 - The `configure-access` topic — the quickstart `DefaultAccessResolver`.
 
 
-## manage-roles  `@warlock.js/access/manage-roles/SKILL.md`
+## manage-roles  `@warlock.js/access/skills/manage-roles/SKILL.md`
 
 ---
 name: manage-roles

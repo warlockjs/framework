@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'Type-safe, framework-agnostic validation for Warlock.js: schemas, coercion, modifiers, JSON Schema, Standard Schema. Exports `v`, `validate`, `ObjectValidator`, `StringValidator`, `Infer`, reached as `v.object`, `v.string`, `v.array`, `v.enum`, `v.union`. Use for: "validate this request body", "require an email and a min-length password", "infer the TypeScript type from a schema", "make a field optional or give it a default", "generate JSON Schema", "write a custom rule". Not this package: database rules and file validators live in @warlock.js/core; model schemas and persistence are @warlock.js/cascade.'
+description: 'Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator` and `Infer`. Use for "validate a request body", "require an email", optional fields and defaults, schema type inference, custom rules, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.'
 ---
 
 # @warlock.js/seal
@@ -61,7 +61,7 @@ Skip if you only need framework-bound validators (file uploads, DB rules) — th
 - `@warlock.js/core` (the `validate-input` topic of the `warlock-js-core` skill) — adds framework validators through `core/v`; import the base `v` from seal.
 
 
-## bridge-standard-schema  `@warlock.js/seal/bridge-standard-schema/SKILL.md`
+## bridge-standard-schema  `@warlock.js/seal/skills/bridge-standard-schema/SKILL.md`
 
 ---
 name: bridge-standard-schema
@@ -227,7 +227,7 @@ Seal forks the types locally. Reasons:
 If V2 lands, re-fork. Until then the local copy is the right call.
 
 
-## compose-seal-modifiers  `@warlock.js/seal/compose-seal-modifiers/SKILL.md`
+## compose-seal-modifiers  `@warlock.js/seal/skills/compose-seal-modifiers/SKILL.md`
 
 ---
 name: compose-seal-modifiers
@@ -536,7 +536,7 @@ Switch back with `.immutable`. Default is fine 99% of the time. Reach for `.muta
 - Don't mutate a schema you handed to a Model. Default immutability protects you; opting into `.mutable` on shared schemas is asking for confusion.
 
 
-## define-structural-shape  `@warlock.js/seal/define-structural-shape/SKILL.md`
+## define-structural-shape  `@warlock.js/seal/skills/define-structural-shape/SKILL.md`
 
 ---
 name: define-structural-shape
@@ -711,7 +711,7 @@ rename entries; present keys are validated as strings. Literal keys are optional
 in the inferred dictionary; use `v.object` for required named fields.
 
 
-### define-structural-shape/array-methods.md  `@warlock.js/seal/define-structural-shape/array-methods.md`
+### define-structural-shape/array-methods.md  `@warlock.js/seal/skills/define-structural-shape/array-methods.md`
 
 # `v.array(itemValidator)` — method reference
 
@@ -793,7 +793,7 @@ v.array(v.string()).default([]).optional();
 ```
 
 
-### define-structural-shape/object-methods.md  `@warlock.js/seal/define-structural-shape/object-methods.md`
+### define-structural-shape/object-methods.md  `@warlock.js/seal/skills/define-structural-shape/object-methods.md`
 
 # `v.object({...})` — method reference
 
@@ -991,7 +991,7 @@ const signupSchema = v.object({
 ```
 
 
-## extend-seal-with-plugins  `@warlock.js/seal/extend-seal-with-plugins/SKILL.md`
+## extend-seal-with-plugins  `@warlock.js/seal/skills/extend-seal-with-plugins/SKILL.md`
 
 ---
 name: extend-seal-with-plugins
@@ -1207,7 +1207,7 @@ const bothDates: SchemaRule = {
 ```
 
 
-## generate-json-schema  `@warlock.js/seal/generate-json-schema/SKILL.md`
+## generate-json-schema  `@warlock.js/seal/skills/generate-json-schema/SKILL.md`
 
 ---
 name: generate-json-schema
@@ -1354,7 +1354,7 @@ If the schema validator itself accepts data but the _generated_ JSON Schema reje
 Generating JSON Schema is cheap (pure-function tree walk), so don't worry about caching the result for schemas that change at startup. For dynamic schemas built per-request, generate per-request — there's no shared mutable state.
 
 
-## handle-seal-errors  `@warlock.js/seal/handle-seal-errors/SKILL.md`
+## handle-seal-errors  `@warlock.js/seal/skills/handle-seal-errors/SKILL.md`
 
 ---
 name: handle-seal-errors
@@ -1504,7 +1504,7 @@ Avoid leaking `result.data` back to the client when rejecting — it might conta
 For server-side logs, log `errors[]` with the field paths and rule types; redact values unless you're certain the field isn't sensitive. The `@warlock.js/logger` redaction layer is the right place to enforce that.
 
 
-## pick-seal-primitive  `@warlock.js/seal/pick-seal-primitive/SKILL.md`
+## pick-seal-primitive  `@warlock.js/seal/skills/pick-seal-primitive/SKILL.md`
 
 ---
 name: pick-seal-primitive
@@ -1661,7 +1661,7 @@ For cross-cutting modifiers (`.optional`/`.nullable`/`.default`/`.catch`/`.in`/`
 - Don't expect `v.computed` / `v.managed` to validate input — they ignore input shape entirely. Reach for them only when _producing_ a value.
 
 
-### pick-seal-primitive/boolean-methods.md  `@warlock.js/seal/pick-seal-primitive/boolean-methods.md`
+### pick-seal-primitive/boolean-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/boolean-methods.md`
 
 # `v.boolean()` — method reference
 
@@ -1769,7 +1769,7 @@ v.object({
 ```
 
 
-### pick-seal-primitive/date-methods.md  `@warlock.js/seal/pick-seal-primitive/date-methods.md`
+### pick-seal-primitive/date-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/date-methods.md`
 
 # `v.date()` — method reference
 
@@ -1948,7 +1948,7 @@ v.date().toEndOfDay().toDateOnly();
 ```
 
 
-### pick-seal-primitive/number-methods.md  `@warlock.js/seal/pick-seal-primitive/number-methods.md`
+### pick-seal-primitive/number-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/number-methods.md`
 
 # `v.number()` / `v.int()` / `v.float()` / `v.numeric()` — method reference
 
@@ -2090,7 +2090,7 @@ v.int().min(0).default(0).optional();
 ```
 
 
-### pick-seal-primitive/string-methods.md  `@warlock.js/seal/pick-seal-primitive/string-methods.md`
+### pick-seal-primitive/string-methods.md  `@warlock.js/seal/skills/pick-seal-primitive/string-methods.md`
 
 # `v.string()` — method reference
 
@@ -2268,7 +2268,7 @@ The standalone `replaceMutator` and `replaceAllMutator` preserve the stringified
 value when called without a context or replacement options.
 
 
-## seal-basics  `@warlock.js/seal/seal-basics/SKILL.md`
+## seal-basics  `@warlock.js/seal/skills/seal-basics/SKILL.md`
 
 ---
 name: seal-basics

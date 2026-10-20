@@ -4,11 +4,11 @@
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/devtools/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## devtools-overview  `@warlock.js/devtools/devtools-overview/SKILL.md`
+## devtools  `@warlock.js/devtools/skills/SKILL.md`
 
 ---
-name: devtools-overview
-description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations, AI traces per HTTP request (model, tokens, cost, cache hits, tools, retries, truncation, compaction), the route map and an API docs page (`/__warlock/docs`, the OpenAPI 3.1 document of the app rendered with Scalar or Swagger UI at `/__warlock/docs/swagger`, with OpenAPI and Postman downloads). Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard", "browse my API docs in dev", "see the OpenAPI for my routes", "open Swagger UI for my API", "export my routes to Postman". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
+name: warlock-js-devtools
+description: 'Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail" or "open devtools". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
 ---
 
 # `@warlock.js/devtools` — overview
@@ -180,7 +180,7 @@ The **Processes** tab refreshes `GET /__warlock/api/processes`: PIDs, workload
 categories, labels, display commands, limits, enforcement, and peak memory.
 It excludes ownership tokens. Without registration the list is empty. The
 endpoint retains development/loopback guards and provides no stop action.
-Use the `supervise-processes` skill of `@warlock.js/process` for launch,
+Use the `warlock-js-process` skill for launch,
 recovery and stop APIs; configure one owner/registry per application instance.
 
 

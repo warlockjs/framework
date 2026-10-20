@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [create-a-warlock-project](create-warlock/create-a-warlock-project/SKILL.md): Create a Warlock project with the canonical scaffold, package selection, and project conventions.
+- [create-warlock](create-warlock/skills/SKILL.md): Scaffold Warlock apps with `npm create warlock@latest` or `npx create-warlock`; the CLI entry exports `parseFlags`, `packageVersion` and default `createApp`. Use for "create a project", "start a backend or SSR app", choose a database, AI adapters, features or linting, and automate setup with `--yes` and `--pm=npm`. Not this package → @warlock.js/core for extending an existing app; @warlock.js/web for page APIs.

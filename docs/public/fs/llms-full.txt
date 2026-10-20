@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'Filesystem primitives for Warlock.js: sync and async file/dir operations with one canonical name each (`*Async` is async, bare name is sync). Exports `fs`, `File`, `Directory`, `getJsonFileAsync`, `putFileAsync`, `atomicWriteAsync`, `atomicWriteJsonAsync`, `ensureDirectoryAsync`, `copyDirectoryAsync`, `listFilesAsync`, `hashFileAsync`, `createConfinedReader`. Use for: "read a JSON file", "write a file without corrupting it on crash", "create a directory recursively", "hash a file", "list files in a folder", "read a user-chosen folder without following symlinks or escaping it". Not this package: uploads and storage drivers live in @warlock.js/core; config loading is a core concern.'
+description: 'Filesystem helpers with sync names and `Async` variants: `fs`, `File`, `Directory`, `getJsonFileAsync`, `atomicWriteAsync`, `hashFileAsync` and `createConfinedReader`. Use for "read JSON", "write atomically", "copy a directory", "hash a file" or "read a folder without escaping it". Not this package → @warlock.js/core for uploads/storage; @warlock.js/ai-workspace for agent file tools with policy enforcement.'
 ---
 
 # @warlock.js/fs
@@ -65,7 +65,7 @@ Skip if your code path is one-off and bare `node:fs/promises` is already importe
 - The `warlock-conventions` topic of the `warlock-js-core` skill — the parent framework's conventions; `fs` is one of its foundation packages.
 
 
-## hash-files  `@warlock.js/fs/hash-files/SKILL.md`
+## hash-files  `@warlock.js/fs/skills/hash-files/SKILL.md`
 
 ---
 name: hash-files
@@ -199,7 +199,7 @@ Cheaper than `cmp`-byte-comparing two large files when the result is "yes/no dif
 - Don't expect digests to compare lexically meaningfully — they're random hex. For ordering, hash and then `bigint`-convert if you really need sort.
 
 
-## manage-directories  `@warlock.js/fs/manage-directories/SKILL.md`
+## manage-directories  `@warlock.js/fs/skills/manage-directories/SKILL.md`
 
 ---
 name: manage-directories
@@ -363,7 +363,7 @@ const tsFiles = await walk("./src");
 - Don't list a directory you're concurrently modifying — readdir snapshots aren't atomic across concurrent writes.
 
 
-## multi-file-transactions  `@warlock.js/fs/multi-file-transactions/SKILL.md`
+## multi-file-transactions  `@warlock.js/fs/skills/multi-file-transactions/SKILL.md`
 
 ---
 name: multi-file-transactions
@@ -455,7 +455,7 @@ Flat APIs: `transactionAsync`, `openTransactionRootAsync`,
 For one file without CAS or locking, use the `write-atomically` topic.
 
 
-## read-a-folder-confined  `@warlock.js/fs/read-a-folder-confined/SKILL.md`
+## read-a-folder-confined  `@warlock.js/fs/skills/read-a-folder-confined/SKILL.md`
 
 ---
 name: read-a-folder-confined
@@ -552,7 +552,7 @@ Each link is resolved with `realpath` and must land inside the root. `walk` desc
 - The reader only reads. For an agent that also writes and runs commands, use `@warlock.js/ai-workspace`; its jail follows links that stay inside and accepts absolute paths inside the jail by design.
 
 
-## read-and-write-files  `@warlock.js/fs/read-and-write-files/SKILL.md`
+## read-and-write-files  `@warlock.js/fs/skills/read-and-write-files/SKILL.md`
 
 ---
 name: read-and-write-files
@@ -665,7 +665,7 @@ const all = await statsAsync("./bundle.js"); // fs.Stats
 - Don't pass binary content to `putFile` / `putFileAsync` as a `Buffer` directly — these are text-only (UTF-8). For binaries, use `node:fs/promises`'s `writeFile` directly, or use `atomicWriteAsync` (which accepts `string | Buffer`).
 
 
-## use-the-fs-facade  `@warlock.js/fs/use-the-fs-facade/SKILL.md`
+## use-the-fs-facade  `@warlock.js/fs/skills/use-the-fs-facade/SKILL.md`
 
 ---
 name: use-the-fs-facade
@@ -775,7 +775,7 @@ const moved = await fs.file("a.txt").moveTo(fs.dir("archive")); // new File hand
 - The `write-atomically` topic — `put({ atomic })` delegates to this.
 
 
-## write-atomically  `@warlock.js/fs/write-atomically/SKILL.md`
+## write-atomically  `@warlock.js/fs/skills/write-atomically/SKILL.md`
 
 ---
 name: write-atomically

@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'Cache layer for Warlock apps with pluggable drivers (memory, LRU, file, Redis, Postgres). Exports `cache`, `CacheManager`, `cached`, `TaggedCache`, `ScopedCache`, `RedisCacheDriver`, `MemoryCacheDriver`, `MockCacheDriver`, `PgCacheDriver`. Use for: "cache this query for 5 minutes", "invalidate every key for tenant 42", "stale-while-revalidate", "take a lock so only one worker runs this", "tag keys and flush the tag", "increment a counter in cache". Not this package: HTTP response/page caching belongs to @warlock.js/core or web; persistent data is a @warlock.js/cascade model.'
+description: 'Pluggable memory, LRU, file, Redis and Postgres caching: `cache`, `cached`, `CacheManager`, `TaggedCache`, `ScopedCache` and `MockCacheDriver`. Use for "cache this query", "invalidate a tenant", "stale-while-revalidate", "take a lock", tag invalidation or counters. Not this package → @warlock.js/core for HTTP response caching; @warlock.js/web for page caching; @warlock.js/cascade for persistent models.'
 ---
 
 # @warlock.js/cache
@@ -54,7 +54,7 @@ A single `cache` singleton fronts a configured driver. `cache.set(key, value, op
 - The `configure-app` topic of the `warlock-js-core` skill — wires the cache driver from `src/config/cache.ts` and exposes the singleton.
 
 
-## apply-cache-patterns  `@warlock.js/cache/apply-cache-patterns/SKILL.md`
+## apply-cache-patterns  `@warlock.js/cache/skills/apply-cache-patterns/SKILL.md`
 
 ---
 name: apply-cache-patterns
@@ -157,7 +157,7 @@ await cache.tags([`tenant-${tenantId}`]).invalidate();
 - The `use-cached-hof` topic — `cached()` HOF for declarative memoization
 
 
-## cache-basics  `@warlock.js/cache/cache-basics/SKILL.md`
+## cache-basics  `@warlock.js/cache/skills/cache-basics/SKILL.md`
 
 ---
 name: cache-basics
@@ -288,7 +288,7 @@ const user = await cache.remember("user.1", "1h", async () => db.users.find(1));
 - Don't switch embedders without re-embedding the entire vector index.
 
 
-## configure-pg-cache  `@warlock.js/cache/configure-pg-cache/SKILL.md`
+## configure-pg-cache  `@warlock.js/cache/skills/configure-pg-cache/SKILL.md`
 
 ---
 name: configure-pg-cache
@@ -408,7 +408,7 @@ See the `handle-cache-errors` topic for the full error class hierarchy.
 - The `pick-cache-driver` topic — comparing pg with memory / redis / file
 
 
-## configure-set-options  `@warlock.js/cache/configure-set-options/SKILL.md`
+## configure-set-options  `@warlock.js/cache/skills/configure-set-options/SKILL.md`
 
 ---
 name: configure-set-options
@@ -514,7 +514,7 @@ await cache.set("k", v, undefined); // same as no TTL
 ```
 
 
-## handle-cache-errors  `@warlock.js/cache/handle-cache-errors/SKILL.md`
+## handle-cache-errors  `@warlock.js/cache/skills/handle-cache-errors/SKILL.md`
 
 ---
 name: handle-cache-errors
@@ -610,7 +610,7 @@ try {
 - **Concurrent writes clobbering each other** — last-write-wins by default. Use `update()` or `onConflict: "create"` if you need protection.
 
 
-## observe-cache  `@warlock.js/cache/observe-cache/SKILL.md`
+## observe-cache  `@warlock.js/cache/skills/observe-cache/SKILL.md`
 
 ---
 name: observe-cache
@@ -718,7 +718,7 @@ Drivers that never fire events stay absent from `byDriver` — guard with `?.` a
 - Don't forget to attach early. If startup metrics matter, call `cache.metrics()` right after `cache.init()`.
 
 
-## pick-cache-driver  `@warlock.js/cache/pick-cache-driver/SKILL.md`
+## pick-cache-driver  `@warlock.js/cache/skills/pick-cache-driver/SKILL.md`
 
 ---
 name: pick-cache-driver
@@ -852,7 +852,7 @@ The manager loads (and connects) the override driver lazily on first use, then r
 - The `test-cache-code` topic — `MockCacheDriver` and `NullCacheDriver` for tests
 
 
-## test-cache-code  `@warlock.js/cache/test-cache-code/SKILL.md`
+## test-cache-code  `@warlock.js/cache/skills/test-cache-code/SKILL.md`
 
 ---
 name: test-cache-code
@@ -1080,7 +1080,7 @@ it("returns the most similar doc above threshold", async () => {
 The `pg` driver accepts any object satisfying `PgClientLike` (`{ query(text, values) }`). For unit tests, hand-roll a minimal Map-backed fake — see `src/drivers/pg-cache-driver.spec.ts` for a 60-line `FakePool` that recognizes the exact SQL shapes the driver issues. For integration coverage, gate a real-PG suite on a `POSTGRES_URL` env var and skip cleanly when unset.
 
 
-## use-cache-atomic  `@warlock.js/cache/use-cache-atomic/SKILL.md`
+## use-cache-atomic  `@warlock.js/cache/skills/use-cache-atomic/SKILL.md`
 
 ---
 name: use-cache-atomic
@@ -1149,7 +1149,7 @@ if (remaining < 0) {
 - The `pick-cache-driver` topic — when you need cross-node atomicity
 
 
-## use-cache-bulk  `@warlock.js/cache/use-cache-bulk/SKILL.md`
+## use-cache-bulk  `@warlock.js/cache/skills/use-cache-bulk/SKILL.md`
 
 ---
 name: use-cache-bulk
@@ -1213,7 +1213,7 @@ returned promise rejects.
 - The `use-cache-tags` topic — invalidate a batch by tag
 
 
-## use-cache-list  `@warlock.js/cache/use-cache-list/SKILL.md`
+## use-cache-list  `@warlock.js/cache/skills/use-cache-list/SKILL.md`
 
 ---
 name: use-cache-list
@@ -1302,7 +1302,7 @@ const top = await stack.pop(); // LIFO
 These are tracked as candidates for v3.
 
 
-## use-cache-lock  `@warlock.js/cache/use-cache-lock/SKILL.md`
+## use-cache-lock  `@warlock.js/cache/skills/use-cache-lock/SKILL.md`
 
 ---
 name: use-cache-lock
@@ -1413,7 +1413,7 @@ await cache.lock(
 - **Cross-server requires `redis` or `pg`.** Memory / LRU / file drivers don't coordinate across servers.
 
 
-## use-cache-namespace  `@warlock.js/cache/use-cache-namespace/SKILL.md`
+## use-cache-namespace  `@warlock.js/cache/skills/use-cache-namespace/SKILL.md`
 
 ---
 name: use-cache-namespace
@@ -1503,7 +1503,7 @@ Note: scope `ttl` defaults are NOT applied to SWR — `freshTtl` / `staleTtl` al
 - Don't mix prefix separators. The convention is `.` (dot) — pick one and stick with it across scopes so nested prefixes compose predictably.
 
 
-## use-cache-similarity  `@warlock.js/cache/use-cache-similarity/SKILL.md`
+## use-cache-similarity  `@warlock.js/cache/skills/use-cache-similarity/SKILL.md`
 
 ---
 name: use-cache-similarity
@@ -1601,7 +1601,7 @@ See the `configure-pg-cache` topic.
 - Don't use `topK: 0` or negative — `pg` rejects with `CacheConfigurationError`; memory drivers return `[]` but it's a code smell.
 
 
-## use-cache-tags  `@warlock.js/cache/use-cache-tags/SKILL.md`
+## use-cache-tags  `@warlock.js/cache/skills/use-cache-tags/SKILL.md`
 
 ---
 name: use-cache-tags
@@ -1693,7 +1693,7 @@ See the `use-cached-hof` topic.
 - Don't use tags as a query mechanism. Tags drop keys; they don't list them. If you need "give me every user", store an index list separately.
 
 
-## use-cache-update-merge  `@warlock.js/cache/use-cache-update-merge/SKILL.md`
+## use-cache-update-merge  `@warlock.js/cache/skills/use-cache-update-merge/SKILL.md`
 
 ---
 name: use-cache-update-merge
@@ -1781,7 +1781,7 @@ The per-key lock map lives on the driver instance and is cleared after each chai
 | "Read-then-delete atomically"              | `pull()`                                                        |
 
 
-## use-cache-utils  `@warlock.js/cache/use-cache-utils/SKILL.md`
+## use-cache-utils  `@warlock.js/cache/skills/use-cache-utils/SKILL.md`
 
 ---
 name: use-cache-utils
@@ -1874,7 +1874,7 @@ For most call sites the duration string (`"1h"`, `"7d"`) reads better.
 - The `pick-cache-driver` topic — building a custom driver where these help
 
 
-## use-cached-hof  `@warlock.js/cache/use-cached-hof/SKILL.md`
+## use-cached-hof  `@warlock.js/cache/skills/use-cached-hof/SKILL.md`
 
 ---
 name: use-cached-hof
@@ -1982,7 +1982,7 @@ const getCategoryMeta = cached(
 - Don't include secrets in args — they'd land in cache keys. Project only the identifying fields into the key.
 
 
-## use-swr  `@warlock.js/cache/use-swr/SKILL.md`
+## use-swr  `@warlock.js/cache/skills/use-swr/SKILL.md`
 
 ---
 name: use-swr

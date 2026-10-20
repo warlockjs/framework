@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'In-process job scheduler for Warlock.js with fluent and cron scheduling, retries, overlap prevention and timezones. Exports `Scheduler`, `scheduler`, `Job`, `job`, `CronParser`, `parseCron`, plus types `RetryConfig`, `JobResult`, `SchedulerEvents`. Use for: "run this every day at 3am", "run a cron expression on weekdays", "retry a failing job 3 times", "stop a job overlapping itself", "run in New York time", "log job failures". Not this package: durable queues and background workers are not scheduling; per-run locking across instances uses @warlock.js/cache.'
+description: 'In-process cron and fluent scheduling: `Scheduler`, `scheduler`, `Job`, `job`, `CronParser` and `parseCron`. Use for "run every day at 3am", "schedule weekdays", "retry a failing job", "prevent overlap", choose a timezone or observe job failures. Not this package → @warlock.js/queue for durable background workers; @warlock.js/cache for locks across instances; @warlock.js/herald for broker messaging.'
 ---
 
 # @warlock.js/scheduler
@@ -58,7 +58,7 @@ Define a job with `job("name", async () => { ... })`. Attach a schedule via the 
 - The `warlock-js-core` skill index — the parent framework that scheduled jobs typically run alongside.
 
 
-## configure-retry-and-overlap  `@warlock.js/scheduler/configure-retry-and-overlap/SKILL.md`
+## configure-retry-and-overlap  `@warlock.js/scheduler/skills/configure-retry-and-overlap/SKILL.md`
 
 ---
 name: configure-retry-and-overlap
@@ -204,7 +204,7 @@ job("sync", sync).everyMinutes(5).onOneServer({ lockTtl: "10m", key: "sync-v2" }
 - Throws at call time if the job has no name/key.
 
 
-## observe-scheduler  `@warlock.js/scheduler/observe-scheduler/SKILL.md`
+## observe-scheduler  `@warlock.js/scheduler/skills/observe-scheduler/SKILL.md`
 
 ---
 name: observe-scheduler
@@ -362,7 +362,7 @@ job.cronExpression; // string | null
 - The `schedule-fluently` topic — the methods that mutate the state these getters expose
 
 
-## pin-schedule-timezone  `@warlock.js/scheduler/pin-schedule-timezone/SKILL.md`
+## pin-schedule-timezone  `@warlock.js/scheduler/skills/pin-schedule-timezone/SKILL.md`
 
 ---
 name: pin-schedule-timezone
@@ -471,7 +471,7 @@ Node ships full ICU on most platforms, so all IANA zones work out of the box. If
 - The `observe-scheduler` topic — `job.nextRun.toISOString()` always renders in UTC; format with `.tz(zone)` to see local time
 
 
-## schedule-fluently  `@warlock.js/scheduler/schedule-fluently/SKILL.md`
+## schedule-fluently  `@warlock.js/scheduler/skills/schedule-fluently/SKILL.md`
 
 ---
 name: schedule-fluently
@@ -613,7 +613,7 @@ j?.cronExpression; // null if using fluent API
 - The `pin-schedule-timezone` topic — `.inTimezone()`
 
 
-## schedule-with-cron  `@warlock.js/scheduler/schedule-with-cron/SKILL.md`
+## schedule-with-cron  `@warlock.js/scheduler/skills/schedule-with-cron/SKILL.md`
 
 ---
 name: schedule-with-cron
@@ -740,7 +740,7 @@ If the job has `.inTimezone(tz)`, the cron parser receives a timezone-aware `day
 - The `pin-schedule-timezone` topic — pinning a cron schedule to a wall-clock timezone
 
 
-## scheduler-basics  `@warlock.js/scheduler/scheduler-basics/SKILL.md`
+## scheduler-basics  `@warlock.js/scheduler/skills/scheduler-basics/SKILL.md`
 
 ---
 name: scheduler-basics

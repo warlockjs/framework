@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'Structured logging for Warlock.js with pluggable channels, redaction and shutdown flushing. Exports `log`, `Logger`, `LogChannel`, `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `applyRedact`, `DEFAULT_REDACT_KEYS`, `captureAnyUnhandledRejection`. Use for: "log an error with context", "write logs to a file as JSON", "send errors to Sentry", "hide passwords and tokens in logs", "flush logs before exit", "catch unhandled rejections", "write my own log channel". Not this package: HTTP request handling and error responses live in @warlock.js/core; scheduled jobs are @warlock.js/scheduler.'
+description: 'Structured logging with channels, filtering, redaction and shutdown flushing: `log`, `Logger`, `LogChannel`, `ConsoleLog`, `JSONFileLog`, `SentryLog` and `applyRedact`. Use for "log an error with context", "hide tokens", "write JSON logs", "send errors to Sentry" or "flush before exit". Not this package → @warlock.js/core for HTTP error responses; @warlock.js/ai-panoptic for agent traces and AI cost dashboards.'
 ---
 
 # @warlock.js/logger
@@ -71,7 +71,7 @@ You write `log.info("auth", "login", "user signed in", { userId })`. The logger 
 - The `warlock-conventions` topic of the `warlock-js-core` skill — the parent framework's conventions; logger is one of its foundation packages and ships transitively when you install core.
 
 
-## capture-unhandled-errors  `@warlock.js/logger/capture-unhandled-errors/SKILL.md`
+## capture-unhandled-errors  `@warlock.js/logger/skills/capture-unhandled-errors/SKILL.md`
 
 ---
 name: capture-unhandled-errors
@@ -185,7 +185,7 @@ Both listeners log with:
 If you want these routed to a specific file, filter on `data.module === "app"`. See the `filter-log-entries` topic.
 
 
-## configure-logger  `@warlock.js/logger/configure-logger/SKILL.md`
+## configure-logger  `@warlock.js/logger/skills/configure-logger/SKILL.md`
 
 ---
 name: configure-logger
@@ -291,7 +291,7 @@ See the `redact-sensitive-log-fields` topic for the redact contract and the `fil
 - The `flush-logs-on-shutdown` topic — `autoFlushOn` event behavior
 
 
-## filter-log-entries  `@warlock.js/logger/filter-log-entries/SKILL.md`
+## filter-log-entries  `@warlock.js/logger/skills/filter-log-entries/SKILL.md`
 
 ---
 name: filter-log-entries
@@ -415,7 +415,7 @@ Filters run on **every** entry per channel. A synchronous, cheap predicate is fi
 The `minLevel` check is the fastest of the three (single comparison before fan-out), so prefer it when "drop everything below X uniformly" matches your need.
 
 
-## flush-logs-on-shutdown  `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`
+## flush-logs-on-shutdown  `@warlock.js/logger/skills/flush-logs-on-shutdown/SKILL.md`
 
 ---
 name: flush-logs-on-shutdown
@@ -555,7 +555,7 @@ resolves so shutdown can continue. Timeout does not cancel a channel's network
 operation; its driver owns cancellation.
 
 
-## logger-basics  `@warlock.js/logger/logger-basics/SKILL.md`
+## logger-basics  `@warlock.js/logger/skills/logger-basics/SKILL.md`
 
 ---
 name: logger-basics
@@ -644,7 +644,7 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 - Don't shadow the import in local code: `for (const log of logEntries) { ... }` will hide the singleton inside that block. Rename loop variables (`entry`, `record`) when working with logger imports.
 
 
-## pick-log-channel  `@warlock.js/logger/pick-log-channel/SKILL.md`
+## pick-log-channel  `@warlock.js/logger/skills/pick-log-channel/SKILL.md`
 
 ---
 name: pick-log-channel
@@ -815,7 +815,7 @@ If two channels share a `name`, only one is reachable this way — the search re
 - The `write-custom-log-channel` topic — extending `LogChannel` for custom sinks
 
 
-## redact-sensitive-log-fields  `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`
+## redact-sensitive-log-fields  `@warlock.js/logger/skills/redact-sensitive-log-fields/SKILL.md`
 
 ---
 name: redact-sensitive-log-fields
@@ -1020,7 +1020,7 @@ Keys are normalized; values are exact literal substrings (punctuation is literal
 Registration retains keys/values in memory for the process lifetime. Removed/rotated values stay protected. It does not protect prior logs, transformed/encoded credentials, direct console calls, third-party loggers or credentials never registered. Core's `secrets` store registers its encountered keys/values automatically. Keep credentials out of logs even with this protection enabled.
 
 
-## ship-logs-to-sentry  `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`
+## ship-logs-to-sentry  `@warlock.js/logger/skills/ship-logs-to-sentry/SKILL.md`
 
 ---
 name: ship-logs-to-sentry
@@ -1142,7 +1142,7 @@ The channel never crashes your app: the dynamic import failure is swallowed, the
 - The `write-custom-log-channel` topic — build your own sink
 
 
-## test-logging-code  `@warlock.js/logger/test-logging-code/SKILL.md`
+## test-logging-code  `@warlock.js/logger/skills/test-logging-code/SKILL.md`
 
 ---
 name: test-logging-code
@@ -1325,7 +1325,7 @@ process.emit("uncaughtException", new Error("test"), "uncaughtException");
 See the `capture-unhandled-errors` topic for a full example.
 
 
-## use-log-helpers  `@warlock.js/logger/use-log-helpers/SKILL.md`
+## use-log-helpers  `@warlock.js/logger/skills/use-log-helpers/SKILL.md`
 
 ---
 name: use-log-helpers
@@ -1395,7 +1395,7 @@ end({ rowsProcessed: report.rowCount });
 - `log.timer` shorthand binds to the singleton — see the `test-logging-code` topic for how to swap channels per test.
 
 
-## write-custom-log-channel  `@warlock.js/logger/write-custom-log-channel/SKILL.md`
+## write-custom-log-channel  `@warlock.js/logger/skills/write-custom-log-channel/SKILL.md`
 
 ---
 name: write-custom-log-channel

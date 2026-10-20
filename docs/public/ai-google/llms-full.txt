@@ -4,24 +4,11 @@
 
 > Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-google/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
 
-## Package orientation
+## ai-google  `@warlock.js/ai-google/skills/SKILL.md`
 
 ---
-description: "Provider adapter for Google Gemini API and Vertex AI in Warlock AI applications. Exports `GoogleSDK` with model and provider configuration for the shared AI contracts. Use when connecting this provider, configuring API keys or Vertex project settings, reasoning and embeddings, or diagnosing provider requests and usage. Read `setup-google` for construction and examples using GOOGLE_API_KEY or Vertex credentials. Not this package: agent loops, tools and workflows → @warlock.js/ai; HTTP and MCP tools → @warlock.js/ai-tools."
----
-
-# @warlock.js/ai-google
-
-This adapter supplies provider-backed models for `@warlock.js/ai`. Read `setup-google.md` to construct `GoogleSDK`, configure API keys or Vertex project settings, reasoning and embeddings, and understand provider-specific behavior.
-
-For agent composition, read the `run-ai-agent` topic of the `@warlock.js/ai` package. Keep provider configuration here and application orchestration in that package.
-
-
-## setup-google  `@warlock.js/ai-google/setup-google/SKILL.md`
-
----
-name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `providerOptions`, `GoogleCallOptions`, `countTokens`, `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `ai.providerTool`, `googleSearch`, `includeThoughts`, `streamChunks`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `inputIncludesCache`, `GOOGLE_MODEL_PRICING`, `googlePricingFor`, `ProviderOverloadedError`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent loop the `run-ai-agent` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+name: warlock-js-ai-google
+description: 'Google Gemini and Imagen adapter for Warlock AI: `GoogleSDK`, `GeminiImageModel`, `GoogleImageModel`, `GoogleCallOptions` and `GOOGLE_MODEL_PRICING`. Use for "connect Gemini", thinking, streaming, tools, embeddings, images or grounded search through `model()`, `embedder()` and `image()`. Not this package → @warlock.js/ai for orchestration; @warlock.js/ai-live for video and realtime sessions.'
 ---
 
 # `@warlock.js/ai-google`

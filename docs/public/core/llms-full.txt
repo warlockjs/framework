@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: "The Warlock server framework: HTTP routes, controllers, responses, resources, repositories, CLI, mail, storage, security helpers. Exports `router`, `Request`, `Response`, `RequestHandler`, `useCase`, `RepositoryManager`, `defineResource`, `defineConfig`, `storage`, `sendMail`, `hashPassword`, `command`. Use for: add a route, write a controller, return a JSON response, hide a field from the response, upload a file, send an email, hash a password, add a CLI command, generate an OpenAPI document, type an API response, wire a socket, run or configure the app. Not this package: database models/queries → @warlock.js/cascade; input schemas → @warlock.js/seal; SSR pages → @warlock.js/web."
+description: 'Warlock application runtime: `router`, `Request`, `Response`, `config`, `env`, `sendMail` and `defineConfig`. Use for "add an API route", controllers, middleware, CLI commands, config, uploads, mail, sockets, OpenAPI, testing or upgrades. Not this package → @warlock.js/web for React SSR pages; @warlock.js/cascade for database queries; @warlock.js/seal for standalone schemas; @warlock.js/auth for login.'
 ---
 
 # @warlock.js/core
@@ -45,7 +45,7 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 - Prefer typed model getters over scattered `.get<T>("field")` casts.
 
 
-## add-connector  `@warlock.js/core/add-connector/SKILL.md`
+## add-connector  `@warlock.js/core/skills/add-connector/SKILL.md`
 
 ---
 name: add-connector
@@ -277,7 +277,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 - The `warlock-conventions` topic — module layout, canonical imports.
 
 
-## benchmark-code  `@warlock.js/core/benchmark-code/SKILL.md`
+## benchmark-code  `@warlock.js/core/skills/benchmark-code/SKILL.md`
 
 ---
 name: benchmark-code
@@ -543,7 +543,7 @@ The `latency` is the _total_ time including retries — useful for the SLO you a
 - The `configure-app` topic — wiring `src/config/benchmark.ts`.
 
 
-## build-restful  `@warlock.js/core/build-restful/SKILL.md`
+## build-restful  `@warlock.js/core/skills/build-restful/SKILL.md`
 
 ---
 name: build-restful
@@ -815,7 +815,7 @@ router.restfulResource("/orders", new OrdersRestful());
 - The `warlock-conventions` topic — controller/service/repository layering rules.
 
 
-## build-url  `@warlock.js/core/build-url/SKILL.md`
+## build-url  `@warlock.js/core/skills/build-url/SKILL.md`
 
 ---
 name: build-url
@@ -999,7 +999,7 @@ Don't call `setBaseUrl` per request — it's process-global and races every othe
 - The `configure-app` topic — `src/config/app.ts` and the `baseUrl` env wiring.
 
 
-## configure-app  `@warlock.js/core/configure-app/SKILL.md`
+## configure-app  `@warlock.js/core/skills/configure-app/SKILL.md`
 
 ---
 name: configure-app
@@ -1426,7 +1426,7 @@ this config. Return `undefined` for errors you do not recognize; a mapped 5xx
 is opaque unless the mapper explicitly chooses a public message.
 
 
-## create-controller  `@warlock.js/core/create-controller/SKILL.md`
+## create-controller  `@warlock.js/core/skills/create-controller/SKILL.md`
 
 ---
 name: create-controller
@@ -1725,7 +1725,7 @@ export const remoteCatalogController: RequestHandler = async ({ request, respons
 ```
 
 
-## create-module  `@warlock.js/core/create-module/SKILL.md`
+## create-module  `@warlock.js/core/skills/create-module/SKILL.md`
 
 ---
 name: create-module
@@ -1926,7 +1926,7 @@ After editing generated code, run `npm run format` and `npm run lint:check`.
 Formatting retains unused imports; the linter reports them.
 
 
-## define-resource  `@warlock.js/core/define-resource/SKILL.md`
+## define-resource  `@warlock.js/core/skills/define-resource/SKILL.md`
 
 ---
 name: define-resource
@@ -2333,7 +2333,7 @@ export const CommentResource = defineResource({
 - The `create-controller` topic — calling `new XResource(record).toJSON()` from a controller.
 
 
-## encrypt-data  `@warlock.js/core/encrypt-data/SKILL.md`
+## encrypt-data  `@warlock.js/core/skills/encrypt-data/SKILL.md`
 
 ---
 name: encrypt-data
@@ -2547,11 +2547,11 @@ Password hashing (`hashPassword`) needs `bcryptjs`, which is its own install —
 - The `warlock-conventions` topic — service layering, where the encryption boundary should sit.
 
 
-## generate-openapi  `@warlock.js/core/generate-openapi/SKILL.md`
+## generate-openapi  `@warlock.js/core/skills/generate-openapi/SKILL.md`
 
 ---
 name: generate-openapi
-description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`), write a Postman collection from it with `warlock generate.postman` (default `storage/postman/collection.json`), and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `generate.postman`, `openApiToPostmanCollection`, `getDevelopmentPostmanCollection`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — the `create-controller` topic; the devtools dashboard — the `devtools-overview` topic of the `warlock-js-devtools` skill; listing routes — the `warlock-routes` topic.'
+description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`), write a Postman collection from it with `warlock generate.postman` (default `storage/postman/collection.json`), and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `generate.postman`, `openApiToPostmanCollection`, `getDevelopmentPostmanCollection`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — the `create-controller` topic; the devtools dashboard — the `warlock-js-devtools` skill; listing routes — the `warlock-routes` topic.'
 ---
 
 # Warlock — generate an OpenAPI document
@@ -2725,7 +2725,7 @@ const { document, warnings } = buildOpenApiDocument(router.list(), {
 - The `warlock-routes` topic — list the routes the document is built from.
 
 
-## hash-password  `@warlock.js/core/hash-password/SKILL.md`
+## hash-password  `@warlock.js/core/skills/hash-password/SKILL.md`
 
 ---
 name: hash-password
@@ -2912,7 +2912,7 @@ There is no `warlock add` feature for password hashing — `bcryptjs` is a plain
 - The `warlock-conventions` topic — service layering, where the password boundary should sit.
 
 
-## health-checks  `@warlock.js/core/health-checks/SKILL.md`
+## health-checks  `@warlock.js/core/skills/health-checks/SKILL.md`
 
 ---
 name: health-checks
@@ -3054,7 +3054,7 @@ For an even smoother handoff, give the load balancer time to observe the 503 bef
 - The `use-middleware` topic — maintenance mode and other built-in middleware.
 
 
-## lower-stage3-decorators  `@warlock.js/core/lower-stage3-decorators/SKILL.md`
+## lower-stage3-decorators  `@warlock.js/core/skills/lower-stage3-decorators/SKILL.md`
 
 ---
 name: lower-stage3-decorators
@@ -3114,7 +3114,7 @@ It's the **same esbuild transform the production `tsx`/build path uses**, so a f
 - The `write-migration` topic of the `warlock-js-cascade` skill — the decorated models this plugin lets you load.
 
 
-## make-endpoint  `@warlock.js/core/make-endpoint/SKILL.md`
+## make-endpoint  `@warlock.js/core/skills/make-endpoint/SKILL.md`
 
 ---
 name: make-endpoint
@@ -3228,7 +3228,7 @@ Every `generate.*` command, `make`, and `add` take both. `--dry-run` writes (and
 - The `generate-openapi` topic — what `responseSchema` documents.
 
 
-## model-factories  `@warlock.js/core/model-factories/SKILL.md`
+## model-factories  `@warlock.js/core/skills/model-factories/SKILL.md`
 
 ---
 name: model-factories
@@ -3324,7 +3324,7 @@ it("lists users", async () => {
 - The `write-seeder` topic — seeding a development database.
 
 
-## process-image  `@warlock.js/core/process-image/SKILL.md`
+## process-image  `@warlock.js/core/skills/process-image/SKILL.md`
 
 ---
 name: process-image
@@ -3501,7 +3501,7 @@ See the `upload-file` topic for the multipart entry point and the `store-file` t
 - The `warlock-conventions` topic — where image-processing services live.
 
 
-## register-route  `@warlock.js/core/register-route/SKILL.md`
+## register-route  `@warlock.js/core/skills/register-route/SKILL.md`
 
 ---
 name: register-route
@@ -3786,7 +3786,7 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 - The `warlock-conventions` topic — module layout, the `guarded` convention, path aliases.
 
 
-## report-framework-issue  `@warlock.js/core/report-framework-issue/SKILL.md`
+## report-framework-issue  `@warlock.js/core/skills/report-framework-issue/SKILL.md`
 
 ---
 name: report-framework-issue
@@ -3949,7 +3949,7 @@ GitHub CLI flags: [list](https://cli.github.com/manual/gh_issue_list),
 [authentication](https://cli.github.com/manual/gh_auth_status).
 
 
-## request-memo  `@warlock.js/core/request-memo/SKILL.md`
+## request-memo  `@warlock.js/core/skills/request-memo/SKILL.md`
 
 ---
 name: request-memo
@@ -4095,7 +4095,7 @@ Reusing one key for different result types is a caller bug: TypeScript cannot co
 - The `create-controller` topic — consuming request-scoped values from controllers.
 
 
-## request-tracing  `@warlock.js/core/request-tracing/SKILL.md`
+## request-tracing  `@warlock.js/core/skills/request-tracing/SKILL.md`
 
 ---
 name: request-tracing
@@ -4333,7 +4333,7 @@ export default httpConfig;
 - The `logger-basics` topic of the `warlock-js-logger` skill — structured logging; tracing hooks are the place to bridge phase timing into your log channel.
 
 
-## resolve-path  `@warlock.js/core/resolve-path/SKILL.md`
+## resolve-path  `@warlock.js/core/skills/resolve-path/SKILL.md`
 
 ---
 name: resolve-path
@@ -4508,7 +4508,7 @@ If you find yourself reaching for `path.join(process.cwd(), ...)` — that's a s
 - The `upload-file` topic — the `UploadedFile` shape that pairs with `uploadsPath`.
 
 
-## retry-operation  `@warlock.js/core/retry-operation/SKILL.md`
+## retry-operation  `@warlock.js/core/skills/retry-operation/SKILL.md`
 
 ---
 name: retry-operation
@@ -4630,7 +4630,7 @@ const result = await measure("publish-event", () =>
 - The `write-use-case` topic — the use-case `retry` option.
 
 
-## run-app  `@warlock.js/core/run-app/SKILL.md`
+## run-app  `@warlock.js/core/skills/run-app/SKILL.md`
 
 ---
 name: run-app
@@ -5350,7 +5350,7 @@ directly. Regression tests cover both paths without inherited loader hooks,
 including configured declaration roots, source updates and deleted declarations.
 
 
-## send-mail  `@warlock.js/core/send-mail/SKILL.md`
+## send-mail  `@warlock.js/core/skills/send-mail/SKILL.md`
 
 ---
 name: send-mail
@@ -5756,7 +5756,7 @@ await Mail.to(user.email)
 - The `warlock-conventions` topic — where mail-sending services live.
 
 
-## send-response  `@warlock.js/core/send-response/SKILL.md`
+## send-response  `@warlock.js/core/skills/send-response/SKILL.md`
 
 ---
 name: send-response
@@ -6243,7 +6243,7 @@ export function requireProduct<T>(product: T | null | undefined): T {
 ```
 
 
-## store-file  `@warlock.js/core/store-file/SKILL.md`
+## store-file  `@warlock.js/core/skills/store-file/SKILL.md`
 
 ---
 name: store-file
@@ -6691,7 +6691,7 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 - The `send-response` topic — `response.sendFile(absPath)` for serving local files.
 
 
-## store-secrets  `@warlock.js/core/store-secrets/SKILL.md`
+## store-secrets  `@warlock.js/core/skills/store-secrets/SKILL.md`
 
 ---
 name: store-secrets
@@ -6855,7 +6855,7 @@ The normal test harness still installs `secretsFake`; explicit `backend`
 instances and that fake continue to bypass configured backend selection.
 
 
-## test-browser  `@warlock.js/core/test-browser/SKILL.md`
+## test-browser  `@warlock.js/core/skills/test-browser/SKILL.md`
 
 ---
 name: test-browser
@@ -6978,7 +6978,7 @@ if ownership verification fails and reports the failure in evidence. Do not add
 process-name or port-based kills to a spec.
 
 
-## test-fakes  `@warlock.js/core/test-fakes/SKILL.md`
+## test-fakes  `@warlock.js/core/skills/test-fakes/SKILL.md`
 
 ---
 name: test-fakes
@@ -7107,7 +7107,7 @@ An unknown fake name or a non-boolean value fails setup with the list of known f
 - The `model-factories` topic — deterministic fixtures.
 
 
-## test-http  `@warlock.js/core/test-http/SKILL.md`
+## test-http  `@warlock.js/core/skills/test-http/SKILL.md`
 
 ---
 name: test-http
@@ -7571,7 +7571,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 - The `write-cli-command` topic — `warlock add test` scaffolds both global + worker setup files.
 
 
-## test-service  `@warlock.js/core/test-service/SKILL.md`
+## test-service  `@warlock.js/core/skills/test-service/SKILL.md`
 
 ---
 name: test-service
@@ -8021,7 +8021,7 @@ setupTest({ importModule: (file) => import(file) });
 The generated `src/test-setup.ts` already does this. Without it, `setupTest()` under Vitest warns once.
 
 
-## update-packages  `@warlock.js/core/update-packages/SKILL.md`
+## update-packages  `@warlock.js/core/skills/update-packages/SKILL.md`
 
 ---
 name: update-packages
@@ -8169,7 +8169,7 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 - The `configure-app` topic — `warlock.config.ts` shape and `defineConfig`.
 
 
-## upgrade-from-5-29  `@warlock.js/core/upgrade-from-5-29/SKILL.md`
+## upgrade-from-5-29  `@warlock.js/core/skills/upgrade-from-5-29/SKILL.md`
 
 ---
 name: upgrade-from-5-29
@@ -8705,7 +8705,7 @@ marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
 
 
-## upload-file  `@warlock.js/core/upload-file/SKILL.md`
+## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
 
 ---
 name: upload-file
@@ -9018,7 +9018,7 @@ The reverse direction — sending a stored file back via `response.sendFile(...)
 - The `warlock-conventions` topic — storage configuration and driver selection.
 
 
-## use-app-context  `@warlock.js/core/use-app-context/SKILL.md`
+## use-app-context  `@warlock.js/core/skills/use-app-context/SKILL.md`
 
 ---
 name: use-app-context
@@ -9329,7 +9329,7 @@ cors: {
 - The `warlock-conventions` topic — module layout, where paths point to.
 
 
-## use-localization  `@warlock.js/core/use-localization/SKILL.md`
+## use-localization  `@warlock.js/core/skills/use-localization/SKILL.md`
 
 ---
 name: use-localization
@@ -9671,7 +9671,7 @@ This produces `account.title` and `account.actions.save`. Keep every leaf comple
 When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
 
 
-## use-middleware  `@warlock.js/core/use-middleware/SKILL.md`
+## use-middleware  `@warlock.js/core/skills/use-middleware/SKILL.md`
 
 ---
 name: use-middleware
@@ -9969,7 +9969,7 @@ router.post("/private/preview", ({ response }) => response.success({ ready: true
 ```
 
 
-## use-model-transformers  `@warlock.js/core/use-model-transformers/SKILL.md`
+## use-model-transformers  `@warlock.js/core/skills/use-model-transformers/SKILL.md`
 
 ---
 name: use-model-transformers
@@ -10202,7 +10202,7 @@ Rule of thumb: transformers are for **pure, deterministic** transforms of the ro
 - The `warlock-conventions` topic — schema files live in `src/app/<module>/models/<entity>/<entity>.model.ts`.
 
 
-## use-repository  `@warlock.js/core/use-repository/SKILL.md`
+## use-repository  `@warlock.js/core/skills/use-repository/SKILL.md`
 
 ---
 name: use-repository
@@ -10636,7 +10636,7 @@ The third arg is a context object — `{ allValues, dateFormat, ... }` — for f
 - The `warlock-conventions` topic — controller → service → repository → model layering.
 
 
-## use-request-locals  `@warlock.js/core/use-request-locals/SKILL.md`
+## use-request-locals  `@warlock.js/core/skills/use-request-locals/SKILL.md`
 
 ---
 name: use-request-locals
@@ -10807,7 +10807,7 @@ Writing `request.locals.organization` does not affect `request.all()`, `request.
 - The `create-controller` topic — reading locals in downstream controllers.
 
 
-## validate-input  `@warlock.js/core/validate-input/SKILL.md`
+## validate-input  `@warlock.js/core/skills/validate-input/SKILL.md`
 
 ---
 name: validate-input
@@ -11165,7 +11165,7 @@ updateProductController.validation = {
 - The `warlock-conventions` topic — `Request<Schema>` type-alias convention.
 
 
-## warlock-agents-md  `@warlock.js/core/warlock-agents-md/SKILL.md`
+## warlock-agents-md  `@warlock.js/core/skills/warlock-agents-md/SKILL.md`
 
 ---
 name: warlock-agents-md
@@ -11265,7 +11265,7 @@ refresher.dispose();
 - The `warlock-conventions` topic — the conventions listed in the section.
 
 
-## warlock-board  `@warlock.js/core/warlock-board/SKILL.md`
+## warlock-board  `@warlock.js/core/skills/warlock-board/SKILL.md`
 
 ---
 name: warlock-board
@@ -11392,7 +11392,7 @@ const { messages } = await watchBoard({ agent: "implementer", timeoutMs: 30 * 60
 - The `warlock-inspect` topic — the app's facts as JSON before you change it.
 
 
-## warlock-check  `@warlock.js/core/warlock-check/SKILL.md`
+## warlock-check  `@warlock.js/core/skills/warlock-check/SKILL.md`
 
 ---
 name: warlock-check
@@ -11533,7 +11533,7 @@ Migrate lint and format tooling with
 and work through the manual-review list. Use `--lint=oxc` for new apps.
 
 
-## warlock-conventions  `@warlock.js/core/warlock-conventions/SKILL.md`
+## warlock-conventions  `@warlock.js/core/skills/warlock-conventions/SKILL.md`
 
 ---
 name: warlock-conventions
@@ -11789,7 +11789,7 @@ The comment covers the codes it names on its own line and the next; with no code
 - The `send-response` topic — the full Response helper surface.
 
 
-## warlock-doctor  `@warlock.js/core/warlock-doctor/SKILL.md`
+## warlock-doctor  `@warlock.js/core/skills/warlock-doctor/SKILL.md`
 
 ---
 name: warlock-doctor
@@ -11972,7 +11972,7 @@ formatting. Oxlint/Oxfmt are the only supported tools in 5.34.0. Use the
 Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-run`).
 
 
-## warlock-inspect  `@warlock.js/core/warlock-inspect/SKILL.md`
+## warlock-inspect  `@warlock.js/core/skills/warlock-inspect/SKILL.md`
 
 ---
 name: warlock-inspect
@@ -12110,7 +12110,7 @@ const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA
 - The `generate-openapi` topic — the same route schemas as an OpenAPI document.
 
 
-## warlock-mcp  `@warlock.js/core/warlock-mcp/SKILL.md`
+## warlock-mcp  `@warlock.js/core/skills/warlock-mcp/SKILL.md`
 
 ---
 name: warlock-mcp
@@ -12234,7 +12234,7 @@ await server.close();
 - The `expose-as-mcp-server` topic of @warlock.js/ai-tools — the transport underneath.
 
 
-## warlock-routes  `@warlock.js/core/warlock-routes/SKILL.md`
+## warlock-routes  `@warlock.js/core/skills/warlock-routes/SKILL.md`
 
 ---
 name: warlock-routes
@@ -12374,11 +12374,11 @@ and exits non-zero.
 - The `write-cli-command` topic — the command + `preload` shape `routesCommand` is built from.
 
 
-## warlock-trace  `@warlock.js/core/warlock-trace/SKILL.md`
+## warlock-trace  `@warlock.js/core/skills/warlock-trace/SKILL.md`
 
 ---
 name: warlock-trace
-description: 'Verify runtime behaviour without a browser: `warlock trace <method> <url> [--body json|@file] [--header k:v] [--json]` sends one request to the running `warlock dev` server and prints what devtools recorded for it — middleware chain with timings, validation result and errors, handler time, queries with N+1 flags, logs, cache operations, captured mails, the response and timings — as a versioned report (`schemaVersion: 1`); `traceRequest()` returns the same object. Triggers: `warlock trace`, `traceRequest`, `TraceReport`, `buildTraceReport`, `x-request-id`, `.warlock/dev-server.json`, `WL8008`, `WL8009`, `WL5004`, `--id-header`; "did validation pass for this request", "which queries does this endpoint run", "is there an N+1 on this route", "what middleware runs on this route", "check the endpoint after my change", "request timeline as JSON". Skip: the devtools dashboard in a browser — the `devtools-overview` skill of @warlock.js/devtools; static route facts (guard, rate limit, schemas) — the `warlock-inspect` topic; typecheck/lint/tests — the `warlock-check` topic.'
+description: 'Verify runtime behaviour without a browser: `warlock trace <method> <url> [--body json|@file] [--header k:v] [--json]` sends one request to the running `warlock dev` server and prints what devtools recorded for it — middleware chain with timings, validation result and errors, handler time, queries with N+1 flags, logs, cache operations, captured mails, the response and timings — as a versioned report (`schemaVersion: 1`); `traceRequest()` returns the same object. Triggers: `warlock trace`, `traceRequest`, `TraceReport`, `buildTraceReport`, `x-request-id`, `.warlock/dev-server.json`, `WL8008`, `WL8009`, `WL5004`, `--id-header`; "did validation pass for this request", "which queries does this endpoint run", "is there an N+1 on this route", "what middleware runs on this route", "check the endpoint after my change", "request timeline as JSON". Skip: the devtools dashboard in a browser — the `warlock-js-devtools` skill; static route facts (guard, rate limit, schemas) — the `warlock-inspect` topic; typecheck/lint/tests — the `warlock-check` topic.'
 ---
 
 # Warlock — `warlock trace`
@@ -12456,10 +12456,10 @@ Devtools is checked before anything is sent. With `--json` a failure prints `{ "
 
 - The `warlock-inspect` topic — the static facts of a route (guard, rate limit, schemas).
 - The `warlock-check` topic — typecheck, lint, tests and conventions in one run.
-- The `devtools-overview` skill of `@warlock.js/devtools` — the dashboard behind the timeline.
+- The `warlock-js-devtools` skill — the dashboard behind the timeline.
 
 
-## wire-socket  `@warlock.js/core/wire-socket/SKILL.md`
+## wire-socket  `@warlock.js/core/skills/wire-socket/SKILL.md`
 
 ---
 name: wire-socket
@@ -12770,7 +12770,7 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 - The `warlock-conventions` topic — where socket-related code lives (a setup function for handler registration, `services/` for emit sites).
 
 
-## write-cli-command  `@warlock.js/core/write-cli-command/SKILL.md`
+## write-cli-command  `@warlock.js/core/skills/write-cli-command/SKILL.md`
 
 ---
 name: write-cli-command
@@ -13111,11 +13111,11 @@ Set a unique owner and registry per app instance, then import `processes` from
 the generated module and await `processes.spawn({ kind: "worker", command,
 args, labels })`. Consume output and await `handle.exited`. Use handle stops or
 label filters; never stop processes by command or name. `spawnPty()` lazily
-loads separately installed optional peer `node-pty`. The `supervise-processes`
-skill in `@warlock.js/process` contains complete working examples.
+loads separately installed optional peer `node-pty`. The `warlock-js-process`
+skill contains complete working examples.
 
 
-## write-middleware  `@warlock.js/core/write-middleware/SKILL.md`
+## write-middleware  `@warlock.js/core/skills/write-middleware/SKILL.md`
 
 ---
 name: write-middleware
@@ -13343,7 +13343,7 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 - The `warlock-conventions` topic — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.
 
 
-## write-seeder  `@warlock.js/core/write-seeder/SKILL.md`
+## write-seeder  `@warlock.js/core/skills/write-seeder/SKILL.md`
 
 ---
 name: write-seeder
@@ -13738,7 +13738,7 @@ warlock seed --transaction    # (default true) — pass --transaction=false to s
 - The `warlock-conventions` topic — `seeds/` is the canonical folder name (singular `seed/` is incorrect).
 
 
-## write-use-case  `@warlock.js/core/write-use-case/SKILL.md`
+## write-use-case  `@warlock.js/core/skills/write-use-case/SKILL.md`
 
 ---
 name: write-use-case

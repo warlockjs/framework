@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'Message bus over RabbitMQ (Kafka planned): publish, subscribe, and request-response between services. Exports `connectToBroker`, `herald`, `heraldChannel`, `Broker`, `defineEvent`, `defineConsumer`, `EventMessage`, `EventConsumer`, `Consumable`, `brokerRegistry`. Use for: "publish an event to RabbitMQ", "subscribe to a channel", "ack or nack a message", "request and reply over the bus", "cross-service messaging". Not this package: durable retried background jobs on Redis → @warlock.js/queue; cron/recurring work → @warlock.js/scheduler.'
+description: 'Broker messaging over RabbitMQ: `connectToBroker`, `herald`, `heraldChannel`, `defineEvent`, `defineConsumer`, `EventMessage` and `EventConsumer`. Use for "publish an event", "subscribe to a channel", "ack or nack", "request and reply" or cross-service pub/sub. Not this package → @warlock.js/queue for durable retried background jobs; @warlock.js/scheduler for cron; @warlock.js/notifications for user notifications.'
 ---
 
 # @warlock.js/herald
@@ -31,7 +31,7 @@ Herald is the broker-agnostic message bus. `connectToBroker(config)` boots a bro
 - Do not value-import from client code.
 
 
-## consume-message  `@warlock.js/herald/consume-message/SKILL.md`
+## consume-message  `@warlock.js/herald/skills/consume-message/SKILL.md`
 
 ---
 name: consume-message
@@ -256,7 +256,7 @@ await channel.delete(); // remove the queue entirely
 - The `request-and-respond` topic — when you need to reply to a message
 
 
-## herald-basics  `@warlock.js/herald/herald-basics/SKILL.md`
+## herald-basics  `@warlock.js/herald/skills/herald-basics/SKILL.md`
 
 ---
 name: herald-basics
@@ -361,7 +361,7 @@ herald("analytics").channel("events").publish({/* ... */}); // → analytics
 - The `seal-basics` topic of the `warlock-js-seal` skill — schema validation
 
 
-## publish-message  `@warlock.js/herald/publish-message/SKILL.md`
+## publish-message  `@warlock.js/herald/skills/publish-message/SKILL.md`
 
 ---
 name: publish-message
@@ -540,7 +540,7 @@ Set an optional `version` on the event (instance field) to drive the consumer's 
 - The `request-and-respond` topic — when you need a reply
 
 
-## request-and-respond  `@warlock.js/herald/request-and-respond/SKILL.md`
+## request-and-respond  `@warlock.js/herald/skills/request-and-respond/SKILL.md`
 
 ---
 name: request-and-respond

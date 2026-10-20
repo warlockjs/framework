@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'Multi-channel notifications for Warlock: define once, send by mail, in-app database, or custom channels. Exports `defineNotification`, `notify`, `defineChannel`, `mailChannel`, `inApp`, `notificationColumns`, `notifications`, `bullmqQueue`, `heraldQueue`, `NotificationConfig`. Use for: "notify a user", "send order shipped by email and in-app", "unread notifications", "add a Slack or webhook channel", "queue notification delivery". Not this package: sending a plain email or mail templates → @warlock.js/core sendMail; background jobs → @warlock.js/queue.'
+description: 'Define once and notify through mail, in-app or custom channels: `defineNotification`, `notify`, `defineChannel`, `mailChannel`, `inApp`, `bullmqQueue` and `heraldQueue`. Use for "notify a user", "show unread notifications", "add a webhook channel" or "queue notification delivery". Not this package → @warlock.js/core for plain email and templates; @warlock.js/queue for jobs; @warlock.js/herald for broker messaging.'
 ---
 
 # @warlock.js/notifications
@@ -32,7 +32,7 @@ An orchestrator over transports that already exist: one event, many recipients, 
 - Do not value-import from client code.
 
 
-## configure-notifications  `@warlock.js/notifications/configure-notifications/SKILL.md`
+## configure-notifications  `@warlock.js/notifications/skills/configure-notifications/SKILL.md`
 
 ---
 name: configure-notifications
@@ -174,7 +174,7 @@ afterEach(() => resetNotificationConfig());
 - The `define-channel` topic — custom channels.
 
 
-## define-channel  `@warlock.js/notifications/define-channel/SKILL.md`
+## define-channel  `@warlock.js/notifications/skills/define-channel/SKILL.md`
 
 ---
 name: define-channel
@@ -287,7 +287,7 @@ export const slackChannel = (config: { token: string }) =>
 - The `develop-warlock.js-feature` workspace skill — lazy-import pattern for SDK-backed channels.
 
 
-## define-notification  `@warlock.js/notifications/define-notification/SKILL.md`
+## define-notification  `@warlock.js/notifications/skills/define-notification/SKILL.md`
 
 ---
 name: define-notification
@@ -421,7 +421,7 @@ Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-chan
 - The `observe-notifications` topic — `notifications.on("sending" | "sent" | "failed" | "skipped", …)`.
 
 
-## notifications-basics  `@warlock.js/notifications/notifications-basics/SKILL.md`
+## notifications-basics  `@warlock.js/notifications/skills/notifications-basics/SKILL.md`
 
 ---
 name: notifications-basics
@@ -523,7 +523,7 @@ await inApp.markAsRead(user, "ntf_123");
 - The `observe-notifications` topic — events + metrics.
 
 
-## observe-notifications  `@warlock.js/notifications/observe-notifications/SKILL.md`
+## observe-notifications  `@warlock.js/notifications/skills/observe-notifications/SKILL.md`
 
 ---
 name: observe-notifications
@@ -597,7 +597,7 @@ A handler that throws is logged and swallowed — the other handlers for the sam
 - The `send-ad-hoc` topic — when `notifiable` is undefined in events.
 
 
-## queue-notifications  `@warlock.js/notifications/queue-notifications/SKILL.md`
+## queue-notifications  `@warlock.js/notifications/skills/queue-notifications/SKILL.md`
 
 ---
 name: queue-notifications
@@ -711,7 +711,7 @@ await orderShipped.queue(user, { order }, { idempotencyKey: `ship:${order.id}` }
 - The `herald-basics` topic of the `warlock-js-herald` skill - connecting the broker.
 
 
-## send-ad-hoc  `@warlock.js/notifications/send-ad-hoc/SKILL.md`
+## send-ad-hoc  `@warlock.js/notifications/skills/send-ad-hoc/SKILL.md`
 
 ---
 name: send-ad-hoc
@@ -810,7 +810,7 @@ await notify.slack(staff, { text: "Deploy starting" });
 - The `observe-notifications` topic — `sending` / `sent` / `failed` / `skipped` events.
 
 
-## use-in-app  `@warlock.js/notifications/use-in-app/SKILL.md`
+## use-in-app  `@warlock.js/notifications/skills/use-in-app/SKILL.md`
 
 ---
 name: use-in-app
@@ -988,7 +988,7 @@ database: inApp.configure({ repository: notificationsRepository }),
 - The `define-notification` topic — create rows via the database channel.
 
 
-## write-notification-migration  `@warlock.js/notifications/write-notification-migration/SKILL.md`
+## write-notification-migration  `@warlock.js/notifications/skills/write-notification-migration/SKILL.md`
 
 ---
 name: write-notification-migration

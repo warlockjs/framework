@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: "Provider-agnostic LLM toolkit: agents, tools, teams, workflows, RAG, memory, guardrails. Exports `ai`, `agent`, `tool`, `team`, `workflow`, `planner`, `supervisor`, `orchestrator`, `rag`, `memory`, `systemPrompt`, `humanApproval`, `guard`. Use for: call an LLM, build an AI agent, give it tools, run a multi-agent team, chain steps, RAG over documents, embed text, generate images or speech, transcribe audio, approve tool calls, redact PII, replay model calls, run evals. Not this package: web/HTTP/MCP tools → @warlock.js/ai-tools; file+shell agents → @warlock.js/ai-workspace; tracing → @warlock.js/ai-panoptic; model adapters → ai-openai, ai-anthropic, other ai-<provider> packages."
+description: 'Provider-neutral AI agents, tools, workflows, memory, RAG and multimodal calls. Exports `ai`, `humanApproval`, `guardrail`, `team`, `MockModel` and `countInputTokens`. Use for "run an agent", "define a tool", "stream a response", "add approval" or "track token cost". Not this package → @warlock.js/ai-tools for MCP and web tools; @warlock.js/ai-workspace for file/shell tools; @warlock.js/ai-openai for provider setup.'
 ---
 
 # @warlock.js/ai
@@ -43,7 +43,7 @@ The core AI package. Everything hangs off the `ai` facade (`ai.agent`, `ai.tool`
 - `registerAiMatchers` lazy-loads `vitest`; only call it from tests.
 
 
-## ai-basics  `@warlock.js/ai/ai-basics/SKILL.md`
+## ai-basics  `@warlock.js/ai/skills/ai-basics/SKILL.md`
 
 ---
 name: ai-basics
@@ -74,7 +74,7 @@ Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working 
 ## Foundations
 
 1. **Public API is functional factories.** Use `ai.agent({...})`, `ai.tool({...})`, `ai.workflow({...})`, `ai.step({...})`, `ai.supervisor({...})`, `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()`. Never `new Agent()`.
-2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `warlock-js-ai-openai` skill.
 3. **Schemas everywhere are `StandardSchemaV1<T>`.** Recommended: `@warlock.js/seal` (the `seal-basics` topic of the `warlock-js-seal` skill) — `v.object({...})`. Zod, Valibot, hand-rolled all interop.
 4. **`execute()` never throws.** Errors funnel into `result.error` as a typed `AIError` subclass. Same for `stream.result`, `workflow.execute()` / `resume()`, `supervisor.execute()` / `resume()`. See the `handle-ai-errors` topic.
 5. **Each `execute()` call is isolated.** Fresh internal execution instance per call.
@@ -155,7 +155,7 @@ Runtime deps: `@warlock.js/cache` (persistence), `@warlock.js/logger` (logging),
 - `domains/ai/conventions/errors.md` — framework-vs-consumer-app error split
 
 
-## ai-dx-helpers  `@warlock.js/ai/ai-dx-helpers/SKILL.md`
+## ai-dx-helpers  `@warlock.js/ai/skills/ai-dx-helpers/SKILL.md`
 
 ---
 name: ai-dx-helpers
@@ -440,7 +440,7 @@ const concierge = ai.agent({
 - The `pick-ai-provider` topic — `fallbackModel` wraps these adapters; cost-truth tokens
 
 
-## approve-tool-calls  `@warlock.js/ai/approve-tool-calls/SKILL.md`
+## approve-tool-calls  `@warlock.js/ai/skills/approve-tool-calls/SKILL.md`
 
 ---
 name: approve-tool-calls
@@ -583,7 +583,7 @@ Only a _handler bug_ — a non-sentinel throw from your handler — propagates, 
 - `@warlock.js/ai` — the `ai.agent(...)`, `AgentMiddleware`, `tool.before`, and `ToolInvokeResult` primitives this gate wraps.
 
 
-## attach-ai-middleware  `@warlock.js/ai/attach-ai-middleware/SKILL.md`
+## attach-ai-middleware  `@warlock.js/ai/skills/attach-ai-middleware/SKILL.md`
 
 ---
 name: attach-ai-middleware
@@ -935,7 +935,7 @@ prompt. Official verified rates and sources:
 https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees
 
 
-## define-ai-tool  `@warlock.js/ai/define-ai-tool/SKILL.md`
+## define-ai-tool  `@warlock.js/ai/skills/define-ai-tool/SKILL.md`
 
 ---
 name: define-ai-tool
@@ -1338,7 +1338,7 @@ Keep provider-hosted tools alongside `...surface.tools`. Eager provider tools ac
 For savings, compare `ai.measure({ model, tools: fullEagerList })` with `ai.measure({ model, tools: surface.tools })` and inspect `ai.measure.diff(full, discovered).parts.tools`; negative tokens mean a reduction. Measurement does not load hidden tools. Search-result schemas and extra trips still cost context tokens; include representative discovery messages when measuring the whole run.
 
 
-## detect-and-redact-pii  `@warlock.js/ai/detect-and-redact-pii/SKILL.md`
+## detect-and-redact-pii  `@warlock.js/ai/skills/detect-and-redact-pii/SKILL.md`
 
 ---
 name: detect-and-redact-pii
@@ -1443,7 +1443,7 @@ npm install openai
 - The `escalate-block-to-human` topic — escalating a hard `block` to a human-review surface.
 
 
-## durable-agent-runs  `@warlock.js/ai/durable-agent-runs/SKILL.md`
+## durable-agent-runs  `@warlock.js/ai/skills/durable-agent-runs/SKILL.md`
 
 ---
 name: durable-agent-runs
@@ -1594,7 +1594,7 @@ Pair `deleteOnComplete: true` with this loop when you don't need the completed-r
 - [[durable-resume]] — the OTHER resume: `ai.human.resume` of a gated tool call (human-in-the-loop), not a crash.
 
 
-## durable-resume  `@warlock.js/ai/durable-resume/SKILL.md`
+## durable-resume  `@warlock.js/ai/skills/durable-resume/SKILL.md`
 
 ---
 name: durable-resume
@@ -1745,7 +1745,7 @@ const redisStore = ai.human.interrupt.redis({ url: process.env.REDIS_URL });
 - `@warlock.js/ai` — the `CheckpointStore` / `SnapshotStore` the `InterruptStore` mirrors, and the `ai.agent(...)` re-run target.
 
 
-## embed-text  `@warlock.js/ai/embed-text/SKILL.md`
+## embed-text  `@warlock.js/ai/skills/embed-text/SKILL.md`
 
 ---
 name: embed-text
@@ -1860,7 +1860,7 @@ No built-in vector store. Bring your own (pgvector / Qdrant / Pinecone / Chroma 
 - The `search-by-vector` topic of the `warlock-js-cascade` skill — cascade `similarTo` query method
 
 
-## escalate-block-to-human  `@warlock.js/ai/escalate-block-to-human/SKILL.md`
+## escalate-block-to-human  `@warlock.js/ai/skills/escalate-block-to-human/SKILL.md`
 
 ---
 name: escalate-block-to-human
@@ -1961,7 +1961,7 @@ A `check()` may be sync or async (async = call an external service); the guard a
 - The `detect-and-redact-pii` topic — the `pii` detector and the optional `moderation` peer that commonly drives an escalation.
 
 
-## eval-datasets-and-ci  `@warlock.js/ai/eval-datasets-and-ci/SKILL.md`
+## eval-datasets-and-ci  `@warlock.js/ai/skills/eval-datasets-and-ci/SKILL.md`
 
 ---
 name: eval-datasets-and-ci
@@ -2088,7 +2088,7 @@ if (report.regression && !report.regression.passed) process.exit(1);
 - The `record-replay-llm` topic — `ai.vcr` for deterministic, offline eval runs
 
 
-## generate-images  `@warlock.js/ai/generate-images/SKILL.md`
+## generate-images  `@warlock.js/ai/skills/generate-images/SKILL.md`
 
 ---
 name: generate-images
@@ -2248,7 +2248,7 @@ const { data, usage } = await ai.image({ model: mock.image!({ name: "mock-image"
 ```
 
 
-## generate-speech  `@warlock.js/ai/generate-speech/SKILL.md`
+## generate-speech  `@warlock.js/ai/skills/generate-speech/SKILL.md`
 
 ---
 name: generate-speech
@@ -2399,7 +2399,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 - [[handle-ai-errors]] — the typed `AIError` taxonomy on `result.error`
 
 
-## guard-input-output  `@warlock.js/ai/guard-input-output/SKILL.md`
+## guard-input-output  `@warlock.js/ai/skills/guard-input-output/SKILL.md`
 
 ---
 name: guard-input-output
@@ -2522,7 +2522,7 @@ A detector's `check()` **rejecting** is an infrastructure fault, not a content v
 - The `run-ai-agent` topic — running the agent, the middleware pipeline, and the `GuardrailViolationError` on `result.error`.
 
 
-## handle-ai-errors  `@warlock.js/ai/handle-ai-errors/SKILL.md`
+## handle-ai-errors  `@warlock.js/ai/skills/handle-ai-errors/SKILL.md`
 
 ---
 name: handle-ai-errors
@@ -2825,7 +2825,7 @@ async function runWithFallbacks(input: string) {
 - `domains/ai/conventions/errors.md` — framework vs app error convention
 
 
-## keep-agent-conversations  `@warlock.js/ai/keep-agent-conversations/SKILL.md`
+## keep-agent-conversations  `@warlock.js/ai/skills/keep-agent-conversations/SKILL.md`
 
 ---
 name: keep-agent-conversations
@@ -2931,7 +2931,7 @@ On Claude, `providerOptions.anthropic.serverCompaction` is the server-side alter
 - Without `durable` on the agent, `resume()` throws; the next `send` replaces the pending mark.
 
 
-## log-ai-calls  `@warlock.js/ai/log-ai-calls/SKILL.md`
+## log-ai-calls  `@warlock.js/ai/skills/log-ai-calls/SKILL.md`
 
 ---
 name: log-ai-calls
@@ -3075,7 +3075,7 @@ See the `test-logging-code` topic of the `warlock-js-logger` skill for the test 
 - The `handle-ai-errors` topic — what lands on the `error` channel
 
 
-## manage-ai-stores  `@warlock.js/ai/manage-ai-stores/SKILL.md`
+## manage-ai-stores  `@warlock.js/ai/skills/manage-ai-stores/SKILL.md`
 
 ---
 name: manage-ai-stores
@@ -3234,7 +3234,7 @@ A bare `ai.supervisor()` / `ai.workflow()` uses a `snapshotStore` for `resume(ru
 - The `handle-ai-errors` topic — `OrchestratorDriftError` / `OrchestratorConfigError`
 
 
-## manage-prompts  `@warlock.js/ai/manage-prompts/SKILL.md`
+## manage-prompts  `@warlock.js/ai/skills/manage-prompts/SKILL.md`
 
 ---
 name: manage-prompts
@@ -3433,7 +3433,7 @@ If you only ever called `ai.prompt({ ... })` and used the returned registry, **n
 - The `run-ai-agent` topic — wiring a resolved prompt into an agent, plus the judge-safe agent preset (`ai.agent.judge`)
 
 
-## observe-ai-flows  `@warlock.js/ai/observe-ai-flows/SKILL.md`
+## observe-ai-flows  `@warlock.js/ai/skills/observe-ai-flows/SKILL.md`
 
 ---
 name: observe-ai-flows
@@ -3535,7 +3535,7 @@ A misbehaving listener's throw is swallowed (same swallow-on-throw discipline as
 - The `run-ai-team` topic — a team inherits `observe` through the supervisor it forwards to
 
 
-## persist-ai-data  `@warlock.js/ai/persist-ai-data/SKILL.md`
+## persist-ai-data  `@warlock.js/ai/skills/persist-ai-data/SKILL.md`
 
 ---
 name: persist-ai-data
@@ -3766,7 +3766,7 @@ The driver must support `similar()`. Without similarity → `CacheUnsupportedErr
 - The `cache-basics` topic of the `warlock-js-cache` skill — driver catalog
 
 
-## pick-ai-provider  `@warlock.js/ai/pick-ai-provider/SKILL.md`
+## pick-ai-provider  `@warlock.js/ai/skills/pick-ai-provider/SKILL.md`
 
 ---
 name: pick-ai-provider
@@ -3969,7 +3969,7 @@ If you switch providers mid-project (e.g. OpenAI → Anthropic):
 
 ## See also
 
-- The `setup-openai` topic of the `warlock-js-ai-openai` skill — full OpenAI adapter docs
+- The `warlock-js-ai-openai` skill — full OpenAI adapter docs
 - The `run-ai-agent` topic — model passed into `ai.agent({...})`
 - The `embed-text` topic — embedder primitive on the SDK
 - The `handle-ai-errors` topic — adapter error categorization
@@ -4033,7 +4033,7 @@ the transport lacks it. Pass only options appropriate to your selected adapter;
 provider-only fields do not replace framework-owned messages, tools or model.
 
 
-## rag-loaders-and-stores  `@warlock.js/ai/rag-loaders-and-stores/SKILL.md`
+## rag-loaders-and-stores  `@warlock.js/ai/skills/rag-loaders-and-stores/SKILL.md`
 
 ---
 name: rag-loaders-and-stores
@@ -4232,7 +4232,7 @@ The `embedder`'s `dimensions` MUST equal the store's `dimensions` — a mismatch
 - The `use-cache-similarity` topic of the `warlock-js-cache` skill — the cache driver `cacheVectorStore` adapts.
 
 
-## record-replay-llm  `@warlock.js/ai/record-replay-llm/SKILL.md`
+## record-replay-llm  `@warlock.js/ai/skills/record-replay-llm/SKILL.md`
 
 ---
 name: record-replay-llm
@@ -4336,7 +4336,7 @@ VCR composes **below** `ai.fallbackModel` and works with any adapter. Wrap the l
 - The `pick-ai-provider` topic — the adapters whose models VCR wraps
 
 
-## refine-prompts  `@warlock.js/ai/refine-prompts/SKILL.md`
+## refine-prompts  `@warlock.js/ai/skills/refine-prompts/SKILL.md`
 
 ---
 name: refine-prompts
@@ -4437,7 +4437,7 @@ Factory-time resolution reads whatever is pinned **at that moment** — so warm 
 - The `eval-datasets-and-ci` topic — measure original vs refined behaviour on a dataset
 
 
-## run-ai-agent  `@warlock.js/ai/run-ai-agent/SKILL.md`
+## run-ai-agent  `@warlock.js/ai/skills/run-ai-agent/SKILL.md`
 
 ---
 name: run-ai-agent
@@ -5004,7 +5004,7 @@ sessions. On models that bind thinking to the exact prior history (Claude Fable
 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5) the Anthropic adapter replays retained
 turns without their thinking; older models keep it. Prefer
 `providerOptions.anthropic.serverCompaction` on those models when the
-reasoning matters (see `setup-anthropic`).
+reasoning matters (see the `warlock-js-ai-anthropic` skill).
 
 ```ts
 const result = await worker.execute("Refactor the module", { captureMessages: true });
@@ -5054,7 +5054,7 @@ A concurrency cap limits calls within one model trip; it is not a process-wide
 limit across many agent runs. Results still reach the model in request order.
 
 
-## run-ai-rag  `@warlock.js/ai/run-ai-rag/SKILL.md`
+## run-ai-rag  `@warlock.js/ai/skills/run-ai-rag/SKILL.md`
 
 ---
 name: run-ai-rag
@@ -5197,7 +5197,7 @@ await kb.clear(); // drops every entry written under this rag's namespace
 - The `run-ai-agent` topic — wiring the retrieval tool into an agent
 
 
-## run-ai-team  `@warlock.js/ai/run-ai-team/SKILL.md`
+## run-ai-team  `@warlock.js/ai/skills/run-ai-team/SKILL.md`
 
 ---
 name: run-ai-team
@@ -5316,7 +5316,7 @@ A member callback that calls `agent.execute()` **directly** still nests `member 
 - The `observe-ai-flows` topic — the `observe` seam a team inherits
 
 
-## run-ai-workflow  `@warlock.js/ai/run-ai-workflow/SKILL.md`
+## run-ai-workflow  `@warlock.js/ai/skills/run-ai-workflow/SKILL.md`
 
 ---
 name: run-ai-workflow
@@ -5601,7 +5601,7 @@ Every payload carries `runId` and `rootRunId`.
 - The `handle-ai-errors` topic — `WorkflowError` subclasses
 
 
-## run-orchestrator  `@warlock.js/ai/run-orchestrator/SKILL.md`
+## run-orchestrator  `@warlock.js/ai/skills/run-orchestrator/SKILL.md`
 
 ---
 name: run-orchestrator
@@ -5820,7 +5820,7 @@ await orch.execute(input, { sessionId, history, on: { "orchestrator.drift.checke
 - The `handle-ai-errors` topic — `OrchestratorDriftError` / `OrchestratorConfigError`
 
 
-## run-planner  `@warlock.js/ai/run-planner/SKILL.md`
+## run-planner  `@warlock.js/ai/skills/run-planner/SKILL.md`
 
 ---
 name: run-planner
@@ -5967,7 +5967,7 @@ A plan step can hand a bounded subtask to a fresh single-use agent with a hard s
 Use `MockSDK` for the planning model — script the plan as a JSON string matching `{ steps, summary? }`. Capabilities can be `mockAgent({ name, responses })`. See `src/planner/planner.spec.ts`.
 
 
-## run-supervisor  `@warlock.js/ai/run-supervisor/SKILL.md`
+## run-supervisor  `@warlock.js/ai/skills/run-supervisor/SKILL.md`
 
 ---
 name: run-supervisor
@@ -6359,7 +6359,7 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 - The `define-ai-tool` topic — tool artifacts side-channel
 
 
-## secure-outbound-requests  `@warlock.js/ai/secure-outbound-requests/SKILL.md`
+## secure-outbound-requests  `@warlock.js/ai/skills/secure-outbound-requests/SKILL.md`
 
 ---
 name: secure-outbound-requests
@@ -6466,7 +6466,7 @@ Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting t
 - The `handle-ai-errors` topic — `OutboundPolicyError`
 
 
-## transcribe-audio  `@warlock.js/ai/transcribe-audio/SKILL.md`
+## transcribe-audio  `@warlock.js/ai/skills/transcribe-audio/SKILL.md`
 
 ---
 name: transcribe-audio
@@ -6629,7 +6629,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 - [[handle-ai-errors]] — the typed `AIError` taxonomy on `result.error`
 
 
-## use-ai-memory  `@warlock.js/ai/use-ai-memory/SKILL.md`
+## use-ai-memory  `@warlock.js/ai/skills/use-ai-memory/SKILL.md`
 
 ---
 name: use-ai-memory
@@ -6810,7 +6810,7 @@ Drivers without similarity support throw `CacheUnsupportedError` from `set({ vec
 - The `cache-basics` topic of the `warlock-js-cache` skill — vector driver catalog
 
 
-## use-runtime-skills  `@warlock.js/ai/use-runtime-skills/SKILL.md`
+## use-runtime-skills  `@warlock.js/ai/skills/use-runtime-skills/SKILL.md`
 
 ---
 name: use-runtime-skills
@@ -6925,7 +6925,7 @@ The optional `analytics` sink fires `catalogued` / `loaded` / `used` / `saved` /
 - The `secure-outbound-requests` topic — the `guardedFetch` / `OutboundPolicy` guard the `url` source's manifest fetch runs through
 
 
-## write-system-prompt  `@warlock.js/ai/write-system-prompt/SKILL.md`
+## write-system-prompt  `@warlock.js/ai/skills/write-system-prompt/SKILL.md`
 
 ---
 name: write-system-prompt

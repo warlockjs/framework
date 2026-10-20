@@ -7,7 +7,7 @@
 ## Package orientation
 
 ---
-description: 'JWT authentication for Warlock apps: login/logout, refresh-token rotation, protected routes, multiple user types. Exports `Auth`, `authService`, `authMiddleware`, `authEvents`, `currentUser`, `loginThrottleMiddleware`, `requireVerifiedEmail`, `GoogleProvider`, `AuthErrorCodes`. Use for: "log a user in and issue tokens", "protect this route", "add an admin user type", "rate-limit login attempts", "verify email / reset password", "sign in with Google". Not this package: general route middleware lives in @warlock.js/core; request-body validation is @warlock.js/seal.'
+description: 'JWT authentication, refresh rotation, sessions, OTP and passkeys for Warlock apps. Exports `Auth`, `authService`, `authMiddleware`, `currentUser` and `GoogleProvider`. Use for "log in", "protect a route", "reset a password", "sign in with Google" or multiple user types. Not this package → @warlock.js/access for roles and permission policies; @warlock.js/core for general middleware; @warlock.js/seal for input rules.'
 ---
 
 # @warlock.js/auth
@@ -57,7 +57,7 @@ Your user model extends the `Auth` base model and declares its `userType`. A log
 - The `cascade-basics` topic of the `warlock-js-cascade` skill — the ORM behind the `Auth`, `AccessToken`, and `RefreshToken` models.
 
 
-## auth-basics  `@warlock.js/auth/auth-basics/SKILL.md`
+## auth-basics  `@warlock.js/auth/skills/auth-basics/SKILL.md`
 
 ---
 name: auth-basics
@@ -178,7 +178,7 @@ Two values that look right and are not:
 - Don't run `auth.cleanup` from app boot. Schedule it (cron, scheduler) as a periodic task — see the `scheduler-basics` topic of the `warlock-js-scheduler` skill.
 
 
-## customize-token-storage  `@warlock.js/auth/customize-token-storage/SKILL.md`
+## customize-token-storage  `@warlock.js/auth/skills/customize-token-storage/SKILL.md`
 
 ---
 name: customize-token-storage
@@ -347,7 +347,7 @@ If you rename a column, override the statics **and these getters** so they map t
 - The `define-model` topic of the `warlock-js-cascade` skill — extending models and schemas.
 
 
-## customize-user-type  `@warlock.js/auth/customize-user-type/SKILL.md`
+## customize-user-type  `@warlock.js/auth/skills/customize-user-type/SKILL.md`
 
 ---
 name: customize-user-type
@@ -521,7 +521,7 @@ abstract class Auth<TSchema> extends Model<TSchema> implements Authenticable {
 - The `define-model` topic of the `warlock-js-cascade` skill — `@RegisterModel`, models in general
 
 
-## handle-login-and-logout  `@warlock.js/auth/handle-login-and-logout/SKILL.md`
+## handle-login-and-logout  `@warlock.js/auth/skills/handle-login-and-logout/SKILL.md`
 
 ---
 name: handle-login-and-logout
@@ -723,7 +723,7 @@ Full event list: `login.attempt`, `login.success`, `login.failed`, `logout`, `lo
 For cookie sessions read by `@warlock.js/web` pages, log in with `authService.loginWithSessionCookies(request, response, Model, credentials)`. It requires a same-origin `Origin`/`Referer` even without cookies (login CSRF) and sets the access and refresh cookies (`auth.cookie.name`, `auth.cookie.refreshName`, `Path=/`). To share a session across subdomains, configure `auth.cookie.cookieDomain(request)` to return (for example) `".example.com"`; return `undefined` for host-only cookies. With `cookieDomain` configured, always pass the request to cookie helpers so they select the same Domain: `authService.setSessionCookies(response, tokens, request)`, `authService.clearSessionCookies(response, request)`, and `authService.clearAuthCookie(response, options, request)`. Omitting it throws `CookieDomainRequestRequiredError`. Domain clears also remove the legacy host-only names. Resolve pages with `pageSession({ project })` (`web.session`); header beats cookie; `auth.session.maxAge` defaults to `"30d"`. A page session with multiple `userTypes` cannot renew its cookie: the resolver only supplies a renewal user type when exactly one type is allowed, so it reads the session but skips automatic renewal. Multi-instance: share the JWT secret and the cache store, keep clocks in sync.
 
 
-## login-with-providers  `@warlock.js/auth/login-with-providers/SKILL.md`
+## login-with-providers  `@warlock.js/auth/skills/login-with-providers/SKILL.md`
 
 ---
 name: login-with-providers
@@ -1035,7 +1035,7 @@ router.post(
 - The `define-channel` topic of the `warlock-js-notifications` skill: an SMS/WhatsApp channel
 
 
-## manage-tokens  `@warlock.js/auth/manage-tokens/SKILL.md`
+## manage-tokens  `@warlock.js/auth/skills/manage-tokens/SKILL.md`
 
 ---
 name: manage-tokens
@@ -1235,7 +1235,7 @@ The package signs access and refresh tokens with independent secrets — `config
 - The `scheduler-basics` topic of the `warlock-js-scheduler` skill — scheduling cleanup
 
 
-## protect-routes  `@warlock.js/auth/protect-routes/SKILL.md`
+## protect-routes  `@warlock.js/auth/skills/protect-routes/SKILL.md`
 
 ---
 name: protect-routes
@@ -1551,7 +1551,7 @@ This is an Origin check, not a double-submit CSRF token — cheaper, and closes 
 - The `warlock-js-access` skill index — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough
 
 
-## register-user  `@warlock.js/auth/register-user/SKILL.md`
+## register-user  `@warlock.js/auth/skills/register-user/SKILL.md`
 
 ---
 name: register-user
@@ -1702,7 +1702,7 @@ Cleaner alternative: emit your own `user.registered` event from the controller a
 - The `define-model` topic of the `warlock-js-cascade` skill — `toJsonColumns` / `resource` for public output
 
 
-## run-auth-commands  `@warlock.js/auth/run-auth-commands/SKILL.md`
+## run-auth-commands  `@warlock.js/auth/skills/run-auth-commands/SKILL.md`
 
 ---
 name: run-auth-commands
@@ -1865,7 +1865,7 @@ Register it the same way as the bundled commands — call the factory inside `de
 - The `scheduler-basics` topic of the `warlock-js-scheduler` skill — in-process scheduling
 
 
-## throttle-login-attempts  `@warlock.js/auth/throttle-login-attempts/SKILL.md`
+## throttle-login-attempts  `@warlock.js/auth/skills/throttle-login-attempts/SKILL.md`
 
 ---
 name: throttle-login-attempts
@@ -2017,7 +2017,7 @@ They compose. For a hard ceiling on request volume _and_ failure-aware account l
 - The `use-middleware` topic of the `warlock-js-core` skill — `middleware.rateLimit` and the built-in middleware suite.
 
 
-## verify-email-and-reset-password  `@warlock.js/auth/verify-email-and-reset-password/SKILL.md`
+## verify-email-and-reset-password  `@warlock.js/auth/skills/verify-email-and-reset-password/SKILL.md`
 
 ---
 name: verify-email-and-reset-password
