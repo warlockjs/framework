@@ -551,7 +551,7 @@ describe("project skill contracts", () => {
       expect(read(migration)).toContain("publicId: string(36).unique()");
     }
     expect(read("src/app/posts/controllers/update-post.controller.ts")).toContain(
-      "Post.findOne({ publicId: id })",
+      "Post.first({ publicId: id })",
     );
     expect(read("src/app/posts/schema/update-post.schema.ts")).toContain("id: v.string().uuid()");
     expect(read("src/app/users/controllers/list-users.controller.ts")).toContain("pagination,");

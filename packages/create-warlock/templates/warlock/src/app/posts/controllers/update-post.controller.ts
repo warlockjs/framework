@@ -10,7 +10,7 @@ export const updatePostController: GuardedRequestHandler<UpdatePostSchema> = asy
   response,
 }) => {
   const { id, ...input } = request.validated();
-  const post = await Post.findOne({ publicId: id });
+  const post = await Post.first({ publicId: id });
 
   if (!post) {
     throw new ResourceNotFoundError("Post not found.");
