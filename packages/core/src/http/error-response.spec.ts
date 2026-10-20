@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HttpErrorResponseFormatter } from "./error-response";
 import { startHttpServer, type FastifyInstance } from "./server";
@@ -46,7 +47,7 @@ describe("http.errorResponse", () => {
     }));
     const server = serverWith(formatter);
     for (const status of [422, 429, 500]) {
-      server.get(`/error-${status}`, (_request, reply) =>
+      server.get(`/error-${status}`, (_request: FastifyRequest, reply: FastifyReply) =>
         reply.header("X-Request-Id", "warlock-request-id").code(status).send({ errors: [] }),
       );
     }
@@ -106,7 +107,9 @@ describe("http.errorResponse", () => {
   it("preserves default responses when unconfigured or when the formatter declines", async () => {
     for (const formatter of [undefined, () => undefined]) {
       const server = serverWith(formatter);
-      server.get("/error", (_request, reply) => reply.code(409).send({ error: "Conflict" }));
+      server.get("/error", (_request: FastifyRequest, reply: FastifyReply) =>
+        reply.code(409).send({ error: "Conflict" }),
+      );
 
       const response = await server.inject({ method: "GET", url: "/error" });
 
@@ -118,11 +121,13 @@ describe("http.errorResponse", () => {
     const formatter = vi.fn<HttpErrorResponseFormatter>(() => ({ changed: true }));
     const server = serverWith(formatter);
     server.get("/success", async () => ({ ok: true }));
-    server.get("/html", (_request, reply) =>
+    server.get("/html", (_request: FastifyRequest, reply: FastifyReply) =>
       reply.code(404).type("text/html").send("<h1>Missing</h1>"),
     );
-    server.get("/text", (_request, reply) => reply.code(400).type("text/plain").send("Invalid"));
-    server.get("/stream", (_request, reply) =>
+    server.get("/text", (_request: FastifyRequest, reply: FastifyReply) =>
+      reply.code(400).type("text/plain").send("Invalid"),
+    );
+    server.get("/stream", (_request: FastifyRequest, reply: FastifyReply) =>
       reply
         .code(500)
         .type("application/json")
@@ -142,7 +147,9 @@ describe("http.errorResponse", () => {
     const server = serverWith(() => {
       throw failure;
     });
-    server.get("/error", (_request, reply) => reply.code(409).send({ error: "Conflict" }));
+    server.get("/error", (_request: FastifyRequest, reply: FastifyReply) =>
+      reply.code(409).send({ error: "Conflict" }),
+    );
 
     const response = await server.inject("/error");
 

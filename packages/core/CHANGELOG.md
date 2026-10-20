@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.34.3
 
+### Fixed
+
+- Type Fastify error-response hook and test handler parameters explicitly, and align upgrade fixture expectations with the enabled explicit-any, brace and console rules.
+
 ### Added
 
 - Opt-in `http.errorResponse` formats JSON error bodies at the transport boundary, including framework validation, unmatched routes, early parsing errors, rate limits and server errors, with a correlated request ID. Existing bodies remain unchanged unless configured.
