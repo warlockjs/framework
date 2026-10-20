@@ -1,10 +1,10 @@
 ---
 name: web-code-standards
 description: >-
-  Strict separation-of-concerns standards for Warlock.js src/web pages and
-  components: loaders delegate data and business rules to app services;
-  components delegate all behavior to separate custom-hook files.
-  Use alongside code-standards for web work; skip for backend-only changes.
+  Standards for Warlock.js src/web pages, setup files, single-responsibility
+  components, hooks, Mongez React Form validation, accessible custom controls,
+  and UI kit choices. Use when building or reviewing web features;
+  use code-standards for shared TypeScript rules.
 ---
 
 # Web code standards
@@ -54,13 +54,17 @@ make the feature harder to read.
 ## 1. Keep the page contract, make the implementation thin
 
 Page logic lives in the matching `.setup.ts` file: `config`, `loader`,
-`register`, and `action`/`actions`. UI files contain the default
-component and named components such as `ErrorBoundary`. Pair `layout.tsx` with
+`register`, and `action`/`actions`. The UI file owns its named default
+component; re-export a framework-required named component such as `ErrorBoundary`
+from that component's own file. Pair `layout.tsx` with
 `layout.setup.ts`, `root.tsx` with `root.setup.ts`, and `error.page.tsx` with
 `error.setup.ts`. Use type-only imports from setup for loader/action inference.
 The framework projects browser-safe `register()` code to the client. Put route,
 cache, validation, middleware, metadata, and sitemap policy inside `config`;
-metadata always belongs in `config.metadata`.
+metadata always belongs in `config.metadata`. Do not add an empty setup file
+when a component has no configuration, loader, action, or registration work.
+The starter follows this boundary for root configuration, home route policy
+and translations, and not-found metadata.
 
 Use the config type that matches the module. A page can preserve loader data
 inference for metadata by satisfying `PageConfig<typeof loader>`:
@@ -82,15 +86,18 @@ export const config = {
 ```
 
 ```tsx title="src/web/posts.page.tsx"
-export default function PostsPage() {
-  return <main>Posts</main>;
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./posts.setup";
+
+export default function PostsPage({ data }: PageProps<typeof loader>) {
+  return <main>{data.title}</main>;
 }
 ```
 
-When code navigates by a page name, `href(name, params, query)` validates the
-published route table at runtime. `href("posts.indxe")` is a string that
-TypeScript accepts, then the helper throws with the known route names. Generated
-route-name and parameter types are not available in 5.17.
+Use `href(name, params, query)` for named page navigation. Generated declarations
+in `.warlock/typings/web-routes.d.ts` check route names and required path
+parameters when included in the app's TypeScript project; runtime route-table
+validation still applies. Do not widen those contracts to strings or add casts.
 
 Layouts use one `config satisfies LayoutConfig` object for `prefix`,
 `middleware`, `metadata`, and a sitemap default. Roots use one
@@ -133,11 +140,22 @@ queries, aggregations, and domain transformations in the service. A service
 must have a meaningful domain name and own the operation, not exist as a
 generic pass-through for a repository method.
 
-Extract substantive view sections into cohesive components. A component
-that needs any behavior gets a separate feature-named custom-hook file; a
-component with no behavior stays presentational and needs no hook. Split by
-responsibility, not by a mechanical line-count limit. Framework exports
-for logic remain in the setup file even when their work is delegated elsewhere.
+Give every component one responsibility and one reason to change. Define one
+component per file, with a named default export. Extract substantive view
+sections into cohesive components. Put hooks in `hooks/` and pure UI helpers
+in `utils/`, one hook or helper per file, exported by name. A hook owns state,
+effects, handlers, navigation, and client mutations; a utility has no React or
+browser lifecycle dependency. A presentational component needs no hook.
+
+Keep a small piece of logic or a private helper inline only when it is tightly
+coupled to that one component and keeping it there leaves the file small and
+focused. A component file past roughly 150 lines, a second component, or multiple
+helpers is a split signal, not a mechanical line limit: split at ownership
+boundaries, never into arbitrary chunks to meet a count. The one-component rule
+still applies. Framework logic exports remain in setup even when delegated.
+Keep feature CSS beside the feature and import it from the owning presentation
+boundary; keep loading, error, empty, focus, reduced-motion, and locale behavior
+with that boundary.
 
 Preserve the framework's rendering boundary: `root.tsx` owns the document,
 `#vessel` and `<Scripts />`; the loader runs on the server, while the rendered
@@ -152,35 +170,6 @@ not a hidden link or a client-side redirect.
 output; the page composes `PostArticle`, `PostComments`, and `RelatedPosts`;
 `use-post-comments.ts` owns subscription, state, and handlers for
 `PostComments`. Each piece has one reason to change.
-
-## Setup and component files
-
-Use a setup file when a feature registers framework behavior. The setup file
-owns its `register`, `config`, and `loader` exports; its matching component
-only renders the supplied data. Keep loader inference type-only so it does
-not pull server work into a browser component:
-
-The default starter follows this boundary: `root.setup.ts` owns strict-mode
-configuration, `home/index.setup.ts` owns route policy, its loader, and the
-universal translations `register()`, and `404.setup.ts` owns not-found
-metadata. Do not add an empty setup file when a component has no server
-configuration, loader, or registration work.
-
-```tsx
-import type { PageProps } from "@warlock.js/web";
-import type { loader } from "./posts.setup";
-
-export default function PostsPage({ data }: PageProps<typeof loader>) {
-  return <PostsList posts={data.posts} />;
-}
-```
-
-Each React component file has one named default component. Export hooks,
-utilities, and types by name. A component renders; its feature hook owns
-state, effects, handlers, navigation, and client mutations. A utility stays
-pure and has no React or browser lifecycle dependency. Keep feature CSS beside
-the feature and import it from the owning presentation boundary; keep loading,
-error, empty, focus, reduced-motion, and locale behavior with that boundary.
 
 ## Declaration spacing and local types
 
@@ -218,17 +207,17 @@ state starts unset, write `useState<ErrorText>()`; do not add a redundant
   same validated, public data as the page. Keep private routes out of public
   discovery, and do not generate database-backed assets on every GET.
 
-## 3. Components render; custom hooks own all behavior
+## 3. Components render; custom hooks own behavior
 
-**No behavior in React component bodies, even when it is small.** A
-component may declare props, call its dedicated custom hook if needed,
-and render JSX from its props and the hook's returned values. Put `useState`,
+**Delegate behavior to the component's dedicated custom hook by default.** A
+component declares props, calls that hook if needed, and renders JSX from its
+props and the hook's returned values. Put `useState`,
 `useEffect`, subscriptions, timers, browser API calls, derived-value
 calculations, event handlers, mutations, and navigation decisions in a
 separate custom-hook file. Keep pure domain calculations in `src/app`
 services; a hook may call a small pure UI helper outside the component.
-Do not put a one-line callback or inline computation in JSX because it
-"doesn't warrant a hook". Pure presentational components need no hook.
+Use section 1's inline exception only for small, tightly coupled logic;
+reuse or file growth means it belongs in its own hook or utility file.
 JSX conditionals that only select which markup to show are presentation,
 not a license to implement business rules in render.
 
@@ -272,6 +261,117 @@ enforce the same policy independently. Use a full navigation when an auth or
 document boundary requires it, otherwise prefer the framework's navigation
 and refresh primitives so state and loader data stay in sync.
 
+### Use Mongez React Form for every form
+
+Always use `Form`, `useFormControl`, and `useSubmitButton` from
+`@mongez/react-form`; the web stack already uses this package, including the
+starter's contact form. Do not add a second form library or manage field
+validation and submission state in parallel React state. Keep those hooks in
+the control's and submit button's dedicated hook files, following section 1.
+
+Declare validation in a browser-safe `<Form schema={schema}>` (Seal implements
+Standard Schema), a control's `schema`, or `useFormControl({ rules: [...] })`.
+The `rules` array contains imported rule objects, never rule-name strings.
+For example, `{ name: "email", type: "email", required: true,
+rules: [requiredRule, emailRule] }` uses Mongez's rules: `requiredRule` needs
+`required: true`, and `emailRule` needs the control's `type: "email"`.
+Put `requiredRule` first. Schema issues map back to registered control names,
+so keep schema paths and control names aligned.
+
+Never use `required`, `pattern`, `min`, `max`, `minLength`, or `type="email"`
+as browser validation, or rely on the browser's constraint UI. These may be
+Mongez rule configuration props; do not spread raw control props onto DOM
+inputs. Mongez v4's `Form` renders `noValidate` by default; keep it enabled
+and preserve it if using a custom form host. A schema-backed email field can
+render `type="text"` with `inputMode="email"` and `autoComplete="email"`,
+leaving email validation entirely to the form.
+
+Render the control's `error` through `getErrorProps()` and connect the field
+with `getInputProps()` (or equivalent explicit wiring for a custom widget).
+This keeps field identity, focus, blur validation, and error announcement in
+the same form contract. For example, each block below is its own file:
+
+```ts title="src/web/contact/contact.schema.ts"
+import { v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({ email: v.email() });
+```
+
+```ts title="src/web/contact/hooks/use-contact-email.ts"
+import { useFormControl } from "@mongez/react-form";
+
+export function useContactEmail() {
+  return useFormControl({ name: "email" });
+}
+```
+
+```tsx title="src/web/contact/components/contact-email.tsx"
+import { useContactEmail } from "../hooks/use-contact-email";
+
+export default function ContactEmail() {
+  const { id, error, getInputProps, getErrorProps } = useContactEmail();
+
+  return (
+    <div>
+      <label htmlFor={id}>Email</label>
+      <input {...getInputProps({ type: "text", inputMode: "email", autoComplete: "email" })} />
+      {error ? <span {...getErrorProps()}>{error}</span> : null}
+    </div>
+  );
+}
+```
+
+Render `ContactEmail` inside `<Form schema={contactSchema} onSubmit={submit}>`;
+the feature hook owns `submit`. The submit button's hook calls
+`useSubmitButton()` and exposes `disabled` and `isSubmitting` to its component.
+For API mutations, use `useSubmitForm` from `@warlock.js/web/form` in the
+feature hook. With generated route declarations and a handler's `responseSchema`,
+`useSubmitForm({ route })` infers the declared success body; `ApiResponse` from
+`@warlock.js/web` reads a declared status body. Do not replace this inference
+with casts. Server endpoints must still validate input independently.
+
+### Build custom controls with the project's UI kit
+
+Do not render native `<select>`, `<input type="checkbox">`,
+`<input type="radio">`, or `<input type="date">` UI. Build a searchable
+select/dropdown with a search input, a custom checkbox, custom radio
+controls, and a custom date picker. Each field uses `useFormControl` through
+its dedicated hook; a radio group registers one selected value for the group.
+Connect value/checked changes, blur, disabled state, focus refs, validation,
+and errors to that control. Configure a checkbox control with
+`type: "checkbox"` and wire `checked` / `setChecked`. Adapt other widget
+callbacks to `changeValue`; do not blindly spread DOM input props onto a kit
+component with a different callback contract. Keep search text and popup state separate from
+the selected form value. A kit's hidden input for submission is acceptable;
+it must not display native UI or become a second validation source.
+
+Check the existing styling stack and UI kit before building controls:
+
+- With Tailwind and shadcn/ui already installed, compose its components:
+  Command + Popover for a searchable select, Checkbox, RadioGroup, and
+  Calendar + Popover for dates. Keep Mongez as the form owner rather than
+  copying a kit example that introduces another form library.
+- With Tailwind but no shadcn/ui, or with no UI kit, ask the user which kit
+  to use **before installing anything**. Recommend shadcn/ui for Tailwind
+  projects because its composable accessible primitives fit the styling
+  stack. Explain the recommendation for other stacks and wait for the
+  user's choice; never silently add dependencies.
+- With another established kit and no Tailwind, use its corresponding
+  accessible primitives and the same Mongez adapters.
+
+Custom controls must preserve the accessibility native controls supplied.
+Follow the WAI-ARIA APG [combobox/listbox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/),
+[checkbox](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/),
+[radiogroup](https://www.w3.org/WAI/ARIA/apg/patterns/radio/), and
+[date picker dialog/grid](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/examples/datepicker-dialog/)
+patterns. Preserve labels, visible focus, disabled/selected/checked states,
+`aria-invalid`, and error descriptions linked to `getErrorProps()` output.
+Support keyboard search and arrow navigation, Enter selection, Space toggling,
+and Escape dismissal as appropriate. Manage popup entry and focus return;
+a modal date dialog traps focus and its calendar grid supports day/month
+keyboard navigation. Kit composition still needs correct labels, focus refs,
+and announced errors; styling alone does not make a control accessible.
+
 ## 5. Ship usable, localizable presentation
 
 - Use semantic landmarks, headings, buttons, links, and explicit form labels.
@@ -311,12 +411,13 @@ Before approving a web change, ask:
    effects without untangling unrelated responsibilities?
 2. Does every loader obtain data and business decisions from a named app
    service, with models/repositories kept out of the web layer?
-3. Does each behavioral component delegate all state, effects, derived
-   values, event handlers, and mutations to its own custom hook file?
+3. Does each component have one responsibility and its own file, with hooks
+   and helpers extracted except for the small, tightly coupled inline case?
 4. Is the service query bounded, the resource shape intentional, and the
    cache scope safe?
 5. Do refresh, navigation, errors, retries, and cleanup leave the UI correct?
-6. Are forms and interactions accessible and translated to the degree the
-   interface promises?
+6. Do forms use Mongez schema/rules and accessible custom controls, with
+   native validation disabled and the UI kit choice agreed before installation?
+   Are interactions translated to the degree the interface promises?
 7. Are the relevant quality rules enforced or covered by focused tests,
    rather than described only in comments?
