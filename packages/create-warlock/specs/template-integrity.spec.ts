@@ -540,8 +540,8 @@ describe("project skill contracts", () => {
       ["users", "user"],
       ["posts", "post"],
     ]) {
-      expect(read(`src/app/${module}/models/${model}/${model}.model.ts`)).toContain(
-        "publicId: v.string().uuid().default(() => randomUUID())",
+      expect(read(`src/app/${module}/models/${model}/${model}.model.ts`)).toMatch(
+        /publicId:\s*v\s*\.string\(\)\s*\.uuid\(\)\s*\.default\(\(\)\s*=>\s*randomUUID\(\)\)/,
       );
       expect(read(`src/app/${module}/resources/${model}.resource.ts`)).toContain(
         'id: ["publicId", "string"]',

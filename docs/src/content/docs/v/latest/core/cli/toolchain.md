@@ -47,6 +47,10 @@ It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates genera
 editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
 `.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
+Generated migration configs enable `typescript/no-explicit-any`, `curly`, and
+`no-console` as errors, matching new apps. Fix the resulting diagnostics before
+running the app's checks again.
+
 Literal custom rules are translated without executing the config. Per-folder
 `no-restricted-imports` and `no-restricted-exports` become Oxlint overrides with
 file/exclusion patterns. Supported `@typescript-eslint/*` rules become native
