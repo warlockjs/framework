@@ -105,11 +105,11 @@ for (const driver of ["memory", "local"] as const) {
     });
 
     it("does not take delayed jobs early and orders ready jobs by priority then FIFO", async () => {
-      const seen: number[] = [];
+      const seen: { payload: number; at: number }[] = [];
       const job = defineJob({
         name: "local.priority",
         handle: (payload: number) => {
-          seen.push(payload);
+          seen.push({ payload, at: Date.now() });
         },
       });
       const dispatchedAt = Date.now();
@@ -120,11 +120,16 @@ for (const driver of ["memory", "local"] as const) {
       await job.dispatch(0);
       await job.dispatch(1);
       await startWorkers();
-      await eventually(() => seen.length >= 4);
-      expect(seen.slice(0, 4)).toEqual([0, 1, 2, 3]);
       await eventually(() => seen.length === 5);
-      expect(Date.now() - dispatchedAt).toBeGreaterThanOrEqual(150);
-      expect(seen[4]).toBe(4);
+      // Durable writes can take longer than the delay on a slow machine, so the
+      // delayed job may legitimately become ready before workers start. Assert the
+      // guarantees themselves: never early, and ready jobs by priority then FIFO.
+      expect(seen.filter(({ payload }) => payload !== 4).map(({ payload }) => payload)).toEqual([
+        0, 1, 2, 3,
+      ]);
+      const delayedRun = seen.find(({ payload }) => payload === 4);
+      expect(delayedRun).toBeDefined();
+      expect((delayedRun?.at ?? 0) - dispatchedAt).toBeGreaterThanOrEqual(150);
     });
 
     it.each([
