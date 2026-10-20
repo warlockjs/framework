@@ -8712,6 +8712,10 @@ It replaces standard scripts/dependencies, pins TypeScript 7.0.2, updates genera
 editor settings, removes `healthCheckers.eslint` and selects Oxlint. A generated
 `.prettierignore` becomes `.oxfmtignore`; Oxfmt scripts read it explicitly.
 
+Generated migration configs enable `typescript/no-explicit-any`, `curly`, and
+`no-console` as errors, matching new apps. Fix those diagnostics before running
+`npm run lint:check` and `npx warlock check` again.
+
 The `oxc-toolchain` codemod also updates generated VS Code settings and literal
 ESLint/Oxlint health-check switches. Custom editor settings, checker arrays,
 computed options and nonstandard scripts require review. Oxc diagnostics keep
