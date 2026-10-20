@@ -211,3 +211,17 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## Project skills and starter contracts
+
+Generated apps include nine project skills for API design, TypeScript standards, persistence, Git workflow, module boundaries, resilience, security, testing, and web standards. Each discovery description stays within 450 characters and names a sibling skill for adjacent work. References use skill names and package topic names so agent-kit can resolve the installed project and package skill names.
+
+New domain fields and resource output use camelCase; driver-managed timestamp storage can retain snake_case. The sample User and Post models keep Cascade's numeric primary keys internally and generate a separate `publicId` UUID server-side. Their resources expose that value as `id`; post update routes and user ID filters resolve it through `publicId`. Cascade's `uuid` getter only stringifies a primary key. For legacy stored columns, a resource schema entry such as `totalCents: ["total_cents", "int"]` emits camelCase without renaming the database column.
+
+The HTTP config combines `errorMapper` for opaque unexpected thrown errors with `errorResponse` for every JSON error response. The public contract is `{ error: { code, message }, details?, requestId }`, including framework-generated 404, 422, 429, and 500 responses. Validation issues appear under `details`; 5xx messages stay opaque and diagnostic payloads/stacks are omitted. Routed errors carry Warlock's real request ID; early Fastify rejections use its request ID, echoed in the same correlation header. HTML error pages and streams keep their own contracts. See [HTTP response formatting](/v/latest/core/the-basics/http-response/#format-every-json-error-response).
+
+The contact, locale, user create/list and post create/update examples declare `responseSchema` for generated client types and OpenAPI; the API design skill requires this declaration for new controllers. Side-effecting API contracts require `Idempotency-Key`; authenticate before idempotency middleware, enforce the header in app middleware, and use shared storage for retries across processes. The contact demo remains a side-effect-free validation example. Its locale interaction, field wiring, and submit state live in feature hooks, with one component per file and shared props types.
+
+Oxlint enables `typescript/no-explicit-any`, explicit member accessibility, `curly`, and `no-console`. The hybrid interface-for-contracts/type-for-data convention stays a review rule because `consistent-type-definitions` only supports one global preference. App sub-folder barrels remain permitted; web imports target individual component and hook files to keep client bundles lean and server-only code out of barrels. Run `npm run lint:check` and `npm run format:check` in the generated app.
+
+These model/resource conventions apply to newly generated apps. Existing apps adopting public UUIDs must add and backfill a unique column before changing their resource output or route lookups; updating a skill alone does not migrate stored data.

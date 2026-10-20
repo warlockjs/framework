@@ -19,12 +19,24 @@ const DEFAULT_OTP_EXPIRATION: Duration = { minutes: 15 };
 // Parse duration to milliseconds
 function parseDurationToMs(duration: Duration): number {
   let ms = 0;
-  if (duration.milliseconds) ms += duration.milliseconds;
-  if (duration.seconds) ms += duration.seconds * 1000;
-  if (duration.minutes) ms += duration.minutes * 60 * 1000;
-  if (duration.hours) ms += duration.hours * 60 * 60 * 1000;
-  if (duration.days) ms += duration.days * 24 * 60 * 60 * 1000;
-  if (duration.weeks) ms += duration.weeks * 7 * 24 * 60 * 60 * 1000;
+  if (duration.milliseconds) {
+    ms += duration.milliseconds;
+  }
+  if (duration.seconds) {
+    ms += duration.seconds * 1000;
+  }
+  if (duration.minutes) {
+    ms += duration.minutes * 60 * 1000;
+  }
+  if (duration.hours) {
+    ms += duration.hours * 60 * 60 * 1000;
+  }
+  if (duration.days) {
+    ms += duration.days * 24 * 60 * 60 * 1000;
+  }
+  if (duration.weeks) {
+    ms += duration.weeks * 7 * 24 * 60 * 60 * 1000;
+  }
   return ms;
 }
 

@@ -1,6 +1,6 @@
 ---
 name: module-boundaries
-description: 'Architecture rules for how modules under `src/app/**` relate — each module owns one domain noun (`orders`, `users`, `carts`, `payments`); standard layout per module (`controllers/`, `services/`, `models/<noun>/`, `repositories/`, `schema/`, `resources/`, `types/`, `utils/`, `events/`, `errors/`, `routes.ts`); public surface exposed through sub-folder barrels (`services/index.ts`, `utils/index.ts`, `types/index.ts`) — NEVER a module-root `index.ts` re-exporting everything; no module reaches into another module''s internal files; zero circular dependencies between modules; inter-module communication is explicit — direct service call OR `@mongez/events` bus, never shared mutable globals; cross-cutting helpers live in `src/app/shared/`. Triggers: adding a new module under `src/app/**`; importing from another module; deciding where new code belongs; circular import error; Oxlint `import/no-restricted-paths` violation; user asks "can module A use module B''s internals", "how should modules talk", "where should this code live", "I''m getting a circular dependency", "what folders does a module need", "what goes in shared". Skip: intra-module file organization (load `skills/code-standards/SKILL.md` § 4); barrel mechanics within a module (load `skills/code-standards/SKILL.md` § 2.2); deploying / packaging / monorepo questions; framework primitive details — load relevant `@warlock.js/*` skill.'
+description: "Domain module ownership, dependency direction, app sub-folder exports, cross-module services and events, and shared helpers. Use when adding modules or changing imports between domains. Use code-standards instead for organization within one module."
 ---
 
 # Module boundaries
@@ -94,7 +94,7 @@ This is the one absolute rule:
 ✅ src/app/orders/types/index.ts           ← good
 ```
 
-See `skills/code-standards/SKILL.md` § 2.2 for the reasoning.
+See the `code-standards` skill § 2.2 for the reasoning.
 
 ---
 

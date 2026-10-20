@@ -2,6 +2,7 @@ import { integer, Migration, string, text, timestamp } from "@warlock.js/cascade
 import { Post } from "../post.model";
 
 export default Migration.create(Post, {
+  publicId: string(36).unique(),
   title: string(255),
   description: text(),
   slug: string(255).unique(),

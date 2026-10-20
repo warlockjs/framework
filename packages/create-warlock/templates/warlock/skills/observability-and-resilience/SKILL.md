@@ -1,6 +1,6 @@
 ---
 name: observability-and-resilience
-description: 'How this project stays debuggable in production and survives flaky dependencies — `log.<level>(module, action, message, context)` from `@warlock.js/logger` with `X-Request-Id` propagation (already shipped via core middleware), structured metrics naming `<area>.<noun>.<unit>`, health endpoints (`/health/live` for liveness vs `/health/ready` for readiness), timeouts on every external call (`@warlock.js/http` `timeout` per Http instance / per request), retries with exponential backoff for idempotent ops only (never auto-retry POST without an idempotency key), idempotency keys for side effects (payments, emails, webhook deliveries), circuit breakers for flaky deps, graceful shutdown via `log.configure({ autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"] })`, N+1 detection, streaming for large payloads. Triggers: making an HTTP / AI / queue / DB call; adding a timeout or retry; designing an idempotency key for a side effect; instrumenting metrics; adding a health check; tracing a request across services; user asks "timeout", "retry policy", "idempotency", "request id", "tracing", "graceful shutdown", "health check", "circuit breaker", "N+1 query", "caching strategy", "metrics naming"; touching `@warlock.js/http` / `@warlock.js/scheduler` / `@warlock.js/ai` call sites. Skip: log call signature (load `skills/code-standards/SKILL.md` § 8); secrets in logs (load `skills/security-baseline/SKILL.md` § 8); pure-function refactors with no external I/O; cache driver setup (load `@warlock.js/cache` skills); HTTP client config in depth (load `@warlock.js/http` skills).'
+description: "Request correlation, structured logs, timeouts, retries, idempotency, health checks, metrics, shutdown and bounded queries. Use when adding external I/O or production instrumentation. Use security-baseline instead for secrets and sensitive data handling."
 ---
 
 # Observability & resilience
@@ -53,7 +53,7 @@ Set a default at the `Http` instance level; override per request when the endpoi
 // ✅ instance-level default
 const stripeClient = new Http({
   baseURL: "https://api.stripe.com",
-  timeout: 10_000,  // 10s — enough for most calls, short enough to fail fast
+  timeout: 10_000, // 10s — enough for most calls, short enough to fail fast
 });
 
 // ✅ per-request override for a known-slow call
@@ -132,12 +132,14 @@ Persist `key → result` with a TTL longer than your retry window (24h is typica
 
 ### 4.4 Pattern
 
+This simplified service sketch also needs an atomic reservation and provider-side idempotency to prevent concurrent duplicate charges. At the HTTP boundary, require `Idempotency-Key` and run `middleware.idempotency()` after auth as described in the `api-design` skill.
+
 ```typescript
 // ✅
 export async function chargePaymentService(input, idempotencyKey) {
-  const cached = await idempotencyRepository.find({ key: idempotencyKey });
+  const cached = await idempotencyRepository.findBy("key", idempotencyKey);
   if (cached) {
-    return cached.result;
+    return cached.get("result");
   }
 
   const result = await stripeClient.post("/v1/charges", input);
@@ -261,11 +263,11 @@ These belong here because performance failures present as resilience failures �
 
 A list endpoint that fires one query per item is a bug. Either eager-load relations (Cascade's `.with("relation")`) or batch-fetch the related ids in a single query and join in-process.
 
-A code review that lets an N+1 through is doing its job poorly. Add it to the review checklist (already in `skills/api-design/SKILL.md`).
+A code review that lets an N+1 through is doing its job poorly. Add it to the review checklist (already in the `api-design` skill).
 
 ### 9.2 Pagination always
 
-See `skills/api-design/SKILL.md` § 3. No unbounded list ever, even if today's dataset is 12 rows.
+See the `api-design` skill § 3. No unbounded list ever, even if today's dataset is 12 rows.
 
 ### 9.3 Stream large payloads
 

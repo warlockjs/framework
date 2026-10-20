@@ -1,6 +1,6 @@
 ---
 name: code-standards
-description: 'Project-level TypeScript code standards for apps built on Warlock.js — `interface` vs `type`, access modifiers, no `any`, no inline-duplicated unions, file-naming suffixes (`.contract.ts` / `.type.ts` / `.service.ts` / `.model.ts` / `.resource.ts` / `.spec.ts`), single-responsibility files, FP-factory + internal-class pattern, brace-every-control-block readability with blank lines between consecutive blocks, JSDoc on public surface and non-obvious logic, error classes extending framework errors, async/await + `Promise.all`, `undefined` over `null`, Vitest co-located, Oxlint/Oxfmt. Triggers: writing/editing any `.ts` / `.tsx` file in this project; user asks "what are the code standards / style rules / conventions"; spawning a sub-agent that will write code; reviewing a diff for style issues; deciding `interface` vs `type`, when to use a class, where helpers live, how to name a file, or whether something needs JSDoc. Skip: pure-Markdown / JSON / YAML edits with no code change; runtime / behavior questions about a specific framework primitive — load the relevant `@warlock.js/<pkg>` skill instead; package-publishing or CI workflow questions.'
+description: "Shared TypeScript rules: contracts versus data types, function services, file names, app barrels, errors, async work, logging and Oxc enforcement. Use when writing or reviewing TypeScript. Use web-code-standards instead for web components, hooks and setup boundaries."
 ---
 
 # Code Standards
@@ -8,7 +8,7 @@ description: 'Project-level TypeScript code standards for apps built on Warlock.
 **Status:** Stable
 **Applies to:** All TypeScript in this project — services, models, resources, modules, app code, scripts.
 
-> **Sub-agent rule:** Before writing any code, read this file end-to-end and apply every rule. When spawning a sub-agent that will write code, prepend: _"First, read `skills/code-standards/SKILL.md` and apply every rule."_
+> **Sub-agent rule:** Before writing any code, read this file end-to-end and apply every rule. When spawning a sub-agent that will write code, prepend: _"First, read the `code-standards` skill and apply every rule."_
 
 The bar is **senior-level clean code**. Not "it compiles" — code that the next person on this codebase can read in one pass.
 
@@ -18,6 +18,7 @@ The bar is **senior-level clean code**. Not "it compiles" — code that the next
 
 ### 1.1 `interface` for contracts, `type` for data
 
+- Declaration-merging targets (for example framework module augmentations) also require `interface`.
 - `interface` describes a **contract** — anything with methods, anything a class implements, anything that holds actions.
 - `type` describes a **data shape** — plain objects, unions, tuples, mapped types, discriminated unions.
 
@@ -49,7 +50,7 @@ Never omit `public` / `private` / `protected`. Explicit is faster to read than i
 
 ```typescript
 // ✅
-export class CartService {
+export class Cart {
   public readonly currency: string;
   private items: CartItem[] = [];
   public add(item: CartItem) {
@@ -58,7 +59,7 @@ export class CartService {
 }
 
 // ❌
-export class CartService {
+export class Cart {
   readonly currency: string; // missing public
   items: CartItem[] = []; // missing private
   add(item: CartItem) {} // missing public
@@ -160,7 +161,7 @@ import { formatUserName } from "app/users/utils";
 import { listUsersService, formatUserName, User } from "app/users";
 ```
 
-The module-root barrel is the one that causes circular imports and tree-shaking misses. Sub-folder barrels are safe because they only group siblings of the same role.
+The module-root barrel is the one that causes circular imports and tree-shaking misses. This recommendation applies to server app modules under `src/app/**`. Web feature folders under `src/web/**` have no barrels: imports point to the exact component or hook file so client bundles stay lean and server-only code is never pulled through a barrel. See the `web-code-standards` skill.
 
 ### 2.3 No file extension in import paths
 
@@ -170,14 +171,24 @@ Always bare: `from "./order.service"`, never `from "./order.service.ts"` or `.js
 
 ## 3. File naming
 
-| Suffix         | Purpose                             | Example                |
-| -------------- | ----------------------------------- | ---------------------- |
-| `.contract.ts` | Interface only (blueprint)          | `payment.contract.ts`  |
-| `.type.ts`     | Types only (data shapes)            | `order.type.ts`        |
-| `.service.ts`  | Service class                       | `cart.service.ts`      |
-| `.model.ts`    | Domain model class                  | `user.model.ts`        |
-| `.resource.ts` | Output mapper (model → wire format) | `order.resource.ts`    |
-| `.spec.ts`     | Co-located test for a sibling `.ts` | `cart.service.spec.ts` |
+| Suffix                    | Purpose                                        | Example                                 |
+| ------------------------- | ---------------------------------------------- | --------------------------------------- |
+| `.contract.ts`            | Interface contract                             | `payment.contract.ts`                   |
+| `.type.ts`                | Data types                                     | `order.type.ts`                         |
+| `.service.ts`             | Named service function                         | `list-users.service.ts`                 |
+| `.controller.ts`          | HTTP handler function                          | `me.controller.ts`                      |
+| `.repository.ts`          | Framework repository subclass and instance     | `users.repository.ts`                   |
+| `.schema.ts`              | Seal schema and inferred type                  | `create-user.schema.ts`                 |
+| `.error.ts`               | Framework error subclass                       | `order-conflict.error.ts`               |
+| `.middleware.ts`          | Request middleware function                    | `require-owner.middleware.ts`           |
+| `.model.ts`               | Cascade model subclass                         | `user.model.ts`                         |
+| `.migration.ts`           | Timestamped model migration                    | `20-10-2026_12-00-00-user.migration.ts` |
+| `.seeder.ts` / `.seed.ts` | Seeder (starter uses `.seed.ts`)               | `users.seed.ts`                         |
+| `.page.tsx`               | Web page component                             | `index.page.tsx`                        |
+| `.setup.ts`               | Page, layout or root policy and server exports | `index.setup.ts`                        |
+| `use-*.ts`                | Named feature hook                             | `use-contact-form.ts`                   |
+| `.resource.ts`            | Output mapper                                  | `user.resource.ts`                      |
+| `.spec.ts` / `.test.ts`   | Co-located test                                | `cart.service.spec.ts`                  |
 
 **One primary export per file.** If a `.contract.ts` also defines closely-related data types used only by that contract, that's fine — but the primary export is the interface.
 
@@ -192,8 +203,8 @@ If the file's description needs an "and", split it. The same goes for classes an
 **File-level SRP.** If a file has more than one top-level helper that isn't a direct implementation detail of the main export, extract helpers into a `utils/` folder — one helper per file. The main file imports from leaf paths.
 
 ```
-❌ cart.service.ts holds CartService + calculateTax + formatLineItem + applyDiscount
-✅ cart.service.ts holds CartService only
+❌ cart.service.ts holds cartService + calculateTax + formatLineItem + applyDiscount
+✅ cart.service.ts holds cartService only
    utils/calculate-tax.ts
    utils/format-line-item.ts
    utils/apply-discount.ts
@@ -201,7 +212,7 @@ If the file's description needs an "and", split it. The same goes for classes an
 
 ### 4.2 Public API is functional, classes are an implementation detail
 
-The default shape of a public primitive is a **factory function returning a plain object**. Users of your service never call `new`.
+This rule governs app code: services are named functions such as `listUsersService(input)`. A stateful app primitive may use a **factory function returning a plain object**. Framework base classes are extended as their package skills require: models, repositories, connectors, and errors remain subclasses; resources returned by `defineResource` are constructed with `new`.
 
 Reach for a `class` in exactly three cases:
 
@@ -304,7 +315,7 @@ for (const item of items) {
 // ✅ the WHY isn't obvious from the code
 // Stripe returns idempotency_key on retry but not on first call —
 // fall back to the order id so downstream dedup still works.
-const key = response.idempotency_key ?? order.id;
+const key = response.idempotencyKey ?? order.id;
 ```
 
 ### 4.7 Pure helpers live outside classes
@@ -323,20 +334,19 @@ Define the class once, then throw it from the call site by name — the type its
 
 ```typescript
 // ✅ define
-import { HttpError } from "@warlock.js/core";
+import { ConflictError } from "@warlock.js/core";
 
-export class CartLockedError extends HttpError {
-  public readonly statusCode = 409;
+export class CartLockedError extends ConflictError {
   public constructor(public readonly cartId: string) {
     super(`Cart ${cartId} is locked`);
   }
 }
 
-// ✅ throw — the class name is the error code, the message stays useful
+// ✅ throw — the class identifies the exception; the HTTP formatter supplies the wire code
 import { CartLockedError } from "app/cart/errors/cart-locked.error";
 
 if (cart.isLocked) {
-  throw new CartLockedError(cart.id);
+  throw new CartLockedError(cart.get<string>("publicId"));
 }
 
 // ❌ bare Error — no status code, no type to catch, no classification
@@ -455,14 +465,14 @@ log.info("order-placed", { orderId, userId, total });
 **Other rules:**
 
 - Log at boundaries (request in, request out, error caught) — not every internal step.
-- **Redact at the source.** Tokens, passwords, credit card numbers, personal identifiers never appear in log context. Configure redaction once via `log.configure({ redact: ... })` — see `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`.
+- **Redact at the source.** Tokens, passwords, credit card numbers, personal identifiers never appear in log context. Configure redaction once via `log.configure({ redact: ... })` — see the `@warlock.js/logger` skill's `redact-sensitive-log-fields` topic.
 - `module` is the area of the app (`"orders"`, `"auth"`, `"payments"`), `action` is the verb-noun event (`"order-placed"`, `"login-failed"`, `"refund-issued"`). Both are searchable indexes — keep them consistent across the codebase.
 
 ---
 
 ## 9. Non-negotiable defaults
 
-Senior-team baseline rules. Each one prevents a real class of bug or incident. Each one is short because each one is unconditional. Deeper coverage lives in sibling skills — `skills/security-baseline/`, `skills/data-and-persistence/`, `skills/api-design/`, `skills/observability-and-resilience/`.
+Senior-team baseline rules. Each one prevents a real class of bug or incident. Each one is short because each one is unconditional. Deeper coverage lives in sibling skills — the `security-baseline` skill, the `data-and-persistence` skill, the `api-design` skill, the `observability-and-resilience` skill.
 
 ### 9.1 Validate untrusted input at the boundary
 
@@ -485,7 +495,7 @@ export type CreateOrderSchema = Infer<typeof createOrderSchema>;
 const input = request.body as CreateOrderSchema;
 ```
 
-Validation runs once at the route boundary; everything inward consumes the typed result. See `skills/security-baseline/SKILL.md` for the full input-trust model.
+Validation runs once at the route boundary; everything inward consumes the typed result. See the `security-baseline` skill for the full input-trust model.
 
 ### 9.2 Money is integer minor units, time is UTC at rest
 
@@ -500,13 +510,13 @@ type Order = { totalCents: number; placedAtUtc: Date };
 type Order = { total: number; placedAt: string }; // float money, ambiguous tz
 ```
 
-See `skills/data-and-persistence/SKILL.md`.
+See the `data-and-persistence` skill.
 
 ### 9.3 IDs in URLs are opaque
 
-Use UUIDs or nanoids for any identifier that crosses a process boundary — URLs, response bodies, log lines, webhooks. Never expose sequential primary keys: they leak business volume (anyone can tell `/orders/1042` means you've placed 1042 orders) and invite enumeration attacks.
+Use an opaque UUID for public resource IDs in URLs, responses, and webhooks. The starter models store a separate `publicId`, generated by `randomUUID()` from `node:crypto` through a Seal default, with a unique migration column. The resource emits `id: ["publicId", "string"]`; services look up `{ publicId: id }`, then use the model's internal identity for writes.
 
-Sequential keys are fine as internal database primary keys. They just don't leave the database.
+Cascade's default `id` is sequential (including its NoSQL-generated integer); `model.uuid` only stringifies the primary key. Neither creates an opaque identifier. Internal primary/foreign keys may remain numeric. Never use `find(publicId)` or repository `getCached(publicId)` unless the primary key was explicitly changed. The `data-and-persistence` skill covers the schema and migration.
 
 ### 9.4 Every external call has a timeout
 
@@ -514,7 +524,7 @@ HTTP, AI, queue, database driver — every call to something outside this proces
 
 `@warlock.js/http` accepts `timeout` per request and `timeout` per `Http` instance. Set a default at the instance level; override per request when a specific endpoint needs more.
 
-See `skills/observability-and-resilience/SKILL.md`.
+See the `observability-and-resilience` skill.
 
 ### 9.5 Idempotency keys for external side effects
 
@@ -524,7 +534,7 @@ This is the difference between "the network blipped" and "the customer got bille
 
 ### 9.6 One response envelope across the project
 
-Every HTTP response in the project uses the same shape — success and failure both. Pick once, document in `skills/api-design/SKILL.md`, use everywhere. The moment this rule lands, the frontend stops writing per-endpoint special cases.
+Every HTTP response follows the named success envelopes or the canonical `{ error: { code, message }, details?, requestId }` error envelope in the `api-design` skill. The moment this rule lands, the frontend stops writing per-endpoint special cases.
 
 ### 9.7 Config validated at boot, no scattered `process.env`
 
@@ -579,15 +589,14 @@ bounded regexes on input, one controller per file, `type` (not `kind`) as a
 union's discriminator. Each problem has a `WL` code and its fix
 (`npx warlock explain <CODE>`).
 
-For Oxlint, consider enabling these additional rules:
+The scaffold enables these Oxlint rules:
 
-- `typescript/explicit-member-accessibility` — enforces § 1.2
-- `typescript/no-explicit-any` — enforces § 1.3
-- `typescript/consistent-type-definitions` — supports § 1.1
-- `typescript/no-floating-promises` — enforces § 6.3 (requires `oxlint-tsgolint` and `options.typeAware: true`)
-- `typescript/await-thenable` (same type-aware engine requirement)
-- `curly` — enforces braces (§ 4.4)
-- `no-console` — enforces § 8
+- `typescript/explicit-member-accessibility` — § 1.2
+- `typescript/no-explicit-any` — § 1.3
+- `curly` — § 4.4
+- `no-console` — § 8
+
+`typescript/consistent-type-definitions` cannot express § 1.1's hybrid rule (interfaces for contracts, types for data); its global `type` or `interface` preference would contradict that rule, so it stays disabled. Review the distinction manually. `typescript/no-floating-promises` and `typescript/await-thenable` remain optional: both require `oxlint-tsgolint` and `options.typeAware: true`.
 
 Match `.oxfmtrc.json`: 100 columns, double quotes, semicolons, trailing commas and built-in import sorting.
 
@@ -619,7 +628,7 @@ Before any change ships:
 
 - [ ] Every untrusted input has a `@warlock.js/seal` schema at the boundary
 - [ ] Money fields are integer minor units, time stored as UTC
-- [ ] IDs exposed in URLs are opaque (UUID / nanoid)
+- [ ] IDs exposed in URLs are opaque (the starter uses a separate public UUID)
 - [ ] Every external call (HTTP, AI, queue, DB) has an explicit timeout
 - [ ] External side effects (payments, emails, webhooks) use idempotency keys
 - [ ] Response shape matches the project's canonical envelope

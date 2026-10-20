@@ -472,7 +472,21 @@ describe("App template emission", () => {
     expect(pageSetup).toContain("getHomeService");
     expect(pageSetup).toContain("export function register()");
     expect(notFoundSetup).toContain('title: "Page not found"');
-    expect(contact).toContain("useTrans()");
+    const contactLocale = readFileSync(
+      path.join(appPath, "src/web/home/hooks/use-contact-locale.ts"),
+      "utf8",
+    );
+    expect(contact).toContain("useContactLocale()");
+    expect(contact).not.toContain("useState");
+    expect(contactLocale).toContain("useTrans()");
+    expect(contactLocale).toContain("await changeLocaleCode(nextLocale)");
+    expect(
+      existsSync(path.join(appPath, "src/web/home/components/contact-form-controls.tsx")),
+    ).toBe(false);
+    expect(existsSync(path.join(appPath, "src/web/home/components/contact-field.tsx"))).toBe(true);
+    expect(
+      existsSync(path.join(appPath, "src/web/home/components/contact-submit-button.tsx")),
+    ).toBe(true);
     expect(contact).not.toContain("transFrom(");
     expect(config).toContain("webConnector()");
     expect(tsconfig).toContain('"web/*"');

@@ -5,7 +5,7 @@
 > `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, `CONVENTIONS.md`, …)
 > are **derived** from this file by
 > [agent-kit](https://github.com/hassanzohdy/agent-kit). Edit **this** file, then
-> run `yarn skills:sync` (or `npx agent-kit sync`) to regenerate them — never edit
+> run `npm run skills:sync` (or `npx agent-kit sync`) to regenerate them — never edit
 > the derived files directly.
 
 ## Project overview
@@ -51,7 +51,7 @@ The rule is: **skill first, source second, web last.**
   `.cursor/skills/`, GitHub Copilot → `.github/skills/`, Codex → `.codex/skills/`,
   and the equivalent directory for other agents).
 
-If a skill you expect is missing, run `yarn skills:sync` (it also runs
+If a skill you expect is missing, run `npm run skills:sync` (it also runs
 automatically on `postinstall`).
 
 ## Available project skills (`skills/`)
@@ -75,19 +75,19 @@ automatically on `postinstall`).
 
 ## Commands
 
-- `yarn dev` — start the dev server (`warlock dev`)
-- `yarn build` — type-check then build for production (`tsc && warlock build`)
-- `yarn start` — start the production server (`warlock start`)
-- `yarn migrate` / `yarn migrate.fresh` / `yarn migrate.list` — run migrations
-- `yarn seed` — run database seeders
-- `yarn lint` / `yarn format` / `yarn tsc` — lint and format with the selected toolchain, and type-check (`tsc --noEmit`)
+- `npm run dev` — start the dev server (`warlock dev`)
+- `npm run build` — type-check then build for production (`tsc && warlock build`)
+- `npm run start` — start the production server (`warlock start`)
+- `npm run migrate` / `npm run migrate.fresh` / `npm run migrate.list` — run migrations
+- `npm run seed` — run database seeders
+- `npm run lint` / `npm run format` / `npm run tsc` — lint and format with the selected toolchain, and type-check (`tsc --noEmit`)
 - `npx warlock check` — verify a change: typecheck, lint, the affected tests and the framework's conventions in one report (`--changed` for only what changed); run it after every change and loop until it exits 0
-- `yarn skills:sync` — re-sync skills from `node_modules` and regenerate the
+- `npm run skills:sync` — re-sync skills from `node_modules` and regenerate the
   derived per-agent files from this `AGENTS.md`
 
 ## Code style
 
-Follow the **code-standards** skill (`skills/code-standards/SKILL.md`) for all
+Follow the `code-standards` skill for all
 TypeScript — read it before writing or reviewing any `.ts` / `.tsx`. In short:
 `interface` for contracts and `type` for data shapes, no `any`, access modifiers
 on every class member, single-responsibility files with the documented naming

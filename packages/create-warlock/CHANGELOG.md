@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.34.3
 
+### Fixed
+
+- Align project skills with real handler signatures, resource source-key tuples, public UUIDs, response schemas, idempotency headers, and the canonical JSON error envelope. Keep discovery descriptions within 450 characters and resolve cross-skill references by name.
+- Extract contact locale and form-control behavior into feature hooks and separate components with dedicated props types; preserve form interactions and consume normalized validation details.
+
 ### Changed
+
+- New app models expose a separate public UUID; sample post updates and user filters resolve public IDs, and user lists return the documented pagination envelope.
+- Enable non-type-aware Oxlint rules for explicit any, braces, member accessibility, and console usage in both scaffold toolchain copies.
 
 - Strengthen the web code standards skill with single-responsibility components, Mongez React Form validation, accessible custom controls, and explicit UI kit selection; consolidate setup-file guidance and correct typed-route advice.
 - The agent skill now exports as `create-warlock`; package discovery descriptions stay within 450 characters.

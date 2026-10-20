@@ -14,3 +14,9 @@ export const localeController: RequestHandler<Request<LocaleSchema>> = async ({
 };
 
 localeController.validation = { schema: localeSchema };
+
+localeController.responseSchema = {
+  200: { body: { locale: "string" } },
+  422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+};

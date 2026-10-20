@@ -1,6 +1,6 @@
 ---
 name: git-workflow
-description: 'Git, branching, commit messages, PRs, and CI gates for this project — conventional commits with module-scoped types (`feat(orders): ...`, `fix(auth): ...`, `refactor(cart): ...`, `docs(users): ...`, `chore: ...`), branch naming (`feat/`, `fix/`, `chore/`, `refactor/`, `docs/` prefix + slug), PR size cap (~400 LoC), required reviewers, CI gates (`yarn tsc` / `yarn lint` / `yarn test` / `yarn audit --level=high`), no force-push to `main`, squash-merge policy, tagging and releases. Triggers: writing a commit message; opening / reviewing / merging a PR; naming a branch; setting up CI; user asks "commit format", "conventional commits", "branch naming", "how big should a PR be", "what CI gates do we need", "how do we release", "can I force push", "squash or merge", "scope in commit message", "what scopes are valid". Skip: code style inside files (load `skills/code-standards/SKILL.md`); deploy mechanics / pm2 setup; framework primitive questions; publishing / semantic-versioning of npm packages.'
+description: "Project Git conventions, branches, conventional commits, pull requests, review and CI gates. Use when preparing or reviewing commits and PRs. Use code-standards instead for implementation style."
 ---
 
 # Git workflow
@@ -200,14 +200,14 @@ A drive-by approve is worse than no approve — it gives false confidence. If yo
 
 Every PR runs these. All must pass before merge. The exact commands match `package.json` scripts:
 
-| Gate                         | Command                   | Blocks on                       |
-| ---------------------------- | ------------------------- | ------------------------------- |
-| Type-check                   | `yarn tsc`                | Any TS error                    |
-| Lint                         | `yarn lint`               | Any Oxlint error                |
-| Tests                        | `yarn test --run`         | Any failed test                 |
-| Coverage (recommended floor) | `yarn test:coverage`      | TBD per team policy             |
-| Dependency audit             | `yarn audit --level=high` | High / critical vulnerabilities |
-| Format check                 | `yarn format --check`     | Any unformatted file            |
+| Gate                         | Command                        | Blocks on                       |
+| ---------------------------- | ------------------------------ | ------------------------------- |
+| Type-check                   | `npm run tsc`                  | Any TS error                    |
+| Lint                         | `npm run lint:check`           | Any Oxlint error                |
+| Tests                        | `npm run test -- --run`        | Any failed test                 |
+| Coverage (recommended floor) | `npm run test:coverage`        | TBD per team policy             |
+| Dependency audit             | `npm audit --audit-level=high` | High / critical vulnerabilities |
+| Format check                 | `npm run format:check`         | Any unformatted file            |
 
 Additional rules:
 

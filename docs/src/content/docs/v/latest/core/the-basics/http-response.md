@@ -669,3 +669,30 @@ bounds a stream that never finishes.
 `http.serverOptions: { http2: true }` uses session draining by default. The
 framework maps idle-connection shutdown to session tracking on HTTP/2, so Fastify
 never receives its unsupported `forceCloseConnections: "idle"` setting.
+
+## Format every JSON error response
+
+`http.errorMapper` classifies thrown non-`HttpError` errors as `{ status, message?, payload? }`. It does not see existing `HttpError` subclasses, returned validation errors, helper responses, unmatched routes, or global rate-limit failures.
+
+Use `http.errorResponse` when the application needs one JSON error envelope across those paths:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+export default {
+  errorMapper: () => ({ status: 500 }),
+  errorResponse({ status, requestId }) {
+    return {
+      error: {
+        code: status >= 500 ? "serverError" : `http${status}`,
+        message: status >= 500 ? "Internal server error." : "Request failed.",
+      },
+      requestId,
+    };
+  },
+} satisfies HttpConfigurations;
+```
+
+The synchronous formatter receives `HttpErrorResponseContext`: `{ status: number, body: unknown, requestId: string }`. Narrow `body` before reading fields; it is the parsed, serialized JSON body. Return a JSON-serializable object or `undefined` to keep the original. The formatter changes only the body, preserving the HTTP status and headers except for recalculated content length, a `private, no-store` cache policy, and the correlation header. If it throws or cannot serialize its result, core logs the formatter error and retains the original body.
+
+The hook covers status 400–599 with `application/json` or an `application/*+json` content type, including Fastify parsing errors, unmatched-route 404s, validation 422s, rate-limit 429s, and 500s. Warlock responses use the ID already stamped from `request.id`. Before Warlock creates a Request, the formatter receives Fastify's `request.id` and echoes that same value under `http.requestId.header` (default `X-Request-Id`). Setting `http.requestId.enabled: false` suppresses that header; without a stamped Warlock ID, the formatter falls back to Fastify's request ID even for routed responses. Keep request-ID headers enabled when the body must correlate with Warlock request logs. HTML pages, files, raw text, streams, and errors after headers have been sent are not reformatted. With no formatter configured, existing response shapes are unchanged.

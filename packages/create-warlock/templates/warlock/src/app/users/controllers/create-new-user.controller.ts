@@ -1,4 +1,5 @@
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+import { UserResource } from "app/users/resources/user.resource";
 import { User } from "../models/user";
 import { createUserSchema, type CreateUserSchema } from "../schema/create-user.schema";
 
@@ -6,7 +7,11 @@ export const createNewUserController: GuardedRequestHandler<CreateUserSchema> = 
   request,
   response,
 }) => {
-  const file = request.file("image")!;
+  const file = request.file("image");
+
+  if (!file) {
+    return response.badRequest({ error: { code: "imageRequired", message: "Image is required." } });
+  }
 
   const output = await file.save("images");
 
@@ -24,4 +29,10 @@ export const createNewUserController: GuardedRequestHandler<CreateUserSchema> = 
 
 createNewUserController.validation = {
   schema: createUserSchema,
+};
+
+createNewUserController.responseSchema = {
+  201: { body: { message: "string", user: UserResource } },
+  422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
 };

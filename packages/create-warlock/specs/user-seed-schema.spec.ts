@@ -26,7 +26,7 @@ function read(relativePath: string): string {
 
 /**
  * Field names in `userSchema = v.object({...})` whose rule chain can reject a
- * create without the field: not `.optional()`, and not conditional on `id`
+ * create without the field: neither `.optional()` nor `.default()`, and not conditional on `id`
  * (`requiredIfEmpty("id")` is satisfied on create only by supplying the field,
  * so it counts as required for a seed, which never passes an id).
  */
@@ -46,7 +46,7 @@ function requiredModelFields(modelSource: string): string[] {
       continue;
     }
 
-    if (!field[2].includes(".optional()")) {
+    if (!field[2].includes(".optional()") && !field[2].includes(".default(")) {
       fields.push(field[1]);
     }
   }
@@ -70,6 +70,12 @@ describe("template users seed satisfies the template user model", () => {
     const required = requiredModelFields(read("src/app/users/models/user/user.model.ts"));
 
     expect(required).toEqual(expect.arrayContaining(["name", "email", "password"]));
+  });
+
+  it("treats server-generated defaults as fields the seed may omit", () => {
+    expect(requiredModelFields(read("src/app/users/models/user/user.model.ts"))).not.toContain(
+      "publicId",
+    );
   });
 
   it("writes every field the model requires", () => {

@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: 'Project-wide HTTP API conventions for Warlock.js apps — list endpoints return `{ <pluralResourceName>, pagination }`, single-item endpoints return `{ <resourceCamelName>: <object> }`, delete returns `204 No Content` (or `{ message }`); framework response helpers map 1:1 to status codes (`response.success` / `successCreate` / `noContent` / `accepted` / `badRequest` / `unauthorized` / `forbidden` / `notFound` / `conflict` / `unprocessableEntity` / `tooManyRequests` / `serverError`); kebab-case plural URL nouns (`/ai-models`); snake_case fields inside resources; offset pagination by default, cursor for time-ordered firehose; list query params validated by a schema (caps `limit`, whitelists `orderBy`, strips unknown keys — never raw `request.all()`); typed controllers via `GuardedRequestHandler<Schema>` (guarded) / `RequestHandler<Request<Schema>>` (public) with the schema in the `schema/` folder + `request.validated()` — the per-endpoint `requests/` folder is retired; not-found is thrown from the service (`ResourceNotFoundError`) so controllers stay clean; resources are output-only (`defineResource`); RESTful routes via `router.route().list().show().create().update().destroy()`; versioning guidance for the rare app that needs it. Triggers: writing a controller, route handler, or HTTP endpoint; shaping a response body; choosing a status code; adding pagination to a list endpoint; designing a `.resource.ts`; defining a route; deciding what `request.validated()` vs `request.input(...)` returns; where the schema file lives; how to return not-found; whether to version an API; user asks "what status code", "how do we paginate", "what does the response look like", "list vs single envelope", "snake_case or camelCase in responses", "how do we structure a controller", "where does the schema go", "should I version my API". Skip: input validation rules (load `skills/security-baseline/SKILL.md` § 1); pagination performance / N+1 (load `skills/observability-and-resilience/SKILL.md`); data column naming inside models (load `skills/data-and-persistence/SKILL.md`); framework router internals — load `@warlock.js/core` route skills; CSS / UI work.'
+description: "HTTP envelopes, camelCase resources, opaque public IDs, status codes, pagination, responseSchema, routes and idempotency headers. Use when designing or reviewing an API endpoint. Use security-baseline instead for input trust, authentication and authorization."
 ---
 
 # API design
@@ -16,7 +16,7 @@ The project-wide contract between server and client. The frontend should be able
 
 ## 1. Response envelope
 
-The project uses **three envelope shapes**, one per response kind. Each kind has its own controller pattern. Do not invent a fourth.
+The project uses **three envelope shapes**, one per response kind. Each success kind has its own controller pattern. All errors use § 1.4.
 
 ### 1.1 List endpoints — `{ <pluralResourceName>, pagination }`
 
@@ -47,10 +47,10 @@ Read, create, and update endpoints return the resource under its camelCase singu
 ```typescript
 // ✅ get-faq.service.ts — the service throws
 import { ResourceNotFoundError } from "@warlock.js/core";
-import { faqsRepository } from "../repositories/faqs.repository";
+import { Faq } from "../models/faq/faq.model";
 
-export async function getFaqService(id: number | string) {
-  const faq = await faqsRepository.getCached(id);
+export async function getFaqService(id: string) {
+  const faq = await Faq.findOne({ publicId: id });
 
   if (!faq) {
     throw new ResourceNotFoundError("Faq resource not found!");
@@ -60,13 +60,20 @@ export async function getFaqService(id: number | string) {
 }
 
 // ✅ get-faq.controller.ts — stays clean, no null-check
-export const getFaqController: RequestHandler = async (request, response) => {
-  const faq = await getFaqService(request.input("id"));
+import { v } from "@warlock.js/seal";
+import type { Request, RequestHandler } from "@warlock.js/core";
+export const getFaqController: RequestHandler<Request<{ id: string }>> = async ({
+  request,
+  response,
+}) => {
+  const faq = await getFaqService(request.validated().id);
 
   return response.success({
     faq,
   });
 };
+
+getFaqController.validation = { params: v.object({ id: v.string().uuid() }) };
 ```
 
 The framework maps `ResourceNotFoundError` to a `404` response automatically — the controller doesn't translate it.
@@ -79,11 +86,16 @@ The framework maps `ResourceNotFoundError` to a `404` response automatically —
 
 ```typescript
 // ✅ default — nothing to say, say nothing
-export const deleteFaqController: RequestHandler = async (request, response) => {
-  await deleteFaqService(request.input("id"));
+export const deleteFaqController: RequestHandler<Request<{ id: string }>> = async ({
+  request,
+  response,
+}) => {
+  await deleteFaqService(request.validated().id);
 
   return response.noContent();
 };
+
+deleteFaqController.validation = { params: v.object({ id: v.string().uuid() }) };
 ```
 
 - Default to `204 No Content` — a successful delete has no body worth sending.
@@ -92,21 +104,28 @@ export const deleteFaqController: RequestHandler = async (request, response) => 
 
 ### 1.4 Error responses
 
-Use the framework's status helpers — never hand-roll an error body.
+Every JSON error response has this shape, with optional `details` for safe field errors or domain context:
 
-```typescript
-// ✅
-return response.notFound(); // { error: "notFound" }, 404
-return response.unauthorized(); // { error: "unauthorized" }, 401
-return response.conflict({ error: "Order already cancelled" });
-return response.badRequest({ error: "Validation failed", otherInfo: "whatever" });
-
-// ❌
-return response.send({ error: "..." }, 404); // bypassing the helper
-return response.success({ error: "..." }); // 200 with an error body — never
+```json
+{
+  "error": { "code": "notFound", "message": "Resource not found." },
+  "requestId": "request-correlation-id"
+}
 ```
 
-Never `200 OK` with an `error` field — the status code carries the outcome.
+Use the matching status helper or throw a framework error from the service. The starter's `http.errorResponse` formatter normalizes helper bodies and framework-generated JSON errors, including unmatched-route 404, validation 422, rate-limit 429, and 500. It removes stacks and masks all 5xx messages. `requestId` is the real Warlock `request.id`, read from the framework's correlation header at the transport boundary; a rejection before Warlock creates a Request uses Fastify's request ID and echoes that same value in the header. Do not generate a new ID inside a controller or use a user ID. See the `observability-and-resilience` skill for trace propagation.
+
+```typescript
+return response.notFound(); // formatter supplies { error: { code, message }, requestId }
+return response.conflict({
+  error: { code: "orderCancelled", message: "Order already cancelled." },
+});
+return response.badRequest({ error: { code: "invalidRequest", message: "Invalid request." } });
+```
+
+`http.errorMapper` translates thrown non-`HttpError` domain errors to `{ status, message?, payload? }`; it does **not** format response bodies. It skips `HttpError` subclasses, returned validation/helper responses, and Fastify's unmatched-route and global rate-limit responses. The starter config uses it to keep unknown thrown errors opaque; `http.errorResponse` handles the final JSON shape for all these paths. HTML error pages, files, and already-started streams retain their own contracts; neither hook rewrites their bodies.
+
+Never send a `200 OK` with an `error` field. Never put secrets, stack traces, raw request bodies, or internal database IDs in `details`.
 
 ---
 
@@ -132,7 +151,7 @@ One canonical mapping. Use the framework helpers; the helper's name **is** the s
 
 **The 401 vs 403 distinction:** 401 means "I don't know who you are." 403 means "I know who you are, and you can't do this." Mixing them leaks information.
 
-**404 vs 403 on private resources:** if revealing existence is itself a leak ("this private workspace exists, you just can't see it"), return 404. The framework default `{ error: "notFound" }` is fine — don't expose internal reasons.
+**404 vs 403 on private resources:** if revealing existence is itself a leak ("this private workspace exists, you just can't see it"), return 404. The canonical error with code `notFound` is sufficient — don't expose internal reasons.
 
 ---
 
@@ -184,7 +203,7 @@ Use when the dataset is large, append-mostly, and time-ordered: chat messages, e
 
 Filters go in query params named after the filterable field (`?status=active&type=basic`). The query schema (§ 3.5) validates each value's type; the repository's `filterBy` rules then map accepted fields to WHERE clauses.
 
-Sort: `?orderBy=created_at&orderDir=desc`. Default sort lives on the repository's `defaultOptions`.
+Sort: `?orderBy=createdAt&orderDir=desc`. Default sort lives on the repository's `defaultOptions`.
 
 ### 3.5 Validate the query — schema first, strip unknown
 
@@ -192,7 +211,7 @@ List endpoints validate their query params with a `@warlock.js/seal` schema, exa
 
 The schema earns its place three ways:
 
-- **Kills operator injection.** Declaring `status: v.enum(OrderStatus)` rejects a smuggled `{ $ne: null }` at the boundary — `filterBy` alone may pass it straight through (see `skills/security-baseline/SKILL.md` § 4.2).
+- **Kills operator injection.** Declaring `status: v.enum(OrderStatus)` rejects a smuggled `{ $ne: null }` at the boundary — `filterBy` alone may pass it straight through (see the `security-baseline` skill § 4.2).
 - **Makes the limit cap real.** `limit: v.int().min(1).max(100)` turns the § 3.3 ceiling into enforcement — `?limit=9999999` becomes a `422`, not a table scan.
 - **Whitelists `orderBy`.** Restricting sort to known indexed columns closes the slow-query vector.
 
@@ -205,7 +224,7 @@ export const listOrdersSchema = v.object({
   status: v.enum(OrderStatus).optional(),
   page: v.int().min(1).default(1),
   limit: v.int().min(1).max(100).default(20),
-  orderBy: v.literal("created_at", "total_cents").optional(),
+  orderBy: v.literal("createdAt", "totalCents").optional(),
 });
 
 export type ListOrdersSchema = Infer<typeof listOrdersSchema>;
@@ -214,7 +233,7 @@ export type ListOrdersSchema = Infer<typeof listOrdersSchema>;
 const { data, pagination } = await listOrdersService(request.validated());
 ```
 
-**Strip unknown keys — don't disallow them.** Seal strips extra keys by default, which is exactly right for query strings: they routinely carry incidental params (`?utm_source=...`, cache-busters `?_=1718`). Throwing a `422` on those is hostile. Reserve disallow-unknown for request *bodies*, where an unexpected key usually signals a client bug or a renamed field.
+**Strip unknown keys — don't disallow them.** Seal strips extra keys by default, which is exactly right for query strings: they routinely carry incidental params (`?utm_source=...`, cache-busters `?_=1718`). Throwing a `422` on those is hostile. Reserve disallow-unknown for request _bodies_, where an unexpected key usually signals a client bug or a renamed field.
 
 ---
 
@@ -224,7 +243,8 @@ const { data, pagination } = await listOrdersService(request.validated());
 
 - **Plural, kebab-case nouns:** `/ai-models`, `/ai-api-keys`, `/contacts`.
 - **Nested resources only one level deep:** `/orders/:id/items`. If you need two levels (`/orders/:id/items/:itemId/refunds`), the inner resource probably deserves to be top-level.
-- **Actions use verb suffixes on the resource path:** `POST /orders/:id/cancel`, not `POST /cancel-order`. The verb is the second-to-last segment.
+- **Actions use verb suffixes on the resource path:** `POST /orders/:id/cancel`, not `POST /cancel-order`. The verb is the final segment.
+- **Public path IDs are opaque UUIDs.** `/orders/:id` resolves the model's `publicId`; resource `id` is that same value. Cascade's default numeric `id` and its stringifying `uuid` getter are internal identities, not public UUID generators. See the `data-and-persistence` skill.
 - **Query params are filters, never identity.** Identity goes in the path (`/orders/:id`), filters in the query string (`?status=paid`).
 
 ### 4.2 Route registration — the RESTful builder
@@ -259,7 +279,7 @@ For endpoints that don't fit the RESTful five (e.g. `POST /orders/:id/cancel`), 
 
 ## 5. Resources (`.resource.ts`)
 
-A resource is the **wire format** for a model. Output-only. No reconciliation, no hydration, no computed side effects — those live in services or model accessors (see project memory `feedback_resources_output_only`).
+A resource is the **wire format** for a model. Output-only. No reconciliation, no hydration, no computed side effects — those live in services or model accessors.
 
 ### 5.1 Definition
 
@@ -269,32 +289,42 @@ import { defineResource } from "@warlock.js/core";
 
 export const AiModelResource = defineResource({
   schema: {
-    id: "string",
+    id: ["publicId", "string"],
     provider: "string",
     name: "string",
     description: "string",
-    provider_model_id: "string",
-    is_free: "boolean",
-    input_price: "number",
-    output_price: "number",
+    providerModelId: "string",
+    isFree: "boolean",
+    inputPrice: "number",
+    outputPrice: "number",
     capabilities: "object",
     features: "array",
-    created_by: "string",
-    updated_by: "string",
+    createdBy: "string",
+    updatedBy: "string",
   },
 });
 ```
 
-### 5.2 Field naming — snake_case
+### 5.2 Field naming — camelCase everywhere
 
-Field names inside the resource schema use **snake_case**, matching the framework's wire convention: `provider_model_id`, `is_free`, `created_by`. The model layer above uses camelCase; the resource is where the convention shifts to wire format.
+Envelope keys **and resource fields** are camelCase: `aiModel`, `providerModelId`, `isFree`, `createdBy`. `defineResource` preserves each schema key as the output key; it does not automatically convert naming styles. A string cast reads the same source key. A tuple `[sourceKey, castType]` reads a differently named stored column:
 
-Top-level envelope keys (the wrapper around the resource: `aiModel`, `aiModels`, `pagination`, `message`) remain camelCase.
+```typescript
+export const OrderResource = defineResource({
+  schema: {
+    id: ["publicId", "string"],
+    totalCents: ["total_cents", "int"],
+    createdAt: ["created_at", "date"],
+  },
+});
+```
+
+This supports legacy snake_case storage without leaking snake_case into JSON. New starter domain columns use camelCase; driver-managed timestamps can still be snake_case (PostgreSQL). Select the tuple's source key to match the actual stored field. See the `@warlock.js/core` skill's `define-resource` topic.
 
 ### 5.3 Rules
 
 - A resource never reaches into another model — if you need composed data, the service composes the result and passes one final object to the resource.
-- A resource never runs business logic — if a value is computed (e.g. `total_spent_cents`), compute it in the service and pass the already-computed field.
+- A resource never runs business logic — if a value is computed (e.g. `totalSpentCents`), compute it in the service and pass the already-computed field.
 - Sensitive fields are omitted at the resource level, not redacted at the log layer.
 
 ---
@@ -305,7 +335,7 @@ Top-level envelope keys (the wrapper around the resource: `aiModel`, `aiModels`,
 
 A write endpoint is **two files**: the schema in the module's `schema/` folder, and the controller. The old per-endpoint `requests/` folder is retired — the controller is typed directly via a generic request-handler type, so no separate `Request<Schema>` wrapper file is needed.
 
-List endpoints follow the **same** two-file shape — a `list-<noun>.schema.ts` validates the query string (see § 3.5). Only single-identifier reads (`get-<noun>` by id) skip the schema and use `request.input("id")`.
+List endpoints follow the **same** two-file shape — a `list-<noun>.schema.ts` validates the query string (see § 3.5). Validate public IDs as strings (UUIDs for starter models), including single-identifier reads. A service accepts the validated public ID and looks up `publicId`, never the sequential primary key.
 
 ```
 schema/create-lead.schema.ts           ← v.object({...}) + Infer<>
@@ -334,13 +364,13 @@ import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type CreateLeadSchema, createLeadSchema } from "../schema/create-lead.schema";
 import { createLeadService } from "../services/create-lead.service";
 
-export const createLeadController: GuardedRequestHandler<CreateLeadSchema> = async (
+export const createLeadController: GuardedRequestHandler<CreateLeadSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const lead = await createLeadService(request.validated());
 
-  return response.success({
+  return response.successCreate({
     lead,
   });
 };
@@ -352,23 +382,50 @@ createLeadController.validation = {
 
 ### 6.2 Picking the handler type
 
-| Route kind                       | Controller type                       | What it adds                          |
-| -------------------------------- | ------------------------------------- | ------------------------------------- |
-| Guarded (auth required) + body   | `GuardedRequestHandler<Schema>`       | typed `request.validated()` + `request.locals.user` |
-| Public + body                    | `RequestHandler<Request<Schema>>`     | typed `request.validated()`           |
-| Read / list (no body)            | `RequestHandler`                      | nothing extra                         |
+| Route kind                     | Controller type                   | What it adds                                        |
+| ------------------------------ | --------------------------------- | --------------------------------------------------- |
+| Guarded (auth required) + body | `GuardedRequestHandler<Schema>`   | typed `request.validated()` + `request.locals.user` |
+| Public + body                  | `RequestHandler<Request<Schema>>` | typed `request.validated()`                         |
+| Read / list (no body)          | `RequestHandler`                  | nothing extra                                       |
 
 `GuardedRequestHandler<Schema>` (defined in `app/auth/requests/guarded.request.ts`) is `RequestHandler<GuardedRequest<Schema>>` — it both types the validated payload and guarantees `request.locals.user` is present.
 
 ### 6.3 Accessing inputs
 
 - `request.validated()` — typed access to the schema-validated body. Use this in every write endpoint. The type comes from the handler's generic, so no cast is needed.
-- `request.input(name)` — single named input (path / query / body fallback). Use for read endpoints that take a single identifier.
+- `request.input(name)` — raw single named input (path / query / body fallback). Validate it before passing an identifier to a service; a TypeScript annotation alone is not validation.
 - `request.all()` — raw, unvalidated payload. **Avoid it.** List endpoints take a query schema and use `request.validated()` just like writes (see § 3.5); `request.all()` bypasses the boundary type-guard and should never appear on a public route.
 
 ### 6.4 Validation failures
 
 The framework returns `422 Unprocessable Entity` with field-level errors automatically when `controller.validation.schema` rejects the input. Do not handle validation errors inside the controller — let the framework boundary do it.
+
+### 6.5 Declare every controller's responseSchema
+
+Attach `responseSchema` beside `validation` on every controller, including list/read/delete handlers. It declares each documented status body; it is not runtime response validation. Export resources from their own `.resource.ts` files so route generation can resolve them.
+
+```typescript
+createLeadController.responseSchema = {
+  201: { body: { lead: LeadResource } },
+  422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+};
+```
+
+Use `response.successCreate({ lead })` for that 201. List schemas describe the plural resource array plus `pagination`; 204 has no body. `npx warlock generate.typings` (also run by `npx warlock dev`) generates named route declarations. The web `ApiResponse` type and `useSubmitForm({ route })` infer these declared status bodies. `npx warlock generate.openapi` uses the same declarations for OpenAPI. See the `@warlock.js/core` skill's `create-controller` and `generate-openapi` topics and the `@warlock.js/web` skill's `submit-a-form` topic.
+
+### 6.6 Side effects require an Idempotency-Key header
+
+For payments, email sends, webhook dispatch, and other retry-sensitive writes, require `Idempotency-Key` at the HTTP boundary. The caller creates one key per user intent and reuses it for retries with the same body:
+
+```http
+POST /orders
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+Content-Type: application/json
+
+{"cartId":"6ba7b810-9dad-41d1-80b4-00c04fd430c8"}
+```
+
+Attach `middleware.idempotency()` **after authentication**. It replays a cached status/body for the same caller, key and body and marks `Idempotent-Replay: true`; a changed body with the same key returns 422, an in-flight request returns 409. The middleware passes through a missing key, so add an app middleware that validates and requires `request.header("idempotency-key")` before it. Configure a shared cache driver for multiple processes and define a retention TTL. Do not cache a retry-sensitive operation only in component state. The service must also make downstream side effects idempotent: a response cache alone cannot make a remote charge and a local write atomic. See the `@warlock.js/core` skill's `use-middleware` topic.
 
 ---
 
@@ -453,9 +510,12 @@ Before merging any controller / route / resource change:
 - [ ] Routes registered via `router.route(...).list().show().create().update().destroy()` (or explicit `router.<verb>(...)` for custom actions)
 - [ ] Auth-required routes wrapped in `guarded(() => { ... })`
 - [ ] Write endpoint: schema in `schema/` folder, controller typed `GuardedRequestHandler<Schema>` / `RequestHandler<Request<Schema>>`, `controller.validation = { schema }`, no separate `requests/` file
-- [ ] Read endpoint uses `request.input(...)` for identity, not `request.all()`
+- [ ] Read endpoint validates its opaque public ID before service lookup
 - [ ] Resource is output-only — no logic, no reaching into other models
-- [ ] Resource field names are snake_case
+- [ ] Envelope and resource keys are camelCase; legacy stored columns use source-key tuples
+- [ ] Every controller declares `responseSchema`; generated client/OpenAPI types match its statuses
+- [ ] Errors use `{ error: { code, message }, details?, requestId }`, including framework failures
+- [ ] Side-effecting endpoints require `Idempotency-Key`, scoped after auth and reused on retries
 - [ ] `Cache-Control` set explicitly on `GET` endpoints
 - [ ] Versioning: additive-only by default; explicit `/vN` prefix only when a real breaking change forces it
 - [ ] Deprecated fields announced via `Deprecation` / `Sunset` headers, not silently changed

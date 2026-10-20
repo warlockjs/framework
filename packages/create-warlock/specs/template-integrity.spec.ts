@@ -446,6 +446,9 @@ describe("lint toolchain source templates", () => {
     const lint = JSON.parse(read(".oxlintrc.json"));
     const format = JSON.parse(read(".oxfmtrc.json"));
     expect(lint.categories.correctness).toBe("error");
+    expect(lint.rules["typescript/no-explicit-any"]).toBe("error");
+    expect(lint.rules.curly).toBe("error");
+    expect(lint.rules["no-console"]).toBe("error");
     expect(lint.rules["typescript/explicit-member-accessibility"][0]).toBe("error");
     expect(lint.rules["typescript/consistent-type-imports"][0]).toBe("error");
     expect(format.sortImports).toEqual({
@@ -515,5 +518,63 @@ describe("web template UI and setup contracts", () => {
     expect(setup).toContain("satisfies PageConfig<typeof loader>");
     expect(setup).toContain("metadata: {");
     expect(read("src/web/404.setup.ts")).toContain('title: "Page not found"');
+  });
+});
+
+describe("project skill contracts", () => {
+  it("keeps discovery descriptions concise and links independent of installation paths", () => {
+    for (const name of readdirSync(path.join(templateRoot, "skills"))) {
+      const source = read(`skills/${name}/SKILL.md`);
+      const description = source.match(/^description: (["'])([^\n]+)\1$/m)?.[2];
+      expect(description, name).toBeDefined();
+      expect(description?.length, name).toBeLessThanOrEqual(450);
+      expect(source, name).not.toMatch(/(?:skills\/|\.\.\/)[\w-]+\/SKILL\.md/);
+      expect(source, name).not.toMatch(/@warlock\.js\/[^/`]+\/[^`]*SKILL\.md/);
+      expect(source, name).not.toMatch(/async \(\s*request,\s*response/);
+      expect(source, name).not.toContain("v.uuid()");
+    }
+  });
+
+  it("generates separate public UUIDs and resolves public route IDs by that column", () => {
+    for (const [module, model] of [
+      ["users", "user"],
+      ["posts", "post"],
+    ]) {
+      expect(read(`src/app/${module}/models/${model}/${model}.model.ts`)).toContain(
+        "publicId: v.string().uuid().default(() => randomUUID())",
+      );
+      expect(read(`src/app/${module}/resources/${model}.resource.ts`)).toContain(
+        'id: ["publicId", "string"]',
+      );
+    }
+    for (const migration of migrationTemplates.slice(0, 2)) {
+      expect(read(migration)).toContain("publicId: string(36).unique()");
+    }
+    expect(read("src/app/posts/controllers/update-post.controller.ts")).toContain(
+      "Post.findOne({ publicId: id })",
+    );
+    expect(read("src/app/posts/schema/update-post.schema.ts")).toContain("id: v.string().uuid()");
+    expect(read("src/app/users/controllers/list-users.controller.ts")).toContain("pagination,");
+  });
+
+  it("declares resource response schemas on the changed sample controllers", () => {
+    for (const file of [
+      "src/app/users/controllers/list-users.controller.ts",
+      "src/app/users/controllers/create-new-user.controller.ts",
+      "src/app/posts/controllers/create-new-post.controller.ts",
+      "src/app/posts/controllers/update-post.controller.ts",
+      "src/app/contact/controllers/contact.controller.ts",
+      "src/app/locale/controllers/locale.controller.ts",
+    ]) {
+      expect(read(file), file).toContain(".responseSchema =");
+      expect(read(file), file).toContain('error: { code: "string", message: "string" }');
+    }
+  });
+
+  it("configures the domain mapper and transport formatter together", () => {
+    expect(read("src/config/http.ts")).toContain("errorMapper: () => ({ status: 500 })");
+    expect(read("src/config/http.ts")).toContain("errorResponse: formatHttpErrorResponse");
+    expect(read("src/web/home/hooks/use-contact-form.ts")).toContain("body.error?.message");
+    expect(read("src/web/home/hooks/use-contact-form.ts")).toContain("errors: body.details");
   });
 });

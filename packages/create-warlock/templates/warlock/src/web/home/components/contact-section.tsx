@@ -1,38 +1,14 @@
 import { Form } from "@mongez/react-form";
-import { changeLocaleCode, useLocale, useTextDirection, useTrans } from "@warlock.js/web";
-import { useState } from "react";
 import { contactSchema } from "../../../shared/contact.schema";
 import { useContactForm } from "../hooks/use-contact-form";
-import { ContactField, ContactSubmitButton } from "./contact-form-controls";
+import { useContactLocale } from "../hooks/use-contact-locale";
+import ContactField from "./contact-field";
+import ContactSubmitButton from "./contact-submit-button";
 
-export function ContactSection() {
+export default function ContactSection() {
   const { status: contactStatus, submitContact } = useContactForm();
-  const locale = useLocale();
-  const direction = useTextDirection();
-  const translate = useTrans();
-  const [isSwitchingLocale, setIsSwitchingLocale] = useState(false);
-  const [localeError, setLocaleError] = useState("");
+  const { direction, translate, isSwitchingLocale, localeError, toggleLocale } = useContactLocale();
 
-  /**
-   * Switch locale via the framework's `changeLocaleCode` — no reload, no
-   * manual cookie write. The control is disabled while the request is in
-   * flight, and a rejection leaves the current locale in place while
-   * surfacing an error instead of throwing.
-   */
-  async function toggleLocale() {
-    const nextLocale = locale === "en" ? "ar" : "en";
-
-    setIsSwitchingLocale(true);
-    setLocaleError("");
-
-    try {
-      await changeLocaleCode(nextLocale);
-    } catch (error) {
-      setLocaleError(error instanceof Error ? error.message : "Could not update the locale.");
-    } finally {
-      setIsSwitchingLocale(false);
-    }
-  }
   return (
     <section className="warlock-section warlock-contact" id="contact" dir={direction}>
       <div className="warlock-contact-copy">
