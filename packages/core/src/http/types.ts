@@ -9,6 +9,7 @@ import type { HttpRateLimitConfig } from "./build-rate-limit-options";
 import type { StreamQueueOptions } from "./bounded-stream-queue";
 import type { CspConfig } from "./csp";
 import type { HttpErrorMapper } from "./error-mapper";
+import type { HttpErrorResponseFormatter } from "./error-response";
 import type { HttpLoggingConfig } from "./request-log-snapshot";
 import type { Response } from "./response";
 import type { HttpTracingConfig } from "./tracing/tracing.type";
@@ -245,6 +246,12 @@ export interface HttpConfigurations {
    * handling. See {@link HttpErrorMapper}.
    */
   errorMapper?: HttpErrorMapper;
+  /**
+   * Format all JSON error responses (400–599), including Fastify parsing,
+   * not-found and global rate-limit responses. Runs after serialization;
+   * undefined keeps the original body. HTML and streams are not formatted.
+   */
+  errorResponse?: HttpErrorResponseFormatter;
   /**
    * In `warlock dev`, warn once per route about POST/PUT/PATCH/DELETE routes
    * that have no auth middleware and no `public: true`. Development only;

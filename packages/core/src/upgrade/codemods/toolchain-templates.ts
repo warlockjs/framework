@@ -217,7 +217,9 @@ dist
   "env": { "node": true, "es2021": true },
   "categories": { "correctness": "error" },
   "rules": {
-    "typescript/no-explicit-any": "off",
+    "typescript/no-explicit-any": "error",
+    "curly": "error",
+    "no-console": "error",
     "no-unused-vars": [
       "warn",
       {

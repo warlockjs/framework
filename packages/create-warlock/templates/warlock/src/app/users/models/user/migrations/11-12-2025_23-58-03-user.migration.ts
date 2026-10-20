@@ -2,6 +2,7 @@ import { json, Migration, string, timestamp } from "@warlock.js/cascade";
 import { User } from "../user.model";
 
 export default Migration.create(User, {
+  publicId: string(36).unique(),
   name: string(255),
   email: string(255).unique(),
   password: string(255),

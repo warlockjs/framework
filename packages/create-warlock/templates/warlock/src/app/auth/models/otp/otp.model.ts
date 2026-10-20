@@ -33,9 +33,15 @@ export class OTP extends Model<OTPSchema> {
    * Check if OTP is valid (not expired, not used, not max attempts)
    */
   public get isValid(): boolean {
-    if (this.get("usedAt")) return false;
-    if ((this.get("attempts") ?? 0) >= (this.get("maxAttempts") ?? 0)) return false;
-    if (new Date() > new Date(this.get("expiresAt"))) return false;
+    if (this.get("usedAt")) {
+      return false;
+    }
+    if ((this.get("attempts") ?? 0) >= (this.get("maxAttempts") ?? 0)) {
+      return false;
+    }
+    if (new Date() > new Date(this.get("expiresAt"))) {
+      return false;
+    }
     return true;
   }
 

@@ -1,6 +1,6 @@
 ---
 name: security-baseline
-description: 'Project-level security floor for Warlock.js apps — input validation at every boundary via `@warlock.js/seal` schemas, authentication via `@warlock.js/auth` (JWT + refresh) with `userType` config, server-side authorization never trusting client-supplied `userId`/`organizationId`, secrets only via `env(...)` + typed config files (never `process.env.X` scattered), parameterized queries through Cascade ORM (never raw concatenation), rate limiting via `@fastify/rate-limit` configured in `config/http.ts`, PII / token redaction in logs (`log.configure({ redact })`), `bcryptjs` for password hashing, `@mongez/encryption` for symmetric encryption, dependency vulnerability scanning (`yarn audit`). Triggers: writing a route handler / controller that accepts external input; touching auth, login, signup, session, token, JWT, password, refresh-token; reading secrets / API keys / env vars; writing a Cascade query or repository filter; handling file uploads, webhook payloads, queue messages; setting rate limits; user asks "is this secure", "input validation", "SQL / NoSQL injection", "XSS", "CSRF", "rate limiting", "secrets management", "authentication vs authorization", "where does X env var go"; importing `@warlock.js/seal` or `@warlock.js/auth` or `bcryptjs`. Skip: pure UI / styling that handles no data; code-style questions (load `skills/code-standards/SKILL.md`); HTTP envelope shape (load `skills/api-design/SKILL.md`); cryptography internals / writing your own crypto — stop and use a vetted lib; advanced auth flows (OAuth, SAML) — load `@warlock.js/social-auth` skill.'
+description: "Input schemas, authentication, authorization, secrets, safe queries, rate limits, password handling and log redaction. Use when code accepts external input or handles identity or credentials. Use api-design instead for HTTP response contracts."
 ---
 
 # Security baseline
@@ -10,7 +10,7 @@ description: 'Project-level security floor for Warlock.js apps — input validat
 
 The non-negotiable security floor for any project on this template. Each rule maps to a real class of incident — most production breaches trace back to one of these eight being absent or sloppy.
 
-> **Sub-agent rule:** Before writing any code that handles external input, identity, or secrets, read this file. Code-style rules live in `skills/code-standards/SKILL.md` — this skill is about what the code must do, not how it must look.
+> **Sub-agent rule:** Before writing any code that handles external input, identity, or secrets, read this file. Code-style rules live in the `code-standards` skill — this skill is about what the code must do, not how it must look.
 
 ---
 
@@ -27,13 +27,13 @@ Anything that crosses the process boundary:
 - Webhook payloads
 - Queue messages
 - Env vars (validated once at boot — see § 3)
-- Database rows from a *different* service (treat them as external if you don't own the writer)
+- Database rows from a _different_ service (treat them as external if you don't own the writer)
 
 ### 1.2 Where validation runs
 
 At the boundary, exactly once. Never inside services.
 
-The Warlock pattern: schema lives in the module's `schema/` folder, the controller types itself with the schema and attaches it via `controller.validation.schema`. See `skills/api-design/SKILL.md` § 6 for the full controller shape.
+The Warlock pattern: schema lives in the module's `schema/` folder, the controller types itself with the schema and attaches it via `controller.validation.schema`. See the `api-design` skill § 6 for the full controller shape.
 
 ```typescript
 // ✅ schema/create-order.schema.ts
@@ -56,10 +56,10 @@ export type CreateOrderSchema = Infer<typeof createOrderSchema>;
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type CreateOrderSchema, createOrderSchema } from "../schema/create-order.schema";
 
-export const createOrderController: GuardedRequestHandler<CreateOrderSchema> = async (
+export const createOrderController: GuardedRequestHandler<CreateOrderSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const order = await placeOrderService(request.validated()); // already typed + safe
   return response.success({ order });
 };
@@ -80,7 +80,7 @@ The framework returns `422 Unprocessable Entity` with structured field errors au
 
 - **Verify the signature first**, schema-validate second. A signature failure aborts before any other work.
 - Reject requests older than the provider's replay window (typically 5 minutes).
-- Idempotency-key the handler (see `skills/observability-and-resilience/SKILL.md` § 4) — providers retry.
+- Idempotency-key the handler (see the `observability-and-resilience` skill § 4) — providers retry.
 
 ---
 
@@ -92,18 +92,18 @@ AuthN proves who you are. AuthZ decides what you can do. Conflating them is how 
 
 ```typescript
 // ❌ trusting the client
-const order = await ordersRepository.find({ id, userId: request.input("userId") });
+const order = await Order.findOne({ publicId: id, userId: request.input("userId") });
 
 // ✅ identity from the authenticated session
 const user = request.locals.user;
-const order = await ordersRepository.find({ id, userId: user.id });
+const order = await Order.findOne({ publicId: id, userId: user.id });
 ```
 
 Any field whose value would determine permission (`userId`, `organizationId`, `roleId`, `isAdmin`) is read from the authenticated session — never from the request body, query, or header.
 
 ### 2.2 Authentication via `@warlock.js/auth`
 
-The project's auth stack: JWT access tokens (1h) + refresh tokens (30d), configured in `config/auth.ts`. Password hashing via `bcryptjs`. The framework's `authService` (`@warlock.js/auth`) is the single entry point:
+The project's auth stack: JWT access tokens and optional refresh tokens, configured in `src/config/auth.ts`. The starter uses `NO_EXPIRATION` for access tokens and disables refresh tokens; choose finite lifetimes and explicitly enable refresh when the application needs sessions. Password hashing via `bcryptjs`. The framework's `authService` (`@warlock.js/auth`) is the single entry point:
 
 ```typescript
 // ✅ thin wrapper service — the framework does the work
@@ -124,13 +124,13 @@ Pattern: at the start of every mutating service, check ownership and role:
 ```typescript
 // ✅
 export async function updateOrderService(orderId: string, input, user) {
-  const order = await ordersRepository.find({ id: orderId });
+  const order = await Order.findOne({ publicId: orderId });
 
   if (!order) {
     throw new OrderNotFoundError(orderId);
   }
 
-  if (order.userId !== user.id && !user.isAdmin) {
+  if (order.get("userId") !== user.id && !user.isAdmin) {
     throw new ForbiddenError("not your order");
   }
 
@@ -168,7 +168,7 @@ const authConfigurations: AuthConfigurations = {
   jwt: {
     secret: env("JWT_SECRET"),
     expiresIn: "1h",
-    refresh: { /* ... */ },
+    refresh: {/* ... */},
   },
 };
 ```
@@ -184,10 +184,10 @@ The logger redaction layer is the safety net, but the first line of defence is n
 log.info("auth", "login", "User authenticated", { user, password, token });
 
 // ✅
-log.info("auth", "login", "User authenticated", { userId: user.id });
+log.info("auth", "login", "User authenticated", { userId: user.get("publicId") });
 ```
 
-Configure `log.configure({ redact: { paths: ["password", "token", "*.secret", "*.apiKey"] } })` at startup — see `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`.
+Configure `log.configure({ redact: { paths: ["password", "token", "*.secret", "*.apiKey"] } })` at startup — see the `@warlock.js/logger` skill's `redact-sensitive-log-fields` topic.
 
 ### 3.4 Token lifetimes
 
@@ -213,7 +213,7 @@ const orders = await ordersRepository.raw(`status = '${input.status}'`);
 
 If a request body is `{ status: { $ne: null } }`, a naive `find({ status: input.status })` becomes a `$ne: null` match — returns every row. The seal schema is what prevents this: declaring `status: v.string()` rejects an object value at the boundary.
 
-This applies to **query strings too**, not just bodies — a `?status[$ne]=` smuggled through the query is the same attack. That's why list endpoints validate the query with a schema and never pass raw `request.all()` to the repository (see `skills/api-design/SKILL.md` § 3.5).
+This applies to **query strings too**, not just bodies — a `?status[$ne]=` smuggled through the query is the same attack. That's why list endpoints validate the query with a schema and never pass raw `request.all()` to the repository (see the `api-design` skill § 3.5).
 
 This is a real reason § 1 is non-negotiable.
 
@@ -281,6 +281,7 @@ For `/auth/login` and `/auth/reset-password`, key the limiter on the **email or 
 ### 6.4 Progressive lockout
 
 After N failed login attempts:
+
 - 3 failures → 1-minute delay
 - 5 failures → 5-minute delay + email notification
 - 10 failures → temporary account lock + manual review
@@ -291,13 +292,13 @@ Never silently succeed-and-fail (returning 200 with no body to hide whether the 
 
 ## 7. Dependency hygiene
 
-### 7.1 `yarn audit` in CI
+### 7.1 `npm audit` in CI
 
-CI runs `yarn audit --level=high` on every PR. High and critical vulnerabilities block merge. Moderate goes on the backlog with a fix-by date.
+CI runs `npm audit --audit-level=high` on every PR. High and critical vulnerabilities block merge. Moderate goes on the backlog with a fix-by date.
 
 ### 7.2 Lockfile committed
 
-`yarn.lock` is checked in. Always. CI installs with `--frozen-lockfile`.
+`package-lock.json` is checked in. CI installs with `npm ci`.
 
 ### 7.3 No `latest` in `package.json`
 
@@ -311,7 +312,7 @@ Every dependency is future risk. Before adding a 5-line utility, ask whether it'
 
 ## 8. Logging and PII
 
-See `skills/code-standards/SKILL.md` § 8 for the call signature. This is the **what not to log** list:
+See the `code-standards` skill § 8 for the call signature. This is the **what not to log** list:
 
 ### 8.1 Never log
 
@@ -340,7 +341,7 @@ log.configure({
 });
 ```
 
-See `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md` for the additive per-channel layer.
+See the `@warlock.js/logger` skill's `redact-sensitive-log-fields` topic for the additive per-channel layer.
 
 ---
 
@@ -356,7 +357,7 @@ Before merging a change that touches input, identity, secrets, or persistence:
 - [ ] All DB queries go through Cascade — no raw string-built queries
 - [ ] Rate limit appropriate for the route family (default for general, aggressive for auth)
 - [ ] No `.env` or secrets file in the commit
-- [ ] `yarn audit --level=high` passes
+- [ ] `npm audit --audit-level=high` passes
 - [ ] Logger redaction config covers any new sensitive field introduced
 - [ ] File uploads cap size, sniff MIME, server-generate the stored filename
 - [ ] Webhooks verify signature before any other work

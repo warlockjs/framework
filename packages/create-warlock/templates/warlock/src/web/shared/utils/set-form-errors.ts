@@ -31,7 +31,9 @@ export function setFormErrors(
 
     if (Array.isArray(errors)) {
       for (const issue of errors) {
-        if (!isRecord(issue)) continue;
+        if (!isRecord(issue)) {
+          continue;
+        }
 
         const input = issue[inputKey];
         const message = issue[errorKey];

@@ -2,7 +2,7 @@ import { defineResource } from "@warlock.js/core";
 
 export const UserResource = defineResource({
   schema: {
-    id: "number",
+    id: ["publicId", "string"],
     name: "string",
     email: "string",
     image: "storageUrl",

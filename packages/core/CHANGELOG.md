@@ -8,7 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.34.3
 
+### Added
+
+- Opt-in `http.errorResponse` formats JSON error bodies at the transport boundary, including framework validation, unmatched routes, early parsing errors, rate limits and server errors, with a correlated request ID. Existing bodies remain unchanged unless configured.
+
 ### Changed
+
+- Keep the upgrade toolchain's enabled explicit-any, brace and console rules in sync with the new-app scaffold.
 
 - Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance.
 

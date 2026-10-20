@@ -1,6 +1,6 @@
 ---
 name: testing-strategy
-description: 'Test pyramid posture for Warlock.js apps — Vitest co-located (`foo.ts` → `foo.spec.ts`); **when testing is enabled in the project (a `test`/`test:*` script in package.json OR a `vitest.config.*` / `vite.config.*` file), it is mandatory that every service ships a co-located `.service.spec.ts` and every HTTP controller / request handler ships a test — a new service or endpoint without a spec is incomplete**; unit tests dominate (~70%), integration tests via `@testcontainers/mongodb` + `@testcontainers/postgresql` (~25%), e2e for critical user journeys only (~5%); coverage is a smoke detector not a target (`yarn test:coverage` via `@vitest/coverage-v8`); flaky-test zero-tolerance (quarantine in 24h, fix or delete in 7); test isolation (no shared state, no order dependency); AAA structure with blank-line phases; mock at the boundary not deep inside; `MockSDK` from `@warlock.js/ai` for AI calls; real DB via testcontainers for integration; snapshot tests only for small deterministic output; contract tests for external integrations. Triggers: deciding whether to write a unit / integration / e2e test for a change; setting up a new `.spec.ts`; debugging a flaky test; reviewing the test plan in a PR; user asks "should I unit test this", "what is our coverage policy", "this test keeps failing intermittently", "what should I mock", "test pyramid", "integration test vs unit test", "snapshot tests", "how do I test a service that hits the DB", "how do I test AI code". Skip: Vitest assertion API mechanics — that''s the testing framework''s docs; language / runtime questions; load testing / performance benchmarking; framework-package internals — load the relevant `@warlock.js/*` skill.'
+description: "Vitest test scope, co-located service and endpoint specs when testing is enabled, isolation, boundary mocks, integration tests and flaky-test policy. Use when planning or reviewing test coverage. Use git-workflow instead for CI and merge gates."
 ---
 
 # Testing strategy
@@ -32,7 +32,7 @@ Write the spec in the **same change** that adds the service or controller. A rev
 
 ### 0.2 If testing is NOT enabled
 
-No `test` script and no vitest/vite config — e.g. a scaffold created without the `test` feature. **Do not** add tests or testing dependencies unprompted, and don't invent a `vitest.config`. If the project is outgrowing prototype stage, *suggest* enabling the `test` feature — but never scaffold a suite the project didn't ask for.
+No `test` script and no vitest/vite config — e.g. a scaffold created without the `test` feature. **Do not** add tests or testing dependencies unprompted, and don't invent a `vitest.config`. If the project is outgrowing prototype stage, _suggest_ enabling the `test` feature — but never scaffold a suite the project didn't ask for.
 
 ---
 
@@ -95,7 +95,7 @@ Not enforced numerically. Enforced culturally — when a reviewer sees ten new e
 ### 2.2 Don't test
 
 - **The framework** — `@warlock.js/*` has its own tests. Don't re-test that `response.success()` returns 200.
-- **Trivial getters / setters** — `cart.totalCents` returning `this.get<number>("total_cents", 0)` doesn't need a test
+- **Trivial getters / setters** — `cart.totalCents` returning `this.get<number>("totalCents", 0)` doesn't need a test
 - **One-line passthroughs** — `loginService(...)` just calling `authService.login(...)` doesn't need a unit test (an integration test of the wiring is better)
 - **Generated code** — migrations, resource scaffolds
 
@@ -149,7 +149,7 @@ const result = await summarizeContentService(input, { provider: ai });
 expect(result).toBe("mocked response");
 ```
 
-See `@warlock.js/ai/skills/run-ai-agent/SKILL.md` for the full mock surface.
+See the `@warlock.js/ai` skill's `run-ai-agent` topic for the full mock surface.
 
 ### 4.3 Database — real, via testcontainers
 
@@ -179,7 +179,7 @@ In the test environment `setupTest()` installs fakes for mail, queue, cache, sto
 ```typescript
 import { mailFake, queueFake } from "@warlock.js/core/tests";
 
-const order = { id: 42 }; // what the code under test placed
+const order = { id: "550e8400-e29b-41d4-a716-446655440000" }; // what the code under test placed
 
 mailFake.assertSent({ to: "ada@example.test" });
 queueFake.assertPushed("invoices.send", { orderId: order.id });
@@ -235,7 +235,7 @@ Low coverage = guaranteed gaps. High coverage = no guarantee of correctness. Tre
 
 Chasing the last 5% of coverage produces brittle tests over edge-case code that nobody cares about. Spend the time on tests that catch real regressions.
 
-### 6.4 The `yarn test:coverage` command
+### 6.4 The `npm run test:coverage` command
 
 Runs Vitest with `@vitest/coverage-v8` (already in dependencies). Add coverage as a CI gate per the floors above once the suite is large enough.
 
@@ -337,4 +337,4 @@ Before merging a change that should include tests (testing enabled — see § 0)
 - [ ] Test names describe behaviour, not implementation
 - [ ] No `.only`, no `.skip` without a tracking ticket
 - [ ] Snapshots reviewed line-by-line if updated
-- [ ] `yarn test --run` passes; `yarn test:coverage` doesn't drop the floor
+- [ ] `npm run test --run` passes; `npm run test:coverage` doesn't drop the floor

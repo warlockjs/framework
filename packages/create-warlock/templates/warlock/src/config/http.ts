@@ -1,10 +1,16 @@
 import type { HttpConfigurations } from "@warlock.js/core";
 import { env } from "@warlock.js/core";
+import { formatHttpErrorResponse } from "../app/shared/utils/format-http-error-response";
 
 const httpConfigurations: HttpConfigurations = {
   port: env("HTTP_PORT", 3000),
   host: env("HTTP_HOST", "localhost"),
   log: true,
+  // errorMapper classifies thrown non-HttpErrors; it cannot shape returned
+  // validation, not-found, or rate-limit responses. Format all JSON errors at
+  // the transport boundary, including Fastify's early rejections.
+  errorMapper: () => ({ status: 500 }),
+  errorResponse: formatHttpErrorResponse,
   fileUploadLimit: 12 * 1024 * 1024 * 1024,
   rateLimit: {
     max: 260,

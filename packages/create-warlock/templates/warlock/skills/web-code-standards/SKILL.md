@@ -1,16 +1,12 @@
 ---
 name: web-code-standards
-description: >-
-  Standards for Warlock.js src/web pages, setup files, single-responsibility
-  components, hooks, Mongez React Form validation, accessible custom controls,
-  and UI kit choices. Use when building or reviewing web features;
-  use code-standards for shared TypeScript rules.
+description: "Warlock web pages and setup files, component and hook ownership, Mongez forms, accessible controls, locale behavior and UI kit choices. Use when building or reviewing src/web features. Use code-standards instead for shared TypeScript rules."
 ---
 
 # Web code standards
 
 **Applies to:** `src/web/**` in this project. Read
-[`code-standards`](../code-standards/SKILL.md) for the shared TypeScript rules,
+the `code-standards` skill for the shared TypeScript rules,
 and the relevant `@warlock.js/web` skill before using a framework feature.
 This skill adds the web-specific rules; it does not override security or
 module-boundary requirements. When reviewing existing code, identify debt
@@ -45,7 +41,7 @@ ancestor and child dictionaries cannot redefine the same key. Keep legacy
 Within a web feature, use `components/`, `hooks/`, and `utils/` for their
 named purpose; do not create `lib/` as a catch-all. These folders have no
 barrel `index.ts`: import the named component, hook, or helper from its own
-file. Keep types in `types/` when a feature has several contracts, or in one
+file. These exact imports keep client bundles lean and prevent server-only code from being pulled through a barrel. The `code-standards` skill allows sub-folder barrels only for `src/app/**` server modules. Keep types in `types/` when a feature has several contracts, or in one
 `<feature>.types.ts` file when they are small. Do not duplicate a contract in
 both places. Put component props in that dedicated type module by default;
 keep a tiny private prop type beside a component only when extracting it would

@@ -1,8 +1,9 @@
 import { command } from "@warlock.js/core";
+import { log } from "@warlock.js/logger";
 
 export default command({
   name: "hello.world",
   action: () => {
-    console.log("Hello World Guys!");
+    log.info("users", "hello.world", "Hello World!");
   },
 });

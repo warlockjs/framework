@@ -18,6 +18,7 @@ export * from "./uploads";
 // errors
 export * from "./errors";
 export type { HttpErrorMapper, HttpErrorMapping } from "./error-mapper";
+export type { HttpErrorResponseContext, HttpErrorResponseFormatter } from "./error-response";
 // middleware
 export * from "./middleware";
 export * from "./plugins";

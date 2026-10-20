@@ -7,15 +7,12 @@ type ContactValues = InferFormValues<typeof contactSchema>;
 
 type ContactResponse = {
   message: string;
-  received: {
-    email: string;
-    characters: number;
-  };
 };
 
 type ContactErrorBody = {
-  message?: string;
-  errors?: unknown;
+  error?: { code: string; message: string };
+  details?: unknown;
+  requestId?: string;
 };
 
 type ContactStatus = {
@@ -44,12 +41,12 @@ export function useContactForm() {
 
       if (!response.ok) {
         if (response.status === 422) {
-          setFormErrors({ body }, form);
+          setFormErrors({ body: { errors: body.details } }, form);
         }
 
         setStatus({
           state: "error",
-          message: body.message || "The request was not accepted.",
+          message: body.error?.message || "The request was not accepted.",
         });
         return;
       }

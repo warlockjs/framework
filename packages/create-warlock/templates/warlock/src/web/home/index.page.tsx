@@ -1,5 +1,5 @@
 import type { PageProps } from "@warlock.js/web";
-import { ContactSection } from "./components/contact-section";
+import ContactSection from "./components/contact-section";
 import { ContentSections } from "./components/content-sections";
 import { HeroSection } from "./components/hero-section";
 import { HomeFooter } from "./components/home-footer";

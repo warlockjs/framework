@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Auth } from "@warlock.js/auth";
 import { RegisterModel } from "@warlock.js/cascade";
 import { useHashedPassword } from "@warlock.js/core";
@@ -5,6 +6,10 @@ import { v, type Infer } from "@warlock.js/seal";
 import { UserResource } from "app/users/resources/user.resource";
 
 export const userSchema = v.object({
+  publicId: v
+    .string()
+    .uuid()
+    .default(() => randomUUID()),
   name: v.string(),
   email: v.email().requiredIfEmpty("id"),
   // Required at the controller layer (`create-user.schema.ts`) on
