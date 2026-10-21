@@ -1,3 +1,11 @@
+import {
+  evaluateBuildBudgets,
+  readBuildBudgetReport,
+  writeBuildBudgetReport,
+  formatBuildBudgets,
+  formatBudgetViolations,
+  type BuildBudgetReport,
+} from "./build-budgets";
 import { colors } from "@mongez/copper";
 import {
   ensureDirectoryAsync,
@@ -130,6 +138,8 @@ export class ProductionBuilder {
   /** Browser-safe API metadata captured in a fresh registration-only child. */
   private namedApiRoutes?: readonly import("../router/types").NamedApiRoute[];
 
+  public budgetReport?: BuildBudgetReport;
+
   /**
    * Main build entry point
    *
@@ -172,6 +182,7 @@ export class ProductionBuilder {
     await this.initializeOptions();
 
     const finalOutDir = this.options.outdir!;
+    const previousBudgetReport = await readBuildBudgetReport(finalOutDir);
     const tempOutDir = createTempOutputDir(finalOutDir);
 
     // Set once the temp directory has been renamed onto `finalOutDir`. Its
@@ -220,6 +231,20 @@ export class ProductionBuilder {
       // paths they bake in resolve), and BEFORE step 6 deletes the
       // production directory they may still read.
       await runEmitContributions(this.connectors, this.buildContext());
+
+      const clientReport = await readBuildBudgetReport(finalOutDir);
+      this.budgetReport = evaluateBuildBudgets(
+        clientReport?.pages ?? [],
+        this.options.budgets,
+        previousBudgetReport,
+      );
+      if (clientReport) await writeBuildBudgetReport(finalOutDir, this.budgetReport);
+      if (this.budgetReport.pages.length > 0) console.log(formatBuildBudgets(this.budgetReport));
+      if (this.budgetReport.violations.length > 0) {
+        const message = formatBudgetViolations(this.budgetReport);
+        if (this.options.budgets?.mode !== "warn") throw new Error(message);
+        console.warn(message);
+      }
 
       // Step 5.7: Mark `dist` as a genuine, complete build — the one thing
       // `warlock start` trusts. Written LAST on purpose: every earlier step
@@ -775,6 +800,7 @@ bootstrap();
     delete esbuildOptions.esmShim;
     delete esbuildOptions.banner;
     delete esbuildOptions.routeRegistrationTimeoutMs;
+    delete esbuildOptions.budgets;
 
     await ensureDirectoryAsync(writeOutDir);
 

@@ -182,7 +182,7 @@ Omit switches to run TypeScript and installed/configured Oxlint. Set `oxlint: fa
 
 ## `warlock build` — production bundle
 
-esbuild bundle of the app down to a single JS file in `dist/`. No flags — every setting comes from `warlock.config.ts > build`.
+esbuild bundle of the app down to a single JS file in `dist/`. `--json` prints the client budget report; build settings come from `warlock.config.ts > build`. See the `build-budgets` topic for per-page gzip limits and deltas.
 
 ### `build.*` config knobs
 

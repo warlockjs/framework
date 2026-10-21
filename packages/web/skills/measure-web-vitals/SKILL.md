@@ -1,6 +1,6 @@
 ---
 name: measure-web-vitals
-description: 'Report field Core Web Vitals (LCP, INP, CLS, plus FCP/TTFB) from the browser with the official `web-vitals` library and `navigator.sendBeacon`, attributed to the current route and device class. Covers where to register the reporter (`<ClientOnly>` / a root-level effect component, never module scope), why LCP/CLS are a HARD-load metric while INP accumulates for the whole session, tagging soft (client) navigations with `routerEvents`, and the p75 field thresholds that judge a route. Triggers: `web-vitals`, `onLCP`, `onINP`, `onCLS`, `onFCP`, `onTTFB`, `sendBeacon`, "Core Web Vitals", "RUM", "real user monitoring", "field data", "LCP too slow", "layout shift", "INP budget", "p75". Skip: lab/synthetic budgets and CI performance gates — a later addition; the `<Image>` component''s own API, descriptors and loaders — the `render-images` topic; client-only rendering mechanics — the `render-client-only` topic; the root document shell — the `write-the-root` topic.'
+description: 'Report field Core Web Vitals (LCP, INP, CLS, plus FCP/TTFB) from the browser with the official `web-vitals` library and `navigator.sendBeacon`, attributed to the current route and device class. Covers where to register the reporter (`<ClientOnly>` / a root-level effect component, never module scope), why LCP/CLS are a HARD-load metric while INP accumulates for the whole session, tagging soft (client) navigations with `routerEvents`, and the p75 field thresholds that judge a route. Triggers: `web-vitals`, `onLCP`, `onINP`, `onCLS`, `onFCP`, `onTTFB`, `sendBeacon`, "Core Web Vitals", "RUM", "real user monitoring", "field data", "LCP too slow", "layout shift", "INP budget", "p75". Skip: bundle transfer budgets and CI gates — core build-budgets; the `<Image>` component''s own API, descriptors and loaders — the `render-images` topic; client-only rendering mechanics — the `render-client-only` topic; the root document shell — the `write-the-root` topic.'
 ---
 
 # Warlock — measure Web Vitals (field RUM)
@@ -279,3 +279,7 @@ all.
   `Link`, `navigateTo()`, `refresh()`: what makes a navigation "soft".
 - The `stream-deferred-data` topic:
   `defer()` and `<Suspense>`, relevant to the CLS guidance above.
+
+For per-page compressed JS/CSS limits during `npx warlock build`, use core
+`build.budgets` and the `build-budgets` topic. These build-time asset sizes
+complement field vitals; they do not measure rendering or interaction latency.

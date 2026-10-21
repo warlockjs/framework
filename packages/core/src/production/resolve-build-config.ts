@@ -19,7 +19,12 @@ import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
  * that; widening them to `string | undefined` pushed the lie downstream into
  * `start-production.command.ts`, which then could not trust its own config.
  */
-type BuilderStrippedKeys = "singleBundle" | "esmShim" | "banner" | "routeRegistrationTimeoutMs";
+type BuilderStrippedKeys =
+  | "budgets"
+  | "singleBundle"
+  | "esmShim"
+  | "banner"
+  | "routeRegistrationTimeoutMs";
 
 export type ResolvedBuildConfig = Required<
   Omit<NonNullable<WarlockConfig["build"]>, "outDirectory" | BuilderStrippedKeys>

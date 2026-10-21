@@ -1,3 +1,4 @@
+import type { BuildBudgets } from "../production/build-budgets";
 import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../commands/cli-command";
 import type { Connector } from "../connectors/types";
@@ -49,6 +50,8 @@ export type WarlockConfig = {
      * @default dist
      */
     outdir?: string;
+    /** Per-page compressed client asset limits. Omit for reporting only. */
+    budgets?: BuildBudgets;
     /**
      * Alias for {@link outdir}.
      *

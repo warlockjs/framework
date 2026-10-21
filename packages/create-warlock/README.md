@@ -251,3 +251,11 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+### Client performance budgets
+
+Generated projects configure `build.budgets.page` with gzip limits of `150kb`
+JavaScript and `50kb` CSS, in `mode: "error"`. `npx warlock build` reports each
+page and enforces the limits; `npx warlock build --json` prints the report for CI.
+API-only projects report no client pages. Adjust the limits in `warlock.config.ts`
+or set `mode: "warn"` to keep reporting without failing.
