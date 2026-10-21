@@ -158,9 +158,14 @@ export function buildHydrationPayload(
     // object).
     translations:
       bundle.routeTranslations !== undefined
-        ? bundle.routeTranslations.keywords
+        ? (bundle.routeTranslations.delivered?.keywords ?? bundle.routeTranslations.keywords)
         : (getKeywordsListOf(locale) ?? {}),
     ...(bundle.routeTranslations !== undefined ? { translationMode: "scoped" as const } : {}),
+    // The shared table this page's translations are completed by. Only a scoped
+    // payload delivered with pruning carries one; see `translations/types.ts`.
+    ...(bundle.routeTranslations?.delivered?.assets === undefined
+      ? {}
+      : { translationAssets: bundle.routeTranslations.delivered.assets }),
     // Same optional/never-empty rule as `metadata`/`errorPage` above — see
     // `HydrationDocumentPayloadSource.deferred`'s own doc comment.
     ...(deferredMarkerKeys.length === 0 ? {} : { deferred: deferredMarkerKeys }),

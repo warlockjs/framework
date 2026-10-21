@@ -4,6 +4,7 @@ import { sharedContext } from "../shared/shared-context";
 import type { MetadataOutput } from "../metadata";
 import type { LocaleRouting } from "../routing/locale-routing";
 import type { NamedApiRouteMetadata } from "../routing/named-api-routes";
+import type { HydrationTranslationAssets } from "../translations/types";
 
 /**
  * The JSON-safe error shape carried from the server document to browser
@@ -108,6 +109,13 @@ export type HydrationDocumentPayloadSource = {
    * the client instead of registering this payload into the global table.
    */
   readonly translationMode?: "scoped";
+  /**
+   * The shared translation table this payload's dictionary is completed by:
+   * its URL, its content hash (or development revision), and the groups it
+   * provides. Present only for a scoped payload delivered with pruning; the
+   * browser loads it before hydration, so the first render has every key.
+   */
+  readonly translationAssets?: HydrationTranslationAssets;
   /**
    * The params the SERVER matched for this request — `bundle.route.params`
    * (`server/execute-page-request.ts:288`), carried untransformed. Same reason

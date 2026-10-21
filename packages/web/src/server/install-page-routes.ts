@@ -88,6 +88,12 @@ import {
 } from "./not-found-page";
 import type { LayoutModuleShape } from "./page-module-shapes";
 import { createRouteTranslationsResolver } from "./route-translations";
+import { developmentTranslationDelivery } from "./translation-delivery";
+import { developmentTranslationPages } from "./translation-dev-pages";
+import {
+  registerDevelopmentTranslationRoutes,
+  TRANSLATION_ROUTE_SOURCE_FILE,
+} from "./translation-route";
 import {
   filterActiveSites,
   siteRegistrationRouter,
@@ -578,6 +584,14 @@ export async function installPageRoutes(
     const routeLocaleManifest =
       artifact === undefined ? buildRouteLocaleManifest(graph, localeOptions) : artifact.manifest;
 
+    // Development serves each locale's full table here, the payload's pointer
+    // to it. Owned like the page routes, so a reload replaces them.
+    if (routeLocaleManifest !== undefined) {
+      await options.router.withSourceFile(TRANSLATION_ROUTE_SOURCE_FILE, () =>
+        registerDevelopmentTranslationRoutes(options.router, routeLocaleManifest.sources),
+      );
+    }
+
     if (options.siteDispatch === undefined) {
       return await installDiscoveredPageRoutes(
         options,
@@ -664,7 +678,19 @@ async function installDiscoveredPageRoutes(
   const discovered = [...discoveredGraph.pages].sort((left, right) =>
     left.pageFile < right.pageFile ? -1 : left.pageFile > right.pageFile ? 1 : 0,
   );
-  const getRouteTranslations = createRouteTranslationsResolver(routeLocaleManifest);
+  const getRouteTranslations = createRouteTranslationsResolver(
+    routeLocaleManifest,
+    routeLocaleManifest === undefined
+      ? undefined
+      : developmentTranslationDelivery({
+          sources: routeLocaleManifest.sources,
+          appSrcRoot,
+          pages: developmentTranslationPages({
+            pages: discoveredGraph.pages,
+            appFile: options.appFile,
+          }),
+        }),
+  );
 
   // THE NOT-FOUND PAGE IS TAKEN OUT OF THE ORDINARY LOOP, not filtered inside
   // it. It has no `route` export to read, no path to compose and no collision
