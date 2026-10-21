@@ -35,7 +35,7 @@ type LocaleState = {
 /** Immutable tables, fetched once per URL. A failed load is remembered as `undefined`, so keys render instead of retrying forever. */
 const tables = new Map<string, Promise<Table | undefined>>();
 const locales = new Map<string, LocaleState>();
-const mergedPayloads = new WeakSet<object>();
+let mergedPayloads = new WeakSet<object>();
 const reported = new Set<string>();
 
 function stateOf(locale: string): LocaleState {
@@ -138,11 +138,20 @@ export async function loadTranslationAssets(
     state.dictionary = undefined;
   }
 
-  if (!mergedPayloads.has(payload)) {
-    mergedPayloads.add(payload);
-    mergeInto(state.pageLocal, payload.translations);
-    state.dictionary = undefined;
-  }
+  mergePayloadTranslations(payload);
+}
+
+/**
+ * Merge a payload's pruned dictionary into its locale, once per payload object.
+ * Idempotent, so both the loader and the dictionary reader may call it.
+ */
+export function mergePayloadTranslations(payload: HydrationDocumentPayloadSource): void {
+  if (mergedPayloads.has(payload)) return;
+
+  mergedPayloads.add(payload);
+  const state = stateOf(payload.locale);
+  mergeInto(state.pageLocal, payload.translations);
+  state.dictionary = undefined;
 }
 
 function describeShared(table: Table, assets: HydrationTranslationAssets): SharedTable {
@@ -244,4 +253,5 @@ export function resetTranslationStoreForTests(): void {
   tables.clear();
   locales.clear();
   reported.clear();
+  mergedPayloads = new WeakSet<object>();
 }

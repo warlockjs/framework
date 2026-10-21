@@ -16,7 +16,7 @@ export const TRANSLATION_ROUTE_SOURCE_FILE = "\0warlock:translations";
  * build wrote.
  */
 export function registerDevelopmentTranslationRoutes(
-  router: Router,
+  router: Pick<Router, "get">,
   sources: readonly TranslationSourceEntries[],
 ): void {
   for (const locale of localeCodesOf(sources)) {

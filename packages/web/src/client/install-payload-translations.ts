@@ -1,6 +1,6 @@
 import { extend, type Keywords } from "@mongez/localization";
 import type { HydrationDocumentPayloadSource } from "../hydration-payload";
-import { translationDictionaryFor } from "./translation-store";
+import { mergePayloadTranslations, translationDictionaryFor } from "./translation-store";
 
 /**
  * The immutable dictionary a scoped payload's locale renders with: its shared
@@ -11,6 +11,8 @@ export function scopedPayloadTranslations(
   payload: HydrationDocumentPayloadSource,
 ): Readonly<Keywords> | undefined {
   if (payload.translationMode !== "scoped") return undefined;
+
+  mergePayloadTranslations(payload);
 
   return translationDictionaryFor(payload.locale);
 }
