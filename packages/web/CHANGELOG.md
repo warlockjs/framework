@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.35.0
+
+### Changed
+
+- Correct the `ClientOnly` opening example to defer browser reads through a function child, and update the navigation and page-guard skill examples to match the real API.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

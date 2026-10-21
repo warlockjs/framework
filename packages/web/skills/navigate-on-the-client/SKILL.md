@@ -389,24 +389,26 @@ Safe to call during SSR: it reads the search string of the request being rendere
 `currentRoute()` and `previousRoute()` report route names and params sent by the server; they never re-match the browser URL.
 
 ```tsx title="src/web/components/current-product-id.tsx"
-import { currentRoute, previousRoute } from "@warlock.js/web";
+import { currentRoute, previousRoute, useIsClient } from "@warlock.js/web";
 
 export function CurrentProductId() {
-  const current = currentRoute();
-  const previous = previousRoute();
+  // false on the server and during hydration: both sides render the same placeholder.
+  const isClient = useIsClient();
+  const current = isClient ? currentRoute() : undefined;
+  const previous = isClient ? previousRoute() : undefined;
 
   return (
     <dl>
       <dt>Current product</dt>
-      <dd>{current?.params?.id ?? "none"}</dd>
+      <dd>{isClient ? (current?.params?.id ?? "none") : "—"}</dd>
       <dt>Previous page</dt>
-      <dd>{previous?.name ?? "first visit"}</dd>
+      <dd>{isClient ? (previous?.name ?? "first visit") : "—"}</dd>
     </dl>
   );
 }
 ```
 
-Both return `undefined` during the server render and before hydration mounts, so branching on them in markup needs `useIsClient()` (see the navbar recipe above).
+Both return `undefined` during the server render and before hydration mounts, so the example gates every read with `useIsClient()` (see the navbar recipe above). When the server must render these values, take them from the loader's `route` argument instead.
 
 `previousRoute()` means the previously swapped page, not the previous browser-history entry. On the first page it is `undefined`.
 
@@ -422,7 +424,7 @@ Both return `undefined` during the server render and before hydration mounts, so
 ## Gotchas
 
 - **Use `refresh()`, not `revalidate()`.** `refresh` is the exported loader re-fetch primitive.
-- **`navigateTo` accepts a URL/path.** Resolve named routes with `href()` first.
+- **`navigateTo` takes a path or a `{ name, params, query }` target.** Pass the object form for a named route, as in "Programmatic navigation". Reach for `href(name, ...)` only when you need the URL string itself (a redirect header or an email body), not to navigate.
 - **Pass exactly one Link destination.** Combining `to`, `href`, `email`, or `tel` throws.
 - **Do not add `params` or `query` to a literal URL.** Put them in the URL itself or use a route name.
 - **Do not build a client matcher.** The server's matched name and params travel in the payload.

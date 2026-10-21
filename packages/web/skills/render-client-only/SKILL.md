@@ -15,26 +15,29 @@ has mounted, without ever producing a hydration mismatch.
 ```tsx
 import { ClientOnly } from "@warlock.js/web";
 
+function BrowserPreference() {
+  let preference: string | null = null;
+
+  try {
+    preference = window.localStorage.getItem("lastVisited");
+  } catch {
+    // Storage can be blocked or throw even after mount (private windows, disabled site data).
+  }
+
+  return <span>{preference ?? "first visit"}</span>;
+}
+
 function LastVisited() {
-  return (
-    <ClientOnly fallback={<span>—</span>}>
-      <span>{window.localStorage.getItem("lastVisited") ?? "first visit"}</span>
-    </ClientOnly>
-  );
+  return <ClientOnly fallback={<span>—</span>}>{() => <BrowserPreference />}</ClientOnly>;
 }
 ```
 
 - `fallback` renders on the server, AND on the client's hydration render. It defaults to `null`.
 - `children` renders once the page has mounted in the browser — after hydration has already matched the server markup, never during it.
-- `children` may also be a function, `() => ReactNode`, for code that must not run at all until the browser render:
+- `children` may be a node or a function, `() => ReactNode`. The function form is the one to use when reading browser APIs must wait for the browser render too.
+- `BrowserPreference` reads storage only when it renders, so the server never evaluates `window`. Its module must still be safe to import on the server; see the next section if it touches browser globals at import time.
 
-```tsx
-<ClientOnly fallback={<p>Loading map…</p>}>
-  {() => <Map center={window.localStorage.getItem("lastCenter")} />}
-</ClientOnly>
-```
-
-The plain-node form and the function form differ only in WHEN the expression inside them runs. `<span>{window.foo}</span>` as a plain child is already constructed — `window.foo` was read — by the time it reaches `<ClientOnly>`; wrap it in a function when reading `window` must wait for the browser render too, not just the visible output.
+The plain-node form and the function form differ only in WHEN the expression inside them runs. `<span>{window.localStorage.getItem("lastVisited")}</span>` as a plain child is already evaluated — `window` was read — by the time it reaches `<ClientOnly>`, so the server render throws. Wrap the read in a component passed as a function child instead.
 
 ## `useIsClient()`
 
