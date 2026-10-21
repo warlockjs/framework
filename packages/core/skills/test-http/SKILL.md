@@ -547,3 +547,5 @@ For an in-process server, pass `client: app` from `createTestHttpServer()` and
 close it in teardown. For signed-in requests, pass `client: await actingAs(user)`
 and dispose that client afterward. These clients use the same assertion and
 run the real HTTP middleware and serialization paths.
+
+Cleanup hooks that own asynchronous handles should return a promise for completed closure. For MessagePorts, subscribe to `close` before calling `close()` and await the event before checking reference state.

@@ -139,7 +139,7 @@ function createModelResolver(options: SessionResolverOptions) {
  * @example
  * export default { session: pageSession({ project: (user: User) => userResource(user) }) };
  */
-export function pageSession<TModel = any, TUser = unknown>(
+export function pageSession<TModel = unknown, TUser = unknown>(
   options: PageSessionOptions<TModel, TUser>,
 ): PageSessionResolver<TModel, TUser> {
   if (typeof options?.project !== "function") {

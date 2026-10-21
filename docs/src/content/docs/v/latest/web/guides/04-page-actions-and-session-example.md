@@ -129,3 +129,5 @@ export default function AccountPage({ data }: PageProps<typeof loader>) {
 On GET, the loader reads the model and the page receives `data.name`. On POST, `<Form>` sends the fields to the page action. If validation fails, `FieldError` and `useActionData` show the errors. If saving succeeds, the redirect runs the loader again and shows the new name. Without JavaScript, the browser follows a standard POST/redirect/GET; with JavaScript, Web enhances the same form.
 
 The login action should set Auth session cookies, and a logout POST should revoke the session and clear those cookies. See [Sessions for pages](/v/latest/auth/guides/sessions-for-pages/) and [Page actions](/v/latest/web/essentials/15-page-actions/) for those flows and named actions.
+
+For guarded-page session narrowing, include the generated `.warlock/typings/web-routes.d.ts` in your TypeScript project. The generator owns `PageRouteRegistry`, including `guard: "user"`; applications declare only their `SessionRegistry` projection and never hand-write route entries.

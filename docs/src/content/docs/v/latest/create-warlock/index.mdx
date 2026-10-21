@@ -285,3 +285,7 @@ dependency versions are copied into the app; existing source is preserved.
 See [Shared form controls](/v/latest/web/getting-started/tailwind-and-shadcn/#shared-form-controls)
 for the component list, props, value shapes, keyboard and date semantics.
 Existing Tailwind apps can use `npx warlock add design-system`.
+
+The interactive feature picker uses compact labels and drops hints when space is limited, including the existing-Tailwind design controls option on a 40-column terminal.
+
+When submitting a generated form asynchronously, return the save promise from `onSubmit` so Mongez clears its submitting state on completion and allows another submission. A synchronous handler must manage that state explicitly.

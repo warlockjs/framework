@@ -298,3 +298,7 @@ import TextInput from "web/design-system/components/text-input";
 All fourteen controls, props and hooks are documented by the Web
 `build-accessible-controls` topic and the generated `web-code-standards` skill.
 Existing apps use `npx warlock add tailwind`, then `npx warlock add design-system`.
+
+Feature picker labels stay compact enough for a 40-column terminal; hints are shortened or omitted when necessary. The existing-Tailwind design controls choice keeps its feature value when its display label is shortened.
+
+For generated form controls, return the save promise from `onSubmit` to finish the form's submitting lifecycle before a second submission. In jsdom control tests, provide a scoped ResizeObserver adapter because jsdom does not calculate layout.

@@ -37,6 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Wait for owned MessagePort close events in the test-server disposal regression so referenced handles are actually released.
+
 - Recognize required and optional auth descriptors in route inspection and generated agent summaries, including inherited session guards.
 - Describe optional authentication as an anonymous security alternative in OpenAPI while keeping legacy guards required.
 - Generate notification locale strings for every configured locale with an explicit English fallback.

@@ -1,3 +1,4 @@
+import type { Request } from "@warlock.js/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const configKey = vi.fn();
@@ -30,7 +31,11 @@ function buildRequest(
     authorizationValue,
     cookie: (name: string) => cookies[name],
     locals: {} as Record<string, unknown>,
-  } as never;
+  } as unknown as Request;
+}
+
+function response() {
+  return { unauthorized: vi.fn(() => "401"), forbidden: vi.fn(() => "403") };
 }
 
 beforeEach(() => {
@@ -127,7 +132,7 @@ describe("sessionMiddleware", () => {
     const result = await sessionMiddleware()({ request, response: response() } as never);
 
     expect(result).toBeUndefined();
-    expect((request as any).locals.user).toBe(model);
+    expect(request.locals.user).toBe(model);
   });
 
   it("rejects a guest with 401 unless optional", async () => {

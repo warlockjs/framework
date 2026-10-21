@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.35.0
 
+### Fixed
+
+- Keep the existing-Tailwind design controls label within narrow terminal rows and supply the ResizeObserver test adapter needed by Radix form inputs in jsdom, and complete async submission fixtures before resubmitting. Pin matching React and React DOM test dependencies for standalone runs.
+
 ### Added
 
 - New projects configure gzip client budgets of 150kb JavaScript and 50kb CSS, enforced by `warlock build`.

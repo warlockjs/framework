@@ -328,3 +328,5 @@ router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
   router.post("/settings", async ({ response }) => response.success({ saved: true }));
 });
 ```
+
+When wiring `pageSession`, annotate the projection callback model parameter. An unspecified model type defaults to `unknown`. Refresh renewal needs an explicit user type; missing renewal types must not issue cookies.

@@ -15,6 +15,15 @@ import SubmitButton from "../templates/design-system/src/web/design-system/compo
 let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
+  // jsdom has no layout engine; Radix observes hidden form-input sizes.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -23,6 +32,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 function element<T extends Element>(selector: string): T {
   const result = host.querySelector<T>(selector);
@@ -64,7 +74,8 @@ describe("generated Mongez controls", () => {
   });
 
   it("collects checkbox booleans and an empty multiple selection, excluding submit controls", async () => {
-    const onSubmit = vi.fn();
+    // Promise-returning handlers release the form's submitting state.
+    const onSubmit = vi.fn(async () => undefined);
     await act(async () =>
       root.render(
         createElement(
@@ -96,7 +107,8 @@ describe("generated Mongez controls", () => {
   });
 
   it("registers one scalar radio group with value-based ids and visible selected state", async () => {
-    const onSubmit = vi.fn();
+    // Promise-returning handlers release the form's submitting state.
+    const onSubmit = vi.fn(async () => undefined);
     await act(async () =>
       root.render(
         createElement(

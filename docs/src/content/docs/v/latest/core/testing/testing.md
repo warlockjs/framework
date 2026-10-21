@@ -689,3 +689,5 @@ with `await restoreTestFakes()`. Both are exported from `@warlock.js/core/tests`
 `await storageFake.install({ isolated: true })` / `await storageFake.restore()`
 provides it for a storage-only harness. Existing installs share the HTTP root by
 default; the isolated option never replaces or deletes that shared root.
+
+Module cleanup hooks that close asynchronous handles must return a promise that resolves after closure. For a `MessagePort`, register its `close` event listener before calling `close()` and await that event before asserting the handle is no longer referenced.
