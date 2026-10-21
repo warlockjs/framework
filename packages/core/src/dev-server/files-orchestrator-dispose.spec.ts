@@ -1,3 +1,4 @@
+import { once } from "node:events";
 import { MessageChannel } from "node:worker_threads";
 import { expect, it, vi } from "vitest";
 import { FilesOrchestrator } from "./files-orchestrator";
@@ -8,9 +9,10 @@ it("runs module cleanup hooks that own referenced handles on test-server disposa
   const channel = new MessageChannel();
   channel.port1.on("message", () => undefined);
   const cleanup = vi.fn(async () => {
-    await Promise.resolve();
+    const closed = [once(channel.port1, "close"), once(channel.port2, "close")];
     channel.port1.close();
     channel.port2.close();
+    await Promise.all(closed);
   });
   const file = new FileManager(
     "/tmp/src/app/example/main.ts",

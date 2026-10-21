@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Restore session middleware response fixtures, keep session projection defaults typed as unknown, and skip renewal without an explicit user type.
+
 - Exclude expired refresh rows from session caps while preserving oldest-first eviction.
 - Bound Google token and JWKS requests with configurable `timeoutMs`, `fetch` and `endpoints` options; retain all identity checks and isolate JWKS caches.
 - Reject unavailable refresh families outside the transaction callback so expected credential rejection is not logged as a database failure.

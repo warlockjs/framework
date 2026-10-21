@@ -125,3 +125,17 @@ declare module "@warlock.js/web" {
   }
 }
 ```
+
+The following is **generated output**, shown to make the example's typing
+prerequisite explicit. Let the route generator write this file; apps must never
+hand-write `PageRouteRegistry` entries.
+
+```ts title=".warlock/typings/web-routes.d.ts"
+import "@warlock.js/web";
+
+declare module "@warlock.js/web" {
+  interface PageRouteRegistry {
+    "account.show": { path: "/account"; params: {}; actions: never; guard: "user" };
+  }
+}
+```

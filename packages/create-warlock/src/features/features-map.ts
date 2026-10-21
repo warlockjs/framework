@@ -101,7 +101,7 @@ export const features: FeatureOption[] = [
   },
   {
     key: "design-system",
-    label: "Design system controls (existing Tailwind)",
+    label: "Controls (existing Tailwind)",
     hint: "Add the shared accessible Mongez controls; requires Tailwind to be set up",
     group: "Rendering & Mail",
   },

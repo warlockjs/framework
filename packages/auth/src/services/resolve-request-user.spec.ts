@@ -118,6 +118,17 @@ describe("resolveRequestUser", () => {
     expect(outcome).toEqual({ user: null, failure: "unauthorized" });
   });
 
+  it("does not renew without an explicit renewal user type", async () => {
+    const request = buildRequest(undefined, { refresh: "old-refresh" });
+    const resolved = await resolveRequestUser(request as never, {} as never, {
+      tokenFrom: "cookie:access",
+      refreshCredential: "cookie:refresh",
+    });
+    expect(resolved).toBeNull();
+    expect(renewAutomaticSession).not.toHaveBeenCalled();
+    expect(setAuthCookie).not.toHaveBeenCalled();
+  });
+
   it("renews once from the refresh cookie and writes the rotated pair", async () => {
     jwtVerify.mockResolvedValue({ id: 1, userType: "user" });
     accessTokenFindByToken.mockResolvedValue(liveRow());

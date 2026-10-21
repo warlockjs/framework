@@ -287,3 +287,7 @@ for the component list, props, value shapes, keyboard and date semantics.
 Existing Tailwind apps can use `npx warlock add design-system`.
 
 Starter controllers declare `responseSchema` for their success and explicit error statuses. Keep those contracts aligned when changing controller responses, including the token payloads in authentication controllers.
+
+The interactive feature picker uses compact labels and drops hints when space is limited, including the existing-Tailwind design controls option on a 40-column terminal.
+
+When submitting a generated form asynchronously, return the save promise from `onSubmit` so Mongez clears its submitting state on completion and allows another submission. A synchronous handler must manage that state explicitly.

@@ -956,9 +956,15 @@ importers:
       radix-ui:
         specifier: 1.8.1
         version: 1.8.1(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
       react-day-picker:
         specifier: 9.14.0
         version: 9.14.0(react@19.2.8)
+      react-dom:
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
       tailwind-merge:
         specifier: 3.7.0
         version: 3.7.0

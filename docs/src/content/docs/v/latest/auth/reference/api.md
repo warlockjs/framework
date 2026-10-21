@@ -331,3 +331,5 @@ Source: `@warlock.js/auth/src/utils/auth-error-codes.ts`.
 - [Configuration](../getting-started/03-configuration.mdx) — option-by-option walkthrough of `AuthConfigurations`.
 - [Manage tokens](../guides/manage-tokens.md) — what each service method actually does.
 - [The auth flow](../essentials/01-the-auth-flow.md) — how the pieces fit together.
+
+Session projection callbacks should declare their model parameter type; `pageSession` defaults an unspecified model to `unknown`. Automatic renewal requires an explicit renewal user type before refresh credentials can mint cookies.

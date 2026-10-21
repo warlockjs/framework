@@ -17,6 +17,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
+- Include generated guarded-route output in the page protection skill so its session and useUser examples compile independently.
+
 - Install fetched sessions on refresh, locale changes, and central page swaps, including guest sessions; superseded responses cannot publish identity.
 - Preserve the shared request-store resolver and request-keyed scopes across server module re-evaluation during development.
 

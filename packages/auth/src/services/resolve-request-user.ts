@@ -92,13 +92,14 @@ export async function resolveRequestUserOutcome(
   let renewalAttempted = false;
 
   const renew = async (): Promise<boolean> => {
-    if (!refreshCredential || renewalAttempted) return false;
+    const { renewalUserType } = options;
+    if (!refreshCredential || !renewalUserType || renewalAttempted) return false;
 
     renewalAttempted = true;
     const refreshToken = readCredential(request, refreshCredential);
     if (!refreshToken) return false;
 
-    const pair = await authService.renewAutomaticSession(refreshToken, options.renewalUserType!, {
+    const pair = await authService.renewAutomaticSession(refreshToken, renewalUserType, {
       overlapMs: options.overlapMs,
       maxAgeMs: options.maxAgeMs,
     });
