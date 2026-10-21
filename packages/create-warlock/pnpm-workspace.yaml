@@ -19,3 +19,4 @@ minimumReleaseAgeExclude:
   # localization, ...). The family bumps it on release day, so it trips the gate
   # exactly like @warlock.js/* did (5.20.0: @mongez/reinforcements@4.0.2).
   - "@mongez/*"
+  - lucide-react@1.61.0

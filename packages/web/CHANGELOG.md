@@ -4,28 +4,21 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ## 5.35.0
 
-### Changed
-
-- Correct the `ClientOnly` opening example to defer browser reads through a function child, and update the navigation and page-guard skill examples to match the real API.
 ### Added
 
 - Add the `build-rtl-and-mixed-direction-ui` and `preserve-feedback-and-motion` agent skill topics, covering RTL layouts and mixed-direction content, and accessible feedback, failure handling and motion patterns.
+- Client manifest traversal for first-visit and deferred asset sizes, including hydration, page layouts, setup registrations and error boundaries; Rollup module attribution identifies the largest contributors.
+- Watched development regression coverage for shared-store connectivity and a characterization of layout form identifier hydration parity.
+- `build-accessible-controls` skill and design-system documentation cover shared Mongez controls, keyboard and focus behavior, stable ids, RTL, visual checked states, empty/reset semantics, and calendar dates versus instants.
+
+### Changed
+
+- Correct the `ClientOnly` opening example to defer browser reads through a function child, and update the navigation and page-guard skill examples to match the real API.
+
 ### Fixed
 
 - Install fetched sessions on refresh, locale changes, and central page swaps, including guest sessions; superseded responses cannot publish identity.
-### Added
-
-- Client manifest traversal for first-visit and deferred asset sizes, including hydration, page layouts, setup registrations and error boundaries; Rollup module attribution identifies the largest contributors.
-### Fixed
-
 - Preserve the shared request-store resolver and request-keyed scopes across server module re-evaluation during development.
-
-### Added
-
-- Watched development regression coverage for shared-store connectivity and a characterization of layout form identifier hydration parity.
-### Added
-
-- `build-accessible-controls` skill and design-system documentation cover shared Mongez controls, keyboard and focus behavior, stable ids, RTL, visual checked states, empty/reset semantics, and calendar dates versus instants.
 
 ## 5.34.3 - 2026-10-20
 

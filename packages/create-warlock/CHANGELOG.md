@@ -6,22 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.35.0
 
+### Added
+
+- New projects configure gzip client budgets of 150kb JavaScript and 50kb CSS, enforced by `warlock build`.
+- Web starter home-page browser spec with accessibility, overflow and screenshot checks at phone and desktop widths; omitted from API-only projects.
+- Pin the template's Vitest to 4.1.10 for awaited worker cleanup support. Selecting the test feature uses core's unit/integration projects generator, including quota-aware worker sizing and the cleanup runner, while preserving existing configs.
+- Update the testing-strategy project skill and scaffolding docs with matching file conventions, cheap unit configuration, opt-in worker lifetime/reset hooks, setup profiling and an affected-tests plus integration release gate with full suites nightly.
+- Full-stack and Tailwind + shadcn selections include fourteen accessible app-owned form controls, separate behavior hooks and props types, and exact UI dependency pins. The optional template and add-command payload share an integrity contract.
+- Template web standards name the shared controls and their direct web-alias imports; template verification includes the optional sources.
+
 ### Changed
 
 - Add a state ownership rule to the web code standards skill: loader data is server truth, and shared client state lives in named store modules.
 - Teach the project API design skill to use typed domain errors, bounded list endpoints and response-schema contract assertions. The starter formatter preserves explicitly safe `AppError` messages and details through its native typed context.
-### Added
-
-- New projects configure gzip client budgets of 150kb JavaScript and 50kb CSS, enforced by `warlock build`.
-### Added
-
-- Web starter home-page browser spec with accessibility, overflow and screenshot checks at phone and desktop widths; omitted from API-only projects.
-- Pin the template's Vitest to 4.1.10 for awaited worker cleanup support. Selecting the test feature uses core's unit/integration projects generator, including quota-aware worker sizing and the cleanup runner, while preserving existing configs.
-- Update the testing-strategy project skill and scaffolding docs with matching file conventions, cheap unit configuration, opt-in worker lifetime/reset hooks, setup profiling and an affected-tests plus integration release gate with full suites nightly.
-### Added
-
-- Full-stack and Tailwind + shadcn selections include fourteen accessible app-owned form controls, separate behavior hooks and props types, and exact UI dependency pins. The optional template and add-command payload share an integrity contract.
-- Template web standards name the shared controls and their direct web-alias imports; template verification includes the optional sources.
 
 ## 5.34.3 - 2026-10-20
 

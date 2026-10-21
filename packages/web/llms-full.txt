@@ -19,12 +19,13 @@ Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**`
 1. Install the layer with `warlock add web` (`add-web-to-an-app.md`), then edit the document in `src/web/root.tsx` (`write-the-root.md`).
 2. Separate UI and logic with `use-page-setup-files`, then create pages with `config` and a loader (`create-a-page.md`, `load-page-data.md`, which also covers how loader data is typed on the page); wrap them with `use-layouts.md`; set titles, descriptions, Open Graph and per-locale metadata (`set-page-metadata.md`).
 3. Link and navigate with `<Link>`, `href()`, `navigateTo` (`navigate-on-the-client.md`).
-4. Post forms to a Core API route (`submit-a-form.md`), then `refresh()` to revalidate (a route whose handler declares `responseSchema` types `data` and `onSuccess`); or handle a form on the page itself with an `action` export and `<Form>` (`handle-a-form-action.md`).
+4. Post forms to a Core API route (`submit-a-form.md`), then `refresh()` to revalidate (a route whose handler declares `responseSchema` types `data` and `onSuccess`); or handle a form on the page itself with an `action` export and `<Form>` (`handle-a-form-action.md`). Keep feedback, pending states and motion correct with `preserve-feedback-and-motion.md`.
 5. Guard pages and read the user (`protect-a-page.md`); a `requireUser()`-guarded page is typed as signed-in (`useUser("route.name")` is non-null).
-6. Translate pages (`localize-pages.md`); stream slow data (`stream-deferred-data.md`).
+6. Translate pages (`localize-pages.md`), then build RTL and mixed-direction layouts (`build-rtl-and-mixed-direction-ui.md`); stream slow data (`stream-deferred-data.md`).
 7. Polish: styles (`serve-styles.md`), self-hosted fonts (`use-web-fonts.md`), sitemap and robots (`generate-sitemap.md`), themes (`multi-theme.md`), multi-site apps (`multi-site.md`), client-only UI and hydration debugging (`render-client-only.md`), images (`render-images.md`), vitals (`measure-web-vitals.md`).
-8. Test page loaders, actions and rendering (`test-a-page.md`).
-9. Observe SSR phases and deferred values with `TracingHooks` (`observe-page-requests.md`).
+8. Build form controls with `build-accessible-controls` (the app design-system, keyboard/focus, RTL and date semantics).
+9. Test page loaders, actions and rendering (`test-a-page.md`).
+10. Observe SSR phases and deferred values with `TracingHooks` (`observe-page-requests.md`).
 
 ## Conventions and pitfalls
 
@@ -161,6 +162,180 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 - The `write-the-root` topic: customize the generated document shell.
 - The `serve-styles` topic: add global CSS from the root.
 - The `run-app` topic of the `warlock-js-core` skill: run dev, build, and production.
+
+## build-accessible-controls  `@warlock.js/web/skills/build-accessible-controls/SKILL.md`
+
+---
+name: build-accessible-controls
+description: "Use the app design-system Mongez controls for accessible forms: searchable selections, radio/checkbox/switch states, calendar dialogs, explicit ids, keyboard navigation and focus return. For endpoint submission use submit-a-form."
+---
+
+# Build accessible controls
+
+For Tailwind apps, run `npx warlock add design-system`. If Tailwind is missing,
+first run `npx warlock add tailwind`. The installer refuses before changing an
+unconfigured app and preserves existing files. `npm create warlock@latest app --
+--stack=web` includes the controls by default; an explicit `--features` replaces
+the preset, and selecting `shadcn` includes the design system.
+
+Use `Form` directly from `@mongez/react-form` (it renders `noValidate`). Do not
+create a competing form owner or use native browser validation attributes.
+
+```tsx
+import { Form } from "@mongez/react-form";
+import EmailInput from "web/design-system/components/email-input";
+import MultiSelectInput from "web/design-system/components/multi-select-input";
+import SubmitButton from "web/design-system/components/submit-button";
+
+export default function PreferencesForm() {
+  return (
+    <Form>
+      <EmailInput id="preferences-email" name="email" label="Email" hint="For receipts" />
+      <MultiSelectInput
+        id="preferences-topics"
+        name="topics"
+        label="Topics"
+        options={[
+          { value: "news", label: "News" },
+          { value: "events", label: "Events" },
+        ]}
+      />
+      <SubmitButton id="preferences-submit" name="submit" label="Save" />
+    </Form>
+  );
+}
+```
+
+Import each default export by its web alias, without barrels:
+TextInput, EmailInput, PasswordInput, TextareaInput, SelectInput,
+MultiSelectInput, DatePickerInput, TimePickerInput, DateTimePickerInput,
+CheckboxInput, RadioInput, SwitchInput, FileInput and SubmitButton live in
+`web/design-system/components/<kebab-name>`. Hooks live in
+`web/design-system/hooks/use-<name>` and props in `web/design-system/types`.
+
+Every control requires `id`, `name`, and `label`. Give repeated forms distinct,
+stable id prefixes. Options have unique stable string `value`s and string
+`label`s, plus optional `disabled`. Option ids derive from values so reordering
+options does not change identity. Do not generate random ids during render.
+Hints and errors reference `${id}-hint` and `${id}-error`; errors are announced.
+Use `schema`/`rules` and `validateOn` for Mongez validation. External errors use
+`error`; the server must validate independently.
+
+## Keyboard and focus
+
+- SelectInput and MultiSelectInput open with Enter/Space on their trigger and
+  focus a searchable combobox. Arrow keys, Home/End move its active option;
+  Enter selects. Multi-selection toggles with Enter, or Space while search is
+  empty. Selection stays independent of search. Disabled options are skipped;
+  an empty result is announced. Escape dismisses and Radix returns focus to
+  the trigger. Clear writes `""` for single choice or `[]` for multiple choice.
+- CheckboxInput and SwitchInput use Radix keyboard behavior and Mongez
+  `type: "checkbox"`, `checked` and `setChecked`; unchecked values collect false.
+  Checked states have a visible indicator/background, focus has a ring, and
+  disabled states have reduced opacity. Do not communicate state by color alone.
+- RadioInput registers one Mongez scalar for the whole RadioGroup. Tab enters
+  the group; arrows move selection, respecting `dir="rtl"`. Each item has its
+  own label and a visible selected indicator. Use `value` or `defaultValue` to
+  choose its string value. Clearing the group produces `""`.
+- Date controls open a modal Popover dialog with a labelled calendar grid.
+  DayPicker owns arrow/day/week/month navigation and initial focus. Escape or
+  Close returns focus to the trigger. Clear writes `""`. Preserve the modal
+  focus trap; do not replace it with an unlabelled positioned div.
+- FileInput supplies File or File[] to Mongez and clears the browser input on
+  reset/clear. A browser cannot restore an initial file selection, so its reset
+  baseline is always empty. SubmitButton follows the owning form's submission
+  state and excludes itself from collected values.
+
+Keep event adaptation, state and effects in hooks. Preserve `inputRef`,
+`visibleElementRef`, disabled state, blur validation, and error descriptions
+when changing a widget. A ref must point at a focusable widget, not a hidden
+submission input. Popups also need their own accessible name. Keep visible text,
+search/clear/close labels and placeholders localized; pass `dir` to portalled
+widgets because they do not inherit the field wrapper's direction.
+
+## Date versus instant
+
+DatePickerInput stores a calendar date (`YYYY-MM-DD`), TimePickerInput stores a
+wall-clock time (`HH:mm`), and DateTimePickerInput stores a local wall-clock
+value (`YYYY-MM-DDTHH:mm`). These are strings, not UTC instants. DateTime starts
+at midnight when a date is chosen without a time; clearing its time clears the
+value. Resolve timezone and daylight-saving policy explicitly in the service
+before converting to an instant. Never use `toISOString().slice(0, 10)` for a
+calendar date: timezone conversion can select a different day.
+
+When extending the kit, follow the WAI-ARIA APG
+[combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/),
+[listbox](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/),
+[checkbox](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/),
+[radio group](https://www.w3.org/WAI/ARIA/apg/patterns/radio/),
+[switch](https://www.w3.org/WAI/ARIA/apg/patterns/switch/), and
+[date dialog/grid](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/examples/datepicker-dialog/)
+patterns. Test focus entry/return, keyboard interaction, checked/selected states,
+validation, clearing/reset, repeated forms and RTL in the app's browser suite.
+
+## build-rtl-and-mixed-direction-ui  `@warlock.js/web/skills/build-rtl-and-mixed-direction-ui/SKILL.md`
+
+---
+name: build-rtl-and-mixed-direction-ui
+description: 'Build RTL/LTR layouts in SSR pages: document lang/dir, `useTextDirection()`, logical CSS, mirroring, `dir="auto"` for user text, LTR identifiers and fields, locale-correct dates. Read for Arabic or Hebrew UI or direction bugs. Dictionaries: `localize-pages.md`.'
+---
+
+# Warlock web — build RTL and mixed-direction UI
+
+Read this after `localize-pages.md`, which owns dictionaries and the locale URL strategy. This topic covers what the page does with a direction once the locale is known.
+
+## Direction comes from the locale
+
+The server render sets `<html lang dir>` from the request's resolved locale. The default root does this; a custom `src/web/root.tsx` must follow the same rule (`write-the-root.md`). The browser cannot update the document from inside the hydrated tree, so after a client locale change the framework syncs `lang` and `dir` itself.
+
+Inside pages, read the direction instead of recomputing it:
+
+```tsx
+import { useTextDirection, useTrans } from "@warlock.js/web";
+
+export default function Banner() {
+  const direction = useTextDirection(); // "rtl" | "ltr"
+  const t = useTrans();
+
+  return <aside dir={direction}>{t("banner.title")}</aside>;
+}
+```
+
+`localeDirection(locale)` resolves the direction for any BCP 47 tag (script subtags win, so `az-Arab` is rtl). Use it for locale lists in a switcher, where each option needs its own direction.
+
+## Layout uses logical properties
+
+Write spacing, alignment and positioning in logical terms so one stylesheet serves both directions:
+
+- `margin-inline-start` / `padding-inline-end` instead of `margin-left` / `padding-right`.
+- `inset-inline-start`, `text-align: start`, `border-inline-start`.
+- Flex and grid order follows `dir` automatically; avoid hard-coded `row-reverse` for locale switches.
+
+Mirror only directional meaning: back and forward chevrons, progress direction, "next" arrows. Do not mirror brand marks, clocks, play icons, or icons whose orientation is universal. Mirror by CSS (`[dir="rtl"] .chevron { transform: scaleX(-1) }`) or a direction-aware icon component, not by duplicating markup.
+
+## Translate every visible and spoken string
+
+Translate first-party labels, placeholders, empty, loading and error states, page metadata, and accessible names (`aria-label`, `alt` on meaningful images, button text generated by components). A translated paragraph next to an English button is a bug. Each flattened key has one owner in `locales.json`; do not duplicate a label under two routes.
+
+## Content direction is separate
+
+The interface direction is the page's `dir`. User-written text can run in any direction, so:
+
+- Give user text and comments `dir="auto"` so the browser picks direction from the first strong character.
+- Isolate identifiers, usernames, timestamps and speaker labels inside a sentence with `<bdi>` or `dir="ltr"` on a span, so punctuation does not jump.
+- Keep email, URL, code, phone and API-key inputs LTR where the content requires it (`dir="ltr"` on the input), without forcing the whole form LTR. Labels stay in the page direction.
+
+## Dates, times and numbers
+
+Format instants with an explicit locale and the user's timezone, and produce identical output on the server and in the first client render. A different default on either side causes a hydration mismatch.
+
+Treat date-only values (a birthday, a due date) separately from instants: format them in UTC or as calendar fields, never by converting through the viewer's timezone, or they shift a day. Localized digits in input are a product choice; if you accept Arabic-Indic digits, normalize and validate them on the server too.
+
+## Verify with real text
+
+Test with actual Arabic copy and with mixed Arabic and English sentences containing emails, numbers and code. A mirrored sidebar alone does not prove RTL support. Check the keyboard path and focus order in both directions, and check that the browser's `lang` on `<html>` matches the page language so screen readers pick the right voice.
+
+Keep fonts, palettes, calendar systems and digit policies configurable by the application; the framework does not choose them.
 
 ## create-a-page  `@warlock.js/web/skills/create-a-page/SKILL.md`
 
@@ -2099,12 +2274,13 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 - The `navigate-on-the-client` topic: navigation, refresh, and `<Link>`'s `locale` prop.
 - The `use-localization` topic of the `warlock-js-core` skill: global/module dictionaries and localized data columns.
 - The `multi-site` topic: per-site `localeRouting`.
+- The `build-rtl-and-mixed-direction-ui` topic: document `lang`/`dir`, logical CSS, and locale-correct dates for RTL pages.
 
 ## measure-web-vitals  `@warlock.js/web/skills/measure-web-vitals/SKILL.md`
 
 ---
 name: measure-web-vitals
-description: 'Report field Core Web Vitals (LCP, INP, CLS, plus FCP/TTFB) from the browser with the official `web-vitals` library and `navigator.sendBeacon`, attributed to the current route and device class. Covers where to register the reporter (`<ClientOnly>` / a root-level effect component, never module scope), why LCP/CLS are a HARD-load metric while INP accumulates for the whole session, tagging soft (client) navigations with `routerEvents`, and the p75 field thresholds that judge a route. Triggers: `web-vitals`, `onLCP`, `onINP`, `onCLS`, `onFCP`, `onTTFB`, `sendBeacon`, "Core Web Vitals", "RUM", "real user monitoring", "field data", "LCP too slow", "layout shift", "INP budget", "p75". Skip: lab/synthetic budgets and CI performance gates — a later addition; the `<Image>` component''s own API, descriptors and loaders — the `render-images` topic; client-only rendering mechanics — the `render-client-only` topic; the root document shell — the `write-the-root` topic.'
+description: 'Report field Core Web Vitals (LCP, INP, CLS, plus FCP/TTFB) from the browser with the official `web-vitals` library and `navigator.sendBeacon`, attributed to the current route and device class. Covers where to register the reporter (`<ClientOnly>` / a root-level effect component, never module scope), why LCP/CLS are a HARD-load metric while INP accumulates for the whole session, tagging soft (client) navigations with `routerEvents`, and the p75 field thresholds that judge a route. Triggers: `web-vitals`, `onLCP`, `onINP`, `onCLS`, `onFCP`, `onTTFB`, `sendBeacon`, "Core Web Vitals", "RUM", "real user monitoring", "field data", "LCP too slow", "layout shift", "INP budget", "p75". Skip: bundle transfer budgets and CI gates — core build-budgets; the `<Image>` component''s own API, descriptors and loaders — the `render-images` topic; client-only rendering mechanics — the `render-client-only` topic; the root document shell — the `write-the-root` topic.'
 ---
 
 # Warlock — measure Web Vitals (field RUM)
@@ -2383,6 +2559,10 @@ all.
   `Link`, `navigateTo()`, `refresh()`: what makes a navigation "soft".
 - The `stream-deferred-data` topic:
   `defer()` and `<Suspense>`, relevant to the CLS guidance above.
+
+For per-page compressed JS/CSS limits during `npx warlock build`, use core
+`build.budgets` and the `build-budgets` topic. These build-time asset sizes
+complement field vitals; they do not measure rendering or interaction latency.
 
 ## multi-site  `@warlock.js/web/skills/multi-site/SKILL.md`
 
@@ -3030,24 +3210,26 @@ Safe to call during SSR: it reads the search string of the request being rendere
 `currentRoute()` and `previousRoute()` report route names and params sent by the server; they never re-match the browser URL.
 
 ```tsx title="src/web/components/current-product-id.tsx"
-import { currentRoute, previousRoute } from "@warlock.js/web";
+import { currentRoute, previousRoute, useIsClient } from "@warlock.js/web";
 
 export function CurrentProductId() {
-  const current = currentRoute();
-  const previous = previousRoute();
+  // false on the server and during hydration: both sides render the same placeholder.
+  const isClient = useIsClient();
+  const current = isClient ? currentRoute() : undefined;
+  const previous = isClient ? previousRoute() : undefined;
 
   return (
     <dl>
       <dt>Current product</dt>
-      <dd>{current?.params?.id ?? "none"}</dd>
+      <dd>{isClient ? (current?.params?.id ?? "none") : "—"}</dd>
       <dt>Previous page</dt>
-      <dd>{previous?.name ?? "first visit"}</dd>
+      <dd>{isClient ? (previous?.name ?? "first visit") : "—"}</dd>
     </dl>
   );
 }
 ```
 
-Both return `undefined` during the server render and before hydration mounts, so branching on them in markup needs `useIsClient()` (see the navbar recipe above).
+Both return `undefined` during the server render and before hydration mounts, so the example gates every read with `useIsClient()` (see the navbar recipe above). When the server must render these values, take them from the loader's `route` argument instead.
 
 `previousRoute()` means the previously swapped page, not the previous browser-history entry. On the first page it is `undefined`.
 
@@ -3063,7 +3245,7 @@ Both return `undefined` during the server render and before hydration mounts, so
 ## Gotchas
 
 - **Use `refresh()`, not `revalidate()`.** `refresh` is the exported loader re-fetch primitive.
-- **`navigateTo` accepts a URL/path.** Resolve named routes with `href()` first.
+- **`navigateTo` takes a path or a `{ name, params, query }` target.** Pass the object form for a named route, as in "Programmatic navigation". Reach for `href(name, ...)` only when you need the URL string itself (a redirect header or an email body), not to navigate.
 - **Pass exactly one Link destination.** Combining `to`, `href`, `email`, or `tel` throws.
 - **Do not add `params` or `query` to a literal URL.** Put them in the URL itself or use a route name.
 - **Do not build a client matcher.** The server's matched name and params travel in the payload.
@@ -3152,6 +3334,15 @@ payload's `shared` snapshot before rendering. Retained components using
 switches. Write shared values in server middleware on each request; client
 writes remain refused.
 
+## Session updates after swaps
+
+`await refresh()` and `await changeLocaleCode("ar")` install the fetched session
+projection before rendering, including a guest (`user: null` or an omitted
+session). Central page/action swaps do the same. Failed or superseded requests
+leave the current identity intact; a response superseded while building its tree
+cannot publish its identity. Persistent components using `useUser()` observe
+profile updates and sign-out without remounting.
+
 ## observe-page-requests  `@warlock.js/web/skills/observe-page-requests/SKILL.md`
 
 ---
@@ -3191,6 +3382,82 @@ registerTracingHooks({
 Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
 Use `key` only to identify a deferred value; do not put sensitive loader data
 in tracing attributes.
+
+## preserve-feedback-and-motion  `@warlock.js/web/skills/preserve-feedback-and-motion/SKILL.md`
+
+---
+name: preserve-feedback-and-motion
+description: "Keep feedback correct in SSR pages: field errors, announcements, failed refresh after a successful write, flash messages across full loads, pending states, duplicate-submit guards, reduced motion. Read when messages vanish or retries repeat writes."
+---
+
+# Warlock web — preserve feedback and motion
+
+Read this with `submit-a-form.md` (posting and refresh) and `handle-a-form-action.md` (on-page actions). This topic covers the feedback and motion patterns around them. It describes patterns only; the framework exports no toast, flash or motion primitive, so build these with your own components and storage.
+
+## Field errors stay with fields
+
+Show actionable validation errors next to the field they describe, linked with `aria-describedby` and `aria-invalid`. Put general outcomes ("saved", "could not save") in a live region so screen readers hear them. A toast alone can vanish before it is read, so a persistent failure needs visible text that stays on the page until the user acts.
+
+## Mutation failure is not a failed refresh
+
+A form submit can succeed on the server and then fail to refresh the page data. Treat these as different outcomes:
+
+- **Mutation failed**: nothing changed. Keep the input, show the error, and let the user retry.
+- **Mutation succeeded, refresh failed**: the side effect already happened. Report success, then report the stale view separately. A retry here would repeat a completed write (a second order, a second comment).
+
+Model the two states distinctly in your component. Do not map every non-2xx response to "try again" without checking whether the server committed the change.
+
+## Full loads are a lifecycle boundary
+
+A full document load (a hard navigation, a locale change that reloads, a redirect after login) destroys in-memory state. A success message set before the redirect is gone by the time the next page renders.
+
+If feedback must cross a navigation, use an app-owned flash mechanism:
+
+- Write it once, at the moment of the outcome, with a short expiry.
+- Consume it once on the destination page, then delete it.
+- Validate the stored payload before rendering it; it came from storage, not from your code.
+- Store a translation key plus safe parameters, not rendered text, so it can be shown in the destination locale.
+- Keep secrets, tokens and personal data out of it.
+- Handle storage failures (quota, blocked cookies) by degrading to no message, not an error page.
+
+Use the same pattern for confirmation state ("your email was changed") after a redirect.
+
+## Model the request lifecycle explicitly
+
+Give each action an explicit state: idle, pending, succeeded, retryable failure, and fatal failure. Then:
+
+- Disable the submit control while pending, and ignore further submits for the same action. Disabling the button alone is not enough for fast double clicks or Enter key repeats; guard in the handler too.
+- Ignore completions for an action the user has left. When the page changes, a late response must not write into the new view.
+- Keep the user's input when a request fails, so a retry does not start from an empty form.
+
+## Motion
+
+Share motion durations and easings as tokens so components agree. Respect `prefers-reduced-motion`: drop transform animations and keep opacity changes short or remove them.
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .drawer {
+    transition: none;
+  }
+}
+```
+
+Animations must never delay focus, keyboard handling, authorization checks, or the completion of the action. A close animation that holds the DOM for 300 ms must not block the server call behind it, and focus must move to the next logical target immediately.
+
+## Clean up timers and observers
+
+Exit animations use timers, and observers watch sizes and visibility. Clear them on unmount and on rapid open and close:
+
+```tsx
+useEffect(() => {
+  const timer = window.setTimeout(() => setVisible(false), 300);
+
+  return () => window.clearTimeout(timer);
+}, [closing]);
+```
+
+Cancel pending timers when the component unmounts or when a newer open replaces the older close, or the old timer will hide the new content.
 
 ## protect-a-page  `@warlock.js/web/skills/protect-a-page/SKILL.md`
 
@@ -3240,6 +3507,8 @@ export const config = { route: "/login", middleware: [requireGuest({ to: "/accou
 - Renewal is automatic (refresh cookie). Do not resolve the session from deferred work.
 - After login or logout call `clearPrefetchCache()` before `navigateTo`/`refresh()`.
 - Log in with `authService.loginWithSessionCookies`, which requires an Origin/Referer.
+
+`requireUser()` answers "is someone signed in?" only. It is authentication, not authorization: a page named `admin` is not restricted to staff just because it uses `requireUser()`. Check roles, permissions and domain rules with `@warlock.js/access` inside the page loader or the action, and secure every mutation API route on its own, since a page guard does not protect a route that the page calls.
 
 ## Type a guarded page as signed-in
 
@@ -3302,9 +3571,11 @@ In dev, a file the generator cannot parse reads as unguarded rather than breakin
 ## Generated typing prerequisites
 
 The guarded example assumes your generated route declaration and session
-projection declaration are included in the TypeScript project. The relevant
-shape is below; let Warlock generate the route entry, and maintain the session
-projection type alongside your app's resolver.
+projection declaration are included in the TypeScript project. The app owns only the
+session projection type, kept alongside your app's resolver. `PageRouteRegistry`
+is generated from the page graph into `.warlock/typings/web-routes.d.ts`
+(including `guard: "user"` for guarded pages); do not hand-write or copy its
+entries.
 
 ```ts title="src/types/page-session.d.ts"
 import type { Auth } from "@warlock.js/auth";
@@ -3314,9 +3585,6 @@ declare module "@warlock.js/web" {
   interface SessionRegistry {
     user: { id: string | number; name: string };
     model: Auth;
-  }
-  interface PageRouteRegistry {
-    "account.show": { path: "/account"; params: {}; guard: "user" };
   }
 }
 ```
@@ -3340,26 +3608,29 @@ has mounted, without ever producing a hydration mismatch.
 ```tsx
 import { ClientOnly } from "@warlock.js/web";
 
+function BrowserPreference() {
+  let preference: string | null = null;
+
+  try {
+    preference = window.localStorage.getItem("lastVisited");
+  } catch {
+    // Storage can be blocked or throw even after mount (private windows, disabled site data).
+  }
+
+  return <span>{preference ?? "first visit"}</span>;
+}
+
 function LastVisited() {
-  return (
-    <ClientOnly fallback={<span>—</span>}>
-      <span>{window.localStorage.getItem("lastVisited") ?? "first visit"}</span>
-    </ClientOnly>
-  );
+  return <ClientOnly fallback={<span>—</span>}>{() => <BrowserPreference />}</ClientOnly>;
 }
 ```
 
 - `fallback` renders on the server, AND on the client's hydration render. It defaults to `null`.
 - `children` renders once the page has mounted in the browser — after hydration has already matched the server markup, never during it.
-- `children` may also be a function, `() => ReactNode`, for code that must not run at all until the browser render:
+- `children` may be a node or a function, `() => ReactNode`. The function form is the one to use when reading browser APIs must wait for the browser render too.
+- `BrowserPreference` reads storage only when it renders, so the server never evaluates `window`. Its module must still be safe to import on the server; see the next section if it touches browser globals at import time.
 
-```tsx
-<ClientOnly fallback={<p>Loading map…</p>}>
-  {() => <Map center={window.localStorage.getItem("lastCenter")} />}
-</ClientOnly>
-```
-
-The plain-node form and the function form differ only in WHEN the expression inside them runs. `<span>{window.foo}</span>` as a plain child is already constructed — `window.foo` was read — by the time it reaches `<ClientOnly>`; wrap it in a function when reading `window` must wait for the browser render too, not just the visible output.
+The plain-node form and the function form differ only in WHEN the expression inside them runs. `<span>{window.localStorage.getItem("lastVisited")}</span>` as a plain child is already evaluated — `window` was read — by the time it reaches `<ClientOnly>`, so the server render throws. Wrap the read in a component passed as a function child instead.
 
 ## `useIsClient()`
 
@@ -4849,6 +5120,10 @@ declare module "@warlock.js/web" {
 }
 ```
 
+## See also
+
+- The `preserve-feedback-and-motion` topic: field errors, failed-refresh handling, flash messages across full loads, and duplicate-submit guards.
+
 ## test-a-page  `@warlock.js/web/skills/test-a-page/SKILL.md`
 
 ---
@@ -5150,6 +5425,21 @@ export async function subscribe(email: string) {
   console.info("Subscribed", email);
 }
 ```
+
+## Browser accessibility and development regressions
+
+Use the core `test-browser` skill for owned browser fixtures. After navigation or
+revealing form feedback, call `await page.assertAccessible()` and
+`await page.assertViewport()` at 390 and 1280 pixels. Narrow known exceptions with
+`await page.assertAccessible({ allow: [{ id: "color-contrast", selector: ".legacy-caption" }] })`.
+Inspect `evidence.json` for rule IDs, targets, incomplete checks and allowances.
+
+For watched-server regressions start the owned copy in development mode, edit
+its files, and wait for a visible revision after every edit. Check several edits
+and setup add/change/delete, concurrent imported `shared` reads, and hydrated
+interactions. For `useId()` under layouts compare SSR attributes with values
+captured by hydrated event handlers, repeated instances, label/ARIA targets and
+navigation. DOM attributes alone cannot establish hook parity.
 
 ## use-layouts  `@warlock.js/web/skills/use-layouts/SKILL.md`
 

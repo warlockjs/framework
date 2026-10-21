@@ -35,11 +35,11 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 
 ## Topics by area
 
-- **Foundations:** warlock-conventions, create-module, make-endpoint, configure-app, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators, upgrade-from-5-29
+- **Foundations:** warlock-conventions, create-module, make-endpoint, configure-app, build-budgets, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators, upgrade-from-5-29
 - **HTTP & routing:** register-route, warlock-routes, create-controller, use-middleware, write-middleware, validate-input, use-request-locals, build-restful, wire-socket
 - **Responses & resources:** send-response, define-resource, use-model-transformers, use-localization
 - **Domain layers:** write-use-case, use-repository, write-seeder
-- **CLI & running the app:** run-app, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
+- **CLI & running the app:** generate-web-ui, run-app, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
 - **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
 - **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing
@@ -552,6 +552,61 @@ The `latency` is the _total_ time including retries — useful for the SLO you a
 - The `configure-app` topic — wiring `src/config/benchmark.ts`.
 
 
+## build-budgets  `@warlock.js/core/skills/build-budgets/SKILL.md`
+
+---
+name: build-budgets
+description: "Configure build.budgets in warlock.config.ts, inspect per-page gzip JS/CSS and deferred assets, compare the last build, and enforce limits with warlock build --json. Use for client bundle size regressions and CI transfer-size gates. For field metrics use web measure-web-vitals."
+---
+
+# Client build budgets
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  build: {
+    budgets: {
+      page: { js: "150kb", css: "50kb" },
+      pages: { "/admin/**": { js: "220kb" } },
+      mode: "error",
+    },
+  },
+});
+```
+
+Run `npx warlock build` for the sorted table, or `npx warlock build --json`
+for `{ success, budgets, error? }`. Progress goes to stderr in JSON mode.
+`budgets` contains `version: 1`, `compression: "gzip"`, `pages` and
+`violations`. API-only builds report an empty page list.
+
+Page limits cover the hydration entry, page, layouts, root, setup registrations
+and error boundary, plus their transitive static imports. Files are counted once
+per page and gzipped individually. Dynamic imports beyond those required roots
+are reported separately and do not consume the budget. Shared files count in
+each page's first visit. This measures emitted JS/CSS, not HTML, fonts or images.
+
+`pages` keys match route paths with `*` (within a segment), `**` (across
+segments), or `?` (one non-slash character). Defaults apply first; matching rules
+merge in insertion order and the last supplied field wins. Unsupported glob
+syntax fails with an actionable error. Units are case-insensitive `b`, `kb` and
+`mb`, with 1024 bytes per kb; equality passes. Omitted fields are unlimited.
+
+Existing apps without budgets receive a report only. Configured budgets default
+to `mode: "error"`; `"warn"` logs violations and completes. New project templates
+configure 150kb JS / 50kb CSS. A failure names the page, limit, actual size and
+the ten largest rendered modules. Those module sizes are Rollup attribution
+estimates in uncompressed rendered bytes, not gzip shares; compression is not
+additive across modules inside a file.
+
+The successful build stores `build-budgets.json` in `build.outdir` (normally
+`dist`). Preserve that directory before rebuilding to obtain deltas. A failed
+build rolls back to the previous artifact and baseline. JSON output still
+contains its attempted report. Changing output directories or deleting dist
+starts a fresh baseline; new routes display no delta. Vite's private
+`client/.vite/budget-modules.json` contains the full module attribution.
+
+
 ## build-restful  `@warlock.js/core/skills/build-restful/SKILL.md`
 
 ---
@@ -822,6 +877,62 @@ router.restfulResource("/orders", new OrdersRestful());
 - The `create-controller` topic — what the chain's handlers look like.
 - The `define-resource` topic — wire shape for the records the chain returns.
 - The `warlock-conventions` topic — controller/service/repository layering rules.
+
+## Bounded list endpoints
+
+Use `listEndpoint(request, listCallback, options)` from `@warlock.js/core` to
+produce `{ <pluralKey>: data, pagination }` from a page-based repository list.
+The callback receives repository options, with sorting translated into the
+repository's `[column, direction]` tuple. Wrap repository methods in an arrow
+to preserve their receiver. Both `list` and `listCached` work.
+
+```ts
+import { listEndpoint, type Request, type RequestHandler } from "@warlock.js/core";
+import { v, type Infer } from "@warlock.js/seal";
+import { productsRepository } from "../repositories/products.repository";
+
+const querySchema = v.object({
+  page: v.int().min(1).default(1),
+  limit: v.int().min(1).default(20),
+  orderBy: v.literal("createdAt", "name").optional(),
+  orderDir: v.literal("asc", "desc").optional(),
+  status: v.literal("active", "archived").optional(),
+});
+type Query = Infer<typeof querySchema>;
+
+export const listProducts: RequestHandler<Request<Query>> = async ({ request, response }) =>
+  response.success(
+    await listEndpoint(request, (options) => productsRepository.listCached(options), {
+      pluralKey: "products",
+      maxLimit: 100,
+      orderBy: ["createdAt", "name"],
+      filters: ["status"],
+    }),
+  );
+
+listProducts.validation = { schema: querySchema, validating: ["query"] };
+// Attach responseSchema with your ProductResource and pagination fields too.
+```
+
+`request.validated()` must already contain schema-validated query values. Seal
+handles coercion and filter validation; the helper does not read raw query or
+body values. Configure the repository's `filterBy` for the chosen filter fields.
+Only explicitly listed `filters` are forwarded; pagination and sort controls
+cannot be declared as filters in the typed API. Filters remain flat repository
+options, rather than a nested `filters` object.
+
+Defaults are page 1, limit 20, maxLimit 100. The helper clamps a positive integer
+limit to maxLimit (use `.max(100)` in the query schema instead if you prefer a
+422 for excessive requests). Invalid page/limit or unlisted sort columns throw
+`AppError("invalidListQuery", 422, ...)`. Sort directions are restricted to
+`asc`/`desc`, defaulting to `asc` when a column is provided. With no column,
+repository default ordering applies. Invalid helper configuration throws a
+`TypeError`. The plural key must be nonempty and cannot be `pagination`.
+
+The helper forces page pagination and preserves the repository's pagination
+metadata without recalculating it. Cursor and unpaginated endpoints need their
+own controller. Add authorization constraints inside the callback using trusted
+server values; never accept them as client filters.
 
 
 ## build-url  `@warlock.js/core/skills/build-url/SKILL.md`
@@ -1461,6 +1572,13 @@ The synchronous formatter receives `HttpErrorResponseContext`: `{ status: number
 
 The hook covers status 400–599 with `application/json` or an `application/*+json` content type, including Fastify parsing errors, unmatched-route 404s, validation 422s, rate-limit 429s, and 500s. Warlock responses use the ID already stamped from `request.id`. Before Warlock creates a Request, the formatter receives Fastify's `request.id` and echoes that same value under `http.requestId.header` (default `X-Request-Id`). Setting `http.requestId.enabled: false` suppresses that header; without a stamped Warlock ID, the formatter falls back to Fastify's request ID even for routed responses. Keep request-ID headers enabled when the body must correlate with Warlock request logs. HTML pages, files, raw text, streams, and errors after headers have been sent are not reformatted. With no formatter configured, existing response shapes are unchanged.
 
+## Co-located configuration tests
+
+`src/config/mail.spec.ts` and `src/config/mail.test.tsx` are never imported as
+configuration. Discovery and reload also exclude `test`, `tests`, `__tests__`,
+`__mocks__`, `__fixtures__`, and `fixtures` directories at any depth. A real
+`src/config/tests.ts` remains ordinary configuration.
+
 
 ## create-controller  `@warlock.js/core/skills/create-controller/SKILL.md`
 
@@ -1960,6 +2078,15 @@ Generated web starter files match the scaffold’s Oxfmt configuration and its
 built-in import sorting.
 After editing generated code, run `npm run format` and `npm run lint:check`.
 Formatting retains unused imports; the linter reports them.
+
+## Notification translation defaults
+
+After configuring `app.localeCodes`, run `npx warlock add notifications`.
+New notification dictionaries include `notFound` as a string in every configured
+locale. English ("Notification not found") is the explicit fallback for each
+locale without a bundled translation, including locale sets without English.
+Replace fallback text with your translations before publishing. Existing module
+files and existing translation keys are preserved.
 
 
 ## define-resource  `@warlock.js/core/skills/define-resource/SKILL.md`
@@ -2759,6 +2886,81 @@ const { document, warnings } = buildOpenApiDocument(router.list(), {
 - The `create-controller` topic — `validation`, `description` and `responseSchema` on a handler.
 - The `define-resource` topic — resources, which become `components.schemas`.
 - The `warlock-routes` topic — list the routes the document is built from.
+
+
+## generate-web-ui  `@warlock.js/core/skills/generate-web-ui/SKILL.md`
+
+---
+name: generate-web-ui
+description: "Generate web pages, schema-backed forms and CRUD UI with warlock generate page, form and crud-ui. Includes setup companions, design-system controls, useSubmitForm, optional guarded endpoints and module CRUD prerequisites."
+---
+
+# Generate web UI
+
+Run these commands from an app with `@warlock.js/web` installed and the app's
+design system in `src/web/design-system/components/`. Controls are default
+exports, imported individually through `web/design-system/components/<name>`;
+they implement Mongez `useFormControl` and accept `name`, `label`, `hint` and
+`error`. Forms import `Form` directly from `@mongez/react-form`.
+
+```sh
+npx warlock generate page account/settings
+npx warlock generate page dashboard --interactive
+npx warlock generate form contact
+npx warlock generate form feedback --module posts --endpoint
+npx warlock generate crud-ui posts --dry-run --json
+npx warlock generate crud-ui posts
+```
+
+`page account/settings` creates `src/web/account/settings.page.tsx` and
+`settings.setup.ts`, with `/account/settings`, a named route, a loader and
+`config.metadata`. `--interactive` also creates a counter feature hook under
+`hooks/`; replace that example with the feature's behavior. Executable page
+exports belong in `.setup.ts`, UI in `.page.tsx`, state and effects in hooks.
+
+`form contact` creates `src/web/forms/contact-form.tsx`, a props file, a
+`use-contact-form` hook using `useSubmitForm`, and
+`src/shared/schema/contact.schema.ts`. The starter schema has one `name`
+string field; edit that shared schema and the controls together. Its default
+submit target is `/contact`; supply a real endpoint or set the form's `path`.
+With `--module posts`, output lives under `src/web/posts/`, the shared schema
+under `src/shared/schema/posts/`, and the target is `/posts/contact`.
+The module must exist. `--endpoint` requires `--module`, adds a controller
+with `validation` and `responseSchema`, and appends a guarded POST route.
+This initial endpoint validates and echoes the input; replace that body with a
+service call to persist it. It does not create database persistence for you.
+
+For CRUD UI, first generate a full module with
+`npx warlock generate module posts`. Define its create/update schemas and
+list query schema, then run `npx warlock generate crud-ui posts`.
+The generator loads the real Seal schemas using the app loader, so their
+imports must resolve. These schema modules must be safe to import on both
+client and server. Plain string fields map to TextInput, password names to
+PasswordInput, email/date/time/date-time formats to the corresponding controls,
+and booleans to CheckboxInput. Unions, nullable fields, enums, numeric fields,
+nested objects and arrays require custom control decisions and are rejected
+before writing output. An empty module schema produces an empty form.
+
+CRUD output contains list/create/edit pages and setup companions, separate
+create/update forms, their hooks and props, list/edit/delete hooks, and a
+delete action component. Lists use the existing GET endpoint and its
+`data`/`pagination` contract (`page` and `pages`). Literal fields in
+`listPostsQuerySchema` become filter inputs; `page` is controlled by navigation
+and `limit` remains the endpoint default. Edit reads GET `/posts/:id`, create
+submits POST `/posts`, update uses PUT `/posts/:id`, and delete uses DELETE
+`/posts/:id`. Successful deletion refreshes the list. Mutation forms show
+validation errors, pending state and success feedback.
+
+CRUD generation accepts the conventional full module route file, allowing
+formatting and comments. It fails closed for custom routes/guards instead of
+inferring authorization. Pages require `requireUser({ userType: "user" })`,
+matching the starter's `guarded` helper. Configure `web.session` with the auth
+page-session resolver before visiting these pages. Endpoint guards still
+run on every API request; customized authorization requires a hand-written UI.
+
+All three commands support `--dry-run --json` through the normal generation
+report. Existing generated files are skipped unless `--force` is explicit.
+Route registration is idempotent and retains existing module content.
 
 
 ## hash-password  `@warlock.js/core/skills/hash-password/SKILL.md`
@@ -4852,7 +5054,7 @@ Omit switches to run TypeScript and installed/configured Oxlint. Set `oxlint: fa
 
 ## `warlock build` — production bundle
 
-esbuild bundle of the app down to a single JS file in `dist/`. No flags — every setting comes from `warlock.config.ts > build`.
+esbuild bundle of the app down to a single JS file in `dist/`. `--json` prints the client budget report; build settings come from `warlock.config.ts > build`. See the `build-budgets` topic for per-page gzip limits and deltas.
 
 ### `build.*` config knobs
 
@@ -5791,6 +5993,31 @@ await Mail.to(user.email)
 - The `configure-app` topic — `src/config/mail.ts` shape and `env()` patterns.
 - The `warlock-conventions` topic — where mail-sending services live.
 
+## Preview development mail in devtools
+
+Run `npx warlock add devtools`, start development, and open `/__warlock` (or your
+configured devtools path). In the mail panel, select a captured message to read
+its recipients, subject, text, and sandboxed HTML preview. Send while the panel's
+collector is attached; captures are held in memory and disappear on restart.
+
+Use development mail mode so previews do not deliver real email:
+
+```ts
+import { setMailMode, sendMail } from "@warlock.js/core";
+
+setMailMode("development");
+await sendMail({
+  to: "reader@example.com",
+  subject: "Preview",
+  html: "<p>Your code is 123456</p>",
+});
+```
+
+Development sends emit `mailEvents.onCaptured`, which devtools consumes; console
+logs show metadata rather than sensitive bodies. Devtools is mounted only for
+the development runtime and is not mounted in production. Keep production mail
+mode configured for actual delivery. Test-mode assertions use the test mailbox.
+
 
 ## send-response  `@warlock.js/core/skills/send-response/SKILL.md`
 
@@ -6304,6 +6531,56 @@ export default {
 The synchronous formatter receives `HttpErrorResponseContext`: `{ status: number, body: unknown, requestId: string }`. Narrow `body` before reading fields; it is the parsed, serialized JSON body. Return a JSON-serializable object or `undefined` to keep the original. The formatter changes only the body, preserving the HTTP status and headers except for recalculated content length, a `private, no-store` cache policy, and the correlation header. If it throws or cannot serialize its result, core logs the formatter error and retains the original body.
 
 The hook covers status 400–599 with `application/json` or an `application/*+json` content type, including Fastify parsing errors, unmatched-route 404s, validation 422s, rate-limit 429s, and 500s. Warlock responses use the ID already stamped from `request.id`. Before Warlock creates a Request, the formatter receives Fastify's `request.id` and echoes that same value under `http.requestId.header` (default `X-Request-Id`). Setting `http.requestId.enabled: false` suppresses that header; without a stamped Warlock ID, the formatter falls back to Fastify's request ID even for routed responses. Keep request-ID headers enabled when the body must correlate with Warlock request logs. HTML pages, files, raw text, streams, and errors after headers have been sent are not reformatted. With no formatter configured, existing response shapes are unchanged.
+
+## Typed domain failures
+
+`AppError<Details, Code>` is available from `@warlock.js/core` and the lightweight
+`@warlock.js/core/errors` entry. Its constructor is
+`new AppError(code, status, publicMessage, details?)`. Status must be an integer
+from 400 to 599. The message and details are explicitly public, including for
+5xx errors: never put diagnostics, credentials or private records there.
+
+```ts
+import { AppError } from "@warlock.js/core/errors";
+
+throw new AppError("quotaExceeded", 429, "Try again later.", { retryAfter: 30 });
+```
+
+The default response is
+`{ error: { code: "quotaExceeded", message: "Try again later.", details: { retryAfter: 30 } } }`.
+Absent details are omitted; `false`, `0` and `null` details are preserved. Errors
+retain the private, no-store cache policy, and server failures are logged.
+
+`AppError` and `HttpError` are separate `Error` subclasses. Existing `HttpError`
+constructors, inheritance, `payload` and legacy `{ error: message, payload? }`
+bodies remain unchanged. Both bypass `http.errorMapper`; ordinary errors retain
+the existing opaque 500 fallback. Choose `AppError` for new domain failures
+that need stable codes, and keep existing HTTP error subclasses as they are.
+
+`http.errorResponse` receives an optional typed `appError` alongside `body`,
+`status` and `requestId`. No per-error mapper is needed:
+
+```ts
+import type { HttpErrorResponseFormatter } from "@warlock.js/core";
+
+const errorResponse: HttpErrorResponseFormatter = ({ appError, requestId }) => {
+  if (!appError) return undefined; // keep other JSON errors unchanged
+  return {
+    error: {
+      code: appError.code,
+      message: appError.publicMessage,
+      ...(appError.details === undefined ? {} : { details: appError.details }),
+    },
+    requestId,
+  };
+};
+// Set this function as http.errorResponse in your HTTP configuration.
+```
+
+The formatter sees the original instance only for thrown `AppError`s handled
+by the request lifecycle. Early Fastify rejections and returned helper responses
+have no `appError`; use `body` and `status` for those cases. Do not spread an
+error instance into the response.
 
 
 ## store-file  `@warlock.js/core/skills/store-file/SKILL.md`
@@ -7041,6 +7318,59 @@ recorded process group (Windows: verified PID tree). It retains disposable files
 if ownership verification fails and reports the failure in evidence. Do not add
 process-name or port-based kills to a spec.
 
+## Accessibility checks
+
+Call `await page.assertAccessible()` after the content is visible and again after
+opening menus, dialogs or validation feedback. The harness reads its pinned local
+axe-core distribution and injects it with CDP `Runtime.evaluate`; it never fetches
+a CDN script or adds axe to the app bundle. A missing dependency, injection error,
+unmatched selector or scan exception fails the step.
+
+```ts
+await page.assertAccessible();
+await page.assertAccessible({
+  selector: "main",
+  tags: ["wcag2a", "wcag2aa", "wcag21aa"],
+  allow: [{ id: "color-contrast", selector: ".legacy-caption" }],
+  timeoutMs: 30_000,
+});
+```
+
+Defaults run all enabled axe rules on the document. `tags` uses axe's `runOnly`
+tag filter; `selector` limits the scanned region. Allowances match exact rule IDs
+and, when supplied, an exact single-element target selector. Omitting `selector`
+from an allowance permits that rule everywhere; keep exceptions narrow. Nested
+frame/shadow targets cannot match a simple selector allowance. Allowed nodes stay
+in evidence with `allowed: true`; other nodes of the same rule still fail.
+
+Evidence's `accessibility` array contains URL, viewport, timestamp, violations
+with rule IDs and target selectors, and incomplete checks for manual review.
+Incomplete checks do not fail automatically. A passing automated scan does not
+replace keyboard, screen-reader, focus-order or contrast review. See the
+[axe API](https://github.com/dequelabs/axe-core/blob/develop/doc/API.md) for scan
+semantics. Run at both 390 and 1280 pixels with `assertViewport()` as well.
+
+## Watched development checks
+
+Use an owned app copy with `app.env: { NODE_ENV: "development" }` and
+`app.start: [process.execPath, "node_modules/@warlock.js/core/bin/warlock.js", "dev"]`.
+Do not attach to an existing server. The fixture's `directory` is available in
+`run`; use `node:fs/promises` to edit only files inside that copy.
+
+Wait for a visible revision marker after each edit; a successful file write alone
+does not prove watcher invalidation or browser hydration. Exercise several edits,
+including setup-file creation, changes and removal. After each revision, request
+the page again, exercise a hydrated control, check imported `shared` in loaders
+and middleware, and verify concurrent requests keep distinct values. Do not
+allowlist request-store or hydration errors to make these checks pass.
+
+For forms beneath layouts, compare server-rendered IDs with the hydrated hook
+values (for example expose the hook value in a click handler), check repeated
+instances, label `for` and ARIA references, then navigate away and back. Comparing
+DOM IDs alone can miss a mismatch: React may retain the server attribute while
+client handlers capture another ID. Capture evidence and screenshots at every
+revision. Do not replace React's `useId()` globally or hide hydration warnings.
+
 
 ## test-fakes  `@warlock.js/core/skills/test-fakes/SKILL.md`
 
@@ -7634,6 +7964,95 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 - The `warlock-conventions` topic — module layout, where `tests/*.test.ts` files live.
 - The `write-cli-command` topic — `warlock add test` scaffolds both global + worker setup files.
 
+## Worker dictionaries and owned runtime resources
+
+The generated `src/test-setup.ts` calls:
+
+```ts
+await setupTest({ importModule: (file) => import(file) });
+```
+
+`setupTest()` reads `src/app/*/utils/locales.json` after configuration in each
+Vitest worker. Server translation helpers therefore see all configured locales
+without manual registration. Invalid dictionaries fail setup. `teardownTest()`
+unregisters those dictionaries; legacy executable locale files still require
+explicit imports in worker setup.
+
+Global HTTP fixtures should use `await startHttpTestServer({ port: 0, web: false })`
+for API-only suites and `await stopHttpTestServer()` in teardown. Stop releases
+connectors and the file runtime's loader channel, queued work, watchers, health
+workers, and registered module cleanup hooks, including after partial startup.
+A Node loader registration is process-scoped; its message channel is closed at
+teardown. Module-owned timers/listeners must register their cleanup hooks.
+
+A module that owns a long-running handle can export an awaited cleanup:
+
+```ts
+// src/app/messages/main.ts
+import { createServer } from "node:net";
+const listener = createServer();
+listener.listen(0, "127.0.0.1");
+export async function cleanup(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    listener.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+```
+
+HTTP test teardown awaits these cleanup functions and reports failures after
+attempting every module's cleanup. Avoid leaving module-owned handles running
+outside this lifecycle.
+
+## Response contracts from declared schemas
+
+`assertResponseContracts` from `@warlock.js/core/tests` sends HTTP requests and
+asserts the serialized JSON body against the handler's `responseSchema` for the
+actual status. It reuses Core's OpenAPI schema translation, including resource
+classes, nested objects, arrays, nullable casts and resource self references.
+It checks required fields and primitive types without coercion; extra fields
+are allowed. URL/date format annotations are not checked beyond their declared
+JSON shape. Builders, computed resolvers and resources without a static shape
+fail with a diagnostic rather than silently passing.
+
+```ts
+import { it } from "vitest";
+import { router } from "@warlock.js/core";
+import { assertResponseContracts } from "@warlock.js/core/tests";
+
+it("matches product response declarations", async () => {
+  await assertResponseContracts({
+    routes: router.list().filter((route) => route.path === "/products"),
+    cases: () => [{ path: "/products?page=1&limit=10", status: 200 }],
+    requireAllStatuses: true,
+  });
+});
+```
+
+With the shared test server, retain `startHttpTestServer({ port: 0 })` in global
+setup and `setupTest` in the worker. The routes and their handler schemas must
+also be loaded in the worker running this assertion (import their routes module
+there); global setup runs in a different process. Omit `routes` to discover all
+registered routes with `responseSchema` in that worker. Empty discovery fails.
+Explicit routes lacking a schema also fail.
+
+Static GET routes default to one request without headers. Parameterized routes
+and non-GET methods require explicit `cases(route)` fixtures; an empty case
+list fails. Each case can supply a concrete `path`, `init` (headers, serialized
+body, etc.) and expected `status`. Supply fixtures with valid IDs, seeded data,
+authentication and invalid inputs to exercise the desired outcomes. An `all` route also needs a concrete fixture `method`. Redirects
+are not followed. POST/PUT/PATCH/DELETE fixtures execute real side effects;
+use isolated test data and clean it up.
+
+Undeclared response statuses fail. Only statuses actually returned are checked
+by default; `requireAllStatuses: true` additionally fails if any declared status
+has no exercised fixture. HEAD, 204 and 304 responses must have an empty body; declare it with
+`{ body: {} }`. Other statuses must carry matching JSON.
+
+For an in-process server, pass `client: app` from `createTestHttpServer()` and
+close it in teardown. For signed-in requests, pass `client: await actingAs(user)`
+and dispose that client afterward. These clients use the same assertion and
+run the real HTTP middleware and serialization paths.
+
 
 ## test-service  `@warlock.js/core/skills/test-service/SKILL.md`
 
@@ -7652,9 +8071,9 @@ For unit tests, you import the thing under test and call it directly. No HTTP, n
 
 ⛔ **If your project was generated before 4.14.0, fix BOTH the comment and the call.** The comment is false, **and** the generated `setupTest({ connectors: true })` is now an _explicit_ value that overrides your `src/config/tests.ts`. **Bare `setupTest()` is the correct call.**
 
-**The lifetime is FILE-SCOPED, on purpose.** Your setup file bootstraps the framework and its `afterAll(teardownTest)` closes it, once per test file. **One owner, one pairing — correct under every pool, every isolation setting, and watch mode.**
+**The default lifetime is FILE-SCOPED.** Your setup file bootstraps the framework and its `afterAll(teardownTest)` closes it, once per test file. **One owner, one pairing — correct under every pool, every isolation setting, and watch mode.**
 
-⚠ **A worker-scoped lifetime is possible and is deliberately not shipped yet.** Lifecycle state now lives in the worker runtime, so leaving the framework running would let every file in a worker share one bootstrap. Two things block claiming it: under `pool: "threads"` we cannot observe whether Node reclaims a torn-down thread's sockets and pools, and **in watch mode Vitest reuses workers between reruns, so there is no recycle and no cleanup owner.** It gets taken when the real cost is measured and the integration is chosen, not inherited. See _Lifecycle and repeated calls_ below.
+Worker lifetime is available as an opt-in in 5.35.0. See the runtime lifetime section below for its runner, pool and isolation requirements.
 
 ⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with _"has no exported member"_ — **add `/tests` to the specifier and nothing else changes.**
 
@@ -8056,7 +8475,7 @@ Node process, preserve the source package's module mode. ESM fixtures need a
 CommonJS and named exports fail before the behavior under test runs. Assert the
 child process exit status with its captured stderr before checking stdout.
 
-- **`setupTest` runs per test file, not per worker** — every version of this skill through 4.13.0 said otherwise. **You pay one framework bootstrap per test file**, which is what 4.13.0 already cost; the difference is that it is now a chosen lifetime rather than a side effect of a module flag resetting.
+- **By default `setupTest` boots per test file** — every version of this skill through 4.13.0 said otherwise. **You pay one framework bootstrap per test file**, which is what 4.13.0 already cost; the difference is that it is now a chosen lifetime rather than a side effect of a module flag resetting.
 - ⛔ **Never delete the `afterAll(teardownTest)` from your setup file.** Without it nothing closes what `setupTest` opened, and the connectors outlive the file that started them.
 - ⛔ **You can't swap the connector set by calling `setupTest` again — it rejects now.** Through 4.13.0 the second call was silently ignored. Tear down first, or don't call it.
 - **These connections are separate from the HTTP test server's.** A row inserted by a service-level test is on this connection; the HTTP test server has its own. They only see each other if both point at the same physical DB **and** the inserting test has committed.
@@ -8083,6 +8502,164 @@ setupTest({ importModule: (file) => import(file) });
 ```
 
 The generated `src/test-setup.ts` already does this. Without it, `setupTest()` under Vitest warns once.
+
+## Runtime lifetime, unit projects and setup profiling
+
+`warlock add test` (also used by `create-warlock --features=test`) generates two
+Vitest projects. `unit` discovers `src/**/*.spec.ts` outside `tests/` directories
+and has no Warlock setup or HTTP global setup. `integration` discovers
+`src/**/*.test.ts`, specs inside `src/**/tests/`, and `tests/**/*.{test,spec}.ts`.
+It uses the framework setup, HTTP global setup and a generated `src/test-runner.ts`.
+Keep pure service specs beside their source and mock repositories at the boundary.
+Existing config files are preserved; copy the projects layout into them manually.
+Vitest 4.1.10 or newer is required for the generated runner.
+
+For a unit spec that needs configuration values, use:
+
+```ts
+import { afterAll, expect } from "vitest";
+import { setupTest, teardownTest } from "@warlock.js/core/tests";
+
+await setupTest({
+  mode: "unit",
+  importModule: (file) => import(file),
+  file: expect.getState().testPath,
+});
+afterAll(teardownTest);
+```
+
+Unit mode loads `warlock.config.ts` and configuration values once per module graph.
+It skips bootstrap/env/prestart hooks, connectors, config special handlers,
+`filesOrchestrator.init()`, the native ESM loader, and fake installation. Keep
+configuration imports free of side effects; arbitrary code imported by a config
+file can still perform I/O. A plain unit spec usually needs no `setupTest()` at all.
+`connectors: false` still bootstraps; it is not the cheap unit mode. Use separate
+projects for unit and integration runtimes.
+
+### Opt into one runtime per fork
+
+The default remains `tests.lifetime: "file"`. To reuse a runtime, change the
+integration project's `isolate` to `false`, keep `pool: "forks"` and
+`runner: "./src/test-runner.ts"`, then configure:
+
+```ts title="src/config/tests.ts"
+import { resetWorkerDatabase } from "../test-database";
+
+export default {
+  lifetime: "worker",
+  // Application-owned callback: truncate only this worker's test database.
+  // Called before every file's fixtures, including the first file.
+  resetBetweenFiles: async () => {
+    await resetWorkerDatabase();
+  },
+  profileSetup: true,
+};
+```
+
+Run with `npx vitest run --project integration`. Worker lifetime refuses watch,
+threads, isolated module graphs, or a missing runner with a message explaining
+the required settings. Keep `afterAll(teardownTest)` in the setup file: in worker
+mode it marks the end of the file; Vitest's awaited worker cleanup closes the
+runtime once. The runner uses `VitestTestRunner.onCleanupWorkerContext`, verified
+in Vitest 4.1.10's `runners.d.ts`, runner implementation and worker cleanup source.
+For an existing project, generate this runner without overwriting your config:
+
+```ts title="src/test-runner.ts"
+import { configureTestWorker } from "@warlock.js/core/tests";
+import { VitestTestRunner } from "vitest/runners";
+
+export default class WarlockTestRunner extends VitestTestRunner {
+  public constructor(config: ConstructorParameters<typeof VitestTestRunner>[0]) {
+    super(config);
+    configureTestWorker(
+      { pool: this.pool, watch: config.watch, isolate: config.isolate },
+      (cleanup) => this.onCleanupWorkerContext(cleanup),
+    );
+  }
+}
+```
+
+The first file bootstraps; subsequent files reuse connectors and config. Between
+files, selected fakes are restored and reinstalled, resetting mail/queue records,
+cache, secrets, clock, IDs and a private storage directory. Worker storage is
+separate from the global HTTP server's storage: use an in-process test HTTP server
+when assertions need to see request-side fake state. The hook runs after fake
+reset and before fixtures. It must finish before returning. Within a file,
+repeated `setupTest()` calls remain idempotent; use `beforeEach`/`afterEach` for
+per-test cleanup.
+
+This trades module isolation for startup cost: application singletons, config
+mutations, mocks and module side effects can survive between files. Reset your
+own state in `resetBetweenFiles`, restore mocks, and keep connector selection
+consistent. Give each worker a distinct database/schema using
+`process.env.VITEST_POOL_ID` when preparing test connections. Never drop a shared
+database from this hook while other workers are using it. The framework does not
+create a memory replica set or a cross-worker lock; those belong to the application's
+global setup. A shared HTTP server and a single replica set can contend on I/O,
+locks and shared fixtures even though workers run concurrently. Scope rows and
+HTTP fixtures per worker, or run tests that require global mutation separately
+with `maxWorkers: 1`. No test-server teardown ownership changes are needed here.
+
+`getTestRuntimeStats()` from `@warlock.js/core/tests` returns process-local
+`{ bootstraps, files }`. For example, after setup in worker mode:
+
+```ts
+import { expect, it } from "vitest";
+import { getTestRuntimeStats } from "@warlock.js/core/tests";
+
+it("reuses this worker's runtime", () => {
+  expect(getTestRuntimeStats().bootstraps).toBe(1);
+});
+```
+
+Across one integration project, a successful run with no worker recycling needs
+at most `maxWorkers` bootstraps. Multiple projects, worker crashes and memory-limit
+recycling can create additional processes; count distinct PIDs in profiles.
+
+### Measure and size CI workers
+
+Set `tests.profileSetup: true` or run
+`WARLOCK_TEST_PROFILE=1 npx vitest run --project integration`. Pass
+`file: expect.getState().testPath` to `setupTest()` for file labels (the generated
+setup does this). Each file emits one line with milliseconds for environment, config,
+bootstrap, orchestrator, app config, connectors, fakes, reset and teardown as
+applicable. Reused files report reset instead of startup steps. A summary per
+worker reports file/bootstrap counts, summed step timings and final shutdown.
+The generated config also installs `TestSetupReporter` from `@warlock.js/core/vite`
+(`reporters: ["default", new TestSetupReporter()]`), which aggregates file counts,
+bootstrap counts and timings across PIDs into a run summary. Summed timings are
+not wall time. Worker shutdown is included when its summary reaches the reporter
+before the run-end callback; individual worker summaries always report it.
+
+The generated config sets `maxWorkers: recommendedTestWorkers()` from
+`@warlock.js/core/vite`. It takes the smaller of CPU affinity and the tightest
+visible cgroup v2 quota, rounding fractional CPUs down with a minimum of one.
+For example `cpu.max = 1200000 100000` recommends 12 workers on a 48-CPU host.
+The format follows the [kernel cgroup v2 CPU interface](https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#cpu-interface-files).
+It reads `/proc/self/cgroup` and visible ancestors under `/sys/fs/cgroup`; hosts
+without readable v2 quotas use affinity. Set `maxWorkers` explicitly on cgroup v1,
+custom cgroup mounts, or when database/memory limits require fewer workers.
+
+### Release gate
+
+```bash
+npx warlock test --changed --since "$LAST_RELEASE_REF"
+npx vitest run --project integration
+# Nightly (all projects):
+npx vitest run
+```
+
+The first command includes affected tests, using the existing changed-test CLI;
+the second always covers integration wiring. Keep the full suite nightly and
+compare cold and reused setup profiles on the same revision, worker count and
+database fixture before claiming a speedup.
+
+For a manual fake harness outside `setupTest`, the same private storage behavior
+is available with `await installTestFakes(true, { isolatedStorage: true })`, paired
+with `await restoreTestFakes()`. Both are exported from `@warlock.js/core/tests`.
+`await storageFake.install({ isolated: true })` / `await storageFake.restore()`
+provides it for a storage-only harness. Existing installs share the HTTP root by
+default; the isolated option never replaces or deletes that shared root.
 
 
 ## update-packages  `@warlock.js/core/skills/update-packages/SKILL.md`
@@ -8771,6 +9348,14 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## 5.34 to 5.35 resource hidden input
+
+Model resources now receive hidden input columns (subject to `resourceColumns`)
+to support derivations such as `has_secret: Boolean(data.secret)`. Model
+serialization removes `hidden` top-level keys from the final resource result.
+Review resources that copy input under renamed or nested keys and return explicit
+public projections. Direct resource construction does not invoke model filtering.
 
 
 ## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
@@ -9737,6 +10322,27 @@ GET /products/42?locale=ar
 This produces `account.title` and `account.actions.save`. Keep every leaf complete for the configured locale list. The page pipeline selects an immutable snapshot for its route source and locale. `useTrans()` and `t()` use that snapshot; a missing scoped key returns the key itself. With no route-locales manifest, the existing global `@mongez/localization` registry remains the legacy fallback path.
 
 When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
+
+## Worker dictionaries and owned runtime resources
+
+The generated `src/test-setup.ts` calls:
+
+```ts
+await setupTest({ importModule: (file) => import(file) });
+```
+
+`setupTest()` reads `src/app/*/utils/locales.json` after configuration in each
+Vitest worker. Server translation helpers therefore see all configured locales
+without manual registration. Invalid dictionaries fail setup. `teardownTest()`
+unregisters those dictionaries; legacy executable locale files still require
+explicit imports in worker setup.
+
+Global HTTP fixtures should use `await startHttpTestServer({ port: 0, web: false })`
+for API-only suites and `await stopHttpTestServer()` in teardown. Stop releases
+connectors and the file runtime's loader channel, queued work, watchers, health
+workers, and registered module cleanup hooks, including after partial startup.
+A Node loader registration is process-scoped; its message channel is closed at
+teardown. Module-owned timers/listeners must register their cleanup hooks.
 
 
 ## use-middleware  `@warlock.js/core/skills/use-middleware/SKILL.md`
@@ -11539,7 +12145,7 @@ npx warlock typecheck --changed       # changed files + the files importing them
 npx warlock typecheck --json --project tsconfig.app.json
 ```
 
-`--changed` checks the changed files and their direct importers only; a full run (cheap after the first, it is incremental) catches anything further away.
+`--changed` checks diagnostics for changed files and their transitive importers. The native compiler still performs an incremental program compilation.
 
 ## `warlock explain`
 
@@ -11599,6 +12205,69 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 Migrate lint and format tooling with
 `npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run`, then remove `--dry-run`
 and work through the manual-review list. Use `--lint=oxc` for new apps.
+
+## Web and response contract conventions
+
+The following codes default to **warnings**, so upgrading does not fail existing projects.
+They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the existing conventions.
+
+| Code     | Convention                                                                   | Remedy                                                                                                                                                             |
+| -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WL9013` | A component file exceeds 150 lines                                           | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
+| `WL9014` | More than one component in a file                                            | Move each component into its own TSX file.                                                                                                                         |
+| `WL9015` | State/effects or event-handler functions inside a component                  | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
+| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input           | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
+| `WL9017` | DOM input/textarea/select native validation                                  | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
+| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema` | Assign `handler.responseSchema` to document each response status.                                                                                                  |
+
+Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
+with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
+are excluded. Handler checks recognize inline JSX callbacks, `handle*`/`on*` functions,
+and local function values referenced by event props. They do not execute code or infer
+runtime spreads, factory contracts or values imported from other files.
+
+Create `.warlock-check.json` in the project root:
+
+```json
+{
+  "componentLineLimit": 180,
+  "rules": {
+    "WL9013": "warning",
+    "WL9015": "error",
+    "WL9016": "off"
+  }
+}
+```
+
+`rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including
+existing codes. Per-line `// warlock-check-ignore WL9015 -- reason` works as before.
+Use `npx warlock explain WL9015` for the registry explanation.
+
+```bash
+npx warlock check --changed --fix --json
+```
+
+`--changed` selects tracked changes against HEAD plus untracked source files and their
+transitive import dependents (including re-exports, type imports and related tests).
+Resolution uses the project's compiler configuration, with relative/app imports as a
+fallback for files outside that configuration. Lint and conventions receive that selection;
+Vitest uses related mode. TypeScript still compiles incrementally as a program, then filters
+diagnostics to the selection and its importers; this is not a partial compilation.
+
+`--fix` applies safe convention edits before the pipeline. Currently it removes `.js`
+suffixes from relative imports (`WL9002`). Ignored/disabled findings are not fixed.
+Component extraction, control replacement and response schemas require human decisions.
+Problems that have a safe edit include optional `fix: { start, end, text }` in JSON;
+`start` and `end` are zero-based source string offsets with an exclusive end.
+The report otherwise keeps schema version 1 and its existing shape. Applied fixes disappear
+from the final report; unresolved findings remain. Review the resulting source diff.
+
+Programmatic usage: `await runCheck({ changed: true, fix: true })` from
+`@warlock.js/core/tooling`.
+
+## Explain a source file
+
+`npx warlock explain src/app/posts/services/list.service.ts --json` reports the file's module, convention role, exports, imports, importers and reaching routes/pages. It boots the app for route/page registrations; error-code explanations remain static. See the `warlock-inspect` topic for graph semantics and the boot-free `npx warlock inspect --section files --json` command.
 
 
 ## warlock-conventions  `@warlock.js/core/skills/warlock-conventions/SKILL.md`
@@ -12057,9 +12726,9 @@ npx warlock inspect --json > app.json                # the full report
 npx warlock inspect --json --section routes,models   # only some sections
 ```
 
-It boots like `warlock doctor`: connectors boot (routes register) but none starts — no database, cache or socket connection, no port. With `--json`, stdout is only the JSON.
+Except for `--section files` (static source inspection without app boot), it boots like `warlock doctor`: connectors boot (routes register) but none starts — no database, cache or socket connection, no port. With `--json`, stdout is only the JSON.
 
-Sections: `routes`, `models`, `resources`, `config`, `events`, `pages`, `jobs`, `schedules`, `packages`. An unknown section fails before the app boots.
+Sections: `routes`, `models`, `resources`, `config`, `events`, `pages`, `jobs`, `schedules`, `packages`, `files`. An unknown section fails before the app boots.
 
 ## Answer questions with jq
 
@@ -12176,6 +12845,49 @@ const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA
 - The `warlock-agents-md` topic — the app summary `warlock dev` keeps in AGENTS.md.
 - The `warlock-routes` topic — the human route table.
 - The `generate-openapi` topic — the same route schemas as an OpenAPI document.
+
+## Session middleware in groups
+
+`sessionMiddleware({ userTypes: "user" })` publishes the same `warlock.auth`
+descriptor as `authMiddleware()`. Group middleware is inherited by nested
+routes, so `inspect` and the generated `agents-md` summary recognize these guards.
+`{ optional: true }` reports `auth.required: false`, with sources and user types
+retained. Such routes remain in the unguarded-write list. Legacy descriptors
+without `required` still mean required authentication.
+
+```ts
+import { router } from "@warlock.js/core";
+import { sessionMiddleware } from "@warlock.js/auth";
+
+router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
+  router.post("/settings", async ({ response }) => response.success({ saved: true }));
+});
+```
+
+## Source files and reachability
+
+```bash
+npx warlock inspect --section files --json
+npx warlock explain src/app/posts/services/list.service.ts
+npx warlock explain src/web/components/Post.tsx --json
+npx warlock explain WL3001 --json
+```
+
+The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`. Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec; unmatched files use `source`. Non-code assets have empty exports and imports.
+
+Each code file is parsed once with OXC per inspection. Export names include types, aliases, destructured bindings, `default` and `*` for star re-exports; star exports are recorded rather than expanded. Imports include type imports, side effects, re-exports and literal dynamic imports. Each import is `{ specifier, file }`: `file` is the resolved local path, or `null` for external/unresolved imports. Resolution follows inherited tsconfig path aliases, fallback targets, baseUrl, extensionless files and directory indexes within `src/`. Computed dynamic imports and CommonJS `require()` calls are not graph edges. Parse/config failures appear in `warnings`.
+
+File explanations accept a project-relative or absolute path. They boot the app to read the existing routes/pages sections, then walk the static graph to find entry points reaching the file, including page layouts and loaders. Type-only edges participate; this is source reachability, not proof that runtime execution calls a function. Every route declared in a reaching route module is listed. Boot warnings remain in the JSON explanation and human output, so missing registrations are visible. `warlock explain <WLxxxx>` keeps its static error-code behavior.
+
+```ts
+import { inspectApp, explainFile } from "@warlock.js/core/tooling";
+
+const report = await inspectApp({ sections: ["files"] });
+const source = explainFile("src/app/posts/services/list.service.ts", report);
+console.log(source.role, source.exports, source.importedBy);
+```
+
+For route/page reachability in code, call `inspectApp({ sections: ["files", "routes", "pages"] })` in an already booted app. `inspect_files` exposes the section through MCP with a case-insensitive `filter` on file, module or role.
 
 
 ## warlock-mcp  `@warlock.js/core/skills/warlock-mcp/SKILL.md`
@@ -12300,6 +13012,10 @@ await server.close();
 - The `warlock-check` topic — what `check_run` and `test_run` report.
 - The `warlock-trace` topic — send a request and read its timeline.
 - The `expose-as-mcp-server` topic of @warlock.js/ai-tools — the transport underneath.
+
+## Source file graph
+
+Call `inspect_files` with `{ "filter": "service" }` for file paths, modules, convention roles, export names, resolved imports and reverse `importedBy` edges. This section scans `src/` without executing source modules; files-only requests skip the lazy app boot. `inspect_app` includes a `files` count. See `npx warlock explain src/app/posts/services/list.service.ts --json` for reaching routes and pages.
 
 
 ## warlock-routes  `@warlock.js/core/skills/warlock-routes/SKILL.md`
@@ -13181,6 +13897,22 @@ args, labels })`. Consume output and await `handle.exited`. Use handle stops or
 label filters; never stop processes by command or name. `spawnPty()` lazily
 loads separately installed optional peer `node-pty`. The `warlock-js-process`
 skill contains complete working examples.
+
+## Add the shared design system
+
+```bash
+npx warlock add tailwind
+npx warlock add design-system
+```
+
+`design-system` refuses before dependency installation when Tailwind is absent
+from `package.json` or `src/web/app.css`. It adds pinned shadcn primitives and
+Mongez controls to `src/web/design-system`, preserving existing source files.
+Use `--no-install` to record dependencies only, or `--dry-run --json` to preview
+files and dependencies without writing. For example, a generated control is
+`import TextInput from "web/design-system/components/text-input";` with
+`<TextInput id="profile-name" name="name" label="Name" />`.
+See Web's `build-accessible-controls` topic for the complete control contract.
 
 
 ## write-middleware  `@warlock.js/core/skills/write-middleware/SKILL.md`
@@ -15409,6 +16141,29 @@ export class User extends Model<UserSchema> {
 - The `define-relations` topic — relations and eager loading
 - The `track-changes` topic — dirty tracking
 - The `subscribe-to-model-events` topic — lifecycle hooks
+
+## Resource derivations from hidden columns
+
+A model resource receives data before `hidden` filtering. `resourceColumns`, when
+configured, still limits that input. This allows a resource to derive a public
+flag from a hidden column:
+
+```ts
+class AccountResource {
+  constructor(private readonly data: Record<string, unknown>) {}
+  toJSON() {
+    return { ...this.data, has_secret: Boolean(this.data.secret) };
+  }
+}
+```
+
+With `static hidden = ["secret"]` and `static resource = AccountResource`,
+`model.toJSON()` returns `has_secret` but removes the top-level `secret` even
+when the resource returns it. The model's stored data is unchanged. The same
+boundary applies when models are serialized in page payloads. Resources are
+trusted shaping code: never copy a secret into another key or a nested object.
+Directly constructing a resource bypasses the model's final filter; return an
+explicit public projection in that case.
 
 
 ## define-relations  `@warlock.js/cascade/skills/define-relations/SKILL.md`
@@ -26417,6 +27172,38 @@ Client side, the button is just a link. It must be a top-level navigation, not a
 - **Linking.** An existing `provider_accounts` row (provider plus Google `sub`) always decides the user. Without one, the Google email must be verified (`email_verified: true`), or the call throws `ProviderEmailNotVerifiedError` (403, `EC010`) and nothing is linked or created. A verified email links the matching user, or creates one with `{ email, name, emailVerifiedAt: now }`.
 - Other OIDC providers: implement `AuthProvider` (`authorizationUrl(state)`, `handleCallback({ query, expected })`) and register it under `auth.providers.custom.<name>`.
 
+### Google request deadlines and controlled providers
+
+`GoogleProviderConfig.timeoutMs` sets a positive integer deadline per token or
+JWKS request (default `5000`, maximum `2147483647`). Both requests receive an
+abort signal, including response-body reads. Timeout failures become
+`InvalidProviderCallbackError` with `code-exchange-failed` or `invalid-id-token`.
+
+For controlled tests, supply trusted endpoints and a fetch-compatible transport:
+
+```ts
+import { GoogleProvider } from "@warlock.js/auth";
+
+const provider = new GoogleProvider({
+  clientId: "test-client",
+  clientSecret: "test-secret",
+  redirectUri: "https://example.test/callback",
+  timeoutMs: 1000,
+  fetch: (url, options) => fetch(url, options),
+  endpoints: {
+    authorization: "https://provider.test/authorize",
+    token: "https://provider.test/token",
+    jwks: "https://provider.test/keys",
+  },
+});
+```
+
+The transport must honor `options.signal`. Endpoint overrides are trusted
+configuration, never request input. They do not change the accepted Google
+issuers, client audience, signature, expiry, nonce or PKCE checks. Each provider
+instance owns its JWKS cache so test keys cannot enter another instance's cache.
+The implementation uses the `jose` 6 `customFetch` and `timeoutDuration` options.
+
 ## GitHub, Discord, LinkedIn
 
 Same shape as Google: a config block under `auth.providers.<name>`, a GET
@@ -26859,6 +27646,23 @@ The package signs access and refresh tokens with independent secrets — `config
 - The `run-auth-commands` topic — the bundled cleanup command
 - The `scheduler-basics` topic of the `warlock-js-scheduler` skill — scheduling cleanup
 
+## Active session caps and rejected refreshes
+
+`RefreshToken.enforceMax(user, max)` uses the same active predicate as
+`RefreshToken.activeFor(user)`: `revoked_at` is null and `expires_at` is strictly
+after now. It revokes the oldest active rows until there is room for one new
+session; expired rows need no cleanup before issuance.
+
+```ts
+const sessions = await RefreshToken.activeFor(user); // newest first
+const next = await authService.refreshTokens(refreshToken); // pair or null
+```
+
+A missing or revoked token family rejects outside the family transaction's
+callback, after a read-only transaction completes. Expected refresh rejections
+do not produce database rollback errors. Replay containment still revokes the
+family, and actual query, commit and rollback failures remain visible.
+
 
 ## protect-routes  `@warlock.js/auth/skills/protect-routes/SKILL.md`
 
@@ -27174,6 +27978,24 @@ This is an Origin check, not a double-submit CSRF token — cheaper, and closes 
 - The `handle-login-and-logout` topic — where the access token gets issued in the first place
 - The `throttle-login-attempts` topic — brute-force throttle to stack in front of the login route
 - The `warlock-js-access` skill index — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough
+
+## Session middleware in groups
+
+`sessionMiddleware({ userTypes: "user" })` publishes the same `warlock.auth`
+descriptor as `authMiddleware()`. Group middleware is inherited by nested
+routes, so `inspect` and the generated `agents-md` summary recognize these guards.
+`{ optional: true }` reports `auth.required: false`, with sources and user types
+retained. Such routes remain in the unguarded-write list. Legacy descriptors
+without `required` still mean required authentication.
+
+```ts
+import { router } from "@warlock.js/core";
+import { sessionMiddleware } from "@warlock.js/auth";
+
+router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
+  router.post("/settings", async ({ response }) => response.success({ saved: true }));
+});
+```
 
 
 ## register-user  `@warlock.js/auth/skills/register-user/SKILL.md`
@@ -30562,12 +31384,13 @@ Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**`
 1. Install the layer with `warlock add web` (`add-web-to-an-app.md`), then edit the document in `src/web/root.tsx` (`write-the-root.md`).
 2. Separate UI and logic with `use-page-setup-files`, then create pages with `config` and a loader (`create-a-page.md`, `load-page-data.md`, which also covers how loader data is typed on the page); wrap them with `use-layouts.md`; set titles, descriptions, Open Graph and per-locale metadata (`set-page-metadata.md`).
 3. Link and navigate with `<Link>`, `href()`, `navigateTo` (`navigate-on-the-client.md`).
-4. Post forms to a Core API route (`submit-a-form.md`), then `refresh()` to revalidate (a route whose handler declares `responseSchema` types `data` and `onSuccess`); or handle a form on the page itself with an `action` export and `<Form>` (`handle-a-form-action.md`).
+4. Post forms to a Core API route (`submit-a-form.md`), then `refresh()` to revalidate (a route whose handler declares `responseSchema` types `data` and `onSuccess`); or handle a form on the page itself with an `action` export and `<Form>` (`handle-a-form-action.md`). Keep feedback, pending states and motion correct with `preserve-feedback-and-motion.md`.
 5. Guard pages and read the user (`protect-a-page.md`); a `requireUser()`-guarded page is typed as signed-in (`useUser("route.name")` is non-null).
-6. Translate pages (`localize-pages.md`); stream slow data (`stream-deferred-data.md`).
+6. Translate pages (`localize-pages.md`), then build RTL and mixed-direction layouts (`build-rtl-and-mixed-direction-ui.md`); stream slow data (`stream-deferred-data.md`).
 7. Polish: styles (`serve-styles.md`), self-hosted fonts (`use-web-fonts.md`), sitemap and robots (`generate-sitemap.md`), themes (`multi-theme.md`), multi-site apps (`multi-site.md`), client-only UI and hydration debugging (`render-client-only.md`), images (`render-images.md`), vitals (`measure-web-vitals.md`).
-8. Test page loaders, actions and rendering (`test-a-page.md`).
-9. Observe SSR phases and deferred values with `TracingHooks` (`observe-page-requests.md`).
+8. Build form controls with `build-accessible-controls` (the app design-system, keyboard/focus, RTL and date semantics).
+9. Test page loaders, actions and rendering (`test-a-page.md`).
+10. Observe SSR phases and deferred values with `TracingHooks` (`observe-page-requests.md`).
 
 ## Conventions and pitfalls
 
@@ -30704,6 +31527,180 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 - The `write-the-root` topic: customize the generated document shell.
 - The `serve-styles` topic: add global CSS from the root.
 - The `run-app` topic of the `warlock-js-core` skill: run dev, build, and production.
+
+## build-accessible-controls  `@warlock.js/web/skills/build-accessible-controls/SKILL.md`
+
+---
+name: build-accessible-controls
+description: "Use the app design-system Mongez controls for accessible forms: searchable selections, radio/checkbox/switch states, calendar dialogs, explicit ids, keyboard navigation and focus return. For endpoint submission use submit-a-form."
+---
+
+# Build accessible controls
+
+For Tailwind apps, run `npx warlock add design-system`. If Tailwind is missing,
+first run `npx warlock add tailwind`. The installer refuses before changing an
+unconfigured app and preserves existing files. `npm create warlock@latest app --
+--stack=web` includes the controls by default; an explicit `--features` replaces
+the preset, and selecting `shadcn` includes the design system.
+
+Use `Form` directly from `@mongez/react-form` (it renders `noValidate`). Do not
+create a competing form owner or use native browser validation attributes.
+
+```tsx
+import { Form } from "@mongez/react-form";
+import EmailInput from "web/design-system/components/email-input";
+import MultiSelectInput from "web/design-system/components/multi-select-input";
+import SubmitButton from "web/design-system/components/submit-button";
+
+export default function PreferencesForm() {
+  return (
+    <Form>
+      <EmailInput id="preferences-email" name="email" label="Email" hint="For receipts" />
+      <MultiSelectInput
+        id="preferences-topics"
+        name="topics"
+        label="Topics"
+        options={[
+          { value: "news", label: "News" },
+          { value: "events", label: "Events" },
+        ]}
+      />
+      <SubmitButton id="preferences-submit" name="submit" label="Save" />
+    </Form>
+  );
+}
+```
+
+Import each default export by its web alias, without barrels:
+TextInput, EmailInput, PasswordInput, TextareaInput, SelectInput,
+MultiSelectInput, DatePickerInput, TimePickerInput, DateTimePickerInput,
+CheckboxInput, RadioInput, SwitchInput, FileInput and SubmitButton live in
+`web/design-system/components/<kebab-name>`. Hooks live in
+`web/design-system/hooks/use-<name>` and props in `web/design-system/types`.
+
+Every control requires `id`, `name`, and `label`. Give repeated forms distinct,
+stable id prefixes. Options have unique stable string `value`s and string
+`label`s, plus optional `disabled`. Option ids derive from values so reordering
+options does not change identity. Do not generate random ids during render.
+Hints and errors reference `${id}-hint` and `${id}-error`; errors are announced.
+Use `schema`/`rules` and `validateOn` for Mongez validation. External errors use
+`error`; the server must validate independently.
+
+## Keyboard and focus
+
+- SelectInput and MultiSelectInput open with Enter/Space on their trigger and
+  focus a searchable combobox. Arrow keys, Home/End move its active option;
+  Enter selects. Multi-selection toggles with Enter, or Space while search is
+  empty. Selection stays independent of search. Disabled options are skipped;
+  an empty result is announced. Escape dismisses and Radix returns focus to
+  the trigger. Clear writes `""` for single choice or `[]` for multiple choice.
+- CheckboxInput and SwitchInput use Radix keyboard behavior and Mongez
+  `type: "checkbox"`, `checked` and `setChecked`; unchecked values collect false.
+  Checked states have a visible indicator/background, focus has a ring, and
+  disabled states have reduced opacity. Do not communicate state by color alone.
+- RadioInput registers one Mongez scalar for the whole RadioGroup. Tab enters
+  the group; arrows move selection, respecting `dir="rtl"`. Each item has its
+  own label and a visible selected indicator. Use `value` or `defaultValue` to
+  choose its string value. Clearing the group produces `""`.
+- Date controls open a modal Popover dialog with a labelled calendar grid.
+  DayPicker owns arrow/day/week/month navigation and initial focus. Escape or
+  Close returns focus to the trigger. Clear writes `""`. Preserve the modal
+  focus trap; do not replace it with an unlabelled positioned div.
+- FileInput supplies File or File[] to Mongez and clears the browser input on
+  reset/clear. A browser cannot restore an initial file selection, so its reset
+  baseline is always empty. SubmitButton follows the owning form's submission
+  state and excludes itself from collected values.
+
+Keep event adaptation, state and effects in hooks. Preserve `inputRef`,
+`visibleElementRef`, disabled state, blur validation, and error descriptions
+when changing a widget. A ref must point at a focusable widget, not a hidden
+submission input. Popups also need their own accessible name. Keep visible text,
+search/clear/close labels and placeholders localized; pass `dir` to portalled
+widgets because they do not inherit the field wrapper's direction.
+
+## Date versus instant
+
+DatePickerInput stores a calendar date (`YYYY-MM-DD`), TimePickerInput stores a
+wall-clock time (`HH:mm`), and DateTimePickerInput stores a local wall-clock
+value (`YYYY-MM-DDTHH:mm`). These are strings, not UTC instants. DateTime starts
+at midnight when a date is chosen without a time; clearing its time clears the
+value. Resolve timezone and daylight-saving policy explicitly in the service
+before converting to an instant. Never use `toISOString().slice(0, 10)` for a
+calendar date: timezone conversion can select a different day.
+
+When extending the kit, follow the WAI-ARIA APG
+[combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/),
+[listbox](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/),
+[checkbox](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/),
+[radio group](https://www.w3.org/WAI/ARIA/apg/patterns/radio/),
+[switch](https://www.w3.org/WAI/ARIA/apg/patterns/switch/), and
+[date dialog/grid](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/examples/datepicker-dialog/)
+patterns. Test focus entry/return, keyboard interaction, checked/selected states,
+validation, clearing/reset, repeated forms and RTL in the app's browser suite.
+
+## build-rtl-and-mixed-direction-ui  `@warlock.js/web/skills/build-rtl-and-mixed-direction-ui/SKILL.md`
+
+---
+name: build-rtl-and-mixed-direction-ui
+description: 'Build RTL/LTR layouts in SSR pages: document lang/dir, `useTextDirection()`, logical CSS, mirroring, `dir="auto"` for user text, LTR identifiers and fields, locale-correct dates. Read for Arabic or Hebrew UI or direction bugs. Dictionaries: `localize-pages.md`.'
+---
+
+# Warlock web — build RTL and mixed-direction UI
+
+Read this after `localize-pages.md`, which owns dictionaries and the locale URL strategy. This topic covers what the page does with a direction once the locale is known.
+
+## Direction comes from the locale
+
+The server render sets `<html lang dir>` from the request's resolved locale. The default root does this; a custom `src/web/root.tsx` must follow the same rule (`write-the-root.md`). The browser cannot update the document from inside the hydrated tree, so after a client locale change the framework syncs `lang` and `dir` itself.
+
+Inside pages, read the direction instead of recomputing it:
+
+```tsx
+import { useTextDirection, useTrans } from "@warlock.js/web";
+
+export default function Banner() {
+  const direction = useTextDirection(); // "rtl" | "ltr"
+  const t = useTrans();
+
+  return <aside dir={direction}>{t("banner.title")}</aside>;
+}
+```
+
+`localeDirection(locale)` resolves the direction for any BCP 47 tag (script subtags win, so `az-Arab` is rtl). Use it for locale lists in a switcher, where each option needs its own direction.
+
+## Layout uses logical properties
+
+Write spacing, alignment and positioning in logical terms so one stylesheet serves both directions:
+
+- `margin-inline-start` / `padding-inline-end` instead of `margin-left` / `padding-right`.
+- `inset-inline-start`, `text-align: start`, `border-inline-start`.
+- Flex and grid order follows `dir` automatically; avoid hard-coded `row-reverse` for locale switches.
+
+Mirror only directional meaning: back and forward chevrons, progress direction, "next" arrows. Do not mirror brand marks, clocks, play icons, or icons whose orientation is universal. Mirror by CSS (`[dir="rtl"] .chevron { transform: scaleX(-1) }`) or a direction-aware icon component, not by duplicating markup.
+
+## Translate every visible and spoken string
+
+Translate first-party labels, placeholders, empty, loading and error states, page metadata, and accessible names (`aria-label`, `alt` on meaningful images, button text generated by components). A translated paragraph next to an English button is a bug. Each flattened key has one owner in `locales.json`; do not duplicate a label under two routes.
+
+## Content direction is separate
+
+The interface direction is the page's `dir`. User-written text can run in any direction, so:
+
+- Give user text and comments `dir="auto"` so the browser picks direction from the first strong character.
+- Isolate identifiers, usernames, timestamps and speaker labels inside a sentence with `<bdi>` or `dir="ltr"` on a span, so punctuation does not jump.
+- Keep email, URL, code, phone and API-key inputs LTR where the content requires it (`dir="ltr"` on the input), without forcing the whole form LTR. Labels stay in the page direction.
+
+## Dates, times and numbers
+
+Format instants with an explicit locale and the user's timezone, and produce identical output on the server and in the first client render. A different default on either side causes a hydration mismatch.
+
+Treat date-only values (a birthday, a due date) separately from instants: format them in UTC or as calendar fields, never by converting through the viewer's timezone, or they shift a day. Localized digits in input are a product choice; if you accept Arabic-Indic digits, normalize and validate them on the server too.
+
+## Verify with real text
+
+Test with actual Arabic copy and with mixed Arabic and English sentences containing emails, numbers and code. A mirrored sidebar alone does not prove RTL support. Check the keyboard path and focus order in both directions, and check that the browser's `lang` on `<html>` matches the page language so screen readers pick the right voice.
+
+Keep fonts, palettes, calendar systems and digit policies configurable by the application; the framework does not choose them.
 
 ## create-a-page  `@warlock.js/web/skills/create-a-page/SKILL.md`
 
@@ -32642,12 +33639,13 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 - The `navigate-on-the-client` topic: navigation, refresh, and `<Link>`'s `locale` prop.
 - The `use-localization` topic of the `warlock-js-core` skill: global/module dictionaries and localized data columns.
 - The `multi-site` topic: per-site `localeRouting`.
+- The `build-rtl-and-mixed-direction-ui` topic: document `lang`/`dir`, logical CSS, and locale-correct dates for RTL pages.
 
 ## measure-web-vitals  `@warlock.js/web/skills/measure-web-vitals/SKILL.md`
 
 ---
 name: measure-web-vitals
-description: 'Report field Core Web Vitals (LCP, INP, CLS, plus FCP/TTFB) from the browser with the official `web-vitals` library and `navigator.sendBeacon`, attributed to the current route and device class. Covers where to register the reporter (`<ClientOnly>` / a root-level effect component, never module scope), why LCP/CLS are a HARD-load metric while INP accumulates for the whole session, tagging soft (client) navigations with `routerEvents`, and the p75 field thresholds that judge a route. Triggers: `web-vitals`, `onLCP`, `onINP`, `onCLS`, `onFCP`, `onTTFB`, `sendBeacon`, "Core Web Vitals", "RUM", "real user monitoring", "field data", "LCP too slow", "layout shift", "INP budget", "p75". Skip: lab/synthetic budgets and CI performance gates — a later addition; the `<Image>` component''s own API, descriptors and loaders — the `render-images` topic; client-only rendering mechanics — the `render-client-only` topic; the root document shell — the `write-the-root` topic.'
+description: 'Report field Core Web Vitals (LCP, INP, CLS, plus FCP/TTFB) from the browser with the official `web-vitals` library and `navigator.sendBeacon`, attributed to the current route and device class. Covers where to register the reporter (`<ClientOnly>` / a root-level effect component, never module scope), why LCP/CLS are a HARD-load metric while INP accumulates for the whole session, tagging soft (client) navigations with `routerEvents`, and the p75 field thresholds that judge a route. Triggers: `web-vitals`, `onLCP`, `onINP`, `onCLS`, `onFCP`, `onTTFB`, `sendBeacon`, "Core Web Vitals", "RUM", "real user monitoring", "field data", "LCP too slow", "layout shift", "INP budget", "p75". Skip: bundle transfer budgets and CI gates — core build-budgets; the `<Image>` component''s own API, descriptors and loaders — the `render-images` topic; client-only rendering mechanics — the `render-client-only` topic; the root document shell — the `write-the-root` topic.'
 ---
 
 # Warlock — measure Web Vitals (field RUM)
@@ -32926,6 +33924,10 @@ all.
   `Link`, `navigateTo()`, `refresh()`: what makes a navigation "soft".
 - The `stream-deferred-data` topic:
   `defer()` and `<Suspense>`, relevant to the CLS guidance above.
+
+For per-page compressed JS/CSS limits during `npx warlock build`, use core
+`build.budgets` and the `build-budgets` topic. These build-time asset sizes
+complement field vitals; they do not measure rendering or interaction latency.
 
 ## multi-site  `@warlock.js/web/skills/multi-site/SKILL.md`
 
@@ -33573,24 +34575,26 @@ Safe to call during SSR: it reads the search string of the request being rendere
 `currentRoute()` and `previousRoute()` report route names and params sent by the server; they never re-match the browser URL.
 
 ```tsx title="src/web/components/current-product-id.tsx"
-import { currentRoute, previousRoute } from "@warlock.js/web";
+import { currentRoute, previousRoute, useIsClient } from "@warlock.js/web";
 
 export function CurrentProductId() {
-  const current = currentRoute();
-  const previous = previousRoute();
+  // false on the server and during hydration: both sides render the same placeholder.
+  const isClient = useIsClient();
+  const current = isClient ? currentRoute() : undefined;
+  const previous = isClient ? previousRoute() : undefined;
 
   return (
     <dl>
       <dt>Current product</dt>
-      <dd>{current?.params?.id ?? "none"}</dd>
+      <dd>{isClient ? (current?.params?.id ?? "none") : "—"}</dd>
       <dt>Previous page</dt>
-      <dd>{previous?.name ?? "first visit"}</dd>
+      <dd>{isClient ? (previous?.name ?? "first visit") : "—"}</dd>
     </dl>
   );
 }
 ```
 
-Both return `undefined` during the server render and before hydration mounts, so branching on them in markup needs `useIsClient()` (see the navbar recipe above).
+Both return `undefined` during the server render and before hydration mounts, so the example gates every read with `useIsClient()` (see the navbar recipe above). When the server must render these values, take them from the loader's `route` argument instead.
 
 `previousRoute()` means the previously swapped page, not the previous browser-history entry. On the first page it is `undefined`.
 
@@ -33606,7 +34610,7 @@ Both return `undefined` during the server render and before hydration mounts, so
 ## Gotchas
 
 - **Use `refresh()`, not `revalidate()`.** `refresh` is the exported loader re-fetch primitive.
-- **`navigateTo` accepts a URL/path.** Resolve named routes with `href()` first.
+- **`navigateTo` takes a path or a `{ name, params, query }` target.** Pass the object form for a named route, as in "Programmatic navigation". Reach for `href(name, ...)` only when you need the URL string itself (a redirect header or an email body), not to navigate.
 - **Pass exactly one Link destination.** Combining `to`, `href`, `email`, or `tel` throws.
 - **Do not add `params` or `query` to a literal URL.** Put them in the URL itself or use a route name.
 - **Do not build a client matcher.** The server's matched name and params travel in the payload.
@@ -33695,6 +34699,15 @@ payload's `shared` snapshot before rendering. Retained components using
 switches. Write shared values in server middleware on each request; client
 writes remain refused.
 
+## Session updates after swaps
+
+`await refresh()` and `await changeLocaleCode("ar")` install the fetched session
+projection before rendering, including a guest (`user: null` or an omitted
+session). Central page/action swaps do the same. Failed or superseded requests
+leave the current identity intact; a response superseded while building its tree
+cannot publish its identity. Persistent components using `useUser()` observe
+profile updates and sign-out without remounting.
+
 ## observe-page-requests  `@warlock.js/web/skills/observe-page-requests/SKILL.md`
 
 ---
@@ -33734,6 +34747,82 @@ registerTracingHooks({
 Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
 Use `key` only to identify a deferred value; do not put sensitive loader data
 in tracing attributes.
+
+## preserve-feedback-and-motion  `@warlock.js/web/skills/preserve-feedback-and-motion/SKILL.md`
+
+---
+name: preserve-feedback-and-motion
+description: "Keep feedback correct in SSR pages: field errors, announcements, failed refresh after a successful write, flash messages across full loads, pending states, duplicate-submit guards, reduced motion. Read when messages vanish or retries repeat writes."
+---
+
+# Warlock web — preserve feedback and motion
+
+Read this with `submit-a-form.md` (posting and refresh) and `handle-a-form-action.md` (on-page actions). This topic covers the feedback and motion patterns around them. It describes patterns only; the framework exports no toast, flash or motion primitive, so build these with your own components and storage.
+
+## Field errors stay with fields
+
+Show actionable validation errors next to the field they describe, linked with `aria-describedby` and `aria-invalid`. Put general outcomes ("saved", "could not save") in a live region so screen readers hear them. A toast alone can vanish before it is read, so a persistent failure needs visible text that stays on the page until the user acts.
+
+## Mutation failure is not a failed refresh
+
+A form submit can succeed on the server and then fail to refresh the page data. Treat these as different outcomes:
+
+- **Mutation failed**: nothing changed. Keep the input, show the error, and let the user retry.
+- **Mutation succeeded, refresh failed**: the side effect already happened. Report success, then report the stale view separately. A retry here would repeat a completed write (a second order, a second comment).
+
+Model the two states distinctly in your component. Do not map every non-2xx response to "try again" without checking whether the server committed the change.
+
+## Full loads are a lifecycle boundary
+
+A full document load (a hard navigation, a locale change that reloads, a redirect after login) destroys in-memory state. A success message set before the redirect is gone by the time the next page renders.
+
+If feedback must cross a navigation, use an app-owned flash mechanism:
+
+- Write it once, at the moment of the outcome, with a short expiry.
+- Consume it once on the destination page, then delete it.
+- Validate the stored payload before rendering it; it came from storage, not from your code.
+- Store a translation key plus safe parameters, not rendered text, so it can be shown in the destination locale.
+- Keep secrets, tokens and personal data out of it.
+- Handle storage failures (quota, blocked cookies) by degrading to no message, not an error page.
+
+Use the same pattern for confirmation state ("your email was changed") after a redirect.
+
+## Model the request lifecycle explicitly
+
+Give each action an explicit state: idle, pending, succeeded, retryable failure, and fatal failure. Then:
+
+- Disable the submit control while pending, and ignore further submits for the same action. Disabling the button alone is not enough for fast double clicks or Enter key repeats; guard in the handler too.
+- Ignore completions for an action the user has left. When the page changes, a late response must not write into the new view.
+- Keep the user's input when a request fails, so a retry does not start from an empty form.
+
+## Motion
+
+Share motion durations and easings as tokens so components agree. Respect `prefers-reduced-motion`: drop transform animations and keep opacity changes short or remove them.
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .drawer {
+    transition: none;
+  }
+}
+```
+
+Animations must never delay focus, keyboard handling, authorization checks, or the completion of the action. A close animation that holds the DOM for 300 ms must not block the server call behind it, and focus must move to the next logical target immediately.
+
+## Clean up timers and observers
+
+Exit animations use timers, and observers watch sizes and visibility. Clear them on unmount and on rapid open and close:
+
+```tsx
+useEffect(() => {
+  const timer = window.setTimeout(() => setVisible(false), 300);
+
+  return () => window.clearTimeout(timer);
+}, [closing]);
+```
+
+Cancel pending timers when the component unmounts or when a newer open replaces the older close, or the old timer will hide the new content.
 
 ## protect-a-page  `@warlock.js/web/skills/protect-a-page/SKILL.md`
 
@@ -33783,6 +34872,8 @@ export const config = { route: "/login", middleware: [requireGuest({ to: "/accou
 - Renewal is automatic (refresh cookie). Do not resolve the session from deferred work.
 - After login or logout call `clearPrefetchCache()` before `navigateTo`/`refresh()`.
 - Log in with `authService.loginWithSessionCookies`, which requires an Origin/Referer.
+
+`requireUser()` answers "is someone signed in?" only. It is authentication, not authorization: a page named `admin` is not restricted to staff just because it uses `requireUser()`. Check roles, permissions and domain rules with `@warlock.js/access` inside the page loader or the action, and secure every mutation API route on its own, since a page guard does not protect a route that the page calls.
 
 ## Type a guarded page as signed-in
 
@@ -33845,9 +34936,11 @@ In dev, a file the generator cannot parse reads as unguarded rather than breakin
 ## Generated typing prerequisites
 
 The guarded example assumes your generated route declaration and session
-projection declaration are included in the TypeScript project. The relevant
-shape is below; let Warlock generate the route entry, and maintain the session
-projection type alongside your app's resolver.
+projection declaration are included in the TypeScript project. The app owns only the
+session projection type, kept alongside your app's resolver. `PageRouteRegistry`
+is generated from the page graph into `.warlock/typings/web-routes.d.ts`
+(including `guard: "user"` for guarded pages); do not hand-write or copy its
+entries.
 
 ```ts title="src/types/page-session.d.ts"
 import type { Auth } from "@warlock.js/auth";
@@ -33857,9 +34950,6 @@ declare module "@warlock.js/web" {
   interface SessionRegistry {
     user: { id: string | number; name: string };
     model: Auth;
-  }
-  interface PageRouteRegistry {
-    "account.show": { path: "/account"; params: {}; guard: "user" };
   }
 }
 ```
@@ -33883,26 +34973,29 @@ has mounted, without ever producing a hydration mismatch.
 ```tsx
 import { ClientOnly } from "@warlock.js/web";
 
+function BrowserPreference() {
+  let preference: string | null = null;
+
+  try {
+    preference = window.localStorage.getItem("lastVisited");
+  } catch {
+    // Storage can be blocked or throw even after mount (private windows, disabled site data).
+  }
+
+  return <span>{preference ?? "first visit"}</span>;
+}
+
 function LastVisited() {
-  return (
-    <ClientOnly fallback={<span>—</span>}>
-      <span>{window.localStorage.getItem("lastVisited") ?? "first visit"}</span>
-    </ClientOnly>
-  );
+  return <ClientOnly fallback={<span>—</span>}>{() => <BrowserPreference />}</ClientOnly>;
 }
 ```
 
 - `fallback` renders on the server, AND on the client's hydration render. It defaults to `null`.
 - `children` renders once the page has mounted in the browser — after hydration has already matched the server markup, never during it.
-- `children` may also be a function, `() => ReactNode`, for code that must not run at all until the browser render:
+- `children` may be a node or a function, `() => ReactNode`. The function form is the one to use when reading browser APIs must wait for the browser render too.
+- `BrowserPreference` reads storage only when it renders, so the server never evaluates `window`. Its module must still be safe to import on the server; see the next section if it touches browser globals at import time.
 
-```tsx
-<ClientOnly fallback={<p>Loading map…</p>}>
-  {() => <Map center={window.localStorage.getItem("lastCenter")} />}
-</ClientOnly>
-```
-
-The plain-node form and the function form differ only in WHEN the expression inside them runs. `<span>{window.foo}</span>` as a plain child is already constructed — `window.foo` was read — by the time it reaches `<ClientOnly>`; wrap it in a function when reading `window` must wait for the browser render too, not just the visible output.
+The plain-node form and the function form differ only in WHEN the expression inside them runs. `<span>{window.localStorage.getItem("lastVisited")}</span>` as a plain child is already evaluated — `window` was read — by the time it reaches `<ClientOnly>`, so the server render throws. Wrap the read in a component passed as a function child instead.
 
 ## `useIsClient()`
 
@@ -35392,6 +36485,10 @@ declare module "@warlock.js/web" {
 }
 ```
 
+## See also
+
+- The `preserve-feedback-and-motion` topic: field errors, failed-refresh handling, flash messages across full loads, and duplicate-submit guards.
+
 ## test-a-page  `@warlock.js/web/skills/test-a-page/SKILL.md`
 
 ---
@@ -35693,6 +36790,21 @@ export async function subscribe(email: string) {
   console.info("Subscribed", email);
 }
 ```
+
+## Browser accessibility and development regressions
+
+Use the core `test-browser` skill for owned browser fixtures. After navigation or
+revealing form feedback, call `await page.assertAccessible()` and
+`await page.assertViewport()` at 390 and 1280 pixels. Narrow known exceptions with
+`await page.assertAccessible({ allow: [{ id: "color-contrast", selector: ".legacy-caption" }] })`.
+Inspect `evidence.json` for rule IDs, targets, incomplete checks and allowances.
+
+For watched-server regressions start the owned copy in development mode, edit
+its files, and wait for a visible revision after every edit. Check several edits
+and setup add/change/delete, concurrent imported `shared` reads, and hydrated
+interactions. For `useId()` under layouts compare SSR attributes with values
+captured by hydrated event handlers, repeated instances, label/ARIA targets and
+navigation. DOM attributes alone cannot establish hook parity.
 
 ## use-layouts  `@warlock.js/web/skills/use-layouts/SKILL.md`
 
@@ -49045,21 +50157,21 @@ Features: none
 
 ## Flags
 
-| Flag                           | Takes value | Default                                                             | Purpose                                                                                                 |
-| ------------------------------ | ----------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory.                                                                        |
-| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default.                       |
-| `--db`                         | yes         | `mongodb`                                                           | Database driver key (`mongodb`, `postgres`, or `none`).                                                 |
-| `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                      |
-| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — use `npm` for the commands in this guide.                                             |
-| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
-| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                     |
-| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                         |
-| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                        |
-| `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                    |
-| `--jwt` / `--no-jwt`           | no          | off                                                                 | Generate JWT secrets via the project's `jwt` script.                                                    |
-| `--yes` / `-y`                 | no          | off                                                                 | Fully headless mode.                                                                                    |
-| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form wizard.                                                                      |
+| Flag                           | Takes value | Default                                                                                        | Purpose                                                                                                 |
+| ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `<positional>` / `--name`      | yes         | — (required)                                                                                   | Project name + target directory.                                                                        |
+| `--stack`                      | yes         | `api`                                                                                          | `api` or `web` — the structural choice; `web` seeds `web`, `shadcn`, and `design-system` by default.    |
+| `--db`                         | yes         | `mongodb`                                                                                      | Database driver key (`mongodb`, `postgres`, or `none`).                                                 |
+| `--no-db`                      | no          | —                                                                                              | Opt out of a database — shorthand for `--db=none`.                                                      |
+| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                                                    | Package manager — use `npm` for the commands in this guide.                                             |
+| `--features`                   | yes (CSV)   | none, or `["web", "shadcn", "design-system"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
+| `--lint`                       | yes         | `oxc`                                                                                          | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                     |
+| `--ai`                         | yes (CSV)   | none                                                                                           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                         |
+| `--agents`                     | yes (CSV)   | `claude`                                                                                       | Comma-separated `agent-kit` targets — see below.                                                        |
+| `--git` / `--no-git`           | no          | off                                                                                            | Initialize a Git repo (`git init` + `main` branch + initial commit).                                    |
+| `--jwt` / `--no-jwt`           | no          | off                                                                                            | Generate JWT secrets via the project's `jwt` script.                                                    |
+| `--yes` / `-y`                 | no          | off                                                                                            | Fully headless mode.                                                                                    |
+| `--interactive`, `--customize` | no          | off                                                                                            | Restore the full long-form wizard.                                                                      |
 
 If selected feature dependencies do not install, JWT generation is skipped and reported rather than retried through
 the package manager.
@@ -49242,6 +50354,43 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## Starter browser checks
+
+Full-stack web projects include `e2e/home.e2e.ts`. Run `npx warlock e2e` with
+Chrome or Edge installed. The spec builds and starts an owned app copy, visits
+`/` at 1280×800 and 390×844, then calls `page.assertAccessible()`,
+`page.assertViewport()` and `page.screenshot("home")`. API-only scaffolds omit
+this web spec. The fixture excludes dotenv files and production data directories;
+provide disposable service configuration explicitly if you add database-backed
+features. A database-free scaffold needs no external database.
+
+## Test projects
+
+`npx create-warlock my-project --yes --features=test` delegates to `warlock add test`:
+unit `*.spec.ts` outside `tests/` runs without Warlock setup, integration `*.test.ts`
+and specs under `tests/` use framework setup and the generated cleanup runner.
+The template pins Vitest 4.1.10. See the generated `testing-strategy` skill for
+`setupTest({ mode: "unit", importModule })`, opt-in `tests.lifetime: "worker"`,
+`tests.resetBetweenFiles`, profiling and the changed-tests release gate.
+
+## Shared form controls
+
+`npx create-warlock app --yes --stack=web` includes Tailwind, shadcn primitives
+and the app-owned design system. `--features=tailwind,shadcn` also includes it.
+An explicit `--features` replaces the preset. Import the generated default
+exports from `web/design-system/components/<kebab-name>`; use `Form` from
+`@mongez/react-form` directly. For example:
+
+```tsx
+import TextInput from "web/design-system/components/text-input";
+
+<TextInput id="profile-name" name="name" label="Name" hint="Display name" />;
+```
+
+All fourteen controls, props and hooks are documented by the Web
+`build-accessible-controls` topic and the generated `web-code-standards` skill.
+Existing apps use `npx warlock add tailwind`, then `npx warlock add design-system`.
 
 
 ================================================================================

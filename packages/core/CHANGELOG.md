@@ -8,6 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.35.0
 
+### Added
+
+- Typed `AppError` domain failures with native HTTP handling and `http.errorResponse` context, preserving legacy HTTP error behavior.
+- `listEndpoint` builds typed plural-key page responses from validated query controls and repository list callbacks, with bounded limits and explicit sort/filter whitelists.
+- `assertResponseContracts` checks real HTTP responses against declared status schemas, with fixtures, resource support and optional complete status coverage.
+- Web convention warnings for component size, multiple components, component-owned state/effects and handlers, native form controls and native validation; exported controller response schema warnings (`WL9013`–`WL9018`). Configure severity and component line limits through `.warlock-check.json`.
+- `warlock check --fix` applies safe relative import extension fixes and exposes available edits through the optional JSON `fix` field.
+- `warlock inspect --section files` lists every file under `src/` with its module, convention role, exports and resolved import graph without booting the app. The versioned report schema and MCP `inspect_files` tool expose the same section.
+- `warlock explain <file>` prints exports, importers and transitively reaching routes/pages, with `--json` support. Error-code explanations continue to work.
+- Per-page gzip JS/CSS build budgets with route overrides, warn/error enforcement, previous-build deltas, and `warlock build --json` reports. Existing apps remain report-only unless limits are configured.
+- Browser `page.assertAccessible(options?)` using a pinned local axe-core injection over CDP, exact rule/selector allowances, violation diagnostics and accessibility evidence.
+- Opt-in `tests.lifetime: "worker"` for Vitest forks in a single run with a shared module graph (`isolate: false`) and the generated cleanup runner. Connectors boot once per worker, file boundaries reset fakes/clock/IDs/private storage and await `tests.resetBetweenFiles`, and worker cleanup awaits shutdown. `getTestRuntimeStats()` exposes bootstrap/file counts. Unsafe pools, watch, isolation and missing runner configurations are refused.
+- `setupTest({ mode: "unit", importModule })` loads configuration values once per module graph without bootstrap hooks, config special handlers, connectors, fake installation or native loader hooks.
+- `tests.profileSetup` / `WARLOCK_TEST_PROFILE=1` report setup steps and teardown per file, with summaries per worker including final shutdown; the generated `TestSetupReporter` aggregates a run summary across workers. `setupTest({ file })` labels profiles.
+- `recommendedTestWorkers()` from `@warlock.js/core/vite` respects CPU affinity and visible cgroup v2 CPU quotas. Testing docs/skills cover shared HTTP/database contention and affected-tests plus integration release gates, with a full suite nightly.
+- `warlock add design-system` scaffolds app-owned accessible shadcn controls connected to Mongez React Form, with pinned dependencies, a Tailwind preflight before mutations, preservation of existing files, and dry-run support.
+- `warlock generate page <path>` scaffolds a UI-only page and setup companion with route, loader and metadata; `--interactive` adds a feature hook.
+- `warlock generate form <name> [--module <name>] [--endpoint]` scaffolds design-system controls, a shared Seal schema, a `useSubmitForm` hook and an optional guarded controller/route with validation and response schema.
+- `warlock generate crud-ui <module>` scaffolds guarded list/create/edit pages, schema-backed forms, endpoint-derived filters, pagination and a delete action for conventional CRUD modules. All web generators support dry-run JSON reports and preserve existing files unless forced.
+
+### Changed
+
+- Document the development devtools captured-mail preview without logging message bodies.
+- `warlock check --changed` includes transitive import dependents for scoped lint, conventions and related tests. Changed typecheck diagnostics now include transitive importers.
+- New `warlock add test` configs split pure `*.spec.ts` files from integration `*.test.ts` and specs under `tests/`; only integration loads framework/HTTP setup. Existing configs are preserved. The generated runner requires Vitest 4.1.10 or newer.
+- Reference workload before this change: 1,335 files, 3,532.79 seconds summed setup, 4,465.55 seconds wall time (reported on 5.33.0). No after measurement was run under the implementation check-once rule. The startup cost model changes from one bootstrap per file to one per active worker plus reset cost; this is not a measured wall-time speedup. Use the new profiling switch to compare the same suite and worker count.
+
 ### Fixed
 
 - Recognize required and optional auth descriptors in route inspection and generated agent summaries, including inherited session guards.
@@ -16,56 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Exclude co-located tests and test-only directories from configuration discovery and reload.
 - Register module JSON dictionaries in each test worker and remove them during teardown.
 - Dispose HTTP test-server file runtime resources and pending loader acknowledgements on shutdown and failed startup.
-
-### Changed
-
-- Document the development devtools captured-mail preview without logging message bodies.
-### Added
-
-- Typed `AppError` domain failures with native HTTP handling and `http.errorResponse` context, preserving legacy HTTP error behavior.
-- `listEndpoint` builds typed plural-key page responses from validated query controls and repository list callbacks, with bounded limits and explicit sort/filter whitelists.
-- `assertResponseContracts` checks real HTTP responses against declared status schemas, with fixtures, resource support and optional complete status coverage.
-### Added
-
-- Web convention warnings for component size, multiple components, component-owned state/effects and handlers, native form controls and native validation; exported controller response schema warnings (`WL9013`–`WL9018`). Configure severity and component line limits through `.warlock-check.json`.
-- `warlock check --fix` applies safe relative import extension fixes and exposes available edits through the optional JSON `fix` field.
-
-### Changed
-
-- `warlock check --changed` includes transitive import dependents for scoped lint, conventions and related tests. Changed typecheck diagnostics now include transitive importers.
-### Added
-
-- `warlock inspect --section files` lists every file under `src/` with its module, convention role, exports and resolved import graph without booting the app. The versioned report schema and MCP `inspect_files` tool expose the same section.
-- `warlock explain <file>` prints exports, importers and transitively reaching routes/pages, with `--json` support. Error-code explanations continue to work.
-### Added
-
-- Per-page gzip JS/CSS build budgets with route overrides, warn/error enforcement, previous-build deltas, and `warlock build --json` reports. Existing apps remain report-only unless limits are configured.
-### Added
-
-- Browser `page.assertAccessible(options?)` using a pinned local axe-core injection over CDP, exact rule/selector allowances, violation diagnostics and accessibility evidence.
-### Added
-
-- Opt-in `tests.lifetime: "worker"` for Vitest forks in a single run with a shared module graph (`isolate: false`) and the generated cleanup runner. Connectors boot once per worker, file boundaries reset fakes/clock/IDs/private storage and await `tests.resetBetweenFiles`, and worker cleanup awaits shutdown. `getTestRuntimeStats()` exposes bootstrap/file counts. Unsafe pools, watch, isolation and missing runner configurations are refused.
-- `setupTest({ mode: "unit", importModule })` loads configuration values once per module graph without bootstrap hooks, config special handlers, connectors, fake installation or native loader hooks.
-- `tests.profileSetup` / `WARLOCK_TEST_PROFILE=1` report setup steps and teardown per file, with summaries per worker including final shutdown; the generated `TestSetupReporter` aggregates a run summary across workers. `setupTest({ file })` labels profiles.
-- `recommendedTestWorkers()` from `@warlock.js/core/vite` respects CPU affinity and visible cgroup v2 CPU quotas. Testing docs/skills cover shared HTTP/database contention and affected-tests plus integration release gates, with a full suite nightly.
-
-### Changed
-
-- New `warlock add test` configs split pure `*.spec.ts` files from integration `*.test.ts` and specs under `tests/`; only integration loads framework/HTTP setup. Existing configs are preserved. The generated runner requires Vitest 4.1.10 or newer.
-- Reference workload before this change: 1,335 files, 3,532.79 seconds summed setup, 4,465.55 seconds wall time (reported on 5.33.0). No after measurement was run under the implementation check-once rule. The startup cost model changes from one bootstrap per file to one per active worker plus reset cost; this is not a measured wall-time speedup. Use the new profiling switch to compare the same suite and worker count.
-
-### Fixed
-
 - Native ESM loader registration shares a process-global promise across repeated initialization and module reloads; test startup skips the hook when an importer runs application modules through Vitest.
-### Added
-
-- `warlock add design-system` scaffolds app-owned accessible shadcn controls connected to Mongez React Form, with pinned dependencies, a Tailwind preflight before mutations, preservation of existing files, and dry-run support.
-### Added
-
-- `warlock generate page <path>` scaffolds a UI-only page and setup companion with route, loader and metadata; `--interactive` adds a feature hook.
-- `warlock generate form <name> [--module <name>] [--endpoint]` scaffolds design-system controls, a shared Seal schema, a `useSubmitForm` hook and an optional guarded controller/route with validation and response schema.
-- `warlock generate crud-ui <module>` scaffolds guarded list/create/edit pages, schema-backed forms, endpoint-derived filters, pagination and a delete action for conventional CRUD modules. All web generators support dry-run JSON reports and preserve existing files unless forced.
 
 ## 5.34.3 - 2026-10-20
 
