@@ -4023,6 +4023,19 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 - The `send-response` topic — picking the right `response.<helper>()`.
 - The `warlock-conventions` topic — module layout, the `guarded` convention, path aliases.
 
+## A named route the browser must never call — `clientVisible: false`
+
+A named API route is embedded in a page's browser route table only when that page's client code reaches its name. Mark an endpoint that browser code must never reach with `clientVisible: false`:
+
+```ts
+router.post("/internal/reindex", reindexController, {
+  name: "internal.reindex",
+  clientVisible: false,
+});
+```
+
+It is then never embedded in a page, and `warlock check` reports a browser reference to its name as `WL9020` (an error). The server still authorizes the call as for any route.
+
 
 ## report-framework-issue  `@warlock.js/core/skills/report-framework-issue/SKILL.md`
 
@@ -9369,6 +9382,43 @@ one `#vessel` around `{children}`. Client navigation still swaps layout/page
 children while preserving the document root. Remove temporary explicit form IDs
 only when the application does not otherwise depend on those names.
 
+## 5.35 to 5.36 per-page API routes
+
+A page document now carries only the named API routes its client code can reach. Before 5.36 every page carried every named route, so a browser call to a name the build cannot see worked on every page by accident. Check each `apiHref()` and `useSubmitForm({ route })` call:
+
+- A name written as a string literal, a constant or a template with a static prefix is found automatically.
+- A name computed at run time, or taken from a module the build cannot follow, now throws on the page that calls it. Declare the names in that page's setup file, for example `export const config = { apiRoutes: ["orders.*"] };`, a layout or root `config` covers every page that renders it. Or call the endpoint with an explicit `path` and `method`.
+- `npx warlock check` reports the call sites that need a declaration as `WL9019`.
+
+Routes registered with `clientVisible: false` are never embedded, and a browser call to one is an error (`WL9020`). Keep endpoints the browser must not reach on that option. Authorization is unchanged: the server still decides each request.
+
+To measure a page's inline payload, set `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process and never fails a request.
+## 5.35 to 5.36 translation payloads
+
+A page's hydration payload now carries only the translations its client code
+can reach, in route-dictionary (`locales.json`) and global-registry (`extend()`)
+apps alike. The groups every page uses (default `app` and `common`) arrive once
+per locale in a hashed, cached file that the page preloads. Nothing in a page's
+render changes: server output is the full dictionary, as before.
+
+Run `warlock build`, then `warlock check`. A `WL9104` warning marks a page that
+renders a translation key computed at runtime. Declare the keys it renders in
+the page's setup file, for example
+`export const config = { translations: ["statuses.*", "members.title"] }`, so the
+page ships only what it uses.
+
+In development, a warning names a key the page reads but its payload lacks, and
+resolves it from the full table so the page keeps working. In production the
+key renders as its own text and the miss is reported once through
+`onClientError` with `kind: "translations"`. Declare the key, or set
+`build: { translations: { prune: false } }` in the web connector options while migrating to
+restore the previous per-page payload.
+
+Global-registry apps are covered too. Their shared table is served at
+`/__warlock/translations/<locale>.<hash>.json`, which is cached immutable in
+production. A direct `trans()` call from `@mongez/localization` is not checked
+for a pruning miss; the calls through `useTrans()` are.
+
 
 ## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
 
@@ -10355,6 +10405,10 @@ connectors and the file runtime's loader channel, queued work, watchers, health
 workers, and registered module cleanup hooks, including after partial startup.
 A Node loader registration is process-scoped; its message channel is closed at
 teardown. Module-owned timers/listeners must register their cleanup hooks.
+
+## Translation keys in pages (5.36)
+
+`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. Declare its keys in the page's setup file, `export const config = { translations: ["statuses.*", "members.title"] }`, to ship only what it uses. The `web` skill `localize-pages` covers the browser side.
 
 
 ## use-middleware  `@warlock.js/core/skills/use-middleware/SKILL.md`
@@ -12223,14 +12277,17 @@ and work through the manual-review list. Use `--lint=oxc` for new apps.
 The following codes default to **warnings**, so upgrading does not fail existing projects.
 They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the existing conventions.
 
-| Code     | Convention                                                                   | Remedy                                                                                                                                                             |
-| -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `WL9013` | A component file exceeds 150 lines                                           | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
-| `WL9014` | More than one component in a file                                            | Move each component into its own TSX file.                                                                                                                         |
-| `WL9015` | State/effects or event-handler functions inside a component                  | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
-| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input           | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
-| `WL9017` | DOM input/textarea/select native validation                                  | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
-| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema` | Assign `handler.responseSchema` to document each response status.                                                                                                  |
+| Code     | Convention                                                                       | Remedy                                                                                                                                                             |
+| -------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WL9013` | A component file exceeds 150 lines                                               | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
+| `WL9014` | More than one component in a file                                                | Move each component into its own TSX file.                                                                                                                         |
+| `WL9015` | State/effects or event-handler functions inside a component                      | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
+| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input               | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
+| `WL9017` | DOM input/textarea/select native validation                                      | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
+| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`     | Assign `handler.responseSchema` to document each response status.                                                                                                  |
+| `WL9019` | Browser route call (`apiHref`, `useSubmitForm({ route })`) takes a run-time name | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
+| `WL9020` | Browser code names a route registered with `clientVisible: false` (error)        | Call the endpoint from the server, or remove `clientVisible: false` from the route.                                                                                |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)    | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
@@ -33456,6 +33513,51 @@ export default function AccountPage() {
 }
 ```
 
+## Shared tables and page pruning (5.36)
+
+A page ships only the translations its client code can reach. The groups
+every page uses (default `app` and `common`, the first segment of a key) are
+emitted once per locale as a content-hashed, immutable JSON file and preloaded
+by the document. Hydration waits for that file, so the first render has every
+key.
+
+The build finds each page's keys by reading its client module graph: the page,
+its layouts, the root, error pages and the components they import. Literal
+keys, static-prefix templates (``trans(`statuses.${s}`)`` ships `statuses.*`)
+and module constants are resolved. A key it cannot resolve falls back to every
+group, and `warlock check` reports it as `WL9104`. Declare such keys in the
+page's setup file:
+
+```ts title="src/web/orders/index.setup.ts"
+export const config = {
+  route: "/orders",
+  translations: ["statuses.*", "members.title"],
+};
+```
+
+The same applies to the global registry (`extend()` / `register()`, the
+starter's default). The shared groups are copied once, when the web connector
+boots, and that copy and its hash are fixed for the process. Every process of
+one build serves the same table under the same name, so a rolling deploy or a
+cluster never names a table another process lacks. A key a page registers later
+(its `register()` runs on the first request) is not in the shared table; it
+travels inline in that page's payload when the page uses it.
+
+A browser asks for the hashed table first. On a 404 it fetches the unhashed
+`/__warlock/translations/<locale>.json`, and only then retries the hashed one.
+
+Use `useTrans()` under any local name. Do not pass the translator as a prop or
+store it: a translator passed on as a value is treated as computed, so the page
+falls back to every group. Pass the key instead, or declare it.
+
+When a key is missing from a page's payload, development warns once with the
+declaration to add and resolves the key from the full table. Production renders
+the key and reports it once through `onClientError` (`kind: "translations"`).
+Tune the groups and pruning with the build setting
+`web({ build: { translations: { sharedGroups: ["app", "common"], prune: true } } })`.
+Development reads the same setting. Set `prune: false` to ship every key while
+you declare the rest.
+
 ## Scope, errors, and legacy lookups
 
 A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.
@@ -34537,6 +34639,10 @@ export function NavigationProgress() {
 }
 ```
 
+## Named API routes in the page's table
+
+`apiHref(name)` takes only names in the current page's route table, the routes its client code reaches (see the `submit-a-form` topic, "Which named routes a page can use"). It throws for any other name, and a client navigation swaps in the new page's table. Pass an explicit `path` and `method` to a `fetch` call the build cannot see, or declare the name with `config.apiRoutes`.
+
 ## Generated named-route types
 
 Warlock writes `.warlock/typings/web-routes.d.ts` atomically after successful
@@ -34771,6 +34877,10 @@ registerTracingHooks({
 Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
 Use `key` only to identify a deferred value; do not put sensitive loader data
 in tracing attributes.
+
+## Inline payload budget
+
+Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The check is advisory: it never fails a request. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.
 
 ## preserve-feedback-and-motion  `@warlock.js/web/skills/preserve-feedback-and-motion/SKILL.md`
 
@@ -36428,6 +36538,16 @@ the schema in `config.action.validation` and submit with `useSubmitAction`, not
 `useSubmitForm`. Do not share database uniqueness checks or other server-only
 rules with the browser; keep those server-side or split the schema.
 
+## Which named routes a page can use
+
+`useSubmitForm({ route })` resolves its name against the route table of the page being shown. Each page document carries the named routes its client code reaches: a string literal, a constant or a template prefix naming the route, plus anything declared with `config.apiRoutes` in the page's setup file. Declare a name the build cannot see:
+
+```ts title="orders.setup.ts"
+export const config: PageConfig = { apiRoutes: ["orders.*"] };
+```
+
+A name the page does not carry throws. Development names the route and the declaration that fixes it; production throws a short error with no fallback. A route registered with `clientVisible: false` is never in the table. `warlock check` reports a name it cannot read as `WL9019`. Use an explicit `path` and `method` for such a call when declaring is not practical.
+
 ## Typed responses from `responseSchema`
 
 When the API handler declares `responseSchema` (see core's `create-controller`), the generated `ApiRouteRegistry` entry carries a `response` map and `useSubmitForm({ route })` types `data`, `response` and `onSuccess` from the route's declared 2xx body. No generic argument and no cast.
@@ -37166,6 +37286,10 @@ middleware and loaders. It is synchronous and must not return a Promise. The
 framework projects browser-safe registration code and its dependencies to the
 client. Keep registration safe for both realms; server-only services belong
 in loaders or actions.
+
+## Browser-reachable API routes
+
+A page document embeds only the named API routes its client code can reach. Declare a name the build cannot see, such as one read from data, in the setup file's `config`: `config.apiRoutes: ["orders.show", "reports.*"]`. A layout or root declaration reaches every page that renders it. A route registered with `clientVisible: false` is never embedded.
 
 ## Duplicate declarations and development
 

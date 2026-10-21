@@ -2067,6 +2067,51 @@ export default function AccountPage() {
 }
 ```
 
+## Shared tables and page pruning (5.36)
+
+A page ships only the translations its client code can reach. The groups
+every page uses (default `app` and `common`, the first segment of a key) are
+emitted once per locale as a content-hashed, immutable JSON file and preloaded
+by the document. Hydration waits for that file, so the first render has every
+key.
+
+The build finds each page's keys by reading its client module graph: the page,
+its layouts, the root, error pages and the components they import. Literal
+keys, static-prefix templates (``trans(`statuses.${s}`)`` ships `statuses.*`)
+and module constants are resolved. A key it cannot resolve falls back to every
+group, and `warlock check` reports it as `WL9104`. Declare such keys in the
+page's setup file:
+
+```ts title="src/web/orders/index.setup.ts"
+export const config = {
+  route: "/orders",
+  translations: ["statuses.*", "members.title"],
+};
+```
+
+The same applies to the global registry (`extend()` / `register()`, the
+starter's default). The shared groups are copied once, when the web connector
+boots, and that copy and its hash are fixed for the process. Every process of
+one build serves the same table under the same name, so a rolling deploy or a
+cluster never names a table another process lacks. A key a page registers later
+(its `register()` runs on the first request) is not in the shared table; it
+travels inline in that page's payload when the page uses it.
+
+A browser asks for the hashed table first. On a 404 it fetches the unhashed
+`/__warlock/translations/<locale>.json`, and only then retries the hashed one.
+
+Use `useTrans()` under any local name. Do not pass the translator as a prop or
+store it: a translator passed on as a value is treated as computed, so the page
+falls back to every group. Pass the key instead, or declare it.
+
+When a key is missing from a page's payload, development warns once with the
+declaration to add and resolves the key from the full table. Production renders
+the key and reports it once through `onClientError` (`kind: "translations"`).
+Tune the groups and pruning with the build setting
+`web({ build: { translations: { sharedGroups: ["app", "common"], prune: true } } })`.
+Development reads the same setting. Set `prune: false` to ship every key while
+you declare the rest.
+
 ## Scope, errors, and legacy lookups
 
 A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.
@@ -3148,6 +3193,10 @@ export function NavigationProgress() {
 }
 ```
 
+## Named API routes in the page's table
+
+`apiHref(name)` takes only names in the current page's route table, the routes its client code reaches (see the `submit-a-form` topic, "Which named routes a page can use"). It throws for any other name, and a client navigation swaps in the new page's table. Pass an explicit `path` and `method` to a `fetch` call the build cannot see, or declare the name with `config.apiRoutes`.
+
 ## Generated named-route types
 
 Warlock writes `.warlock/typings/web-routes.d.ts` atomically after successful
@@ -3382,6 +3431,10 @@ registerTracingHooks({
 Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
 Use `key` only to identify a deferred value; do not put sensitive loader data
 in tracing attributes.
+
+## Inline payload budget
+
+Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The check is advisory: it never fails a request. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.
 
 ## preserve-feedback-and-motion  `@warlock.js/web/skills/preserve-feedback-and-motion/SKILL.md`
 
@@ -5039,6 +5092,16 @@ the schema in `config.action.validation` and submit with `useSubmitAction`, not
 `useSubmitForm`. Do not share database uniqueness checks or other server-only
 rules with the browser; keep those server-side or split the schema.
 
+## Which named routes a page can use
+
+`useSubmitForm({ route })` resolves its name against the route table of the page being shown. Each page document carries the named routes its client code reaches: a string literal, a constant or a template prefix naming the route, plus anything declared with `config.apiRoutes` in the page's setup file. Declare a name the build cannot see:
+
+```ts title="orders.setup.ts"
+export const config: PageConfig = { apiRoutes: ["orders.*"] };
+```
+
+A name the page does not carry throws. Development names the route and the declaration that fixes it; production throws a short error with no fallback. A route registered with `clientVisible: false` is never in the table. `warlock check` reports a name it cannot read as `WL9019`. Use an explicit `path` and `method` for such a call when declaring is not practical.
+
 ## Typed responses from `responseSchema`
 
 When the API handler declares `responseSchema` (see core's `create-controller`), the generated `ApiRouteRegistry` entry carries a `response` map and `useSubmitForm({ route })` types `data`, `response` and `onSuccess` from the route's declared 2xx body. No generic argument and no cast.
@@ -5777,6 +5840,10 @@ middleware and loaders. It is synchronous and must not return a Promise. The
 framework projects browser-safe registration code and its dependencies to the
 client. Keep registration safe for both realms; server-only services belong
 in loaders or actions.
+
+## Browser-reachable API routes
+
+A page document embeds only the named API routes its client code can reach. Declare a name the build cannot see, such as one read from data, in the setup file's `config`: `config.apiRoutes: ["orders.show", "reports.*"]`. A layout or root declaration reaches every page that renders it. A route registered with `clientVisible: false` is never embedded.
 
 ## Duplicate declarations and development
 
