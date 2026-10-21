@@ -109,6 +109,18 @@ The manifest records derived page names. A clean diff does not prove that no
 two routes collided during registration; discovery itself remains the source
 of that failure.
 
+### Translation tables
+
+`warlock build` writes each locale's shared translation groups (default `app`
+and `common`) to `dist/client/assets/translations/<locale>.<hash>.json`. The file
+name carries the content hash, so the server serves it with the bundle's
+one-year immutable cache headers, and a changed table is a new URL. Every
+other group is pruned per page to the keys the page's client code can reach,
+and the build records that usage in the production page barrel. Tune the groups
+and pruning with the connector's `translations` option. The
+[localization guide](/v/latest/web/essentials/localization/) explains the keys
+the analysis resolves and how to declare the rest.
+
 ## Run `warlock start` from the app root
 
 The page manifest stores `clientDir` as an app-root-relative path such as

@@ -2,6 +2,31 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.36.0
+
+### Added
+
+- Shared translation groups are emitted at build time as one JSON file per locale whose name carries its content hash (`/assets/translations/<locale>.<hash>.json`). They are served with the bundle's immutable cache headers, preloaded by the document, and loaded once before hydration, so the first client render has every key the server rendered with. Locale switching loads the other locale's table.
+- Per-page pruning of every other group: a scoped page payload inlines only the keys its client module graph can look up. Literal keys, static-prefix template keys (which include their subtree), module-level constants, literal choices, and `config.translations` declarations in the page's setup file are resolved statically. A key that cannot be resolved (`trans(key)`, or a translator passed on as a value) makes that page fall back to every non-shared group.
+- The web connector's build option `translations`: `sharedGroups` (default `["app", "common"]`) and `prune` (default `true`).
+- The hydration payload's `translationAssets` reference (URL, hash, groups and a development flag). The document preloads the shared table with `<link rel="preload" as="fetch">`.
+- Client navigation merges each payload's pruned keys into the locale's dictionary.
+- Development: a translation the page reads but its payload lacks is resolved from the full table, with one warning per key and page that names the `config.translations` declaration to add. The development server serves each locale's full table at `/__warlock/translations/<locale>` with `Cache-Control: no-store`.
+- Production: a missing key renders its key and is reported once through `onClientError` with the new `kind: "translations"`. A shared table that cannot be loaded is retried once; the page then renders its keys and the failure is reported the same way.
+- `warlock check` reports `WL9104` for a translation key computed at runtime in `src/web`.
+
+### Changed
+
+- **BREAKING** A scoped page payload no longer carries every translation group. It carries the keys the page's client code can reach, and the shared groups arrive in a separate, cached table. Apps that read the hydration payload directly, or that render a key their client code builds at run time without declaring it, must update. Set `translations: { prune: false }` in the web connector options to restore the previous per-page payload while migrating. See the upgrade note below.
+
+### Upgrading
+
+- Re-run `warlock build`. The build now writes `assets/translations/*.json` next to the bundle and records each page's usage in the production page barrel.
+- Run `warlock check`. A `WL9104` warning marks a page that renders a key computed at runtime. Declare the keys it renders with `config.translations` in the page's setup file, for example `export const config = { translations: ["statuses.*"] }`.
+- In development, a warning names any key the page reads but its payload lacks. Add the declaration it suggests.
+- If a production page shows keys where translations used to appear, check the `kind: "translations"` reports from `onClientError`: the key is missing from the page's payload. Declare it, or set `prune: false` while you do.
+- Apps without route dictionaries (`locales.json`) keep the global translation registry and are not affected.
+
 ## 5.35.0 - 2026-10-21
 
 ### Added

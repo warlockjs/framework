@@ -30,6 +30,38 @@ export default function AccountPage() {
 }
 ```
 
+## Shared tables and page pruning (5.36)
+
+A page ships only the translations its client code can reach. The groups
+every page uses (default `app` and `common`, the first segment of a key) are
+emitted once per locale as a content-hashed, immutable JSON file and preloaded
+by the document. Hydration waits for that file, so the first render has every
+key.
+
+The build finds each page's keys by reading its client module graph: the page,
+its layouts, the root, error pages and the components they import. Literal
+keys, static-prefix templates (``trans(`statuses.${s}`)`` ships `statuses.*`)
+and module constants are resolved. A key it cannot resolve falls back to every
+group, and `warlock check` reports it as `WL9104`. Declare such keys in the
+page's setup file:
+
+```ts title="src/web/orders/index.setup.ts"
+export const config = {
+  route: "/orders",
+  translations: ["statuses.*", "members.title"],
+};
+```
+
+Use `useTrans()` under any local name. Do not pass the translator as a prop or
+store it: a translator passed on as a value is treated as computed, so the page
+falls back to every group. Pass the key instead, or declare it.
+
+When a key is missing from a page's payload, development warns once with the
+declaration to add and resolves the key from the full table. Production renders
+the key and reports it once through `onClientError` (`kind: "translations"`).
+Tune the groups and pruning with the web connector's `translations` option:
+`{ sharedGroups: ["app", "common"], prune: true }`.
+
 ## Scope, errors, and legacy lookups
 
 A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.

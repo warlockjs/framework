@@ -552,3 +552,23 @@ Root components and providers execute in both realms. Move server-only work into
 one `#vessel` around `{children}`. Client navigation still swaps layout/page
 children while preserving the document root. Remove temporary explicit form IDs
 only when the application does not otherwise depend on those names.
+
+## 5.35 to 5.36 translation payloads
+
+A page's hydration payload now carries only the translations its client code
+can reach. The groups every page uses (default `app` and `common`) arrive once
+per locale in a hashed, cached file that the page preloads. Nothing in a page's
+render changes: server output is the full dictionary, as before.
+
+Run `warlock build`, then `warlock check`. A `WL9104` warning marks a page that
+renders a translation key computed at runtime. Declare the keys it renders in
+the page's setup file, for example
+`export const config = { translations: ["statuses.*", "members.title"] }`, so the
+page ships only what it uses.
+
+In development, a warning names a key the page reads but its payload lacks, and
+resolves it from the full table so the page keeps working. In production the
+key renders as its own text and the miss is reported once through
+`onClientError` with `kind: "translations"`. Declare the key, or set
+`translations: { prune: false }` in the web connector options while migrating to
+restore the previous per-page payload.

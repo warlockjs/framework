@@ -225,6 +225,87 @@ On failure (network error, or the fresh page could not be built), the
 promise rejects and the active locale and any cookie are left exactly as
 they were.
 
+## Translation delivery: shared tables and page pruning — new in 5.36
+
+A page's hydration payload carries the translations its client code can
+reach, not every dictionary in the app. Translation groups that every page
+uses are shipped once per locale instead:
+
+- **Shared groups** (default `app` and `common`, the first segment of a key)
+  are emitted at build time as one JSON file per locale whose name includes its
+  content hash, such as `/assets/translations/en.3f9a1c0d2b7e4a51.json`. The
+  file is served with the same long-lived immutable cache headers as the
+  bundle, and the document preloads it. A content change is a new file name,
+  so a cached copy is never stale. Hydration waits for the table, so the first
+  client render has every key the server rendered with.
+- **Every other group** is pruned per page. The build reads the page's client
+  module graph, the page, its layouts, the root, every error page and the
+  components they import, and inlines only the keys that graph can look up.
+
+Keys are found statically:
+
+| The client code does                               | The page ships                                   |
+| -------------------------------------------------- | ------------------------------------------------ |
+| `trans("members.title")`, `t(...)`, `transX(...)`  | that key and its subtree                         |
+| ``trans(`statuses.${order.status}`)``              | every key under the static prefix `statuses.`    |
+| `trans(KEY)` where `const KEY = "x.y"` (same file) | `x.y`                                            |
+| `trans(flag ? "a" : "b")`                          | both literal keys                                |
+| `trans(key)`, a translator passed on as a value    | every non-shared key (the full fallback, larger) |
+
+A translator is any binding of `trans`, `t`, `transX`, `transFrom`'s key
+argument, or the result of `useTrans()`, under any local name.
+
+### Declare what static analysis cannot see
+
+A key computed at run time has no static prefix, so the page falls back to
+every group. Declare the keys in the page's setup file instead:
+
+```ts title="src/web/orders/index.setup.ts"
+export const config = {
+  route: "/orders",
+  translations: ["statuses.*", "members.title", "members"],
+};
+```
+
+`"statuses.*"` declares every key under `statuses.`, `"members.title"` declares
+one key, and a plain group name declares the group with its subtree. A
+declaration may name a key the page reads only through a helper. `warlock check`
+reports each computed lookup in `src/web` as `WL9104` and points at this
+declaration.
+
+### Development and production behave differently on a miss
+
+A key the page reads but its payload lacks is a pruning miss:
+
+- **Development** resolves it from the full table, so the page keeps working,
+  and logs one warning per key and page that names the declaration to add.
+- **Production** renders the key and reports the miss once through
+  through the client error reporter that `onClientError` registers, the same
+  one hydration and navigation failures use.
+  It never throws during render.
+
+Client navigation merges each page's pruned keys into the locale's dictionary,
+so a page visited earlier keeps its keys. Locale switching loads the other
+locale's shared table.
+
+### Options
+
+The web connector's build options control both halves:
+
+```ts title="warlock.config.ts"
+web({
+  translations: {
+    sharedGroups: ["app", "common", "members"], // shipped once per locale
+    prune: true, // false ships every non-shared key on every page
+  },
+});
+```
+
+`prune: false` restores the previous per-page payload: every non-shared key is
+inlined. It is the escape hatch while a page is being checked. Apps without
+route dictionaries (`locales.json`) keep the global registry path and are not
+affected.
+
 ## Gotchas
 
 - **`useLocale()` requires the page pipeline.** It throws outside
