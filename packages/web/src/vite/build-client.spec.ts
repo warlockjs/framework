@@ -9,6 +9,7 @@ import {
 const vite = vi.hoisted(() => ({
   build: vi.fn(),
   createLogger: vi.fn(() => ({ info: vi.fn() })),
+  version: "8.3.3",
 }));
 
 vi.mock("vite", () => vite);

@@ -43,6 +43,7 @@ All notable changes to `@warlock.js/web` are documented here.
 - `warlock check` reports `WL9104` for a translation key computed at runtime in `src/web`.
 - Gate A's refusal of Node builtins in the bundler's `external` option works on Vite 8. Rolldown does not pass `external` to `buildStart`, so the guard reads the option in the `options` hook and normalizes a string, a RegExp, an array or a function; without this a build with `fs` externalized would have shipped it unrefused.
 - Client budget attribution (`clientBudgetModules`) reads Rolldown's `renderedLength`, and a spec runs it on a real build.
+- An app that still has Vite 7 installed gets a clear error before the client build or the development server starts, naming the found version and the upgrade command. Before, `warlock build` failed with `Could not resolve entry module` because Vite 7 ignores `build.rolldownOptions`. A Vite version that cannot be parsed is not blocked.
 
 ### Changed
 
