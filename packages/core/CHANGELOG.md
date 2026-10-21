@@ -37,6 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Restore application-config-only preload for feature generators, preserving configured notification locales and one-shot CLI exit. Correct cleanup test hooks to return void.
+
 - Fix CRUD UI generation with the Oxc parser, ES2022-compatible tooling arrays, nullable component bodies, and app-free feature scaffolding. Align inspection CLI tests and convention error-code headings.
 - Wait for owned MessagePort close events in the test-server disposal regression so referenced handles are actually released.
 

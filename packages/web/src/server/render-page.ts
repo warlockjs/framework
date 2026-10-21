@@ -1103,7 +1103,7 @@ async function finishRender(
   const hasExplicitAlternates =
     bundle.metadata?.alternates !== undefined && Object.keys(bundle.metadata.alternates).length > 0;
 
-  const fonts = dataRequest ? undefined : documentFonts(streamOptions.appRoot);
+  const fonts = documentFonts(streamOptions.appRoot);
   const preloadFonts = [triple.app, triple.layout, triple.page].every(
     (module) => module.fontPreload !== false,
   );
@@ -1131,6 +1131,15 @@ async function finishRender(
     localeRouting,
     namedApiRoutes: resolveNamedApiRoutes(),
   };
+
+  // Resolve document slots before either wire representation is serialized.
+  const { payload: _payload, metadata: _metadata, ...document } = documentValue;
+  bundle.document = document;
+  documentValue.payload = buildHydrationPayload(
+    bundle,
+    documentSlots.locale,
+    sessionExtras(bundle),
+  );
 
   const wrapWithContext = (element: ReactNode): ReactNode =>
     createElement(DocumentContext.Provider, {

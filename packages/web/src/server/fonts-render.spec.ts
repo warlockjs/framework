@@ -167,9 +167,14 @@ describe("fonts in rendered documents", () => {
     expect(rendered.html).not.toContain("font-");
     expect(rendered.html).not.toContain("/@warlock/fonts");
   });
-  it("does not read font sources or emit preloads on a data request", async () => {
-    config.set("web", { fonts: [{ ...fonts[0], files: [{ path: "missing.woff2" }] }] });
-    const rendered = await render(entry(), true);
-    expect(rendered.html).not.toContain('as="font"');
+  it("carries identical font slots when rendering either page representation", async () => {
+    const document = await render();
+    const data = await render(entry(), true);
+    expect(data.bundle?.document?.fontPreloads).toEqual(document.bundle?.document?.fontPreloads);
+    expect(data.bundle?.document?.fontPreloads).toHaveLength(1);
+    expect(data.bundle?.document?.stylesheetUrls).toEqual(
+      document.bundle?.document?.stylesheetUrls,
+    );
+    expect(data.html).toContain('as="font"');
   });
 });

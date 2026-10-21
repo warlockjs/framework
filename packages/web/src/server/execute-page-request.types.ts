@@ -5,7 +5,10 @@ import type { SharedContext } from "../index";
 import type { PageRoute, PageSite } from "../context";
 import type { MetadataOutput, PageMetadata } from "../metadata";
 import type { PageActionConfig } from "../page-config";
-import type { SerializedErrorPageProps } from "../components/document-context";
+import type {
+  HydrationDocumentPayloadSource,
+  SerializedErrorPageProps,
+} from "../components/document-context";
 import type { SharedStore } from "../shared";
 import type { SessionModel, SessionUser } from "../session/session.types";
 import type { ActionState } from "./action-state";
@@ -202,6 +205,8 @@ export type PageErrorRecord = {
 };
 
 export type PageDataBundle = {
+  /** Resolved document slots shared by document and navigation payloads. */
+  document?: HydrationDocumentPayloadSource["document"];
   live?: LivePageOptions;
   route: {
     name: string;

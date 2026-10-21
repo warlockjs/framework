@@ -17,6 +17,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
+- Carry resolved document slots through the shared hydration payload so navigation data and document-embedded payloads stay identical.
+
 - Include generated guarded-route output in the page protection skill so its session and useUser examples compile independently.
 - **BREAKING** Hydrate the same full-document root ancestry as SSR, preserving React `useId()` and generated form IDs beneath layouts. Root components now execute in the browser; move server-only work to root setup loaders. Client navigation continues to replace the layout/page subtree inside `#vessel`.
 

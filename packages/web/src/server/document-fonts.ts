@@ -7,7 +7,7 @@ import { consumePageManifest } from "./page-manifest";
 
 const documents = new Map<string, FontDocument>();
 
-/** Called only after the pipeline decides to render a document. */
+/** Resolve document slots after the pipeline selects a page, for either representation. */
 export function documentFonts(appRoot = process.cwd()): FontDocument | undefined {
   const fonts = config.get("web", {}).fonts;
   if (!fonts?.length) return undefined;

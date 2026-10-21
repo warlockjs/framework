@@ -477,6 +477,8 @@ describe("createPageRouteHandler — data requests", () => {
         loadModule: moduleLoader(modules).loadModule,
         applyBufferedCookie: recorded.applyBufferedCookie as never,
         httpServer: undefined,
+        stylesheetUrls: ["/assets/app.css"],
+        hydrationClientModuleUrl: "/assets/hydrate.mjs",
       })(recorded.context);
     }
 
@@ -486,6 +488,7 @@ describe("createPageRouteHandler — data requests", () => {
     );
 
     expect(embedded, "the document must embed a payload to compare against").not.toBeNull();
+    expect(asData.written.sent).toBe(embedded?.[1]);
     expect(parse(asData.written.sent as string)).toEqual(parse(embedded![1] as string));
   });
 

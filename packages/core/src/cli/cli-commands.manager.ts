@@ -764,7 +764,7 @@ export class CLICommandsManager {
 
     await warlockConfigManager.load();
 
-    if (preloaders.config || preloaders.bootstrap || preloaders.prestart) {
+    if (preloaders.bootstrap || preloaders.prestart) {
       await filesOrchestrator.init();
     }
 
