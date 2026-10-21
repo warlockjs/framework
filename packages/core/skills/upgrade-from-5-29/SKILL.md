@@ -564,6 +564,7 @@ A page document now carries only the named API routes its client code can reach.
 Routes registered with `clientVisible: false` are never embedded, and a browser call to one is an error (`WL9020`). Keep endpoints the browser must not reach on that option. Authorization is unchanged: the server still decides each request.
 
 To measure a page's inline payload, set `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process and never fails a request.
+
 ## 5.35 to 5.36 translation payloads
 
 A page's hydration payload now carries only the translations its client code
