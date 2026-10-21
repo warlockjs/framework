@@ -6216,3 +6216,5 @@ export default function ViewportPage() {
 `<Head />` emits a default viewport even without this override. Remove a manual
 duplicate tag from `root.tsx`; use `viewport: false` only when intentionally
 suppressing it.
+
+The hydration payload carries resolved `document` slots in both HTML and navigation data responses. Keep `<Scripts />` in the root; the framework shares stylesheet, font, locale-routing and hydration-module slots across both representations.

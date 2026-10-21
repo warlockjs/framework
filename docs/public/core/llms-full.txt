@@ -13925,6 +13925,8 @@ files and dependencies without writing. For example, a generated control is
 `<TextInput id="profile-name" name="name" label="Name" />`.
 See Web's `build-accessible-controls` topic for the complete control contract.
 
+Built-in `npx warlock add notifications` preloads `config: ["app"]` so generated locale stubs respect `app.localeCodes`, without bootstrap hooks or connectors.
+
 
 ## write-middleware  `@warlock.js/core/skills/write-middleware/SKILL.md`
 
