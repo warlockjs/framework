@@ -24,7 +24,10 @@ export function Scripts(props: ScriptsProps): ReactElement {
   const context = useDocumentContext("Scripts");
   const { payload, nonce, hydrationClientModuleUrl, namedApiRoutes, siteKey } = context;
   const { payload: _payload, metadata: _metadata, ...document } = context;
-  const documentPayload = { ...payload, document: payload.document ?? document };
+  // The route table has its own script (below), so the copy the payload's
+  // `document` slot holds is left out of this one: it would ship the table twice.
+  const { namedApiRoutes: _namedApiRoutes, ...documentSlots } = payload.document ?? document;
+  const documentPayload = { ...payload, document: documentSlots };
 
   // `renderPageFailure` marks its payload non-hydrating (page-render-bundle.ts):
   // a module-load/registration throw happens before any triple exists, so

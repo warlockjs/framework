@@ -14,6 +14,7 @@ import {
   webEsbuildDefine,
 } from "./generate-pages-barrel";
 import { MissingPageDefaultExportError } from "./page-default-export";
+import { resolvePayloadBudget } from "../server/payload-budget";
 
 const temporaryDirectories: string[] = [];
 
@@ -96,17 +97,61 @@ describe("generatePagesBarrel", () => {
         "",
         "providePageManifest({",
         '  clientDir: "dist/client",',
+        '  payloadBudget: {"page":65536,"pages":[],"mode":"warn"},',
         '  app: { module: app, sourceFile: "src/web/root.tsx" },',
         "  pages: [",
         "    {",
         "      module: p0,",
         '      sourceFile: "src/web/home.page.tsx",',
         "      layouts: [],",
+        "      apiRouteNames: [],",
         "    },",
         "  ],",
         "});",
         "",
       ].join("\n"),
+    );
+  });
+
+  it("embeds in each page's manifest entry only the route names its client code reaches", async () => {
+    const appRoot = makeAppTree({
+      "src/web/root.tsx": APP,
+      "src/web/orders/orders.page.tsx":
+        'import { apiHref } from "@warlock.js/web";\nexport const config = { route: "/orders" };\nexport default function Page() { return apiHref("orders.show"); }\n',
+      "src/web/users/users.page.tsx":
+        'export const config = { route: "/users" };\nexport default function Page() { return null; }\n',
+    });
+    const productionDir = path.join(appRoot, ".warlock", "production");
+
+    const result = await generatePagesBarrel({
+      appRoot,
+      productionDir,
+      clientDir: "dist/client",
+      clientApiRouteNames: ["orders.show", "admin.purge"],
+    });
+
+    expect(result.contents).toContain('apiRouteNames: ["orders.show"],');
+    expect(result.contents).toContain("apiRouteNames: [],");
+    expect(result.contents).not.toContain("admin.purge");
+  });
+
+  it("bakes the resolved payload budget into the manifest", async () => {
+    const appRoot = makeAppTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
+    const productionDir = path.join(appRoot, ".warlock", "production");
+
+    const result = await generatePagesBarrel({
+      appRoot,
+      productionDir,
+      clientDir: "dist/client",
+      payloadBudget: resolvePayloadBudget({
+        page: "32kb",
+        pages: { "/admin/**": "96kb" },
+        mode: "error",
+      }),
+    });
+
+    expect(result.contents).toContain(
+      'payloadBudget: {"page":32768,"pages":[{"pattern":"/admin/**","bytes":98304}],"mode":"error"},',
     );
   });
 

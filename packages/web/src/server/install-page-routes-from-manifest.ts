@@ -41,6 +41,7 @@ import { composeLayoutModules } from "./compose-layout-modules";
 import { composePageModule } from "./compose-page-module";
 import { createPageModuleLoader } from "./create-page-module-loader";
 import { resolveLocaleRouting } from "./locale-routing/resolve-locale-routing";
+import { resolvePayloadBudget } from "./payload-budget";
 import {
   localeActionRegistrations,
   localePageRegistrations,
@@ -466,6 +467,9 @@ export function installPageRoutesFromManifest(
   };
 
   const app = manifest.app;
+  // Resolved at build time by the generated barrel; the default applies to a
+  // manifest from a build that predates the budget.
+  const payloadBudget = manifest.payloadBudget ?? resolvePayloadBudget(undefined);
 
   if (app === undefined) {
     throw new Error(
@@ -537,6 +541,8 @@ export function installPageRoutesFromManifest(
                 ? []
                 : productionStylesheetUrls(clientDir, [app.sourceFile, notFoundPage.sourceFile]),
             resolveRequestStylesheetUrls,
+            clientApiRouteNames: () => notFoundPage.apiRouteNames ?? [],
+            payloadBudget,
           }),
         );
   const renderNotFound = () => notFoundPageHandler;
@@ -625,6 +631,8 @@ export function installPageRoutesFromManifest(
       getRouteTranslations,
       stylesheetUrls,
       resolveRequestStylesheetUrls,
+      clientApiRouteNames: () => page.apiRouteNames ?? [],
+      payloadBudget,
       cache,
       renderNotFound,
     };

@@ -81,6 +81,10 @@ framework projects browser-safe registration code and its dependencies to the
 client. Keep registration safe for both realms; server-only services belong
 in loaders or actions.
 
+## Browser-reachable API routes
+
+A page document embeds only the named API routes its client code can reach. Declare a name the build cannot see, such as one read from data, in the setup file's `config`: `config.apiRoutes: ["orders.show", "reports.*"]`. A layout or root declaration reaches every page that renders it. A route registered with `clientVisible: false` is never embedded.
+
 ## Duplicate declarations and development
 
 Every logic export has one owner. Duplicates fail with the export name and

@@ -67,7 +67,8 @@ import { createSettledThenable } from "../loaders/settled-thenable";
 import { bindRequestRouteTranslations } from "./request-route-translations";
 import { resolveNamedApiRoutes } from "./named-api-routes";
 import { siteHydrationUrl } from "./hydration-client-url";
-import { consumePageManifest } from "./page-manifest";
+import { consumePageManifest, type PagePayloadBudget } from "./page-manifest";
+import { reportPayloadBudget } from "./payload-budget";
 import { HYDRATION_SITE_QUERY } from "../vite/hydration-entries";
 
 export { escapePayload, PAYLOAD_SCRIPT_ID };
@@ -191,6 +192,19 @@ export type RenderPageRequestOptions = {
   stylesheetUrls?: readonly string[];
   /** The hydration client entry module URL — carried onto `DocumentContextValue.hydrationClientModuleUrl`, same reasoning. */
   hydrationClientModuleUrl?: string;
+  /**
+   * The named API route names THIS page's document may embed, read per request
+   * (a thunk, because development recomputes them when a source file changes).
+   * Only the names it returns, and only those Core registered and did not mark
+   * `clientVisible: false`, reach the browser table. Absent means an empty table.
+   */
+  clientApiRouteNames?: () => readonly string[];
+  /**
+   * The inline payload budget this document is checked against, once it is
+   * rendered (`server/payload-budget.ts`). Advisory: an overage is reported, never
+   * a failed request. Absent means no check.
+   */
+  payloadBudget?: PagePayloadBudget;
   /** `modulepreload` URLs for the entry's own static imports — carried onto `DocumentContextValue.hydrationClientModulePreloadUrls`, same reasoning (card 53f8647e). */
   hydrationClientModulePreloadUrls?: readonly string[];
   /**
@@ -797,6 +811,10 @@ async function finishRender(
     resolveRequestStylesheetUrls?: RequestStylesheetUrlResolver;
     waitForAll: boolean;
     awaitDeferredForDataRequest?: boolean;
+    /** See `RenderPageRequestOptions.clientApiRouteNames`. */
+    clientApiRouteNames?: () => readonly string[];
+    /** See `RenderPageRequestOptions.payloadBudget`. */
+    payloadBudget?: PagePayloadBudget;
     /** See `RenderPageRequestOptions.crawler`. */
     crawler?: boolean;
     /** See `RenderPageRequestOptions.noindex`. */
@@ -1129,7 +1147,7 @@ async function finishRender(
     hydrationClientModulePreloadUrls: streamOptions.hydrationClientModulePreloadUrls,
     localeAlternates: hasExplicitAlternates ? undefined : localeAlternates,
     localeRouting,
-    namedApiRoutes: resolveNamedApiRoutes(),
+    namedApiRoutes: resolveNamedApiRoutes(streamOptions.clientApiRouteNames?.()),
   };
 
   // Resolve document slots before either wire representation is serialized.
@@ -1140,6 +1158,15 @@ async function finishRender(
     documentSlots.locale,
     sessionExtras(bundle),
   );
+
+  if (streamOptions.payloadBudget !== undefined) {
+    reportPayloadBudget({
+      budget: streamOptions.payloadBudget,
+      route: { name: bundle.route.name, path: bundle.route.path },
+      payload: documentValue.payload,
+      routes: documentValue.namedApiRoutes,
+    });
+  }
 
   const wrapWithContext = (element: ReactNode): ReactNode =>
     createElement(DocumentContext.Provider, {
@@ -1620,6 +1647,8 @@ export async function renderPageRequest(
           resolveRequestStylesheetUrls: options.resolveRequestStylesheetUrls,
           waitForAll: options.waitForAll ?? false,
           awaitDeferredForDataRequest: options.awaitDeferredForDataRequest,
+          clientApiRouteNames: options.clientApiRouteNames,
+          payloadBudget: options.payloadBudget,
           crawler: options.crawler,
           noindex: options.noindex,
           getRouteTranslations: options.getRouteTranslations,

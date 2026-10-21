@@ -77,6 +77,13 @@ export type PageConfig<TLoader extends LoaderFunction | undefined = undefined> =
   readonly action?: PageActionConfig;
   /** Settings per named `actions` export, keyed by action name. */
   readonly actions?: Readonly<Record<string, PageActionConfig>>;
+  /**
+   * Browser route names this page uses but the build cannot see, such as a name
+   * read from data: `["orders.show", "orders.*"]`. Each entry is a route name or
+   * a `prefix.*` pattern. Routes a page's client code references by literal name
+   * are included automatically; `clientVisible: false` routes never are.
+   */
+  readonly apiRoutes?: readonly string[];
 };
 
 /**
@@ -95,6 +102,8 @@ export type LayoutConfig<TLoader extends LoaderFunction | undefined = undefined>
   readonly metadata?: PageMetadata<TLoader>;
   /** `false` suppresses declared font preloads for this page and its descendants. */
   readonly fontPreload?: boolean;
+  /** Browser route names for every page that renders this layout (see `PageConfig.apiRoutes`). */
+  readonly apiRoutes?: readonly string[];
 };
 
 /**
@@ -109,4 +118,6 @@ export type RootConfig<TLoader extends LoaderFunction | undefined = undefined> =
   readonly metadata?: PageMetadata<TLoader>;
   /** `false` suppresses declared font preloads for this page and its descendants. */
   readonly fontPreload?: boolean;
+  /** Browser route names for every page in the application (see `PageConfig.apiRoutes`). */
+  readonly apiRoutes?: readonly string[];
 };

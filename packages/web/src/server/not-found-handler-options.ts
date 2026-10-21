@@ -54,6 +54,8 @@ export type NotFoundPageHandlerInput = {
   stylesheetUrls: readonly string[];
   /** Resolves per-request `linkStylesheetsFor()` declarations; see `PageRouteHandlerOptions`. */
   resolveRequestStylesheetUrls?: RequestStylesheetUrlResolver;
+  /** The named API route names this page's document may embed; see `PageRouteHandlerOptions`. */
+  clientApiRouteNames?: () => readonly string[];
 };
 
 /**
@@ -78,6 +80,7 @@ export function notFoundPageHandlerOptions(
     loadErrorPage: input.loadErrorPage,
     errorPageFile: input.errorPageFile,
     getRouteTranslations: input.getRouteTranslations,
+    clientApiRouteNames: input.clientApiRouteNames,
     // NO LAYOUT means no layout CSS either — just root and the not-found
     // page's own stylesheets.
     stylesheetUrls: input.stylesheetUrls,

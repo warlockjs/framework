@@ -3,6 +3,7 @@ import {
   BadRequestError,
   ForbiddenError,
   Response,
+  router,
   ServerError,
   setEnvironment,
   type Request,
@@ -39,6 +40,7 @@ import { renderPageFailure, renderPageRequest, resolveServerErrorPageProps } fro
 import { hydrationErrorPageProps, type ErrorPageModule } from "./error-page";
 import { PublicPageError } from "./public-page-error";
 import type { PipelineStore } from "./execute-page-request.types";
+import { resetPayloadBudgetReports, resolvePayloadBudget } from "./payload-budget";
 
 beforeEach(() => {
   resolvePageMetadata.mockClear();
@@ -869,5 +871,110 @@ describe("finishRender ordinary page props", () => {
     expect(pageProps?.params).toEqual({ category: "books", productId: "42" });
     expect(appProps).not.toHaveProperty("params");
     expect(layoutProps).not.toHaveProperty("params");
+  });
+});
+
+describe("per-page browser route table", () => {
+  const entry: PageRouteEntry = {
+    path: "/orders/:id",
+    name: "orders.page",
+    triple: {
+      app: {
+        default: ({ children }: { children?: ReactNode }) =>
+          createElement(DefaultApp, { children }),
+      },
+      layout: {
+        default: ({ children }: { children?: ReactNode }) =>
+          createElement("section", null, children),
+      },
+      page: { default: () => createElement("p", null, "orders") },
+    },
+  };
+
+  const registered = [
+    { name: "orders.show", path: "/api/orders/:id", method: "GET" as const },
+    { name: "admin.purge", path: "/api/admin/purge", method: "POST" as const },
+    {
+      name: "internal.reindex",
+      path: "/internal/reindex",
+      method: "POST" as const,
+      clientVisible: false as const,
+    },
+  ];
+
+  beforeEach(() => {
+    resetPayloadBudgetReports();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("embeds only the routes the page may reach, never a route that opted out of the browser", async () => {
+    vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(registered);
+
+    const rendered = await renderPageRequest("/orders/1", {
+      routes: [entry],
+      createHttp: () => createHttp(),
+      clientApiRouteNames: () => ["orders.show", "internal.reindex"],
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+    expect(rendered.html).toContain("/api/orders/:id");
+    expect(rendered.html).not.toContain("/api/admin/purge");
+    expect(rendered.html).not.toContain("/internal/reindex");
+    expect(rendered.bundle?.document?.namedApiRoutes).toEqual({
+      "orders.show": { path: "/api/orders/:id", method: "GET" },
+    });
+  });
+
+  it("gives a client navigation the same page table in its payload", async () => {
+    vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(registered);
+
+    const rendered = await renderPageRequest("/orders/1", {
+      routes: [entry],
+      createHttp: () => createHttp(),
+      dataRequest: true,
+      clientApiRouteNames: () => ["orders.show"],
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+    if (rendered.bundle === undefined) throw new Error("expected a render bundle");
+    expect(buildHydrationPayload(rendered.bundle, "en").document).toMatchObject({
+      namedApiRoutes: { "orders.show": { path: "/api/orders/:id", method: "GET" } },
+    });
+  });
+
+  it("embeds an empty table when the page is asked for no names", async () => {
+    vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(registered);
+
+    const rendered = await renderPageRequest("/orders/1", {
+      routes: [entry],
+      createHttp: () => createHttp(),
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+    expect(rendered.html).not.toContain("/api/orders/:id");
+    expect(rendered.bundle?.document?.namedApiRoutes).toEqual({});
+  });
+
+  it("reports an over-budget document from the render itself, once per route", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(registered);
+
+    for (let request = 0; request < 2; request++) {
+      await renderPageRequest("/orders/1", {
+        routes: [entry],
+        createHttp: () => createHttp(),
+        clientApiRouteNames: () => ["orders.show"],
+        payloadBudget: resolvePayloadBudget({ page: "1b" }),
+      });
+    }
+
+    const reports = warn.mock.calls.filter((call) =>
+      String(call[0]).includes('Route "orders.page"'),
+    );
+    expect(reports).toHaveLength(1);
+    expect(String(reports[0]?.[0])).toContain("over its");
   });
 });

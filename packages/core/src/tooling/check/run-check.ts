@@ -17,6 +17,7 @@ import {
   checkExitCode,
 } from "./check-report.types";
 import { runConventions } from "./conventions-step";
+import { collectApiRouteFacts } from "./api-route-references";
 import { checkNodeVersion } from "./environment-step";
 import { runLint } from "./lint-step";
 import { listSourceFiles, listTestFiles } from "./source-files";
@@ -176,7 +177,16 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
 
   if (options.fix && !filesBlocked && !skip.has("conventions")) {
     try {
-      applyConventionFixes(cwd, runConventions(cwd, await targets(), options.project));
+      const fixTargets = await targets();
+      applyConventionFixes(
+        cwd,
+        runConventions(
+          cwd,
+          fixTargets,
+          options.project,
+          collectApiRouteFacts(cwd, await listSourceFiles(cwd)),
+        ),
+      );
     } catch (error) {
       problems.push(
         createProblem({
@@ -272,7 +282,14 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
 
     return {
       detail: `${conventionFiles.length} file(s) checked`,
-      problems: runConventions(cwd, conventionFiles, options.project),
+      // Facts come from the whole project even when only changed files are checked:
+      // a route registered in one file may be referenced from another.
+      problems: runConventions(
+        cwd,
+        conventionFiles,
+        options.project,
+        collectApiRouteFacts(cwd, await listSourceFiles(cwd)),
+      ),
     };
   });
 

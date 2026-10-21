@@ -1007,13 +1007,22 @@ export class Router {
    *
    * Names are the registered names, including method suffixes. `all` stays
    * intact as route metadata; consumers decide whether their use supports it.
+   * A route that opted out with `clientVisible: false` carries that flag, and
+   * only that flag, so browser-facing consumers can leave it out.
    */
   public getNamedApiRoutes(options: NamedApiRoutesOptions = {}): readonly NamedApiRoute[] {
     return Object.freeze(
       this.routes
         .filter((route) => !route.isPage && typeof route.name === "string" && route.name.length > 0)
         .map((route) => {
-          const snapshot = { name: route.name!, path: route.path, method: route.method };
+          // `clientVisible: false` is the only key this flag ever adds, and it is
+          // present only then: the common snapshot keeps its exact shape.
+          const snapshot = {
+            name: route.name!,
+            path: route.path,
+            method: route.method,
+            ...(route.clientVisible === false ? { clientVisible: false as const } : {}),
+          };
           const schema = route.handler?.responseSchema;
           const response = schema ? options.resolveResponse?.(schema, route) : undefined;
 

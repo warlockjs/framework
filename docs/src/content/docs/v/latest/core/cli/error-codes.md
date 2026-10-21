@@ -557,3 +557,19 @@ Controller has no response schema. Assign `handler.responseSchema` to an exporte
 ```bash
 npx warlock explain WL9018
 ```
+
+### WL9019
+
+A browser route call (`apiHref()` or `useSubmitForm({ route })`) in `src/web` takes a route name that is only known at run time, so the page's route table cannot include it. Pass a string literal (or a template with a static prefix), or declare the names with `config.apiRoutes` in a page setup file. Defaults to a warning, and no warning is reported once any page declares `config.apiRoutes`; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9019
+```
+
+### WL9020
+
+Browser code names a route registered with `clientVisible: false`. Such a route is never embedded in a page, so the call would fail in the browser. Call the endpoint from the server, or remove `clientVisible: false` from the route. Defaults to an error; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9020
+```

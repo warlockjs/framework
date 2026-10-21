@@ -83,6 +83,29 @@ framework projects browser-safe registration code and its dependencies to the
 client. Keep registration safe for both realms; server-only services belong
 in loaders or actions.
 
+## Browser-reachable API routes
+
+A page document embeds only the named API routes its client code can reach, so
+a page never carries the whole API surface. Warlock finds them from the page's
+browser code: a route name written as a string literal (`apiHref("orders.show")`,
+`useSubmitForm({ route: "orders.create" })`, a constant), and the static prefix
+of a template (`` `orders.${kind}` `` reaches every name under `orders.`). Only
+registered routes qualify, and a route registered with `clientVisible: false`
+never does.
+
+A name built at run time that the build cannot see is declared in the setup
+file's `config`. Each entry is a route name or a `prefix.*` pattern:
+
+```ts title="orders.setup.ts"
+export const config: PageConfig = {
+  apiRoutes: ["orders.show", "reports.*"],
+};
+```
+
+A layout or root `config` accepts the same key, and its names reach every page
+that renders that layout. `warlock check` reports a route call that takes a name
+it cannot read as `WL9019` until a declaration covers it.
+
 ## Duplicate declarations and development
 
 Every logic export has one owner. Duplicates fail with the export name and

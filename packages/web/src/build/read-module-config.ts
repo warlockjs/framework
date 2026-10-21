@@ -40,6 +40,12 @@ export type ModuleConfigRead = {
    * the keys of an `actions` object literal or `config.actions`. Sorted, unique.
    */
   actionNames?: string[];
+  /**
+   * The browser route names a module declares with `config.apiRoutes`: literal
+   * route names, or `prefix.*` patterns covering every name under the prefix.
+   * Declared in source order, unique. Absent when the config declares none.
+   */
+  apiRoutes?: string[];
 };
 
 type ModuleKind = PageModuleKind;
@@ -179,12 +185,38 @@ function middlewareGuardsUser(node: ValueNode, bindings: ReadonlySet<string>): b
   });
 }
 
+/** `config.apiRoutes` entries: a route name, or a `prefix.*` pattern (`"orders.*"`). */
+const API_ROUTE_DECLARATION = /^[^*\s]+(?:\.\*)?$/;
+
+/** Reads `config.apiRoutes` as an array of literal, well-formed route declarations. */
+function readApiRoutes(value: ValueNode, sourceFile: string): string[] {
+  const array = unwrap(value);
+  if (array.type !== "ArrayExpression") {
+    fail(sourceFile, "config.apiRoutes must be an array literal of route names");
+  }
+  const names: string[] = [];
+  for (const element of array.elements) {
+    const literal = element === null ? undefined : stringLiteral(element as ValueNode);
+    if (literal === undefined || !API_ROUTE_DECLARATION.test(literal)) {
+      fail(
+        sourceFile,
+        'config.apiRoutes entries must be string literals: a route name such as "orders.show", or a prefix pattern such as "orders.*"',
+      );
+    }
+    if (!names.includes(literal)) names.push(literal);
+  }
+  return names;
+}
+
 function inspectConfig(
   declarator: { id: { type: string; name?: string }; init?: ValueNode | null },
   sourceFile: string,
   kind: ModuleKind,
   bindings: ReadonlySet<string>,
-): Pick<ModuleConfigRead, "route" | "prefix" | "strictMode" | "hasMiddleware" | "guardsUser"> & {
+): Pick<
+  ModuleConfigRead,
+  "route" | "prefix" | "strictMode" | "hasMiddleware" | "guardsUser" | "apiRoutes"
+> & {
   actionKeys: string[];
 } {
   if (declarator.id.type !== "Identifier" || declarator.id.name !== "config" || !declarator.init) {
@@ -197,6 +229,7 @@ function inspectConfig(
   let strictMode: boolean | undefined;
   let hasMiddleware = false;
   let guardsUser = false;
+  let apiRoutes: string[] | undefined;
   const actionKeys: string[] = [];
 
   for (const member of object.properties) {
@@ -223,6 +256,7 @@ function inspectConfig(
     }
     if (key === "actions") actionKeys.push(...literalKeys(member.value));
     if (key === "route") route = readRoute(member.value, sourceFile);
+    if (key === "apiRoutes") apiRoutes = readApiRoutes(member.value, sourceFile);
     if (key === "prefix") {
       const value = stringLiteral(member.value);
       if (value === undefined) fail(sourceFile, "config.prefix must be a string literal");
@@ -241,6 +275,7 @@ function inspectConfig(
     ...(strictMode === undefined ? {} : { strictMode }),
     hasMiddleware,
     ...(guardsUser ? { guardsUser: true as const } : {}),
+    ...(apiRoutes === undefined ? {} : { apiRoutes }),
     actionKeys,
   };
 }
@@ -285,6 +320,7 @@ export function readModuleConfig(
   let strictMode: boolean | undefined;
   let hasMiddleware = false;
   let guardsUser = false;
+  let apiRoutes: string[] | undefined;
   let hasDefault = false;
   let declaresAction = false;
   let hasSingleAction = false;
@@ -358,6 +394,7 @@ export function readModuleConfig(
       strictMode = read.strictMode;
       hasMiddleware = read.hasMiddleware;
       guardsUser = read.guardsUser === true;
+      apiRoutes = read.apiRoutes;
       for (const key of read.actionKeys) actionNames.add(key);
     }
   }
@@ -371,6 +408,7 @@ export function readModuleConfig(
     ...(strictMode === undefined ? {} : { strictMode }),
     hasMiddleware,
     ...(guardsUser ? { guardsUser: true as const } : {}),
+    ...(apiRoutes === undefined ? {} : { apiRoutes }),
     hasDefault,
     hasConfig: configSeen,
     ...(actionNames.size > 0 ? { actionNames: [...actionNames].sort() } : {}),
@@ -452,6 +490,7 @@ export function mergeModuleConfigReads(
     ...(configOwner?.strictMode === undefined ? {} : { strictMode: configOwner.strictMode }),
     hasMiddleware: configOwner?.hasMiddleware ?? false,
     ...(configOwner?.guardsUser === true ? { guardsUser: true as const } : {}),
+    ...(configOwner?.apiRoutes === undefined ? {} : { apiRoutes: configOwner.apiRoutes }),
     hasDefault: primaryRead.hasDefault,
     hasConfig: primaryRead.hasConfig || setupRead.hasConfig,
     ...(actionNames.length > 0 ? { actionNames } : {}),

@@ -345,6 +345,20 @@ export interface RouteOptions {
    * router.post("/auth/login", loginController, { public: true });
    */
   public?: boolean;
+  /**
+   * Whether this named API route may be embedded in a page for browser use.
+   *
+   * Defaults to `true`. Set `false` for an endpoint that must never be
+   * reachable through `apiHref()` or `useSubmitForm({ route })` from client
+   * code (an internal webhook, an admin-only job trigger). Such a route is never
+   * written into any page's browser route table, and a client reference to its
+   * name is a `warlock check` error (`WL9020`). Server-side authorization still
+   * decides who may call the endpoint.
+   *
+   * @example
+   * router.post("/internal/reindex", reindexController, { name: "internal.reindex", clientVisible: false });
+   */
+  clientVisible?: boolean;
 }
 
 export type RequestMethod =
@@ -369,6 +383,11 @@ export type NamedApiRoute = Readonly<{
    * (paths relative to `.warlock/typings/`), object literal types and arrays.
    */
   response?: Readonly<Record<string, string>>;
+  /**
+   * Present only as `false`, and only on a route that opted out with
+   * `clientVisible: false`. Absent means the route may be embedded in pages.
+   */
+  clientVisible?: false;
 }>;
 
 /** Options for `router.getNamedApiRoutes()`. */

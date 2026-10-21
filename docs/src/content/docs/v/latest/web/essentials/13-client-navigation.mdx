@@ -91,7 +91,9 @@ or when the runtime declines a same-origin URL.
 `href()` resolves named page routes through the server-published route table.
 It takes either positional arguments (`href(name, params, query)`) or an
 object (`href(name, { params, query })`). `apiHref()` does the same for named
-API routes, which is useful for `fetch` URLs. Generated declarations in
+API routes, which is useful for `fetch` URLs. Both accept only the names in the
+current page's route table; see
+[Form submission](/v/latest/web/essentials/14-form-submission/#which-named-routes-a-page-can-use). Generated declarations in
 `.warlock/typings/web-routes.d.ts` make page names and required path parameters
 type-safe when they are available; runtime validation remains active before
 generation. `refresh()` leaves history unchanged

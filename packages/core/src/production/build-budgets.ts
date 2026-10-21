@@ -2,12 +2,30 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export type PageBudget = { js?: string; css?: string };
+/**
+ * The inline payload budget (`build.budgets.payload`): how much hydration data
+ * one rendered document may embed. Measured at runtime, per document, and
+ * reported once per route; see `web/src/server/payload-budget.ts`.
+ */
+export type PayloadBudget = {
+  /** Limit for one document, e.g. "64kb"; defaults to 64kb. */
+  page?: string;
+  /** Route-path globs supporting *, ** and ?. The later matching entry sets the limit. */
+  pages?: Record<string, string>;
+  /**
+   * `"warn"` (default) logs a warning and `"error"` logs at error level. Neither
+   * fails a request: the budget reports, it does not gate.
+   */
+  mode?: "warn" | "error";
+};
 export type BuildBudgets = {
   page?: PageBudget;
   /** Route-path globs supporting *, ** and ?. Later matching entries win per field. */
   pages?: Record<string, PageBudget>;
   /** Defaults to error when budgets are configured. */
   mode?: "error" | "warn";
+  /** Inline payload budget per rendered document. Checked at runtime, not by `warlock build`. */
+  payload?: PayloadBudget;
 };
 export type BudgetPage = {
   page: string;

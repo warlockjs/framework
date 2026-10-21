@@ -162,6 +162,21 @@ function install(
 }
 
 describe("production page route installation", () => {
+  it("hands each page handler its build-time route names, and the manifest's payload budget", () => {
+    const { run, built } = install(
+      manifestOf([
+        { ...homePage, apiRouteNames: ["orders.show"] },
+        { ...productsPage, apiRouteNames: [] },
+      ]),
+    );
+    run();
+
+    const [home, products] = built;
+    expect(home?.clientApiRouteNames?.()).toEqual(["orders.show"]);
+    expect(products?.clientApiRouteNames?.()).toEqual([]);
+    expect(home?.payloadBudget).toEqual({ page: 64 * 1024, pages: [], mode: "warn" });
+  });
+
   it("uses each site's own error boundary when installing a multi-site manifest", async () => {
     const landingError = {
       module: { default: () => "landing" },
