@@ -1,0 +1,107 @@
+---
+title: Web UI generators
+description: Generate pages, shared-schema forms and module CRUD interfaces.
+---
+
+Use these generators in an app with `@warlock.js/web` and the app design system
+installed at `src/web/design-system/`. Each control is a Mongez React Form
+control with `name`, `label`, `hint` and `error` props. Generated forms import
+controls individually, for example:
+
+```tsx
+import TextInput from "web/design-system/components/text-input";
+import { Form } from "@mongez/react-form";
+```
+
+## Pages
+
+```sh
+npx warlock generate page account/settings
+npx warlock generate page dashboard --interactive
+```
+
+The first command creates `src/web/account/settings.page.tsx` and its
+`settings.setup.ts` companion. The setup contains a loader, the
+`/account/settings` route and metadata in `config.metadata`. The page contains
+one default component and only type-imports the loader. `--interactive` adds a
+feature hook under `hooks/`, with a counter example to replace with your own
+behavior. Keep state and effects there and executable page exports in setup.
+Names must be relative paths made of letters, numbers, hyphens and underscores.
+
+## Forms
+
+```sh
+npx warlock generate form contact
+npx warlock generate form contact --module posts --endpoint
+```
+
+Without a module, the form, submit hook and props type live under
+`src/web/forms/`, and the Seal schema lives at
+`src/shared/schema/contact.schema.ts`. With `--module posts`, UI files live
+under `src/web/posts/` and the schema under `src/shared/schema/posts/`.
+The module must already exist.
+
+The initial schema has a required `name` string and the component uses
+`TextInput` and `SubmitButton`. Extend that single schema and the form's
+controls together. Both client validation and the optional server controller
+import the same schema value. Submission uses `useSubmitForm` in a separate
+hook, with pending, error and success feedback. The form accepts `path`,
+`method` (`POST` or `PUT`) and `defaultValue` props.
+
+The default target is `/contact`, or `/posts/contact` with a module. Without
+`--endpoint`, provide the matching API yourself. With `--endpoint`, a module is
+required: the generator adds a controller with `validation` and
+`responseSchema`, and registers a guarded POST route in the module's existing
+`routes.ts`. Repeating generation does not duplicate that route. The initial
+controller validates and echoes the input; replace the response body with a
+service call for database persistence.
+
+## CRUD UI
+
+```sh
+npx warlock generate module posts
+npx warlock generate crud-ui posts --dry-run --json
+npx warlock generate crud-ui posts
+```
+
+Define the module's create/update Seal schemas and list query fields before
+generating its UI. The generator loads the actual schemas through the app
+loader; their imports must resolve and be safe for client use. Empty schemas
+produce empty forms. Generated forms import those existing schemas rather
+than creating competing validation definitions.
+
+Supported field mappings are plain strings to `TextInput`, password names to
+`PasswordInput`, email/date/time/date-time formats to their corresponding
+design-system controls, and booleans to `CheckboxInput`. Numeric fields,
+unions, nullable fields, enums, arrays and nested objects need explicit control
+and conversion choices; generation rejects them before writing files.
+
+Output under `src/web/posts/` includes:
+
+- List, create and edit pages, each with a setup companion and metadata.
+- Create and update forms, separate submit hooks and props types.
+- A list hook that reads GET `/posts`, with pagination and filter state.
+- An edit hook that reads GET `/posts/:id`; updates submit PUT `/posts/:id`.
+- A separate delete component and hook that call DELETE `/posts/:id`, show
+  errors and refresh the list on success.
+
+The list uses the module endpoint's `data` array and `pagination.page` /
+`pagination.pages` contract. Literal fields in the conventional
+`listPostsQuerySchema` become filter controls, excluding `page` and `limit`;
+pagination controls `page`, and `limit` uses the server default. Create submits
+POST `/posts`. The generated UI preserves the module endpoints' authorization
+and response handling.
+
+CRUD UI generation accepts the conventional full CRUD route file, including
+formatting and comment changes. Custom route shapes and guards are rejected
+because their behavior cannot safely be inferred. Generated page middleware
+uses `requireUser({ userType: "user" })`, matching the starter's guarded module
+routes. Configure `web.session` with the auth page-session resolver first.
+For customized route policy, build the UI explicitly against that contract.
+
+## Preview and existing files
+
+All three generators participate in the standard `--dry-run --json` report,
+including form endpoint route edits. Dry runs write nothing. Existing files
+are skipped unless `--force` is supplied; forced generation replaces their
+contents. Route additions retain existing module code.

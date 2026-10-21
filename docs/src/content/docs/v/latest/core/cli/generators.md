@@ -123,6 +123,8 @@ The controller imports the schema and its inferred type from the schema file dir
 
 This is the workflow you'll use most. Each generator does one job; combine them as needed.
 
+For pages, shared-schema forms and module CRUD interfaces, see [Web UI generators](./web-generators).
+
 ## The generators in detail
 
 ### `generate.module <name>`
