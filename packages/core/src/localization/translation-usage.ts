@@ -92,7 +92,7 @@ export function translationDeclarationUsage(entry: string, file: string): Transl
   const invalid = (): Error =>
     new Error(
       `config.translations entry ${JSON.stringify(entry)} in "${file}" must be a translation key, ` +
-        'a group, or a prefix ending in ".*" such as "statuses.*".',
+        'a group, or a prefix such as "statuses.*"; a wildcard is allowed only as the final ".*".',
     );
 
   if (entry.length === 0 || /\s/.test(entry)) throw invalid();
@@ -292,7 +292,10 @@ export function scanTranslationSource(fileName: string, text: string): Translati
       const specifiers = node.specifiers;
       const typeOnly =
         node.importKind === "type" ||
-        (specifiers.length > 0 && specifiers.every((specifier) => specifier.importKind === "type"));
+        (specifiers.length > 0 &&
+          specifiers.every(
+            (specifier) => specifier.type === "ImportSpecifier" && specifier.importKind === "type",
+          ));
       if (!typeOnly) imports.push(node.source.value);
     } else if (
       (node.type === "ExportNamedDeclaration" || node.type === "ExportAllDeclaration") &&
