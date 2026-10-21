@@ -15,3 +15,4 @@ design-system, AI-workflow and performance-budget decisions. Everything ships in
 | runtime | DW-13 session install on refresh/locale/swap, DW-06 resource derivation from hidden fields, DW-01, DW-02, DW-03, DW-05, DW-07 |
 | auth | DW-15, DW-09, DW-08, DW-10 |
 | skills | WEB_SKILLS 2.2, 2.4, state-ownership rule, RTL topic, feedback/motion topic (no-JS form work and Mongez changes are out of scope) |
+| test-runtime | worker-scoped test runtime, unit mode and unit/integration project split, once-per-process loader hook, setup profiling, worker count under CPU quotas, release-gate test recipe (TEST_RUNTIME_PERFORMANCE.md) |
