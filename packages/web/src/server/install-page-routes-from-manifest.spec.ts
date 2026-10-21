@@ -6,6 +6,7 @@ import { discoverPages, isDiscoveredRoutablePage } from "../build/discover-pages
 import { NestedLayoutsNotSupportedError } from "../routing/layout-policy";
 import { href, resetRouteTable, routeTablePublisher } from "../routing/route-table";
 import { toPosix } from "../shared/to-posix";
+import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../translations/types";
 import type { PageRouteHandler, PageRouteHandlerOptions } from "./create-page-route-handler";
 import {
   installPageRoutesFromManifest,
@@ -43,9 +44,15 @@ type RegisteredRoute = {
 function recordingRouter(apiRoutes: readonly string[] = []) {
   const registered: RegisteredRoute[] = [];
   const notFound: RegisteredRoute[] = [];
+  const translationTables: string[] = [];
 
   const router = {
     get(path: string, handler: PageRouteHandler, options: RegisteredRoute["options"]) {
+      // The translation table route is every install's, and no page.
+      if (path.startsWith(TRANSLATION_TABLE_ROUTE_PREFIX)) {
+        translationTables.push(path);
+        return;
+      }
       (path === NOT_FOUND_ROUTE_PATH ? notFound : registered).push({ path, handler, options });
     },
     // `apiRoutes` stands for the routes the APPLICATION registered on the same
@@ -60,7 +67,7 @@ function recordingRouter(apiRoutes: readonly string[] = []) {
     ],
   } as unknown as InstallPageRoutesFromManifestOptions["router"];
 
-  return { router, registered, notFound };
+  return { router, registered, notFound, translationTables };
 }
 
 /**
@@ -147,7 +154,7 @@ function install(
   overrides: Partial<InstallPageRoutesFromManifestOptions> = {},
   apiRoutes: readonly string[] = [],
 ) {
-  const { router, registered, notFound } = recordingRouter(apiRoutes);
+  const { router, registered, notFound, translationTables } = recordingRouter(apiRoutes);
   const { createHandler, built } = recordingHandlerFactory();
 
   const run = () =>
@@ -158,10 +165,18 @@ function install(
       ...overrides,
     });
 
-  return { run, registered, notFound, built };
+  return { run, registered, notFound, built, translationTables };
 }
 
 describe("production page route installation", () => {
+  it("registers the translation table route once, whatever the pages", () => {
+    const { run, translationTables } = install(manifestOf([homePage]));
+
+    run();
+
+    expect(translationTables).toEqual([`${TRANSLATION_TABLE_ROUTE_PREFIX}/*`]);
+  });
+
   it("hands each page handler its build-time route names, and the manifest's payload budget", () => {
     const { run, built } = install(
       manifestOf([

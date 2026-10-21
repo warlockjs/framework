@@ -11,6 +11,7 @@ import { normalizePageModule } from "./normalize-page-module";
 import { isNotFoundPageFile } from "./not-found-page";
 import type { PageFileChanges } from "./page-file-change";
 import { isErrorPageFilePath } from "./page-file-change";
+import { TRANSLATION_ROUTE_SOURCE_FILE } from "./translation-route";
 
 function pathKey(file: string): string {
   const normalized = path.resolve(file).replace(/\\/g, "/");
@@ -38,11 +39,21 @@ export function registeredPageFiles(
   ];
 }
 
-/** Exact route-source owners replaced by a live page-table transaction. */
+/**
+ * Exact route-source owners replaced by a live page-table transaction: every
+ * page owner, plus the translation table route, which the page installer
+ * registers again on every install and so must be released with the pages.
+ */
 export function pageRouteSourceFiles(routes: ReturnType<Router["list"]>): string[] {
   return [
     ...new Set(
-      routes.filter((route) => route.isPage && route.sourceFile).map((route) => route.sourceFile),
+      routes
+        .filter(
+          (route) =>
+            route.sourceFile &&
+            (route.isPage || route.sourceFile === TRANSLATION_ROUTE_SOURCE_FILE),
+        )
+        .map((route) => route.sourceFile),
     ),
   ];
 }

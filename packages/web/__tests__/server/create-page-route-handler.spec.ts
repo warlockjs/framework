@@ -1,7 +1,8 @@
 import { PassThrough } from "node:stream";
-import { parse } from "devalue";
+import { parse, stringify } from "devalue";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpContext } from "@warlock.js/core";
+import { escapePayload } from "../../src/components/document-context";
 import {
   createPageRouteHandler,
   type PageModuleLoader,
@@ -488,8 +489,20 @@ describe("createPageRouteHandler — data requests", () => {
     );
 
     expect(embedded, "the document must embed a payload to compare against").not.toBeNull();
-    expect(asData.written.sent).toBe(embedded?.[1]);
-    expect(parse(asData.written.sent as string)).toEqual(parse(embedded![1] as string));
+
+    // ONE field differs on purpose: the page's browser route table. A document
+    // carries it in its own script (`<Scripts/>`, so it ships once), while a
+    // navigation has no such script and receives it in the payload's document
+    // slot. Everything else is the same bytes.
+    const sent = parse(asData.written.sent as string) as {
+      document?: Record<string, unknown>;
+    };
+    const { namedApiRoutes, ...sentDocument } = sent.document ?? {};
+
+    expect(namedApiRoutes, "a navigation carries the page's route table").toBeDefined();
+    expect(asDocument.written.html).toContain('id="__WARLOCK_NAMED_API_ROUTES__"');
+    expect(embedded?.[1]).toBe(escapePayload(stringify({ ...sent, document: sentDocument })));
+    expect(parse(embedded![1] as string)).toEqual({ ...sent, document: sentDocument });
   });
 
   it("declares Vary so a cache cannot serve a document to a data request", async () => {

@@ -130,6 +130,7 @@ function stubGeneratedPages(pageCount: number): void {
     barrelFile: "virtual-pages.ts",
     contents: "",
     pageRoutes: { version: 1, routes: [] },
+    translationAssets: [],
   });
 }
 

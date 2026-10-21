@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Router } from "@warlock.js/core";
 import type { PageManifest } from "../../src/server/page-manifest";
+import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../../src/translations/types";
 
 const createServerMock = vi.hoisted(() => vi.fn());
 const resolveHydrationClientUrlMock = vi.hoisted(() => vi.fn(() => "/assets/hydration-test.js"));
@@ -153,7 +154,10 @@ function recordRoutes(graph: WebGraph) {
     _handler: unknown,
     options?: { name?: string },
   ) => {
-    registered.push({ path: routePath, name: options?.name });
+    // The translation table route is every install's, and no page.
+    if (!routePath.startsWith(TRANSLATION_TABLE_ROUTE_PREFIX)) {
+      registered.push({ path: routePath, name: options?.name });
+    }
 
     return graph.router;
   }) as Router["get"]);

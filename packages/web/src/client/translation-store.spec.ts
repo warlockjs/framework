@@ -296,6 +296,16 @@ describe("hydration parity", () => {
   });
 });
 
+/** A payload of the global-registry mode: the one that names no `translationMode`. */
+function globalRegistryPayload(
+  ...args: Parameters<typeof payload>
+): HydrationDocumentPayloadSource {
+  const source = payload(...args);
+  delete (source as { translationMode?: string }).translationMode;
+
+  return source;
+}
+
 describe("global-registry mode", () => {
   afterEach(() => setTranslationsList({}));
 
@@ -304,12 +314,11 @@ describe("global-registry mode", () => {
       "fetch",
       vi.fn(async () => jsonResponse({ app: { title: "Orders app" }, common: { save: "Save" } })),
     );
-    const source = payload(
+    const source = globalRegistryPayload(
       { orders: { title: "Orders" } },
       { url: "/__warlock/translations/store-test.g1.json", hash: "g1", groups: ["app", "common"] },
       "orders.index",
     );
-    delete (source as { translationMode?: string }).translationMode;
 
     await loadTranslationAssets(source);
     installPayloadTranslations(source);
@@ -326,12 +335,12 @@ describe("global-registry mode", () => {
       "fetch",
       vi.fn(async () => jsonResponse({ app: { title: "Orders app" } })),
     );
-    const first = payload(
+    const first = globalRegistryPayload(
       { orders: { title: "Orders" } },
       { url: "/__warlock/translations/store-test.g2.json", hash: "g2", groups: ["app"] },
       "orders.index",
     );
-    const second = payload(
+    const second = globalRegistryPayload(
       { members: { title: "Members" } },
       { url: "/__warlock/translations/store-test.g2.json", hash: "g2", groups: ["app"] },
       "members.index",
@@ -353,7 +362,7 @@ describe("global-registry mode", () => {
       "fetch",
       vi.fn(async () => jsonResponse({ app: { title: "Orders app" } })),
     );
-    const source = payload(
+    const source = globalRegistryPayload(
       {},
       { url: "/__warlock/translations/store-test.g3.json", hash: "g3", groups: ["app"] },
     );

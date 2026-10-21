@@ -54,6 +54,10 @@ async function devHarness(shared: boolean) {
     .replace(
       '"./routing/current-locale"',
       JSON.stringify(toPosix(path.join(SOURCE_ROOT, "routing/current-locale.ts"))),
+    )
+    .replace(
+      '"./client/translation-store"',
+      JSON.stringify(toPosix(path.join(SOURCE_ROOT, "client/translation-store.ts"))),
     );
   if (!shared) {
     const before = localeSource;

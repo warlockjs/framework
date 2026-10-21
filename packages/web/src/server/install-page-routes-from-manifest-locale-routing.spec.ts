@@ -9,6 +9,7 @@ import type { PageRouteHandler, PageRouteHandlerOptions } from "./create-page-ro
 import type { PageManifest, PageManifestPageEntry } from "./page-manifest";
 import { NOT_FOUND_ROUTE_PATH } from "./not-found-page";
 import { LocaleParamRoutingConflictError } from "./locale-routing/locale-param-routing-conflict";
+import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../translations/types";
 
 /**
  * Card A of `releases/v5.17-locale-routing-design-note.md` — `web.localeRouting`.
@@ -29,6 +30,8 @@ function recordingRouter() {
 
   const router = {
     get(path: string, handler: PageRouteHandler, options: RegisteredRoute["options"]) {
+      // The translation table route is every install's, and no page.
+      if (path.startsWith(TRANSLATION_TABLE_ROUTE_PREFIX)) return;
       (path === NOT_FOUND_ROUTE_PATH ? notFound : registered).push({ path, handler, options });
     },
     list: () => [...registered, ...notFound].map((route) => ({ path: route.path })),

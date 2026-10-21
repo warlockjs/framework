@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { NOT_FOUND_ROUTE_NAME, NOT_FOUND_ROUTE_PATH } from "./not-found-page";
+import { resolvePayloadBudget } from "./payload-budget";
 
 describe("notFoundPageHandlerOptions", () => {
   it("assembles the invariant not-found handler options", () => {
@@ -31,6 +32,23 @@ describe("notFoundPageHandlerOptions", () => {
     expect(options.skipPageLoader).toBe(true);
     // Never assembled here — each caller adds it, or does not, on its own.
     expect("httpServer" in options).toBe(false);
+  });
+
+  it("hands the not-found document the same route names and payload budget as every page", () => {
+    const payloadBudget = resolvePayloadBudget({ page: "32kb" });
+    const clientApiRouteNames = () => ["orders.show"];
+
+    const options = notFoundPageHandlerOptions({
+      appFile: "src/web/root.tsx",
+      pageFile: "src/web/404.page.tsx",
+      loadModule: async () => ({}),
+      stylesheetUrls: [],
+      clientApiRouteNames,
+      payloadBudget,
+    });
+
+    expect(options.clientApiRouteNames).toBe(clientApiRouteNames);
+    expect(options.payloadBudget).toBe(payloadBudget);
   });
 
   it("carries an empty stylesheet chain through untouched", () => {

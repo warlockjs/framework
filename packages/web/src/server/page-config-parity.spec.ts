@@ -10,6 +10,7 @@ import type { PageRouteHandler, PageRouteHandlerOptions } from "./create-page-ro
 import { installPageRoutes, type InstallPageRoutesOptions } from "./install-page-routes";
 import { installPageRoutesFromManifest } from "./install-page-routes-from-manifest";
 import type { PageManifest, PageManifestPageEntry } from "./page-manifest";
+import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../translations/types";
 
 const temporaryDirectories: string[] = [];
 
@@ -32,7 +33,10 @@ function recordingRouter() {
   const registered: RegisteredRoute[] = [];
   const router = {
     get(path: string, _handler: PageRouteHandler, options: RegisteredRoute["options"]) {
-      if (path !== "*") registered.push({ path, options });
+      // Neither the catch-all nor the translation table route is a page.
+      if (path !== "*" && !path.startsWith(TRANSLATION_TABLE_ROUTE_PREFIX)) {
+        registered.push({ path, options });
+      }
       return router;
     },
     async withSourceFile<T>(_sourceFile: string, callback: () => T | Promise<T>) {

@@ -33,6 +33,7 @@
 import type { PageModuleLoader, PageRouteHandlerOptions } from "./create-page-route-handler";
 import type { ErrorPageModuleLoader } from "./error-page";
 import type { RequestStylesheetUrlResolver } from "./document-stylesheet-urls";
+import type { PagePayloadBudget } from "./page-manifest";
 import type { RouteTranslationsResolver } from "./route-translations";
 import { NOT_FOUND_ROUTE_NAME, NOT_FOUND_ROUTE_PATH } from "./not-found-page";
 
@@ -56,6 +57,8 @@ export type NotFoundPageHandlerInput = {
   resolveRequestStylesheetUrls?: RequestStylesheetUrlResolver;
   /** The named API route names this page's document may embed; see `PageRouteHandlerOptions`. */
   clientApiRouteNames?: () => readonly string[];
+  /** The inline payload budget the not-found document is checked against, same as every other page. */
+  payloadBudget?: PagePayloadBudget;
 };
 
 /**
@@ -81,6 +84,7 @@ export function notFoundPageHandlerOptions(
     errorPageFile: input.errorPageFile,
     getRouteTranslations: input.getRouteTranslations,
     clientApiRouteNames: input.clientApiRouteNames,
+    payloadBudget: input.payloadBudget,
     // NO LAYOUT means no layout CSS either — just root and the not-found
     // page's own stylesheets.
     stylesheetUrls: input.stylesheetUrls,

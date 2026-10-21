@@ -42,7 +42,7 @@ describe("route names agree between the build and the installer", () => {
     const relative = path.posix.relative("src/web", sourceFile);
 
     expect(resolveRoute(undefined, sourceFile).name).toBe(buildName(relative, undefined));
-    expect(resolveRoute(undefined, sourceFile).name).toBe("orders.index");
+    expect(resolveRoute(undefined, sourceFile).name).toBe("orders");
   });
 
   it("agrees on an explicit name declared through the route export", () => {

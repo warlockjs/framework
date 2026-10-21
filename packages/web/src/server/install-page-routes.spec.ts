@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { container, type Router } from "@warlock.js/core";
 import * as discoverPagesModule from "../build/discover-pages";
+import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../translations/types";
 import { NestedLayoutsNotSupportedError } from "../routing/layout-policy";
 import * as createPageRouteHandlerModule from "./create-page-route-handler";
 import type { PageRouteHandler, PageRouteHandlerOptions } from "./create-page-route-handler";
@@ -75,16 +76,22 @@ type RegisteredRoute = {
  * registers the not-found route (`*`), and it is not one of the pages — it has
  * no declared URL, it is not in the returned table and it is not published for
  * `href()`. Splitting it here keeps `registered` meaning what every case below
- * was written to mean: the pages that declared a path.
+ * was written to mean: the pages that declared a path. The translation table
+ * route (`/__warlock/translations/*`) is every install's too, and is no page
+ * either, so it is left out of both arrays.
  */
 function recordingRouter() {
   const registered: RegisteredRoute[] = [];
   const notFound: (RegisteredRoute & { handler: PageRouteHandler })[] = [];
+  const translationTables: RegisteredRoute[] = [];
   let sourceFile: string | undefined;
 
   const router = {
     get(routePath: string, handler: PageRouteHandler, options: RegisteredRoute["options"]) {
-      if (routePath === NOT_FOUND_ROUTE_PATH) {
+      if (routePath.startsWith(TRANSLATION_TABLE_ROUTE_PREFIX)) {
+        // Not a page: no declared URL, not in the returned table.
+        translationTables.push({ path: routePath, options, sourceFile, handler });
+      } else if (routePath === NOT_FOUND_ROUTE_PATH) {
         notFound.push({ path: routePath, options, handler, sourceFile });
       } else {
         registered.push({ path: routePath, options, sourceFile, handler });
@@ -124,7 +131,7 @@ function recordingRouter() {
     ],
   } as unknown as Router;
 
-  return { router, registered, notFound };
+  return { router, registered, notFound, translationTables };
 }
 
 /**
@@ -155,7 +162,7 @@ function install(
   vite: InstallPageRoutesOptions["vite"],
   overrides: Partial<InstallPageRoutesOptions> = {},
 ) {
-  const { router, registered, notFound } = recordingRouter();
+  const { router, registered, notFound, translationTables } = recordingRouter();
 
   const run = () =>
     installPageRoutes({
@@ -166,7 +173,7 @@ function install(
       ...overrides,
     });
 
-  return { run, router, registered, notFound };
+  return { run, router, registered, notFound, translationTables };
 }
 
 /**
@@ -1051,6 +1058,21 @@ describe("installPageRoutes — a page module that fails to load", () => {
 describe("installPageRoutes — the not-found page", () => {
   beforeEach(seedHttpServer);
   afterEach(() => container.delete("http.server"));
+
+  it("registers the translation table route under its own owner, after the pages", async () => {
+    const appRoot = makeAppTree({ "src/web/home.page.tsx": "" });
+    const appSrcRoot = path.join(appRoot, "src");
+    const homeFile = path.join(appSrcRoot, "web", "home.page.tsx");
+    const vite = fakeVite({ [homeFile]: { default: (): null => null, config: { route: "/" } } });
+
+    const { run, translationTables } = install(appSrcRoot, vite);
+    await run();
+
+    expect(translationTables.map((route) => route.path)).toEqual([
+      `${TRANSLATION_TABLE_ROUTE_PREFIX}/*`,
+    ]);
+    expect(translationTables[0]?.sourceFile).toBe("\0warlock:translations");
+  });
 
   it("registers the catch-all last, under the reserved name, and never at /404", async () => {
     const appRoot = makeAppTree({
