@@ -261,3 +261,12 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## Test projects
+
+`npx create-warlock my-project --yes --features=test` delegates to `warlock add test`:
+unit `*.spec.ts` outside `tests/` runs without Warlock setup, integration `*.test.ts`
+and specs under `tests/` use framework setup and the generated cleanup runner.
+The template pins Vitest 4.1.10. See the generated `testing-strategy` skill for
+`setupTest({ mode: "unit", importModule })`, opt-in `tests.lifetime: "worker"`,
+`tests.resetBetweenFiles`, profiling and the changed-tests release gate.

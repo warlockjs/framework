@@ -32,3 +32,6 @@ export { assertPortIsAvailable, isPortAvailable } from "../http/port-preflight";
 // export, but it is still a contract: renaming the variable is a user-visible
 // change even though nothing exports it. The storage fake's
 // `WARLOCK_TEST_STORAGE_ROOT` is the same kind of channel.
+
+export { configureTestWorker, getTestRuntimeStats } from "./test-runtime-scope";
+export type { TestWorkerConfiguration } from "./test-runtime-scope";

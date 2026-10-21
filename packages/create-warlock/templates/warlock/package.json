@@ -46,7 +46,7 @@
     "@mongez/agent-kit": "^1.3.1",
     "@types/node": "^25.0.3",
     "typescript": "7.0.2",
-    "vitest": "4.0.5",
+    "vitest": "4.1.10",
     "oxlint": "1.88.0",
     "oxfmt": "0.73.0"
   }

@@ -229,3 +229,24 @@ The contact, locale, user create/list and post create/update examples declare `r
 Oxlint enables `typescript/no-explicit-any`, explicit member accessibility, `curly`, and `no-console`. The hybrid interface-for-contracts/type-for-data convention stays a review rule because `consistent-type-definitions` only supports one global preference. App sub-folder barrels remain permitted; web imports target individual component and hook files to keep client bundles lean and server-only code out of barrels. Run `npm run lint:check` and `npm run format:check` in the generated app.
 
 These model/resource conventions apply to newly generated apps. Existing apps adopting public UUIDs must add and backfill a unique column before changing their resource output or route lookups; updating a skill alone does not migrate stored data.
+
+## Test projects
+
+`npm create warlock@latest my-project -- --features=test` uses `warlock add test`
+to generate separate Vitest projects. `unit` discovers `src/**/*.spec.ts` outside
+`tests/` with no framework or HTTP setup. `integration` discovers `*.test.ts` and
+specs under `tests/` with the framework setup and a worker cleanup runner.
+The template pins Vitest 4.1.10 for that runner API. Existing configs are preserved.
+
+```bash
+npx vitest run --project unit
+npx warlock test --changed --since "$LAST_RELEASE_REF"
+npx vitest run --project integration
+# Full suite nightly:
+npx vitest run
+```
+
+The default runtime lifetime is per file. For reuse, profiling and the
+quota-aware `recommendedTestWorkers()` helper, see the
+[testing guide](/v/latest/core/testing/testing/#runtime-lifetime-unit-projects-and-setup-profiling).
+The generated `testing-strategy` project skill covers the same trade-offs.

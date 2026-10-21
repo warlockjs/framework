@@ -73,7 +73,9 @@ describe("proof 2 — the generated test setup preserves project config and pair
     // The only option passed is `importModule` (app modules load through
     // vitest's module graph, 5.25); an explicit `connectors` value would
     // outrank `tests.connectors` config, so none may appear.
-    expect(setupFile).toContain("await setupTest({ importModule: (file) => import(file) });");
+    expect(setupFile).toContain(
+      "await setupTest({ importModule: (file) => import(file), file: expect.getState().testPath });",
+    );
     expect(setupFile).not.toMatch(/setupTest\s*\(\s*\{[^)]*connectors/);
     expect(setupFile).not.toContain("connectors: true");
   });
@@ -82,7 +84,7 @@ describe("proof 2 — the generated test setup preserves project config and pair
     const setupFile = emittedFile(await runTestScaffold(), "src/test-setup.ts");
 
     expect(setupFile).toContain("afterAll(teardownTest);");
-    expect(setupFile).toMatch(/import\s*\{\s*afterAll\s*\}\s*from\s*"vitest";/);
+    expect(setupFile).toMatch(/import\s*\{\s*afterAll, expect\s*\}\s*from\s*"vitest";/);
     expect(setupFile).toMatch(/teardownTest[^\n]*from "@warlock\.js\/core\/tests"/);
   });
 

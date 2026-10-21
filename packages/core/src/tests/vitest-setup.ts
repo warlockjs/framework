@@ -2,8 +2,8 @@
  * Worker test lifecycle — `setupTest` / `teardownTest`.
  *
  * Implements `contracts/2026-08-12-test-worker-lifecycle.md`. The pair is
- * context-scoped, not "once per worker": Vitest runs `setupFiles` before EVERY
- * test file and rebuilds the module registry each time, so the harness that
+ * File-scoped by default, optionally worker-scoped. Vitest runs `setupFiles`
+ * before every test file. With isolation enabled it rebuilds the module registry. The harness that
  * calls `setupTest` owns pairing it with `teardownTest` in the same runtime
  * context.
  *
@@ -21,6 +21,15 @@
  * - HTTP global setup stays separately owned by `startHttpTestServer` /
  *   `stopHttpTestServer`.
  */
+import { performance } from "node:perf_hooks";
+import { config } from "../config";
+import { loadUnitConfig } from "./load-unit-config";
+import {
+  testRuntimeScope,
+  selectTestLifetime,
+  timeTestStep,
+  finishTestProfile,
+} from "./test-runtime-scope";
 import { Application } from "../application/application";
 import { bootstrap } from "../bootstrap";
 import { setAppModuleImporter } from "../loader/app-module-importer";
@@ -51,7 +60,18 @@ import type { TestTimeoutHandle } from "./test-setup-timeout";
 
 export type { TestConnectorsSelection } from "./test-connectors-selection";
 
+export type TestRuntimeConfiguration = {
+  lifetime?: "file" | "worker";
+  profileSetup?: boolean;
+  /** Runs before fixtures in every worker-lifetime file, including the first. Use a worker-specific database. */
+  resetBetweenFiles?: () => void | Promise<void>;
+};
+
 export type TestSetupOptions = {
+  /** Unit mode loads config values without hooks, connectors or native loaders. Requires importModule. */
+  mode?: "unit" | "integration";
+  /** File label for setup profiling. Pass expect.getState().testPath from Vitest. */
+  file?: string;
   /**
    * Which connectors to start.
    *
@@ -115,14 +135,14 @@ export class TestLifecycleError extends Error {
 }
 
 const POISONED_MESSAGE =
-  "setupTest() refuses to start a test runtime: an earlier teardownTest() reported a shutdown failure, so the connectors, ports and pools it owned are not known to be closed. Restart the Vitest worker before setting up again, or call teardownTest() to retry the shutdown — the lifecycle only returns to idle on a fully successful retry.";
+  "setupTest() refuses to start a test runtime: an earlier teardownTest() or per-file reset reported a failure, so the connectors, ports and pools it owned are not known to be closed. Restart the Vitest worker before setting up again, or call teardownTest() to retry the shutdown — the lifecycle only returns to idle on a fully successful retry.";
 
 /**
  * Bootstrap the test runtime and start the selected connectors.
  *
- * ⚠ Runs once per TEST FILE, not once per worker: `setupFiles` is executed for
- * every file and its module registry is rebuilt with it, measured across both
- * pools with isolation on and off. The lifecycle state lives on the runtime
+ * By default boots once per TEST FILE. With tests.lifetime: "worker", the runner
+ * owns shutdown and requires a shared module graph. `setupFiles` executes for
+ * every file. The lifecycle state lives on the runtime
  * context rather than in this module precisely so that a rebuild cannot hide a
  * runtime that is still up.
  *
@@ -145,6 +165,40 @@ const POISONED_MESSAGE =
  * await setupTest({ connectors: false });
  */
 export async function setupTest(options?: TestSetupOptions): Promise<void> {
+  const scope = testRuntimeScope();
+  const mode = options?.mode ?? "integration";
+  if (scope.fileOpen && scope.mode !== mode) {
+    throw new TestLifecycleError("Cannot mix unit and integration runtimes in one file.");
+  }
+  if (scope.mode && scope.mode !== mode && getTestLifecycleRegistry().state !== "idle") {
+    throw new TestLifecycleError("Cannot change mode while a test runtime is active.");
+  }
+  scope.mode = mode;
+  if (mode === "unit") {
+    if (!options?.importModule)
+      throw new TestLifecycleError(
+        "setupTest({ mode: 'unit' }) requires importModule from Vitest's module graph.",
+      );
+    if (scope.fileOpen) return;
+    scope.profile = { file: options.file ?? "unknown", steps: {} };
+    await timeTestStep("environment", () => Application.setEnvironment("test"));
+    const importModule = options.importModule;
+    scope.unitConfig ??= timeTestStep("config", async () => {
+      await warlockConfigManager.load();
+      await loadUnitConfig(importModule);
+    });
+    try {
+      await scope.unitConfig;
+    } catch (error) {
+      scope.unitConfig = undefined;
+      scope.profile = undefined;
+      throw error;
+    }
+    if (!profileEnabled()) scope.profile = undefined;
+    scope.files += 1;
+    scope.fileOpen = true;
+    return;
+  }
   warnMissingImportModule(options?.importModule);
 
   const registry = getTestLifecycleRegistry();
@@ -162,7 +216,27 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
 
   if (registry.state === "ready") {
     assertReadySelectionMatches(registry.activeSelection, requested);
-
+    if (scope.lifetime === "worker" && !scope.fileOpen) {
+      scope.boundary ??= Promise.resolve().then(async () => {
+        beginFileProfile(options?.file);
+        try {
+          await timeTestStep("reset", async () => {
+            await restoreTestFakes();
+            await installTestFakes(options?.fakes, { isolatedStorage: true });
+            await resetBetweenFiles();
+          });
+          scope.fileOpen = true;
+          scope.files += 1;
+        } catch (error) {
+          registry.state = "poisoned";
+          finishTestProfile();
+          throw error;
+        } finally {
+          scope.boundary = undefined;
+        }
+      });
+      await scope.boundary;
+    }
     return;
   }
 
@@ -179,7 +253,7 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
   setAppModuleImporter(options?.importModule);
 
   try {
-    return await startTestRuntime(requested, options?.fakes);
+    return await startTestRuntime(requested, options?.fakes, options);
   } finally {
     setAppModuleImporter(undefined);
   }
@@ -203,6 +277,30 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
  * poison anything. This lifecycle can only surface what that layer reports.
  */
 export async function teardownTest(): Promise<void> {
+  const scope = testRuntimeScope();
+  if (scope.mode === "unit") {
+    scope.fileOpen = false;
+    await timeTestStep("teardown", () => Promise.resolve());
+    finishTestProfile();
+    return;
+  }
+  if (scope.lifetime === "worker") {
+    if (scope.boundary) await settled(scope.boundary);
+    scope.fileOpen = false;
+    // The runner owns actual shutdown; afterAll marks the file boundary.
+    await timeTestStep("teardown", () => Promise.resolve());
+    finishTestProfile();
+    return;
+  }
+  try {
+    await timeTestStep("teardown", () => teardownFileRuntime());
+  } finally {
+    scope.fileOpen = false;
+    finishTestProfile();
+  }
+}
+
+async function teardownFileRuntime(): Promise<void> {
   const registry = getTestLifecycleRegistry();
 
   if (registry.state === "stopping" && registry.teardownAttempt) {
@@ -215,7 +313,7 @@ export async function teardownTest(): Promise<void> {
     // lifecycle idle, which the re-entry below then reads as "nothing to do".
     await settled(registry.setupAttempt.completion);
 
-    return teardownTest();
+    return teardownFileRuntime();
   }
 
   if (registry.state === "idle") {
@@ -381,6 +479,7 @@ async function awaitSetupWithinBound(
 function startTestRuntime(
   requested: RequestedTestConnectors,
   fakes: TestFakesSelection | undefined,
+  options?: TestSetupOptions,
 ): Promise<void> {
   const registry = getTestLifecycleRegistry();
 
@@ -406,6 +505,7 @@ function startTestRuntime(
       failEffectiveSelection,
       bound,
       fakes,
+      options,
     ),
   );
 
@@ -438,17 +538,34 @@ async function runTestRuntimeStartup(
   failEffectiveSelection: (error: unknown) => void,
   bound: SetupBound,
   fakes: TestFakesSelection | undefined,
+  options?: TestSetupOptions,
 ): Promise<void> {
   const registry = getTestLifecycleRegistry();
 
   try {
-    Application.setEnvironment("test");
-
-    await warlockConfigManager.load();
-    await bootstrap();
-
-    await filesOrchestrator.init();
-    await loadConfigFiles(true);
+    const steps: Record<string, number> = {};
+    const scope = testRuntimeScope();
+    // Collect cold-start timings before profileSetup becomes readable.
+    scope.profile = { file: options?.file ?? "unknown", steps };
+    await timeTestStep("environment", () => Application.setEnvironment("test"));
+    await timeTestStep("config", () => warlockConfigManager.load());
+    scope.bootstraps += 1;
+    await timeTestStep("bootstrap", () => bootstrap());
+    await timeTestStep("orchestrator", () =>
+      filesOrchestrator.init({ skipLoader: Boolean(process.env.VITEST && options?.importModule) }),
+    );
+    await timeTestStep("appConfig", () => loadConfigFiles(true));
+    if (!profileEnabled()) scope.profile = undefined;
+    scope.lifetime = selectTestLifetime(readRuntimeConfiguration().lifetime);
+    scope.shutdown = async () => {
+      const started = performance.now();
+      try {
+        await teardownFileRuntime();
+      } finally {
+        scope.shutdownMs = performance.now() - started;
+        scope.fileOpen = false;
+      }
+    };
 
     // The first point at which `tests.setupTimeout` is readable at all. An
     // invalid value throws from here and takes the normal failure path — falling
@@ -473,13 +590,18 @@ async function runTestRuntimeStartup(
 
     publishEffectiveSelection(effectiveSelection);
 
-    await startSelectedConnectors(effectiveSelection);
+    await timeTestStep("connectors", () => startSelectedConnectors(effectiveSelection));
 
     // After the connectors, so the cache and storage fakes replace drivers
     // that are already configured instead of being replaced by them.
-    await installTestFakes(fakes);
+    await timeTestStep("fakes", () =>
+      installTestFakes(fakes, { isolatedStorage: scope.lifetime === "worker" }),
+    );
+    if (scope.lifetime === "worker") await timeTestStep("reset", () => resetBetweenFiles());
 
     if (!bound.hasExpired()) {
+      scope.fileOpen = true;
+      scope.files += 1;
       registry.state = "ready";
       registry.setupAttempt = undefined;
     }
@@ -494,6 +616,11 @@ async function runTestRuntimeStartup(
       registry.setupAttempt = undefined;
     }
 
+    const scope = testRuntimeScope();
+    scope.lifetime = "file";
+    scope.fileOpen = false;
+    if (profileEnabled()) finishTestProfile();
+    else scope.profile = undefined;
     console.error("[vitest-setup] Failed to setup test environment:", error);
 
     throw error;
@@ -657,4 +784,35 @@ function assertSelectionsMatch(
  */
 function settled(attempt: Promise<void>): Promise<void> {
   return attempt.catch(() => undefined);
+}
+
+function profileEnabled(): boolean {
+  return (
+    process.env.WARLOCK_TEST_PROFILE === "1" || readRuntimeConfiguration().profileSetup === true
+  );
+}
+
+function beginFileProfile(file?: string): void {
+  if (profileEnabled()) testRuntimeScope().profile = { file: file ?? "unknown", steps: {} };
+}
+
+async function resetBetweenFiles(): Promise<void> {
+  const reset = readRuntimeConfiguration().resetBetweenFiles;
+  if (reset === undefined || reset === null) return;
+  if (typeof reset !== "function")
+    throw new TestLifecycleError("tests.resetBetweenFiles must be a function.");
+  await reset();
+}
+
+function readRuntimeConfiguration(): {
+  lifetime?: unknown;
+  profileSetup?: unknown;
+  resetBetweenFiles?: unknown;
+} {
+  return (
+    config.get<{ lifetime?: unknown; profileSetup?: unknown; resetBetweenFiles?: unknown }>(
+      "tests",
+      {},
+    ) ?? {}
+  );
 }

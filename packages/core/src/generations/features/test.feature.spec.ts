@@ -26,7 +26,9 @@ describe("add test — generated src/test-setup.ts", () => {
 
     const setupFile = [...written.entries()].find(([path]) => /test-setup\.ts$/.test(path));
 
-    expect(setupFile?.[1]).toContain("await setupTest({ importModule: (file) => import(file) });");
+    expect(setupFile?.[1]).toContain(
+      "await setupTest({ importModule: (file) => import(file), file: expect.getState().testPath });",
+    );
   });
 });
 
@@ -34,6 +36,12 @@ describe("add test — spec discovery", () => {
   it("includes generated spec files alongside test files", async () => {
     await testFeature.onExecuting?.({} as never);
     const viteConfig = [...written.entries()].find(([path]) => /vite\.config\.ts$/.test(path));
-    expect(viteConfig?.[1]).toContain('include: ["src/app/**/*.{test,spec}.ts"]');
+    expect(viteConfig?.[1]).toContain('name: "unit"');
+    expect(viteConfig?.[1]).toContain('include: ["src/**/*.spec.ts"]');
+    expect(viteConfig?.[1]).toContain('name: "integration"');
+    expect(viteConfig?.[1]).toContain('"src/**/*.test.ts"');
+    expect(viteConfig?.[1]).toContain("recommendedTestWorkers()");
+    expect(viteConfig?.[1]).toContain("new TestSetupReporter()");
+    expect(viteConfig?.[1]).toContain('runner: "./src/test-runner.ts"');
   });
 });

@@ -4,7 +4,7 @@ import { register } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { type MessagePort, MessageChannel } from "node:worker_threads";
-import type { TranspileInit } from "./load-hook.js";
+import type { TranspileInit } from "./load-hook";
 
 /**
  * Rewrite the hook bundle's remaining npm imports to absolute paths resolved
@@ -52,6 +52,9 @@ export const resolveExternalsFromCore: Plugin = {
   },
 };
 
+const LOADER_KEY = Symbol.for("@warlock.js/core:esm-loader");
+type LoaderHost = typeof globalThis & { [LOADER_KEY]?: Promise<MessagePort> };
+
 /**
  * Bundle, write, and register the ESM loader hook.
  *
@@ -84,9 +87,18 @@ export const resolveExternalsFromCore: Plugin = {
  * // Later, when a file changes:
  * port.postMessage({ type: "bump", absolutePath: "/abs/path/to/user.model.ts" });
  */
-export async function registerLoader(transpile: TranspileInit): Promise<MessagePort> {
-  const { port1, port2 } = new MessageChannel();
+export function registerLoader(transpile: TranspileInit): Promise<MessagePort> {
+  const host = globalThis as LoaderHost;
+  if (host[LOADER_KEY]) return host[LOADER_KEY];
+  const attempt = createLoader(transpile);
+  host[LOADER_KEY] = attempt;
+  void attempt.catch(() => {
+    delete host[LOADER_KEY];
+  });
+  return attempt;
+}
 
+async function createLoader(transpile: TranspileInit): Promise<MessagePort> {
   // hook-thread is a sibling module, so it shares THIS file's extension:
   // `.ts` when core runs from source (tsx), `.mjs` when published.
   const selfPath = fileURLToPath(import.meta.url);
@@ -107,7 +119,9 @@ export async function registerLoader(transpile: TranspileInit): Promise<MessageP
     plugins: [resolveExternalsFromCore],
   });
 
-  const bundledCode = bundleResult.outputFiles[0]!.text;
+  const output = bundleResult.outputFiles[0];
+  if (!output) throw new Error("The ESM loader bundle produced no output.");
+  const bundledCode = output.text;
   // Caller (filesOrchestrator.init) guarantees .warlock/ exists before this runs.
   const hookBundlePath = path.join(process.cwd(), ".warlock", "loader-hook.mjs");
   await putFileAsync(hookBundlePath, bundledCode);
@@ -122,10 +136,17 @@ export async function registerLoader(transpile: TranspileInit): Promise<MessageP
   // our hook short-circuits first. A released `node bin/warlock.js` has no
   // tsx at all and relies entirely on this hook.
 
-  register(pathToFileURL(hookBundlePath).href, import.meta.url, {
-    data: { port: port2, srcRoot, transpile },
-    transferList: [port2],
-  });
+  const { port1, port2 } = new MessageChannel();
+  try {
+    register(pathToFileURL(hookBundlePath).href, import.meta.url, {
+      data: { port: port2, srcRoot, transpile },
+      transferList: [port2],
+    });
+  } catch (error) {
+    port1.close();
+    port2.close();
+    throw error;
+  }
 
   return port1;
 }

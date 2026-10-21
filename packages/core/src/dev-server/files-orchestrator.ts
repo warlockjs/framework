@@ -19,7 +19,7 @@ import type {
 import { FilesHealthcareManager } from "./health-checker/files-healthcare.manager";
 import { buildTranspileInit } from "./loader/build-transpile-init.js";
 import { trackLoaderPortAcks, type LoaderPortAcks } from "./loader/loader-port-acks";
-import { registerLoader } from "./loader/register-loader.js";
+import { registerLoader } from "./loader/register-loader";
 import { ManifestManager } from "./manifest-manager";
 import { ModuleLoader } from "./module-loader";
 import { packageJsonManager } from "./package-json-manager";
@@ -157,7 +157,7 @@ export class FilesOrchestrator {
    * Initialise managers and register the ESM loader hook. Must be called
    * before any user `src/` module is dynamically imported.
    */
-  public async init() {
+  public async init(options: { skipLoader?: boolean } = {}) {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
@@ -166,6 +166,8 @@ export class FilesOrchestrator {
 
     // The loader hook writes itself into .warlock/, so ensure the dir exists.
     await ensureWarlockDirectory();
+
+    if (options.skipLoader) return;
 
     const devServerConfig = await warlockConfigManager.lazyGet("devServer");
     const transpileInit = buildTranspileInit(
