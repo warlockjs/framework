@@ -82,9 +82,19 @@ type SharedScope = {
  * see each other's entries, and everything is GC-eligible when the request's
  * ALS frame ends.
  */
-const sharedScopes = new WeakMap<SharedStore, SharedScope>();
-
-let resolveSharedStore: SharedStoreResolver | undefined;
+// A retained pipeline and a re-evaluated SSR consumer must use the same
+// resolver AND scope map. Only request-keyed records live here, never a target
+// selected for the current request. This matches the React context registry.
+const SHARED_RUNTIME_SLOT = Symbol.for("warlock.web.sharedRuntime");
+type SharedRuntime = {
+  scopes: WeakMap<SharedStore, SharedScope>;
+  resolve?: SharedStoreResolver;
+};
+const runtimeHolder = globalThis as unknown as Record<symbol, SharedRuntime | undefined>;
+const sharedRuntime = (runtimeHolder[SHARED_RUNTIME_SLOT] ??= {
+  scopes: new WeakMap<SharedStore, SharedScope>(),
+});
+const sharedScopes = sharedRuntime.scopes;
 
 /**
  * Boot-time wiring, called once by the pipeline before any request runs.
@@ -94,8 +104,8 @@ let resolveSharedStore: SharedStoreResolver | undefined;
 export function connectSharedStore(
   resolve: SharedStoreResolver | undefined,
 ): SharedStoreResolver | undefined {
-  const previous = resolveSharedStore;
-  resolveSharedStore = resolve;
+  const previous = sharedRuntime.resolve;
+  sharedRuntime.resolve = resolve;
   return previous;
 }
 
@@ -127,7 +137,7 @@ export function connectSharedStore(
  * structurally instead of by importing that type.
  */
 export function currentRequestLocale(): string | undefined {
-  const store = resolveSharedStore?.() as
+  const store = sharedRuntime.resolve?.() as
     | (SharedStore & { request?: { locale?: unknown } })
     | undefined;
   const locale = store?.request?.locale;
@@ -136,7 +146,7 @@ export function currentRequestLocale(): string | undefined {
 }
 
 function currentStore(access: string): SharedStore {
-  if (!resolveSharedStore) {
+  if (!sharedRuntime.resolve) {
     throw new Error(
       `Cannot ${access}: \`shared\` is not connected to a request store ` +
         "(web/src/shared.ts). `shared` is request-scoped — its data lives in " +
@@ -147,7 +157,7 @@ function currentStore(access: string): SharedStore {
     );
   }
 
-  const store = resolveSharedStore();
+  const store = sharedRuntime.resolve();
 
   if (!store) {
     throw new Error(

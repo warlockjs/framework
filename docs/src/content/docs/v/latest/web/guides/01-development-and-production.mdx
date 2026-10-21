@@ -193,3 +193,22 @@ empty.
 See [`warlock routes:diff`](/v/latest/core/cli/routes/#warlock-routesdiff) and
 [connector lifecycle](/v/latest/core/architecture-concepts/connectors/) for
 the surrounding Core APIs.
+
+## Browser regression checks
+
+Use the [browser harness](/v/latest/core/testing/browser-e2e/) to start an owned
+development fixture. Repeatedly edit components and add/change/remove setup files,
+waiting for a visible revision after each write before requesting the route again.
+Exercise a hydrated control as well as SSR. Imported `shared` must stay connected
+to the request store, and parallel requests must keep separate values. Framework
+module re-evaluations share the resolver and request-keyed scope map; this does
+not create a process-wide shared payload.
+
+Run `await page.assertAccessible()` and `await page.assertViewport()` on visible
+content at phone and desktop widths. Accessibility evidence records axe rule IDs,
+selectors, allowances and incomplete checks for manual review.
+
+For forms rendered beneath layouts, compare SSR IDs with values captured by
+hydrated handlers, and inspect repeated instances, label/ARIA references and
+navigation. Checking only the DOM ID can miss a hydration mismatch because React
+may keep the server attribute. Keep hydration errors visible in run evidence.

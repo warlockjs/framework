@@ -297,3 +297,18 @@ export async function subscribe(email: string) {
   console.info("Subscribed", email);
 }
 ```
+
+## Browser accessibility and development regressions
+
+Use the core `test-browser` skill for owned browser fixtures. After navigation or
+revealing form feedback, call `await page.assertAccessible()` and
+`await page.assertViewport()` at 390 and 1280 pixels. Narrow known exceptions with
+`await page.assertAccessible({ allow: [{ id: "color-contrast", selector: ".legacy-caption" }] })`.
+Inspect `evidence.json` for rule IDs, targets, incomplete checks and allowances.
+
+For watched-server regressions start the owned copy in development mode, edit
+its files, and wait for a visible revision after every edit. Check several edits
+and setup add/change/delete, concurrent imported `shared` reads, and hydrated
+interactions. For `useId()` under layouts compare SSR attributes with values
+captured by hydrated event handlers, repeated instances, label/ARIA targets and
+navigation. DOM attributes alone cannot establish hook parity.

@@ -1,8 +1,11 @@
-import { writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { CdpConnection } from "./cdp";
 import {
+  type AccessibilityOptions,
+  type AccessibilityEvidence,
   defaultViewports,
   errorMessage,
   matches,
@@ -420,6 +423,56 @@ export class BrowserPage {
       await this.evaluate(
         "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))",
       );
+    });
+  }
+
+  /** Inject the installed axe distribution through Runtime.evaluate on every scan.
+   * API: https://github.com/dequelabs/axe-core/blob/develop/doc/API.md#api-name-axerun
+   * No CDN, DOM script element, or application dependency is required.
+   */
+  async assertAccessible(options: AccessibilityOptions = {}): Promise<AccessibilityEvidence> {
+    return this.step(`assertAccessible ${this.viewport.name}`, async () => {
+      const source = await readFile(
+        createRequire(import.meta.url).resolve("axe-core/axe.min.js"),
+        "utf8",
+      );
+      const timeout = options.timeoutMs ?? 30_000;
+      await this.evaluate(source, timeout);
+      const result = await this.evaluate<
+        Pick<AccessibilityEvidence, "url" | "violations" | "incomplete">
+      >(
+        `(async () => {
+        const selector = ${JSON.stringify(options.selector ?? null)};
+        const context = selector === null ? document : document.querySelector(selector);
+        if (!context) throw new Error('Accessibility scan selector did not match: ' + selector);
+        const results = await axe.run(context, ${JSON.stringify(options.tags ? { runOnly: { type: "tag", values: options.tags } } : {})});
+        const summarize = entries => entries.map(({id, impact, help, helpUrl, nodes}) => ({
+          id, impact, help, helpUrl, nodes: nodes.map(({target, failureSummary}) => ({target, failureSummary}))
+        }));
+        return {url: location.href, violations: summarize(results.violations), incomplete: summarize(results.incomplete)};
+      })()`,
+        timeout,
+      );
+      for (const violation of result.violations) {
+        for (const node of violation.nodes) {
+          node.allowed =
+            options.allow?.some(
+              (rule) =>
+                rule.id === violation.id &&
+                (rule.selector === undefined ||
+                  (node.target.length === 1 && node.target[0] === rule.selector)),
+            ) ?? false;
+        }
+      }
+      const report = { at: new Date().toISOString(), viewport: { ...this.viewport }, ...result };
+      (this.evidence.accessibility ??= []).push(report);
+      const failures = report.violations.flatMap((violation) =>
+        violation.nodes
+          .filter((node) => !node.allowed)
+          .map((node) => `${violation.id}: ${JSON.stringify(node.target)} — ${violation.help}`),
+      );
+      if (failures.length) throw new Error(`Accessibility violations:\n${failures.join("\n")}`);
+      return report;
     });
   }
 

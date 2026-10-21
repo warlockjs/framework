@@ -229,3 +229,13 @@ The contact, locale, user create/list and post create/update examples declare `r
 Oxlint enables `typescript/no-explicit-any`, explicit member accessibility, `curly`, and `no-console`. The hybrid interface-for-contracts/type-for-data convention stays a review rule because `consistent-type-definitions` only supports one global preference. App sub-folder barrels remain permitted; web imports target individual component and hook files to keep client bundles lean and server-only code out of barrels. Run `npm run lint:check` and `npm run format:check` in the generated app.
 
 These model/resource conventions apply to newly generated apps. Existing apps adopting public UUIDs must add and backfill a unique column before changing their resource output or route lookups; updating a skill alone does not migrate stored data.
+
+## Starter browser checks
+
+Full-stack web projects include `e2e/home.e2e.ts`. Run `npx warlock e2e` with
+Chrome or Edge installed. The spec builds and starts an owned app copy, visits
+`/` at 1280×800 and 390×844, then calls `page.assertAccessible()`,
+`page.assertViewport()` and `page.screenshot("home")`. API-only scaffolds omit
+this web spec. The fixture excludes dotenv files and production data directories;
+provide disposable service configuration explicitly if you add database-backed
+features. A database-free scaffold needs no external database.

@@ -72,6 +72,29 @@ export type ProcessEvidence = {
   ownerFile: string;
   stopped?: boolean;
 };
+export type AccessibilityOptions = {
+  /** CSS selector limiting the scan; defaults to the document. */
+  selector?: string;
+  /** axe rule tags, for example wcag2a and wcag2aa. Defaults to all enabled rules. */
+  tags?: string[];
+  /** Exact rule ID, optionally limited to an exact reported selector. */
+  allow?: { id: string; selector?: string }[];
+  timeoutMs?: number;
+};
+export type AccessibilityViolation = {
+  id: string;
+  impact: string | null;
+  help: string;
+  helpUrl: string;
+  nodes: { target: (string | string[])[]; failureSummary?: string; allowed?: boolean }[];
+};
+export type AccessibilityEvidence = {
+  at: string;
+  url: string;
+  viewport: Viewport;
+  violations: AccessibilityViolation[];
+  incomplete: AccessibilityViolation[];
+};
 export type E2EEvidence = {
   schemaVersion: 1;
   startedAt: string;
@@ -82,6 +105,7 @@ export type E2EEvidence = {
   console: ConsoleEntry[];
   networkFailures: NetworkFailure[];
   screenshots: { name: string; file: string; viewport: Viewport }[];
+  accessibility?: AccessibilityEvidence[];
   processes: ProcessEvidence[];
   errors: string[];
 };

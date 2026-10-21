@@ -118,3 +118,56 @@ Cleanup verifies the unique supervisor command line before stopping only its
 recorded process group (Windows: verified PID tree). It retains disposable files
 if ownership verification fails and reports the failure in evidence. Do not add
 process-name or port-based kills to a spec.
+
+## Accessibility checks
+
+Call `await page.assertAccessible()` after the content is visible and again after
+opening menus, dialogs or validation feedback. The harness reads its pinned local
+axe-core distribution and injects it with CDP `Runtime.evaluate`; it never fetches
+a CDN script or adds axe to the app bundle. A missing dependency, injection error,
+unmatched selector or scan exception fails the step.
+
+```ts
+await page.assertAccessible();
+await page.assertAccessible({
+  selector: "main",
+  tags: ["wcag2a", "wcag2aa", "wcag21aa"],
+  allow: [{ id: "color-contrast", selector: ".legacy-caption" }],
+  timeoutMs: 30_000,
+});
+```
+
+Defaults run all enabled axe rules on the document. `tags` uses axe's `runOnly`
+tag filter; `selector` limits the scanned region. Allowances match exact rule IDs
+and, when supplied, an exact single-element target selector. Omitting `selector`
+from an allowance permits that rule everywhere; keep exceptions narrow. Nested
+frame/shadow targets cannot match a simple selector allowance. Allowed nodes stay
+in evidence with `allowed: true`; other nodes of the same rule still fail.
+
+Evidence's `accessibility` array contains URL, viewport, timestamp, violations
+with rule IDs and target selectors, and incomplete checks for manual review.
+Incomplete checks do not fail automatically. A passing automated scan does not
+replace keyboard, screen-reader, focus-order or contrast review. See the
+[axe API](https://github.com/dequelabs/axe-core/blob/develop/doc/API.md) for scan
+semantics. Run at both 390 and 1280 pixels with `assertViewport()` as well.
+
+## Watched development checks
+
+Use an owned app copy with `app.env: { NODE_ENV: "development" }` and
+`app.start: [process.execPath, "node_modules/@warlock.js/core/bin/warlock.js", "dev"]`.
+Do not attach to an existing server. The fixture's `directory` is available in
+`run`; use `node:fs/promises` to edit only files inside that copy.
+
+Wait for a visible revision marker after each edit; a successful file write alone
+does not prove watcher invalidation or browser hydration. Exercise several edits,
+including setup-file creation, changes and removal. After each revision, request
+the page again, exercise a hydrated control, check imported `shared` in loaders
+and middleware, and verify concurrent requests keep distinct values. Do not
+allowlist request-store or hydration errors to make these checks pass.
+
+For forms beneath layouts, compare server-rendered IDs with the hydrated hook
+values (for example expose the hook value in a click handler), check repeated
+instances, label `for` and ARIA references, then navigate away and back. Comparing
+DOM IDs alone can miss a mismatch: React may retain the server attribute while
+client handlers capture another ID. Capture evidence and screenshots at every
+revision. Do not replace React's `useId()` globally or hide hydration warnings.

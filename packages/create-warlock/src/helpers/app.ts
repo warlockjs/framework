@@ -397,6 +397,7 @@ export class App {
     if (!useWeb) {
       for (const entry of [
         "src/web",
+        "e2e/home.e2e.ts",
         "src/app/contact",
         "src/app/locale",
         "src/shared/contact.schema.ts",

@@ -2,6 +2,16 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.35.0
+
+### Fixed
+
+- Preserve the shared request-store resolver and request-keyed scopes across server module re-evaluation during development.
+
+### Added
+
+- Watched development regression coverage for shared-store connectivity and a characterization of layout form identifier hydration parity.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed
