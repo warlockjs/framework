@@ -149,6 +149,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9016` | Native select, checkbox, radio, date, time or datetime-local input           | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
 | `WL9017` | DOM input/textarea/select native validation                                  | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
 | `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema` | Assign `handler.responseSchema` to document each response status.                                                                                                  |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group) | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers

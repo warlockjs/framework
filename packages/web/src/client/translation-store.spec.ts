@@ -240,3 +240,53 @@ describe("pruning misses", () => {
     expect(translationsForKeyword(LOCALE, dictionary, inline)).toBe(dictionary);
   });
 });
+
+describe("hydration parity", () => {
+  it("renders the same text the server rendered for every key the page reads", async () => {
+    const { pruneKeywords, sharedTableFor } = await import("../translations/delivery");
+    const { usageOf } = await import("@warlock.js/core");
+    const serverKeywords = {
+      app: { title: "Orders app" },
+      orders: { title: "Orders", statuses: { paid: "Paid", open: "Open" } },
+      members: { title: "Members" },
+    };
+    const sources = [
+      {
+        entries: {
+          "app.title": { [LOCALE]: "Orders app" },
+          "orders.title": { [LOCALE]: "Orders" },
+          "orders.statuses.paid": { [LOCALE]: "Paid" },
+          "orders.statuses.open": { [LOCALE]: "Open" },
+          "members.title": { [LOCALE]: "Members" },
+        },
+      },
+    ];
+    const usage = usageOf({ keys: ["orders.title"], prefixes: ["orders.statuses."] });
+    const shared = sharedTableFor(sources, LOCALE, ["app"]);
+
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(shared)));
+    await loadTranslationAssets(
+      payload(
+        pruneKeywords(serverKeywords, usage, ["app"]),
+        { url: "/assets/translations/store-test.parity.json", hash: "parity", groups: ["app"] },
+        "orders.index",
+      ),
+    );
+
+    const dictionary = translationDictionaryFor(LOCALE);
+
+    for (const key of ["app.title", "orders.title", "orders.statuses.paid"]) {
+      const segments = key.split(".");
+      const serverValue = segments.reduce<unknown>(
+        (value, segment) => (value as Record<string, unknown>)[segment],
+        serverKeywords,
+      );
+      const clientValue = segments.reduce<unknown>(
+        (value, segment) => (value as Record<string, unknown>)[segment],
+        translationsForKeyword(LOCALE, dictionary, key),
+      );
+
+      expect(clientValue).toBe(serverValue);
+    }
+  });
+});

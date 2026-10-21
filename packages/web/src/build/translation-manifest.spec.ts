@@ -6,6 +6,7 @@ import { buildTranslationManifest, resolveSharedGroups } from "./translation-man
 import { writeTranslationAssets } from "./emit-translation-assets";
 import type { DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
 import { CLIENT_ASSET_URL_PREFIX } from "../server/client-asset-url-prefix";
+import { productionAssetsDirectoryOptions } from "../server/web-connector";
 import { assetUrlFor } from "../translations/delivery";
 
 let root: string;
@@ -159,6 +160,20 @@ describe("buildTranslationManifest", () => {
 
   it("refuses a shared group that is not a plain group name", () => {
     expect(() => resolveSharedGroups(["bad group"])).toThrow(/must be one translation group name/);
+  });
+});
+
+describe("served location", () => {
+  it("names tables under the assets directory that the immutable cache options cover", () => {
+    const clientDirectory = path.join(root, "dist/client");
+    const options = productionAssetsDirectoryOptions(clientDirectory);
+    const [asset] = buildTranslationManifest(input()).assets;
+
+    expect(options.immutable).toBe(true);
+    expect(options.root).toBe(path.join(clientDirectory, "assets"));
+    expect(assetUrlFor(asset?.fileName ?? "")).toMatch(
+      new RegExp(`^${CLIENT_ASSET_URL_PREFIX}/translations/`),
+    );
   });
 });
 
