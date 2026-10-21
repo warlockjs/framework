@@ -27,3 +27,13 @@ Measured on a real admin page: 56.7 KB HTML, of which translations 22 KB and the
   subtree, `config.translations` declarations, full fallback for unresolvable keys), `warlock check` warning for
   fully dynamic keys, and a development detector for used-but-missing keys.
 - Page data stays inline (required for hydration).
+
+## Development watch race (found in the 5.35.0 validation)
+
+`packages/core/tests/integration/e2e/web-development.test.ts` ("development regression: shared") timed out once under
+full-suite load: after `src/web/layout.setup.ts` was deleted (revision 3) the browser reloaded, then the page edit
+written ~0.4 s later produced no hot update and no reload, so `h1` stayed at "Revision 2". It passed 3/3 alone.
+Suspects: the queued page-route reload in `packages/web/src/server/web-connector.ts` (`enqueuePageRouteReload`,
+file-version matching) returning "handled" without sending a reload, or the skeleton cache in
+`packages/web/src/vite/page-registry-plugin.ts` after the post-deletion reload. Reproduce under load, fix the race,
+keep the test strict.
