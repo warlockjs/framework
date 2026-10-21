@@ -9,6 +9,7 @@ import { importFixes } from "./fixes";
 import { codeStyleFindings } from "./code-style-conventions";
 import { securityFindings } from "./security-conventions";
 import { webFindings, responseSchemaFindings, type ConventionOptions } from "./web-conventions";
+import { translationProblems } from "./translation-conventions";
 import { positionOf, type SourceFinding } from "./source-ast";
 
 /** Extensions tried when resolving an extension-less import. */
@@ -194,6 +195,7 @@ export function checkFileConventions(
   const sourceFile = ast.parseSourceFile(relativePath, source);
   const problems = [
     ...importProblems(sourceFile, relativePath, cwd),
+    ...translationProblems(relativePath, source),
     ...[
       ...securityFindings(sourceFile),
       ...codeStyleFindings(sourceFile),
