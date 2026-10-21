@@ -29,6 +29,7 @@ export const INSPECT_SECTIONS = [
   "jobs",
   "schedules",
   "packages",
+  "files",
 ] as const;
 
 /** One section name. */
@@ -238,7 +239,21 @@ export type InspectReport = {
   jobs?: InspectJob[];
   schedules?: InspectSchedule[];
   packages?: InspectPackage[];
+  files?: InspectFile[];
   /** Shared schemas that `$ref`s point at (`#/components/schemas/<name>`). */
   components: { schemas: Record<string, JsonSchema> };
   warnings: InspectWarning[];
+};
+
+/** A source file and its static module graph, with project-relative paths. */
+export type InspectFile = {
+  file: string;
+  /** src/app/<module>, or the containing top-level src directory. */
+  module: string;
+  role: string;
+  /** Public export names; default and * represent default and star exports. */
+  exports: string[];
+  /** Literal imports and re-exports; null means external or unresolved. */
+  imports: { specifier: string; file: string | null }[];
+  importedBy: string[];
 };

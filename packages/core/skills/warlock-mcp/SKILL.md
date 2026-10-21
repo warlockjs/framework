@@ -118,3 +118,7 @@ await server.close();
 - The `warlock-check` topic — what `check_run` and `test_run` report.
 - The `warlock-trace` topic — send a request and read its timeline.
 - The `expose-as-mcp-server` topic of @warlock.js/ai-tools — the transport underneath.
+
+## Source file graph
+
+Call `inspect_files` with `{ "filter": "service" }` for file paths, modules, convention roles, export names, resolved imports and reverse `importedBy` edges. This section scans `src/` without executing source modules; files-only requests skip the lazy app boot. `inspect_app` includes a `files` count. See `npx warlock explain src/app/posts/services/list.service.ts --json` for reaching routes and pages.

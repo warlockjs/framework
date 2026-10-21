@@ -150,6 +150,38 @@ describe("docs search", () => {
 });
 
 describe("the tool set", () => {
+  it("exposes and filters the source file graph", async () => {
+    const { context } = fakeMcpContext();
+    const inspect = context.inspect;
+    context.inspect = async (sections) => ({
+      ...(await inspect(sections)),
+      files: [
+        {
+          file: "src/app/posts/services/list.service.ts",
+          module: "src/app/posts",
+          role: "service",
+          exports: ["list"],
+          imports: [],
+          importedBy: ["src/app/posts/routes.ts"],
+        },
+        {
+          file: "src/web/root.tsx",
+          module: "src/web",
+          role: "root",
+          exports: ["default"],
+          imports: [],
+          importedBy: [],
+        },
+      ],
+    });
+    const tools = createWarlockMcpTools(context);
+    expect(await tool(tools, "inspect_files").run({ filter: "SERVICE" })).toMatchObject({
+      total: 2,
+      files: [{ role: "service", exports: ["list"], importedBy: ["src/app/posts/routes.ts"] }],
+    });
+    expect(await tool(tools, "inspect_app").run({})).toMatchObject({ counts: { files: 2 } });
+  });
+
   it("filters inspect sections", async () => {
     const tools = createWarlockMcpTools(fakeMcpContext().context);
     const config = await tool(tools, "inspect_config").run({ filter: "database" });

@@ -10,3 +10,5 @@ export { INSPECT_REPORT_JSON_SCHEMA } from "./inspect-report.schema";
 export * from "./inspect-report.types";
 export type { InspectModelModule } from "./collect-models";
 export type { AppModuleImporter } from "./collect-packages";
+
+export { explainFile, type ExplainedFile } from "./explain-file";

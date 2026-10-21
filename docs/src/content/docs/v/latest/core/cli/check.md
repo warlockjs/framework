@@ -251,3 +251,7 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## Explain a source file
+
+`npx warlock explain src/app/posts/services/list.service.ts --json` reports the file's module, convention role, exports, imports, importers and reaching routes/pages. It boots the app for route/page registrations; error-code explanations remain static. See the `warlock-inspect` topic for graph semantics and the boot-free `npx warlock inspect --section files --json` command.

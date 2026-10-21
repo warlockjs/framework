@@ -135,3 +135,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 Migrate lint and format tooling with
 `npx warlock upgrade --from 5.32 --to 5.33.0 --dry-run`, then remove `--dry-run`
 and work through the manual-review list. Use `--lint=oxc` for new apps.
+
+## Explain a source file
+
+`npx warlock explain src/app/posts/services/list.service.ts --json` reports the file's module, convention role, exports, imports, importers and reaching routes/pages. It boots the app for route/page registrations; error-code explanations remain static. See the `warlock-inspect` topic for graph semantics and the boot-free `npx warlock inspect --section files --json` command.

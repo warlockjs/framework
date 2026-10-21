@@ -30,6 +30,7 @@ export function formatInspectSummary(report: InspectReport): string[] {
     ["jobs", report.jobs?.length],
     ["schedules", report.schedules?.length],
     ["packages", report.packages?.length],
+    ["files", report.files?.length],
   ];
 
   for (const [label, count] of counts) {
@@ -74,8 +75,13 @@ export async function inspectCommandAction({ options }: CommandActionData): Prom
   // Parsed first, so a typo fails before the app boots.
   const sections = parseInspectSections(stringOption(options.section));
   const json = options.json === true;
-  const boot = json ? await withConsoleOnStderr(() => bootForInspect()) : await bootForInspect();
-  const report = await inspectApp({ ...inspectOptionsFromBoot(boot), sections });
+  const filesOnly = sections.every((section) => section === "files");
+  const boot = filesOnly
+    ? undefined
+    : json
+      ? await withConsoleOnStderr(() => bootForInspect())
+      : await bootForInspect();
+  const report = await inspectApp({ ...(boot ? inspectOptionsFromBoot(boot) : {}), sections });
 
   if (json) {
     console.log(JSON.stringify(report, null, 2));
