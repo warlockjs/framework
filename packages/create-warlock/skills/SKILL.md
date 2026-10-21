@@ -64,21 +64,21 @@ Features: none
 
 ## Flags
 
-| Flag                           | Takes value | Default                                                             | Purpose                                                                                                 |
-| ------------------------------ | ----------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory.                                                                        |
-| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default.                       |
-| `--db`                         | yes         | `mongodb`                                                           | Database driver key (`mongodb`, `postgres`, or `none`).                                                 |
-| `--no-db`                      | no          | —                                                                   | Opt out of a database — shorthand for `--db=none`.                                                      |
-| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                         | Package manager — use `npm` for the commands in this guide.                                             |
-| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
-| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                     |
-| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                         |
-| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated `agent-kit` targets — see below.                                                        |
-| `--git` / `--no-git`           | no          | off                                                                 | Initialize a Git repo (`git init` + `main` branch + initial commit).                                    |
-| `--jwt` / `--no-jwt`           | no          | off                                                                 | Generate JWT secrets via the project's `jwt` script.                                                    |
-| `--yes` / `-y`                 | no          | off                                                                 | Fully headless mode.                                                                                    |
-| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form wizard.                                                                      |
+| Flag                           | Takes value | Default                                                                                        | Purpose                                                                                                 |
+| ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `<positional>` / `--name`      | yes         | — (required)                                                                                   | Project name + target directory.                                                                        |
+| `--stack`                      | yes         | `api`                                                                                          | `api` or `web` — the structural choice; `web` seeds `web`, `shadcn`, and `design-system` by default.    |
+| `--db`                         | yes         | `mongodb`                                                                                      | Database driver key (`mongodb`, `postgres`, or `none`).                                                 |
+| `--no-db`                      | no          | —                                                                                              | Opt out of a database — shorthand for `--db=none`.                                                      |
+| `--pm`                         | yes         | inferred (`npm_config_user_agent` / system)                                                    | Package manager — use `npm` for the commands in this guide.                                             |
+| `--features`                   | yes (CSV)   | none, or `["web", "shadcn", "design-system"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
+| `--lint`                       | yes         | `oxc`                                                                                          | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes.                                     |
+| `--ai`                         | yes (CSV)   | none                                                                                           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).                                         |
+| `--agents`                     | yes (CSV)   | `claude`                                                                                       | Comma-separated `agent-kit` targets — see below.                                                        |
+| `--git` / `--no-git`           | no          | off                                                                                            | Initialize a Git repo (`git init` + `main` branch + initial commit).                                    |
+| `--jwt` / `--no-jwt`           | no          | off                                                                                            | Generate JWT secrets via the project's `jwt` script.                                                    |
+| `--yes` / `-y`                 | no          | off                                                                                            | Fully headless mode.                                                                                    |
+| `--interactive`, `--customize` | no          | off                                                                                            | Restore the full long-form wizard.                                                                      |
 
 If selected feature dependencies do not install, JWT generation is skipped and reported rather than retried through
 the package manager.
@@ -261,3 +261,21 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## Shared form controls
+
+`npx create-warlock app --yes --stack=web` includes Tailwind, shadcn primitives
+and the app-owned design system. `--features=tailwind,shadcn` also includes it.
+An explicit `--features` replaces the preset. Import the generated default
+exports from `web/design-system/components/<kebab-name>`; use `Form` from
+`@mongez/react-form` directly. For example:
+
+```tsx
+import TextInput from "web/design-system/components/text-input";
+
+<TextInput id="profile-name" name="name" label="Name" hint="Display name" />;
+```
+
+All fourteen controls, props and hooks are documented by the Web
+`build-accessible-controls` topic and the generated `web-code-standards` skill.
+Existing apps use `npx warlock add tailwind`, then `npx warlock add design-system`.

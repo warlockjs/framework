@@ -497,6 +497,28 @@ The satellite features (`ai-tools`, `ai-panoptic`, `ai-workspace`) link their **
 
 These same features are offered in the AI step of [`create-warlock`](https://www.npmjs.com/package/@warlock.js/create-warlock) when scaffolding a new app.
 
+#### Shared design system
+
+```bash
+npx warlock add tailwind
+npx warlock add design-system
+```
+
+`design-system` adds fourteen accessible Mongez React Form controls and shadcn
+primitives with pinned dependencies. It requires Tailwind declared in the app
+manifest and imported by `src/web/app.css`; refusal happens before dependency
+installation or file changes. Existing source files are preserved. Use
+`npx warlock add design-system --no-install` to record dependencies without
+installing, or `npx warlock add design-system --dry-run --json` to preview.
+
+Components are default exports under `src/web/design-system/components/`, with
+hooks and props in adjacent folders. For example:
+`import TextInput from "web/design-system/components/text-input";` and
+`<TextInput id="profile-name" name="name" label="Name" />`. Forms use `Form`
+from `@mongez/react-form` directly. See
+[Shared form controls](/v/latest/web/getting-started/tailwind-and-shadcn/#shared-form-controls)
+for all component names, props and accessibility/value contracts.
+
 ### `update`
 
 Update every `@warlock.js/*` package in your project to its latest published version, then reinstall.

@@ -1034,7 +1034,7 @@ describe("createNewApp — default TTY path", () => {
 
   it.each([
     ["api", []],
-    ["web", ["web"]],
+    ["web", ["web", "shadcn", "design-system"]],
   ] as const)(
     "uses PostgreSQL for the %s preset without changing its features",
     async (stack, features) => {
@@ -1091,7 +1091,7 @@ describe("createNewApp — default TTY path", () => {
   it("includes the web feature by default when the structural answer is web", async () => {
     await createNewApp({ name: "web-app", stack: "web" });
 
-    expect(capturedApp().options.features).toEqual(["web"]);
+    expect(capturedApp().options.features).toEqual(["web", "shadcn", "design-system"]);
   });
 
   it("still honors an explicit --features over the stack's implicit default", async () => {

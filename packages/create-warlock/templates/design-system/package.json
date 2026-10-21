@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@mongez/react-form": "4.0.0",
+    "radix-ui": "1.8.1",
+    "cmdk": "1.1.1",
+    "react-day-picker": "9.14.0",
+    "date-fns": "4.4.0",
+    "cn": "0.5.0",
+    "lucide-react": "1.61.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "tailwind-merge": "3.7.0"
+  }
+}

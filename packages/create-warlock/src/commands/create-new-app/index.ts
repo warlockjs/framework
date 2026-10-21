@@ -218,7 +218,9 @@ async function createFullWizard(cli: CliFlags, pmDetectionPromise: Promise<void>
     options: {
       databaseDriver: databaseDriver as string,
       databasePort: selectedDriver?.defaultPort || 27017,
-      features: selectedFeatures as string[],
+      features: (selectedFeatures as string[]).includes("shadcn")
+        ? [...new Set([...(selectedFeatures as string[]), "design-system"])]
+        : (selectedFeatures as string[]),
       aiProviders: selectedAiProviders as string[],
       useGit,
       useJWT,
@@ -323,7 +325,7 @@ export type SyncAppOptions = Omit<AppOptions, "agents">;
  * because it can require a network fetch; this function stays synchronous so
  * the rest of the flag → app mapping remains trivially unit-testable.
  *
- * `--stack=web` (or the equivalent wizard answer) seeds the `web` feature by
+ * `--stack=web` (or the equivalent wizard answer) seeds the Web styling and control features by
  * default — the one structural choice — but an explicit `--features` always
  * wins, so a user who spells out the feature list is never second-guessed.
  *
@@ -341,7 +343,10 @@ export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
   }
 
   const stack: Stack = cli.stack ?? "api";
-  const features = cli.features ?? (stack === "web" ? ["web"] : []);
+  const requestedFeatures = cli.features ?? (stack === "web" ? ["web", "shadcn"] : []);
+  const features = requestedFeatures.includes("shadcn")
+    ? [...new Set([...requestedFeatures, "design-system"])]
+    : requestedFeatures;
   const aiProviders = cli.ai ?? [];
 
   const allowedKeys = getAllFeatureKeys();

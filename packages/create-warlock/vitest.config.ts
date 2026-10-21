@@ -1,6 +1,11 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: { web: fileURLToPath(new URL("./templates/design-system/src/web", import.meta.url)) },
+  },
+  esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
     globals: false,

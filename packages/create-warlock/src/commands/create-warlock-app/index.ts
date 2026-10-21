@@ -75,7 +75,11 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
       application.configureDatabaseConfig(databaseDriver);
     }
 
-    application.configureWebStarter(features.includes("web"));
+    application.configureWebStarter(
+      features.some((feature) =>
+        ["web", "tailwind", "shadcn", "design-system", "sitemap"].includes(feature),
+      ),
+    );
     application.configureLintToolchain();
     application.configureAgentKitTargets(options.agents ?? ["claude"]);
   } catch (error) {

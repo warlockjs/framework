@@ -24,7 +24,7 @@ export async function askStack(): Promise<SetupChoice> {
       {
         value: "web",
         label: "Full-stack web",
-        hint: "API + server-rendered React pages (SSR)",
+        hint: "API + SSR React pages, Tailwind and accessible shadcn form controls",
       },
       {
         value: "customize",

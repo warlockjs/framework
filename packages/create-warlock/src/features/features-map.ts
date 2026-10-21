@@ -95,8 +95,14 @@ export const features: FeatureOption[] = [
   },
   {
     key: "shadcn",
-    label: "shadcn/ui prerequisites",
-    hint: "components.json, cn(), design tokens, and the web/* tsconfig path so `npx shadcn add <component>` works first time (pulls tailwind)",
+    label: "Tailwind + shadcn/ui design system",
+    hint: "Accessible Mongez form controls, shadcn primitives, design tokens and Tailwind",
+    group: "Rendering & Mail",
+  },
+  {
+    key: "design-system",
+    label: "Design system controls (existing Tailwind)",
+    hint: "Add the shared accessible Mongez controls; requires Tailwind to be set up",
     group: "Rendering & Mail",
   },
   {

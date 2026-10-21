@@ -4,6 +4,13 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.35.0
+
+### Added
+
+- Full-stack and Tailwind + shadcn selections include fourteen accessible app-owned form controls, separate behavior hooks and props types, and exact UI dependency pins. The optional template and add-command payload share an integrity contract.
+- Template web standards name the shared controls and their direct web-alias imports; template verification includes the optional sources.
+
 ## 5.34.3 - 2026-10-20
 
 ### Fixed
